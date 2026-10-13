@@ -9,8 +9,21 @@ import {
     loginAsFixture,
     postLaravel,
     seedIncidentHandoverFixtures,
+    type FixtureUser,
     type IncidentHandoverManifest,
 } from './incident-handover-helpers';
+
+async function switchFixtureRole(page: Page, user: FixtureUser) {
+    if (page.url() !== 'about:blank') {
+        // Finish the old actor's module loads, then stop its React timers before
+        // replacing shared cookies through the API. Otherwise an auth redirect
+        // can still be loading My Day when the next journey navigation starts.
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForLoadState('networkidle', { timeout: 30_000 });
+        await page.goto('about:blank');
+    }
+    await loginAsFixture(page, user);
+}
 
 async function createTaggedAlert(
     page: Page,
@@ -86,7 +99,7 @@ test.describe('Control Room / Incident / H&S alternate workflow branches', () =>
         );
         const manifest = seedIncidentHandoverFixtures();
         const guard = installJourneyBrowserGuards(page);
-        await loginAsFixture(page, manifest.users.operator);
+        await switchFixtureRole(page, manifest.users.operator);
 
         // A — A routine alert ends without an incident or H&S record.
         const routineId = await createTaggedAlert(page, manifest, 'A-routine');
@@ -258,7 +271,7 @@ echo json_encode(['id' => $definition->id], JSON_THROW_ON_ERROR);
                 'Initial response resolved before new witness evidence.',
             resolution_code: 'initial_review_complete',
         });
-        await loginAsFixture(page, manifest.users.owner);
+        await switchFixtureRole(page, manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${reopenJourney.eventId}/accept-handover`,
@@ -323,7 +336,7 @@ echo json_encode([
             has_closed_at: true,
             closure_audits: 1,
         });
-        await loginAsFixture(page, manifest.users.reviewer);
+        await switchFixtureRole(page, manifest.users.reviewer);
         await postLaravel(
             page,
             `/incidents/${reopenJourney.incidentId}/review`,
@@ -405,7 +418,7 @@ echo json_encode([
 
         // D — Snooze hides only temporarily; unsnooze and escalation restore
         // active queue truth with plain language and a durable audit trail.
-        await loginAsFixture(page, manifest.users.operator);
+        await switchFixtureRole(page, manifest.users.operator);
         scalar<{ id: number }>(`
 $definition = \\App\\Models\\ControlRoom\\SlaDefinition::query()->updateOrCreate(
     ['code' => 'task19-snooze-escalate'],
@@ -580,7 +593,7 @@ echo json_encode([
             transferId,
             'E-task-transfer',
         );
-        await loginAsFixture(page, manifest.users.owner);
+        await switchFixtureRole(page, manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${transferJourney.eventId}/accept-handover`,
@@ -627,12 +640,12 @@ echo json_encode([
             page,
             `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/submit`,
         );
-        await loginAsFixture(page, manifest.users.reviewer);
+        await switchFixtureRole(page, manifest.users.reviewer);
         await postLaravel(
             page,
             `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/complete`,
         );
-        await loginAsFixture(page, manifest.users.verifier);
+        await switchFixtureRole(page, manifest.users.verifier);
         await postLaravel(
             page,
             `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/complete`,
@@ -681,7 +694,7 @@ echo json_encode([
         // F — Every parent close remains blocked on its unmet prerequisite,
         // typed closing text remains in place, and the same path succeeds after
         // WorkSafe, H&S, and Incident are completed in order.
-        await loginAsFixture(page, manifest.users.operator);
+        await switchFixtureRole(page, manifest.users.operator);
         const gateId = await createTaggedAlert(
             page,
             manifest,
@@ -693,7 +706,7 @@ echo json_encode([
             gateId,
             'F-closure-gates',
         );
-        await loginAsFixture(page, manifest.users.owner);
+        await switchFixtureRole(page, manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${gateJourney.eventId}/accept-handover`,
@@ -736,7 +749,7 @@ echo json_encode([
             `/health-safety/events/${gateJourney.eventId}?action=worksafe-decision`,
         );
 
-        await loginAsFixture(page, manifest.users.reviewer);
+        await switchFixtureRole(page, manifest.users.reviewer);
         await postLaravel(page, `/incidents/${gateJourney.incidentId}/review`, {
             review_notes: 'Reviewed while H&S remains deliberately incomplete.',
         });
@@ -775,7 +788,7 @@ echo json_encode([
             `/health-safety/events/${gateJourney.eventId}`,
         );
 
-        await loginAsFixture(page, manifest.users.operator);
+        await switchFixtureRole(page, manifest.users.operator);
         await postLaravel(page, `/control-room/alerts/${gateId}/resolve`, {
             resolution_notes:
                 'Operational response complete; governance remains open.',
@@ -819,7 +832,7 @@ echo json_encode([
             page.locator(`a[href="/incidents/${gateJourney.incidentId}"]`),
         ).toHaveAttribute('href', `/incidents/${gateJourney.incidentId}`);
 
-        await loginAsFixture(page, manifest.users.owner);
+        await switchFixtureRole(page, manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${gateJourney.eventId}/worksafe/decision`,
@@ -837,12 +850,12 @@ echo json_encode([
                     'Acceptance and WorkSafe decision are complete.',
             },
         );
-        await loginAsFixture(page, manifest.users.reviewer);
+        await switchFixtureRole(page, manifest.users.reviewer);
         await postLaravel(page, `/incidents/${gateJourney.incidentId}/close`, {
             closed_outcome: 'All governance complete',
             closed_notes: 'H&S closed first.',
         });
-        await loginAsFixture(page, manifest.users.operator);
+        await switchFixtureRole(page, manifest.users.operator);
         await postLaravel(page, `/control-room/alerts/${gateId}/close`, {
             closure_notes:
                 'The same closure path now succeeds after prerequisites.',

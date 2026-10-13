@@ -13,6 +13,7 @@ use App\Models\Permission;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\RoundTemplateCatalogue;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -142,6 +143,56 @@ class RoundTemplateSettingsTest extends TestCase
         $this->assertSame(0, MedicationRound::query()->count());
         $this->assertSame(0, MedicationSettingChange::query()->count());
         $this->assertTrue($foreign->fresh()->active);
+    }
+
+    public function test_reused_catalogue_keeps_default_names_and_staff_choices_current_and_scoped(): void
+    {
+        $catalogue = app(RoundTemplateCatalogue::class);
+        $this->app->instance(RoundTemplateCatalogue::class, $catalogue);
+        $lead = $this->staff(['medications.orders.manage', 'medications.view']);
+        $colleague = $this->staff([]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $foreignLead = $this->staff(['medications.orders.manage', 'medications.view']);
+        $foreignLead->hrEmployeeProfile()->update(['primary_site_id' => $foreignSite->id]);
+        $local = $this->template('Local default', $this->site);
+        $foreign = $this->template('Foreign default', $foreignSite);
+        foreach ([$local, $foreign] as $template) {
+            $template->forceFill(['default_assigned_to' => $colleague->id])->save();
+        }
+
+        $page = $this->actingAs($lead->fresh())->get('/emar/settings')->assertOk();
+        $this->assertSame($colleague->name, $page->inertiaProps('roundTemplates.0.default_staff'));
+        $this->assertContains($colleague->id, array_column($page->inertiaProps('templateStaff'), 'id'));
+        $this->assertNotContains($foreignLead->id, array_column($page->inertiaProps('templateStaff'), 'id'));
+
+        // The same catalogue must not retain an ended staff member's name.
+        $colleague->hrEmployeeProfile()->update(['is_active' => false]);
+        $page = $this->actingAs($lead->fresh())->get('/emar/settings')->assertOk();
+        $this->assertNull($page->inertiaProps('roundTemplates.0.default_assigned_to'));
+        $this->assertNull($page->inertiaProps('roundTemplates.0.default_staff'));
+        $this->assertNotContains($colleague->id, array_column($page->inertiaProps('templateStaff'), 'id'));
+
+        // Moving their employment to another house changes both lists now.
+        $colleague->hrEmployeeProfile()->update(['is_active' => true, 'primary_site_id' => $foreignSite->id]);
+        $page = $this->actingAs($lead->fresh())->get('/emar/settings')->assertOk();
+        $this->assertNull($page->inertiaProps('roundTemplates.0.default_staff'));
+        $this->assertNotContains($colleague->id, array_column($page->inertiaProps('templateStaff'), 'id'));
+
+        $page = $this->actingAs($foreignLead->fresh())->get('/emar/settings')->assertOk();
+        $this->assertSame([$foreign->id], array_column($page->inertiaProps('roundTemplates'), 'id'));
+        $this->assertSame($colleague->id, $page->inertiaProps('roundTemplates.0.default_assigned_to'));
+        $this->assertSame($colleague->name, $page->inertiaProps('roundTemplates.0.default_staff'));
+        $this->assertContains($colleague->id, array_column($page->inertiaProps('templateStaff'), 'id'));
+        $this->assertNotContains($lead->id, array_column($page->inertiaProps('templateStaff'), 'id'));
+
+        // A denied editor grant never exposes the picker through a reused read.
+        $foreignLead->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'medications.orders.manage')->value('id') => ['allowed' => false],
+        ]);
+        $page = $this->actingAs($foreignLead->fresh())->get('/emar/settings')->assertOk();
+        $this->assertFalse($page->inertiaProps('templateAccess.manage'));
+        $this->assertSame([], $page->inertiaProps('templateStaff'));
+        $this->assertSame($colleague->name, $page->inertiaProps('roundTemplates.0.default_staff'));
     }
 
     public function test_templates_follow_the_house_scope_and_never_name_another_houses_staff(): void

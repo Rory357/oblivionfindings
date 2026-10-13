@@ -54,6 +54,10 @@ import {
     type AlertPreview,
 } from './settings/_alerts';
 import {
+    ConnectedServicesSettings,
+    type ConnectedStatus,
+} from './settings/_connected';
+import {
     SettingsCtx,
     type Dialog,
     type SettingsContext,
@@ -92,6 +96,7 @@ import {
     OnCallDialogHost,
     type OnCallData,
 } from './settings/_oncall';
+import { MedicinePhotos } from './settings/_photos';
 import { ReachDialogHost, type ReachGap } from './settings/_reach';
 import { RecordsReporting } from './settings/_records-reporting';
 import { ReviewCadenceSettings } from './settings/_reviews';
@@ -165,6 +170,8 @@ type Props = {
     /** People with a contact gap: Who can't be reached (B2 C5). */
     alertReachGaps: ReachGap[];
     emergencyPolicyAccess: boolean;
+    /** Settings › Connected services: whether each feature is set up (D4). */
+    connectedStatus?: ConnectedStatus;
     alertLog: AlertLogPage | null;
     alertLogSummary: { recent: number; open: number };
 };
@@ -180,6 +187,7 @@ const VIEW_ICON: Record<ViewKey, LucideIcon> = {
 /** Tabs whose settings are saved through the save bar. */
 const SAVED_SECTIONS = [
     'safety',
+    'photos',
     'reviews',
     'timing',
     'competency',
@@ -188,6 +196,8 @@ const SAVED_SECTIONS = [
     'alerts',
     'delivery',
     'emergency',
+    // Connected services › Switches and checks (D4).
+    'services',
 ];
 const SHOW_OPTIONS = [
     { value: 'all', label: 'All settings' },
@@ -313,6 +323,9 @@ export default function EmarSettings(props: Props) {
                       'medicines',
                       'safety',
                       ...(s.groups.review_cadence ? ['reviews'] : []),
+                      ...(s.groups.packPhoto || s.groups.packPhotoReceipt
+                          ? ['photos']
+                          : []),
                       'records',
                       ...(props.controlledSettingsAccess.view
                           ? ['controlled']
@@ -343,7 +356,11 @@ export default function EmarSettings(props: Props) {
                       'log',
                   ]
                 : [],
-            connections: hasConnections ? ['overview'] : [],
+            // D4: link cards for connected-service managers; the switches for settings managers.
+            connections: [
+                ...(hasConnections ? ['overview'] : []),
+                ...(settingsAccess ? ['services'] : []),
+            ],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
         [
@@ -354,6 +371,8 @@ export default function EmarSettings(props: Props) {
             props.controlledSettingsAccess.view,
             alertAccess.view,
             s.groups.review_cadence,
+            s.groups.packPhoto,
+            s.groups.packPhotoReceipt,
         ],
     );
     const [route, setRoute] = useState(() =>
@@ -891,7 +910,13 @@ export default function EmarSettings(props: Props) {
     }));
     const clearQ = () => setQuery('');
     const body =
-        view === 'connections' ? (
+        view === 'connections' && sec === 'services' ? (
+            <ConnectedServicesSettings
+                q={query}
+                show={f.show}
+                status={props.connectedStatus ?? {}}
+            />
+        ) : view === 'connections' ? (
             <ConnectedEntryPoints />
         ) : view === 'rules' && sec === 'overview' ? (
             <RulesOverview data={ruleData} q={query} />
@@ -926,6 +951,15 @@ export default function EmarSettings(props: Props) {
                 houses={props.sites}
                 houseIds={props.controlledSettingsAccess.manageable_site_ids}
                 readOnlyAudit={readOnlyAudit}
+            />
+        ) : view === 'rules' && sec === 'photos' ? (
+            <MedicinePhotos
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
             />
         ) : view === 'rules' && sec === 'records' ? (
             <RecordsReporting q={query} show={f.show} />

@@ -262,7 +262,10 @@ function RequestCard({
                             <UserPlus className="h-3.5 w-3.5" /> Onboard
                         </Button>
                     ) : null}
-                    {can.update && r.clientId && !r.clientProfileComplete ? (
+                    {can.update &&
+                    r.clientId &&
+                    r.clientProfileCanComplete &&
+                    !r.clientProfileComplete ? (
                         <Button
                             size="sm"
                             variant="outline"

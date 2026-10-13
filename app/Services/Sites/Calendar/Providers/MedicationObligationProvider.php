@@ -8,6 +8,7 @@ use App\Models\MedicationReview;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Sites\Calendar\CalendarItem;
+use App\Support\MedicationJourney;
 use App\Support\WorkerClock;
 use Illuminate\Support\Carbon;
 
@@ -74,7 +75,10 @@ class MedicationObligationProvider extends ObligationProvider
                 status: WorkerClock::daysUntil($due) < 0 ? 'overdue' : 'scheduled',
                 ref: strtoupper((string) $review->review_type),
                 site: $this->siteArray($review->client?->site),
-                link: '/emar/reviews?review='.$review->id,
+                link: '/emar/reviews?'.http_build_query(array_filter([
+                    'review' => $review->id, 'client_id' => $review->client_id, 'site_id' => $review->client?->site_id,
+                    'return_to' => MedicationJourney::returnTo(request()->query('return_to')),
+                ], fn ($value) => $value !== null), '', '&', PHP_QUERY_RFC3986),
             );
         }
 
@@ -96,38 +100,61 @@ class MedicationObligationProvider extends ObligationProvider
                     $q->where('controlled_drug', false);
                 }
             })
-            ->whereNotNull('expiry_date')
-            ->whereBetween('expiry_date', [$start->toDateString(), $end->toDateString()])
+            ->where(fn ($q) => $q
+                ->where(fn ($legacy) => $legacy->whereNull('lots_started_at')->where('on_hand', '>', 0)
+                    ->whereBetween('expiry_date', [$start->toDateString(), $end->toDateString()]))
+                ->orWhere(fn ($tracked) => $tracked->whereNotNull('lots_started_at')->whereHas('lots',
+                    fn ($lots) => $lots->where('state', 'open')->where('quantity_remaining', '>', 0)
+                        ->whereBetween('expiry_date', [$start->toDateString(), $end->toDateString()]))))
             ->whereHas('medication', fn ($q) => $q->where('active', true)->where('state', 'active')
                 ->whereHas('client', fn ($c) => $c->whereIn('site_id', $siteIds)))
             ->with([
-                'medication:id,name,client_id',
+                'medication:id,name,client_id,controlled_drug',
                 'medication.client:id,first_name,last_name,site_id',
                 'medication.client.site:id,name,type',
+                'lots' => fn ($lots) => $lots->where('state', 'open')->where('quantity_remaining', '>', 0)
+                    ->whereBetween('expiry_date', [$start->toDateString(), $end->toDateString()]),
             ])
             ->get();
 
         foreach ($stocks as $stock) {
-            $due = $stock->expiry_date instanceof Carbon ? $stock->expiry_date : Carbon::parse($stock->expiry_date);
-            if (! $this->inRange($due, $start, $end)) {
-                continue;
-            }
-
             $client = $stock->medication?->client;
             $clientName = trim(($client?->first_name ?? '').' '.($client?->last_name ?? ''));
+            // Once pack evidence starts, scalar batch/expiry fields are legacy
+            // snapshots. Each open, non-empty pack owns its expiry obligation.
+            foreach ($stock->lots_started_at === null ? [null] : $stock->lots as $lot) {
+                $due = $lot !== null ? $lot->expiry_date : $stock->expiry_date;
+                if (! $due instanceof Carbon || ! $this->inRange($due, $start, $end)) {
+                    continue;
+                }
+                $batch = $lot !== null ? $lot->batch_number : $stock->batch_number;
+                $canUpdateStock = $actor->canDo('medications.stock.update');
+                $context = array_filter([
+                    'site_id' => $client?->site_id, 'client_id' => $client?->id,
+                    'medication_id' => $stock->client_medication_id,
+                    'lot_id' => $canUpdateStock ? $lot?->id : null,
+                    'return_to' => MedicationJourney::returnTo(request()->query('return_to')),
+                ], fn ($value) => $value !== null);
+                $destination = $canUpdateStock ? '/emar/stock/packs' : '/emar/mar';
+                if (! $canUpdateStock) {
+                    $context['tab'] = 'medicines';
+                }
 
-            $items[] = new CalendarItem(
-                id: "medication-stock-{$stock->id}",
-                source: 'medication',
-                group: 'auto',
-                title: ($stock->medication?->name ?? 'Medication').($clientName !== '' ? ' ('.$clientName.')' : '').' — Stock expires',
-                start: $this->isoDate($due),
-                allDay: true,
-                status: $this->dueStatus($due, false),
-                ref: $stock->batch_number,
-                site: $this->siteArray($client?->site),
-                link: '/emar/stock',
-            );
+                $items[] = new CalendarItem(
+                    id: $lot !== null ? "medication-stock-lot-{$lot->id}" : "medication-stock-{$stock->id}",
+                    source: 'medication',
+                    group: 'auto',
+                    title: ($stock->medication?->name ?? 'Medication').($clientName !== '' ? ' ('.$clientName.')' : '').' — Stock expires'
+                        .($batch !== null ? ' · Batch '.$batch : ($lot !== null ? ' · Batch not printed' : '')),
+                    start: $this->isoDate($due),
+                    allDay: true,
+                    status: $this->dueStatus($due, false),
+                    ref: $batch,
+                    site: $this->siteArray($client?->site),
+                    link: $destination.'?'.http_build_query($context, '', '&', PHP_QUERY_RFC3986),
+                    desc: $lot !== null ? $lot->quantity_remaining.' '.$stock->unit.' remaining in this pack.' : null,
+                );
+            }
         }
 
         return $items;

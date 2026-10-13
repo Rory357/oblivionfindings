@@ -1,0 +1,25 @@
+# Payroll adjustment access and processing — 8 October 2026
+
+Status: implemented and verified, including the real processing journey, final production build and desktop/mobile readback.
+
+## Behaviour
+
+WF-06: the pending payroll-adjustment query previously returned corrections across all Sites, and processing relied on an old route-bound amendment without current Site authority or atomic audit. The queue now uses canonical Timesheet scope, without a report-permission bypass. Recording external processing rechecks the current approved account, all established review-permission aliases, approved Site and canonical worker/Shift/Client evidence under locks, including changes committed after an earlier REPEATABLE READ snapshot.
+
+Only the amendment's processing marker and audit are written together. Repeated requests preserve the original timestamp and return an already-recorded outcome. Original timesheet values/status, HR/Billing entries, payroll claims/export and settlement/payment ownership remain unchanged. Existing manual/null-person and legacy canonical-Site access semantics remain. No permission, route, schema, tenancy or clinical policy is introduced. Control Room stays independent.
+
+The interface adds a permitted Timesheets-header entry, shared page header/back route, full original versus approved values, complete reasons and mobile review. The confirmation explicitly records external handling; it does not claim wages were paid. Confirmation requires the same requester, amendment and parent Timesheet, external-processing outcome and persisted timestamp. Interrupted/missing results stay unconfirmed across close/reopen until an explicit successful queue read. Owned pending requests guard navigation and close; a changed account cannot inherit a private review. Empty/paginated states describe the permitted queue without claiming organisation-wide completion.
+
+## Verification
+
+- Native: 58 payroll cases / 915 assertions pass (integrity47/808, queue8/94, amendment3/13). The separately delivered Creation alias correction adds18/337; the transparent composite contains76 unique passing cases/1,252 assertions, retaining raw per-case outcomes and excluding failed partial assertions. Both isolated schemas/process trees cleaned; frozen sources unchanged and five protected previews preserved. Known isolated missing-.env warnings remain.
+- Interface:36 focused cases across four files pass, including19 new cases; nine changed TypeScript files pass lint/format and the full type check passes. Backend syntax/format checks pass, apart from the Controller's three unchanged pre-existing formatting differences. Only two Controller methods changed;45 others remain byte-identical.
+- Final production build passed in4m42s, asset app-5ZPwfpQj.js. The processing journey ran on the prior matching4m31s build app-DZTnCBOE.js; the only subsequent UI change enables the existing shared wrapTitle option. Final actual desktop/mobile readback confirms the complete title, document390/390 with no horizontal page overflow, the correct final asset and console0errors/0warnings. The separate read-only database verification still passes after navigation and reload. A prior deliberate3GiB heap cap failed with memory exhaustion and is not represented as a pass.
+- Actual browser, dedicated8768 preview: permitted header entry and Back navigation, desktop1440/mobile390, pending queue, complete break0→5 review, close/reopen and explicit external-processing confirmation passed. One POST302 yielded the exact actor1/amendment1/Timesheet5 receipt, changed=true, external method, applied_at2026-10-07T14:28:37.000Z. Queue became0 and the retained review displayed the matching confirmation. Browser console reported0errors/0warnings.
+- Development fixture only: one new manual Training Timesheet5 and approved Amendment1, seeded after demo authentication. No real payroll/export/payment workflow. Read-only verification confirms the original parent, immutable amendment, Timesheets1–4 and every prior protected store unchanged; exactly one marker update audit and one mandatory processing audit were added. The verifier's independent PDO initially used server-local timestamp display; matching the application's UTC database session made every original hash match. Only ignored verification tooling changed; no data reset, replay or baseline replacement.
+
+Evidence is retained under test-results/payroll-adjustment-preview-tools-20261008, test-results/payroll-adjustment-browser-command.log and output/playwright/payroll-adjustment*.png. Replay, stale-authority and restricted-Site behaviour are native/UI evidence; the demo account covers both available Sites, so no browser Site-redaction claim is made.
+
+## Remaining programme scope
+
+Amendment request/approve/reject authority, archive/restore, bulk committed results, source-free draft recovery and broader module acceptance remain separate work. This increment does not certify external payroll completion, export acceptance, bank settlement or payment. Separate test-only draft PR20 remains unmerged pending its own remote checks.

@@ -48,13 +48,16 @@ async function openClientProfileFromMyDay(page: Page) {
     await expect(careAction).toHaveAttribute('href', /\/clients\/\d+$/);
     await careAction.click();
 
-    await expect(page).toHaveURL(/\/clients\/\d+(?:\?.*)?$/);
+    await page.waitForURL(/\/clients\/\d+(?:\?.*)?$/, { timeout: 30_000 });
     await expect(
         page.getByRole('heading', { name: 'Playwright Meds', level: 1 }),
     ).toBeVisible();
 }
 
 test.describe('canonical client profile care readiness', () => {
+    // Fixture setup, sign-in and canonical redirects precede the care/axe checks.
+    // CI traces show correct results arriving at the previous whole-test limit.
+    test.setTimeout(60_000);
     test.beforeEach(async ({ context }) => {
         resetMedicationReadinessFixtures();
         await context.setOffline(false);
@@ -105,7 +108,15 @@ test.describe('canonical client profile care readiness', () => {
 
         await openClientProfileFromMyDay(page);
         const profileUrl = new URL(page.url());
-        await page.goto(`${profileUrl.pathname}?tab=mar`);
+        const clientId = profileUrl.pathname.split('/').at(-1)!;
+        const profileReturn = `${profileUrl.pathname}?tab=mar`;
+        const dayResponse = page.waitForResponse(
+            (response) =>
+                new URL(response.url()).pathname ===
+                    `/emar/clients/${clientId}/day` && response.ok(),
+        );
+        await page.goto(profileReturn);
+        const day = await (await dayResponse).json();
 
         await expect(
             page.getByRole('heading', { name: 'Medication', exact: true }),
@@ -118,10 +129,24 @@ test.describe('canonical client profile care readiness', () => {
             exact: true,
         });
         await expect(chartLink).toBeVisible();
-        await expect(chartLink).toHaveAttribute(
-            'href',
-            `/emar/mar?client_id=${profileUrl.pathname.split('/').at(-1)}`,
+        const chartUrl = new URL(
+            (await chartLink.getAttribute('href'))!,
+            page.url(),
         );
+        expect(chartUrl.origin).toBe(profileUrl.origin);
+        expect(chartUrl.pathname).toBe('/emar/mar');
+        expect(Object.fromEntries(chartUrl.searchParams)).toEqual({
+            client_id: clientId,
+            date: day.date,
+            return_to: profileReturn,
+        });
+        await chartLink.click();
+        await expect(page).toHaveURL(chartUrl.href);
+        await page.getByRole('link', { name: 'Back', exact: true }).click();
+        await expect(page).toHaveURL(new URL(profileReturn, profileUrl).href);
+        await expect(
+            page.getByRole('heading', { name: 'Medication', exact: true }),
+        ).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
     });

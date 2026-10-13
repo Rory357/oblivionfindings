@@ -68,7 +68,8 @@ trait HistoricalPackEvidence
             $closing = Qty::normalize($line['closing_quantity'] ?? -1);
             if ((int) ($line['revision'] ?? -1) !== $lot->revision || ! Qty::greaterThan($quantity, 0)
                 || Qty::greaterThan(0, $lineWaste) || Qty::greaterThan($lineWaste, $quantity)
-                || Qty::greaterThan(0, $closing) || $lot->received_at->gt($at)
+                || Qty::greaterThan(0, $closing)
+                || ! self::packStartedBy($lot->received_at, $at)
                 || ! StockLotRules::usable([...$lot->toArray(), 'quantity_remaining' => $quantity], $day)) {
                 $this->packError('The actual pack, revision, usable-at-dose evidence or physical quantity does not match.');
             }

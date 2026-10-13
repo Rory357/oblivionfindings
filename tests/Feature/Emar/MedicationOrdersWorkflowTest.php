@@ -100,11 +100,11 @@ class MedicationOrdersWorkflowTest extends TestCase
             $this->actingAs($this->checker)->get('/emar/prescriptions?view='.$alias)
                 ->assertOk()->assertInertia(fn (Assert $page) => $page
                 ->where('filters.view', $view)->has('orders.data', $view === 'to_check' ? 1 : 2));
-            $query = ['view' => $alias, 'site_id' => $this->site->id, 'client_id' => $this->client->id, 'search' => 'Needs', 'show' => 'attention'];
+            $query = ['view' => $alias, 'site_id' => $this->site->id, 'client_id' => $this->client->id, 'search' => 'Needs', 'show' => 'attention', 'return_to' => '/emar/mar?client_id='.$this->client->id.'&date=2026-10-03'];
             $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query($query))
                 ->assertOk()->assertInertia(fn (Assert $page) => $page
                 ->where('filters.view', $view)->where('filters.site_id', (string) $this->site->id)
-                ->where('filters.search', 'Needs')->where('filters.show', 'attention')
+                ->where('filters.search', 'Needs')->where('filters.show', 'attention')->where('filters.return_to', $query['return_to'])
                 ->where('prefill_client_id', $this->client->id)
                 ->has('orders.data', 1)->where('orders.data.0.id', $waiting->id));
         }
@@ -143,11 +143,49 @@ class MedicationOrdersWorkflowTest extends TestCase
                 ->has('orders.data', 1)->where('orders.data.0.id', $order->id)
                 ->has('clients', 1)->where('clients.0.id', $this->client->id));
             $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query(['view' => $view, 'client_id' => $foreign->id]))
-                ->assertOk()->assertInertia(fn (Assert $page) => $page
-                ->where('prefill_client_id', null)->has('orders.data', 1)->where('orders.data.0.id', $order->id));
+                ->assertNotFound();
             $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query(['view' => $view, 'site_id' => $foreignSite->id]))
                 ->assertNotFound();
         }
+    }
+
+    public function test_exact_reconciliation_selection_survives_history_limit_and_checks_person_scope(): void
+    {
+        $record = $this->startReconciliation();
+        $row = $record->getAttributes();
+        unset($row['id']);
+        DB::table('medication_reconciliations')->insert(array_fill(0, 101, $row));
+        $other = Client::factory()->create(['site_id' => $this->site->id, 'service_context_id' => $this->client->service_context_id]);
+        $other->supportWorkers()->attach($this->checker->id);
+        $foreign = MedicationReconciliation::create(['client_id' => $other->id, 'reason' => 'hospital_discharge', 'sources' => 'Other person source', 'created_by' => $this->checker->id]);
+        $this->order();
+        $this->order(['client_id' => $other->id, 'name' => 'Other person medicine']);
+        $response = $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query([
+            'view' => 'reconciliation', 'client_id' => $this->client->id, 'reconciliation_id' => $record->id,
+        ]))->assertOk();
+        $this->assertSame($record->id, $response->inertiaProps('selected_reconciliation.id'));
+        $this->assertCount(100, $response->inertiaProps('reconciliations'));
+        $this->assertNotContains($record->id, array_column($response->inertiaProps('reconciliations'), 'id'));
+        $this->assertSame([$this->client->id], array_unique(array_column($response->inertiaProps('orders.data'), 'client_id')));
+        $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query([
+            'client_id' => $this->client->id, 'reconciliation_id' => $foreign->id,
+        ]))->assertNotFound();
+        $otherOrder = ClientMedication::where('client_id', $other->id)->sole();
+        $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query([
+            'client_id' => $this->client->id, 'order_id' => $otherOrder->id, 'action' => 'view',
+        ]))->assertNotFound();
+        $otherSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $this->checker->hrEmployeeProfile->update(['secondary_site_ids' => [$otherSite->id]]);
+        $other->update(['site_id' => $otherSite->id, 'service_context_id' => null]);
+        $this->actingAs($this->checker->fresh())->get('/emar/prescriptions?'.http_build_query([
+            'site_id' => $otherSite->id, 'client_id' => $other->id, 'reconciliation_id' => $foreign->id,
+        ]))->assertOk()->assertInertia(fn ($page) => $page->where('selected_reconciliation.id', $foreign->id));
+        $this->get('/emar/prescriptions?'.http_build_query([
+            'site_id' => $this->site->id, 'client_id' => $other->id, 'reconciliation_id' => $foreign->id,
+        ]))->assertNotFound();
+        $this->get('/emar/prescriptions?'.http_build_query([
+            'site_id' => $this->site->id, 'order_id' => $otherOrder->id, 'action' => 'view',
+        ]))->assertNotFound();
     }
 
     public function test_orders_navigation_reviews_selector_opens_reviews_with_scope_and_search(): void

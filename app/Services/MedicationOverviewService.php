@@ -22,6 +22,7 @@ use App\Services\Medication\Controlled\ControlledCountStatus;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -141,11 +142,13 @@ class MedicationOverviewService
                 $actor,
                 MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             );
-            $this->readerClientIds = Client::query()
-                ->whereIn('site_id', $this->readerSiteIds)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+            // EA-066: every person-level list uses the same P02 person rule as
+            // the counts — leads keep the house, ordinary support workers keep
+            // the residents they support or cover.
+            $this->readerClientIds = app(MedicationRecordAccess::class)->readableClientIds(
+                $actor,
+                Client::query()->whereIn('site_id', $this->readerSiteIds)->pluck('id'),
+            );
             // Dose numbers: the reader's Sites narrowed by the P02 person
             // rule, so no number counts a person the reader can't open.
             $this->doseScope = DoseSlotReaderScope::forViewer($actor, $this->readerSiteIds);

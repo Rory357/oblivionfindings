@@ -125,11 +125,21 @@ class P01MedsTodayBoardTest extends TestCase
 
     public function test_people_you_may_open_who_arent_on_your_shift_are_listed_with_why(): void
     {
+        // EA-006 (Stephan's D1): the shift at Kōwhai House covers everyone
+        // there the worker supports, so "not on your shift" is now someone
+        // they support at another house.
+        $rimu = Site::factory()->create(['name' => 'Rimu House', 'is_active' => true]);
+        HrEmployeeProfile::query()->where('user_id', $this->worker->id)->update(['secondary_site_ids' => [$rimu->id]]);
         $this->shift(clockedIn: true);
         $this->order($this->client, 'Paracetamol 500mg', ['09:30']);
         $hemi = $this->person('Hemi', 'Walker');
+        $hemi->update(['site_id' => $rimu->id]);
         $hemi->supportWorkers()->attach($this->worker->id);
         $hemiOrder = $this->order($hemi, 'Levetiracetam 500mg', ['09:00']);
+        // Supported at the same house: on the shift, though it names Aroha.
+        $tama = $this->person('Tama', 'Ruru');
+        $tama->supportWorkers()->attach($this->worker->id);
+        $tamaOrder = $this->order($tama, 'Sertraline 50mg', ['09:00']);
         // Someone at the house who isn't theirs: never listed.
         $other = $this->person('Mere', 'Tane');
         $this->order($other, 'Metformin 500mg', ['09:00']);
@@ -138,11 +148,13 @@ class P01MedsTodayBoardTest extends TestCase
             ->get('/meds/today')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('schedule', fn ($rows) => collect($rows)->pluck('client_id')->unique()->values()->all() === [$this->client->id])
+                ->where('schedule', fn ($rows) => collect($rows)->pluck('client_id')->unique()->sort()->values()->all()
+                    === collect([$this->client->id, $tama->id])->sort()->values()->all())
+                ->where('schedule', fn ($rows) => collect($rows)->firstWhere('medication_id', $tamaOrder->id)['req']['block_all'] === null)
                 ->has('off_shift', 1)
                 ->where('off_shift.0.client_id', $hemi->id)
                 ->where('off_shift.0.medication_id', $hemiOrder->id)
-                ->where('off_shift.0.req.block_all', 'notOnShift')
+                ->where('off_shift.0.req.block_all', 'notClockedIn')
             );
     }
 

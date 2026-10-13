@@ -423,6 +423,30 @@ class StockManagementPaginationTest extends TestCase
         $this->assertSame($before, $this->rawSnapshot());
     }
 
+    public function test_exact_pharmacy_order_selection_survives_pagination_search_and_checks_person_scope(): void
+    {
+        [$medicine] = $this->medicine('Synthetic receipt medicine');
+        $old = $this->order($medicine, ['status' => 'delivered', 'created_at' => now()->subMonth(), 'delivered_at' => now()->subMonth()]);
+        for ($i = 0; $i < 12; $i++) {
+            $this->order($medicine);
+        }
+        $props = $this->page(['view' => 'orders', 'q' => 'No matching list row', 'pharmacy_order_id' => $old->id]);
+        $this->assertSame([], $props['pharmacyOrders']);
+        $this->assertSame($old->id, $props['selected_pharmacy_order']['id']);
+        $this->assertSame('delivered', $props['selected_pharmacy_order']['status']);
+        $other = Client::factory()->create(['site_id' => $this->site->id]);
+        $this->get(route('emar.stock', ['client_id' => $other->id, 'pharmacy_order_id' => $old->id]))->assertNotFound();
+        $foreign = Client::factory()->create(['site_id' => Site::factory()->create(['is_active' => true])->id]);
+        [$foreignMedicine] = $this->medicine('Foreign source', client: $foreign);
+        $foreignOrder = $this->order($foreignMedicine);
+        $this->get(route('emar.stock', ['pharmacy_order_id' => $foreignOrder->id]))->assertNotFound();
+        // Represent retained legacy evidence only; production orders cannot be deleted.
+        DB::table('client_medications')->where('id', $medicine->id)->update(['deleted_at' => now()]);
+        $historical = $this->page(['view' => 'orders', 'pharmacy_order_id' => $old->id]);
+        $this->assertSame('Synthetic receipt medicine', $historical['selected_pharmacy_order']['medication_name']);
+        $this->assertFalse($historical['selected_pharmacy_order']['controlled']);
+    }
+
     private function medicine(string $name, bool $controlled = false, ?Client $client = null, array $stock = [], bool $createStock = true): array
     {
         $medication = ClientMedication::query()->forceCreate(['client_id' => ($client ?? $this->client)->id, 'name' => $name,

@@ -6,13 +6,16 @@
  * Source of truth: Emar/WorkerMedsController. What each dose needs and
  * allows comes from the same requirements the dialog reads; saving checks
  * everything again on the server. */
-import { Head, Link, router } from '@inertiajs/react';
+import { inEmarHubOrder } from '@/lib/emar-navigation';
+import { withMedicationReturn } from '@/lib/medication-navigation';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     CheckCircle2,
     ClipboardCheck,
     ClipboardList,
     Clock3,
+    FileText,
     Flag,
     LogIn,
     Package,
@@ -41,6 +44,7 @@ import type {
     DoseTarget,
     RecordMode,
 } from '@/components/emar/record-dose/types';
+import { RoundSheetExportDialog } from '@/components/emar/round-sheet-export-dialog';
 import {
     EntityContextMenu,
     type MenuItem,
@@ -140,11 +144,6 @@ type Overlay =
     | { kind: 'error'; clientId: number | null }
     | null;
 
-const query = () =>
-    typeof window === 'undefined'
-        ? new URLSearchParams()
-        : medsTodayQuery(window.location.search);
-
 /** "Mon 28 Sep 2026" from the board's "2026-09-28". */
 function shortDate(ymd: string): string {
     const [y, m, d] = ymd.split('-').map(Number);
@@ -159,6 +158,16 @@ const nzDay = (iso: string): string =>
     new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso));
 
 export default function MedsToday(props: MedsTodayProps) {
+    const pageUrl = usePage().url;
+    const query = useCallback(
+        () =>
+            medsTodayQuery(
+                typeof window === 'undefined'
+                    ? new URL(pageUrl, 'https://medication.invalid').search
+                    : window.location.search,
+            ),
+        [pageUrl],
+    );
     const {
         schedule,
         clients,
@@ -206,6 +215,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const range = query().get('range') === 'today' ? 'today' : '24h';
     const outcome = query().get('outcome') ?? 'all';
     const [overlay, setOverlay] = useState<Overlay>(null);
+    const [exportRoundId, setExportRoundId] = useState<number | null>(null);
     const [ctx, setCtx] = useState<{
         x: number;
         y: number;
@@ -391,8 +401,11 @@ export default function MedsToday(props: MedsTodayProps) {
         const row = schedule.find((r) => r.client_id === clientId && r.mar_url);
         return () =>
             router.visit(
-                row?.mar_url ??
-                    `/emar/mar?client_id=${clientId}&date=${props.date}`,
+                withMedicationReturn(
+                    row?.mar_url ??
+                        `/emar/mar?client_id=${clientId}&date=${props.date}`,
+                    `/meds/today?${query()}`,
+                ),
             );
     };
 
@@ -757,7 +770,7 @@ export default function MedsToday(props: MedsTodayProps) {
         <PageHeaderRail<View>
             value={view}
             onSelect={setView}
-            items={[
+            items={inEmarHubOrder('today', [
                 {
                     key: 'schedule',
                     label: 'Schedule',
@@ -792,7 +805,7 @@ export default function MedsToday(props: MedsTodayProps) {
                           },
                       ]
                     : []),
-            ]}
+            ])}
         />
     );
 
@@ -852,7 +865,10 @@ export default function MedsToday(props: MedsTodayProps) {
                     {board_can.view_emar && (
                         <PageHeaderGlassButton asChild icon={ClipboardList}>
                             <Link
-                                href={`/emar/mar?${new URLSearchParams({ date: props.date, ...(person ? { client_id: String(person) } : {}), ...(query().get('site_id') || query().get('site') ? { site_id: (query().get('site_id') || query().get('site'))! } : {}) })}`}
+                                href={withMedicationReturn(
+                                    `/emar/mar?${new URLSearchParams({ date: props.date, ...(person ? { client_id: String(person) } : {}), ...(query().get('site_id') || query().get('site') ? { site_id: (query().get('site_id') || query().get('site'))! } : {}) })}`,
+                                    `/meds/today?${query()}`,
+                                )}
                             >
                                 {person ? 'Open MAR chart' : 'MAR charts'}
                             </Link>
@@ -866,6 +882,18 @@ export default function MedsToday(props: MedsTodayProps) {
                             title="Shift handover — medication"
                         >
                             <Link href="/emar/handovers" />
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {/* EA-045 (approved P10): staff who give medicines reach
+                        their paper records after a downtime. */}
+                    {board_can.view_emar && board_can.record_administration ? (
+                        <PageHeaderGlassButton
+                            asChild
+                            icon={FileText}
+                            aria-label="Downtime & paper records"
+                            title="Downtime & paper records"
+                        >
+                            <Link href="/emar/downtime" />
                         </PageHeaderGlassButton>
                     ) : null}
                     {extraCan.report_error ? (
@@ -998,10 +1026,8 @@ export default function MedsToday(props: MedsTodayProps) {
                                     signer={board_user}
                                     canExport={board_can.export_round === true}
                                     onPrint={() =>
-                                        window.open(
-                                            `/emar/pdf/round-sheet?date=${encodeURIComponent(props.date)}`,
-                                            '_blank',
-                                            'noopener',
+                                        setExportRoundId(
+                                            props.guidedRound!.round.id,
                                         )
                                     }
                                     onClose={() => {
@@ -1103,6 +1129,7 @@ export default function MedsToday(props: MedsTodayProps) {
                         <StockTab
                             alerts={stock_alerts}
                             canManage={board_can.manage_stock}
+                            canReceive={board_can.receive_stock ?? false}
                         />
                     ) : null}
                     {view === 'activity' ? (
@@ -1245,6 +1272,13 @@ export default function MedsToday(props: MedsTodayProps) {
                     onClose={() => setCtx(null)}
                 />
             ) : null}
+            {exportRoundId && (
+                <RoundSheetExportDialog
+                    key={exportRoundId}
+                    roundId={exportRoundId}
+                    onClose={() => setExportRoundId(null)}
+                />
+            )}
         </AppLayout>
     );
 }

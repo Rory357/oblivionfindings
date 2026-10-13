@@ -801,6 +801,7 @@ it('authorises the freshly locked dead letter instead of a stale caller model', 
     $access = Mockery::mock(SecurityDevicesAccessService::class);
     $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
     $access->shouldReceive('accessibleSiteIds')->once()->with(Mockery::type(User::class))->andReturn([$allowedSite->id]);
+    Queue::fake(); // Observe replay denial after the staff and Site fixtures.
 
     expect(fn () => (new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, app(MonitoringEnvelopeConsumer::class)))
         ->replay($actor, $letter, 'Use locked scope'))

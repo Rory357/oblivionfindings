@@ -3,27 +3,35 @@
 namespace Tests\Feature\Emar;
 
 use App\Mail\MailNotSubmitted;
+use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\ItMailboxConnection;
 use App\Models\MedicationBackupAttempt;
 use App\Models\MedicationBackupDelivery;
 use App\Models\MedicationBackupSchedule;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\EmailConfiguration;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\BackupDelivery\BackupDeliveryAccess;
 use App\Services\Medication\BackupDelivery\BackupDeliveryService;
+use App\Services\Medication\BackupDelivery\BackupEmailSender;
 use App\Services\Medication\BackupDelivery\BackupMailTransport;
 use App\Services\Medication\BackupDelivery\BackupPdfEncryption;
+use App\Services\Medication\BackupDelivery\PreparedBackupOAuthTransport;
 use App\Services\Medication\Downtime\DowntimePackPdf;
 use Carbon\Carbon;
 use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Mailer;
 use Illuminate\Mail\Message;
 use Illuminate\Mail\SentMessage;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -37,6 +45,7 @@ use PragmaRX\Google2FA\Google2FA;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mime\Email;
 use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\ConnectedCareSwitches;
 use Tests\TestCase;
 
 class MedicationBackupDeliveryTest extends TestCase
@@ -56,6 +65,8 @@ class MedicationBackupDeliveryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // D4: protected backups run only while switched on (and encrypted).
+        ConnectedCareSwitches::on('protected_backups');
         Carbon::setTestNow(Carbon::parse('2026-10-07 00:00', 'Pacific/Auckland')->utc());
         // Explicit fixture grants avoid committing updates to pre-existing RBAC definitions.
         foreach (['medications.view', 'clients.viewAny', 'medications.backups.manage', 'medications.reports.view', 'medications.reports.export', 'medications.controlled.view'] as $key) {
@@ -66,6 +77,7 @@ class MedicationBackupDeliveryTest extends TestCase
         }
         Storage::fake('private');
         Mail::fake();
+        Http::preventStrayRequests();
         config(['emar-catalogue-backups.send_enabled' => false]);
         $this->site = Site::factory()->create(['is_active' => true, 'archived' => false]);
         $client = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
@@ -164,7 +176,7 @@ class MedicationBackupDeliveryTest extends TestCase
         $this->app->instance(DowntimePackPdf::class, $pdf);
         config(['emar-catalogue-backups.send_enabled' => true]);
         $transport = Mockery::mock(BackupMailTransport::class);
-        $transport->shouldReceive('send')->once()->with($mailboxes, '%PDF-PROTECTED-FICTIONAL', '2026-10-07');
+        $transport->shouldReceive('send')->once()->with($mailboxes, '%PDF-PROTECTED-FICTIONAL', '2026-10-07', $this->site->name, Mockery::pattern('/^B\d+$/'), []);
         $this->app->instance(BackupMailTransport::class, $transport);
         $service = app(BackupDeliveryService::class);
         if ($scheduled) {
@@ -253,7 +265,7 @@ class MedicationBackupDeliveryTest extends TestCase
         } elseif ($change === 'inactive') {
             $invalid->hrEmployeeProfile->forceFill(['is_active' => false])->saveQuietly();
         } else {
-            $invalid->forceFill(['email' => 'unrelated-changed-fictional@example.test'])->saveQuietly();
+            $invalid->hrEmployeeProfile->forceFill(['work_email' => 'unrelated-changed-fictional@example.test'])->saveQuietly();
         }
         foreach ($change === 'revoked' ? [$this->lead] : [$this->lead, $this->recipient] as $reader) {
             $this->actingAs($reader)->get('/emar/backups/deliveries/'.$row->id.'/download')->assertOk()
@@ -345,7 +357,7 @@ class MedicationBackupDeliveryTest extends TestCase
 
             config(['emar-catalogue-backups.send_enabled' => true]);
             $transport = Mockery::mock(BackupMailTransport::class);
-            $transport->shouldReceive('send')->once()->with([$this->recipient->email], $bytes, '2026-10-07');
+            $transport->shouldReceive('send')->once()->with([$this->recipient->email], $bytes, '2026-10-07', $this->site->name, 'B'.$row->id, []);
             $this->app->instance(BackupMailTransport::class, $transport);
             $sent = app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version);
             $this->assertSame('sent', $sent->state);
@@ -384,7 +396,7 @@ class MedicationBackupDeliveryTest extends TestCase
             $bytes = Storage::disk('private')->get($row->artifact_path);
             $this->useBackupKeys('base64:'.base64_encode(str_repeat('b', 32)), $changed ? [$oldKey] : []);
             if ($changed) {
-                $this->recipient->forceFill(['email' => 'changed-fictional@example.test'])->saveQuietly();
+                $this->recipient->hrEmployeeProfile->forceFill(['work_email' => 'changed-fictional@example.test'])->saveQuietly();
             }
             $this->actingAs($this->lead)->get('/emar/backups')->assertOk()
                 ->assertInertia(fn (Assert $p) => $p->where('schedules.0.recipients.0.status', 'review_required'));
@@ -558,7 +570,7 @@ class MedicationBackupDeliveryTest extends TestCase
         $this->openDurableBoundary();
         config(['emar-catalogue-backups.send_enabled' => true]);
         $transport = Mockery::mock(BackupMailTransport::class);
-        $transport->shouldReceive('send')->once()->with([$this->recipient->email], '%PDF-PROTECTED-FICTIONAL', '2026-10-07');
+        $transport->shouldReceive('send')->once()->with([$this->recipient->email], '%PDF-PROTECTED-FICTIONAL', '2026-10-07', Mockery::type('string'), Mockery::pattern('/^B\d+$/'), []);
         $this->app->instance(BackupMailTransport::class, $transport);
         $this->actingAs($this->lead)->postJson('/emar/backups/deliveries/'.$row->id.'/send', ['version' => $row->version])->assertOk()->assertJsonPath('state', 'sent');
         $this->actingAs($this->lead)->postJson('/emar/backups/deliveries/'.$row->id.'/send', ['version' => $row->version])->assertConflict();
@@ -832,11 +844,12 @@ class MedicationBackupDeliveryTest extends TestCase
         $accepted = [];
         $addresses = [$this->recipient->email, $second->email];
         $calls = 0;
-        Mail::shouldReceive('raw')->twice()->andReturnUsing(function (string $body, \Closure $compose) use (&$calls, &$accepted, $addresses) {
+        $mailer = Mockery::mock(Mailer::class);
+        $mailer->shouldReceive('raw')->twice()->andReturnUsing(function (string $body, \Closure $compose) use (&$calls, &$accepted, $addresses, $row) {
             $email = (new Email)->from('fictional-sender@example.test')->text($body);
             $compose(new Message($email));
             $this->assertSame([$addresses[$calls]], array_map(fn ($address) => $address->getAddress(), $email->getTo()));
-            $this->assertSame('Protected chart backup', $email->getSubject());
+            $this->assertSame('Protected chart backup — '.$this->site->name.' — 2026-10-07 (B'.$row->id.')', $email->getSubject());
             $this->assertStringNotContainsString('Fictional backup medicine', $body);
             $calls++;
             if ($calls === 2) {
@@ -846,6 +859,12 @@ class MedicationBackupDeliveryTest extends TestCase
 
             return new SentMessage(new \Symfony\Component\Mailer\SentMessage($email, Envelope::create($email)));
         });
+        $sender = Mockery::mock(BackupEmailSender::class);
+        $sender->shouldReceive('prepare')->once()->andReturnNull();
+        $sender->shouldReceive('make')->once()->with($addresses)->andReturn($mailer);
+        $this->app->instance(BackupEmailSender::class, $sender);
+        $this->app->instance(BackupMailTransport::class, new BackupMailTransport($sender));
+        $service = app(BackupDeliveryService::class);
         try {
             $service->send($this->lead, $row->id, $row->version);
             $this->fail('Accepted earlier mail must make a later no-submission result uncertain.');
@@ -909,7 +928,7 @@ class MedicationBackupDeliveryTest extends TestCase
     public function test_changed_verified_mailbox_requires_recipient_reapproval_before_send(): void
     {
         $row = $this->prepare($this->schedule());
-        $this->recipient->forceFill(['email' => 'new-fictional@example.test'])->saveQuietly();
+        $this->recipient->hrEmployeeProfile->forceFill(['work_email' => 'new-fictional@example.test'])->saveQuietly();
         $this->openDurableBoundary();
         config(['emar-catalogue-backups.send_enabled' => true]);
         $transport = Mockery::mock(BackupMailTransport::class);
@@ -999,7 +1018,7 @@ class MedicationBackupDeliveryTest extends TestCase
         $other->hrEmployeeProfile->forceFill(['is_active' => false])->saveQuietly();
         Carbon::setTestNow(Carbon::parse('2026-10-07 12:00', 'Pacific/Auckland')->utc());
         $transport = Mockery::mock(BackupMailTransport::class);
-        $transport->shouldReceive('send')->once()->with([$this->recipient->email], '%PDF-PROTECTED-FICTIONAL', '2026-10-07');
+        $transport->shouldReceive('send')->once()->with([$this->recipient->email], '%PDF-PROTECTED-FICTIONAL', '2026-10-07', Mockery::type('string'), Mockery::pattern('/^B\d+$/'), []);
         $this->app->instance(BackupMailTransport::class, $transport);
         $service = app(BackupDeliveryService::class);
         $this->assertSame(['prepared' => 1, 'sent' => 1, 'failed' => 0, 'disabled' => 0], $service->dispatchDue());
@@ -1116,6 +1135,163 @@ class MedicationBackupDeliveryTest extends TestCase
         $this->assertSame([], Storage::disk('private')->allFiles());
     }
 
+    /** EA-057 + EA-140: downloads and password reveals are disclosures; the file names its house and reference. */
+    public function test_b10_backup_download_and_password_reveal_are_disclosure_events_and_the_file_names_its_house(): void
+    {
+        $row = $this->prepare($this->schedule());
+        $this->actingAs($this->recipient)->get('/emar/backups/deliveries/'.$row->id.'/download')->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename="chart-backup-'.Str::slug($this->site->name).'-2026-10-07-B'.$row->id.'.pdf"');
+        $authenticator = new Google2FA;
+        $secret = $authenticator->generateSecretKey();
+        $this->recipient->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt($secret), 'two_factor_confirmed_at' => now()])->saveQuietly();
+        $this->postJson('/emar/backups/deliveries/'.$row->id.'/password', ['password' => 'fictional-secret', 'verification_code' => $authenticator->getCurrentOtp($secret)])->assertOk();
+
+        $events = \App\Models\MedicationEvent::query()->where('subject_type', 'medication_backup')->where('subject_id', (string) $row->id)
+            ->whereIn('kind', ['backup.downloaded', 'backup.password_revealed'])->get();
+        $this->assertEqualsCanonicalizing(['backup.downloaded', 'backup.password_revealed'], $events->pluck('kind')->all());
+        $this->assertTrue($events->every(fn ($event) => (int) $event->actor_id === (int) $this->recipient->id && (int) $event->site_id === (int) $this->site->id));
+    }
+
+    /** Fixed rule + EA-141: the HR work email only, and only someone who can open a backup. */
+    public function test_b10_recipient_needs_an_hr_work_email_and_authenticator_and_gets_mail_at_the_work_email(): void
+    {
+        $schedule = $this->schedule(false);
+        $url = '/emar/backups/schedules/'.$schedule->id.'/recipients';
+        $this->recipient->forceFill(['two_factor_secret' => null, 'two_factor_confirmed_at' => null])->saveQuietly();
+        $this->actingAs($this->lead)->postJson($url, ['version' => $schedule->version, 'user_id' => $this->recipient->id, 'approved' => true])->assertUnprocessable();
+        $this->recipient->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt((new Google2FA)->generateSecretKey()), 'two_factor_confirmed_at' => now()])->saveQuietly();
+        $this->recipient->hrEmployeeProfile->forceFill(['work_email' => null])->saveQuietly();
+        $this->actingAs($this->lead)->postJson($url, ['version' => $schedule->version, 'user_id' => $this->recipient->id, 'approved' => true])->assertUnprocessable();
+        $this->assertDatabaseCount('medication_backup_recipients', 0);
+
+        $this->recipient->hrEmployeeProfile->forceFill(['work_email' => 'House.Work@example.test'])->saveQuietly();
+        $this->actingAs($this->lead)->postJson($url, ['version' => $schedule->version, 'user_id' => $this->recipient->id, 'approved' => true])->assertOk();
+        $row = $this->prepare($schedule->fresh());
+        config(['emar-catalogue-backups.send_enabled' => true]);
+        $transport = Mockery::mock(BackupMailTransport::class);
+        $transport->shouldReceive('send')->once()->with(['house.work@example.test'], Mockery::any(), '2026-10-07', Mockery::any(), Mockery::any(), []);
+        $this->app->instance(BackupMailTransport::class, $transport);
+        $this->assertSame('sent', app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version)->state);
+    }
+
+    /** EA-143: a daily schedule is never switched on without the reviewed encryption. */
+    public function test_b10_schedule_cannot_be_switched_on_without_encryption(): void
+    {
+        $encryption = Mockery::mock(BackupPdfEncryption::class);
+        $encryption->shouldReceive('ready')->andReturnFalse();
+        $encryption->shouldReceive('cleanupStale')->andReturn(0);
+        $this->app->instance(BackupPdfEncryption::class, $encryption);
+        try {
+            app(BackupDeliveryService::class)->schedule($this->lead, $this->site->id, 0, ['local_time' => '07:30', 'enabled' => true, 'retention_days' => 7]);
+            $this->fail('A schedule must not be switched on without encryption.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('enabled', $exception->errors());
+        }
+        $this->assertDatabaseMissing('medication_backup_schedules', ['site_id' => $this->site->id, 'enabled' => true]);
+        // Saved switched off, it is allowed (the schedule waits for encryption).
+        $this->assertFalse(app(BackupDeliveryService::class)->schedule($this->lead, $this->site->id, 0, ['local_time' => '07:30', 'enabled' => false, 'retention_days' => 7])->enabled);
+    }
+
+    /** EA-142: a schedule whose owner lost access says so and alerts, instead of failing silently. */
+    public function test_b10_scheduled_backup_with_a_lapsed_owner_records_it_and_alerts(): void
+    {
+        $this->schedule();
+        $permission = Permission::query()->where('key', 'medications.backups.manage')->sole();
+        $this->lead->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
+
+        $results = app(BackupDeliveryService::class)->dispatchDue();
+
+        $this->assertSame(1, $results['failed']);
+        $schedule = MedicationBackupSchedule::query()->where('site_id', $this->site->id)->sole();
+        $this->assertSame('authority_lapsed', $schedule->last_run_state);
+        $this->assertSame('2026-10-07', (string) $schedule->last_run_nz_date);
+        $this->assertTrue(\App\Models\MedicationAlert::query()->where('type', 'backupFailed')->where('site_id', $this->site->id)->exists());
+        $this->assertDatabaseCount('medication_backup_deliveries', 0);
+    }
+
+    /** EA-142 + EA-138: a failed send alerts, and the every-minute job doesn't rebuild it straight away. */
+    public function test_b10_failed_send_alerts_and_is_not_rebuilt_every_minute(): void
+    {
+        $failed = $this->failedDelivery();
+        $this->assertTrue(\App\Models\MedicationAlert::query()->where('type', 'backupFailed')->where('site_id', $this->site->id)->exists());
+        $transport = Mockery::mock(BackupMailTransport::class);
+        $transport->shouldNotReceive('send');
+        $this->app->instance(BackupMailTransport::class, $transport);
+
+        app(BackupDeliveryService::class)->dispatchDue();
+
+        $after = $failed->fresh();
+        $this->assertSame('failed', $after->state);
+        $this->assertSame($failed->version, $after->version);
+        $this->assertSame($failed->getRawOriginal('artifact_path'), $after->getRawOriginal('artifact_path'));
+    }
+
+    /** EA-144: finance-only users can't use any backup action, so the page isn't theirs either. */
+    public function test_b10_finance_only_user_cannot_open_the_backups_page(): void
+    {
+        $finance = $this->staff($this->site, false);
+        $finance->roles()->sync([\App\Models\Role::firstOrCreate(['name' => 'finance'], ['label' => 'Synthetic finance', 'level' => 10, 'type' => 'system'])->id]);
+        $this->actingAs($finance->fresh())->get('/emar/backups')->assertForbidden();
+    }
+
+    /** EA-141: a recipient sets their own passphrase with step-up; only the encryption template is kept. */
+    public function test_b10_recipient_sets_a_backup_passphrase_with_step_up_and_it_is_never_stored(): void
+    {
+        $this->schedule();
+        $passphrase = 'Correct horse battery 42';
+        app(BackupPdfEncryption::class)->shouldReceive('passphraseTemplate')->with($passphrase)
+            ->andReturn(['template' => '%PDF-TEMPLATE-FICTIONAL', 'owner' => str_repeat('o', 64)]);
+        $authenticator = new Google2FA;
+        $secret = $authenticator->generateSecretKey();
+        $this->recipient->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt($secret), 'two_factor_confirmed_at' => now()])->saveQuietly();
+        $input = ['passphrase' => $passphrase, 'passphrase_confirmation' => $passphrase, 'password' => 'fictional-secret'];
+
+        $this->actingAs($this->recipient)->postJson('/emar/backups/passphrase', [...$input, 'verification_code' => '000000'])->assertUnprocessable();
+        $this->actingAs($this->recipient)->postJson('/emar/backups/passphrase', [...$input, 'passphrase' => 'fictional-secret', 'passphrase_confirmation' => 'fictional-secret',
+            'verification_code' => $authenticator->getCurrentOtp($secret)])->assertUnprocessable()->assertJsonValidationErrors('passphrase');
+        $this->assertDatabaseCount('medication_backup_passphrases', 0);
+        $this->actingAs($this->recipient)->postJson('/emar/backups/passphrase', [...$input, 'verification_code' => $authenticator->getCurrentOtp($secret)])->assertOk();
+
+        $row = \App\Models\MedicationBackupPassphrase::query()->where('user_id', $this->recipient->id)->sole();
+        $this->assertSame('%PDF-TEMPLATE-FICTIONAL', base64_decode($row->template));
+        $raw = json_encode(DB::table('medication_backup_passphrases')->get());
+        $decrypted = $row->template.$row->owner_secret.base64_decode($row->template);
+        $this->assertStringNotContainsString($passphrase, $raw.$decrypted);
+        $this->actingAs($this->recipient)->get('/emar/backups')->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('my_passphrase.set', true)->where('my_passphrase.can_set', true));
+    }
+
+    /** EA-141: a recipient with a passphrase gets their own copy, which opens without the app. */
+    public function test_b10_send_attaches_a_personal_copy_for_recipients_with_a_passphrase(): void
+    {
+        $schedule = $this->schedule();
+        $second = $this->staff($this->site, false);
+        $schedule = app(BackupDeliveryService::class)->approveRecipient($this->lead, $schedule->id, $schedule->version, $second->id, true);
+        \App\Models\MedicationBackupPassphrase::query()->create(['user_id' => $this->recipient->id, 'template' => base64_encode('%PDF-TEMPLATE-FICTIONAL'),
+            'owner_secret' => str_repeat('o', 64), 'set_at' => now()]);
+        $this->actingAs($this->lead)->get('/emar/backups')->assertOk()->assertInertia(fn (Assert $p) => $p
+            ->where('schedules.0.recipients', fn ($rows) => collect($rows)->firstWhere('user_id', $this->recipient->id)['has_passphrase'] === true
+                && collect($rows)->firstWhere('user_id', $second->id)['has_passphrase'] === false));
+        $row = $this->prepare($schedule->fresh());
+        app(BackupPdfEncryption::class)->shouldReceive('encryptForRecipient')->once()
+            ->with('%PDF-PROTECTED-FICTIONAL', $row->password, '%PDF-TEMPLATE-FICTIONAL', str_repeat('o', 64))->andReturn('%PDF-PERSONAL-COPY');
+        config(['emar-catalogue-backups.send_enabled' => true]);
+        $transport = Mockery::mock(BackupMailTransport::class);
+        $transport->shouldReceive('send')->once()->with(Mockery::on(fn ($to) => count($to) === 2), '%PDF-PROTECTED-FICTIONAL', '2026-10-07', Mockery::any(), Mockery::any(),
+            [mb_strtolower($this->recipient->email) => '%PDF-PERSONAL-COPY']);
+        $this->app->instance(BackupMailTransport::class, $transport);
+
+        $this->assertSame('sent', app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version)->state);
+    }
+
+    /** EA-141: someone approved without a passphrase is reminded to set one. */
+    public function test_b10_approving_a_recipient_without_a_passphrase_reminds_them(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+        $this->schedule();
+        \Illuminate\Support\Facades\Notification::assertSentTo($this->recipient, \App\Notifications\BackupPassphraseReminderNotification::class);
+    }
+
     private function failedDelivery(): MedicationBackupDelivery
     {
         $row = $this->prepare($this->schedule());
@@ -1161,6 +1337,242 @@ class MedicationBackupDeliveryTest extends TestCase
         }
     }
 
+    public static function currentBackupMailboxChanges(): array
+    {
+        return [['google', 'disconnected'], ['google', 'version'], ['microsoft', 'disconnected'], ['microsoft', 'version']];
+    }
+
+    #[DataProvider('currentBackupMailboxChanges')]
+    public function test_backup_transport_current_read_denies_committed_mailbox_changes_despite_an_old_transaction_snapshot(string $provider, string $change): void
+    {
+        $connection = $this->centralMailbox($provider);
+        $this->openDurableBoundary();
+        $writerConfig = DB::connection()->getConfig();
+        config(['database.connections.backup_email_writer' => $writerConfig]);
+        DB::beginTransaction();
+        try {
+            $stale = ItMailboxConnection::query()->findOrFail($connection->id);
+            $writer = DB::connection('backup_email_writer');
+            $this->assertSame(self::$isolatedMysqlDatabase, $writer->getDatabaseName());
+            $writer->table('it_mailbox_connections')->where('id', $connection->id)->update($change === 'version'
+                ? ['configuration_version' => 2] : ['status' => 'disconnected']);
+            // The ordinary SELECT remains stale under the actual MySQL RR snapshot.
+            $ordinary = ItMailboxConnection::query()->findOrFail($connection->id);
+            $this->assertSame('connected', $ordinary->status);
+            $this->assertSame(1, $ordinary->configuration_version);
+            $transport = new PreparedBackupOAuthTransport($stale, $provider);
+            Http::fake();
+            try {
+                $transport->send((new Email)->from('saved@example.test')->replyTo('saved@example.test')->to($this->recipient->email)->text('Protected synthetic proof'));
+                $this->fail('The backup transport must read the latest canonical mailbox before any provider request.');
+            } catch (MailNotSubmitted) {
+                Http::assertNothingSent();
+            }
+        } finally {
+            DB::rollBack();
+            DB::purge('backup_email_writer');
+        }
+    }
+
+    public function test_central_email_configuration_partial_acceptance_keeps_the_backup_uncertain_and_immutable(): void
+    {
+        $connection = $this->centralMailbox('google');
+        $schedule = $this->schedule();
+        $second = $this->staff($this->site, false);
+        $schedule = app(BackupDeliveryService::class)->approveRecipient($this->lead, $schedule->id, $schedule->version, $second->id, true);
+        $row = $this->prepare($schedule);
+        $before = $row->getRawOriginal();
+        $bytes = Storage::disk('private')->get($row->artifact_path);
+        $orderBefore = $this->order->fresh()->getRawOriginal();
+        config(['mail.default' => 'smtp', 'emar-catalogue-backups.send_enabled' => true]);
+        Http::fake(function ($request) use ($connection) {
+            $this->assertSame('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', $request->url());
+            $connection->update(['scopes' => []]);
+
+            return Http::response(['id' => 'synthetic-first-accepted'], 200);
+        });
+        try {
+            app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version);
+            $this->fail('Partial acceptance is never safe to resend.');
+        } catch (\RuntimeException $error) {
+            $this->assertNotInstanceOf(MailNotSubmitted::class, $error);
+            $this->assertSame('backup_transport_incomplete', $error->getMessage());
+            $this->assertNull($error->getPrevious());
+        }
+        Http::assertSentCount(1);
+        $fresh = $row->fresh();
+        $this->assertSame('uncertain', $fresh->state);
+        $this->assertSame('submission_unknown', $fresh->failure_code);
+        $this->assertSame('uncertain', MedicationBackupAttempt::query()->sole()->state);
+        $this->assertRetainedArtifact($fresh, $before, $bytes);
+        $this->assertSame($orderBefore, $this->order->fresh()->getRawOriginal());
+        $this->actingAs($this->lead)->postJson('/emar/backups/deliveries/'.$row->id.'/retry', ['version' => $fresh->version])->assertConflict();
+        $this->assertSame(1, $row->fresh()->attempt_count);
+        Http::assertSentCount(1);
+        Mail::assertNothingSent();
+    }
+
+    public function test_capture_mode_never_marks_a_ready_backup_as_provider_accepted(): void
+    {
+        $this->centralMailbox('google');
+        $row = $this->prepare($this->schedule());
+        $before = $row->getRawOriginal();
+        $bytes = Storage::disk('private')->get($row->artifact_path);
+        config(['mail.default' => 'array', 'emar-catalogue-backups.send_enabled' => true]);
+        try {
+            app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version);
+            $this->fail('Local capture must remain known unsent.');
+        } catch (MailNotSubmitted $error) {
+            $this->assertSame('backup_email_not_ready', $error->getMessage());
+            $this->assertNull($error->getPrevious());
+        }
+        $fresh = $row->fresh();
+        $this->assertSame('failed', $fresh->state);
+        $this->assertSame('not_submitted', $fresh->failure_code);
+        $this->assertNull($fresh->sent_at);
+        $this->assertSame('failed', MedicationBackupAttempt::query()->sole()->state);
+        $this->assertRetainedArtifact($fresh, $before, $bytes);
+        Http::assertNothingSent();
+        Mail::assertNothingSent();
+    }
+
+    public function test_backup_readiness_is_redacted_and_email_settings_link_uses_its_existing_permission(): void
+    {
+        $this->centralMailbox('google');
+        $this->schedule();
+        config(['mail.default' => 'smtp']);
+        $this->actingAs($this->recipient)->get('/emar/backups')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('can_view_email_settings', false)->where('readiness.email_ready', true)
+            ->where('readiness.email_source', 'saved')->where('readiness.email_capture_mode', null)->where('readiness.email_reason', null));
+        $permission = Permission::firstOrCreate(['key' => 'settings.access.manage'], ['description' => 'Synthetic settings access', 'group' => 'settings']);
+        $this->lead->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+        $response = $this->actingAs($this->lead->fresh())->get('/emar/backups');
+        $response->assertOk()->assertInertia(fn (Assert $page) => $page->where('can_view_email_settings', true));
+        foreach (['synthetic-backup-token', 'saved@example.test', 'synthetic-refresh', 'connection_scope_hash'] as $privateValue) {
+            $this->assertStringNotContainsString($privateValue, $response->getContent());
+        }
+        Http::assertNothingSent();
+        Mail::assertNothingSent();
+    }
+
+    public static function rotatedBackupCredentialFailures(): array
+    {
+        return [['google', 'later rejection'], ['microsoft', 'later rejection'], ['google', 'audit rollback'], ['microsoft', 'audit rollback'], ['google', 'short replacement'], ['microsoft', 'short replacement']];
+    }
+
+    #[DataProvider('rotatedBackupCredentialFailures')]
+    public function test_rotated_oauth_credentials_remain_durable_when_chart_submission_fails(string $provider, string $failure): void
+    {
+        $connection = $this->centralMailbox($provider);
+        $connection->update(['token_expires_at' => now()->subMinute()]);
+        $schedule = $this->schedule();
+        if ($failure === 'later rejection') {
+            $second = $this->staff($this->site, false);
+            $schedule = app(BackupDeliveryService::class)->approveRecipient($this->lead, $schedule->id, $schedule->version, $second->id, true);
+        }
+        $row = $this->prepare($schedule);
+        $before = $row->getRawOriginal();
+        $bytes = Storage::disk('private')->get($row->artifact_path);
+        $orderBefore = $this->order->fresh()->getRawOriginal();
+        config(['mail.default' => 'smtp', 'emar-catalogue-backups.send_enabled' => true,
+            'services.'.$provider.'.client_id' => 'synthetic-client', 'services.'.$provider.'.client_secret' => 'synthetic-client-secret',
+            'services.microsoft.tenant' => 'synthetic-directory']);
+        $refreshes = 0;
+        $submissions = 0;
+        Http::fake(function ($request) use ($provider, $failure, &$refreshes, &$submissions) {
+            if (str_contains($request->url(), 'oauth2')) {
+                $refreshes++;
+                $this->assertSame($provider === 'google' ? 'https://oauth2.googleapis.com/token' : 'https://login.microsoftonline.com/synthetic-directory/oauth2/v2.0/token', $request->url());
+                $this->assertSame('synthetic-refresh', $request['refresh_token']);
+
+                return Http::response(['access_token' => 'rotated-synthetic-access', 'refresh_token' => 'rotated-synthetic-refresh',
+                    'expires_in' => $failure === 'short replacement' ? 60 : 3600], 200);
+            }
+            $submissions++;
+            $this->assertTrue($request->hasHeader('Authorization', 'Bearer rotated-synthetic-access'));
+            if ($submissions === 2) {
+                return Http::response('Synthetic explicit refusal', 422);
+            }
+
+            return $provider === 'google' ? Http::response(['id' => 'synthetic-accepted'], 200) : Http::response('', 202);
+        });
+        if ($failure === 'audit rollback') {
+            $recorder = Mockery::mock(MedicationEventRecorder::class);
+            $recorder->shouldReceive('append')->once()->andThrow(new \RuntimeException('Synthetic audit rollback after acceptance'));
+            $this->app->instance(MedicationEventRecorder::class, $recorder);
+        }
+        try {
+            app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version);
+            $this->fail('The synthetic boundary must reject or roll back chart submission.');
+        } catch (\RuntimeException $error) {
+            if ($failure === 'short replacement') {
+                $this->assertInstanceOf(MailNotSubmitted::class, $error);
+                $this->assertSame('backup_email_preparation_failed', $error->getMessage());
+            } else {
+                $this->assertNotInstanceOf(MailNotSubmitted::class, $error);
+                $this->assertSame($failure === 'audit rollback' ? 'Synthetic audit rollback after acceptance' : 'backup_transport_incomplete', $error->getMessage());
+            }
+            $this->assertNull($error->getPrevious());
+        }
+        $fresh = $row->fresh();
+        $this->assertSame($failure === 'short replacement' ? 'failed' : 'uncertain', $fresh->state);
+        $this->assertSame($failure === 'short replacement' ? 'not_submitted' : 'submission_unknown', $fresh->failure_code);
+        $this->assertSame($fresh->state, MedicationBackupAttempt::query()->sole()->state);
+        $this->assertSame(1, $refreshes);
+        $this->assertSame($failure === 'short replacement' ? 0 : ($failure === 'later rejection' ? 2 : 1), $submissions);
+        $current = $connection->fresh();
+        $this->assertSame('rotated-synthetic-access', $current->getAccessToken());
+        $this->assertSame('rotated-synthetic-refresh', $current->getRefreshToken());
+        $this->assertStringNotContainsString('rotated-synthetic-refresh', $current->getRawOriginal('refresh_token'));
+        $this->assertRetainedArtifact($fresh, $before, $bytes);
+        $this->assertSame($orderBefore, $this->order->fresh()->getRawOriginal());
+        if ($failure !== 'short replacement') {
+            $this->actingAs($this->lead)->postJson('/emar/backups/deliveries/'.$row->id.'/retry', ['version' => $fresh->version])->assertConflict();
+            $this->assertSame(1, $row->fresh()->attempt_count);
+        }
+        Http::assertSentCount($refreshes + $submissions);
+        Mail::assertNothingSent();
+    }
+
+    public function test_first_explicit_provider_rejection_preserves_known_unsent_backup_state(): void
+    {
+        $this->centralMailbox('google');
+        $row = $this->prepare($this->schedule());
+        $before = $row->getRawOriginal();
+        $bytes = Storage::disk('private')->get($row->artifact_path);
+        config(['mail.default' => 'smtp', 'emar-catalogue-backups.send_enabled' => true]);
+        Http::fake(fn () => Http::response('Synthetic explicit refusal', 422));
+        try {
+            app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version);
+            $this->fail('A rejected first recipient is known unaccepted.');
+        } catch (MailNotSubmitted $error) {
+            $this->assertSame('backup_transport_not_submitted', $error->getMessage());
+            $this->assertNull($error->getPrevious());
+        }
+        $fresh = $row->fresh();
+        $this->assertSame('failed', $fresh->state);
+        $this->assertSame('not_submitted', $fresh->failure_code);
+        $this->assertNull($fresh->sent_at);
+        $this->assertSame('failed', MedicationBackupAttempt::query()->sole()->state);
+        $this->assertRetainedArtifact($fresh, $before, $bytes);
+        Http::assertSentCount(1);
+        Mail::assertNothingSent();
+    }
+
+    private function centralMailbox(string $provider): ItMailboxConnection
+    {
+        $connection = ItMailboxConnection::create(['provider' => $provider, 'status' => 'connected',
+            'account_email' => 'saved@example.test', 'access_token' => 'synthetic-backup-token', 'refresh_token' => 'synthetic-refresh',
+            'token_expires_at' => now()->addHour(), 'scopes' => [$provider === 'google' ? 'https://www.googleapis.com/auth/gmail.send' : 'Mail.Send']])->fresh();
+        AppSetting::create(['key' => EmailConfiguration::KEY, 'value' => [
+            'configuration_version' => 1, 'provider' => $provider, 'from_name' => 'Saved Sender',
+            'it_support' => ['enabled' => false, 'connection_id' => (int) $connection->id,
+                'connection_version' => $connection->configuration_version, 'connection_scope_hash' => $connection->mailboxScopeHash()],
+        ]]);
+
+        return $connection;
+    }
+
     private function useBackupKeys(string $key, array $previous = []): void
     {
         config(['app.key' => $key, 'app.previous_keys' => $previous]);
@@ -1172,6 +1584,8 @@ class MedicationBackupDeliveryTest extends TestCase
     {
         $user = User::factory()->create(['role' => 'team_lead', 'approved_at' => now(), 'email_verified_at' => now(), 'password' => 'fictional-secret']);
         ensureCanonicalHrStaffProfile($user, $site, ['start_date' => '2025-01-01']);
+        // EA-141: a backup recipient has authenticator two-step sign-in.
+        $user->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt((new Google2FA)->generateSecretKey()), 'two_factor_confirmed_at' => now()])->saveQuietly();
         $keys = ['medications.view', 'clients.viewAny', 'medications.reports.view', 'medications.reports.export', 'medications.controlled.view'];
         if ($manager) {
             $keys[] = 'medications.backups.manage';
@@ -1214,6 +1628,7 @@ class MedicationBackupDeliveryTest extends TestCase
         $this->assertContains($connection->getDatabaseName(), [
             'oblivion_findings_codex_test_'.getmypid(),
             'emar_connected_backup_retry_20261007_'.getmypid(),
+            'emar_central_email_20261007_'.getmypid(),
         ]);
         $this->assertSame(self::$isolatedMysqlDatabase, $connection->getDatabaseName());
         $this->assertSame($connection->getDatabaseName(), $connection->selectOne('SELECT DATABASE() AS owned_database')->owned_database);

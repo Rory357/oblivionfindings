@@ -66,6 +66,8 @@ use App\Http\Controllers\Operations\RosterTemplateController;
 use App\Http\Controllers\Operations\ServiceAgreementController;
 use App\Http\Controllers\Operations\ShiftNoteController;
 use App\Http\Controllers\Operations\ShiftReportController;
+use App\Http\Controllers\Operations\WorkforceSettingsController;
+use App\Http\Controllers\Operations\WorkforceEligibilityRefreshController;
 use App\Http\Controllers\RosteringController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
@@ -944,6 +946,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // old bookmark gets routed home instead of hitting an error page.
     Route::middleware(['role_scope:my-day', 'permission:rostering.viewAny'])->group(function () {
         Route::get('/rostering', [RosteringController::class, 'index'])->name('operations.rostering.index');
+        Route::get('/workforce-settings', [WorkforceSettingsController::class, 'index'])->name('operations.workforce.settings');
+        Route::patch('/workforce-settings', [WorkforceSettingsController::class, 'update'])->name('operations.workforce.settings.update');
+        Route::patch('/workforce-settings/staffing-rules', [WorkforceSettingsController::class, 'updateStaffingRules'])
+            ->middleware('permission:hr.settings.manage')->name('operations.workforce.settings.staffing-rules.update');
+        Route::patch('/workforce-settings/eligibility-rules', [WorkforceSettingsController::class, 'updateEligibilityRules'])
+            ->middleware('permission:hr.settings.manage')->name('operations.workforce.settings.eligibility-rules.update');
+        Route::get('/workforce-settings/history', [WorkforceSettingsController::class, 'history'])
+            ->middleware('permission:hr.settings.manage')->name('operations.workforce.settings.history');
         Route::get('/rostering/conflicts', [RosteringController::class, 'conflicts'])->name('operations.rostering.conflicts');
         Route::post('/rostering/coverage/{key}/ack', [CoverageGapController::class, 'ack'])
             ->name('operations.rostering.coverage.ack');
@@ -965,11 +975,16 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.rostering.calendar.shifts.update');
     });
 
+    Route::get('/workforce/eligibility-refresh', [WorkforceEligibilityRefreshController::class, 'index'])
+        ->middleware('permission:rostering.viewAny|shifts.viewAny|shifts.viewAssigned')->name('operations.workforce.eligibility-refresh.index');
+    Route::post('/workforce/eligibility-refresh/{shift}/retry', [WorkforceEligibilityRefreshController::class, 'retry'])
+        ->whereNumber('shift')->middleware('permission:shifts.update')->name('operations.workforce.eligibility-refresh.retry');
+
     // Roster templates — now a tab inside the Rostering workspace. The list,
     // create, edit, view and apply all happen in pop-ups on /operations/rostering;
     // only the mutation endpoints live here. The old index URL 302s to the tab so
     // existing bookmarks keep working.
-    Route::get('/rostering/templates', fn () => redirect()->route('operations.rostering.index', ['tab' => 'templates']))
+    Route::get('/rostering/templates', [RosterTemplateController::class, 'index'])
         ->middleware('permission:roster_templates.viewAny|rostering.viewAny')
         ->name('operations.rostering.templates.index');
 
@@ -1322,9 +1337,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     Route::middleware('permission:rostering.viewAny')->group(function () {
         Route::get('/qualifications', [QualificationMatchController::class, 'index'])->name('operations.qualifications.index');
-        Route::post('/qualifications', [QualificationMatchController::class, 'store'])->name('operations.qualifications.store');
-        Route::put('/qualifications/{requirement}', [QualificationMatchController::class, 'update'])->name('operations.qualifications.update');
-        Route::delete('/qualifications/{requirement}', [QualificationMatchController::class, 'destroy'])->name('operations.qualifications.destroy');
+        Route::post('/qualifications', [QualificationMatchController::class, 'store'])->name('operations.qualifications.store')
+            ->middleware('permission:qualifications.create');
+        Route::put('/qualifications/{requirement}', [QualificationMatchController::class, 'update'])->name('operations.qualifications.update')
+            ->middleware('permission:qualifications.edit');
+        Route::delete('/qualifications/{requirement}', [QualificationMatchController::class, 'destroy'])->name('operations.qualifications.destroy')
+            ->middleware('permission:qualifications.delete');
         Route::get('/qualifications/check/{shift}', [QualificationMatchController::class, 'checkShift'])->name('operations.qualifications.check');
     });
 

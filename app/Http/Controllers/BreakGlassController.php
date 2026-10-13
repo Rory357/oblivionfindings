@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\User;
 use App\Services\Medication\EmergencyAccess\EmergencyAccessService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -108,9 +109,17 @@ class BreakGlassController extends Controller
         return back()->with('success', 'Repeat use acknowledged. New use brings it back.');
     }
 
+    /**
+     * Oversight (review, ending someone else's access) is Site-scoped with
+     * the eMAR Site bypass only, never audit.view or breakglass.end
+     * (EA-030 / EA-065). An out-of-scope house answers "not found" (EA-203).
+     */
     private function assertClientSiteAccess(User $user, Client $client, bool $oversight = true): void
     {
-        $this->siteAccess->assertCanAccessSiteId($user, (int) $client->site_id,
-            $oversight ? ['medications.audit.view', 'medications.breakglass.end'] : []);
+        abort_unless(in_array(
+            (int) $client->site_id,
+            $this->siteAccess->accessibleSiteIds($user, $oversight ? MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS : []),
+            true,
+        ), 404);
     }
 }

@@ -6,6 +6,7 @@ import {
     expectNoConsoleErrors,
     loginAsStaff,
     resetRosteringReadinessFixtures,
+    reviewRosterForPublish,
 } from './helpers';
 import {
     rosteringFlagsEnabled,
@@ -35,8 +36,7 @@ async function expectNoBlockingAxeViolations(page: Page) {
 async function openPublishReview(page: Page) {
     await page.goto('/operations/rostering?week=2026-05-04&site_id=9001');
     await expect(page.getByTestId('rostering-publish-panel')).toBeVisible();
-    await page.getByTestId('rostering-review-publish').click();
-    await expect(page.getByTestId('publish-review-page')).toBeVisible();
+    await reviewRosterForPublish(page);
 }
 
 async function openPublishDiff(page: Page) {
@@ -97,8 +97,7 @@ test.describe('operations rostering a11y smoke', () => {
 
         await loginAsStaff(page);
         await page.goto('/operations/rostering?week=2026-05-04&site_id=9001');
-        await page.getByTestId('rostering-review-publish').click();
-        await expect(page.getByTestId('publish-review-page')).toBeVisible();
+        await reviewRosterForPublish(page);
 
         await expectNoBlockingAxeViolations(page);
         expectNoConsoleErrors(consoleErrors);

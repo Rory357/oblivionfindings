@@ -1,5 +1,10 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
+import {
+    EntityContextMenu,
+    useEntityContextMenu,
+} from '@/components/lists/entity-menu';
 import {
     EntityTable,
     type EntityTableColumn,
@@ -30,9 +35,10 @@ import {
     WizardStepPane,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { toDatetimeLocal, workerTimeOffsets } from '@/lib/datetime';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Check, ClipboardCheck, Link2 } from 'lucide-react';
 import {
@@ -128,15 +134,17 @@ export function ConnectedHeader({
     }[];
     children: ReactNode;
 }) {
+    // EA-079/EA-134 (Lane C8): Home-rooted trail from the hub map; the
+    // page's own title is added when the mapped view is named differently.
+    const page = usePage();
+    const mapped = useEmarBreadcrumbs();
+    const trail = mapped.length > 2 ? mapped : [...mapped, parent];
+    const breadcrumbs =
+        trail.at(-1)?.title === title
+            ? trail
+            : [...trail, { title, href: page.url }];
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/my-day' },
-                { title: 'Medication', href: '/meds/today' },
-                parent,
-                { title, href: '#' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={title} />
             <div className="space-y-5">
                 <PageHeader
@@ -146,6 +154,7 @@ export function ConnectedHeader({
                     subline={subline}
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <PageHeaderSearch
                                 value={query}
                                 onChange={onQuery}
@@ -196,6 +205,9 @@ export function BoundedTable<T extends { id: number | string }>({
     empty?: string;
 }) {
     const [page, setPage] = useState(1);
+    const context = useEntityContextMenu<T>();
+    const actionsFor = (row: T) =>
+        open ? [{ label: 'Open', onClick: () => open(row) }] : [];
     const last = Math.max(1, Math.ceil(rows.length / 25));
     const current = Math.min(page, last);
     return (
@@ -244,12 +256,19 @@ export function BoundedTable<T extends { id: number | string }>({
                     rowHeight="content"
                     columns={columns}
                     onOpen={open}
-                    actionsFor={(r) =>
-                        open ? [{ label: 'Open', onClick: () => open(r) }] : []
-                    }
+                    actionsFor={actionsFor}
+                    onRowContextMenu={context.open}
                 />
             ) : (
                 <SettingsNotice>{empty}</SettingsNotice>
+            )}
+            {context.ctx && (
+                <EntityContextMenu
+                    {...context.ctx}
+                    onClose={context.close}
+                    title={identity(context.ctx.record).name}
+                    items={actionsFor(context.ctx.record)}
+                />
             )}
         </div>
     );
@@ -284,7 +303,7 @@ export function ReviewWizard({
     saved: boolean;
     saveLabel?: string;
     success?: string;
-    successDetail?: string;
+    successDetail?: ReactNode;
 }) {
     const [returnTarget] = useState(() => {
         if (typeof document === 'undefined') return null;

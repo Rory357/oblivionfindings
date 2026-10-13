@@ -10,6 +10,12 @@ export type Clinician = {
     expires_at: string;
     revoked_at: string | null;
     identity_verified_at: string;
+    /** EA-104: structured registration evidence and its yearly re-check. */
+    registration_check?: 'structured' | 'note';
+    registration_scope?: string | null;
+    register_checked_at?: string | null;
+    register_recheck_due?: boolean;
+    needs_structured_check?: boolean;
 };
 export type Grant = {
     active: boolean;
@@ -24,6 +30,9 @@ export type Grant = {
     include_controlled: boolean;
     expires_at: string;
     revoked_at: string | null;
+    /** EA-083: chart views by this prescriber under this grant. */
+    views?: number;
+    last_viewed_at?: string | null;
 };
 export type Proposal = {
     id: number;
@@ -38,7 +47,11 @@ export type Proposal = {
     status: string;
     submitted_at: string;
     revision_id: number | null;
+    order_url?: string | null;
+    /** The reply the prescriber sees. */
     decision_note: string | null;
+    /** EA-084: staff only, never sent to the portal. */
+    internal_note?: string | null;
     has_source_file: boolean;
 };
 export type Transfer = {
@@ -102,4 +115,9 @@ export type ConnectedProps = {
         export: boolean;
     };
     witnesses: { id: number; name: string }[];
+    /** EA-104: Settings › Connected services › Prescriber registration check. */
+    registration?: {
+        mode: 'structured' | 'note';
+        councils: Record<string, string>;
+    };
 };

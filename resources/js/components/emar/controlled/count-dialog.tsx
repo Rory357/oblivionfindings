@@ -436,7 +436,7 @@ export function CountDialog({
                 footerStart={
                     <Button
                         variant="outline"
-                        className="min-h-11"
+                        className="frontline-tap"
                         disabled={saving || uncertain}
                         onClick={
                             step > 0 ? () => setStep(step - 1) : requestClose
@@ -447,7 +447,7 @@ export function CountDialog({
                 }
                 footerEnd={
                     <Button
-                        className="min-h-11"
+                        className="frontline-tap"
                         disabled={saving}
                         onClick={step < 2 ? next : () => void save()}
                     >
@@ -500,7 +500,10 @@ export function CountDialog({
                                 </div>
                             }
                             actions={
-                                <Button className="min-h-11" onClick={onClose}>
+                                <Button
+                                    className="frontline-tap"
+                                    onClick={onClose}
+                                >
                                     Done
                                 </Button>
                             }

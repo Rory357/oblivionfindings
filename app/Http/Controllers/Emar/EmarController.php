@@ -163,7 +163,8 @@ class EmarController extends Controller
             'manage_interactions' => (bool) $user && $user->canDo('medications.administer.correct'),
             'manage_stock' => (bool) $user && $user->canDo('medications.stock.update'),
             'view_controlled' => (bool) $user && $user->canDo('medications.controlled.view'),
-            'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')),
+            // EA-196: ending access needs breakglass (own) or breakglass.end, not audit.view.
+            'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.breakglass.end')),
             'view_reports' => (bool) $user && $user->canDo('medications.reports.view'),
             'view_audit' => (bool) $user && $user->canDo('medications.reports.view') && $user->canDo('medications.audit.view'),
             'export_reports' => (bool) $user && (
@@ -2582,6 +2583,7 @@ class EmarController extends Controller
     // ─── Prescriptions / Prescriber Orders ─────────────────
     public function prescriptions(Request $request)
     {
+        $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'prescriber_order_id' => ['nullable', 'integer', 'min:1']]);
         $actor = $request->user();
         abort_unless($actor, 403);
         $siteFilter = $request->integer('site_id') ?: null;
@@ -2605,6 +2607,11 @@ class EmarController extends Controller
             ->with('site:id,name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'site_id']);
+        $readableIds = $this->personScopedClientIds($actor, $clients->pluck('id'));
+        $clients = $clients->whereIn('id', $readableIds)->values();
+        $clientFilter = $request->integer('client_id') ?: null;
+        abort_if($clientFilter !== null && ! in_array($clientFilter, $readableIds, true), 404);
+        $scopedIds = $clientFilter !== null ? [$clientFilter] : $readableIds;
         $workScopedClientIds = $this->medicationScope->clientIdsWithCurrentAuthority(
             $actor,
             $clients->pluck('id')->map(fn ($clientId): int => (int) $clientId)->all(),
@@ -2617,7 +2624,7 @@ class EmarController extends Controller
             && $canViewControlled
             && $canRecordControlled;
 
-        $medications = ClientMedication::active()
+        $medications = ClientMedication::active()->whereIn('client_id', $scopedIds)
             ->where('approval_status', 'verified')
             ->whereHas('client', fn ($q) => $q->whereIn('site_id', $accessibleSiteIds))
             ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
@@ -2648,6 +2655,10 @@ class EmarController extends Controller
             $readerSiteIds,
             true,
         );
+        $orderQuery->whereIn('client_id', $scopedIds);
+        if ($request->integer('prescriber_order_id')) {
+            abort_unless((clone $orderQuery)->when(! $canViewControlled, fn ($q) => $q->visibleToOrdinaryReader())->whereKey($request->integer('prescriber_order_id'))->exists(), 404);
+        }
         if (! $canViewControlled) {
             $orderQuery->visibleToOrdinaryReader();
         }
@@ -2764,6 +2775,7 @@ class EmarController extends Controller
             $readerSiteIds,
             false,
         );
+        $covertQuery->whereIn('client_id', $scopedIds);
         if (! $canViewControlled) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($covertQuery);
         }
@@ -2803,8 +2815,17 @@ class EmarController extends Controller
         $sites = $this->governanceScope->sitePicker($accessibleSiteIds);
         $activeSite = $siteFilter ? $sites->firstWhere('id', $siteFilter) : null;
 
+        // EA-053 (Lane C3): these are old prescriber-order records, read only.
+        // New orders, changes and stops are entered and checked in Orders (P04).
+        $orders = array_map(fn (array $order): array => [...$order, 'can_confirm' => false, 'can_countersign' => false,
+            'can_dispense' => false, 'can_link' => false, 'can_cancel' => false], $orders);
+        $canCreateManualOrders = false;
+
         return Inertia::render('emar/Prescriptions', [
             'orders' => $orders,
+            'read_only' => true,
+            'selected_prescriber_order_id' => $request->integer('prescriber_order_id') ?: null,
+            'selected_prescriber_order' => collect($orders)->firstWhere('id', $request->integer('prescriber_order_id')),
             'covert' => $covert,
             'clients' => $clients
                 ->map(fn (Client $c) => [
@@ -3175,6 +3196,7 @@ class EmarController extends Controller
             'rounds' => $rounds,
             'date' => $date,
             'now_label' => now()->setTimezone(config('app.worker_timezone', config('app.timezone')))->format('g:i a'),
+            'selected_site_id' => $siteFilter,
             'lastGenerated' => $lastGenerated?->toIso8601String(),
             'guidedRound' => $guidedRound,
             'activity' => $activity,
@@ -3452,7 +3474,7 @@ class EmarController extends Controller
         abort_unless($actor && $actor->canDo('medications.view'), 403);
         $filters = $request->validate([
             'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'],
-            'client_medication_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'],
+            'client_medication_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'], 'destruction_id' => ['nullable', 'integer', 'min:1'],
         ]);
         $siteFilter = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
         $clientFilter = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
@@ -3481,7 +3503,7 @@ class EmarController extends Controller
 
         // Flat, client-side-filterable disposal register. Voided records remain
         // in the list (struck through) — the register is immutable (MoD Regs 1977).
-        $destructions = $this->governanceScope->scopeCanonicalClientMedicationRows(
+        $destructionQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
             MedicationDestruction::query(),
             $readerSiteIds,
         )
@@ -3499,9 +3521,12 @@ class EmarController extends Controller
                 'witness2:id,name',
                 'voidedByUser:id,name',
             ])
-            ->latest('destroyed_at')
-            ->limit(300)
-            ->get();
+            ->where(fn ($q) => $q->whereNull('medication_destructions.site_id')->orWhereHas('client', fn ($c) => $c->whereColumn('clients.site_id', 'medication_destructions.site_id')));
+        $selectedDestruction = $request->integer('destruction_id') ? (clone $destructionQuery)->findOrFail($request->integer('destruction_id')) : null;
+        $destructions = (clone $destructionQuery)->latest('destroyed_at')->limit(300)->get();
+        if ($selectedDestruction !== null) {
+            $destructions = $destructions->push($selectedDestruction)->unique('id')->sortByDesc('destroyed_at')->values();
+        }
 
         // Every active medication is destroyable — same CdMedication shape the
         // shared RecordDestructionDialog consumes on the Controlled Drugs page.
@@ -3521,6 +3546,7 @@ class EmarController extends Controller
 
         return Inertia::render('emar/Destructions', [
             'filters' => ['site_id' => $siteFilter, 'client_id' => $clientFilter, 'client_medication_id' => $medicineFilter, 'date' => $filters['date'] ?? null],
+            'selected_destruction_id' => $selectedDestruction?->id,
             'can_record' => $request->user()?->canDo('medications.controlled.record') ?? false,
             'destructions' => $destructions->map(fn (MedicationDestruction $d) => [
                 'id' => $d->id,
@@ -6972,7 +6998,8 @@ class EmarController extends Controller
                     'delivery_notes' => 'nullable|string|max:2000',
                     ...$this->medicationOnlineOnlySubmissionRules(),
                 ]);
-                $this->assertActiveGovernanceMedication($medication);
+                // EA-073: a held medicine's delivery is still received into the register.
+                abort_unless(MedicationStockService::receivable($medication), 404, 'The requested medication record was not found.');
                 abort_unless(
                     (bool) $medication->controlled_drug
                     && (int) $validated['client_medication_id'] === (int) $medication->id,
@@ -7059,40 +7086,39 @@ class EmarController extends Controller
                     ]);
                 }
 
-                $entry = ClientControlledDrugEntry::create([
-                    'client_id' => $client->id,
-                    'client_medication_id' => $medication->id,
-                    'pharmacy_order_id' => $lockedOrder->id,
-                    'client_request_uuid' => $validated['client_request_uuid'],
-                    'captured_offline_at' => $validated['captured_offline_at'] ?? null,
-                    'origin_device_id' => $validated['origin_device_id'] ?? null,
-                    'queued_offline' => (bool) ($validated['queued_offline'] ?? false),
-                    'service_context_id' => $client->service_context_id,
-                    'entry_type' => 'receipt',
-                    'quantity' => $quantityReceived,
-                    'unit' => $stock->unit,
-                    'batch_number' => $lockedOrder->batch_number,
-                    'expiry_date' => $lockedOrder->batch_expiry,
-                    'on_hand_before' => $authoritativeBefore,
-                    'on_hand_after' => $expectedAfter,
-                    'reason' => 'Pharmacy order delivery',
-                    'notes' => $validated['delivery_notes'] ?? null,
-                    'recorded_at' => now(),
-                    'recorded_by' => $actor->id,
-                    'witnessed_by' => $witness->id,
-                ]);
-
-                if ($stock->lots_started_at !== null) {
-                    $stock->forceFill(['on_hand' => $expectedAfter, 'supplier_name' => $lockedOrder->pharmacy_name])->saveFromPackLedger();
-                    app(MedicationStockService::class)->controlledDeliveryAfterRegister($stock, $lockedActor,
-                        [...$validated, 'request_uuid' => $validated['client_request_uuid'], 'packs' => $validated['packs'] ?? [],
-                            'source' => 'pharmacy', 'source_reference' => 'Pharmacy order '.$lockedOrder->id], $entry, $lockedOrder);
-                } else {
-                    $this->mergeDeliveredBatch($stock, $lockedOrder->batch_number, $lockedOrder->batch_expiry, $authoritativeBefore);
-                    $stock->forceFill(['on_hand' => $expectedAfter, 'supplier_name' => $lockedOrder->pharmacy_name, 'last_counted_at' => now()])->save();
-                    $lockedOrder->forceFill(['status' => 'delivered', 'delivered_at' => now(), 'received_by' => $actor->id,
-                        'quantity_received' => $quantityReceived, 'delivery_notes' => $validated['delivery_notes'] ?? null])->save();
-                }
+                // EA-092 (Lane C2): one receipt writer. The canonical P07 register
+                // receipt writes the entry and balance (with its own audit), and
+                // this delivery's packs or batch attach inside the same lock.
+                $entry = app(ControlledRegisterService::class)->recordReceipt(
+                    $lockedActor, $client, $medication, $stock,
+                    [
+                        'witnessed_by' => (int) $validated['witnessed_by'], 'witness_credential' => $validated['witness_credential'] ?? null,
+                        'quantity' => $quantityReceived, 'pharmacy_order_id' => $lockedOrder->id,
+                        'batch_number' => $lockedOrder->batch_number, 'expiry_date' => $lockedOrder->batch_expiry,
+                        'delivery_notes' => $validated['delivery_notes'] ?? null,
+                    ],
+                    $lockedUsers,
+                    function (ClientControlledDrugEntry $entry) use ($stock, $lockedActor, $validated, $lockedOrder, $authoritativeBefore, $quantityReceived, $actor): void {
+                        if ($stock->lots_started_at !== null) {
+                            $stock->forceFill(['supplier_name' => $lockedOrder->pharmacy_name])->saveFromPackLedger();
+                            app(MedicationStockService::class)->controlledDeliveryAfterRegister($stock, $lockedActor,
+                                [...$validated, 'request_uuid' => $validated['client_request_uuid'], 'packs' => $validated['packs'] ?? [],
+                                    'source' => 'pharmacy', 'source_reference' => 'Pharmacy order '.$lockedOrder->id], $entry, $lockedOrder);
+                        } else {
+                            $this->mergeDeliveredBatch($stock, $lockedOrder->batch_number, $lockedOrder->batch_expiry, $authoritativeBefore);
+                            $stock->forceFill(['supplier_name' => $lockedOrder->pharmacy_name, 'last_counted_at' => now()])->save();
+                            $lockedOrder->forceFill(['status' => 'delivered', 'delivered_at' => now(), 'received_by' => $actor->id,
+                                'quantity_received' => $quantityReceived, 'delivery_notes' => $validated['delivery_notes'] ?? null])->save();
+                        }
+                    },
+                );
+                app(\App\Services\Medication\Audit\MedicationEventRecorder::class)->append(new \App\Services\Medication\Audit\MedicationEventData(
+                    siteId: (int) $client->site_id, kind: 'stock.receive', subjectType: 'stock', subjectId: (string) $medication->id,
+                    actorId: (int) $lockedActor->id, occurredAt: CarbonImmutable::now('UTC'), summary: 'Stock received',
+                    facts: ['request_uuid' => $validated['client_request_uuid'], 'client_medication_id' => $medication->id,
+                        'entry_id' => $entry->id, 'pharmacy_order_id' => $lockedOrder->id, 'quantity_received' => $quantityReceived],
+                    clientId: (int) $client->id, controlled: true,
+                ));
                 AuditLogger::logOrFail('medications.controlled.pharmacy_delivery.receive', $entry, [
                     'actor_id' => $actor->id,
                     'client_id' => $client->id,

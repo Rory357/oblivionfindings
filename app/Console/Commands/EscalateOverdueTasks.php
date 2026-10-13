@@ -116,6 +116,17 @@ class EscalateOverdueTasks extends Command
                             ], (int) $watcherId) ? 1 : 0;
                         }
 
+                        // Level 2 for medication work (EA-018): only managers
+                        // who can open the item themselves, each told with
+                        // their own projection of it, once per manager.
+                        if ($item->dueAt !== null
+                            && Carbon::parse($item->dueAt)->lte($managerCutoff)
+                            && $this->isMedicationItem($aggregator, $item)) {
+                            $escalated += $this->escalateMedicationItemToManagers($aggregator, $notifications, $seen, $item);
+
+                            continue;
+                        }
+
                         // Level 2 — 3+ days overdue: escalate to the managers
                         // group, assignee or not.
                         if ($item->dueAt !== null && Carbon::parse($item->dueAt)->lte($managerCutoff)) {
@@ -136,6 +147,62 @@ class EscalateOverdueTasks extends Command
         $this->info("Overdue task escalations sent — assignee nudges: {$nudged}, manager escalations: {$escalated}, watcher FYIs: {$watchersPinged}.");
 
         return self::SUCCESS;
+    }
+
+    private function isMedicationItem(TaskAggregator $aggregator, TaskItem $item): bool
+    {
+        $provider = $aggregator->providerFor($item->source);
+
+        return $provider !== null && str_contains(class_basename($provider), 'Medication');
+    }
+
+    /**
+     * A medication item's 3-day escalation goes to the manager roles, but only
+     * to managers whose own task feed contains it (the provider's permission,
+     * Site and person rules), titled from their own projection. An item
+     * already escalated the old way (to the whole group) is not repeated.
+     *
+     * @param  array<string, bool>  $seen
+     */
+    private function escalateMedicationItemToManagers(
+        TaskAggregator $aggregator,
+        NotificationService $notifications,
+        array &$seen,
+        TaskItem $item,
+    ): int {
+        $source = $item->identitySource();
+        $itemId = $item->numericId();
+        if (isset($seen[$source.'|'.$itemId.'|2|0'])) {
+            return 0;
+        }
+
+        $sent = 0;
+        $managers = User::query()
+            ->whereNotNull('approved_at')
+            ->whereHas('roles', fn ($roles) => $roles->whereIn('name', NotificationService::MANAGER_ROLES))
+            ->orderBy('id')
+            ->get();
+        foreach ($managers as $manager) {
+            if (isset($seen[$source.'|'.$itemId.'|2|'.$manager->id])) {
+                continue;
+            }
+            $managerItem = $aggregator->findItemFor($manager, $source, $itemId);
+            if ($managerItem === null) {
+                continue;
+            }
+            $sent += $this->escalate($notifications, $seen, $managerItem, 2, [
+                'event_key' => 'tasks.overdue_escalation',
+                'body' => sprintf(
+                    'A work item has been overdue for %d+ days%s and needs management attention.',
+                    self::MANAGER_ESCALATION_DAYS,
+                    $managerItem->assignee ? ' (assigned to '.($managerItem->assignee['name'] ?? 'a staff member').')' : ' (unassigned)',
+                ),
+                'target_user_ids' => [(int) $manager->id],
+                'include_managers' => false,
+            ], (int) $manager->id) ? 1 : 0;
+        }
+
+        return $sent;
     }
 
     /**

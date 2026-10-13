@@ -10,6 +10,7 @@ use App\Models\ServiceAgreementLineItem;
 use App\Models\ServiceAgreementRate;
 use App\Models\Site;
 use App\Models\Timesheet;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\ShiftOperationalSnapshotService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -35,7 +36,7 @@ class BillingService
      * edits the allocation breakdown. Once entries are invoiced/paid the
      * caller must not re-run generation — we leave those rows alone.
      */
-    public function generateFromTimesheet(Timesheet $timesheet): Collection
+    public function generateFromTimesheet(Timesheet $timesheet, ?array $currentSnapshot = null): Collection
     {
         if ($timesheet->status !== 'approved') {
             return new Collection;
@@ -53,13 +54,24 @@ class BillingService
 
         $rateType = $this->determineRateType($timesheet);
         $payroll = $this->rateResolver->resolve($timesheet);
-        $baseSnapshot = $this->snapshots->billingSnapshotForTimesheet(
+        $baseSnapshot = $currentSnapshot === null ? $this->snapshots->billingSnapshotForTimesheet(
             $timesheet,
             $payroll['pay_rate'],
             $payroll['payroll_cost']
-        );
+        ) : [
+            'site_id' => $currentSnapshot['site_id'],
+            'site_name_snapshot' => $currentSnapshot['site_name_snapshot'],
+            'location_snapshot' => $currentSnapshot['location_snapshot'],
+            'service_context_name_snapshot' => $currentSnapshot['service_context_name_snapshot'],
+            'client_name_snapshot' => $currentSnapshot['client_name_snapshot'],
+            'staff_name_snapshot' => $currentSnapshot['staff_name_snapshot'],
+            'shift_type_snapshot' => $currentSnapshot['shift_type_snapshot'],
+            'pay_type_snapshot' => $timesheet->pay_type,
+            'pay_rate_snapshot' => round($payroll['pay_rate'], 2),
+            'payroll_cost' => round($payroll['payroll_cost'], 2),
+        ];
 
-        return DB::transaction(function () use ($timesheet, $allocations, $rateType, $baseSnapshot) {
+        return DB::transaction(function () use ($timesheet, $allocations, $rateType, $baseSnapshot, $currentSnapshot) {
             $existing = BillingEntry::where('timesheet_id', $timesheet->id)
                 ->with('fundingClaimItem:id,billing_entry_id')
                 ->orderBy('id')
@@ -84,14 +96,15 @@ class BillingService
                     continue;
                 }
 
-                $client = Client::query()
+                $clientQuery = Client::query()
                     ->whereKey($clientId)
                     ->whereNotNull('site_id')
                     ->whereHas('site', fn ($siteQuery) => $siteQuery
                         ->active()
                         ->notArchived()
-                        ->whereNull('archived_at'))
-                    ->first();
+                        ->whereNull('archived_at'));
+                $client = $currentSnapshot === null ? $clientQuery->first()
+                    : CurrentAuthorizationReads::within(fn ($reads) => $reads->query($clientQuery)->first());
                 if (! $client) {
                     continue;
                 }

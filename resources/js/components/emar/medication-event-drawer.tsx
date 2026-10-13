@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { WizardShell } from '@/components/wizard/shell';
 import { formatDateTimeLong } from '@/lib/datetime';
+import { withMedicationReturn } from '@/lib/medication-navigation';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -52,6 +53,8 @@ export type AuditEvent = {
     details: Record<string, unknown>;
     category: string;
     source: string;
+    source_href?: string | null;
+    source_label?: string | null;
     site_id: number | null;
     site_name: string | null;
     outcome: string | null;
@@ -252,7 +255,19 @@ const HIDDEN_DETAIL_KEYS = new Set(['changes', 'scheduled_for']);
  *  includes medicine changes and Stock includes both receipts and destructions. */
 export const eventPrimaryLink = (
     event: AuditEvent,
-): { href: string; label: string } => {
+): { href: string; label: string } | null => {
+    if (event.source_href === null) return null;
+    if (event.source_href)
+        return {
+            href:
+                typeof window === 'undefined'
+                    ? event.source_href
+                    : withMedicationReturn(
+                          event.source_href,
+                          window.location.pathname + window.location.search,
+                      ),
+            label: event.source_label ?? 'source record',
+        };
     const link: EventLink = EVENT_LINK[event.event_type] ??
         SOURCE_LINK[event.source] ?? { href: '/emar', label: 'eMAR' };
     return { href: eventLinkHref(link, event), label: link.label };
@@ -295,10 +310,8 @@ export function MedicationEventDrawer({
             v !== '',
     );
     const link = eventPrimaryLink(event);
-    const primaryHref = link.href;
-    const resolveHref = event.flags.includes('missing_witness')
-        ? eventLinkHref(CONTROLLED_LINK, event)
-        : primaryHref;
+    const primaryHref = link?.href;
+    const resolveHref = primaryHref;
     const isGap = event.flags.length > 0;
 
     const sections = [
@@ -504,15 +517,17 @@ export function MedicationEventDrawer({
                                 View client
                             </Button>
                         ) : null}
-                        <Button
-                            className="frontline-tap frontline-focus h-auto whitespace-normal"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.visit(primaryHref)}
-                        >
-                            <Eye className="size-4" />
-                            Open on {link.label}
-                        </Button>
+                        {link && (
+                            <Button
+                                className="frontline-tap frontline-focus h-auto whitespace-normal"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => router.visit(link.href)}
+                            >
+                                <Eye className="size-4" />
+                                Open on {link.label}
+                            </Button>
+                        )}
                         <Button
                             className="frontline-tap frontline-focus h-auto whitespace-normal"
                             variant="ghost"
@@ -546,7 +561,7 @@ export function MedicationEventDrawer({
                                 Flag for investigation
                             </Button>
                         )}
-                        {isGap && (
+                        {isGap && resolveHref && (
                             <Button
                                 className="frontline-tap frontline-focus h-auto whitespace-normal"
                                 asChild
@@ -560,13 +575,15 @@ export function MedicationEventDrawer({
                         )}
                     </div>
                     <div className="flex items-center gap-2 sm:hidden">
-                        <Button
-                            className="frontline-tap frontline-focus"
-                            variant="outline"
-                            onClick={() => router.visit(primaryHref)}
-                        >
-                            Open record
-                        </Button>
+                        {link && (
+                            <Button
+                                className="frontline-tap frontline-focus"
+                                variant="outline"
+                                onClick={() => router.visit(link.href)}
+                            >
+                                Open record
+                            </Button>
+                        )}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button

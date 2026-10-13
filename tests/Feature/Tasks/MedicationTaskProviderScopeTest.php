@@ -25,6 +25,9 @@ use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    // Lane C1 (EA-090): downtime authority is a permission; RbacSeeder
+    // resets role grants, so add it the way DatabaseSeeder does.
+    $this->seed(\Database\Seeders\MedicationDowntimePermissionsSeeder::class);
 });
 
 function medicationTaskGrant(User $actor, array $keys, bool $allowed = true): void
@@ -188,12 +191,12 @@ it('requires exact independent audit authority and approved sites for emergency 
 
     expect($provider->authorizedTasks($actor))->toBe([]);
     medicationTaskGrant($actor, ['medications.audit.view']);
-    // This exact audit permission deliberately covers all active approved Sites
-    // and people; the auditor's employment Site and support assignments do not
-    // narrow that independent audit boundary.
+    // EA-017 / EA-065: audit.view is not a house bypass. The reviewer sees
+    // emergency access at the houses they're approved for — the same rule
+    // ClientPolicy::reviewBreakGlass applies when they record the review.
     expect(collect($provider->authorizedTasks($actor))->pluck('id')->sort()->values()->all())
-        ->toBe(collect([$visible, $foreign])->map(fn ($grant) => 'med_emergency_review-'.$grant->id)->sort()->values()->all());
-    foreach ([$archived, $own, $cosigned, $reviewed] as $hidden) {
+        ->toBe(['med_emergency_review-'.$visible->id]);
+    foreach ([$foreign, $archived, $own, $cosigned, $reviewed] as $hidden) {
         expect($provider->authorizedTasks($actor, ['id' => $hidden->id]))->toBe([]);
         $this->actingAs($actor)->getJson(route('tasks.detail', ['source' => 'med_emergency_review', 'id' => $hidden->id]))->assertNotFound();
     }

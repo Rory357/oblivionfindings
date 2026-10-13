@@ -443,185 +443,23 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertNull($revision->rejection_reason);
     }
 
-    public function test_csv_import_reports_validation_errors_when_no_rows_can_be_imported(): void
+    public function test_csv_import_is_refused_and_writes_nothing(): void
     {
+        // EA-023 (Lane C3): a CSV import created unchecked orders outside P04
+        // (Site access only, never controlled). Each order is entered in Orders.
         $manager = $this->makeSiteUser(['medications.orders.manage'], $this->site);
-        $this->client->update(['first_name' => 'Local', 'last_name' => 'Resident']);
-        Client::factory()->create([
-            'site_id' => $this->site->id,
-            'service_context_id' => $this->client->service_context_id,
-            'first_name' => 'Local', 'last_name' => 'Resident', 'status' => 'active',
-        ]);
-        $header = "client_name,medication_name,dose,frequency,route\n";
-
-        foreach ([
-            $header,
-            "\n\n",
-            $header."Local Resident,Missing columns\n",
-            $header."Local Resident,Missing dose,,Once daily,oral\n",
-            $header."OneName,Invalid name,5 mg,Once daily,oral\n",
-            $header."Unknown Person,Unmatched medicine,5 mg,Once daily,oral\n",
-            $header."Local Resident,Ambiguous medicine,5 mg,Once daily,oral\n",
-        ] as $csv) {
-            $this->actingAs($manager)->post('/emar/medications/import', [
-                'csv_file' => UploadedFile::fake()->createWithContent('medications.csv', $csv),
-            ])->assertRedirect()->assertSessionHasErrors('csv_file')->assertSessionMissing('success');
-            $this->assertDatabaseCount('client_medications', 0);
-        }
-    }
-
-    public function test_csv_import_reports_validation_errors_when_the_actor_has_no_accessible_house(): void
-    {
-        $manager = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-        $this->grantPermissions($manager, ['medications.view', 'medications.orders.manage']);
         $this->client->update(['first_name' => 'Local', 'last_name' => 'Resident']);
 
         $this->actingAs($manager)->post('/emar/medications/import', [
             'csv_file' => UploadedFile::fake()->createWithContent('medications.csv',
                 "client_name,medication_name,dose,frequency,route\n"
-                ."Local Resident,Inaccessible medicine,5 mg,Once daily,oral\n"),
-        ])->assertRedirect()->assertSessionHasErrors('csv_file')->assertSessionMissing('success');
+                ."Local Resident,Imported medicine,5 mg,Once daily,oral\n"
+                ."Local Resident,Morphine,10 mg,Once daily,oral\n"),
+        ])->assertRedirect('/emar/prescriptions')->assertSessionHas('error')->assertSessionMissing('success');
+        $this->actingAs($manager)->postJson('/emar/medications/import', [
+            'csv_file' => UploadedFile::fake()->createWithContent('medications.csv', "client_name,medication_name\nLocal Resident,Morphine\n"),
+        ])->assertStatus(409);
         $this->assertDatabaseCount('client_medications', 0);
-    }
-
-    public function test_csv_import_success_reports_actual_imported_and_skipped_rows(): void
-    {
-        $manager = $this->makeSiteUser(['medications.orders.manage'], $this->site);
-        $this->client->update(['first_name' => 'Local', 'last_name' => 'Resident']);
-
-        $this->actingAs($manager)->post('/emar/medications/import', [
-            'csv_file' => UploadedFile::fake()->createWithContent('medications.csv',
-                "client_name,medication_name,dose,frequency,route\n"
-                ."\nLocal Resident,Imported medicine,5 mg,Once daily,oral\n"
-                ."Local Resident,Invalid row\n"
-                ."Unknown Person,Unmatched medicine,5 mg,Once daily,oral\n"),
-        ])->assertRedirect()->assertSessionHasNoErrors()
-            ->assertSessionHas('success', '1 medication order imported for checking; 2 rows skipped.');
-        $this->assertDatabaseCount('client_medications', 1);
-        $this->assertDatabaseHas('client_medications', [
-            'client_id' => $this->client->id, 'name' => 'Imported medicine',
-            'approval_status' => 'pending_verification', 'verified_by' => null, 'verified_at' => null,
-        ]);
-    }
-
-    public function test_csv_import_resolves_only_one_canonical_accessible_client_and_creates_pending_orders(): void
-    {
-        $manager = $this->makeSiteUser(['medications.orders.manage'], $this->site);
-        $this->client->update([
-            'first_name' => 'Local',
-            'last_name' => 'Resident',
-        ]);
-        $foreignSite = Site::factory()->create([
-            'is_active' => true,
-            'archived' => false,
-            'archived_at' => null,
-        ]);
-        Client::factory()->create([
-            'site_id' => $foreignSite->id,
-            'service_context_id' => $this->client->service_context_id,
-            'first_name' => 'Local',
-            'last_name' => 'Resident',
-            'status' => 'active',
-        ]);
-        Client::factory()->create([
-            'site_id' => $foreignSite->id,
-            'service_context_id' => $this->client->service_context_id,
-            'first_name' => 'Foreign',
-            'last_name' => 'Only',
-            'status' => 'active',
-        ]);
-
-        $this->actingAs($manager)
-            ->post('/emar/medications/import', [
-                'csv_file' => UploadedFile::fake()->createWithContent(
-                    'medications.csv',
-                    "client_name,medication_name,dose,frequency,route\n"
-                    ."Local Resident,Accessible medicine,5 mg,Once daily,oral\n"
-                    ."Foreign Only,Concealed medicine,10 mg,Once daily,oral\n",
-                ),
-            ])
-            ->assertRedirect()->assertSessionHasNoErrors()
-            ->assertSessionHas('success', '1 medication order imported for checking; 1 row skipped.');
-
-        $accessibleMedication = ClientMedication::query()
-            ->where('name', 'Accessible medicine')
-            ->firstOrFail();
-        $this->assertSame($this->client->id, (int) $accessibleMedication->client_id);
-        $this->assertSame($manager->id, (int) $accessibleMedication->created_by);
-        $this->assertSame('pending_verification', $accessibleMedication->approval_status);
-        $this->assertNull($accessibleMedication->verified_by);
-        $this->assertDatabaseMissing('client_medications', [
-            'name' => 'Concealed medicine',
-        ]);
-
-        Client::factory()->create([
-            'site_id' => $this->site->id,
-            'service_context_id' => $this->client->service_context_id,
-            'first_name' => 'Local',
-            'last_name' => 'Resident',
-            'status' => 'active',
-        ]);
-        $this->actingAs($manager)
-            ->post('/emar/medications/import', [
-                'csv_file' => UploadedFile::fake()->createWithContent(
-                    'medications.csv',
-                    "client_name,medication_name,dose,frequency,route\n"
-                    ."\"Resident, Local\",Ambiguous medicine,5 mg,Once daily,oral\n",
-                ),
-            ])
-            ->assertRedirect()->assertSessionHasErrors('csv_file');
-        $this->assertDatabaseMissing('client_medications', [
-            'name' => 'Ambiguous medicine',
-        ]);
-    }
-
-    public function test_csv_import_rolls_back_every_order_when_a_later_creation_fails(): void
-    {
-        $manager = $this->makeSiteUser(['medications.orders.manage'], $this->site);
-        $this->client->update([
-            'first_name' => 'First',
-            'last_name' => 'Resident',
-        ]);
-        Client::factory()->create([
-            'site_id' => $this->site->id,
-            'service_context_id' => $this->client->service_context_id,
-            'first_name' => 'Second',
-            'last_name' => 'Resident',
-            'status' => 'active',
-        ]);
-        $createCount = 0;
-        $creatingEvent = 'eloquent.creating: '.ClientMedication::class;
-        Event::listen($creatingEvent, static function () use (&$createCount): void {
-            $createCount++;
-            if ($createCount === 2) {
-                throw new RuntimeException('Simulated second-order persistence failure.');
-            }
-        });
-
-        try {
-            $this->withoutExceptionHandling()
-                ->actingAs($manager)
-                ->post('/emar/medications/import', [
-                    'csv_file' => UploadedFile::fake()->createWithContent(
-                        'medications.csv',
-                        "client_name,medication_name,dose,frequency,route\n"
-                        ."First Resident,First imported medicine,5 mg,Once daily,oral\n"
-                        ."Second Resident,Second imported medicine,10 mg,Once daily,oral\n",
-                    ),
-                ]);
-            $this->fail('The simulated persistence failure was not thrown.');
-        } catch (RuntimeException $exception) {
-            $this->assertSame('Simulated second-order persistence failure.', $exception->getMessage());
-        } finally {
-            Event::forget($creatingEvent);
-        }
-
-        $this->assertDatabaseMissing('client_medications', [
-            'name' => 'First imported medicine',
-        ]);
-        $this->assertDatabaseMissing('client_medications', [
-            'name' => 'Second imported medicine',
-        ]);
     }
 
     /** @param array<int, string> $permissions */

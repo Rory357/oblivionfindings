@@ -128,4 +128,30 @@ describe('client directory with section-limited worker payloads', () => {
         expect(screen.getByText('No alerts shown')).toBeInTheDocument();
         expect(screen.queryByText('All clear')).not.toBeInTheDocument();
     });
+    it('distinguishes an unreviewed allergy record from an empty safety summary', () => {
+        page.props.clients = [
+            person(16, {
+                safety: {
+                    has_any: false,
+                    safeguarding: false,
+                    allergies_count: 0,
+                    critical_risks_count: 0,
+                    allergy_record: {
+                        status: 'none',
+                        entries: [],
+                        reviewed: null,
+                        digest: 'current',
+                    },
+                },
+            }),
+        ];
+        render(<ClientsIndex />);
+        expect(
+            screen.getAllByText('Allergies not reviewed').length,
+        ).toBeGreaterThan(0);
+        expect(screen.queryByText('No alerts shown')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('No known allergies'),
+        ).not.toBeInTheDocument();
+    });
 });

@@ -436,6 +436,13 @@ export function MailboxProviderPanel({
                             </div>
                         </form>
                     )}
+                    <p className="text-subtle">
+                        Connecting lets you review permission to read and send
+                        mail. To use this mailbox for IT messages or protected
+                        eMAR backups, select it in Main Settings → Email after
+                        connecting or reconnecting. Microsoft shared mailboxes
+                        also need send access granted in Microsoft 365.
+                    </p>
                     <div className="flex flex-wrap gap-2 border-t pt-4">
                         <Button
                             type="button"

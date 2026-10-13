@@ -36,10 +36,12 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationRbacAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     protected function setUp(): void
     {
@@ -231,6 +233,8 @@ class MedicationRbacAuthorizationTest extends TestCase
         ]);
 
         $reader = $this->userWithPermissions(['medications.view'], $site);
+        // P02 person rule (EA-066/EA-107): the reader supports this resident.
+        $client->supportWorkers()->attach($reader->id);
         $alertsResponse = $this->actingAs($reader)
             ->getJson(route('api.medications.alerts.index'))
             ->assertOk()
@@ -251,6 +255,7 @@ class MedicationRbacAuthorizationTest extends TestCase
             'medications.view',
             'medications.controlled.view',
         ], $site);
+        $client->supportWorkers()->attach($controlledReader->id); // P02 person rule
         $this->actingAs($controlledReader)
             ->getJson(route('api.medications.alerts.index'))
             ->assertOk()
@@ -464,6 +469,8 @@ class MedicationRbacAuthorizationTest extends TestCase
         ]);
 
         $reader = $this->userWithPermissions(['medications.view'], $site);
+        // P02 person rule (EA-066/EA-107): the reader supports this resident.
+        $client->supportWorkers()->attach($reader->id);
         $this->actingAs($reader)
             ->get(route('emar.index'))
             ->assertOk()
@@ -491,6 +498,7 @@ class MedicationRbacAuthorizationTest extends TestCase
             'medications.view',
             'medications.controlled.view',
         ], $site);
+        $client->supportWorkers()->attach($controlledReader->id); // P02 person rule
         $this->actingAs($controlledReader)
             ->get(route('emar.index'))
             ->assertOk()
@@ -784,8 +792,9 @@ class MedicationRbacAuthorizationTest extends TestCase
             "/key: 'destructions',\\s*label: '[^']+',\\s*href: '\\/emar\\/destructions',\\s*icon: \\w+,\\s*visible: all\\(view, any\\(controlledView, stockUpdate\\)\\)/s",
             $navigation,
         );
+        // Approved P06: the Stock view lands on the Stock hub (Lane C8).
         $this->assertMatchesRegularExpression(
-            "/key: 'stock',\\s*label: '[^']+',\\s*href: '\\/emar\\/stock',\\s*icon: \\w+,\\s*visible: all\\(view, stockUpdate\\)/s",
+            "/key: 'stock',\\s*label: '[^']+',\\s*href: '\\/emar\\/stock\\/packs',\\s*icon: \\w+,\\s*visible: all\\(view, stockUpdate\\)/s",
             $navigation,
         );
         // Standard reports need the exact module reader; audit adds its own gate.
@@ -1898,6 +1907,8 @@ class MedicationRbacAuthorizationTest extends TestCase
             'client_id' => $client->id,
             'user_id' => $actor->id,
         ]);
+        // B5 (EA-069): the shift card follows the person rule; this worker supports the resident.
+        $client->supportWorkers()->attach($actor->id);
         $foreignShift = Shift::factory()->forSite($foreignSite)->create([
             'client_id' => $foreignClient->id,
             'user_id' => $foreignWorker->id,

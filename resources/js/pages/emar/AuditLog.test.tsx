@@ -145,6 +145,7 @@ describe('Medication history server periods and frontline controls', () => {
             );
             expect(destination.pathname).toBe(path);
             expect([...destination.searchParams.entries()]).toEqual([
+                ...(path === '/emar/reports' ? [['view', 'exports']] : []),
                 ['client_id', '42'],
                 ['site_id', '8'],
                 ['date_from', '2026-09-21'],

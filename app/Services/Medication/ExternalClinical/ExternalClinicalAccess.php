@@ -8,6 +8,7 @@ use App\Models\MedicationExternalGrant;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use Carbon\CarbonImmutable;
@@ -15,6 +16,7 @@ use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 final class ExternalClinicalAccess
@@ -27,11 +29,15 @@ final class ExternalClinicalAccess
     public function provision(User $actor, array $input): MedicationExternalClinician
     {
         return $this->internal($actor, (int) ($input['client_id'] ?? 0), function (Client $client, User $locked) use ($input) {
+            // EA-104: Structured (the default setting) records the council,
+            // number, scope and the date checked on the public register.
+            $structured = app(ConnectedCareSettings::class)->registrationCheck() === 'structured';
             $data = Validator::make($input, [
                 'name' => 'required|string|max:255', 'email' => 'required|email|max:255|unique:users,email',
-                'provider_name' => 'required|string|max:255', 'registration_authority' => 'required|string|max:255',
-                'registration_number' => 'required|string|max:100', 'identity_evidence' => 'required|string|max:2000',
+                'provider_name' => 'required|string|max:255',
                 'identity_confirmed' => 'required|accepted', 'expires_at' => 'required|date|after:now',
+                ...($structured ? $this->structuredRules() : ['registration_authority' => 'required|string|max:255',
+                    'registration_number' => 'required|string|max:100', 'identity_evidence' => 'required|string|max:2000']),
             ])->validate();
             $expires = $this->expiry($data['expires_at'], 'maximum_identity_days');
             // Never convert an existing internal, family or client account.
@@ -41,9 +47,11 @@ final class ExternalClinicalAccess
             $user->save();
             $profile = MedicationExternalClinician::query()->create([
                 'user_id' => $user->id, 'provider_name' => $data['provider_name'],
-                'registration_authority' => $data['registration_authority'], 'registration_number' => $data['registration_number'],
-                'identity_evidence' => $data['identity_evidence'], 'verified_by' => $locked->id,
+                'registration_authority' => $data['registration_authority'], 'registration_number' => trim($data['registration_number']),
+                'identity_evidence' => $structured ? $this->structuredEvidence($data) : $data['identity_evidence'], 'verified_by' => $locked->id,
                 'identity_verified_at' => now(), 'expires_at' => $expires,
+                ...($structured ? ['registration_check' => 'structured', 'registration_scope' => trim($data['registration_scope']),
+                    'register_checked_at' => $data['register_checked_at'], 'register_checked_by' => $locked->id] : ['registration_check' => 'note']),
             ]);
             AuditLogger::logOrFail('medications.external.identity_verified', $profile, ['actor_id' => $locked->id, 'client_id' => $client->id, 'external_user_id' => $user->id]);
 
@@ -57,6 +65,13 @@ final class ExternalClinicalAccess
 
         return $this->internal($actor, (int) ($input['client_id'] ?? 0), function (Client $client, User $locked) use ($input, $submitted) {
             $profile = MedicationExternalClinician::query()->whereKey($submitted->id)->lockForUpdate()->firstOrFail();
+            // EA-104: the person who verified the prescriber's identity and
+            // registration doesn't also grant them a chart (a Settings ›
+            // Connected services switch, on by default).
+            if (app(ConnectedCareSettings::class)->twoPerson(ConnectedCareSettings::TWO_PERSON_IDENTITY)
+                && (int) $profile->verified_by === (int) $locked->id) {
+                $this->invalid('clinician_id', 'Another person grants access. You verified this prescriber, so you can’t also grant them access.');
+            }
             $this->assertIdentity($profile, User::query()->whereKey($profile->user_id)->lockForUpdate()->firstOrFail(), requireSetup: false);
             $data = Validator::make($input, ['purpose' => 'required|string|max:2000', 'expires_at' => 'required|date|after:now',
                 'can_propose' => 'required|boolean', 'include_controlled' => 'required|boolean'])->validate();
@@ -112,6 +127,50 @@ final class ExternalClinicalAccess
             // Marker and approval are retained: auth remains usable for password/logout only.
             AuditLogger::logOrFail('medications.external.identity_revoked', $profile, ['actor_id' => $locked->id, 'client_id' => $client->id]);
         }, [(int) $submitted->user_id]);
+    }
+
+    /**
+     * EA-104: record (or re-check) the structured registration check for an
+     * existing prescriber. Whoever records it becomes the verifier, so with
+     * the two-person rule on they can't also grant this prescriber access.
+     */
+    public function recordRegistrationCheck(User $actor, int $id, array $input): MedicationExternalClinician
+    {
+        $submitted = MedicationExternalClinician::query()->findOrFail($id);
+
+        return $this->internal($actor, (int) ($input['client_id'] ?? 0), function (Client $client, User $locked) use ($id, $input) {
+            $profile = MedicationExternalClinician::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+            abort_unless($profile->revoked_at === null, 409, 'This prescriber’s identity has been withdrawn.');
+            $data = Validator::make($input, [...$this->structuredRules(), 'identity_confirmed' => 'required|accepted'])->validate();
+            $profile->forceFill(['registration_authority' => $data['registration_authority'], 'registration_number' => trim($data['registration_number']),
+                'registration_check' => 'structured', 'registration_scope' => trim($data['registration_scope']),
+                'register_checked_at' => $data['register_checked_at'], 'register_checked_by' => $locked->id,
+                'identity_evidence' => $this->structuredEvidence($data), 'verified_by' => $locked->id, 'identity_verified_at' => now()])->save();
+            AuditLogger::logOrFail('medications.external.registration_checked', $profile, ['actor_id' => $locked->id, 'client_id' => $client->id, 'council' => $data['registration_authority']]);
+
+            return $profile;
+        }, [(int) $submitted->user_id]);
+    }
+
+    /** @return array<string, mixed> */
+    private function structuredRules(): array
+    {
+        $today = CarbonImmutable::now((string) config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+
+        return [
+            'registration_authority' => ['required', 'string', Rule::in(array_keys(ConnectedCareSettings::COUNCILS))],
+            'registration_number' => ['required', 'string', 'regex:/^[A-Za-z0-9][A-Za-z0-9 -]{1,19}$/'],
+            'registration_scope' => 'required|string|max:255',
+            // Checked on the public register within the last 90 days, not in the future.
+            'register_checked_at' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.$today, 'after_or_equal:'.CarbonImmutable::parse($today)->subDays(90)->toDateString()],
+        ];
+    }
+
+    private function structuredEvidence(array $data): string
+    {
+        return sprintf('Checked on the %s public register on %s: registration %s, scope "%s".',
+            ConnectedCareSettings::COUNCILS[$data['registration_authority']] ?? $data['registration_authority'],
+            $data['register_checked_at'], trim($data['registration_number']), trim($data['registration_scope']));
     }
 
     /** Call mutations with the current locked actor; the page uses the same permission rule. */

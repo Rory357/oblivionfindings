@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Briefcase } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
@@ -16,7 +16,9 @@ import type {
 } from '@/components/job-board/types';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { useIsMobile } from '@/hooks/use-mobile';
 import AppLayout from '@/layouts/app-layout';
+import { useBoardFilters, type BoardFilters } from './use-board-filters';
 
 type PaginatedJobs = {
     data: JobPost[];
@@ -28,15 +30,7 @@ type PaginatedJobs = {
 
 interface Props {
     jobs?: PaginatedJobs;
-    filters?: {
-        q?: string;
-        status?: string;
-        scope?: string;
-        date_range?: string;
-        skill?: string;
-        fit?: string;
-        week?: string;
-    };
+    filters?: BoardFilters;
     available_skills?: string[];
     stats?: JobBoardStats;
     week?: JobBoardWeek;
@@ -89,6 +83,14 @@ export default function JobBoardIndex({
     week,
     viewer,
 }: Props) {
+    const mobile = useIsMobile();
+    const page = usePage().props as unknown as {
+        auth?: { user?: { id?: number } | null };
+    };
+    const query = useBoardFilters(
+        filters,
+        String(page.auth?.user?.id ?? 'signed-out'),
+    );
     const scope = resolveScope(filters.scope);
     const firstName = viewer?.first_name ?? 'there';
     const effectiveStats: JobBoardStats = stats ?? {
@@ -131,39 +133,17 @@ export default function JobBoardIndex({
         };
     }, [week]);
 
-    const navigate = (next: Record<string, string | null | undefined>) => {
-        const baseFilters: Record<string, string> = {};
-        const merged: Record<string, string | null | undefined> = {
-            ...filters,
-            ...next,
-        };
-
-        for (const [key, value] of Object.entries(merged)) {
-            if (value !== null && value !== undefined && value !== '') {
-                baseFilters[key] = String(value);
-            }
-        }
-
-        if (next.scope === 'mine') {
-            delete baseFilters.status;
-        }
-
-        router.get('/operations/job-board', baseFilters, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
     const handleScopeChange = (nextScope: JobBoardScope) => {
-        navigate({ scope: nextScope });
+        query.change({ scope: nextScope });
     };
 
     const handleWeekChange = (anchor: string) => {
-        navigate({ week: anchor });
+        query.change({ week: anchor });
     };
 
     const handleFilterChange = (key: string, value: string | null) => {
-        navigate({ [key]: value });
+        if (key === 'q') query.editSearch(value ?? '');
+        else query.change({ [key]: value ?? undefined });
     };
 
     const handleClaim = (job: JobPost) => {
@@ -239,6 +219,36 @@ export default function JobBoardIndex({
 
     const visibleJobs = jobs.data;
 
+    const emptyCopy: Record<
+        JobBoardScope,
+        { title: string; description: string }
+    > = {
+        'for-you': {
+            title: 'No shifts to show',
+            description:
+                'Open shifts and their recorded eligibility appear here. The selected filters limit this list.',
+        },
+        all: {
+            title: 'No open positions to show',
+            description:
+                'Open positions from sites you can access appear here.',
+        },
+        mine: {
+            title: 'No claims to show',
+            description:
+                'Your current claims and recently filled positions appear here.',
+        },
+        replacements: {
+            title: 'No replacement requests to show',
+            description: 'Positions requesting replacement cover appear here.',
+        },
+        approvals: {
+            title: 'No claims awaiting approval',
+            description:
+                'Claimed positions from sites you can access appear here.',
+        },
+    };
+
     const recommended = useMemo(
         () => visibleJobs.filter(strongMatchPredicate).slice(0, 3),
         [visibleJobs],
@@ -258,23 +268,45 @@ export default function JobBoardIndex({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Operations', href: '/operations' },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/job-board' },
                 { title: 'Job Board', href: '/operations/job-board' },
             ]}
         >
             <Head title="Job Board" />
-            <div className="space-y-4 p-4">
+            <div className="space-y-5">
                 <JobBoardHero
+                    rail={
+                        <ScopeTabs
+                            scope={scope}
+                            counts={counts}
+                            onScopeChange={handleScopeChange}
+                            showApprovals={!!viewer?.can_approve}
+                        />
+                    }
+                    onScopeChange={handleScopeChange}
+                    canApprove={!!viewer?.can_approve}
                     firstName={firstName}
                     week={fallbackWeek}
                     stats={effectiveStats}
                     availableSkills={available_skills}
                     filters={{
-                        q: filters.q,
-                        date_range: filters.date_range,
-                        skill: filters.skill,
-                        fit: filters.fit,
+                        q: query.draft.q,
+                        date_range: query.draft.date_range,
+                        skill: query.draft.skill,
+                        fit: query.draft.fit,
                     }}
+                    onSearchSubmit={() => query.change()}
+                    loading={query.loading}
+                    readNotice={
+                        query.loading
+                            ? 'Updating results. The previous results remain visible.'
+                            : (query.error ??
+                              ((query.draft.q ?? '') !== (filters.q ?? '') &&
+                              !query.loading
+                                  ? 'Search changed. Select Search to refresh the positions.'
+                                  : null))
+                    }
                     onFilterChange={handleFilterChange}
                     onWeekChange={handleWeekChange}
                     onAlertMe={handleAlertMe}
@@ -282,13 +314,6 @@ export default function JobBoardIndex({
                     canPostPosition={!!viewer?.can_post_position}
                     sitesCount={effectiveStats.sites}
                     sitesWorkedThisWeek={effectiveStats.sites_worked_this_week}
-                />
-
-                <ScopeTabs
-                    scope={scope}
-                    counts={counts}
-                    onScopeChange={handleScopeChange}
-                    showApprovals={!!viewer?.can_approve}
                 />
 
                 {scope === 'for-you' ? (
@@ -299,7 +324,7 @@ export default function JobBoardIndex({
                     />
                 ) : null}
 
-                <section>
+                <section aria-busy={query.loading}>
                     <header className="mb-3 flex items-center justify-between">
                         <h2 className="inline-flex items-center gap-2 text-[15px] font-bold tracking-tight">
                             {sectionTitle}
@@ -309,19 +334,20 @@ export default function JobBoardIndex({
                         </h2>
                     </header>
 
-                    <div className="grid [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))] gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:[grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
                         {visibleJobs.length === 0 ? (
                             <GuardrailCard
                                 unstyled
-                                className="col-span-full rounded-xl border border-dashed border-border bg-card p-14 text-center text-muted-foreground"
+                                className="col-span-full rounded-xl border border-dashed border-border bg-card px-5 py-10 text-center text-muted-foreground md:p-14"
                             >
                                 <Briefcase className="mx-auto mb-3 h-8 w-8 opacity-40" />
-                                <h3 className="m-0 mb-1 text-base font-semibold text-foreground">
-                                    No shifts match those filters
+                                <h3 className="text-section-title m-0 mb-1 text-foreground">
+                                    {emptyCopy[scope].title}
                                 </h3>
                                 <p className="m-0 text-sm">
-                                    Try widening your date range, clearing a
-                                    skill filter, or switching to "All open".
+                                    {emptyCopy[scope].description} Try clearing
+                                    search or other filters if you expected a
+                                    position here.
                                 </p>
                             </GuardrailCard>
                         ) : (
@@ -337,7 +363,10 @@ export default function JobBoardIndex({
                     </div>
 
                     {(jobs.last_page ?? 1) > 1 ? (
-                        <div className="mt-4 flex items-center justify-center gap-1">
+                        <nav
+                            aria-label="Job Board pages"
+                            className="mt-4 flex flex-wrap items-center justify-center gap-2 md:gap-1"
+                        >
                             {(jobs.links ?? []).map((link, idx) => (
                                 <Button
                                     key={idx}
@@ -345,22 +374,24 @@ export default function JobBoardIndex({
                                     variant={
                                         link.active ? 'default' : 'outline'
                                     }
-                                    className="h-7 min-w-[28px] px-2 text-xs"
-                                    disabled={!link.url}
+                                    className={
+                                        mobile
+                                            ? 'frontline-tap px-2 text-xs'
+                                            : 'h-7 min-w-[28px] px-2 text-xs'
+                                    }
+                                    aria-current={
+                                        link.active ? 'page' : undefined
+                                    }
+                                    disabled={!link.url || query.loading}
                                     onClick={() =>
-                                        link.url &&
-                                        router.get(
-                                            link.url,
-                                            {},
-                                            { preserveState: true },
-                                        )
+                                        link.url && query.goPage(link.url)
                                     }
                                     dangerouslySetInnerHTML={{
                                         __html: link.label,
                                     }}
                                 />
                             ))}
-                        </div>
+                        </nav>
                     ) : null}
                 </section>
             </div>

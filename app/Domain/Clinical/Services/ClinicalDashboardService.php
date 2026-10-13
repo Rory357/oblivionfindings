@@ -27,6 +27,7 @@ use App\Models\MedicationPrnEffectiveness;
 use App\Models\RestraintEvent;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\ClientAllergyRecordService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -163,13 +164,15 @@ class ClinicalDashboardService
      * client's active observation protocols. (Resus/ACP status has no data source
      * yet — deferred rather than fabricated.)
      *
-     * @return array{allergies: array, disabilities: array, blood_type: ?string, baseline_vitals: ?array, active_protocols: array}
+     * @return array{allergies: array, allergy_record: array, allergy_management_url: ?string, disabilities: array, blood_type: ?string, baseline_vitals: ?array, active_protocols: array}
      */
     public function getClinicalCard(User $user, Client $client): array
     {
         $this->siteAccess->assertCanAccessClient($user, $client);
 
         $profile = ClientMedicalProfile::where('client_id', $client->id)->first();
+        $allergyRecords = app(ClientAllergyRecordService::class);
+        $allergies = $allergyRecords->summary($client);
 
         $latestVitals = $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $user)
             ->forClient($client->id)
@@ -178,7 +181,9 @@ class ClinicalDashboardService
             ->first();
 
         return [
-            'allergies' => $profile?->allergies ?? [],
+            'allergies' => array_column($allergies['entries'], 'allergen'),
+            'allergy_record' => $allergies,
+            'allergy_management_url' => $allergyRecords->managementUrl($client, $user),
             'disabilities' => $profile?->disabilities ?? [],
             'blood_type' => $profile?->blood_type,
             'baseline_vitals' => $latestVitals ? [

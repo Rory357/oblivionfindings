@@ -18,6 +18,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseOmissions;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Reporting\MedicationExportAudit;
 use App\Services\Medication\Reporting\MedicationReportAccess;
@@ -88,6 +89,7 @@ class AuditLogController extends Controller
                     if ($this->withinDateRange($ts, $dateFrom, $dateTo)) {
                         $events->push([
                             'id' => 'med_start_'.$med->id,
+                            'client_medication_id' => $med->id,
                             'event_type' => 'medication_started',
                             'timestamp' => $ts->toIso8601String(),
                             'description' => "{$med->name} {$med->dosage} started for {$clientName}",
@@ -107,6 +109,7 @@ class AuditLogController extends Controller
                     if ($this->withinDateRange($ts, $dateFrom, $dateTo)) {
                         $events->push([
                             'id' => 'med_cease_'.$med->id,
+                            'client_medication_id' => $med->id,
                             'event_type' => 'medication_ceased',
                             'timestamp' => $ts->toIso8601String(),
                             'description' => "{$med->name} ceased for {$clientName}",
@@ -268,6 +271,8 @@ class AuditLogController extends Controller
                     'witness' => $admin->witnessedBy->name ?? null,
                     'client_id' => $admin->client_id,
                     'client_name' => $clientName,
+                    'client_medication_id' => $admin->client_medication_id,
+                    'source_date' => ($admin->scheduled_for ?? $admin->administered_at ?? $timestamp)->copy()->timezone('Pacific/Auckland')->toDateString(),
                     'details' => [
                         'medication' => $medName,
                         'dose' => $admin->dose_given,
@@ -375,7 +380,7 @@ class AuditLogController extends Controller
                 $readerSiteIds,
             )
                 ->with(['client:id,first_name,last_name', 'destroyedByUser:id,name'])
-                ->select('id', 'client_id', 'medication_name', 'quantity', 'unit', 'reason', 'disposal_method', 'destroyed_by', 'destroyed_at');
+                ->select('id', 'client_id', 'client_medication_id', 'is_controlled_drug', 'medication_name', 'quantity', 'unit', 'reason', 'disposal_method', 'destroyed_by', 'destroyed_at');
             $destructionTable = $destructionQuery->getModel()->getTable();
             $destructionQuery->where(function (Builder $row) use ($destructionTable): void {
                 $row->whereNull($destructionTable.'.site_id')
@@ -407,6 +412,8 @@ class AuditLogController extends Controller
 
                 $events->push([
                     'id' => 'dest_'.$dest->id,
+                    'client_medication_id' => $dest->client_medication_id,
+                    'controlled' => (bool) $dest->is_controlled_drug,
                     'event_type' => 'destruction',
                     'timestamp' => $dest->destroyed_at?->toIso8601String() ?? $dest->created_at->toIso8601String(),
                     'description' => "{$dest->medication_name} ({$dest->quantity} {$dest->unit}) destroyed for {$clientName}",
@@ -485,6 +492,7 @@ class AuditLogController extends Controller
 
                 $events->push([
                     'id' => 'ver_'.$ver->id,
+                    'client_medication_id' => $ver->client_medication_id,
                     'event_type' => 'medication_changed',
                     'timestamp' => $ver->created_at->toIso8601String(),
                     'description' => "{$ver->name} {$ver->dosage} changed (v{$ver->version_number}) for {$clientName}",
@@ -565,6 +573,7 @@ class AuditLogController extends Controller
 
                 $events->push([
                     'id' => 'cd_'.$entry->id,
+                    'client_medication_id' => $entry->client_medication_id,
                     'event_type' => $eventType,
                     'timestamp' => ($entry->recorded_at ?? $entry->created_at ?? now())->toIso8601String(),
                     'description' => $descMap[$eventType] ?? "Controlled drug {$medName} ({$qty}) — {$clientName}",
@@ -720,7 +729,7 @@ class AuditLogController extends Controller
             'destruction' => 'Stock', 'stock_received' => 'Stock', 'medication_error' => 'Errors',
         ];
 
-        $events = $events->map(function (array $e) use ($categoryOf, $sourceOf, $clientSite, $siteNames) {
+        $events = $events->map(function (array $e) use ($categoryOf, $sourceOf, $clientSite, $siteNames, $user) {
             $type = $e['event_type'];
             $siteId = $e['client_id'] ? ($clientSite[$e['client_id']] ?? null) : null;
 
@@ -742,7 +751,7 @@ class AuditLogController extends Controller
                 $flags[] = 'no_reason';
             }
 
-            return array_merge($e, [
+            return array_merge($e, $this->sourceLink($e, $user, $siteId), [
                 'category' => $categoryOf[$type] ?? 'clinical',
                 'source' => $sourceOf[$type] ?? 'MAR',
                 'site_id' => $siteId,
@@ -825,6 +834,81 @@ class AuditLogController extends Controller
             'can_export_history' => $user->canDo('medications.audit.export'),
             'export_purposes' => MedicationExportAudit::PURPOSES,
         ]);
+    }
+
+    /** Links are released only when the destination can open this same person. */
+    private function sourceLink(array $event, User $actor, ?int $siteId): array
+    {
+        $empty = ['source_href' => null, 'source_label' => null];
+        $clientId = (int) ($event['client_id'] ?? 0);
+        if (! $actor->canDo('medications.view') || ! $clientId || ! app(MarLinkService::class)->canOpen($actor, $clientId)) {
+            return $empty;
+        }
+        $day = $event['source_date'] ?? CarbonImmutable::parse($event['timestamp'])->timezone('Pacific/Auckland')->toDateString();
+        $params = array_filter(['site_id' => $siteId, 'client_id' => $clientId], fn ($value) => $value !== null);
+        $type = $event['event_type'];
+        $id = (int) substr($event['id'], strrpos($event['id'], '_') + 1);
+        if (str_starts_with($event['id'], 'admin_')) {
+            $path = '/emar/mar';
+            $params += ['date' => $day, 'tab' => 'history', 'dose_id' => $id];
+            $label = 'Open dose record';
+        } elseif ($type === 'prescriber_order') {
+            $path = '/emar/prescriptions/legacy';
+            $params += ['prescriber_order_id' => $id];
+            $label = 'Open prescriber order';
+        } elseif ($type === 'destruction') {
+            $controlled = (bool) ($event['controlled'] ?? false);
+            if ($controlled ? ! $actor->canDo('medications.controlled.view')
+                : (! $actor->canDo('medications.stock.update') && ! $actor->canDo('medications.controlled.view'))) {
+                return $empty;
+            }
+            $path = $controlled ? '/emar/controlled' : '/emar/destructions';
+            $params += ['date' => $day, 'destruction_id' => $id];
+            if ($controlled) {
+                $params['view'] = 'destructions';
+            }
+            if ($event['client_medication_id'] ?? null) {
+                $params['client_medication_id'] = $event['client_medication_id'];
+            }
+            $label = 'Open disposal record';
+        } elseif (str_starts_with($type, 'cd_')) {
+            if (! $actor->canDo('medications.controlled.view')) {
+                return $empty;
+            }
+            $path = '/emar/controlled';
+            $params += ['date' => $day, 'entry_id' => $id, 'client_medication_id' => $event['client_medication_id']];
+            $label = 'Open register entry';
+        } elseif ($type === 'review_completed') {
+            $path = '/emar/reviews';
+            $params += ['review' => $id, 'view' => 'recorded'];
+            $label = 'Open review';
+        } elseif ($type === 'stock_received') {
+            if (! $actor->canDo('medications.stock.update')) {
+                return $empty;
+            }
+            $path = '/emar/stock';
+            $params += ['view' => 'orders', 'pharmacy_order_id' => $id];
+            $label = 'Open delivery receipt';
+        } elseif ($type === 'medication_error') {
+            $path = '/emar/errors';
+            $params += ['error' => $id];
+            $label = 'Open medication error';
+        } elseif ($type === 'omission') {
+            $path = '/emar/mar';
+            $params += ['date' => $day, 'tab' => 'chart', 'focus_medication_id' => $event['client_medication_id'] ?? null];
+            $label = 'Open due dose';
+        } elseif (in_array($type, ['medication_started', 'medication_ceased', 'medication_changed'], true)) {
+            $path = '/emar/mar';
+            $params += ['date' => $day, 'tab' => 'medicines', 'medication_id' => $event['client_medication_id']];
+            if ($type === 'medication_ceased') {
+                $params['view'] = 'stopped';
+            }
+            $label = 'Open medication record';
+        } else {
+            return $empty;
+        }
+
+        return ['source_href' => $path.'?'.http_build_query($params), 'source_label' => $label];
     }
 
     private function withinDateRange($timestamp, ?string $dateFrom, ?string $dateTo): bool

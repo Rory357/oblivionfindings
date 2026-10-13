@@ -37,7 +37,7 @@ class CdLossReportProvider implements HasModelClass, SiteScopedTaskProvider, Tas
     public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = ControlledDrugLossReport::query()
-            ->with('client:id,first_name,last_name')
+            ->with('client:id,first_name,last_name,site_id')
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('discovered_at')
             ->limit(300);
@@ -79,7 +79,10 @@ class CdLossReportProvider implements HasModelClass, SiteScopedTaskProvider, Tas
                         : null,
                     dueAt: null,
                     createdAt: optional($report->created_at)->toIso8601String(),
-                    link: '/emar/controlled/loss-reports',
+                    // EA-201 (Lane C8): the register's Loss reports view for this
+                    // person and house, searched to this report.
+                    link: '/emar/controlled?'.http_build_query(array_filter(['view' => 'losses',
+                        'site_id' => $client?->site_id, 'client_id' => $client?->id, 'q' => $report->reference_number])),
                     type: 'CD loss',
                     description: $report->circumstances ? str($report->circumstances)->limit(140)->toString() : null,
                 );

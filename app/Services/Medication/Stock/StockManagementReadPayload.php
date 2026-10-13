@@ -38,7 +38,7 @@ final class StockManagementReadPayload
             'view' => ['nullable', Rule::in(['all', 'low', 'expiring', 'expired', 'controlled', 'orders'])],
             'chip' => ['nullable', Rule::in(['all', 'controlled', 'cold_chain'])],
             'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50])],
-            'page' => ['nullable', 'integer', 'min:1'],
+            'page' => ['nullable', 'integer', 'min:1'], 'pharmacy_order_id' => ['nullable', 'integer', 'min:1'],
         ]);
         $context = $this->readerContext($request);
         $view = $data['view'] ?? 'all';
@@ -54,6 +54,7 @@ final class StockManagementReadPayload
             'page' => $page, 'site_id' => $context['site_id'], 'client_id' => $context['client_id']];
         $stocks = $context['stocks'];
         $orders = $context['orders'];
+        $selectedOrder = $request->integer('pharmacy_order_id') ? (clone $orders)->with(['client:id,first_name,last_name', 'medication' => fn ($query) => $query->withTrashed()->select('id', 'name', 'controlled_drug')])->findOrFail($request->integer('pharmacy_order_id')) : null;
         $controlled = (clone $stocks)->whereHas('medication', fn (Builder $q) => $q->where('controlled_drug', true));
         $summary = [
             'total_stock' => (clone $stocks)->count(),
@@ -117,6 +118,7 @@ final class StockManagementReadPayload
             'can_view_controlled' => $context['can_view_controlled'],
             'stockItems' => $stockPage->getCollection()->map(fn ($s) => $stockById->get($s->id))->values(),
             'controlledRegister' => $this->controlledRows($controlledPage->getCollection(), $context),
+            'selected_pharmacy_order' => $selectedOrder ? $this->orderRow($selectedOrder) : null,
             'pharmacyOrders' => $orderPage->getCollection()->map(fn ($o) => $this->orderRow($o))->values(),
             'stockContext' => $stockContext,
             'openOrdersByMedication' => (object) $openOrders->mapWithKeys(fn ($o) => [(int) $o->client_medication_id => $this->orderRow($o)])->all(),

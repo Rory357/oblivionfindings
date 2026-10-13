@@ -132,8 +132,9 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             "/label: 'Destructions & returns',\s*href: '\/emar\/destructions',\s*icon: \w+,\s*visible: all\(view, any\(controlledView, stockUpdate\)\)/s",
             $navigation,
         );
+        // Approved P06: the Stock view lands on the Stock hub (Lane C8).
         $this->assertMatchesRegularExpression(
-            "/key: 'stock',\s*label: '[^']+',\s*href: '\/emar\/stock',\s*icon: \w+,\s*visible: all\(view, stockUpdate\)/s",
+            "/key: 'stock',\s*label: '[^']+',\s*href: '\/emar\/stock\/packs',\s*icon: \w+,\s*visible: all\(view, stockUpdate\)/s",
             $navigation,
         );
         $this->assertMatchesRegularExpression(
@@ -509,10 +510,9 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertSame([$context['local_client']->id], collect($medications->inertiaProps('clients'))->pluck('id')->all());
         $this->assertSame([$context['local_site']->id], collect($medications->inertiaProps('sites'))->pluck('id')->all());
 
-        $destructions = $this->actingAs($actor)->get(route('emar.destructions'))->assertOk();
-        $this->assertSame([], collect($destructions->inertiaProps('destructions'))->pluck('id')->all());
-        $this->assertSame([$context['local_medication']->id], collect($destructions->inertiaProps('medications'))->pluck('id')->all());
-        $this->assertSame([$context['local_client']->id], collect($destructions->inertiaProps('clients'))->pluck('id')->all());
+        // Lane C2: the old Destructions page lands on the canonical views.
+        $destructions = $this->actingAs($actor)->get(route('emar.destructions'))->assertRedirect();
+        $this->assertStringStartsWith('/emar/', (string) parse_url((string) $destructions->headers->get('Location'), PHP_URL_PATH));
 
         $redirect = $this->actingAs($actor)->get(route('emar.cd_loss.index'))->assertRedirect('/emar/controlled?view=losses');
         $lossReports = $this->actingAs($actor)->get($redirect->headers->get('Location'))->assertOk();
@@ -566,11 +566,9 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             $this->actingAs($globalReader)
                 ->get(route('emar.stock', ['site_id' => $context['foreign_site']->id]))
                 ->assertOk();
-            $disposals = $this->actingAs($globalReader)->get(route('emar.destructions', ['site_id' => $context['foreign_site']->id]))->assertOk();
-            $this->assertSame($context['foreign_site']->id, $disposals->inertiaProps('filters.site_id'));
-            $this->assertSame([$context['foreign_medication']->id], collect($disposals->inertiaProps('medications'))->pluck('id')->all());
-            $this->assertSame([$context['foreign_client']->id], collect($disposals->inertiaProps('clients'))->pluck('id')->all());
-            $this->assertSame([$context['foreign_destruction']->id], collect($disposals->inertiaProps('destructions'))->pluck('id')->all());
+            // Lane C2: the old Destructions page keeps the requested house on redirect.
+            $disposals = $this->actingAs($globalReader)->get(route('emar.destructions', ['site_id' => $context['foreign_site']->id]))->assertRedirect();
+            $this->assertStringContainsString('site_id='.$context['foreign_site']->id, (string) $disposals->headers->get('Location'));
             foreach (['emar.cd_loss.index' => 'losses'] as $routeName => $view) {
                 $redirect = $this->actingAs($globalReader)
                     ->get(route($routeName, ['site_id' => $context['foreign_site']->id]))

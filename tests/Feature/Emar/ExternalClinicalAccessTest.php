@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Responses\LoginResponse;
 use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\ClientMedication;
 use App\Models\MedicationExternalClinician;
 use App\Models\MedicationExternalGrant;
 use App\Models\MedicationExternalProposal;
@@ -34,6 +35,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\ConnectedCareSwitches;
 use Tests\Support\ExternalClinicalFixtures;
 use Tests\TestCase;
 
@@ -44,6 +46,12 @@ final class ExternalClinicalAccessTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // D4: the portal and handovers run only while switched on. These single-
+        // person flows predate the two-person rule, switched back on in the test_b10_ tests below.
+        ConnectedCareSwitches::on('prescriber_portal', 'provider_transfers');
+        ConnectedCareSwitches::off('two_person_identity', 'two_person_handover');
+        // These flows record free-text evidence; Structured checks are tested in test_b10_ tests.
+        ConnectedCareSwitches::value('prescriber_registration_check', 'note');
         $this->connectedFixtures();
     }
 
@@ -316,6 +324,124 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertSame(0, AuditLog::query()->where('action', 'medications.external.identity_revoked')->count());
     }
 
+    /** EA-083 + EA-085: a portal chart view is a logged disclosure and says what it leaves out. */
+    public function test_b10_portal_chart_view_is_logged_and_says_how_many_controlled_medicines_are_hidden(): void
+    {
+        $this->chart();
+        $this->chart(['name' => 'Synthetic controlled medicine', 'controlled_drug' => true]);
+        $this->actingAs($this->clinician)->get('/clinical-portal?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->has('selected_client.medications', 1)
+                ->where('selected_client.hidden_controlled_count', 1)
+                ->where('selected_client.allergy_status.status', 'none'));
+        $view = \App\Models\MedicationEvent::query()->where('kind', 'external.chart_viewed')->sole();
+        $this->assertSame((int) $this->clinician->id, (int) $view->actor_id);
+        $this->assertSame((int) $this->person->id, (int) $view->client_id);
+        $this->assertSame((string) $this->grant->id, (string) $view->subject_id);
+        $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('grants.0.views', 1));
+    }
+
+    /** EA-104: with the two-person rule on (its default), whoever verified a prescriber doesn't also grant them a chart. */
+    public function test_b10_the_verifier_cannot_also_grant_chart_access(): void
+    {
+        ConnectedCareSwitches::on('two_person_identity');
+        app(ExternalClinicalAccess::class)->revokeGrant($this->manager, $this->grant->id, ['reason' => 'Synthetic regrant check']);
+        $input = ['clinician_id' => $this->identity->id, 'client_id' => $this->person->id, 'purpose' => 'Medication review',
+            'expires_at' => now()->addDays(20)->toIso8601String(), 'can_propose' => false, 'include_controlled' => false];
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/grants', $input)->assertUnprocessable()->assertJsonValidationErrors('clinician_id');
+        $this->assertSame(1, MedicationExternalGrant::query()->count());
+        $this->actingAs($this->connectedStaff())->postJson('/emar/connected-care/grants', $input)->assertSuccessful();
+        $this->assertSame(2, MedicationExternalGrant::query()->count());
+    }
+
+    /** EA-084 + EA-025: the prescriber sees only the reply; the request alerts order managers until decided. */
+    public function test_b10_internal_note_stays_internal_and_a_request_alerts_until_decided(): void
+    {
+        $proposal = app(ExternalClinicalProposals::class)->submit($this->clinician, $this->person->id, [
+            'kind' => 'start', 'prescription' => $this->prescription(), 'reason' => 'Start for review', 'request_key' => 'b10-note',
+        ], null);
+        $alert = \App\Models\MedicationAlert::query()->where('type', 'prescriberRequest')->where('client_id', $this->person->id)->sole();
+        $this->assertNotNull($alert->open_key);
+        $this->actingAs($this->manager)->get('/emar/connected-care')->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('selected_client', null)->where('proposals.0.id', $proposal->id));
+
+        $this->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', [
+            'decision' => 'reject', 'decision_note' => 'Please phone the house first.', 'internal_note' => 'Synthetic family concern note',
+        ])->assertSuccessful();
+
+        $this->assertNull($alert->fresh()->open_key);
+        $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('proposals.0.internal_note', 'Synthetic family concern note'));
+        $portal = $this->actingAs($this->clinician)->get('/clinical-portal')->assertOk();
+        $portal->assertInertia(fn (Assert $p) => $p->where('proposals.0.decision_note', 'Please phone the house first.'));
+        $this->assertStringNotContainsString('Synthetic family concern note', (string) $portal->getContent());
+    }
+
+    /** EA-104 (setting, Structured by default): council, number, scope and the date checked; free text alone is refused. */
+    public function test_b10_structured_registration_check_is_the_default_and_records_structured_evidence(): void
+    {
+        ConnectedCareSwitches::value('prescriber_registration_check', 'structured');
+        $base = ['client_id' => $this->person->id, 'name' => 'Dr Structured', 'email' => 'structured-fictional@example.test',
+            'provider_name' => 'Fictional practice', 'identity_confirmed' => true, 'expires_at' => now()->addDays(90)->toIso8601String()];
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', [...$base, 'registration_authority' => 'Clinical register',
+            'registration_number' => 'FREE-1', 'identity_evidence' => 'Checked somehow'])->assertUnprocessable()
+            ->assertJsonValidationErrors(['registration_authority', 'registration_scope', 'register_checked_at']);
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', [...$base, 'registration_authority' => 'MCNZ',
+            'registration_number' => '12345', 'registration_scope' => 'Vocational — general practice',
+            'register_checked_at' => now('Pacific/Auckland')->subDays(120)->toDateString()])->assertUnprocessable()->assertJsonValidationErrors('register_checked_at');
+
+        $id = $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', [...$base, 'registration_authority' => 'MCNZ',
+            'registration_number' => '12345', 'registration_scope' => 'Vocational — general practice',
+            'register_checked_at' => now('Pacific/Auckland')->subDays(2)->toDateString()])->assertSuccessful()->json('id');
+
+        $profile = MedicationExternalClinician::query()->findOrFail($id);
+        $this->assertTrue($profile->hasStructuredCheck());
+        $this->assertSame('Vocational — general practice', $profile->registration_scope);
+        $this->assertSame((int) $this->manager->id, (int) $profile->register_checked_by);
+        // The fixture's free-text record is flagged, not blocked: its grant still works.
+        $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('registration.mode', 'structured')
+                ->where('clinicians', fn ($rows) => collect($rows)->firstWhere('id', $this->identity->id)['needs_structured_check'] === true
+                    && collect($rows)->firstWhere('id', $id)['needs_structured_check'] === false));
+        $this->actingAs($this->clinician)->get('/clinical-portal?client_id='.$this->person->id)->assertOk();
+    }
+
+    /** EA-104: recording the structured check makes the recorder the verifier, so the two-person rule applies to them. */
+    public function test_b10_recording_a_registration_check_keeps_the_two_person_rule(): void
+    {
+        ConnectedCareSwitches::value('prescriber_registration_check', 'structured');
+        ConnectedCareSwitches::on('two_person_identity');
+        $checker = $this->connectedStaff();
+        $this->actingAs($checker)->postJson('/emar/connected-care/clinicians/'.$this->identity->id.'/registration-check', [
+            'client_id' => $this->person->id, 'registration_authority' => 'NCNZ', 'registration_number' => '67890',
+            'registration_scope' => 'Nurse practitioner', 'register_checked_at' => now('Pacific/Auckland')->toDateString(), 'identity_confirmed' => true,
+        ])->assertSuccessful();
+        $this->assertSame((int) $checker->id, (int) $this->identity->fresh()->verified_by);
+        $this->assertTrue($this->identity->fresh()->hasStructuredCheck());
+
+        app(ExternalClinicalAccess::class)->revokeGrant($this->manager, $this->grant->id, ['reason' => 'Synthetic regrant']);
+        $grant = ['clinician_id' => $this->identity->id, 'client_id' => $this->person->id, 'purpose' => 'Review',
+            'expires_at' => now()->addDays(20)->toIso8601String(), 'can_propose' => false, 'include_controlled' => false];
+        $this->actingAs($checker)->postJson('/emar/connected-care/grants', $grant)->assertUnprocessable()->assertJsonValidationErrors('clinician_id');
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/grants', $grant)->assertSuccessful();
+    }
+
+    /** EA-104: Note only is the loosening; with it, free-text evidence is accepted. */
+    public function test_b10_note_only_is_the_loosening_and_accepts_free_text_evidence(): void
+    {
+        $definition = app(\App\Services\Medication\Settings\MedicationSettingsRegistry::class)->definition('connected', 'prescriber_registration_check');
+        $this->assertSame('structured', $definition->default);
+        $this->assertTrue($definition->loosens('structured', 'note'));
+        $this->assertFalse($definition->loosens('note', 'structured'));
+
+        ConnectedCareSwitches::value('prescriber_registration_check', 'note');
+        $id = $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', ['client_id' => $this->person->id,
+            'name' => 'Dr Note', 'email' => 'note-fictional@example.test', 'provider_name' => 'Fictional practice',
+            'registration_authority' => 'Clinical register', 'registration_number' => 'NOTE-1', 'identity_evidence' => 'Checked by phone with the practice',
+            'identity_confirmed' => true, 'expires_at' => now()->addDays(90)->toIso8601String()])->assertSuccessful()->json('id');
+        $this->assertSame('note', MedicationExternalClinician::query()->findOrFail($id)->registration_check);
+    }
+
     private function allowGlobalIdentityWithdrawal(User $actor, string $permission): User
     {
         $definition = Permission::firstOrCreate(['key' => $permission], ['description' => 'Explicit synthetic all-sites authority', 'group' => 'clinical']);
@@ -414,6 +540,16 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertFalse($request->session()->has('url.intended'));
     }
 
+    public function test_connected_care_preserves_requested_site_and_rejects_conflicting_person_context(): void
+    {
+        $this->actingAs($this->manager)->get('/emar/connected-care?'.http_build_query(['client_id' => $this->person->id, 'site_id' => $this->site->id, 'return_to' => '/emar/rounds?site_id='.$this->site->id]))
+            ->assertOk()->assertInertia(fn ($page) => $page->where('filters.site_id', $this->site->id)->where('filters.return_to', '/emar/rounds?site_id='.$this->site->id)->where('selected_client.id', $this->person->id));
+        $other = Site::factory()->create(['is_active' => true]);
+        $this->getJson('/emar/connected-care?'.http_build_query(['client_id' => $this->person->id, 'site_id' => $other->id]))->assertNotFound();
+        $this->getJson('/emar/connected-care?client_id=invalid')->assertUnprocessable();
+        $this->getJson('/emar/connected-care?site_id=-1')->assertUnprocessable();
+    }
+
     public function test_proposal_is_immutable_review_evidence_and_acceptance_waits_for_independent_check(): void
     {
         $order = $this->chart();
@@ -426,15 +562,167 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertNotSame($proposal->prescription['dosage'], DB::table('medication_external_proposals')->value('prescription'));
         $decision = ['decision' => 'accept', 'decision_note' => 'Source reviewed and confirmed', 'source_confirmed' => true,
             'source' => $this->sourceInput(), 'source_file' => UploadedFile::fake()->create('prescription.pdf', 8, 'application/pdf')];
-        $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', $decision)->assertSuccessful();
+        $accepted = $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', $decision)->assertSuccessful()
+            ->assertJsonPath('order_id', $order->id);
+        $this->assertTrue($this->manager->canDo('medications.orders.manage'));
+        $this->assertTrue($this->manager->canDo('medications.orders.verify'));
+        $this->assertStringContainsString('order_id='.$order->id, $accepted->json('order_url'));
+        parse_str(parse_url($accepted->json('order_url'), PHP_URL_QUERY), $authorTarget);
+        $this->assertSame('view', $authorTarget['action']);
+        $this->actingAs($this->manager)->get($accepted->json('order_url'))->assertOk()
+            ->assertInertia(fn ($page) => $page->where('open_order_id', $order->id)
+                ->where('prefill_client_id', $this->person->id)->where('open_order_action', 'view'));
+        $persisted = $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        $this->assertSame($order->id, $persisted->inertiaProps('proposals.0.order_id'));
+        $this->assertSame($accepted->json('order_url'), $persisted->inertiaProps('proposals.0.order_url'));
         $this->assertSame('10 mg', $order->refresh()->dosage);
         $this->assertSame('verified', $order->approval_status);
         $revision = MedicationOrderRevision::findOrFail($proposal->refresh()->revision_id);
         $this->assertSame('pending', $revision->status);
+        $this->assertSame($this->manager->id, (int) $revision->entered_by);
+        $pendingEvidence = $revision->getRawOriginal();
+        $this->actingAs($this->manager)->post('/emar/order-revisions/'.$revision->id.'/check', ['source_matches' => true,
+            'dose_route_times_checked' => true, 'allergies_interactions_checked' => true])
+            ->assertRedirect()->assertSessionHasErrors('checker');
+        $this->assertSame($pendingEvidence, $revision->refresh()->getRawOriginal());
+        $this->assertSame('10 mg', $order->refresh()->dosage);
         $checker = $this->connectedStaff();
-        $this->actingAs($checker)->post('/emar/order-revisions/'.$revision->id.'/check', ['source_matches' => true,
+        $forChecker = $this->actingAs($checker)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        $checkerUrl = $forChecker->inertiaProps('proposals.0.order_url');
+        parse_str(parse_url($checkerUrl, PHP_URL_QUERY), $checkerTarget);
+        $this->assertSame('check', $checkerTarget['action']);
+        $this->assertSame((string) $order->id, $checkerTarget['order_id']);
+        $this->get($checkerUrl)->assertOk()->assertInertia(fn ($page) => $page
+            ->where('open_order_id', $order->id)->where('open_order_action', 'check')->where('open_check_mode', 'independent'));
+        $this->post('/emar/order-revisions/'.$revision->id.'/check', ['source_matches' => true,
             'dose_route_times_checked' => true, 'allergies_interactions_checked' => true])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('20 mg', $order->refresh()->dosage);
+        $this->assertSame($checker->id, (int) $revision->refresh()->checked_by);
+        $completed = $this->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        parse_str(parse_url($completed->inertiaProps('proposals.0.order_url'), PHP_URL_QUERY), $completedTarget);
+        $this->assertSame('view', $completedTarget['action']);
+    }
+
+    public function test_accepted_start_proposal_opens_author_view_and_independent_checker_can_publish_initial_version(): void
+    {
+        $submitted = $this->actingAs($this->clinician)->postJson('/clinical-portal/people/'.$this->person->id.'/proposals', [
+            'kind' => 'start', 'prescription' => $this->prescription(), 'reason' => 'Start prescribed medicine',
+            'request_key' => 'start-continuation',
+        ])->assertSuccessful();
+        $proposal = MedicationExternalProposal::findOrFail($submitted->json('id'));
+        $accepted = $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', [
+            'decision' => 'accept', 'decision_note' => 'Source confirmed', 'source_confirmed' => true,
+            'source' => $this->sourceInput(), 'source_file' => UploadedFile::fake()->create('prescription.pdf', 8, 'application/pdf'),
+        ])->assertSuccessful();
+        $revision = MedicationOrderRevision::with('version')->findOrFail($proposal->refresh()->revision_id);
+        $order = ClientMedication::findOrFail($revision->client_medication_id);
+        $this->assertSame(1, (int) $order->version);
+        $this->assertSame(1, (int) $revision->base_version);
+        $this->assertSame(1, (int) $revision->version->version_number);
+        $this->assertSame('pending_verification', $order->approval_status);
+        $this->assertSame($this->manager->id, (int) $revision->entered_by);
+        $accepted->assertJsonPath('order_id', $order->id);
+        parse_str(parse_url($accepted->json('order_url'), PHP_URL_QUERY), $authorTarget);
+        $this->assertSame('view', $authorTarget['action']);
+        $this->get($accepted->json('order_url'))->assertOk()->assertInertia(fn ($page) => $page
+            ->where('open_order_id', $order->id)->where('open_order_action', 'view'));
+
+        $checker = $this->connectedStaff();
+        $response = $this->actingAs($checker)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        $checkerUrl = $response->inertiaProps('proposals.0.order_url');
+        parse_str(parse_url($checkerUrl, PHP_URL_QUERY), $checkerTarget);
+        $this->assertSame('check', $checkerTarget['action']);
+        $this->assertSame((string) $order->id, $checkerTarget['order_id']);
+        $this->get($checkerUrl)->assertOk()->assertInertia(fn ($page) => $page
+            ->where('open_order_id', $order->id)->where('open_order_action', 'check')->where('open_check_mode', 'independent'));
+        $this->post('/emar/order-revisions/'.$revision->id.'/check', ['source_matches' => true,
+            'dose_route_times_checked' => true, 'allergies_interactions_checked' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('verified', $order->refresh()->approval_status);
+        $this->assertSame(1, (int) $order->version);
+        $this->assertSame('checked', $revision->refresh()->status);
+        $this->assertSame($checker->id, (int) $revision->checked_by);
+    }
+
+    public static function nonIndependentProposalReaders(): array
+    {
+        return [
+            'read-back witness' => ['witness'],
+            'without current work' => ['no_work'],
+            'verification withdrawn' => ['no_verify'],
+            'stale in-effect version' => ['stale_base'],
+            'stopped order' => ['stopped'],
+            'sent-back revision' => ['sent_back'],
+            'controlled reader without record permission' => ['controlled_read_only'],
+        ];
+    }
+
+    #[DataProvider('nonIndependentProposalReaders')]
+    public function test_accepted_proposal_continuation_keeps_non_independent_readers_in_exact_order_view(string $condition): void
+    {
+        $order = $this->chart();
+        $proposal = app(ExternalClinicalProposals::class)->submit($this->clinician, $this->person->id, [
+            'kind' => 'change', 'medication_id' => $order->id, 'expected_version' => 1,
+            'prescription' => $this->prescription(['dosage' => '20 mg']), 'reason' => 'Prescriber source reviewed',
+            'request_key' => 'continuation-'.$condition,
+        ], null);
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', [
+            'decision' => 'accept', 'decision_note' => 'Source confirmed', 'source_confirmed' => true,
+            'source' => $this->sourceInput(), 'source_file' => UploadedFile::fake()->create('prescription.pdf', 8, 'application/pdf'),
+        ])->assertSuccessful();
+        $revision = MedicationOrderRevision::findOrFail($proposal->refresh()->revision_id);
+        $checker = $this->connectedStaff();
+        $this->actingAs($checker);
+        $baseline = $this->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        parse_str(parse_url($baseline->inertiaProps('proposals.0.order_url'), PHP_URL_QUERY), $baselineTarget);
+        $this->assertSame('check', $baselineTarget['action']);
+
+        switch ($condition) {
+            case 'witness':
+                // The recorded read-back involvement remains distinct from the author.
+                $revision->forceFill(['read_back_witness_id' => $checker->id])->save();
+                break;
+            case 'no_work':
+                Shift::where('user_id', $checker->id)->where('client_id', $this->person->id)
+                    ->update(['status' => 'completed', 'actual_ends_at' => now()->subMinute()]);
+                break;
+            case 'no_verify':
+                $checker->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.orders.verify')
+                    ->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
+                break;
+            case 'stale_base':
+                $order->forceFill(['version' => $revision->base_version + 1])->save();
+                break;
+            case 'stopped':
+                $order->forceFill(['state' => 'ceased', 'active' => false, 'ceased_at' => now(),
+                    'ceased_by' => $this->manager->id, 'ceased_reason' => 'Prescriber stopped before review'])->save();
+                break;
+            case 'sent_back':
+                $this->post('/emar/order-revisions/'.$revision->id.'/send-back', ['reason' => 'Source needs correction'])
+                    ->assertRedirect()->assertSessionHasNoErrors();
+                break;
+            case 'controlled_read_only':
+                $order->forceFill(['controlled_drug' => true])->save();
+                foreach (['medications.controlled.view' => true, 'medications.controlled.record' => false] as $key => $allowed) {
+                    $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'medications']);
+                    $checker->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => $allowed]]);
+                }
+                break;
+        }
+        $checker = $checker->fresh();
+        $this->assertTrue($checker->can('viewMedications', $this->person->fresh()));
+        $retainedOrder = $order->fresh()->getRawOriginal();
+        $retainedRevision = $revision->fresh()->getRawOriginal();
+        $response = $this->actingAs($checker)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        $orderUrl = $response->inertiaProps('proposals.0.order_url');
+        parse_str(parse_url($orderUrl, PHP_URL_QUERY), $viewTarget);
+        $this->assertSame('view', $viewTarget['action']);
+        $this->assertSame((string) $order->id, $viewTarget['order_id']);
+        $this->assertSame((string) $this->person->id, $viewTarget['client_id']);
+        $this->get($orderUrl)->assertOk()->assertInertia(fn ($page) => $page
+            ->where('open_order_id', $order->id)->where('prefill_client_id', $this->person->id)->where('open_order_action', 'view'));
+        $this->assertSame($retainedOrder, $order->fresh()->getRawOriginal());
+        $this->assertSame($retainedRevision, $revision->fresh()->getRawOriginal());
     }
 
     public function test_read_only_grant_and_restricted_controlled_orders_deny_proposals(): void

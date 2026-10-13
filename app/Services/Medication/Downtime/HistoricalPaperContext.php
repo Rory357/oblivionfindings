@@ -33,7 +33,8 @@ final class HistoricalPaperContext
 
     public function assertBinding(Client $client, ClientMedication $order, int $giverId, array $data): void
     {
-        abort_unless($this->entry->outcome !== 'given' || PaperDoseFacts::complete($this->entry->clinical_facts ?? [], $this->entry->stock_evidence ?? []), 422);
+        abort_unless($this->entry->outcome !== 'given' || PaperDoseFacts::complete($this->entry->clinical_facts ?? [], $this->entry->stock_evidence ?? [],
+            PaperStockTracking::untrackedEntry($this->entry, $order)), 422);
         abort_unless((int) $this->entry->client_id === (int) $client->id
             && (int) $this->entry->client_medication_id === (int) $order->id
             && (int) $order->client_id === (int) $client->id
@@ -50,6 +51,13 @@ final class HistoricalPaperContext
     /** Pack/count binding is always loaded from retained evidence, never HTTP flags. */
     public function stockEvidence(): array
     {
+        // D2 (Lane C1): stock that wasn't pack-tracked at the paper time has no
+        // settlement; the writer takes nothing off stock or the register.
+        $order = ClientMedication::withTrashed()->findOrFail((int) $this->entry->client_medication_id);
+        if (PaperStockTracking::untrackedEntry($this->entry, $order)) {
+            return ['settlement' => PaperStockTracking::SETTLEMENT, 'paper_entry_id' => (int) $this->entry->id,
+                'occurred_at' => $this->entry->given_at->toIso8601String()];
+        }
         $row = MedicationPaperStockEvidence::query()->where('paper_entry_id', $this->entry->id)->latest('id')->lockForUpdate()->firstOrFail();
         abort_unless(hash_equals($row->fingerprint, PaperReconciliationRules::fingerprint($row->evidence)), 409);
         $reviewer = app(DowntimeAccess::class)->lockActor(User::findOrFail($row->reviewed_by), (int) $this->entry->downtime->site_id);

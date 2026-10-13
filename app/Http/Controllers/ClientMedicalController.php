@@ -28,6 +28,7 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use App\Support\Medication\MedicationStockQuantity;
+use App\Support\MedicationJourney;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
@@ -92,14 +93,31 @@ class ClientMedicalController extends Controller
 
     public function show(Request $request, Client $client)
     {
-        $this->authorize('viewMedications', $client);
+        $returnTo = MedicationJourney::returnTo($request->query('return_to'));
+        if ($request->query('section') === 'medications') {
+            $this->authorize('viewMedications', $client);
 
-        return redirect()->to(EmarUrl::medications($client));
+            return redirect()->to(EmarUrl::medications($client, [
+                'site_id' => $client->site_id, 'return_to' => $returnTo,
+            ]));
+        }
+
+        // General medical history, conditions and emergency contacts follow
+        // client-profile access; their write endpoints separately require update.
+        $this->authorize('view', $client);
+        $this->authorize('viewMedications', $client);
+        $section = in_array($request->query('section'), ['profile', 'conditions', 'emergency_contacts'], true)
+            ? $request->query('section') : 'profile';
+
+        return redirect()->route('operations.clients.show', array_filter([
+            'client' => $client->id, 'tab' => 'medical', 'medical_section' => $section,
+            'return_to' => $returnTo,
+        ], fn ($value) => $value !== null));
     }
 
     public function updateProfile(Request $request, Client $client)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
 
         $data = $request->validate([
             'medical_history' => ['nullable', 'string'],
@@ -130,7 +148,7 @@ class ClientMedicalController extends Controller
             // A copy either sees the saved labels, or this writer sees the
             // completed copy before deciding whether labels may change.
             $lockedClient = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
-            $this->authorize('update', $lockedClient);
+            $this->authorizeMedicalUpdate($lockedClient);
             $profile = ClientMedicalProfile::query()->where('client_id', $lockedClient->id)->lockForUpdate()->first()
                 ?? new ClientMedicalProfile(['client_id' => $lockedClient->id]);
             if (array_key_exists('allergies', $data)) {
@@ -145,7 +163,7 @@ class ClientMedicalController extends Controller
             return [$profile, $lockedClient];
         }, 5);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medical profile', $profile, $client, [
+        $this->notifyMedicalCrud($request->user(), 'updated', 'medical profile', $profile, $client, [
             'title' => 'Medical profile updated',
             'url' => url("/clients/{$client->id}/medical"),
         ]);
@@ -153,244 +171,28 @@ class ClientMedicalController extends Controller
         return back()->with('success', 'Medical profile saved successfully.');
     }
 
+    /**
+     * EA-023 (Lane C3): the person profile no longer writes orders directly.
+     * Like the eMAR flat form, it answers through P04 (MedicationLegacyOrderBridge):
+     * a structured source + prescription is entered as a version waiting to be
+     * checked; anything else is sent to Orders. Hold, resume and stop are
+     * P04 actions with a prescriber instruction, never a state field here.
+     */
     public function storeMedication(Request $request, Client $client)
     {
-        $user = $request->user();
-        abort_unless($user?->canDo('medications.orders.manage') ?? false, 403);
+        abort_unless($request->user()?->canDo('medications.orders.manage') ?? false, 403);
+        $request->merge(['client_id' => (int) $client->id]);
 
-        try {
-            return app(MedicationScopeDecisionService::class)->forClient(
-                $user,
-                (int) $client->id,
-                now(),
-                function (MedicationScopeDecision $scope) use ($request, $user) {
-                    $data = $request->validate([
-                        'name' => ['required', 'string', 'max:255'],
-                        'dosage' => ['nullable', 'string', 'max:255'],
-                        'frequency' => ['nullable', 'string', 'max:255'],
-                        'dose_times' => ['nullable', 'array'],
-                        'dose_times.*' => ['string', 'regex:/^\d{2}:\d{2}$/'],
-                        'is_prn' => ['sometimes', 'boolean'],
-                        'controlled_drug' => ['sometimes', 'boolean'],
-                        'is_controlled_drug' => ['sometimes', 'boolean'],
-                        'high_risk' => ['sometimes', 'boolean'],
-                        'is_high_risk' => ['sometimes', 'boolean'],
-                        'prn_reason' => ['nullable', 'string', 'max:255'],
-                        'max_per_day' => ['nullable', 'integer', 'min:1'],
-                        'max_doses_per_day' => ['nullable', 'integer', 'min:1'],
-                        'min_hours_between_doses' => ['nullable', 'numeric', 'min:0'],
-                        'route' => ['nullable', 'string', 'max:255'],
-                        'form' => ['nullable', 'string', 'max:255'],
-                        'prescriber' => ['nullable', 'string', 'max:255'],
-                        'prescriber_name' => ['nullable', 'string', 'max:255'],
-                        'pharmacy' => ['nullable', 'string', 'max:255'],
-                        'start_date' => ['nullable', 'date'],
-                        'end_date' => ['nullable', 'date', 'after_or_equal:today'],
-                        'ceased_at' => ['prohibited'],
-                        'ceased_reason' => ['prohibited'],
-                        'state' => ['nullable', 'in:active'],
-                        'paused_at' => ['prohibited'],
-                        'instructions' => ['nullable', 'string'],
-                        'active' => ['sometimes', 'accepted'],
-                    ]);
-
-                    // Ordinary profile creation always creates a current active order.
-                    // Historical/ceased evidence can only be written by its governed lifecycle.
-                    $data['state'] = 'active';
-                    $data['active'] = true;
-                    $data['ceased_at'] = null;
-                    $data['ceased_reason'] = null;
-                    $data['paused_at'] = null;
-
-                    $client = $scope->client;
-                    $medication = new ClientMedication;
-                    $medication->client_id = $client->id;
-                    $medication->created_by = $user->id;
-                    $payload = $this->buildMedicationPayload($data);
-                    if (array_key_exists('controlled_drug', $data)
-                        && array_key_exists('is_controlled_drug', $data)
-                        && (bool) $data['controlled_drug'] !== (bool) $data['is_controlled_drug']) {
-                        throw ValidationException::withMessages([
-                            'controlled_drug' => 'Choose one consistent controlled-drug classification.',
-                        ]);
-                    }
-                    abort_if(
-                        (bool) ($payload['controlled_drug'] ?? false)
-                            && (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
-                                || ! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)),
-                        404,
-                    );
-                    $medication->fill($payload);
-                    $medication->save();
-
-                    app(TimelineEmitter::class)->record([
-                        'source_type' => ClientMedication::class,
-                        'source_id' => $medication->id,
-                        'occurred_at' => now(),
-                        'type' => 'medication_prescribed',
-                        'actor_user_id' => $user->id,
-                        'client_id' => $client->id,
-                        'site_id' => $client->site_id,
-                        'subject' => 'Medication added: '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
-                        'body' => $medication->instructions,
-                        'meta' => array_filter([
-                            'medication_name' => $medication->name,
-                            'dosage' => $medication->dosage,
-                            'frequency' => $medication->frequency,
-                            'route' => $medication->route,
-                            'is_prn' => $medication->is_prn,
-                            'controlled_drug' => $medication->controlled_drug,
-                            'high_risk' => $medication->high_risk,
-                        ]),
-                        'visibility' => 'internal',
-                        'is_pinned' => false,
-                        'created_by' => $user->id,
-                    ]);
-
-                    $this->notifyMedicationEvent(
-                        $user,
-                        $client,
-                        'medications.orders.manage',
-                        (bool) $medication->controlled_drug,
-                        false,
-                        [
-                            'action' => 'created',
-                            'entity' => 'medication',
-                            'entity_id' => $medication->id,
-                            'event_key' => 'medication.created',
-                            'title' => 'Medication added: '.$medication->name,
-                            'url' => url("/clients/{$client->id}/medical"),
-                        ],
-                    );
-                    app(MedicationScopeDecisionService::class)->recordBreakGlassUse(
-                        $scope,
-                        'created_medication_order',
-                        'Medication '.$medication->id,
-                    );
-
-                    return back()->with('success', 'Medication added successfully.');
-                },
-            );
-        } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
-            throw $e;
-        } catch (\Throwable $e) {
-            report($e);
-
-            return back()->withInput()->with('error', 'Failed to add medication. No changes were saved.');
-        }
+        return app(\App\Services\Medication\MedicationLegacyOrderBridge::class)->enter($request);
     }
 
     public function updateMedication(Request $request, Client $client, ClientMedication $medication)
     {
-        $user = $request->user();
-        abort_unless($user?->canDo('medications.orders.manage') ?? false, 403);
+        abort_unless($request->user()?->canDo('medications.orders.manage') ?? false, 403);
+        abort_unless((int) $medication->client_id === (int) $client->id, 404);
+        $request->merge(['client_id' => (int) $client->id]);
 
-        try {
-            return app(MedicationScopeDecisionService::class)->forMedication(
-                $user,
-                $medication,
-                now(),
-                function (MedicationScopeDecision $scope) use ($client, $request, $user) {
-                    abort_unless(
-                        (int) $scope->client->id === (int) $client->id,
-                        404,
-                        'The requested medication action is not available.',
-                    );
-                    abort_if(
-                        $scope->medication->controlled_drug
-                            && (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
-                                || ! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)),
-                        404,
-                    );
-
-                    $data = $request->validate([
-                        'name' => ['required', 'string', 'max:255'],
-                        'dosage' => ['nullable', 'string', 'max:255'],
-                        'frequency' => ['nullable', 'string', 'max:255'],
-                        'dose_times' => ['nullable', 'array'],
-                        'dose_times.*' => ['string', 'regex:/^\d{2}:\d{2}$/'],
-                        'is_prn' => ['sometimes', 'boolean'],
-                        'controlled_drug' => ['sometimes', 'boolean'],
-                        'is_controlled_drug' => ['sometimes', 'boolean'],
-                        'high_risk' => ['sometimes', 'boolean'],
-                        'is_high_risk' => ['sometimes', 'boolean'],
-                        'prn_reason' => ['nullable', 'string', 'max:255'],
-                        'max_per_day' => ['nullable', 'integer', 'min:1'],
-                        'max_doses_per_day' => ['nullable', 'integer', 'min:1'],
-                        'min_hours_between_doses' => ['nullable', 'numeric', 'min:0'],
-                        'route' => ['nullable', 'string', 'max:255'],
-                        'form' => ['nullable', 'string', 'max:255'],
-                        'prescriber' => ['nullable', 'string', 'max:255'],
-                        'prescriber_name' => ['nullable', 'string', 'max:255'],
-                        'pharmacy' => ['nullable', 'string', 'max:255'],
-                        'start_date' => ['nullable', 'date'],
-                        'end_date' => ['nullable', 'date'],
-                        'ceased_at' => ['prohibited'],
-                        'ceased_reason' => ['prohibited'],
-                        'state' => ['nullable', 'in:active,paused'],
-                        'paused_at' => ['nullable', 'date'],
-                        'instructions' => ['nullable', 'string'],
-                        'active' => ['sometimes', 'boolean'],
-                    ]);
-
-                    if (($data['active'] ?? null) === false && ($data['state'] ?? null) !== 'paused') {
-                        throw ValidationException::withMessages([
-                            'state' => 'Use Discontinue and record a reason to cease this medication.',
-                        ]);
-                    }
-                    $data['active'] = ! empty($data['state']) ? $data['state'] === 'active' : true;
-                    $data['state'] = $data['state'] ?? 'active';
-
-                    $payload = $this->buildMedicationPayload($data);
-                    if (array_key_exists('controlled_drug', $payload)) {
-                        abort_if(
-                            (bool) $payload['controlled_drug'] !== (bool) $scope->medication->controlled_drug
-                                && (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
-                                    || ! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)),
-                            404,
-                        );
-                        if ((bool) $payload['controlled_drug'] !== (bool) $scope->medication->controlled_drug) {
-                            throw ValidationException::withMessages([
-                                'controlled_drug' => 'Controlled-drug classification cannot be changed on an existing medication order.',
-                            ]);
-                        }
-                    }
-
-                    $scope->medication->fill($payload);
-                    $scope->medication->save();
-
-                    $this->notifyMedicationEvent(
-                        $user,
-                        $scope->client,
-                        'medications.orders.manage',
-                        (bool) $scope->medication->controlled_drug,
-                        false,
-                        [
-                            'action' => 'updated',
-                            'entity' => 'medication',
-                            'entity_id' => $scope->medication->id,
-                            'event_key' => 'medication.updated',
-                            'title' => 'Medication updated: '.$scope->medication->name,
-                            'url' => url("/clients/{$scope->client->id}/medical"),
-                        ],
-                    );
-                    app(MedicationScopeDecisionService::class)->recordBreakGlassUse(
-                        $scope,
-                        'updated_medication_order',
-                        'Medication '.$scope->medication->id,
-                    );
-
-                    return back()->with('success', 'Medication updated successfully.');
-                },
-                submittedClientId: (int) $client->id,
-            );
-        } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
-            throw $e;
-        } catch (\Throwable $e) {
-            report($e);
-
-            return back()->withInput()->with('error', 'Failed to update medication. No changes were saved.');
-        }
+        return app(\App\Services\Medication\MedicationLegacyOrderBridge::class)->enter($request, $medication);
     }
 
     public function updateMedicationStock(
@@ -946,13 +748,28 @@ class ClientMedicalController extends Controller
         );
 
         try {
-            $discontinued = app(MedicationOrderLifecycleService::class)->discontinue(
-                $user,
-                $medication,
-                $request->input('reason'),
-                (int) $client->id,
-                requestKey: $request->input('request_key'),
-            );
+            // EA-135 (Lane C3): the profile stops an order through P04, so the
+            // stop is recorded, its order checks close and order.stopped is
+            // appended — the same as Orders › Stop.
+            $orders = app(\App\Services\Medication\MedicationOrderWorkflow::class);
+            $discontinued = $orders->forMedication($user, (int) $medication->id, 'medications.orders.manage',
+                function (Client $scoped, ClientMedication $order, $actor) use ($request, $client, $orders): ClientMedication {
+                    app(\App\Services\Medication\MedicationRecordAccess::class)->assertReadable($actor, $scoped);
+                    $orders->assertControlled($actor, $order);
+                    $alreadyStopped = $order->state === 'ceased';
+                    $ended = app(MedicationOrderLifecycleService::class)->discontinue(
+                        $actor,
+                        $order,
+                        $request->input('reason'),
+                        (int) $client->id,
+                        requestKey: $request->input('request_key'),
+                    );
+                    if (! $alreadyStopped) {
+                        $orders->action($actor, $ended, 'stopped', ['version' => $ended->version, 'reason' => $ended->ceased_reason]);
+                    }
+
+                    return $ended;
+                }, expectedClientId: (int) $client->id);
 
             if ($discontinued->wasChanged('state')) {
                 try {
@@ -989,7 +806,7 @@ class ClientMedicalController extends Controller
 
     public function storeCondition(Request $request, Client $client)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:255'],
@@ -998,28 +815,32 @@ class ClientMedicalController extends Controller
         ]);
 
         try {
-            $c = new ClientCondition;
-            $c->client_id = $client->id;
-            $c->fill($data);
-            $c->save();
+            $c = DB::transaction(function () use ($client, $data, $request): ClientCondition {
+                $c = new ClientCondition;
+                $c->client_id = $client->id;
+                $c->fill($data);
+                $c->saveOrFail();
 
-            app(TimelineEmitter::class)->record([
-                'source_type' => ClientCondition::class,
-                'source_id' => $c->id,
-                'occurred_at' => now(),
-                'type' => 'condition_added',
-                'actor_user_id' => $request->user()?->id,
-                'client_id' => $client->id,
-                'site_id' => $client->site_id,
-                'subject' => 'Condition added: '.$c->label,
-                'body' => $c->notes,
-                'meta' => array_filter(['severity' => $c->severity]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $request->user()?->id,
-            ]);
+                app(TimelineEmitter::class)->record([
+                    'source_type' => ClientCondition::class,
+                    'source_id' => $c->id,
+                    'occurred_at' => now(),
+                    'type' => 'condition_added',
+                    'actor_user_id' => $request->user()?->id,
+                    'client_id' => $client->id,
+                    'site_id' => $client->site_id,
+                    'subject' => 'Condition added: '.$c->label,
+                    'body' => $c->notes,
+                    'meta' => array_filter(['severity' => $c->severity]),
+                    'visibility' => 'internal',
+                    'is_pinned' => false,
+                    'created_by' => $request->user()?->id,
+                ]);
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'created', 'condition', $c, $client, [
+                return $c;
+            }, 5);
+
+            $this->notifyMedicalCrud($request->user(), 'created', 'condition', $c, $client, [
                 'title' => 'Condition added: '.$c->label,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1034,7 +855,7 @@ class ClientMedicalController extends Controller
 
     public function updateCondition(Request $request, Client $client, ClientCondition $condition)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
         abort_unless($condition->client_id === $client->id, 404);
 
         $data = $request->validate([
@@ -1045,9 +866,9 @@ class ClientMedicalController extends Controller
 
         try {
             $condition->fill($data);
-            $condition->save();
+            $condition->saveOrFail();
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'condition', $condition, $client, [
+            $this->notifyMedicalCrud($request->user(), 'updated', 'condition', $condition, $client, [
                 'title' => 'Condition updated: '.$condition->label,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1062,12 +883,12 @@ class ClientMedicalController extends Controller
 
     public function destroyCondition(Request $request, Client $client, ClientCondition $condition)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
         abort_unless($condition->client_id === $client->id, 404);
 
         try {
-            $condition->delete();
-            app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'condition', $condition, $client, [
+            DB::transaction(fn () => $condition->delete());
+            $this->notifyMedicalCrud($request->user(), 'deleted', 'condition', $condition, $client, [
                 'title' => 'Condition removed: '.($condition->label ?? 'Condition'),
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1082,7 +903,7 @@ class ClientMedicalController extends Controller
 
     public function storeEmergencyContact(Request $request, Client $client)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -1105,9 +926,9 @@ class ClientMedicalController extends Controller
             $e = new ClientEmergencyContact;
             $e->client_id = $client->id;
             $e->fill($data);
-            $e->save();
+            $e->saveOrFail();
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'created', 'emergency contact', $e, $client, [
+            $this->notifyMedicalCrud($request->user(), 'created', 'emergency contact', $e, $client, [
                 'title' => 'Emergency contact added: '.$e->name,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1122,7 +943,7 @@ class ClientMedicalController extends Controller
 
     public function updateEmergencyContact(Request $request, Client $client, ClientEmergencyContact $contact)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
         abort_unless($contact->client_id === $client->id, 404);
 
         $data = $request->validate([
@@ -1144,9 +965,9 @@ class ClientMedicalController extends Controller
 
         try {
             $contact->fill($data);
-            $contact->save();
+            $contact->saveOrFail();
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'emergency contact', $contact, $client, [
+            $this->notifyMedicalCrud($request->user(), 'updated', 'emergency contact', $contact, $client, [
                 'title' => 'Emergency contact updated: '.$contact->name,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1161,12 +982,12 @@ class ClientMedicalController extends Controller
 
     public function destroyEmergencyContact(Request $request, Client $client, ClientEmergencyContact $contact)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
         abort_unless($contact->client_id === $client->id, 404);
 
         try {
-            $contact->delete();
-            app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'emergency contact', $contact, $client, [
+            DB::transaction(fn () => $contact->delete());
+            $this->notifyMedicalCrud($request->user(), 'deleted', 'emergency contact', $contact, $client, [
                 'title' => 'Emergency contact removed: '.($contact->name ?? 'Contact'),
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1176,6 +997,25 @@ class ClientMedicalController extends Controller
             report($e);
 
             return back()->with('error', 'Failed to remove emergency contact: '.$e->getMessage());
+        }
+    }
+
+    /** The Medical section requires both profile and medication-record reads. */
+    private function authorizeMedicalUpdate(Client $client): void
+    {
+        $this->authorize('view', $client);
+        $this->authorize('viewMedications', $client);
+        $this->authorize('update', $client);
+    }
+
+    /** Delivery failure cannot turn a committed medical save into a save error. */
+    private function notifyMedicalCrud(...$arguments): void
+    {
+        try {
+            $arguments[5]['data']['recipient_scope'] = 'client_medical';
+            app(NotificationService::class)->notifyCrud(...$arguments);
+        } catch (\Throwable $notificationFailure) {
+            report($notificationFailure);
         }
     }
 

@@ -38,9 +38,15 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
+import {
+    EMAR_HUBS,
+    visibleEmarViews,
+    type EmarNavigationPermissions,
+} from '@/lib/emar-navigation';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     CalendarDays,
     Download,
@@ -243,6 +249,19 @@ function cell(row: Row, key: string) {
 }
 
 export default function ReportsHub(props: Props) {
+    // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
+    const breadcrumbs = useEmarBreadcrumbs();
+    // EA-221 (Lane C8): the rail is the hub map's Reports views for this
+    // viewer — Audit trail only for audit readers, Protected backups only
+    // for people who can receive one.
+    const navCan = usePage<{ auth?: { can?: EmarNavigationPermissions } }>()
+        .props.auth?.can;
+    const reportViews = new Set(
+        visibleEmarViews(
+            EMAR_HUBS.find((hub) => hub.key === 'reports')!,
+            navCan,
+        ).map((view) => view.key),
+    );
     const [downtimeOpen, setDowntimeOpen] = useState(false);
     const [focusedMetric, setFocusedMetric] = useState<string | null>(null);
     const { filters, data, page, finance, can } = props;
@@ -437,13 +456,7 @@ export default function ReportsHub(props: Props) {
               ? 'Print & exports'
               : props.reports[filters.report];
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                { title: 'Reports & audit', href: '/emar/reports' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication reports & audit" />
             <div className="min-w-0 space-y-5">
                 <PageHeader
@@ -455,10 +468,15 @@ export default function ReportsHub(props: Props) {
                             {can.history && filters.view === 'audit' && (
                                 <PageHeaderGlassButton
                                     onClick={() =>
-                                        router.visit('/emar/reports/history')
+                                        router.get('/emar/reports/history', {
+                                            date_from: filters.date_from,
+                                            date_to: filters.date_to,
+                                            site_id: filters.site_id,
+                                            client_id: filters.client_id,
+                                        })
                                     }
                                 >
-                                    Clinical history
+                                    Medication history
                                 </PageHeaderGlassButton>
                             )}
                             <PageHeaderSearch
@@ -480,7 +498,12 @@ export default function ReportsHub(props: Props) {
                                     title={
                                         filters.site_id
                                             ? 'Check this house’s event chain'
-                                            : 'Choose one house to check its event chain'
+                                            : undefined
+                                    }
+                                    aria-describedby={
+                                        filters.site_id
+                                            ? undefined
+                                            : 'check-chain-reason'
                                     }
                                 >
                                     Check chain
@@ -752,38 +775,66 @@ export default function ReportsHub(props: Props) {
                             items={[
                                 {
                                     key: 'standard',
+                                    nav: 'reports',
                                     label: 'Standard reports',
                                     icon: FileBarChart,
                                 },
                                 {
-                                    key: 'builder',
-                                    label: 'Report builder',
-                                    icon: SlidersHorizontal,
-                                },
-                                {
                                     key: 'audit',
+                                    nav: 'audit',
                                     label: 'Audit trail',
                                     icon: ShieldCheck,
                                 },
                                 {
+                                    key: 'builder',
+                                    nav: 'builder',
+                                    label: 'Report builder',
+                                    icon: SlidersHorizontal,
+                                },
+                                {
                                     key: 'exports',
+                                    nav: 'exports',
                                     label: 'Print & exports',
                                     icon: Download,
                                 },
-                            ]}
+                                {
+                                    key: 'backups',
+                                    nav: 'backups',
+                                    label: 'Protected backups',
+                                    icon: Lock,
+                                },
+                            ]
+                                .filter(
+                                    (item) =>
+                                        reportViews.has(item.nav) &&
+                                        (item.key !== 'audit' || can.audit),
+                                )
+                                .map(({ key, label, icon }) => ({
+                                    key,
+                                    label,
+                                    icon,
+                                }))}
                             value={filters.view}
                             onSelect={(key) =>
                                 key === 'builder'
                                     ? router.visit('/emar/reports/builder')
-                                    : visit({
-                                          view: key as Filters['view'],
-                                          q: '',
-                                      })
+                                    : key === 'backups'
+                                      ? router.visit('/emar/backups')
+                                      : visit({
+                                            view: key as Filters['view'],
+                                            q: '',
+                                        })
                             }
                             ariaLabel="Medication reports views"
                         />
                     }
                 />
+                {/* EA-187 (Lane C9): say why Check chain is unavailable. */}
+                {can.verify && filters.view === 'audit' && !filters.site_id && (
+                    <p className="text-subtle" id="check-chain-reason">
+                        Choose one house to check its event chain.
+                    </p>
+                )}
                 {!online && (
                     <p className="text-subtle" role="status">
                         You’re offline. Loaded records remain available;

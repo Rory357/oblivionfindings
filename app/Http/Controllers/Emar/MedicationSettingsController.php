@@ -22,6 +22,7 @@ use App\Services\Medication\Alerts\MedicationAlertPreviews;
 use App\Services\Medication\Alerts\MedicationAlertReachGaps;
 use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\Alerts\OnCallResolver;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\Settings\EmergencyAccessPolicySettings;
@@ -857,6 +858,8 @@ class MedicationSettingsController extends Controller
             ...$roundTemplates,
             ...$alertPayload,
             'emergencyPolicyAccess' => $this->canManageEmergencyPolicy($actor),
+            // Settings › Connected services (D4): whether each feature is set up.
+            'connectedStatus' => app(ConnectedCareSettings::class)->status(),
             'settingsAccess' => true,
             'controlledSettingsAccess' => ['view' => $canSeeControlled, 'manageable_site_ids' => $canManage && $canSeeControlled
                 ? array_values(array_filter($siteIds, fn ($id) => $this->canUseRuleSiteNow($actor, (int) $id))) : []],
@@ -1359,9 +1362,12 @@ class MedicationSettingsController extends Controller
     private function roundTemplatePayload(User $actor, bool $canTemplates, bool $canRead): array
     {
         $manageable = $canTemplates ? $this->roundTemplates->manageableSiteIds($actor) : [];
+        $catalogue = $canRead
+            ? $this->roundTemplates->rowsAndStaff($actor)
+            : ['rows' => [], 'staff' => $canTemplates ? $this->roundTemplates->staffPicker($actor) : collect()];
 
         return [
-            'roundTemplates' => $canRead ? $this->roundTemplates->rows($actor) : [],
+            'roundTemplates' => $catalogue['rows'],
             'templateAccess' => [
                 'read' => $canRead,
                 'manage' => $canTemplates,
@@ -1374,7 +1380,7 @@ class MedicationSettingsController extends Controller
                     ->map(fn (Site $site): array => ['id' => (int) $site->id, 'name' => (string) $site->name])
                     ->all(),
             ],
-            'templateStaff' => $canTemplates ? $this->roundTemplates->staffPicker($actor)->all() : [],
+            'templateStaff' => $canTemplates ? $catalogue['staff']->all() : [],
         ];
     }
 

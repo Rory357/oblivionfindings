@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import {
     FilePreviewDialog,
     type PreviewFile,
@@ -23,8 +24,10 @@ import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import { medicationReturnParams } from '@/lib/medication-navigation';
 import { Head, router } from '@inertiajs/react';
 import {
     ArrowLeftRight,
@@ -125,6 +128,8 @@ type Props = {
         site_id: number | null;
         client_id?: number | null;
         show?: string;
+        lot_id?: number | null;
+        medication_id?: number | null;
     };
     metrics: {
         tracked: number;
@@ -169,8 +174,14 @@ export default function StockHub({
     selected_client = null,
     focused_count = null,
 }: Props) {
+    // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
+    const breadcrumbs = useEmarBreadcrumbs();
     const [search, setSearch] = useState(filters.search);
     const [modal, setModal] = useState<Modal>(null);
+    useEffect(() => {
+        if (filters.medication_id)
+            setModal({ kind: 'item', id: filters.medication_id });
+    }, [filters.medication_id]);
     useEffect(() => {
         if (focused_count) setModal({ kind: 'count', record: focused_count });
     }, [focused_count]);
@@ -190,7 +201,12 @@ export default function StockHub({
         router.get(
             '/emar/stock/packs',
             Object.fromEntries(
-                Object.entries({ ...filters, search, ...changes }).filter(
+                Object.entries({
+                    ...filters,
+                    ...medicationReturnParams(),
+                    search,
+                    ...changes,
+                }).filter(
                     ([, value]) =>
                         value !== null && value !== undefined && value !== '',
                 ),
@@ -216,8 +232,8 @@ export default function StockHub({
                       disabled:
                           !item.lots_started && item.stock_id !== null
                               ? 'Pack tracking has not been set up.'
-                              : !item.active
-                                ? 'This medicine is no longer active.'
+                              : !(item.receivable ?? item.active)
+                                ? 'This medicine has been stopped.'
                                 : undefined,
                   },
                   {
@@ -244,8 +260,8 @@ export default function StockHub({
                       label: 'Receive a witnessed delivery',
                       icon: Truck,
                       onClick: () => openItem(item, 'receive'),
-                      disabled: !item.active
-                          ? 'This medicine is no longer active.'
+                      disabled: !(item.receivable ?? item.active)
+                          ? 'This medicine has been stopped.'
                           : !item.lots_started && item.stock_id !== null
                             ? 'Pack tracking has not been set up.'
                             : undefined,
@@ -258,8 +274,8 @@ export default function StockHub({
                       label: 'Order from the pharmacy',
                       icon: Truck,
                       onClick: () => openItem(item, 'order'),
-                      disabled: !item.active
-                          ? 'This medicine is no longer active.'
+                      disabled: !(item.receivable ?? item.active)
+                          ? 'This medicine has been stopped.'
                           : undefined,
                   },
                   {
@@ -277,7 +293,10 @@ export default function StockHub({
                   {
                       label: 'Open the controlled register',
                       icon: ShieldCheck,
-                      onClick: () => router.visit('/emar/controlled'),
+                      onClick: () =>
+                          router.visit(
+                              `/emar/controlled?client_id=${item.client_id}&client_medication_id=${item.id}${item.site_id ? '&site_id=' + item.site_id : ''}`,
+                          ),
                   },
               ]
             : []),
@@ -338,16 +357,7 @@ export default function StockHub({
             : []),
     ];
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                {
-                    title: 'Stock & controlled drugs',
-                    href: '/emar/stock/packs',
-                },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Stock & controlled drugs" />
             <div className="grid min-w-0 grid-cols-1 gap-5">
                 <PageHeader
@@ -362,6 +372,7 @@ export default function StockHub({
                     subline="Person-owned medicines, deliveries and counts"
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <ConnectedServicesMenu
                                 clientId={filters.client_id ?? undefined}
                             />
@@ -761,6 +772,11 @@ export default function StockHub({
             {modal?.kind === 'item' && (
                 <ItemWorkspace
                     id={modal.id}
+                    initialLotId={
+                        filters.medication_id === modal.id
+                            ? filters.lot_id
+                            : null
+                    }
                     initialAction={modal.action}
                     order={modal.order}
                     pharmacies={pharmacies}
@@ -800,6 +816,7 @@ export default function StockHub({
 
 function ItemWorkspace({
     id,
+    initialLotId,
     initialAction,
     order,
     pharmacies,
@@ -809,6 +826,7 @@ function ItemWorkspace({
     onSaved,
 }: {
     id: number;
+    initialLotId?: number | null;
     initialAction?:
         | 'receive'
         | 'count'
@@ -833,7 +851,7 @@ function ItemWorkspace({
         null,
     );
     const [setupConfirm, setSetupConfirm] = useState(false);
-    const [section, setSection] = useState(0);
+    const [section, setSection] = useState(initialLotId ? 1 : 0);
     const [file, setFile] = useState<PreviewFile | null>(null);
     const command = useStockCommand();
     useEffect(() => {
@@ -935,9 +953,15 @@ function ItemWorkspace({
                 onSaved={onSaved}
             />
         );
-    const photos = item.packs.flatMap((pack) =>
-        pack.photos.map((photo) => ({ pack, photo })),
-    );
+    // C11: newest first, like the person record's Medicines › Photos.
+    const photos = item.packs
+        .flatMap((pack) => pack.photos.map((photo) => ({ pack, photo })))
+        .sort(
+            (a, b) =>
+                b.photo.taken_at.localeCompare(a.photo.taken_at) ||
+                b.photo.id - a.photo.id,
+        );
+    const canPhotograph = item.photo_policy?.can_photograph ?? can.manage;
     const setup = async () => {
         const result = await command.run({
             action: 'initialise',
@@ -1104,7 +1128,7 @@ function ItemWorkspace({
                                 {can.receive_controlled && item.controlled && (
                                     <Button
                                         disabled={
-                                            !item.active ||
+                                            !(item.receivable ?? item.active) ||
                                             (!item.lots_started &&
                                                 item.stock_id !== null)
                                         }
@@ -1179,7 +1203,9 @@ function ItemWorkspace({
                                     <Button
                                         variant="outline"
                                         onClick={() =>
-                                            router.visit('/emar/controlled')
+                                            router.visit(
+                                                `/emar/controlled?client_id=${item.client_id}&client_medication_id=${item.id}${item.site_id ? '&site_id=' + item.site_id : ''}`,
+                                            )
                                         }
                                     >
                                         Open the controlled register
@@ -1190,64 +1216,78 @@ function ItemWorkspace({
                     )}
                     {section === 1 &&
                         (item.packs.length ? (
-                            item.packs.map((pack) => (
-                                <ReviewCard
-                                    key={pack.id}
-                                    icon={Package}
-                                    title={
-                                        pack.batch_number ??
-                                        (pack.batch_not_printed
-                                            ? 'Batch not printed on the pack'
-                                            : 'Batch unknown')
-                                    }
-                                >
-                                    <ReviewRow
-                                        label="Remaining"
-                                        value={`${pack.quantity_remaining} ${item.unit}`}
-                                    />
-                                    <ReviewRow
-                                        label="Expiry"
-                                        value={
-                                            pack.expiry_date
-                                                ? formatDateOnly(
-                                                      pack.expiry_date.slice(
-                                                          0,
-                                                          10,
-                                                      ),
-                                                  )
-                                                : pack.expiry_not_printed
-                                                  ? 'Not printed on the pack'
-                                                  : 'Unknown'
+                            [...item.packs]
+                                .sort(
+                                    (a, b) =>
+                                        Number(b.id === initialLotId) -
+                                        Number(a.id === initialLotId),
+                                )
+                                .map((pack) => (
+                                    <ReviewCard
+                                        key={pack.id}
+                                        icon={Package}
+                                        title={
+                                            pack.batch_number ??
+                                            (pack.batch_not_printed
+                                                ? 'Batch not printed on the pack'
+                                                : 'Batch unknown')
                                         }
-                                    />
-                                    <ReviewRow
-                                        label="Source"
-                                        value={
-                                            pack.source_reference ??
-                                            pack.source.replaceAll('_', ' ')
-                                        }
-                                    />
-                                    <ReviewRow
-                                        label="Recorded"
-                                        value={formatDateTime(pack.received_at)}
-                                    />
-                                    <ReviewRow
-                                        label="Pack state"
-                                        value={
-                                            pack.state === 'quarantined'
-                                                ? 'Out of use'
-                                                : 'Open'
-                                        }
-                                    />
-                                    {pack.source === 'recorded_balance' && (
-                                        <p className="text-caption">
-                                            Carried forward from the recorded
-                                            balance. Original receipt date and
-                                            label checks are unknown.
-                                        </p>
-                                    )}
-                                </ReviewCard>
-                            ))
+                                    >
+                                        {pack.id === initialLotId && (
+                                            <StatusBadge variant="info">
+                                                Selected pack from calendar
+                                            </StatusBadge>
+                                        )}
+                                        <ReviewRow
+                                            label="Remaining"
+                                            value={`${pack.quantity_remaining} ${item.unit}`}
+                                        />
+                                        <ReviewRow
+                                            label="Expiry"
+                                            value={
+                                                pack.expiry_date
+                                                    ? formatDateOnly(
+                                                          pack.expiry_date.slice(
+                                                              0,
+                                                              10,
+                                                          ),
+                                                      )
+                                                    : pack.expiry_not_printed
+                                                      ? 'Not printed on the pack'
+                                                      : 'Unknown'
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Source"
+                                            value={
+                                                pack.source_reference ??
+                                                pack.source.replaceAll('_', ' ')
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Recorded"
+                                            value={formatDateTime(
+                                                pack.received_at,
+                                            )}
+                                        />
+                                        <ReviewRow
+                                            label="Pack state"
+                                            value={
+                                                pack.state === 'quarantined'
+                                                    ? 'Out of use'
+                                                    : 'Open'
+                                            }
+                                        />
+                                        {pack.source === 'recorded_balance' && (
+                                            <p className="text-caption">
+                                                Carried forward from the
+                                                recorded balance. Original
+                                                receipt date and label checks
+                                                are unknown.
+                                            </p>
+                                        )}
+                                    </ReviewCard>
+                                ))
                         ) : (
                             <EmptyState
                                 icon={Package}
@@ -1348,67 +1388,83 @@ function ItemWorkspace({
                             />
                         ))}
                     {section === 4 && (
-                        <>
-                            {can.manage && item.packs.length > 0 && (
+                        <div className="space-y-3">
+                            {canPhotograph && item.packs.length > 0 && (
                                 <Button onClick={() => setAction('photo')}>
                                     Add or replace a pack photo
                                 </Button>
                             )}
-                            <SettingsNotice role="note">
-                                Photos are supplemental identification. Check
-                                the current order and pack label. A changed pack
-                                or brand needs a new photo.
-                            </SettingsNotice>
                             {photos.length ? (
-                                photos.map(({ pack, photo }) => (
-                                    <ReviewCard
-                                        key={photo.id}
-                                        icon={Camera}
-                                        title={photo.original_name}
-                                    >
-                                        <ReviewRow
-                                            label="Pack"
-                                            value={
-                                                pack.batch_number ??
-                                                'Batch unknown'
-                                            }
-                                        />
-                                        <ReviewRow
-                                            label="Added"
-                                            value={`${formatDateTime(photo.taken_at)} · ${photo.taken_by_name ?? 'Unknown'}`}
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            onClick={() =>
-                                                setFile({
-                                                    id: photo.id,
-                                                    name: 'Medicine pack photo',
-                                                    filename:
-                                                        photo.original_name,
-                                                    mime: photo.mime,
-                                                    bytes: photo.bytes,
-                                                    source:
-                                                        pack.batch_number ??
-                                                        'Batch unknown',
-                                                    previewUrl:
-                                                        photo.preview_url,
-                                                    downloadUrl:
-                                                        photo.download_url,
-                                                })
-                                            }
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    {photos.map(({ pack, photo }) => (
+                                        <figure
+                                            key={photo.id}
+                                            className="space-y-1.5"
                                         >
-                                            View and download
-                                        </Button>
-                                    </ReviewCard>
-                                ))
+                                            <Button
+                                                unstyled
+                                                type="button"
+                                                className="block w-full rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                                aria-label={`View the pack photo taken ${formatDateTime(photo.taken_at)}`}
+                                                onClick={() =>
+                                                    setFile({
+                                                        id: photo.id,
+                                                        name: `${item.name} — photo of the supplied pack`,
+                                                        filename:
+                                                            photo.original_name,
+                                                        mime: photo.mime,
+                                                        bytes: photo.bytes,
+                                                        source: `Taken ${formatDateTime(photo.taken_at)} by ${photo.taken_by_name ?? 'Unknown'} · ${pack.label ?? pack.batch_number ?? 'Batch unknown'}`,
+                                                        previewUrl:
+                                                            photo.preview_url,
+                                                        downloadUrl:
+                                                            photo.download_url,
+                                                    })
+                                                }
+                                            >
+                                                <img
+                                                    src={photo.preview_url}
+                                                    alt={`Pack photo — ${pack.label ?? pack.batch_number ?? 'pack'}`}
+                                                    className="aspect-[4/3] w-full rounded-lg border object-cover"
+                                                />
+                                            </Button>
+                                            <figcaption className="text-caption">
+                                                {formatDateTime(photo.taken_at)}{' '}
+                                                ·{' '}
+                                                {photo.taken_by_name ??
+                                                    'Unknown'}{' '}
+                                                ·{' '}
+                                                {pack.batch_number ??
+                                                    'no batch'}
+                                                <br />
+                                                {photo.description ??
+                                                    (photo.pack_changed
+                                                        ? 'Pack looks different from last time'
+                                                        : 'Pack as received')}
+                                                {pack.supplier
+                                                    ? ` · ${pack.supplier}`
+                                                    : ''}
+                                            </figcaption>
+                                        </figure>
+                                    ))}
+                                </div>
                             ) : (
-                                <EmptyState
-                                    icon={Camera}
-                                    title="No pack photos yet"
-                                    description="A receipt can be saved without a photo."
-                                />
+                                <p className="text-sm text-muted-foreground">
+                                    {item.photo_policy?.mode === 'off'
+                                        ? 'No pack photo yet.'
+                                        : 'No pack photo yet. The next receipt prompts for one.'}
+                                </p>
                             )}
-                        </>
+                            <p className="text-caption">
+                                Photos are stored privately
+                                {item.controlled
+                                    ? ', and shown only to people with controlled-medicine access'
+                                    : ''}
+                                . The latest is shown in the dose dialog.
+                                Earlier photos are kept. Check the label — the
+                                picture is a guide only.
+                            </p>
+                        </div>
                     )}
                 </div>
             </WizardShell>

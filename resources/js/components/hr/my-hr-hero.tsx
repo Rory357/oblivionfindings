@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, type CSSProperties } from 'react';
 
+import { guardMedicationSignOut } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 
 import { MyHrCalendar } from './my-hr-calendar';
@@ -238,6 +239,9 @@ export function MyHrHero({
                                             danger
                                             onClick={() => {
                                                 setAvatarOpen(false);
+                                                // eMAR: ask first while doses are saved only on this device.
+                                                if (!guardMedicationSignOut())
+                                                    return;
                                                 router.post('/logout');
                                             }}
                                         />

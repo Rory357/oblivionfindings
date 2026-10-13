@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { type MouseEvent as ReactMouseEvent, useMemo } from 'react';
 
+import { toDateInput } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 import { Button as GuardrailButton } from '@/components/ui/button';
@@ -27,7 +28,7 @@ import {
     cardCounts,
     clientName,
     fmtShiftRange,
-    handoverDate,
+    handoverCalendarDate,
     humanizeRole,
     relTime,
     ymd,
@@ -58,12 +59,14 @@ export type CardHandlers = {
 
 function HandoverCard({
     h,
+    timeZone,
     onOpen,
     onSubmit,
     onAcknowledge,
     onContextMenu,
 }: {
     h: Handover;
+    timeZone?: string;
     onContextMenu: (e: ReactMouseEvent, h: Handover) => void;
 } & CardHandlers) {
     const counts = cardCounts(h);
@@ -171,7 +174,7 @@ function HandoverCard({
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground">
                         <Clock className="h-3 w-3" />
                         {h.outgoing_shift.label} ·{' '}
-                        {fmtShiftRange(h.outgoing_shift)}
+                        {fmtShiftRange(h.outgoing_shift, timeZone)}
                     </span>
                 ) : null}
                 {h.site ? (
@@ -231,9 +234,12 @@ function HandoverCard({
     );
 }
 
-function dayLabel(date: Date): string {
-    const today = ymd(new Date());
-    const yesterday = new Date();
+function dayLabel(date: Date, timeZone?: string): string {
+    if (Number.isNaN(date.getTime())) return 'Date unavailable';
+    const today = timeZone
+        ? toDateInput(new Date(), timeZone)
+        : ymd(new Date());
+    const yesterday = new Date(`${today}T12:00:00`);
     yesterday.setDate(yesterday.getDate() - 1);
     if (ymd(date) === today) return 'Today';
     if (ymd(date) === ymd(yesterday)) return 'Yesterday';
@@ -242,13 +248,14 @@ function dayLabel(date: Date): string {
 
 export function CardsView({
     handovers,
+    timeZone,
     ...handlers
-}: { handovers: Handover[] } & CardHandlers) {
+}: { handovers: Handover[]; timeZone?: string } & CardHandlers) {
     const { openCtx, menu } = useHandoverContextMenu(handlers);
     const groups = useMemo(() => {
         const byDay = new Map<string, { date: Date; items: Handover[] }>();
         for (const h of handovers) {
-            const date = handoverDate(h);
+            const date = handoverCalendarDate(h, timeZone);
             const key = ymd(date);
             if (!byDay.has(key)) byDay.set(key, { date, items: [] });
             byDay.get(key)!.items.push(h);
@@ -262,7 +269,7 @@ export function CardsView({
             );
         arr.sort((a, b) => b.date.getTime() - a.date.getTime());
         return arr;
-    }, [handovers]);
+    }, [handovers, timeZone]);
 
     if (handovers.length === 0) return <EmptyState />;
 
@@ -273,13 +280,15 @@ export function CardsView({
                     <div key={ymd(g.date)} className="space-y-3">
                         <div className="flex items-center gap-3">
                             <span className="text-sm font-bold">
-                                {dayLabel(g.date)}
+                                {dayLabel(g.date, timeZone)}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                {g.date.toLocaleDateString('en-NZ', {
-                                    day: 'numeric',
-                                    month: 'long',
-                                })}
+                                {Number.isNaN(g.date.getTime())
+                                    ? 'No recorded date'
+                                    : g.date.toLocaleDateString('en-NZ', {
+                                          day: 'numeric',
+                                          month: 'long',
+                                      })}
                             </span>
                             <span className="h-px flex-1 bg-border" />
                             <span className="text-xs text-muted-foreground tabular-nums">
@@ -291,6 +300,7 @@ export function CardsView({
                             <HandoverCard
                                 key={h.id}
                                 h={h}
+                                timeZone={timeZone}
                                 {...handlers}
                                 onContextMenu={openCtx}
                             />

@@ -2,25 +2,35 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Shifts\Timesheets\TimesheetAllocationService;
 use App\Domain\Shifts\Timesheets\TimesheetApprovalService;
+use App\Domain\Shifts\Timesheets\TimesheetCommandReceipt;
+use App\Domain\Shifts\Timesheets\TimesheetCreationService;
+use App\Domain\Shifts\Timesheets\TimesheetPayrollAdjustmentReceipt;
+use App\Domain\Shifts\Timesheets\TimesheetPayrollAdjustmentService;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\TimesheetAmendment;
 use App\Models\User;
-use App\Services\AuditLogger;
 use App\Services\NotificationService;
-use App\Services\Operations\TimesheetReconciliationService;
 use App\Services\ShiftOperationalSnapshotService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class TimesheetController extends Controller
 {
+    private array $staffProfileLinks = [];
+
     public function approvals(Request $request)
     {
         $auth = $request->user();
@@ -184,117 +194,65 @@ class TimesheetController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
-
+        $filters = $this->timesheetReadFilters($request);
         $canApprove = $this->canReviewTimesheets($auth);
-        $tab = $request->query('tab', 'all');
-        $from = $request->query('from');
-        $to = $request->query('to');
-        $clientId = $request->query('client_id');
-        $staffId = $request->query('staff_id');
-        $search = $request->query('search');
-
+        $approvalQueue = $filters['tab'] === 'submitted' && $canApprove;
         $rowEagerLoads = [
-            'client:id,first_name,last_name',
-            'staff:id,name,email',
+            'client:id,first_name,last_name', 'staff:id,name,email',
             'shift:id,client_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,expected_break_minutes,status',
-            'shift.serviceContext:id,name',
-            'shift.tasks:id,shift_id,is_completed',
-            'site:id,name',
-            'clientAllocations.client:id,first_name,last_name',
+            'shift.serviceContext:id,name', 'shift.tasks:id,shift_id,is_completed',
+            'site:id,name', 'clientAllocations.client:id,first_name,last_name',
         ];
-
-        $q = Timesheet::query()
-            ->with($rowEagerLoads)
-            ->orderByDesc('work_date');
-
-        $this->siteAccess()->applyTimesheetScope($q, $auth, $this->timesheetReadBypassPermissions());
-
-        // Scope to "own only" unless the user has manageAny OR is reviewing the
-        // Pending tab as an approver (the Pending tab IS the approval queue —
-        // approvers need to see everyone's submitted timesheets here).
-        $isPendingForApprover = $tab === 'submitted' && $canApprove;
-        if (! $auth->canDo('timesheets.manageAny') && ! $isPendingForApprover) {
-            $q->where('user_id', $auth->id);
-        }
-
-        // Tab → status / archive filter
-        if ($tab === 'archived') {
+        $cohort = $this->timesheetReadCohort($auth, $filters, $approvalQueue);
+        $tabCounts = $this->computeTabCounts($auth, $filters);
+        $q = (clone $cohort)->with($rowEagerLoads)->orderByDesc('work_date')->orderByDesc('id');
+        if ($filters['tab'] === 'archived') {
             $q->whereNotNull('archived_at');
-        } elseif (in_array($tab, ['draft', 'submitted', 'returned', 'approved', 'rejected', 'paid'], true)) {
-            $q->whereNull('archived_at')->where('status', $tab);
         } else {
-            // 'all' hides archived rows
             $q->whereNull('archived_at');
+            if ($filters['tab'] !== 'all') {
+                $q->where('status', $filters['tab']);
+            }
         }
+        $total = $tabCounts[$filters['tab']];
+        $filters['page'] = min($filters['page'], max(1, (int) ceil($total / 50)));
+        $timesheets = $q->paginate(50, ['*'], 'page', $filters['page'], $total)->withQueryString();
+        $pageShown = $timesheets->count();
+        $includesDetailRecord = false;
 
-        if ($from) {
-            $q->whereDate('work_date', '>=', $from);
-        }
-        if ($to) {
-            $q->whereDate('work_date', '<=', $to);
-        }
-        if ($clientId) {
-            $q->where('client_id', $clientId);
-        }
-        if ($staffId) {
-            $q->where('user_id', $staffId);
-        }
-        if ($search) {
-            $q->where(function ($sub) use ($search) {
-                $sub->where('client_name_snapshot', 'like', "%{$search}%")
-                    ->orWhere('staff_name_snapshot', 'like', "%{$search}%")
-                    ->orWhere('shift_location_snapshot', 'like', "%{$search}%");
-            });
-        }
-
-        $timesheets = $q->paginate(50)->withQueryString();
-
-        // `?view={id}` / `?edit={id}` deep links (attendance sessions,
-        // dashboards, the legacy edit-page redirect) open the View/Edit
-        // dialogs client-side by finding the row in the current page.
-        // Guarantee the target is present even when filters/pagination would
-        // hide it — same site scope and visibility rules as the list.
-        $viewId = (int) ($request->query('view') ?: $request->query('edit'));
+        // Preserve authorised legacy dialog links, separately from the filtered page totals.
+        $viewId = (int) ($filters['view'] ?? $filters['edit'] ?? 0);
         if ($viewId && ! $timesheets->getCollection()->contains(fn (Timesheet $ts) => (int) $ts->id === $viewId)) {
             $extraQuery = Timesheet::query()->with($rowEagerLoads)->whereKey($viewId);
             $this->siteAccess()->applyTimesheetScope($extraQuery, $auth, $this->timesheetReadBypassPermissions());
             $extra = $extraQuery->first();
-
-            $visible = $extra && (
-                $auth->canDo('timesheets.manageAny')
-                || (int) $extra->user_id === (int) $auth->id
-                || ($canApprove && $extra->status === 'submitted')
-            );
-
-            if ($visible) {
+            if ($extra && ($auth->canDo('timesheets.manageAny') || (int) $extra->user_id === (int) $auth->id
+                || ($canApprove && $extra->status === 'submitted'))) {
                 $timesheets->setCollection($timesheets->getCollection()->prepend($extra));
+                $includesDetailRecord = true;
             }
         }
-
-        $mutableTimesheetIds = Timesheet::query()
-            ->whereIn('id', $timesheets->getCollection()->pluck('id'))
+        $pagination = ['current_page' => $timesheets->currentPage(), 'per_page' => $timesheets->perPage(),
+            'total' => $total, 'last_page' => $timesheets->lastPage(), 'from' => $timesheets->firstItem(),
+            'to' => $pageShown ? (($filters['page'] - 1) * 50 + $pageShown) : null,
+            'links' => $timesheets->linkCollection()->toArray()];
+        // firstItem uses the materialised collection; a detail-only row is not a page result.
+        $pagination['from'] = $pageShown ? (($filters['page'] - 1) * 50 + 1) : null;
+        $mutableTimesheetIds = Timesheet::query()->whereIn('id', $timesheets->getCollection()->pluck('id'))
             ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, []))
-            ->pluck('id')
-            ->mapWithKeys(fn ($id): array => [(int) $id => true]);
-
+            ->pluck('id')->mapWithKeys(fn ($id): array => [(int) $id => true]);
+        $this->primeStaffProfileLinks($timesheets->getCollection()->pluck('user_id')->unique()->all(), $auth);
         $timesheets = $timesheets->through(fn (Timesheet $ts) => $this->serializeTimesheetRow(
-            $ts,
-            $mutableTimesheetIds->has((int) $ts->id),
-            $canApprove,
-        ));
-
-        // Single scoped status histogram shared by the tab strip and the hero
-        // summary — replaces the ~18 per-status COUNT queries these two used to
-        // fire independently.
-        $statusCounts = $this->scopedStatusCounts($auth);
-
-        // Tab counts — derived from the shared histogram (+ one archived count).
-        $tabCounts = $this->computeTabCounts($auth, $statusCounts);
-
-        // Hero summary — week-aware when the list is scoped to an exact
-        // Mon–Sun pair (the hero week-stepper writes from/to).
-        $heroSummary = $this->computeHeroSummary($auth, $statusCounts, $from, $to);
-
+            $ts, $mutableTimesheetIds->has((int) $ts->id), $canApprove));
+        $summaryBase = clone $cohort;
+        $filters['tab'] === 'archived' ? $summaryBase->whereNotNull('archived_at') : $summaryBase->whereNull('archived_at');
+        $summaryCounts = $this->scopedStatusCounts($summaryBase);
+        $summary = ['total' => array_sum($summaryCounts), ...array_replace(
+            array_fill_keys(['draft', 'submitted', 'returned', 'approved', 'rejected', 'paid'], 0),
+            array_intersect_key($summaryCounts, array_flip(['draft', 'submitted', 'returned', 'approved', 'rejected', 'paid'])))];
+        $summary['archived'] = $filters['tab'] === 'archived' ? $summary['total'] : 0;
+        $heroSummary = $this->computeHeroSummary($auth, $summaryBase, $filters, $approvalQueue);
+        $scope = $this->timesheetReadScopeLabel($auth, $approvalQueue);
         // Clients / sites / shifts for the Create dialog and filters.
         $clientScope = $this->siteAccess()->applyClientScope(Client::query(), $auth, []);
         $clients = $clientScope->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
@@ -313,31 +271,26 @@ class TimesheetController extends Controller
         // Today + upcoming shifts available for tile-pick in the Create dialog.
         $availableShifts = $this->availableShiftsForCreate($auth);
 
-        // When the worker doesn't have `timesheets.manageAny`, the controller
-        // already scopes the list to their own user_id (line above). Flag this
-        // for the front-end so the page renders as "My Timesheets" instead of
-        // the generic manager copy + hides the redundant "Staff" column.
-        $isOwnOnlyView = ! $auth->canDo('timesheets.manageAny');
-
         return inertia('operations/timesheets/index', [
-            'timesheets' => $timesheets,
-            'filters' => [
-                'tab' => $tab,
-                'from' => $from,
-                'to' => $to,
-                'client_id' => $clientId,
-                'staff_id' => $staffId,
-                'search' => $search,
-            ],
-            'tabCounts' => $tabCounts,
-            'heroSummary' => $heroSummary,
-            'isOwnOnlyView' => $isOwnOnlyView,
-            'clients' => $clients,
-            'sites' => $sites,
-            'staff' => $staff,
-            'availableShifts' => $availableShifts,
-            'canApprove' => $canApprove,
-            'canCreate' => $auth->canDo('timesheets.create'),
+            'timesheets' => $timesheets, 'filters' => $filters, 'tabCounts' => $tabCounts,
+            'summary' => $summary, 'pagination' => $pagination,
+            'lists' => ['timesheets' => ['total' => $total, 'shown' => $pageShown, 'limit' => 50,
+                'page' => $filters['page'], 'truncated' => $total > $pageShown,
+                'includes_detail_record' => $includesDetailRecord, 'materialized_count' => $timesheets->count()]],
+            'evidence' => ['state' => $summary['total'] === 0 ? 'no_records' : 'recorded', 'complete' => true,
+                'basis' => 'recorded_timesheets_matching_filters_before_status', 'scope' => $scope,
+                'archive_mode' => $filters['tab'] === 'archived' ? 'archived' : 'active',
+                'date_basis' => 'stored_work_date', 'date_from' => $filters['from'], 'date_to' => $filters['to'],
+                'period_start' => $filters['from'] ? Carbon::parse($filters['from'], $this->workerTimezone())->startOfDay()->utc()->toIso8601String() : null,
+                'period_end_exclusive' => $filters['to'] ? Carbon::parse($filters['to'], $this->workerTimezone())->startOfDay()->addDay()->utc()->toIso8601String() : null,
+                'search_basis' => 'recorded_client_staff_location_snapshots',
+                'timezone' => $this->workerTimezone(), 'checked_at' => now()->toIso8601String(),
+                'tab_counts_basis' => 'each_destination_with_its_existing_owner_or_submitted_review_scope'],
+            'heroSummary' => $heroSummary, 'workerTimezone' => $this->workerTimezone(),
+            'isOwnOnlyView' => ! $auth->canDo('timesheets.manageAny') && ! $approvalQueue,
+            'clients' => $clients, 'sites' => $sites, 'staff' => $staff, 'availableShifts' => $availableShifts,
+            'canApprove' => $canApprove, 'canCreate' => $auth->isApproved() && $auth->canDo('timesheets.create'),
+            'canSubmit' => $auth->isApproved() && $auth->canDo('timesheets.submit'),
         ]);
     }
 
@@ -359,6 +312,21 @@ class TimesheetController extends Controller
         $data['can_mutate'] = $canMutate;
         $data['can_approve'] = $canMutate && $canReview;
         $data['can_edit'] = $canMutate && $ts->attendance_session_id === null;
+        $actor = auth()->user();
+        $approved = $actor && $actor->isApproved();
+        $owns = $actor && ((int) $ts->user_id === (int) $actor->id || $actor->canDo('timesheets.manageAny'));
+        $draft = in_array($ts->status, ['draft', 'returned'], true) && ! $ts->is_protected_from_changes && ! $ts->linkedShiftIsCancelled();
+        $data['can_update'] = $canMutate && $approved && $owns && $draft && $ts->attendance_session_id === null && $actor->canDo('timesheets.update');
+        $data['can_submit'] = $canMutate && $approved && $owns && $draft && $actor->canDo('timesheets.submit');
+        $data['can_resubmit'] = $data['can_update'] && $data['can_submit'];
+        $reviewable = $canMutate && $approved && $canReview && $ts->status === 'submitted' && ! $ts->is_protected_from_changes;
+        $data['can_approve'] = $reviewable && (int) $ts->user_id !== (int) $actor?->id;
+        $data['can_reject'] = $reviewable;
+        $data['can_return'] = $reviewable;
+
+        $profileLink = $this->staffProfileLinks[(int) $ts->user_id] ?? ['employee_profile_id' => null, 'profile_url' => null];
+        $data['staff_employee_profile_id'] = $profileLink['employee_profile_id'];
+        $data['staff_profile_url'] = $profileLink['profile_url'];
 
         // Task progress — pulled from the linked shift's tasks when present.
         $tasksTotal = 0;
@@ -377,144 +345,189 @@ class TimesheetController extends Controller
         return $data;
     }
 
-    /**
-     * Scoped, non-archived status histogram (status => count) used by both the
-     * tab strip and the hero summary. One grouped query per request.
-     *
-     * @return array<string, int>
-     */
-    protected function scopedStatusCounts(User $auth): array
+    private function timesheetReadFilters(Request $request): array
     {
-        $base = Timesheet::query();
-        $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetReadBypassPermissions());
+        $data = $request->validate([
+            'tab' => ['nullable', Rule::in(['all', 'draft', 'submitted', 'returned', 'approved', 'rejected', 'paid', 'archived'])],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
+            'client_id' => ['nullable', 'integer', 'min:1'], 'staff_id' => ['nullable', 'integer', 'min:1'],
+            'search' => ['nullable', 'string', 'max:255'], 'page' => ['nullable', 'integer', 'min:1', 'max:2147483647'],
+            'view' => ['nullable', 'integer', 'min:1'], 'edit' => ['nullable', 'integer', 'min:1'],
+        ]);
 
-        if (! $auth->canDo('timesheets.manageAny')) {
-            $base->where('user_id', $auth->id);
-        }
-
-        return $base->whereNull('archived_at')
-            ->selectRaw('status, count(*) as c')
-            ->groupBy('status')
-            ->pluck('c', 'status')
-            ->map(fn ($c) => (int) $c)
-            ->all();
+        return ['tab' => $data['tab'] ?? 'all', 'from' => $data['from'] ?? null, 'to' => $data['to'] ?? null,
+            'client_id' => isset($data['client_id']) ? (int) $data['client_id'] : null,
+            'staff_id' => isset($data['staff_id']) ? (int) $data['staff_id'] : null,
+            'search' => $data['search'] ?? null, 'page' => (int) ($data['page'] ?? 1),
+            'view' => isset($data['view']) ? (int) $data['view'] : null,
+            'edit' => isset($data['edit']) ? (int) $data['edit'] : null];
     }
 
-    /**
-     * Counts per tab for the tab strip. Reads the per-status numbers from the
-     * shared histogram; only the archived bucket needs its own count.
-     *
-     * @param  array<string, int>  $statusCounts  non-archived status histogram
-     * @return array<string, int>
-     */
-    protected function computeTabCounts(User $auth, array $statusCounts): array
+    private function timesheetReadCohort(User $auth, array $filters, bool $approvalQueue = false): Builder
     {
-        $statuses = ['draft', 'submitted', 'returned', 'approved', 'rejected', 'paid'];
-
-        $archivedBase = Timesheet::query();
-        $this->siteAccess()->applyTimesheetScope($archivedBase, $auth, $this->timesheetReadBypassPermissions());
-
+        $query = Timesheet::query();
+        $this->siteAccess()->applyTimesheetScope($query, $auth, $this->timesheetReadBypassPermissions());
         if (! $auth->canDo('timesheets.manageAny')) {
-            $archivedBase->where('user_id', $auth->id);
+            $query->where(function (Builder $owner) use ($auth, $approvalQueue): void {
+                $owner->where('user_id', $auth->id);
+                if ($approvalQueue && $this->canReviewTimesheets($auth)) {
+                    // Other workers' submitted records are the existing review queue; their drafts are not.
+                    $owner->orWhere('status', 'submitted');
+                }
+            });
+        }
+        foreach (['from' => '>=', 'to' => '<='] as $key => $operator) {
+            if (! empty($filters[$key])) {
+                $query->whereDate('work_date', $operator, $filters[$key]);
+            }
+        }
+        foreach (['client_id' => 'client_id', 'staff_id' => 'user_id'] as $key => $column) {
+            if (! empty($filters[$key])) {
+                $query->where($column, $filters[$key]);
+            }
+        }
+        if (filled($filters['search'] ?? null)) {
+            $pattern = '%'.str_replace(['=', '%', '_'], ['==', '=%', '=_'], $filters['search']).'%';
+            $query->where(function (Builder $text) use ($pattern): void {
+                foreach (['client_name_snapshot', 'staff_name_snapshot', 'shift_location_snapshot'] as $i => $column) {
+                    $method = $i === 0 ? 'whereRaw' : 'orWhereRaw';
+                    $text->{$method}("{$column} LIKE ? ESCAPE '='", [$pattern]);
+                }
+            });
         }
 
-        $counts = [
-            'all' => array_sum($statusCounts),
-            'archived' => $archivedBase->whereNotNull('archived_at')->count(),
-        ];
-        foreach ($statuses as $s) {
-            $counts[$s] = $statusCounts[$s] ?? 0;
-        }
-
-        return $counts;
+        return $query;
     }
 
-    /**
-     * The week the hero summarises. Defaults to the current week; when the
-     * list's from/to filters describe an exact Mon–Sun pair (what the hero
-     * week-stepper writes), the summary follows that week instead. Any other
-     * from/to range keeps the current-week summary — the approval queue must
-     * never week-hide by default, so this is purely an explicit-filter echo.
-     *
-     * @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon}
-     */
+    protected function scopedStatusCounts(Builder $base): array
+    {
+        return (clone $base)->selectRaw('status, COUNT(*) AS aggregate')->groupBy('status')
+            ->pluck('aggregate', 'status')->map(fn ($count): int => (int) $count)->all();
+    }
+
+    protected function computeTabCounts(User $auth, array $filters): array
+    {
+        $own = $this->timesheetReadCohort($auth, $filters);
+        $counts = $this->scopedStatusCounts((clone $own)->whereNull('archived_at'));
+        $tabs = ['all' => array_sum($counts), ...array_replace(
+            array_fill_keys(['draft', 'submitted', 'returned', 'approved', 'rejected', 'paid'], 0),
+            array_intersect_key($counts, array_flip(['draft', 'submitted', 'returned', 'approved', 'rejected', 'paid']))),
+            'archived' => (clone $own)->whereNotNull('archived_at')->count()];
+        if (! $auth->canDo('timesheets.manageAny') && $this->canReviewTimesheets($auth)) {
+            $tabs['submitted'] = $this->timesheetReadCohort($auth, $filters, true)
+                ->whereNull('archived_at')->where('status', 'submitted')->count();
+        }
+
+        return $tabs;
+    }
+
+    private function workerTimezone(): string
+    {
+        return config('app.worker_timezone') ?: config('app.timezone', 'UTC');
+    }
+
+    private function timesheetReadScopeLabel(User $auth, bool $approvalQueue): string
+    {
+        return $auth->canDo('timesheets.manageAny') ? 'permitted_sites'
+            : ($approvalQueue ? 'own_and_permitted_submitted_records' : 'own_records_in_permitted_sites');
+    }
+
+    /** Summary defaults to the current worker week; the list never acquires an implicit date filter. */
     protected function resolveSummaryWeek(?string $from, ?string $to): array
     {
-        if ($from && $to) {
-            try {
-                $f = \Illuminate\Support\Carbon::parse($from)->startOfDay();
-                $t = \Illuminate\Support\Carbon::parse($to)->startOfDay();
-
-                if ($f->isSameDay($f->copy()->startOfWeek()) && $t->isSameDay($f->copy()->addDays(6))) {
-                    return [$f->copy()->startOfDay(), $f->copy()->addDays(6)->endOfDay()];
-                }
-            } catch (\Throwable) {
-                // fall through to the current week
-            }
+        $start = $from ? Carbon::parse($from, $this->workerTimezone())->startOfDay() : null;
+        if ($start && $to && $start->dayOfWeek === Carbon::MONDAY
+            && $start->copy()->addDays(6)->toDateString() === $to) {
+            return [$start, $start->copy()->addDays(6)->endOfDay()];
         }
 
-        return [now()->startOfWeek(), now()->endOfWeek()];
+        return [now($this->workerTimezone())->startOfWeek(Carbon::MONDAY)->startOfDay(),
+            now($this->workerTimezone())->startOfWeek(Carbon::MONDAY)->addDays(6)->endOfDay()];
     }
 
-    /**
-     * Hero summary block — pending/returned/approved counts plus hours-vs-rostered.
-     *
-     * @param  array<string, int>  $statusCounts  non-archived status histogram
-     * @return array<string, mixed>
-     */
-    protected function computeHeroSummary(User $auth, array $statusCounts, ?string $from = null, ?string $to = null): array
+    protected function computeHeroSummary(User $auth, Builder $cohort, array $filters, bool $approvalQueue): array
     {
-        $base = Timesheet::query();
-        $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetReadBypassPermissions());
+        [$weekStart, $weekEnd] = $this->resolveSummaryWeek($filters['from'], $filters['to']);
+        $weekEndExclusive = $weekStart->copy()->addWeek();
+        $week = (clone $cohort)->whereDate('work_date', '>=', $weekStart->toDateString())
+            ->whereDate('work_date', '<', $weekEndExclusive->toDateString());
+        $counts = $this->scopedStatusCounts($week);
+        $hours = round((clone $week)->select(['id', 'starts_at', 'ends_at', 'break_minutes'])
+            ->lazyById(100)->sum(fn (Timesheet $row): float => (float) $row->total_hours), 1);
+        $roster = $this->timesheetRosterCohort($auth, $filters, $approvalQueue)
+            ->where('starts_at', '>=', $weekStart->copy()->utc())->where('starts_at', '<', $weekEndExclusive->copy()->utc());
+        $target = filled($filters['search']) ? null : round((clone $roster)
+            ->select(['id', 'starts_at', 'ends_at', 'expected_break_minutes'])->lazyById(100)->sum(function (Shift $shift): float {
+                if (! $shift->starts_at || ! $shift->ends_at) {
+                    return 0;
+                }
 
-        if (! $auth->canDo('timesheets.manageAny')) {
-            $base->where('user_id', $auth->id);
+                return max(0, $shift->starts_at->diffInMinutes($shift->ends_at) - (int) $shift->expected_break_minutes) / 60;
+            }), 1);
+        $today = now($this->workerTimezone())->startOfDay();
+        $todayQuery = $this->timesheetRosterCohort($auth, $filters, $approvalQueue)
+            ->where('starts_at', '>=', $today->copy()->utc())->where('starts_at', '<', $today->copy()->addDay()->utc());
+        $onShift = $this->timesheetRosterCohort($auth, $filters, $approvalQueue)->where('status', 'in_progress')
+            ->where('starts_at', '<=', now())->where('ends_at', '>', now());
+        $allWeeks = $this->scopedStatusCounts($this->timesheetReadCohort($auth, [], $approvalQueue)->whereNull('archived_at'));
+
+        return ['firstName' => explode(' ', trim($auth->name))[0] ?? $auth->name,
+            'week_start' => $weekStart->toDateString(), 'week_end' => $weekEnd->toDateString(),
+            'week_number' => (int) $weekStart->format('W'), 'timesheets_total' => array_sum($counts),
+            'timesheets_submitted' => $counts['submitted'] ?? 0, 'timesheets_approved' => $counts['approved'] ?? 0,
+            'timesheets_returned' => $counts['returned'] ?? 0, 'unapproved' => $counts['submitted'] ?? 0,
+            'hours_this_week' => $hours, 'hours_target' => $target, 'next_payroll_date' => null, 'regions_count' => null,
+            'sites_count' => $this->siteAccess()->applySiteScope(Site::query(), $auth, $this->timesheetReadBypassPermissions())->count(),
+            'rostered_today' => filled($filters['search']) ? null : $todayQuery->count(),
+            'staff_on_shift' => filled($filters['search']) ? null : $onShift->distinct()->count('user_id'),
+            'all_weeks' => ['total' => array_sum($allWeeks), 'submitted' => $allWeeks['submitted'] ?? 0,
+                'approved' => $allWeeks['approved'] ?? 0, 'returned' => $allWeeks['returned'] ?? 0,
+                'scope' => $this->timesheetReadScopeLabel($auth, $approvalQueue),
+                'basis' => 'all_non_archived_records_without_list_filters'],
+            'evidence' => ['state' => array_sum($counts) === 0 ? 'no_records' : 'recorded', 'complete' => true,
+                'basis' => 'recorded_timesheets_matching_filters_before_status_in_summary_week',
+                'scope' => $this->timesheetReadScopeLabel($auth, $approvalQueue), 'timezone' => $this->workerTimezone(),
+                'period_start' => $weekStart->copy()->utc()->toIso8601String(),
+                'period_end_exclusive' => $weekEndExclusive->copy()->utc()->toIso8601String(), 'checked_at' => now()->toIso8601String(),
+                'date_basis' => 'stored_work_date', 'list_tab' => $filters['tab'], 'date_from' => $filters['from'], 'date_to' => $filters['to'],
+                'rostered_hours_basis' => $target === null ? 'unavailable_for_snapshot_text_search' : 'permitted_assigned_employee_duties_starting_in_summary_week',
+                'payroll_close_basis' => 'not_available', 'sites_count_basis' => 'permitted_sites_without_list_filters',
+                'today' => $today->toDateString(), 'today_counts_basis' => 'permitted_assigned_employee_duties_starting_on_worker_local_today',
+                'on_shift_basis' => 'distinct_recorded_in_progress_workers_overlapping_now_not_verified_attendance']];
+    }
+
+    private function timesheetRosterCohort(User $auth, array $filters, bool $approvalQueue): Builder
+    {
+        $query = Shift::query()->employeeDuties()->whereNotNull('user_id')->where('status', '!=', 'cancelled');
+        $this->siteAccess()->applyShiftScope($query, $auth, $this->timesheetReadBypassPermissions());
+        if (! $auth->canDo('timesheets.manageAny') && ! $approvalQueue) {
+            $query->where('user_id', $auth->id);
+        }
+        foreach (['client_id' => 'client_id', 'staff_id' => 'user_id'] as $key => $column) {
+            if (! empty($filters[$key])) {
+                $query->where($column, $filters[$key]);
+            }
         }
 
-        [$weekStart, $weekEnd] = $this->resolveSummaryWeek($from, $to);
+        return $query;
+    }
 
-        $thisWeek = (clone $base)
-            ->whereBetween('work_date', [$weekStart->toDateString(), $weekEnd->toDateString()])
-            ->whereNull('archived_at')
-            ->get();
-
-        $hoursThisWeek = round($thisWeek->sum(fn ($t) => (float) $t->total_hours), 1);
-
-        // Rostered hours (linked shifts in the same week).
-        $rosteredShifts = Shift::query()
-            ->whereBetween('starts_at', [$weekStart, $weekEnd])
-            ->when(! $auth->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $auth->id))
-            ->get(['id', 'starts_at', 'ends_at', 'expected_break_minutes']);
-
-        $hoursTarget = round($rosteredShifts->sum(function ($s) {
-            if (! $s->starts_at || ! $s->ends_at) {
-                return 0;
-            }
-            $mins = $s->starts_at->diffInMinutes($s->ends_at) - (int) ($s->expected_break_minutes ?? 0);
-
-            return max($mins, 0) / 60;
-        }), 1);
-
-        $firstName = explode(' ', trim($auth->name))[0] ?? $auth->name;
-
-        return [
-            'firstName' => $firstName,
-            'week_start' => $weekStart->toDateString(),
-            'week_end' => $weekEnd->toDateString(),
-            'week_number' => (int) $weekStart->format('W'),
-            'timesheets_total' => array_sum($statusCounts),
-            'timesheets_submitted' => $statusCounts['submitted'] ?? 0,
-            'timesheets_approved' => $statusCounts['approved'] ?? 0,
-            'timesheets_returned' => $statusCounts['returned'] ?? 0,
-            'unapproved' => $statusCounts['submitted'] ?? 0,
-            'hours_this_week' => $hoursThisWeek,
-            'hours_target' => max($hoursTarget, 0.1),
-            'next_payroll_date' => now()->next(Carbon::FRIDAY)->format('d M'),
-            'sites_count' => $this->siteAccess()->applySiteScope(Site::query(), $auth, $this->timesheetReadBypassPermissions())->count(),
-            'regions_count' => 1,
-            'rostered_today' => Shift::query()->whereDate('starts_at', today())->count(),
-            'staff_on_shift' => Shift::query()->whereDate('starts_at', today())->where('status', 'in_progress')->count(),
-        ];
+    private function primeStaffProfileLinks(array $userIds, User $viewer): void
+    {
+        foreach ($userIds as $id) {
+            $this->staffProfileLinks[(int) $id] = ['employee_profile_id' => null, 'profile_url' => null];
+        }
+        if (! $viewer->canDo('hr.employees.viewAny') || $userIds === []) {
+            return;
+        }
+        $profiles = $this->siteAccess()->applyHistoricalHrEmployeeProfileScope(
+            HrEmployeeProfile::withTrashed()->whereIn('user_id', $userIds)->whereHas('user', fn (Builder $staff) => $staff->staff()), $viewer)
+            ->get(['id', 'user_id']);
+        foreach ($profiles as $profile) {
+            $this->staffProfileLinks[(int) $profile->user_id] = ['employee_profile_id' => (int) $profile->id,
+                'profile_url' => route('hr.people.show', $profile->id)];
+        }
     }
 
     /**
@@ -649,6 +662,7 @@ class TimesheetController extends Controller
      */
     public function store(Request $request)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.create'), 403);
 
@@ -682,141 +696,43 @@ class TimesheetController extends Controller
             'tasks.*.completed' => ['boolean'],
         ]);
 
-        $mode = $data['mode'];
-        $userId = $auth->id;
-        $shiftId = $data['shift_id'] ?? null;
-        $linkedShift = null;
-
-        if ($mode === 'shift') {
-            $linkedShift = Shift::findOrFail($shiftId);
-            $this->siteAccess()->assertCanAccessShift(
-                $auth,
-                $linkedShift,
-                [],
-                'You are not authorized to create timesheets for that site.',
-            );
-            if (! $auth->canDo('timesheets.manageAny') && $linkedShift->user_id !== $auth->id) {
-                abort(403);
-            }
-            // Open / unassigned shifts have no `user_id`; default the timesheet
-            // owner to the authenticated user so the row still has a valid
-            // owner. Managers picking an open shift implicitly claim the
-            // timesheet for themselves.
-            $userId = $linkedShift->user_id ?? $auth->id;
-            $data['client_id'] = $linkedShift->client_id;
-
-            if (Timesheet::query()
-                ->where('shift_id', $linkedShift->id)
-                ->where('user_id', $userId)
-                ->exists()) {
-                $message = 'A timesheet already exists for this shift and staff member.';
-
+        try {
+            $result = app(TimesheetCreationService::class)->create($auth, $data);
+        } catch (ValidationException $exception) {
+            $duplicate = $exception->errors()['shift_id'][0] ?? null;
+            if ($duplicate === 'A timesheet already exists for this shift and staff member.') {
                 if ($request->expectsJson()) {
-                    return response()->json([
-                        'message' => $message,
-                        'errors' => ['shift_id' => [$message]],
-                    ], 422);
+                    return response()->json(['message' => $duplicate, 'errors' => $exception->errors()], 422);
                 }
 
-                return back()->with('error', $message)->withInput();
+                return back()->with('error', $duplicate)->withInput();
             }
+            throw $exception;
         }
-
-        // Manual mode: client_id is optional. When provided, enforce site access.
-        if (! empty($data['client_id'])) {
-            $this->siteAccess()->assertCanAccessClientId(
-                $auth,
-                (int) $data['client_id'],
-                [],
-                'You are not authorized to create timesheets for that site.',
-            );
-        } elseif (($data['site_id'] ?? null) !== null) {
-            $this->siteAccess()->assertCanAccessSiteId(
-                $auth,
-                (int) $data['site_id'],
-                [],
-                'You are not authorized to create timesheets for that site.',
-            );
-        }
-
-        $clientForSnapshot = $data['client_id'] ?? null;
-        $snapshot = $clientForSnapshot
-            ? $this->draftSnapshot((int) $clientForSnapshot, $linkedShift, $auth, $data['notes'] ?? null)
-            : $this->manualSnapshot($auth, $data['activity_type'] ?? null, $data['site_id'] ?? null);
-
-        $timesheet = Timesheet::create([
-            'user_id' => $userId,
-            'client_id' => $data['client_id'] ?? null,
-            'shift_id' => $shiftId,
-            'activity_type' => $mode === 'manual' ? ($data['activity_type'] ?? null) : null,
-            'activity_items' => $mode === 'manual' ? ($data['activity_items'] ?? []) : null,
-            'site_id' => $data['site_id'] ?? null,
-            'shift_site_id' => $snapshot['site_id'] ?? null,
-            'shift_service_context_id' => $snapshot['service_context_id'] ?? null,
-            'work_date' => $data['work_date'],
-            'starts_at' => $data['starts_at'],
-            'ends_at' => $data['ends_at'],
-            'break_minutes' => (int) ($data['break_minutes'] ?? $linkedShift?->expected_break_minutes ?? 0),
-            'mileage_km' => $data['mileage_km'] ?? null,
-            'sleepover' => $linkedShift ? (bool) $linkedShift->is_sleepover : (bool) ($data['sleepover'] ?? false),
-            'on_call' => $linkedShift ? (bool) $linkedShift->is_on_call : (bool) ($data['on_call'] ?? false),
-            'allowance_notes' => $data['allowance_notes'] ?? null,
-            'public_holiday' => (bool) ($data['public_holiday'] ?? false),
-            'notes' => $data['notes'] ?? null,
-            'is_residential_billable' => (bool) ($data['is_residential_billable'] ?? false),
-            'shift_site_name_snapshot' => $snapshot['site_name'] ?? null,
-            'shift_location_snapshot' => $snapshot['location'] ?? null,
-            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? null,
-            'client_name_snapshot' => $snapshot['client_name'] ?? null,
-            'staff_name_snapshot' => $snapshot['staff_name'] ?? $auth->name,
-            'shift_type_snapshot' => $snapshot['shift_type'] ?? ($mode === 'manual' ? ($data['activity_type'] ?? 'manual') : 'standard'),
-            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? [],
-            'status' => 'draft',
-            'created_by' => $auth->id,
+        $timesheet = $result->timesheet;
+        $this->notifyTimesheetAfterCommit($auth, 'created', $timesheet, [
+            'event_key' => 'timesheets.created', 'title' => 'Timesheet created',
+            'url' => url('/operations/timesheets?view='.$timesheet->id), 'target_user_ids' => [$timesheet->user_id],
         ]);
-
-        if ($mode === 'shift') {
-            app(TimesheetReconciliationService::class)->reconcile($timesheet);
-        }
-
-        $timesheet->load(['shift.client']);
-        $client = $timesheet->shift?->client ?? $timesheet->client;
-
-        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'timesheet', $timesheet, $client, [
-            'event_key' => 'timesheets.created',
-            'title' => 'Timesheet created',
-            'url' => url("/operations/timesheets?view={$timesheet->id}"),
-            'target_user_ids' => [$timesheet->user_id],
-        ]);
-
-        // If the dialog's "Submit for approval" button was clicked, transition
-        // straight to submitted so the worker doesn't have to chase a second
-        // route from the dialog.
         if (! empty($data['submit'])) {
-            try {
-                $this->timesheetApprovals()->submit($timesheet, $auth);
-                app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $timesheet, $client, [
-                    'event_key' => 'timesheets.submitted',
-                    'title' => 'Timesheet submitted for approval',
-                    'url' => url("/operations/timesheets?view={$timesheet->id}"),
-                    'include_entity_user' => false,
-                ]);
-            } catch (ValidationException $e) {
-                return back()->withErrors($e->errors());
-            }
-        }
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'timesheet_id' => $timesheet->id,
-                'message' => 'Timesheet created.',
+            $this->notifyTimesheetAfterCommit($auth, 'submitted', $timesheet, [
+                'event_key' => 'timesheets.submitted', 'title' => 'Timesheet submitted for approval',
+                'url' => url('/operations/timesheets?view='.$timesheet->id), 'include_entity_user' => false,
             ]);
         }
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'create', $result, ! empty($data['submit']));
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true, 'timesheet_id' => $timesheet->id, 'message' => 'Timesheet created.',
+                ...($receipt === null ? [] : ['timesheet_result' => $receipt]),
+            ]);
+        }
+        $response = redirect()->route('operations.timesheets.index', ['view' => $timesheet->id])->with('success', 'Timesheet created.');
+        if ($receipt !== null) {
+            $response->with('timesheet_result', $receipt);
+        }
 
-        return redirect()
-            ->route('operations.timesheets.index', ['view' => $timesheet->id])
-            ->with('success', 'Timesheet created.');
+        return $response;
     }
 
     /**
@@ -912,6 +828,7 @@ class TimesheetController extends Controller
 
     public function update(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($auth, 403);
         $this->assertCanEditTimesheet($auth, $timesheet);
@@ -1020,23 +937,22 @@ class TimesheetController extends Controller
             'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $snapshotFallback?->coverage_roles_snapshot ?? [],
         ]);
 
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'update', $result);
         $timesheet = $result->timesheet;
 
-        $timesheet->load(['shift.client']);
-        $client = $timesheet->shift?->client;
-
-        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'timesheet', $timesheet, $client, [
+        $this->notifyTimesheetAfterCommit($auth, 'updated', $timesheet, [
             'event_key' => 'timesheets.updated',
             'title' => 'Timesheet updated',
             'url' => url("/operations/timesheets/{$timesheet->id}/edit"),
             'target_user_ids' => [$timesheet->user_id],
         ]);
 
-        return redirect()->back()->with('success', 'Timesheet updated.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet updated.'), $receipt);
     }
 
     public function submit(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.submit'), 403);
 
@@ -1065,18 +981,17 @@ class TimesheetController extends Controller
         );
 
         $result = $this->timesheetApprovals()->submit($timesheet, $auth);
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'submit', $result);
         $submittedTimesheet = $result->timesheet;
 
-        $client = $submittedTimesheet->shift?->client;
-
-        app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $submittedTimesheet, $client, [
+        $this->notifyTimesheetAfterCommit($auth, 'submitted', $submittedTimesheet, [
             'event_key' => 'timesheets.submitted',
             'title' => 'Timesheet submitted for approval',
             'url' => url("/operations/timesheets/{$submittedTimesheet->id}/edit"),
             'include_entity_user' => false,
         ]);
 
-        return redirect()->back()->with('success', 'Timesheet submitted.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet submitted.'), $receipt);
     }
 
     /**
@@ -1090,6 +1005,7 @@ class TimesheetController extends Controller
      */
     public function resubmit(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless(
             $auth && $auth->canDo('timesheets.update') && $auth->canDo('timesheets.submit'),
@@ -1214,22 +1130,22 @@ class TimesheetController extends Controller
             'shift_type_snapshot' => $snapshot['shift_type'] ?? $snapshotFallback?->shift_type_snapshot ?? 'standard',
             'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $snapshotFallback?->coverage_roles_snapshot ?? [],
         ]);
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'resubmit', $result);
         $submittedTimesheet = $result->timesheet;
 
-        $client = $submittedTimesheet->shift?->client;
-
-        app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $submittedTimesheet, $client, [
+        $this->notifyTimesheetAfterCommit($auth, 'submitted', $submittedTimesheet, [
             'event_key' => 'timesheets.submitted',
             'title' => 'Timesheet updated and resubmitted',
             'url' => url("/operations/timesheets/{$submittedTimesheet->id}/edit"),
             'include_entity_user' => false,
         ]);
 
-        return redirect()->back()->with('success', 'Timesheet updated and resubmitted.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet updated and resubmitted.'), $receipt);
     }
 
     public function approve(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
         $this->assertCanMutateTimesheet($auth, $timesheet);
@@ -1245,26 +1161,26 @@ class TimesheetController extends Controller
             return back()->withErrors($exception->errors());
         }
 
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'approve', $result);
         /** @var Timesheet $approvedTimesheet */
         $approvedTimesheet = $result->timesheet;
 
         if (! $result->changed) {
-            return redirect()->back()->with('success', 'Timesheet already approved.');
+            return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet already approved.'), $receipt);
         }
 
-        $client = $approvedTimesheet->shift?->client;
-
-        app(NotificationService::class)->notifyCrud($auth, 'approved', 'timesheet', $approvedTimesheet, $client, [
+        $this->notifyTimesheetAfterCommit($auth, 'approved', $approvedTimesheet, [
             'event_key' => 'timesheets.approved',
             'title' => 'Timesheet approved',
             'url' => url("/operations/timesheets/{$approvedTimesheet->id}/edit"),
         ]);
 
-        return redirect()->back()->with('success', 'Timesheet approved.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet approved.'), $receipt);
     }
 
     public function reject(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
         abort_unless($timesheet->status === 'submitted', 403);
@@ -1285,21 +1201,23 @@ class TimesheetController extends Controller
         }
 
         $result = $this->timesheetApprovals()->reject($timesheet, $auth, $decisionNotes);
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'reject', $result);
         $rejectedTimesheet = $result->timesheet;
 
-        $client = $rejectedTimesheet->shift?->client;
+        if ($result->changed) {
+            $this->notifyTimesheetAfterCommit($auth, 'rejected', $rejectedTimesheet, [
+                'event_key' => 'timesheets.rejected',
+                'title' => 'Timesheet rejected',
+                'url' => url("/operations/timesheets/{$rejectedTimesheet->id}/edit"),
+            ]);
+        }
 
-        app(NotificationService::class)->notifyCrud($auth, 'rejected', 'timesheet', $rejectedTimesheet, $client, [
-            'event_key' => 'timesheets.rejected',
-            'title' => 'Timesheet rejected',
-            'url' => url("/operations/timesheets/{$rejectedTimesheet->id}/edit"),
-        ]);
-
-        return redirect()->back()->with('success', 'Timesheet rejected.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet rejected.'), $receipt);
     }
 
     public function returnForChanges(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
         abort_unless($timesheet->status === 'submitted', 403);
@@ -1320,17 +1238,18 @@ class TimesheetController extends Controller
         }
 
         $result = $this->timesheetApprovals()->returnForChanges($timesheet, $auth, $returnedNotes);
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'return', $result);
         $returnedTimesheet = $result->timesheet;
 
-        $client = $returnedTimesheet->shift?->client;
+        if ($result->changed) {
+            $this->notifyTimesheetAfterCommit($auth, 'returned', $returnedTimesheet, [
+                'event_key' => 'timesheets.returned',
+                'title' => 'Timesheet returned for changes',
+                'url' => url("/operations/timesheets/{$returnedTimesheet->id}/edit"),
+            ]);
+        }
 
-        app(NotificationService::class)->notifyCrud($auth, 'returned', 'timesheet', $returnedTimesheet, $client, [
-            'event_key' => 'timesheets.returned',
-            'title' => 'Timesheet returned for changes',
-            'url' => url("/operations/timesheets/{$returnedTimesheet->id}/edit"),
-        ]);
-
-        return redirect()->back()->with('success', 'Timesheet returned for changes.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet returned for changes.'), $receipt);
     }
 
     /**
@@ -1398,6 +1317,7 @@ class TimesheetController extends Controller
             ->where('status', TimesheetAmendment::STATUS_APPROVED)
             ->where('payroll_adjustment_required', true)
             ->whereNull('applied_at')
+            ->whereHas('timesheet', fn (Builder $query) => $this->siteAccess()->applyTimesheetScope($query, $auth, []))
             ->with([
                 'timesheet:id,shift_id,user_id,client_id,work_date,starts_at,ends_at,status,staff_name_snapshot,client_name_snapshot,shift_site_name_snapshot,payroll_reference,exported_to_payroll_at',
                 'timesheet.shift:id,starts_at,ends_at',
@@ -1405,10 +1325,13 @@ class TimesheetController extends Controller
                 'reviewedBy:id,name',
             ])
             ->orderBy('reviewed_at')
+            ->orderBy('id')
             ->paginate(20)
             ->withQueryString();
 
         return inertia('operations/timesheets/payroll-adjustments', [
+            'canProcess' => $auth->isApproved() && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')),
+            'evidence' => ['timezone' => $this->workerTimezone()],
             'amendments' => $amendments->through(fn (TimesheetAmendment $a) => [
                 'id' => $a->id,
                 'timesheet_id' => $a->timesheet_id,
@@ -1428,34 +1351,25 @@ class TimesheetController extends Controller
         ]);
     }
 
-    /**
-     * Mark a payroll-linked amendment as processed (payroll adjustment handled externally).
-     */
+    /** Records external handling; never applies pay values or marks a Timesheet paid. */
     public function markPayrollAdjustmentProcessed(Request $request, TimesheetAmendment $amendment)
     {
+        $receipts = app(TimesheetPayrollAdjustmentReceipt::class);
+        $rootEntry = $receipts->begin($request);
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
-
-        if ($amendment->status !== TimesheetAmendment::STATUS_APPROVED) {
-            return back()->with('error', 'Only approved amendments can be marked as processed.');
+        $result = app(TimesheetPayrollAdjustmentService::class)->process($amendment, $auth);
+        if ($result->error !== null) {
+            return back()->with('error', $result->error);
+        }
+        $response = back()->with('success', $result->changed
+            ? 'Payroll adjustment marked as processed.'
+            : 'This adjustment has already been marked as processed.');
+        if ($receipt = $receipts->committed($rootEntry, $result)) {
+            $response->with('timesheet_payroll_adjustment_result', $receipt);
         }
 
-        if (! $amendment->payroll_adjustment_required) {
-            return back()->with('error', 'This amendment does not require payroll adjustment.');
-        }
-
-        if ($amendment->applied_at) {
-            return back()->with('success', 'This adjustment has already been marked as processed.');
-        }
-
-        $amendment->update(['applied_at' => now()]);
-
-        AuditLogger::log('timesheet.amendment.payroll_processed', $amendment->timesheet, [
-            'amendment_id' => $amendment->id,
-            'processed_by' => $auth->id,
-        ]);
-
-        return back()->with('success', 'Payroll adjustment marked as processed.');
+        return $response;
     }
 
     protected function canReviewTimesheets(?User $user): bool
@@ -1529,5 +1443,34 @@ class TimesheetController extends Controller
         $this->siteAccess()->applyTimesheetScope($query, $auth, []);
 
         return $query->exists();
+    }
+
+    private function commandReceipt(): TimesheetCommandReceipt
+    {
+        return app(TimesheetCommandReceipt::class);
+    }
+
+    private function withTimesheetReceipt($response, ?array $receipt)
+    {
+        if ($receipt !== null) {
+            $response->with('timesheet_result', $receipt);
+        }
+
+        return $response;
+    }
+
+    private function notifyTimesheetAfterCommit(User $actor, string $action, Timesheet $timesheet, array $options): void
+    {
+        $model = clone $timesheet;
+        DB::afterCommit(function () use ($actor, $action, $model, $options): void {
+            try {
+                app(NotificationService::class)->notifyCrud($actor, $action, 'timesheet', $model, $model->shift?->client ?? $model->client, $options);
+            } catch (\Throwable $exception) {
+                try {
+                    Log::warning('Timesheet notification failed after commit', ['timesheet_id' => $model->id, 'action' => $action, 'exception_class' => $exception::class]);
+                } catch (\Throwable) {
+                }
+            }
+        });
     }
 }

@@ -6,10 +6,12 @@ import {
     EphemeralCredentialQueueError,
     getOfflineQueueSnapshot,
     isOfflineRequestUuidV4,
+    MEDICATION_REQUEST_TIMEOUT_MS,
     quarantineLegacyOfflineSubmission,
     readServerSyncOutcome,
     submitOffline,
     type OfflineAction,
+    type OfflineSubmissionDisplay,
 } from './offline-queue';
 
 type MutationMethod = 'post' | 'put' | 'patch' | 'delete';
@@ -30,6 +32,10 @@ type SubmitMutationOptions = {
     action?: OfflineAction;
     allowQueueWhenOffline?: boolean;
     queuedMessage?: string;
+    /** Said instead of queuedMessage when the server didn't answer while online (EA-010). */
+    unansweredMessage?: string;
+    /** Person, medicine, outcome and time, shown if the action waits or is refused (EA-046). */
+    display?: OfflineSubmissionDisplay | null;
     successMessage?: string;
     duplicateMessage?: string;
 };
@@ -38,6 +44,13 @@ type SubmitMutationResult<T = unknown> = {
     status: SyncStatus;
     data?: T;
     clientRequestUuid?: string;
+    /**
+     * EA-149: false when the request never left the browser, so nothing can
+     * have been saved; true when it was sent but the answer is unknown.
+     */
+    sent?: boolean;
+    /** Why an action was saved on the device: before sending, or no answer while online. */
+    queuedReason?: 'offline' | 'unanswered';
 };
 
 export type MedicationMutationReplayState = {
@@ -91,6 +104,10 @@ type LegacyOfflineQueueEntry = {
 
 const CONNECTION_REQUIRED_MESSAGE =
     'Stay on this screen and reconnect. Check the chart before trying again. Trying again won’t create a duplicate.';
+const NOT_SENT_MESSAGE =
+    'Not sent — nothing was saved. Reconnect, then record it again.';
+const SERVER_UNANSWERED_MESSAGE =
+    'The server didn’t answer. Check the chart before trying again. Trying again won’t create a duplicate.';
 
 const EMAR_QUEUE_STORAGE_KEY = 'emar-offline-queue:v1';
 const EMAR_DEVICE_STORAGE_KEY = 'emar-offline-device-id:v1';
@@ -147,6 +164,7 @@ async function executeMutation<T = unknown>(
             Accept: 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
         },
+        timeout: MEDICATION_REQUEST_TIMEOUT_MS,
     });
 
     return response.data as T;
@@ -244,12 +262,21 @@ function isUncertainTransportError(error: unknown): boolean {
 
 function requiresConnectionResult<T>(
     clientRequestUuid: string,
+    sent: boolean,
 ): SubmitMutationResult<T> {
-    toast.error(CONNECTION_REQUIRED_MESSAGE);
+    const online = typeof navigator === 'undefined' || navigator.onLine;
+    toast.error(
+        !sent
+            ? NOT_SENT_MESSAGE
+            : online
+              ? SERVER_UNANSWERED_MESSAGE
+              : CONNECTION_REQUIRED_MESSAGE,
+    );
 
     return {
         status: 'requires_connection',
         clientRequestUuid,
+        sent,
     };
 }
 
@@ -305,6 +332,8 @@ export async function submitEmarMutation<T = unknown>(
         action = inferAction(url),
         allowQueueWhenOffline = true,
         queuedMessage = 'Action saved offline and queued to sync when the device reconnects.',
+        unansweredMessage,
+        display = null,
         successMessage,
         duplicateMessage,
     } = options;
@@ -321,7 +350,7 @@ export async function submitEmarMutation<T = unknown>(
             };
 
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
-                return requiresConnectionResult<T>(clientRequestUuid);
+                return requiresConnectionResult<T>(clientRequestUuid, false);
             }
 
             let data: unknown;
@@ -333,7 +362,7 @@ export async function submitEmarMutation<T = unknown>(
                 );
             } catch (error) {
                 if (isUncertainTransportError(error)) {
-                    return requiresConnectionResult<T>(clientRequestUuid);
+                    return requiresConnectionResult<T>(clientRequestUuid, true);
                 }
                 throw error;
             }
@@ -349,26 +378,23 @@ export async function submitEmarMutation<T = unknown>(
             url,
             payload,
             queuedMessage,
+            unansweredMessage,
+            display,
         });
 
         if (result.status === 'queued') {
-            return { status: 'queued' };
-        }
-
-        if (result.status === 'requires_connection') {
-            return {
-                status: 'requires_connection',
-                clientRequestUuid: result.clientRequestUuid,
-            };
+            return { status: 'queued', queuedReason: result.reason };
         }
 
         if (
+            result.status === 'requires_connection' ||
             result.status === 'requires_authentication' ||
             result.status === 'storage_unavailable'
         ) {
             return {
                 status: result.status,
                 clientRequestUuid: result.clientRequestUuid,
+                sent: result.sent,
             };
         }
 

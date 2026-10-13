@@ -12,7 +12,7 @@ import {
 } from '@/components/wizard/shell';
 import { formatDateOnly } from '@/lib/datetime';
 import { Check, Download, FileText, ShieldCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { PersonPicker } from './_person-picker';
 import { reportRequest, type ExportContext, type ExportOption } from './_types';
 
@@ -42,20 +42,27 @@ export function ExportDialog({
     props,
     onClose,
     online,
+    onCloseAutoFocus,
 }: {
     option: ExportOption;
     props: ExportContext;
     onClose: () => void;
     online: boolean;
+    onCloseAutoFocus?: ComponentProps<typeof WizardShell>['onCloseAutoFocus'];
 }) {
+    const round = option.type === 'round_sheet' ? props.selected_round : null;
     const [includePrn, setIncludePrn] = useState(
         props.filters.include_prn ?? true,
     );
     const [step, setStep] = useState(0),
-        [site, setSite] = useState(props.filters.site_id),
+        [site, setSite] = useState(round?.site_id ?? props.filters.site_id),
         [person, setPerson] = useState(props.filters.client_id),
-        [from, setFrom] = useState<string | null>(props.filters.date_from),
-        [to, setTo] = useState<string | null>(props.filters.date_to),
+        [from, setFrom] = useState<string | null>(
+            round?.date ?? props.filters.date_from,
+        ),
+        [to, setTo] = useState<string | null>(
+            round?.date ?? props.filters.date_to,
+        ),
         [purpose, setPurpose] = useState(''),
         [detail, setDetail] = useState(''),
         [medicine, setMedicine] = useState(''),
@@ -113,6 +120,7 @@ export function ExportDialog({
         try {
             const response = await reportRequest('/emar/reports/export', {
                 type: option.type,
+                ...(round ? { round_id: round.id } : {}),
                 site_id: site,
                 client_id: person,
                 medication_id: medicine || null,
@@ -159,6 +167,7 @@ export function ExportDialog({
             frontline
             open
             onClose={() => !busy && onClose()}
+            onCloseAutoFocus={onCloseAutoFocus}
             title={`Make ${option.label}`}
             description="Choose the records and record a purpose before downloading."
             railIcon={Download}
@@ -234,71 +243,97 @@ export function ExportDialog({
                 {step === 0 && (
                     <>
                         <p className="text-subtle">{option.description}</p>
-                        <div className="space-y-2">
-                            <Label>House</Label>
-                            <RecordPicker
-                                label="House"
-                                value={site ? String(site) : ''}
-                                options={[
-                                    {
-                                        value: '',
-                                        label: 'All permitted houses',
-                                    },
-                                    ...props.sites.map((s) => ({
-                                        value: String(s.id),
-                                        label: s.name,
-                                    })),
-                                ]}
-                                onChange={(v) => {
-                                    setSite(v ? Number(v) : null);
-                                    setPerson(null);
-                                    setMedicine('');
-                                    setMedicines([]);
-                                }}
-                            />
-                        </div>
-                        {!props.finance && option.type !== 'round_sheet' && (
-                            <div className="space-y-2">
-                                <Label>Person</Label>
-                                <PersonPicker
-                                    value={person}
-                                    onChange={choosePerson}
-                                    siteId={site}
-                                    initial={props.people}
+                        {round && (
+                            <ReviewCard icon={FileText} title="Selected round">
+                                <ReviewRow label="Round" value={round.name} />
+                                <ReviewRow
+                                    label="House"
+                                    value={
+                                        props.sites.find(
+                                            (s) => s.id === round.site_id,
+                                        )?.name ?? 'Selected house'
+                                    }
                                 />
-                            </div>
-                        )}
-                        {option.type === 'cd_register' && (
-                            <div className="space-y-2">
-                                <Label>Controlled medicine</Label>
-                                <RecordPicker
-                                    label="Controlled medicine"
-                                    value={medicine}
-                                    options={medicines}
-                                    onChange={setMedicine}
-                                    disabled={!person}
+                                <ReviewRow
+                                    label="Date"
+                                    value={formatDateOnly(round.date)}
                                 />
-                            </div>
+                                <p className="text-subtle">
+                                    Only this round is included in the file.
+                                </p>
+                            </ReviewCard>
                         )}
-                        <div className="space-y-2">
-                            <Label>NZ calendar period</Label>
-                            <p className="text-subtle">
-                                {formatDateOnly(from)} to {formatDateOnly(to)}
-                            </p>
-                            <LeaveCalendarRange
-                                start={from}
-                                end={to}
-                                onChange={(start, end) => {
-                                    setFrom(start);
-                                    setTo(
-                                        option.type === 'round_sheet'
-                                            ? start
-                                            : end,
-                                    );
-                                }}
-                                required
-                            />
-                        </div>
+                        {!round && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label>House</Label>
+                                    <RecordPicker
+                                        label="House"
+                                        value={site ? String(site) : ''}
+                                        options={[
+                                            {
+                                                value: '',
+                                                label: 'All permitted houses',
+                                            },
+                                            ...props.sites.map((s) => ({
+                                                value: String(s.id),
+                                                label: s.name,
+                                            })),
+                                        ]}
+                                        onChange={(v) => {
+                                            setSite(v ? Number(v) : null);
+                                            setPerson(null);
+                                            setMedicine('');
+                                            setMedicines([]);
+                                        }}
+                                    />
+                                </div>
+                                {!props.finance &&
+                                    option.type !== 'round_sheet' && (
+                                        <div className="space-y-2">
+                                            <Label>Person</Label>
+                                            <PersonPicker
+                                                value={person}
+                                                onChange={choosePerson}
+                                                siteId={site}
+                                                initial={props.people}
+                                            />
+                                        </div>
+                                    )}
+                                {option.type === 'cd_register' && (
+                                    <div className="space-y-2">
+                                        <Label>Controlled medicine</Label>
+                                        <RecordPicker
+                                            label="Controlled medicine"
+                                            value={medicine}
+                                            options={medicines}
+                                            onChange={setMedicine}
+                                            disabled={!person}
+                                        />
+                                    </div>
+                                )}
+                                <div className="space-y-2">
+                                    <Label>NZ calendar period</Label>
+                                    <p className="text-subtle">
+                                        {formatDateOnly(from)} to{' '}
+                                        {formatDateOnly(to)}
+                                    </p>
+                                    <LeaveCalendarRange
+                                        start={from}
+                                        end={to}
+                                        onChange={(start, end) => {
+                                            setFrom(start);
+                                            setTo(
+                                                option.type === 'round_sheet'
+                                                    ? start
+                                                    : end,
+                                            );
+                                        }}
+                                        required
+                                    />
+                                </div>
+                            </>
+                        )}
                         {option.type === 'errors' && (
                             <Label className="frontline-tap flex items-center gap-2">
                                 <Checkbox
@@ -366,6 +401,9 @@ export function ExportDialog({
                                 label="File"
                                 value={`${option.label} · ${option.format}`}
                             />
+                            {round && (
+                                <ReviewRow label="Round" value={round.name} />
+                            )}
                             <ReviewRow
                                 label="House"
                                 value={
@@ -373,16 +411,19 @@ export function ExportDialog({
                                         ?.name ?? 'All permitted houses'
                                 }
                             />
-                            <ReviewRow
-                                label="Person"
-                                value={
-                                    props.people.find((p) => p.id === person)
-                                        ?.name ??
-                                    (person
-                                        ? 'Selected person'
-                                        : 'All permitted people')
-                                }
-                            />
+                            {option.type !== 'round_sheet' && (
+                                <ReviewRow
+                                    label="Person"
+                                    value={
+                                        props.people.find(
+                                            (p) => p.id === person,
+                                        )?.name ??
+                                        (person
+                                            ? 'Selected person'
+                                            : 'All permitted people')
+                                    }
+                                />
+                            )}
                             <ReviewRow
                                 label="Period"
                                 value={`${formatDateOnly(from)} – ${formatDateOnly(to)}`}

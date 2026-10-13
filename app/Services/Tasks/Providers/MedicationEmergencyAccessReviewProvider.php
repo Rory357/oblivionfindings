@@ -4,6 +4,7 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\ClientBreakGlassAccess;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -45,7 +46,7 @@ class MedicationEmergencyAccessReviewProvider implements HasModelClass, SiteScop
 
         return app(TaskProviderAuthorization::class)->siteScoped($user, $this->canView($user), $query,
             fn ($query, User $actor) => $query->whereHas('client', fn ($c) => $c->whereIn('site_id',
-                app(UserSiteAccessService::class)->accessibleSiteIds($actor, ['medications.audit.view']))),
+                app(UserSiteAccessService::class)->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS))),
             fn (ClientBreakGlassAccess $grant) => new TaskItem(
                 id: $this->sourceKey().'-'.$grant->id, source: $this->sourceKey(), sourceLabel: $this->label(),
                 ref: 'EA-'.$grant->id, title: 'Review ended emergency access — '.$grant->client->full_name,

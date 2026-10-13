@@ -42,10 +42,12 @@ use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationHistoricalRecoveryTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 
@@ -66,6 +68,9 @@ class MedicationHistoricalRecoveryTest extends TestCase
         parent::setUp();
         Carbon::setTestNow(Carbon::parse('2026-10-03 00:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
+        // Lane C1 (EA-090): downtime authority is a permission; RbacSeeder
+        // resets role grants, so add it the way DatabaseSeeder does.
+        $this->seed(\Database\Seeders\MedicationDowntimePermissionsSeeder::class);
         $this->site = Site::factory()->create(['is_active' => true]);
         $this->client = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
         $this->giver = $this->staff('team_lead');

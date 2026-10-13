@@ -16,8 +16,11 @@ class TimesheetAllocationService
 {
     public function __construct(private readonly UserSiteAccessService $sites) {}
 
-    public function candidates(Timesheet $timesheet, User $actor): array
+    public function candidates(Timesheet $timesheet, User $actor, ?array $currentCandidates = null): array
     {
+        if ($currentCandidates !== null) {
+            return $currentCandidates;
+        }
         $this->sites->assertCanAccessTimesheet($actor, $timesheet);
         $siteId = $this->sites->timesheetSiteId($timesheet);
         // Time attribution uses the authorised shift/site roster. It does not
@@ -32,27 +35,27 @@ class TimesheetAllocationService
                 'is_primary' => (int) $client->id === (int) $timesheet->client_id])->all();
     }
 
-    public function revision(Timesheet $timesheet): string
+    public function revision(Timesheet $timesheet, bool $current = false): string
     {
         return hash('sha256', json_encode([
             // Reconciliation stamps review metadata after a rejected submit.
             // That must not strand the worker's unchanged allocation draft.
             // Compare the complete allocation/time boundary, not unrelated timestamps.
             $timesheet->only(['id', 'user_id', 'shift_id', 'client_id', 'site_id', 'shift_site_id', 'work_date', 'status', 'starts_at', 'ends_at', 'break_minutes']),
-            $timesheet->clientAllocations()->orderBy('client_id')->get()->map(fn ($row) => $row->only([
+            $timesheet->clientAllocations()->orderBy('client_id')->when($current, fn ($query) => $query->lockForUpdate())->get()->map(fn ($row) => $row->only([
                 'client_id', 'hours', 'allocation_method', 'starts_at', 'ends_at', 'notes', 'sort_order',
             ]))->all(),
         ], JSON_THROW_ON_ERROR));
     }
 
-    public function assertRevision(Timesheet $timesheet, string $expected): void
+    public function assertRevision(Timesheet $timesheet, string $expected, bool $current = false): void
     {
-        if (! hash_equals($this->revision($timesheet), $expected)) {
+        if (! hash_equals($this->revision($timesheet, $current), $expected)) {
             throw ValidationException::withMessages(['timesheet' => 'This timesheet changed while you were reviewing it. Reopen it to check the latest hours and saved split.']);
         }
     }
 
-    public function validate(Timesheet $timesheet, User $actor, array $rows, bool $complete): array
+    public function validate(Timesheet $timesheet, User $actor, array $rows, bool $complete, ?array $currentCandidates = null): array
     {
         $input = Validator::make(['client_allocations' => $rows], [
             'client_allocations' => ['array', 'min:1', 'max:50'],
@@ -65,7 +68,7 @@ class TimesheetAllocationService
             'client_allocations.*.notes' => ['nullable', 'string', 'max:2000'],
             'client_allocations.*.sort_order' => ['sometimes', 'integer', 'min:0'],
         ])->validate()['client_allocations'];
-        $allowed = array_column($this->candidates($timesheet, $actor), 'id');
+        $allowed = array_column($this->candidates($timesheet, $actor, $currentCandidates), 'id');
         $methods = collect($input)->pluck('allocation_method')->unique();
         if ($methods->count() !== 1 || ($methods->first() === 'single' && count($input) !== 1)) {
             throw ValidationException::withMessages(['client_allocations' => 'Choose one allocation method. “One person” must contain exactly one person.']);
@@ -122,9 +125,14 @@ class TimesheetAllocationService
         }
     }
 
-    public function assertSavedSplitComplete(Timesheet $timesheet, User $actor): void
+    public function assertSavedSplitComplete(Timesheet $timesheet, User $actor, ?array $currentCandidates = null): void
     {
-        $rows = $timesheet->clientAllocations()->orderBy('sort_order')->get();
+        $rows = $timesheet->clientAllocations()->orderBy('sort_order')->when($currentCandidates !== null, fn ($query) => $query->lockForUpdate())->get();
+        if ($currentCandidates !== null) {
+            // Carry the exact current split, including empty legacy fallback,
+            // through the prepared approval/HR/billing chain without an RR reread.
+            $timesheet->setRelation('clientAllocations', $rows);
+        }
         if ($rows->isEmpty()) {
             return;
         }
@@ -132,15 +140,31 @@ class TimesheetAllocationService
             ...$row->only(['client_id', 'hours', 'allocation_method', 'notes', 'sort_order']),
             'starts_at' => $row->starts_at?->toIso8601String(),
             'ends_at' => $row->ends_at?->toIso8601String(),
-        ])->all(), true);
+        ])->all(), true, $currentCandidates);
     }
 
-    public function persist(Timesheet $timesheet, array $rows): void
+    public function persist(Timesheet $timesheet, array $rows, bool $confirm = false): void
     {
         foreach ($rows as $row) {
             $timesheet->clientAllocations()->updateOrCreate(['client_id' => $row['client_id']], $row);
         }
         $timesheet->clientAllocations()->whereNotIn('client_id', array_column($rows, 'client_id'))->delete();
+        if ($confirm) {
+            $saved = $timesheet->clientAllocations()->orderBy('client_id')->lockForUpdate()->get()->keyBy('client_id');
+            abort_unless($saved->count() === count($rows), 409, 'The allocation could not be saved. Reopen the review.');
+            foreach ($rows as $row) {
+                $actual = $saved->get($row['client_id']);
+                $expected = new TimesheetClientAllocation($row);
+                abort_unless($actual, 409);
+                foreach (array_keys($row) as $field) {
+                    $a = $actual->getAttribute($field);
+                    $e = $expected->getAttribute($field);
+                    $same = $a instanceof \DateTimeInterface && $e instanceof \DateTimeInterface ? $a->getTimestamp() === $e->getTimestamp()
+                        : (in_array($field, ['client_id', 'sort_order'], true) ? (int) $a === (int) $e : $a === $e);
+                    abort_unless($same, 409, 'The allocation could not be saved. Reopen the review.');
+                }
+            }
+        }
         $timesheet->unsetRelation('clientAllocations');
     }
 

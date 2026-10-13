@@ -1,11 +1,22 @@
-import { ConnectedServicesMenu } from '@/pages/emar/connected/_entry-points';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Clock, Home, Pill } from 'lucide-react';
+import {
+    AlertTriangle,
+    CalendarDays,
+    CalendarRange,
+    Clock,
+    Home,
+    Pill,
+    Printer,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
-import { ChartSection, ChartViewSwitch } from '@/components/emar/record/chart';
+import { MarReportDialog } from '@/components/clients/profile/mar-day/report-dialog';
+import { ChartSection } from '@/components/emar/record/chart';
 import { ClinicalSection } from '@/components/emar/record/clinical';
+import { DoseMeters } from '@/components/emar/record/dose-meters';
 import { HistorySection } from '@/components/emar/record/history';
+import { PhotosSection } from '@/components/emar/record/photos';
 import {
     MedicinesSection,
     RecordMedicineDialog,
@@ -27,6 +38,9 @@ import {
 import {
     PageHeader,
     PageHeaderFilterButton,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -34,6 +48,7 @@ import {
     PageHeaderSearch,
     PageHeaderSearchTrigger,
     PageHeaderStatusChip,
+    PageHeaderViewToggle,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -41,43 +56,59 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useEmarRecordBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
-import { emarScopedHref } from '@/lib/emar-navigation';
+import {
+    emarScopedHref,
+    isFrontlineMedication,
+    type EmarNavigationPermissions,
+} from '@/lib/emar-navigation';
+import { medicationReturnTo } from '@/lib/medication-navigation';
 
 export default function PersonMedicationRecord(props: RecordPageProps) {
     if (props.unavailable)
-        return (
-            <AppLayout
-                breadcrumbs={[
-                    { title: 'Home', href: '/dashboard' },
-                    { title: 'Medication', href: '/emar' },
-                ]}
-            >
-                <Head title="Medication record" />
-                <Card className="p-2">
-                    <EmptyState
-                        icon={
-                            props.unavailable === 'no_access'
-                                ? AlertTriangle
-                                : Pill
-                        }
-                        title={
-                            props.unavailable === 'no_access'
-                                ? 'You don’t have medication-record access'
-                                : 'Medication record not found'
-                        }
-                        description="Check your medication permissions and the person’s current house."
-                        action={
-                            <Button variant="outline" asChild>
-                                <Link href="/dashboard">
-                                    <Home className="size-4" /> Home
-                                </Link>
-                            </Button>
-                        }
-                    />
-                </Card>
-            </AppLayout>
-        );
+        return <UnavailableRecord unavailable={props.unavailable} />;
     return <AvailableRecord key={props.person.id} {...props} />;
+}
+
+/**
+ * EA-079 (Lane C8): the same Home-rooted record trail as an open record —
+ * frontline staff go back to Meds today, never to the lead Overview.
+ */
+function UnavailableRecord({
+    unavailable,
+}: {
+    unavailable: NonNullable<RecordPageProps['unavailable']>;
+}) {
+    const page = usePage();
+    const breadcrumbs = useEmarRecordBreadcrumbs({
+        title: 'Medication record',
+        href: page.url,
+    });
+    const props = { unavailable };
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Medication record" />
+            <Card className="p-2">
+                <EmptyState
+                    icon={
+                        props.unavailable === 'no_access' ? AlertTriangle : Pill
+                    }
+                    title={
+                        props.unavailable === 'no_access'
+                            ? 'You don’t have medication-record access'
+                            : 'Medication record not found'
+                    }
+                    description="Check your medication permissions and the person’s current house."
+                    action={
+                        <Button variant="outline" asChild>
+                            <Link href="/dashboard">
+                                <Home className="size-4" /> Home
+                            </Link>
+                        </Button>
+                    }
+                />
+            </Card>
+        </AppLayout>
+    );
 }
 
 function AvailableRecord({
@@ -85,17 +116,63 @@ function AvailableRecord({
     meters,
     as_at,
     can,
+    today,
 }: Extract<RecordPageProps, { person: unknown }>) {
-    const page = usePage();
+    const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
     const query = new URLSearchParams(page.url.split('?')[1]);
     const date = query.get('date');
     const hubUrl = new URL(
-        emarScopedHref('/emar/mar', page.url),
+        emarScopedHref(
+            isFrontlineMedication(page.props.auth?.can)
+                ? '/meds/today'
+                : '/emar/medications',
+            page.url,
+        ),
         'https://emar.invalid',
     );
+    // EA-108 (Lane C8): back to everyone in the house, not a one-person list.
     hubUrl.searchParams.delete('client_id');
+    const backHref =
+        medicationReturnTo(query.get('return_to')) ??
+        hubUrl.pathname + hubUrl.search;
     const week = query.get('mode') === 'week';
     const historyPage = Math.max(1, Number(query.get('page')) || 1);
+    // EA-109 (Lane C9): each section's approved filters, kept in the URL.
+    const pick = <T extends string>(
+        key: string,
+        allowed: readonly T[],
+        fallback: T,
+    ): T =>
+        (allowed as readonly string[]).includes(query.get(key) ?? '')
+            ? (query.get(key) as T)
+            : fallback;
+    const medType = pick('type', ['all', 'scheduled', 'prn'] as const, 'all');
+    const attention = query.get('attn') === '1';
+    const showResolved = query.get('resolved') === '1';
+    const range = pick('range', ['7d', '30d', 'all'] as const, '7d');
+    const outcome = pick(
+        'out',
+        ['all', 'given', 'notgiven', 'corrected'] as const,
+        'all',
+    );
+    const sectionFilters: Record<string, string | null> = {
+        type: medType === 'all' ? null : medType,
+        attn: attention ? '1' : null,
+        resolved: showResolved ? '1' : null,
+        range: range === '7d' ? null : range,
+        out: outcome === 'all' ? null : outcome,
+    };
+    // "As at" refreshes the header and reloads the open section.
+    const [refreshKey, setRefreshKey] = useState(0);
+    const refresh = () =>
+        router.reload({
+            onSuccess: () => {
+                setRefreshKey((key) => key + 1);
+                toast.success(
+                    `Up to date · as at ${formatTime(new Date().toISOString())} · Pacific/Auckland`,
+                );
+            },
+        });
     const sections = RECORD_SECTIONS.map((item) => ({
         ...item,
         views: item.views.filter(
@@ -110,6 +187,7 @@ function AvailableRecord({
     );
     const [search, setSearch] = useState('');
     const [find, setFind] = useState(false);
+    const [printing, setPrinting] = useState(false);
     const [medicine, setMedicine] = useState<number | null>(
         () =>
             Number(
@@ -150,10 +228,21 @@ function AvailableRecord({
         : section.views[0].key;
     const navigateQuery = (extra: Record<string, string | null>) =>
         router.push({
-            url: `/emar/mar${locationSearch(person.id, location, extra, page.url.split('?')[1])}`,
+            url: `/emar/mar${locationSearch(person.id, location, { ...sectionFilters, ...extra }, page.url.split('?')[1])}`,
             preserveState: true,
             preserveScroll: true,
         });
+    // C11: Medicines › Photos for one medicine (approved P02 "View pack photos").
+    const openPhotos = (medicationId: number) => {
+        const next: RecordLocation = { tab: 'medicines', view: 'photos' };
+        setLocation(next);
+        setMedicine(null);
+        router.push({
+            url: `/emar/mar${locationSearch(person.id, next, { med: String(medicationId) }, page.url.split('?')[1])}`,
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
     const jump = (tab: RecordLocation['tab'], view?: string) => {
         const target = RECORD_SECTIONS.find((item) => item.key === tab);
         if (target) go({ tab, view: view ?? target.views[0].key });
@@ -166,7 +255,7 @@ function AvailableRecord({
                     variant="profile"
                     wrapTitle
                     mobileSummary={`${meters.medicines.count} medicines · ${person.house ?? 'Medication record'}`}
-                    backHref={hubUrl.pathname + hubUrl.search}
+                    backHref={backHref}
                     mark={
                         <span className="eh-mark-ring text-sm font-semibold">
                             {person.initials}
@@ -174,8 +263,22 @@ function AvailableRecord({
                     }
                     title={person.name}
                     titleChip={
-                        <PageHeaderStatusChip variant="neutral">
-                            {person.status ?? 'Record'}
+                        // EA-216 (Lane C9): the person's status in words and
+                        // tone, as on their profile — never the raw value.
+                        <PageHeaderStatusChip
+                            variant={
+                                person.status === 'active'
+                                    ? 'success'
+                                    : person.status === 'onboarding' ||
+                                        person.status === 'respite'
+                                      ? 'warning'
+                                      : 'neutral'
+                            }
+                        >
+                            {person.status
+                                ? person.status.charAt(0).toUpperCase() +
+                                  person.status.slice(1).replaceAll('_', ' ')
+                                : 'Record'}
                         </PageHeaderStatusChip>
                     }
                     subline={
@@ -197,7 +300,14 @@ function AvailableRecord({
                                 placeholder="Find in this record…"
                                 onOpen={() => setFind(true)}
                             />
-                            <ConnectedServicesMenu clientId={person.id} />
+                            {can.print && today ? (
+                                <PageHeaderGlassButton
+                                    icon={Printer}
+                                    onClick={() => setPrinting(true)}
+                                >
+                                    Print MAR
+                                </PageHeaderGlassButton>
+                            ) : null}
                             <RecordDoseLaunch
                                 clientId={person.id}
                                 personName={person.preferred}
@@ -210,6 +320,11 @@ function AvailableRecord({
                     }
                     meters={
                         <>
+                            <DoseMeters
+                                doses={meters.doses ?? null}
+                                onChart={() => jump('chart')}
+                                onHistory={() => jump('history', 'doses')}
+                            />
                             <PageHeaderMeterBlock
                                 label="Medicines"
                                 onClick={() => jump('medicines')}
@@ -254,48 +369,196 @@ function AvailableRecord({
                                     · health profile
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="INR"
-                                onClick={() => jump('clinical', 'inr')}
-                                ariaLabel="View INR results"
-                            >
-                                <PageHeaderMeterBig>
-                                    {meters.inr?.value ?? 'None recorded'}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    {meters.inr
-                                        ? `${formatDateOnly(meters.inr.tested)} · ${meters.inr.target ? `target ${meters.inr.target.join('–')}` : 'target not recorded'}`
-                                        : 'Open clinical results'}
-                                    {meters.inr?.next
-                                        ? ` · next ${formatDateOnly(meters.inr.next)}`
-                                        : ''}
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Syringe driver"
-                                onClick={() => jump('clinical', 'driver')}
-                                ariaLabel="View syringe driver"
-                            >
-                                <PageHeaderMeterBig>
-                                    {meters.driver?.concealed
-                                        ? 'Controlled access needed'
-                                        : meters.driver
-                                          ? 'Running'
-                                          : 'None running'}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    {meters.driver && !meters.driver.concealed
-                                        ? meters.driver.last_check
-                                            ? `Last checked ${formatDateTime(meters.driver.last_check)}`
-                                            : 'No check recorded'
-                                        : 'Open clinical record'}
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
+                            {meters.inr ? (
+                                <PageHeaderMeterBlock
+                                    label="INR"
+                                    onClick={() => jump('clinical', 'inr')}
+                                    ariaLabel="View INR results"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {meters.inr?.value ?? 'None recorded'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {meters.inr
+                                            ? `${formatDateOnly(meters.inr.tested)} · ${meters.inr.target ? `target ${meters.inr.target.join('–')}` : 'target not recorded'}`
+                                            : 'Open clinical results'}
+                                        {meters.inr?.next
+                                            ? ` · next ${formatDateOnly(meters.inr.next)}`
+                                            : ''}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ) : null}
+                            {meters.driver ? (
+                                <PageHeaderMeterBlock
+                                    label="Syringe driver"
+                                    onClick={() => jump('clinical', 'driver')}
+                                    ariaLabel="View syringe driver"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {meters.driver?.concealed
+                                            ? 'Controlled access needed'
+                                            : meters.driver
+                                              ? 'Running'
+                                              : 'None running'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {meters.driver &&
+                                        !meters.driver.concealed
+                                            ? meters.driver.last_check
+                                                ? `Last checked ${formatDateTime(meters.driver.last_check)}`
+                                                : 'No check recorded'
+                                            : 'Open clinical record'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ) : null}
                         </>
                     }
                     filters={
                         <>
-                            <PageHeaderFilterButton icon={Clock} disabled>
+                            {location.tab === 'chart' &&
+                            activeView !== 'asneeded' ? (
+                                <PageHeaderViewToggle
+                                    ariaLabel="Chart layout"
+                                    value={week ? 'week' : 'day'}
+                                    onChange={(next) =>
+                                        navigateQuery({
+                                            mode:
+                                                next === 'week' ? 'week' : null,
+                                        })
+                                    }
+                                    options={[
+                                        {
+                                            value: 'day',
+                                            label: 'Day',
+                                            icon: CalendarDays,
+                                        },
+                                        {
+                                            value: 'week',
+                                            label: 'Week',
+                                            icon: CalendarRange,
+                                        },
+                                    ]}
+                                />
+                            ) : null}
+                            {location.tab === 'medicines' &&
+                            location.view !== 'photos' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Type"
+                                        value={medType}
+                                        allValue="all"
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'All types',
+                                            },
+                                            {
+                                                value: 'scheduled',
+                                                label: 'Scheduled',
+                                            },
+                                            {
+                                                value: 'prn',
+                                                label: 'As needed',
+                                            },
+                                        ]}
+                                        onChange={(next) =>
+                                            navigateQuery({
+                                                type:
+                                                    next === 'all'
+                                                        ? null
+                                                        : next,
+                                            })
+                                        }
+                                    />
+                                    <PageHeaderFilterCheck
+                                        label="Needs attention"
+                                        checked={attention}
+                                        onChange={(next) =>
+                                            navigateQuery({
+                                                attn: next ? '1' : null,
+                                            })
+                                        }
+                                    />
+                                </>
+                            ) : null}
+                            {location.tab === 'allergies' &&
+                            activeView === 'alerts' ? (
+                                <PageHeaderFilterCheck
+                                    label="Show resolved alerts"
+                                    checked={showResolved}
+                                    onChange={(next) =>
+                                        navigateQuery({
+                                            resolved: next ? '1' : null,
+                                        })
+                                    }
+                                />
+                            ) : null}
+                            {location.tab === 'history' &&
+                            activeView !== 'changes' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Range"
+                                        value={range}
+                                        options={[
+                                            {
+                                                value: '7d',
+                                                label: 'Last 7 days',
+                                            },
+                                            {
+                                                value: '30d',
+                                                label: 'Last 30 days',
+                                            },
+                                            {
+                                                value: 'all',
+                                                label: 'All dates',
+                                            },
+                                        ]}
+                                        onChange={(next) =>
+                                            navigateQuery({
+                                                range:
+                                                    next === '7d' ? null : next,
+                                                page: null,
+                                            })
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Outcome"
+                                        value={outcome}
+                                        allValue="all"
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'All outcomes',
+                                            },
+                                            {
+                                                value: 'given',
+                                                label: 'Given or taken',
+                                            },
+                                            {
+                                                value: 'notgiven',
+                                                label: 'Not given',
+                                            },
+                                            {
+                                                value: 'corrected',
+                                                label: 'Has a correction',
+                                            },
+                                        ]}
+                                        onChange={(next) =>
+                                            navigateQuery({
+                                                out:
+                                                    next === 'all'
+                                                        ? null
+                                                        : next,
+                                                page: null,
+                                            })
+                                        }
+                                    />
+                                </>
+                            ) : null}
+                            <PageHeaderFilterButton
+                                icon={Clock}
+                                onClick={refresh}
+                            >
                                 As at {formatTime(as_at)} · Pacific/Auckland
                             </PageHeaderFilterButton>
                             {location.tab === 'medicines' ? (
@@ -337,29 +600,31 @@ function AvailableRecord({
                             </Button>
                         )}
                     />
-                    {location.tab === 'chart' && activeView !== 'asneeded' && (
-                        <ChartViewSwitch
-                            week={week}
-                            onChange={(nextWeek) =>
-                                navigateQuery({
-                                    mode: nextWeek ? 'week' : null,
-                                })
-                            }
-                        />
-                    )}
                 </div>
                 <div
+                    key={refreshKey}
                     id="medication-record-panel"
                     role="tabpanel"
                     aria-labelledby={`medication-record-tab-${activeView}`}
                     className="max-w-full min-w-0"
                 >
-                    {location.tab === 'medicines' ? (
+                    {location.tab === 'medicines' &&
+                    location.view === 'photos' ? (
+                        <PhotosSection
+                            clientId={person.id}
+                            medicationId={Number(query.get('med')) || null}
+                            onMedicine={setMedicine}
+                            onShowAll={() => navigateQuery({ med: null })}
+                        />
+                    ) : location.tab === 'medicines' ? (
                         <MedicinesSection
                             clientId={person.id}
                             stopped={location.view === 'stopped'}
                             search={search}
+                            type={medType}
+                            attention={attention}
                             onMedicine={setMedicine}
+                            onPhotos={openPhotos}
                         />
                     ) : location.tab === 'support' ? (
                         <CanonicalSupportSection
@@ -382,7 +647,11 @@ function AvailableRecord({
                             }
                         />
                     ) : location.tab === 'allergies' ? (
-                        <SafetySection clientId={person.id} view={activeView} />
+                        <SafetySection
+                            clientId={person.id}
+                            view={activeView}
+                            showResolved={showResolved}
+                        />
                     ) : location.tab === 'clinical' ? (
                         <ClinicalSection
                             clientId={person.id}
@@ -402,6 +671,8 @@ function AvailableRecord({
                                 navigateQuery({ dose_id: null })
                             }
                             page={historyPage}
+                            range={range}
+                            outcome={outcome}
                             onPage={(next) =>
                                 navigateQuery({
                                     page: next > 1 ? String(next) : null,
@@ -416,6 +687,7 @@ function AvailableRecord({
                     key={medicine}
                     clientId={person.id}
                     medicationId={medicine}
+                    onPhotos={openPhotos}
                     onClose={() => {
                         setMedicine(null);
                         if (query.has('medication_id')) {
@@ -447,6 +719,16 @@ function AvailableRecord({
                 testIdPrefix="medication-record"
                 searchLabel="Find a section of this record"
             />
+            {can.print && today ? (
+                <MarReportDialog
+                    open={printing}
+                    onClose={() => setPrinting(false)}
+                    clientId={person.id}
+                    personName={person.preferred}
+                    today={today}
+                    controlledLeftOut={!can.view_controlled}
+                />
+            ) : null}
         </AppLayout>
     );
 }

@@ -191,8 +191,15 @@ final class MedicationReconciliationWorkflow
                     if (mb_strlen((string) $item->notes) > 255) {
                         $this->invalid('items', 'Keep the stop reason within 255 characters.');
                     }
-                    $this->lifecycle->discontinue($actor, $item->medication, $this->orders->reason($item->notes ?? ''),
+                    $alreadyStopped = $item->medication?->state === 'ceased';
+                    $ended = $this->lifecycle->discontinue($actor, $item->medication, $this->orders->reason($item->notes ?? ''),
                         submittedClientId: $client->id, requestKey: 'reconciliation:'.$record->id.':'.$item->id);
+                    // EA-135 (Lane C3): record the stop like every P04 stop, so
+                    // its order checks close and order.stopped is in the chain.
+                    if (! $alreadyStopped) {
+                        $this->orders->action($actor, $ended, 'stopped', ['version' => $ended->version, 'reason' => $ended->ceased_reason,
+                            'reconciliation_id' => $record->id, 'reconciliation_item_id' => $item->id]);
+                    }
                 } elseif ($item->decision === 'ask') {
                     if ($item->next_dose_at === null) {
                         $this->invalid('items', 'Record when the next affected dose is due so the prescriber query has a deadline.');

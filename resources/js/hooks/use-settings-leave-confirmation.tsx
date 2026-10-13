@@ -18,6 +18,15 @@ export function useSettingsLeaveConfirmation(
         cancel?: () => void;
     } | null>(null);
     const approved = useRef(false);
+    const discardAndRun = (run: () => void) => {
+        approved.current = true;
+        try {
+            onDiscard?.();
+            run();
+        } finally {
+            approved.current = false;
+        }
+    };
     const request = useCallback(
         (run: () => void) => {
             if (dirty) setPending({ run });
@@ -55,6 +64,7 @@ export function useSettingsLeaveConfirmation(
     return {
         request,
         historyProtectionAvailable: draftHistoryNavigation() !== null,
+        discardAndRun,
         confirmation: (
             <ConfirmDialog
                 open={dirty && pending !== null}
@@ -64,13 +74,7 @@ export function useSettingsLeaveConfirmation(
                 }}
                 onConfirm={() => {
                     if (!dirty || !pending) return;
-                    approved.current = true;
-                    try {
-                        onDiscard?.();
-                        pending.run();
-                    } finally {
-                        approved.current = false;
-                    }
+                    discardAndRun(pending.run);
                 }}
                 title={title}
                 description={description}

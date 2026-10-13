@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
@@ -23,10 +24,12 @@ export function Toggle({
     label,
     checked,
     onChange,
+    disabled,
 }: {
     label: string;
     checked: boolean;
     onChange: (v: boolean) => void;
+    disabled?: boolean;
 }) {
     return (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
@@ -35,6 +38,7 @@ export function Toggle({
                 <Switch
                     aria-label={label}
                     checked={checked}
+                    disabled={disabled}
                     onCheckedChange={onChange}
                 />
                 <span className="text-caption w-6">
@@ -42,6 +46,169 @@ export function Toggle({
                 </span>
             </div>
         </div>
+    );
+}
+
+type RegistrationValue = {
+    registration_authority: string;
+    registration_number: string;
+    registration_scope: string;
+    register_checked_at: string;
+};
+
+/** EA-104: council, number, scope and the date checked on the public register. */
+function RegistrationFields({
+    councils,
+    value,
+    onChange,
+}: {
+    councils: Record<string, string>;
+    value: RegistrationValue;
+    onChange: (key: keyof RegistrationValue, value: string) => void;
+}) {
+    return (
+        <div className="grid grid-cols-2 gap-4">
+            <RecordPicker
+                label="Council"
+                value={value.registration_authority}
+                options={Object.entries(councils).map(([key, label]) => ({
+                    value: key,
+                    label,
+                }))}
+                onChange={(v) => onChange('registration_authority', v)}
+            />
+            <Field label="Registration number" required>
+                <Input
+                    value={value.registration_number}
+                    onChange={(e) =>
+                        onChange('registration_number', e.target.value)
+                    }
+                />
+            </Field>
+            <Field label="Scope of practice" required>
+                <Input
+                    value={value.registration_scope}
+                    onChange={(e) =>
+                        onChange('registration_scope', e.target.value)
+                    }
+                />
+            </Field>
+            <Field label="Checked on the public register" required>
+                <DatePicker
+                    compact
+                    id="register-checked"
+                    label="Checked on the public register"
+                    value={value.register_checked_at}
+                    onChange={(v) => onChange('register_checked_at', v)}
+                />
+            </Field>
+            <p className="text-caption col-span-2">
+                Record the check you made today or in the last 90 days. A
+                reminder comes when the yearly re-check is due.
+            </p>
+        </div>
+    );
+}
+
+/** EA-104: record (or re-check) an existing prescriber’s structured registration check. */
+export function RegistrationCheckWizard({
+    clinician,
+    props,
+    onClose,
+    onSaved,
+}: {
+    clinician: ConnectedProps['clinicians'][number];
+    props: ConnectedProps;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const command = useCommand();
+    const [saved, setSaved] = useState(false);
+    const [form, setForm] = useState({
+        registration_authority:
+            clinician.registration_authority in
+            (props.registration?.councils ?? {})
+                ? clinician.registration_authority
+                : '',
+        registration_number: clinician.registration_number,
+        registration_scope: clinician.registration_scope ?? '',
+        register_checked_at: '',
+        identity_confirmed: false,
+    });
+    return (
+        <ReviewWizard
+            title="Record a registration check"
+            description={clinician.name}
+            onClose={onClose}
+            onSave={async () => {
+                if (
+                    await command.run(
+                        '/emar/connected-care/clinicians/' +
+                            clinician.id +
+                            '/registration-check',
+                        { ...form, client_id: props.selected_client?.id },
+                    )
+                ) {
+                    setSaved(true);
+                    onSaved();
+                }
+            }}
+            busy={command.busy}
+            error={command.error}
+            disabled={command.uncertain}
+            saved={saved}
+            success="Registration check recorded"
+            successDetail="You are now this prescriber’s verifier. With the two-person rule on, someone else grants them access."
+            steps={[
+                {
+                    label: 'Registration',
+                    valid: !!(
+                        form.registration_authority &&
+                        form.registration_number &&
+                        form.registration_scope &&
+                        form.register_checked_at &&
+                        form.identity_confirmed
+                    ),
+                    content: (
+                        <div className="space-y-4">
+                            <RegistrationFields
+                                councils={props.registration?.councils ?? {}}
+                                value={form}
+                                onChange={(k, v) =>
+                                    setForm((f) => ({ ...f, [k]: v }))
+                                }
+                            />
+                            <Toggle
+                                label="I checked this registration on the council’s public register"
+                                checked={form.identity_confirmed}
+                                onChange={(v) =>
+                                    setForm((f) => ({
+                                        ...f,
+                                        identity_confirmed: v,
+                                    }))
+                                }
+                            />
+                        </div>
+                    ),
+                },
+            ]}
+            review={[
+                { label: 'Prescriber', value: clinician.name },
+                {
+                    label: 'Council',
+                    value:
+                        props.registration?.councils?.[
+                            form.registration_authority
+                        ] ?? form.registration_authority,
+                },
+                {
+                    label: 'Registration number',
+                    value: form.registration_number,
+                },
+                { label: 'Scope of practice', value: form.registration_scope },
+                { label: 'Checked on', value: form.register_checked_at },
+            ]}
+        />
     );
 }
 
@@ -64,6 +231,8 @@ export function AccessWizard({
         provider_name: '',
         registration_authority: '',
         registration_number: '',
+        registration_scope: '',
+        register_checked_at: '',
         identity_evidence: '',
         identity_confirmed: false,
         expires_at: '',
@@ -77,6 +246,29 @@ export function AccessWizard({
     const clinician = props.clinicians.find(
         (c) => String(c.id) === form.clinician_id,
     );
+    // EA-104: Structured (the default) or Note only, from Settings.
+    const structured =
+        (props.registration?.mode ?? 'structured') === 'structured';
+    const identityFields: [
+        (
+            | 'name'
+            | 'email'
+            | 'provider_name'
+            | 'registration_authority'
+            | 'registration_number'
+        ),
+        string,
+    ][] = [
+        ['name', 'Full name'],
+        ['email', 'Verified work email'],
+        ['provider_name', 'Provider / practice'],
+    ];
+    if (!structured) {
+        identityFields.push(
+            ['registration_authority', 'Registration authority'],
+            ['registration_number', 'Registration number'],
+        );
+    }
     const save = async () => {
         const result = await command.run(
             '/emar/connected-care/' +
@@ -126,7 +318,10 @@ export function AccessWizard({
                                   form.provider_name &&
                                   form.registration_authority &&
                                   form.registration_number &&
-                                  form.identity_evidence &&
+                                  (structured
+                                      ? form.registration_scope &&
+                                        form.register_checked_at
+                                      : form.identity_evidence) &&
                                   form.identity_confirmed
                               )
                             : !!(form.clinician_id && form.purpose),
@@ -135,27 +330,7 @@ export function AccessWizard({
                             {kind === 'clinician' ? (
                                 <>
                                     <div className="grid grid-cols-2 gap-4">
-                                        {(
-                                            [
-                                                ['name', 'Full name'],
-                                                [
-                                                    'email',
-                                                    'Verified work email',
-                                                ],
-                                                [
-                                                    'provider_name',
-                                                    'Provider / practice',
-                                                ],
-                                                [
-                                                    'registration_authority',
-                                                    'Registration authority',
-                                                ],
-                                                [
-                                                    'registration_number',
-                                                    'Registration number',
-                                                ],
-                                            ] as const
-                                        ).map(([k, label]) => (
+                                        {identityFields.map(([k, label]) => (
                                             <Field
                                                 key={k}
                                                 label={label}
@@ -175,20 +350,31 @@ export function AccessWizard({
                                             </Field>
                                         ))}
                                     </div>
-                                    <Field
-                                        label="Identity and registration evidence"
-                                        required
-                                    >
-                                        <Textarea
-                                            value={form.identity_evidence}
-                                            onChange={(e) =>
-                                                set(
-                                                    'identity_evidence',
-                                                    e.target.value,
-                                                )
+                                    {structured ? (
+                                        <RegistrationFields
+                                            councils={
+                                                props.registration?.councils ??
+                                                {}
                                             }
+                                            value={form}
+                                            onChange={(k, v) => set(k, v)}
                                         />
-                                    </Field>
+                                    ) : (
+                                        <Field
+                                            label="Identity and registration evidence"
+                                            required
+                                        >
+                                            <Textarea
+                                                value={form.identity_evidence}
+                                                onChange={(e) =>
+                                                    set(
+                                                        'identity_evidence',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                    )}
                                     <Toggle
                                         label="I checked the identity and registration evidence"
                                         checked={form.identity_confirmed}
@@ -284,7 +470,17 @@ export function AccessWizard({
                     label: 'Evidence / purpose',
                     value:
                         kind === 'clinician'
-                            ? form.identity_evidence
+                            ? structured
+                                ? (props.registration?.councils?.[
+                                      form.registration_authority
+                                  ] ?? form.registration_authority) +
+                                  ' ' +
+                                  form.registration_number +
+                                  ' · ' +
+                                  form.registration_scope +
+                                  ' · checked ' +
+                                  form.register_checked_at
+                                : form.identity_evidence
                             : form.purpose,
                 },
                 {
@@ -393,8 +589,13 @@ export function ProposalDecision({
 }) {
     const command = useCommand();
     const [saved, setSaved] = useState(false);
+    const [orderUrl, setOrderUrl] = useState<string | null>(
+        p.order_url ?? null,
+    );
     const [decision, setDecision] = useState('');
     const [note, setNote] = useState('');
+    // EA-084: kept inside the organisation; never shown in the portal.
+    const [internalNote, setInternalNote] = useState('');
     const [confirmed, setConfirmed] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [source, setSource] = useState({
@@ -441,30 +642,50 @@ export function ProposalDecision({
             }
             saveLabel="Record decision"
             onSave={async () => {
-                if (
-                    await command.run(
-                        '/emar/connected-care/proposals/' + p.id + '/decision',
-                        multipart({
-                            decision,
-                            decision_note: note,
-                            source_confirmed: confirmed,
-                            source,
-                            source_file: file,
-                            ...stop,
-                        }),
-                    )
-                ) {
+                const result = await command.run<{ order_url?: string | null }>(
+                    '/emar/connected-care/proposals/' + p.id + '/decision',
+                    multipart({
+                        decision,
+                        decision_note: note,
+                        internal_note: internalNote,
+                        source_confirmed: confirmed,
+                        source,
+                        source_file: file,
+                        ...stop,
+                    }),
+                );
+                if (result) {
+                    setOrderUrl(result.order_url ?? null);
                     setSaved(true);
                     onSaved();
                 }
             }}
             success="Decision recorded"
-            successDetail="Accepted requests enter the existing medication-order checking workflow. They do not become ready to give until the required checks pass."
+            successDetail={
+                <>
+                    <span>
+                        Accepted requests enter medication-order checking. They
+                        are ready to give only after the required checks pass.
+                    </span>
+                    {orderUrl && (
+                        <Button asChild variant="outline">
+                            <a href={orderUrl}>Open the medication order</a>
+                        </Button>
+                    )}
+                </>
+            }
             steps={[
                 {
                     label: 'Request',
                     content: (
                         <div className="space-y-4">
+                            {orderUrl && (
+                                <Button asChild variant="outline">
+                                    <a href={orderUrl}>
+                                        Open the medication order
+                                    </a>
+                                </Button>
+                            )}
                             <ReviewCard
                                 icon={ClipboardCheck}
                                 title={p.kind + ' request'}
@@ -632,10 +853,26 @@ export function ProposalDecision({
                                 ]}
                                 onChange={setDecision}
                             />
-                            <Field label="Decision note" required>
+                            <Field
+                                label="Reply to the prescriber (they will see this)"
+                                required
+                            >
                                 <Textarea
                                     value={note}
                                     onChange={(e) => setNote(e.target.value)}
+                                />
+                            </Field>
+                            <p className="text-caption">
+                                The prescriber reads this word for word in their
+                                portal. Keep family, staff and incident details
+                                out of it.
+                            </p>
+                            <Field label="Internal note (staff only)">
+                                <Textarea
+                                    value={internalNote}
+                                    onChange={(e) =>
+                                        setInternalNote(e.target.value)
+                                    }
                                 />
                             </Field>
                             {decision === 'link_stop' && (
@@ -797,7 +1034,8 @@ export function ProposalDecision({
                         'Existing medication #' + p.medication_id,
                 },
                 { label: 'Decision', value: decision.replace('_', ' ') },
-                { label: 'Note', value: note },
+                { label: 'Reply to the prescriber', value: note },
+                { label: 'Internal note', value: internalNote || 'None' },
                 { label: 'Source confirmed', value: confirmed ? 'Yes' : 'No' },
             ]}
         />

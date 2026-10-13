@@ -1,3 +1,4 @@
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import {
     EntityContextMenu,
     useEntityContextMenu,
@@ -23,7 +24,8 @@ import { WizardShell } from '@/components/wizard/shell';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
-import { Head, Link, router } from '@inertiajs/react';
+import { emarScopedHref } from '@/lib/emar-navigation';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
     ArrowLeftRight,
@@ -123,6 +125,7 @@ type Props = {
     clients: ClientChoice[];
     covert: Covert[];
     reconciliations: Reconciliation[];
+    selected_reconciliation?: Reconciliation | null;
     can: {
         manage: boolean;
         verify: boolean;
@@ -134,7 +137,14 @@ type Props = {
     review_default: string;
     review_handoff: ReviewHandoff | null;
     prefill_client_id: number | null;
-    filters: { view?: View; show?: string; search?: string; site_id?: string };
+    filters: {
+        view?: View;
+        show?: string;
+        search?: string;
+        site_id?: string;
+        client_id?: number | null;
+        return_to?: string | null;
+    };
     respite_stays: RespiteStayChoice[];
     open_order_id: number | null;
     open_order_action: OpeningAction;
@@ -143,6 +153,7 @@ type Props = {
 };
 
 export default function Orders(props: Props) {
+    const page = usePage();
     const [modal, setModal] = useState<Modal>(null);
     const [search, setSearch] = useState(props.filters.search ?? '');
     const request = useRef<AbortController | null>(null);
@@ -161,6 +172,13 @@ export default function Orders(props: Props) {
         setModal(null);
     };
     useEffect(() => () => request.current?.abort(), []);
+    useEffect(() => {
+        if (props.selected_reconciliation)
+            setModal({
+                type: 'reconciliation',
+                record: props.selected_reconciliation,
+            });
+    }, [props.selected_reconciliation]);
     const filter = (change: Partial<Props['filters']>) =>
         router.get(
             '/emar/prescriptions',
@@ -419,6 +437,7 @@ export default function Orders(props: Props) {
                     subline={`Prescriber’s instructions, checks and transitions · loaded ${formatDateTime(props.loaded_at)}`}
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <ConnectedServicesMenu
                                 clientId={
                                     Number(
@@ -607,7 +626,7 @@ export default function Orders(props: Props) {
                                 },
                                 {
                                     key: 'covert',
-                                    label: 'Covert giving',
+                                    label: 'Covert',
                                     icon: ShieldCheck,
                                 },
                                 {
@@ -623,7 +642,13 @@ export default function Orders(props: Props) {
                             ]}
                             onSelect={(value) =>
                                 value === 'reviews'
-                                    ? router.get('/emar/reviews')
+                                    ? // EA-134 (Lane C8): keep the house and person.
+                                      router.get(
+                                          emarScopedHref(
+                                              '/emar/reviews',
+                                              page.url,
+                                          ),
+                                      )
                                     : filter({ view: value, show: '' })
                             }
                         />
@@ -740,7 +765,7 @@ export default function Orders(props: Props) {
                                 href="/emar/prescriptions/legacy"
                                 className="inline-flex min-h-[44px] items-center underline"
                             >
-                                Open supply and dispensing records
+                                Old prescriber-order records (read only)
                             </Link>
                         </p>
                     </>

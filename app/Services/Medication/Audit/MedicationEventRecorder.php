@@ -32,7 +32,9 @@ class MedicationEventRecorder
             throw new LogicException('A medication event must belong to an existing canonical Site.');
         }
         $clientIds = array_values(array_unique(array_filter(array_map(fn ($item) => $item->clientId, $items))));
-        $clients = Client::query()->whereIn('id', $clientIds)->pluck('site_id', 'id');
+        // EA-012 / EA-062: an archived person keeps their place in the chain
+        // (close-out work on their held stock, events closing after archiving).
+        $clients = Client::withTrashed()->whereIn('id', $clientIds)->pluck('site_id', 'id');
         foreach ($items as $item) {
             if ($item->clientId !== null && (int) ($clients[$item->clientId] ?? 0) !== $item->siteId) {
                 throw new LogicException('The medication event person must belong to its canonical Site.');

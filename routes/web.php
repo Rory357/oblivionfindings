@@ -152,6 +152,12 @@ Route::get('/careers/{slug}', fn () => redirect()->route('careers.index'))->wher
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/work-plans/{kind}', [\App\Http\Controllers\WorkPlanningController::class, 'index'])->name('work-plans.index');
+    Route::post('/work-plans/{kind}', [\App\Http\Controllers\WorkPlanningController::class, 'store'])->name('work-plans.store');
+    Route::put('/work-plans/{kind}/{record}', [\App\Http\Controllers\WorkPlanningController::class, 'update'])->whereNumber('record')->name('work-plans.update');
+    Route::get('/dashboard/data', [DashboardController::class, 'data'])->name('dashboard.data');
+    Route::put('/dashboard/layout/{role}', [DashboardController::class, 'saveLayout'])->whereIn('role', \App\Services\Overview\OverviewAccess::ROLES)->name('dashboard.layout');
+    Route::put('/dashboard/default-role', [DashboardController::class, 'defaultRole'])->name('dashboard.default-role');
     // Retired duplicate home: keep bookmarks working, but never render a
     // separate Today dashboard. Personal work belongs in /my-day.
     Route::get('/today', fn () => redirect()->route('my-day', [], 301))->name('today');

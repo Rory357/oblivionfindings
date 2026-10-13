@@ -131,12 +131,14 @@ export function buildItems(
             onClick: () => router.visit(`/staff/${incStaff.id}`),
         });
     }
-    if (client) {
+    if (client && h.mar_url) {
         items.push({
             icon: <Pill className="h-3.5 w-3.5" />,
             label: 'Open on MAR chart',
-            onClick: () => router.visit(`/emar/mar?client_id=${client.id}`),
+            onClick: () => router.visit(h.mar_url!),
         });
+    }
+    if (client) {
         items.push({ sep: true });
         items.push({
             icon: <Flag className="h-3.5 w-3.5" />,

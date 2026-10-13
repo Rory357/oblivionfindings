@@ -23,12 +23,14 @@ use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\Downtime\HistoricalPaperContext;
 use App\Services\Medication\Downtime\PaperAdministrationWriter;
+use App\Services\Medication\Downtime\PaperEntryService;
 use App\Services\Medication\Downtime\PaperReconciliationRules;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Recording\LiveRecordingContext;
@@ -965,14 +967,24 @@ class EnhancedMarService
 
                 $shift = null;
                 if ($shiftId !== null) {
+                    // EA-006 (D1): the worker's shift at the person's house
+                    // also counts when they're assigned to support the
+                    // person, whoever the shift names.
                     $shift = Shift::query()
                         ->whereKey($shiftId)
                         ->where('user_id', $userId)
-                        ->where('client_id', $client->id)
+                        ->where(function ($binding) use ($client, $userId): void {
+                            $binding->where('client_id', $client->id)
+                                ->orWhereExists(fn ($assigned) => $assigned->selectRaw('1')
+                                    ->from('client_user')
+                                    ->where('client_user.client_id', $client->id)
+                                    ->where('client_user.user_id', $userId));
+                        })
                         ->where(function ($query) use ($client): void {
                             $query
                                 ->where('site_id', $client->site_id)
-                                ->orWhereNull('site_id');
+                                ->orWhere(fn ($derived) => $derived->whereNull('site_id')
+                                    ->whereHas('client', fn ($clients) => $clients->where('site_id', $client->site_id)));
                         })
                         ->lockForUpdate()
                         ->first();
@@ -1264,6 +1276,21 @@ class EnhancedMarService
                     }
                 }
 
+                // EA-008: a "given" records the order the dialog showed. If the
+                // order was checked at a new version (or otherwise changed)
+                // while the dialog was open, nothing is saved: the worker sees
+                // the new instructions first. Exact replays resolved above.
+                if (($data['status'] ?? null) === 'given'
+                    && filled($data['order_fingerprint'] ?? null)
+                    && ! hash_equals((string) $data['order_fingerprint'], PaperEntryService::orderFingerprint($medication))) {
+                    return [
+                        'success' => false,
+                        'error_field' => 'order_changed',
+                        'error' => 'Order changed — check the new instructions',
+                        'order_changed' => true,
+                    ];
+                }
+
                 // Exact retained replay has resolved above. A connected form may
                 // retain its server-issued review time while checks are completed;
                 // an offline or earlier paper dose must never guess today's FEFO.
@@ -1409,15 +1436,21 @@ class EnhancedMarService
                             $client,
                             $medication,
                         );
-                        $this->rememberAdministrationReplay(
-                            $existing,
-                            $client,
-                            $medication,
-                            $userId,
-                            $shiftId,
-                            $clientRequestUuid,
-                            $requestFingerprint,
-                        );
+                        // EA-004: a dose saved on a device while someone else
+                        // recorded this one was NOT recorded. Its request is
+                        // never bound to their record, so sending it again
+                        // still says "someone else recorded this", not "sent".
+                        if (! (bool) ($data['queued_offline'] ?? false)) {
+                            $this->rememberAdministrationReplay(
+                                $existing,
+                                $client,
+                                $medication,
+                                $userId,
+                                $shiftId,
+                                $clientRequestUuid,
+                                $requestFingerprint,
+                            );
+                        }
 
                         return [
                             'success' => true,
@@ -1429,7 +1462,10 @@ class EnhancedMarService
                     }
                 }
 
-                $historicalStock = $historicalPaper !== null && ($data['status'] ?? null) === 'given'
+                // D2 (Lane C1): a paper dose from before pack tracking started
+                // posts clinically only; the stock is flagged for a counted recount.
+                $untrackedPaper = ($paperStockEvidence['settlement'] ?? null) === \App\Services\Medication\Downtime\PaperStockTracking::SETTLEMENT;
+                $historicalStock = $historicalPaper !== null && ($data['status'] ?? null) === 'given' && ! $untrackedPaper
                     ? app(MedicationStockService::class)->validateHistoricalEvidence($medication, $paperStockEvidence, true) : null;
 
                 if ($transitStock !== null && ($data['status'] ?? null) === 'given') {
@@ -1456,7 +1492,7 @@ class EnhancedMarService
                 }
 
                 // Live stock checks retain their current-balance semantics.
-                if ($medication->controlled_drug && $historicalStock === null && $transitStock === null) {
+                if ($medication->controlled_drug && $historicalStock === null && $transitStock === null && ! $untrackedPaper) {
                     $medication->load(['stock' => function ($q) {
                         $q->lockForUpdate();
                     }]);
@@ -1512,7 +1548,7 @@ class EnhancedMarService
                 // including when the rollout flag is subsequently disabled.
                 // Unstarted legacy stock is not migrated by a clinical dose.
                 $ordinaryStockQuantity = null;
-                if (! $medication->controlled_drug && ($data['status'] ?? null) === 'given' && $historicalStock === null && $transitStock === null) {
+                if (! $medication->controlled_drug && ($data['status'] ?? null) === 'given' && $historicalStock === null && $transitStock === null && ! $untrackedPaper) {
                     $ordinaryStock = $medication->stock()->lockForUpdate()->first();
                     if ($ordinaryStock?->lots_started_at !== null) {
                         if (blank($ordinaryStock->unit)) {
@@ -1657,7 +1693,7 @@ class EnhancedMarService
                 // new second clinical record with a medication name in notes.
 
                 // Handle controlled drug register entry
-                if ($medication->controlled_drug && $admin->status === 'given' && $transitStock === null) {
+                if ($medication->controlled_drug && $admin->status === 'given' && $transitStock === null && ! $untrackedPaper) {
                     $admin->setRelation('medication', $medication);
                     if ($historicalStock !== null) {
                         $entries = app(MedicationStockService::class)->controlledHistoricalEntries($admin, $lockedActor, $historicalStock, $lockedAuthorizationUsers->get((int) $admin->witnessed_by));
@@ -2104,6 +2140,8 @@ class EnhancedMarService
             $data['witness_credential'],
             $data['scope_authorized'],
             $data['live_recording_context'],
+            // A precondition on the order shown, like the connected review.
+            $data['order_fingerprint'],
             $data['shift_id'],
         );
 
@@ -2746,6 +2784,7 @@ class EnhancedMarService
         int $expectedClientId,
         int $expectedSiteId,
         ?int $expectedAssigneeId,
+        ?User $viewer = null,
     ): array {
         abort_unless($expectedClientId > 0 && $expectedSiteId > 0, 404);
 
@@ -2775,11 +2814,19 @@ class EnhancedMarService
 
         $administrationQuery = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
-            ->where('shift_id', $shiftId)
-            ->where('client_id', $client->id);
+            ->where('shift_id', $shiftId);
+        $clientIds = [(int) $client->id];
+        if ($viewer !== null) {
+            // EA-006 follow-up (shared houses, D1): a worker on this shift can
+            // record for other residents too. Their doses appear for each
+            // person this viewer may read (the person rule, per person).
+            $recorded = (clone $administrationQuery)->distinct()->pluck('client_id')->map(fn ($id): int => (int) $id)->all();
+            $clientIds = array_values(array_unique([...$clientIds, ...app(MedicationRecordAccess::class)->readableClientIds($viewer, $recorded)]));
+        }
+        $administrationQuery->whereIn('client_id', $clientIds);
         $this->medicationGovernanceScope->scopeCanonicalClientMedicationRows(
             $administrationQuery,
-            $client->site_id ? [(int) $client->site_id] : [],
+            Client::query()->whereIn('id', $clientIds)->whereNotNull('site_id')->pluck('site_id')->map(fn ($id): int => (int) $id)->unique()->values()->all(),
             false,
         );
         if (! $includeControlled) {
@@ -2787,9 +2834,18 @@ class EnhancedMarService
         }
 
         $administrations = $administrationQuery
-            ->with('medication:id,name,controlled_drug,is_prn')
+            ->with(['medication:id,name,controlled_drug,is_prn', 'client:id,first_name,last_name'])
             ->orderByDesc('administered_at')
             ->get();
+        // Another resident's dose is named, so it is never read as this person's.
+        $personLabel = function (ClientMedicationAdministration $a) use ($client): ?string {
+            if ((int) $a->client_id === (int) $client->id || $a->client === null) {
+                return null;
+            }
+            $last = trim((string) $a->client->last_name);
+
+            return trim(trim((string) $a->client->first_name).($last !== '' ? ' '.mb_substr($last, 0, 1).'.' : '')) ?: 'Another person';
+        };
 
         $scheduledCount = $administrations->where('medication.is_prn', false)->count();
         $prnCount = $administrations->where('medication.is_prn', true)->count();
@@ -2810,7 +2866,7 @@ class EnhancedMarService
             'by_status' => $byStatus,
             'administrations' => $administrations->map(fn ($a) => [
                 'id' => $a->id,
-                'medication_name' => $a->medication?->name ?? 'Unknown',
+                'medication_name' => ($a->medication?->name ?? 'Unknown').(($person = $personLabel($a)) !== null ? ' — '.$person : ''),
                 'status' => $a->status,
                 'administered_at' => $a->administered_at?->toIso8601String(),
                 'is_controlled' => $a->medication?->controlled_drug ?? false,

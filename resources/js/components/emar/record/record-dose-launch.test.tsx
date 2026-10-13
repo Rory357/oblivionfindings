@@ -1,3 +1,14 @@
+import { ProfileDialogs } from '@/components/clients/profile/dialog-host';
+import type {
+    DayDose,
+    DayMedicine,
+} from '@/components/clients/profile/mar-day/types';
+import {
+    doseRecoveryKey,
+    keepDoseRecovery,
+} from '@/components/emar/record-dose/recovery';
+import { setOfflineQueueActor } from '@/lib/offline-queue';
+import { profileDialogStateFromSearch } from '@/pages/operations/clients/tabs/_groups';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RecordDoseLaunch } from './record-dose-launch';
@@ -8,6 +19,7 @@ const state = vi.hoisted(() => ({
     reason: null as string | null,
     hasPrn: true,
     hidden: 0,
+    medicines: [] as DayMedicine[],
     recordAsNeeded: vi.fn(),
     recordScheduled: vi.fn(),
     reload: vi.fn(),
@@ -25,7 +37,8 @@ vi.mock('./use-record-json', () => ({
                     ? null
                     : {
                           date: '2026-10-07',
-                          medicines: [],
+                          today: '2026-10-07',
+                          medicines: state.medicines,
                           can: {
                               record: state.record,
                               record_reason: state.reason,
@@ -73,6 +86,8 @@ vi.mock('@/components/emar/recording/use-dose-recorder', () => ({
 }));
 
 beforeEach(() => {
+    setOfflineQueueActor(null);
+    setOfflineQueueActor(71);
     vi.clearAllMocks();
     Object.assign(state, {
         load: 'ready',
@@ -80,6 +95,202 @@ beforeEach(() => {
         reason: null,
         hasPrn: true,
         hidden: 0,
+        medicines: [],
+    });
+});
+
+function scheduledMedicine(
+    id: number,
+    status: DayDose['status'] = 'due',
+): DayMedicine {
+    const name = `Scheduled medicine ${id}`;
+    const doses = ['08:00', '12:00'].map(
+        (time): DayDose => ({
+            key: `${id}:${time}`,
+            client_id: 16,
+            client_name: 'Aroha',
+            medication_id: id,
+            medication_name: name,
+            dose: '1 tablet',
+            route: 'oral',
+            is_controlled: false,
+            requires_witness: false,
+            scheduled_for: `2026-10-07T${time}:00+13:00`,
+            time,
+            round_label: 'Test round',
+            status,
+            state: status === 'due' ? 'due' : status,
+            recorded: null,
+            mar_url: '/emar/mar?client_id=16',
+        }),
+    );
+    return {
+        id,
+        name,
+        dose: '1 tablet',
+        route: 'oral',
+        is_controlled: false,
+        requires_witness: false,
+        cells: { '08:00': [doses[0]], '12:00': [doses[1]] },
+    };
+}
+
+function openProfileMedicine(id: number) {
+    return render(
+        <ProfileDialogs
+            dialog={profileDialogStateFromSearch(`?dialog=emar&record=${id}`)}
+            onClose={() => {}}
+            flowContext={{
+                clientId: 16,
+                clientLabel: 'Aroha',
+                preferredName: 'Aroha',
+                staffOptions: [],
+                goalOptions: [],
+                consentTypeOptions: [],
+                fundOptions: [],
+                carePlanId: null,
+                carePlanTitle: null,
+                onboardingWorkflowId: null,
+                canSendFamilyChat: false,
+            }}
+            medications={[]}
+            canRecord
+            canRecordControlled={false}
+            witnessOptions={[]}
+        />,
+    );
+}
+
+describe('profile medicine deep links through the shared picker', () => {
+    it('keeps the requested PRN and never substitutes another medicine', () => {
+        state.medicines = [scheduledMedicine(12)];
+        openProfileMedicine(73);
+        expect(
+            screen.queryByText(/Scheduled medicine 12/),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('No scheduled doses are due now'),
+        ).not.toBeInTheDocument();
+        expect(state.recordAsNeeded).not.toHaveBeenCalled();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Record as-needed dose · Synthetic as-needed tablet',
+            }),
+        );
+        expect(state.recordAsNeeded).toHaveBeenCalledExactlyOnceWith(73);
+        expect(state.recordScheduled).not.toHaveBeenCalled();
+        expect(state.request).toHaveBeenCalledWith('/emar/clients/16/day');
+    });
+
+    it('offers only the requested scheduled medicine and requires a specific dose choice', () => {
+        const requested = scheduledMedicine(12);
+        state.medicines = [scheduledMedicine(13), requested];
+        openProfileMedicine(12);
+        expect(
+            screen.queryByText(/Scheduled medicine 13/),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /as-needed/ }),
+        ).not.toBeInTheDocument();
+        const choices = screen.getAllByRole('button', {
+            name: 'Record this dose',
+        });
+        expect(choices).toHaveLength(2);
+        expect(state.recordScheduled).not.toHaveBeenCalled();
+        fireEvent.click(choices[1]);
+        expect(state.recordScheduled).toHaveBeenCalledExactlyOnceWith(
+            requested.cells['12:00'][0],
+        );
+        expect(state.recordAsNeeded).not.toHaveBeenCalled();
+    });
+
+    it.each(['upcoming', 'given', 'pending_check'] as const)(
+        'explains a requested %s medicine without selecting another due dose',
+        (status) => {
+            state.medicines = [
+                scheduledMedicine(13),
+                scheduledMedicine(12, status),
+            ];
+            openProfileMedicine(12);
+            expect(
+                screen.getByRole('heading', {
+                    name: 'No dose is available to record for Scheduled medicine 12',
+                }),
+            ).toBeInTheDocument();
+            expect(
+                screen.queryByRole('button', { name: 'Record this dose' }),
+            ).not.toBeInTheDocument();
+            expect(
+                screen.queryByRole('button', { name: /as-needed/ }),
+            ).not.toBeInTheDocument();
+            expect(state.recordScheduled).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each([0, 1])(
+        'keeps a missing or hidden requested medicine scoped (hidden=%s)',
+        (hidden) => {
+            state.hidden = hidden;
+            state.medicines = [scheduledMedicine(13)];
+            openProfileMedicine(999);
+            expect(
+                screen.getByRole('heading', {
+                    name: 'The requested medicine is unavailable',
+                }),
+            ).toBeInTheDocument();
+            expect(
+                screen.queryByText(/Scheduled medicine 13/),
+            ).not.toBeInTheDocument();
+            expect(
+                screen.queryByText(/Synthetic as-needed tablet/),
+            ).not.toBeInTheDocument();
+            expect(
+                screen.queryByRole('button', {
+                    name: /Record this dose|as-needed/,
+                }),
+            ).not.toBeInTheDocument();
+            expect(state.recordScheduled).not.toHaveBeenCalled();
+            expect(state.recordAsNeeded).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(['no_permission', 'no_shift'])(
+        'retains current %s checks for the requested medicine',
+        (reason) => {
+            Object.assign(state, { record: false, reason });
+            openProfileMedicine(73);
+            expect(screen.getByRole('status')).toBeInTheDocument();
+            expect(
+                screen.queryByRole('button', { name: /Record as-needed/ }),
+            ).not.toBeInTheDocument();
+            expect(state.recordAsNeeded).not.toHaveBeenCalled();
+        },
+    );
+
+    it('retains only the original requested recovery when that order has retired', () => {
+        for (const id of [12, 41]) {
+            keepDoseRecovery(doseRecoveryKey(16, id, 'prn'), {
+                display: { order: { name: `Original medicine ${id}` } },
+                form: { when: '2026-10-07T08:05', outcome: 'given' },
+                target: { kind: 'prn', orderId: id },
+            });
+        }
+        openProfileMedicine(12);
+        expect(
+            screen.getByText('Unconfirmed attempt · Original medicine 12'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/Original medicine 41/),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getAllByRole('button', { name: 'Check original attempt' }),
+        ).toHaveLength(1);
+        expect(
+            screen.getByRole('heading', {
+                name: 'The requested medicine is unavailable',
+            }),
+        ).toBeInTheDocument();
+        expect(state.recordAsNeeded).not.toHaveBeenCalled();
     });
 });
 
@@ -91,6 +302,37 @@ function open() {
 }
 
 describe('MAR as-needed recording entry', () => {
+    it('keeps unrelated as-needed choices available beside an unconfirmed attempt', () => {
+        keepDoseRecovery(doseRecoveryKey(16, 41, '2026-10-08T08:00:00+13:00'), {
+            display: { order: { name: 'Original antihistamine' } },
+            form: { when: '2026-10-08T08:05', outcome: 'given' },
+            target: {
+                kind: 'scheduled',
+                orderId: 41,
+                scheduledFor: '2026-10-08T08:00:00+13:00',
+            },
+        });
+        open();
+        expect(
+            screen.getByText('Unconfirmed attempt · Original antihistamine'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('8 Oct 2026 · 8:05 am · NZ time · given'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/even if the medicine order has changed/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Check original attempt' }),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Choose an as-needed medicine',
+            }),
+        );
+        expect(state.recordAsNeeded).toHaveBeenCalledOnce();
+        expect(state.recordScheduled).not.toHaveBeenCalled();
+    });
     it('opens the current person’s searchable medicine picker directly and uses the canonical recorder', () => {
         open();
         expect(screen.getByRole('dialog')).toHaveAccessibleName(

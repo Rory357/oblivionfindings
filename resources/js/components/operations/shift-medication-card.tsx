@@ -44,6 +44,9 @@ type ScanVerification = {
 };
 
 type MedicationSummary = {
+    date?: string;
+    mar_url?: string | null;
+    medical_url?: string | null;
     stats?: {
         scheduled?: {
             completed?: number;
@@ -130,18 +133,18 @@ export default function ShiftMedicationCard({
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button asChild size="sm" variant="outline">
-                            <Link href={`/emar/mar?client_id=${clientId}`}>
-                                Open MAR
-                            </Link>
-                        </Button>
-                        <Button asChild size="sm" variant="outline">
-                            <Link
-                                href={`/emar/medications?client_id=${clientId}`}
-                            >
-                                Medical
-                            </Link>
-                        </Button>
+                        {summary?.mar_url && (
+                            <Button asChild size="sm" variant="outline">
+                                <Link href={summary.mar_url}>Open MAR</Link>
+                            </Button>
+                        )}
+                        {summary?.medical_url && (
+                            <Button asChild size="sm" variant="outline">
+                                <Link href={summary.medical_url}>
+                                    Health profile
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">

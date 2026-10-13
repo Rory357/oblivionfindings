@@ -7,6 +7,8 @@ use App\Models\Client;
 use App\Models\Site;
 use App\Models\Summary;
 use App\Models\User;
+use App\Services\Clients\ClientProfileSectionAccess;
+use App\Services\Llm\AiMedicationDataPolicy;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -46,7 +48,7 @@ class SummaryController extends Controller
         return inertia('summaries/index', [
             'scope' => ['type' => 'staff', 'id' => $user->id, 'name' => $user->name],
             'range' => ['from' => $range['from']->toISOString(), 'to' => $range['to']->toISOString()],
-            'summary' => $summary ? $this->dto($summary) : null,
+            'summary' => $summary && $this->showable($summary, $viewer) ? $this->dto($summary) : null,
         ]);
     }
 
@@ -56,6 +58,8 @@ class SummaryController extends Controller
         abort_unless($viewer, 403);
         abort_if($viewer->hasRole('client', 'next_of_kin'), 403);
         $this->authorize('view', $client);
+        // A client summary is drawn from the timeline (EA-014).
+        abort_unless(app(ClientProfileSectionAccess::class)->canViewTimeline($viewer, $client), 403);
 
         $range = $this->parseRange($request);
 
@@ -69,7 +73,7 @@ class SummaryController extends Controller
         return inertia('summaries/index', [
             'scope' => ['type' => 'client', 'id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)],
             'range' => ['from' => $range['from']->toISOString(), 'to' => $range['to']->toISOString()],
-            'summary' => $summary ? $this->dto($summary) : null,
+            'summary' => $summary && $this->showable($summary, $viewer) ? $this->dto($summary) : null,
         ]);
     }
 
@@ -135,6 +139,22 @@ class SummaryController extends Controller
         }
 
         return compact('from', 'to');
+    }
+
+    /**
+     * One stored summary is shared by every reader, so one built from
+     * medication events is shown only under AiMedicationDataPolicy (D5):
+     * never while llm.include_medication_data is off, and otherwise only to
+     * a reader who could see every medication event in it.
+     */
+    private function showable(Summary $summary, User $viewer): bool
+    {
+        $eventIds = collect(data_get($summary->sources, 'timeline_event_ids', []))
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return app(AiMedicationDataPolicy::class)->canShowStoredSummary($viewer, $eventIds);
     }
 
     private function dto(Summary $s): array

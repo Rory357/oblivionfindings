@@ -5,6 +5,18 @@ import {
 } from '@/components/clients/profile/mar-day/dose-cell';
 import type { MedicationDay } from '@/components/clients/profile/mar-day/types';
 import { AsNeededPicker } from '@/components/emar/record-dose/dialogs';
+import {
+    RecordDoseDialog,
+    type PendingDose,
+} from '@/components/emar/record-dose/record-dose-dialog';
+import {
+    formatPendingDoseWhen,
+    pendingDoseRecoveries,
+} from '@/components/emar/record-dose/recovery';
+import type {
+    DoseTarget,
+    EntryPoint,
+} from '@/components/emar/record-dose/types';
 import { useDoseRecorder } from '@/components/emar/recording/use-dose-recorder';
 import { PageHeaderPrimaryButton } from '@/components/page';
 import { SettingsModal } from '@/components/settings/settings-modal';
@@ -61,24 +73,47 @@ export function RecordDoseLaunch({
     );
 }
 
-function DosePicker({
+export function DosePicker({
     clientId,
     personName,
     asNeeded,
     onClose,
     returnFocus,
+    entry = 'mar',
+    medicationId,
 }: {
     clientId: number;
     personName: string;
     asNeeded: boolean;
     onClose: () => void;
     returnFocus: () => HTMLElement | null;
+    entry?: EntryPoint;
+    /** An existing profile deep link requests this exact order, never a substitute. */
+    medicationId?: number;
 }) {
     // A recording action always checks today's orders, even on a historical chart.
-    const { data, load, reload } = useRecordJson<MedicationDay>(
-        `/emar/clients/${clientId}/day`,
-    );
+    const {
+        data: currentDay,
+        load,
+        reload,
+    } = useRecordJson<MedicationDay>(`/emar/clients/${clientId}/day`);
+    const data = useMemo(() => {
+        if (!currentDay || medicationId === undefined) return currentDay;
+        return {
+            ...currentDay,
+            medicines: currentDay.medicines.filter(
+                (medicine) => medicine.id === medicationId,
+            ),
+            prn: {
+                ...currentDay.prn,
+                rows: currentDay.prn.rows.filter(
+                    (medicine) => medicine.id === medicationId,
+                ),
+            },
+        };
+    }, [currentDay, medicationId]);
     const [choosing, setChoosing] = useState(true);
+    const [recovering, setRecovering] = useState<DoseTarget | null>(null);
     const context = useMemo(
         () =>
             data?.recorder?.client
@@ -89,9 +124,10 @@ function DosePicker({
                       notGivenReasons: data.recorder.not_given_reasons,
                       signedAs: data.recorder.signed_as,
                       prnMedications: data.prn.rows,
+                      entry,
                   }
                 : null,
-        [data],
+        [data, entry],
     );
     const recorder = useDoseRecorder(context, onClose, returnFocus);
     const doses =
@@ -105,6 +141,16 @@ function DosePicker({
                 ['due_now', 'due', 'overdue'].includes(kind),
             ) ?? [];
     const ready = load === 'ready' && data !== null;
+    const pending = ready
+        ? pendingDoseRecoveries<PendingDose>(clientId).filter(
+              (attempt) =>
+                  medicationId === undefined || attempt.order === medicationId,
+          )
+        : [];
+    const requestedMedicine =
+        medicationId === undefined
+            ? null
+            : (data?.medicines[0] ?? data?.prn.rows[0]);
     const canChoose = ready && data.can.record && context !== null;
     const hidden =
         ready &&
@@ -121,7 +167,10 @@ function DosePicker({
     return (
         <>
             {choosing &&
-                (asNeeded && canChoose && data.prn.rows.length > 0 ? (
+                (asNeeded &&
+                canChoose &&
+                data.prn.rows.length > 0 &&
+                pending.length === 0 ? (
                     <AsNeededPicker
                         choices={data.prn.rows}
                         onClose={onClose}
@@ -142,9 +191,11 @@ function DosePicker({
                                 : `Record a dose for ${personName}`
                         }
                         description={
-                            asNeeded
-                                ? 'Current as-needed medicines. Choose a medicine to open its safety checks and recording form.'
-                                : 'Choose a scheduled dose due today or an as-needed medicine. Safety checks open before recording.'
+                            medicationId !== undefined
+                                ? 'Only the requested medicine is shown. Choose its due dose or open its as-needed safety checks.'
+                                : asNeeded
+                                  ? 'Current as-needed medicines. Choose a medicine to open its safety checks and recording form.'
+                                  : 'Choose a scheduled dose due today or an as-needed medicine. Safety checks open before recording.'
                         }
                         width={
                             !asNeeded && canChoose && doses.length > 0
@@ -174,6 +225,48 @@ function DosePicker({
                             )
                         ) : (
                             <div className="space-y-3">
+                                {pending.map((attempt) => (
+                                    <div
+                                        key={attempt.key}
+                                        className="flex items-center justify-between gap-4 rounded-lg border p-3"
+                                    >
+                                        <div className="min-w-0 space-y-1 text-sm">
+                                            <p className="font-semibold">
+                                                Unconfirmed attempt ·{' '}
+                                                {
+                                                    attempt.draft.display.order
+                                                        .name
+                                                }
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                                {formatPendingDoseWhen(
+                                                    attempt.draft.form.when,
+                                                )}{' '}
+                                                · NZ time ·{' '}
+                                                {attempt.draft.form.outcome ??
+                                                    'Outcome not confirmed'}
+                                            </p>
+                                            <p>
+                                                Check the original attempt
+                                                before recording the same dose
+                                                again, even if the medicine
+                                                order has changed.
+                                            </p>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                setRecovering(
+                                                    attempt.draft.target,
+                                                );
+                                                setChoosing(false);
+                                            }}
+                                        >
+                                            Check original attempt
+                                        </Button>
+                                    </div>
+                                ))}
                                 {accessMessage && (
                                     <div
                                         role="status"
@@ -193,6 +286,14 @@ function DosePicker({
                                         message="Reload the choices before recording a dose."
                                         onRetry={reload}
                                     />
+                                ) : medicationId !== undefined &&
+                                  !requestedMedicine ? (
+                                    <EmptyState
+                                        icon={Pill}
+                                        variant="compact"
+                                        title="The requested medicine is unavailable"
+                                        description="It may have changed or may no longer be available with your access. Close this window and check the chart, or ask the medication lead to review the original order."
+                                    />
                                 ) : asNeeded ? (
                                     data.prn.rows.length === 0 ? (
                                         <EmptyState
@@ -209,6 +310,17 @@ function DosePicker({
                                                     : 'An as-needed dose needs a current medication order. Ask the medication lead to check the order if a medicine is missing.'
                                             }
                                         />
+                                    ) : canChoose ? (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                recorder.recordAsNeeded();
+                                                setChoosing(false);
+                                            }}
+                                        >
+                                            <Pill className="size-4" /> Choose
+                                            an as-needed medicine
+                                        </Button>
                                     ) : null
                                 ) : canChoose ? (
                                     <>
@@ -267,15 +379,23 @@ function DosePicker({
                                                     </Card>
                                                 );
                                             })
-                                        ) : (
+                                        ) : medicationId !== undefined &&
+                                          data.prn.rows.length > 0 ? null : (
                                             <EmptyState
                                                 icon={Pill}
                                                 variant="compact"
-                                                title="No scheduled doses are due now"
+                                                title={
+                                                    requestedMedicine
+                                                        ? `No dose is available to record for ${requestedMedicine.name}`
+                                                        : 'No scheduled doses are due now'
+                                                }
                                                 description={
-                                                    data.prn.rows.length > 0
-                                                        ? 'You can choose an as-needed medicine below.'
-                                                        : 'Check the chart for later doses. As-needed recording requires a current as-needed order.'
+                                                    requestedMedicine
+                                                        ? 'Check this medicine’s times, order check and existing outcomes on the chart.'
+                                                        : data.prn.rows.length >
+                                                            0
+                                                          ? 'You can choose an as-needed medicine below.'
+                                                          : 'Check the chart for later doses. As-needed recording requires a current as-needed order.'
                                                 }
                                             />
                                         )}
@@ -283,17 +403,22 @@ function DosePicker({
                                             <Button
                                                 variant="outline"
                                                 onClick={() => {
-                                                    recorder.recordAsNeeded();
+                                                    recorder.recordAsNeeded(
+                                                        medicationId,
+                                                    );
                                                     setChoosing(false);
                                                 }}
                                             >
                                                 <Pill className="size-4" />{' '}
-                                                Record an as-needed dose
+                                                {requestedMedicine
+                                                    ? `Record as-needed dose · ${requestedMedicine.name}`
+                                                    : 'Record an as-needed dose'}
                                             </Button>
                                         )}
                                     </>
                                 ) : null}
                                 {hidden &&
+                                    medicationId === undefined &&
                                     !(
                                         asNeeded && data.prn.rows.length === 0
                                     ) && (
@@ -307,6 +432,17 @@ function DosePicker({
                     </SettingsModal>
                 ))}
             {recorder.element}
+            {recovering && (
+                <RecordDoseDialog
+                    target={recovering}
+                    entry={entry}
+                    signedAs={
+                        context?.signedAs ?? { name: '', role_label: null }
+                    }
+                    onClose={onClose}
+                    returnFocus={returnFocus}
+                />
+            )}
         </>
     );
 }

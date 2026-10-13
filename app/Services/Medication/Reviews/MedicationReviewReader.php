@@ -61,7 +61,9 @@ final class MedicationReviewReader
     {
         $controlled = $actor->canDo('medications.controlled.view');
         $items = $review->items;
-        $orders = $detail ? ClientMedication::query()->current()->active()->where('client_id', $review->client_id)->get() : collect();
+        // EA-113 (Lane C3): every order that isn't stopped, held and waiting ones included.
+        $orders = $detail ? ClientMedication::query()->current()->where('state', '!=', 'ceased')->whereNull('ceased_at')
+            ->where('client_id', $review->client_id)->get() : collect();
         // Legacy summary/actions were unstructured and cannot be reliably scrubbed.
         $unstructuredLegacy = $items->isEmpty() && $review->status === 'completed';
         $summary = $this->canReadSource($review, $actor);
@@ -103,6 +105,12 @@ final class MedicationReviewReader
                 'dosage' => $order->controlled_drug && ! $controlled ? null : $order->dosage,
                 'frequency' => $order->controlled_drug && ! $controlled ? null : $order->frequency,
                 'controlled_hidden' => (bool) $order->controlled_drug && ! $controlled,
+                'order_state' => match (true) {
+                    $order->state === 'paused' => 'held',
+                    $order->approval_status === 'rejected' => 'sent_back',
+                    $order->approval_status === 'pending_verification' => 'waiting_check',
+                    default => 'active',
+                },
             ])->all(),
             'history' => $detail ? $review->events->map(function ($event) use ($summary): array {
                 // Never send stored source paths, clinician letter or per-medicine snapshots.

@@ -9,6 +9,8 @@ use App\Services\Medication\Controlled\ControlledSettingsFragment;
 use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationErrorWorkflow;
 use App\Services\Medication\MedicationSafetyPolicySettings;
+use App\Services\Medication\Recording\OfflineReplayReview;
+use App\Services\Medication\Recording\PackPhotoSettings;
 use App\Services\Medication\Reviews\MedicationReviewCadence;
 use App\Services\Medication\WitnessPinSettings;
 
@@ -30,6 +32,9 @@ class MedicationSettingsRegistry
     public const VIEW_STAFF = 'staff';
 
     public const VIEW_ALERTS = 'alerts';
+
+    /** Settings › Connected services: the optional third-party features (D4). */
+    public const VIEW_CONNECTIONS = 'connections';
 
     /** Who gets each alert, organisation-wide: `medications.alerts.{alert}`. */
     public const ALERT_STORAGE_PREFIX = 'medications.alerts.';
@@ -134,9 +139,12 @@ class MedicationSettingsRegistry
     {
         return [
             $this->safetyChecks(),
+            $this->packPhotoAtRecording(),
             $this->doseTiming(),
+            $this->offlineReplay(),
             $this->competencyPolicy(),
             $this->witnessPinRules(),
+            $this->forgottenPin(),
             $this->alertRecipients(),
             $this->alertExtras(),
             $this->alertDelivery(),
@@ -145,7 +153,12 @@ class MedicationSettingsRegistry
             MedicationReviewCadence::settingsGroup(),
             ...ControlledSettingsFragment::groups(),
             \App\Services\Medication\Reporting\RecordsReportingSettings::group(),
+            // Lane C11: Medication rules › Medicine photos (P11 Q18, P06 Q6).
+            \App\Services\Medication\Stock\PackPhotoReceiptSettings::group(),
+            // Lane C1 (D2): Records & reporting › Paper records.
+            \App\Services\Medication\Downtime\DowntimeSettings::group(),
             $this->emergencyPolicy(),
+            \App\Services\Medication\Connected\ConnectedCareSettings::group(),
         ];
     }
 
@@ -569,6 +582,134 @@ class MedicationSettingsRegistry
                 $number('max_attempts', $pins::MAX_ATTEMPTS, 'Wrong attempts before a PIN locks', 'attempts', MedicationSettingDefinition::HIGHER_IS_LOOSER),
                 $number('lockout_minutes', $pins::LOCKOUT_MINUTES, 'How long a locked PIN stays locked', 'minutes', MedicationSettingDefinition::HIGHER_IS_STRICTER),
                 $number('renewal_months', $pins::RENEWAL_MONTHS, 'PIN renewal (optional)', 'months', MedicationSettingDefinition::HIGHER_IS_LOOSER, $pins::RENEWAL_OFF, 'No renewal'),
+            ],
+        );
+    }
+
+    /**
+     * Lane A settings (P11 v5 Staff & PINs › Witness PINs › "Forgotten PIN"
+     * and "Named colleague confirms"; PIN-2): naming a colleague who forgot
+     * their PIN for an ordinary medicine, and how long they have to confirm.
+     * Controlled and witness-required medicines never use it — a fixed
+     * floor in ForgottenWitnessPinService, not a setting. Allowing it, or a
+     * longer time to confirm, loosens.
+     */
+    private function forgottenPin(): MedicationSettingGroup
+    {
+        $pins = WitnessPinSettings::class;
+
+        return new MedicationSettingGroup(
+            key: 'forgotten',
+            view: self::VIEW_STAFF,
+            effect: 'From the next dose signed, at every house — colleagues already named keep their time to confirm',
+            auditEvent: 'medications.forgotten_pin.updated',
+            definitions: [
+                new MedicationSettingDefinition(
+                    group: 'forgotten',
+                    key: 'forgotten_fallback',
+                    storageKey: $pins::FORGOTTEN_FALLBACK,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'pins',
+                    label: 'Forgotten-PIN fallback',
+                    options: [
+                        'no' => 'Not allowed — the colleague resets their PIN or someone else confirms',
+                        'yes' => 'Allowed — the dose is marked “second person not verified” until they confirm from their own login',
+                    ],
+                    default: $pins::FORGOTTEN_FALLBACK_DEFAULT,
+                    rank: ['yes', 'no'],
+                ),
+                new MedicationSettingDefinition(
+                    group: 'forgotten',
+                    key: 'confirm_minutes',
+                    storageKey: $pins::CONFIRM_MINUTES,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'pins',
+                    label: 'Time limit for a named colleague to confirm',
+                    options: [],
+                    default: $pins::CONFIRM_MINUTES_DEFAULT,
+                    numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_LOOSER, 'off' => null, 'off_is_loosest' => false],
+                    range: $pins::CONFIRM_MINUTES_RANGE,
+                    unit: 'minutes',
+                ),
+            ],
+        );
+    }
+
+    /**
+     * Lane A11 settings (P11 v5 Medication rules › Medicine photos; Stephan
+     * 9 Oct: staff medicine photos are core). What the recording dialog does
+     * with the latest photo of the supplied pack. Hiding it, or going from a
+     * tick back to a warning, loosens.
+     */
+    private function packPhotoAtRecording(): MedicationSettingGroup
+    {
+        $photos = PackPhotoSettings::class;
+
+        return new MedicationSettingGroup(
+            key: 'packPhoto',
+            view: self::VIEW_RULES,
+            effect: 'From the next dose recorded, at every house',
+            auditEvent: 'medications.pack_photo.updated',
+            definitions: [
+                new MedicationSettingDefinition(
+                    group: 'packPhoto',
+                    key: 'show',
+                    storageKey: $photos::SHOW,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'photos',
+                    label: 'Show the pack photo when a dose is recorded',
+                    options: [
+                        'no' => 'Off — the recording dialog shows no photo',
+                        'yes' => 'On — the latest photo of the supplied pack, with “Check the label”',
+                    ],
+                    default: $photos::SHOW_DEFAULT,
+                    rank: ['no', 'yes'],
+                ),
+                new MedicationSettingDefinition(
+                    group: 'packPhoto',
+                    key: 'no_photo',
+                    storageKey: $photos::NO_PHOTO,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'photos',
+                    label: 'When there’s no photo',
+                    options: [
+                        'warn' => 'Warn — “No photo — check the label”',
+                        'tick' => 'Ask for a tick — “I’ve checked the label” before continuing',
+                    ],
+                    default: $photos::NO_PHOTO_DEFAULT,
+                    rank: ['warn', 'tick'],
+                ),
+            ],
+        );
+    }
+
+    /**
+     * Lane A settings (EA-131): how long a dose saved on a device may wait
+     * before it is sent. Older than this, it is not added to the chart; it
+     * goes to reviewed paper recovery and a lead gets a follow-up. Longer
+     * is looser.
+     */
+    private function offlineReplay(): MedicationSettingGroup
+    {
+        return new MedicationSettingGroup(
+            key: 'offline',
+            view: self::VIEW_ROUNDS,
+            effect: 'From the next dose sent from a device, at every house',
+            auditEvent: 'medications.offline_replay.updated',
+            definitions: [
+                new MedicationSettingDefinition(
+                    group: 'offline',
+                    key: 'max_hours',
+                    storageKey: OfflineReplayReview::MAX_AGE_SETTING,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'timing',
+                    label: 'A dose saved on a device can still be sent for',
+                    options: [],
+                    default: OfflineReplayReview::DEFAULT_MAX_AGE_HOURS,
+                    numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_LOOSER, 'off' => null, 'off_is_loosest' => false],
+                    range: OfflineReplayReview::MAX_AGE_RANGE,
+                    unit: 'hours',
+                ),
             ],
         );
     }

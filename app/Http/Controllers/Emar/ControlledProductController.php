@@ -20,8 +20,24 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 final class ControlledProductController extends Controller
 {
+    /**
+     * EA-074/075/089/173 (Lane C2, with C8's redirect): the old Destructions
+     * page recorded, voided and exported around the canonical workflows. A
+     * controlled reader lands on the register's Destructions view (witnessed
+     * destruction and void, guarded exports), with the person and medicine
+     * filters carried over and re-checked there. A stock-only reader keeps
+     * the ordinary disposal history (no controlled rows, no recording).
+     */
     public function destructions(Request $request)
     {
+        if ($request->user()->canDo('medications.controlled.view')) {
+            // Same validated scope as the losses redirect: unknown or foreign
+            // people and medicines stay not found.
+            return $this->redirectRead($request, 'destructions');
+        }
+
+        // A stock-only reader keeps the ordinary disposal history (no
+        // controlled rows) until P06 Removals lists historic disposals too.
         return app(EmarController::class)->destructions($request);
     }
 
@@ -63,7 +79,11 @@ final class ControlledProductController extends Controller
         }
         if ($action === 'destruction_void') {
             abort_if($record->is_controlled_drug && ! $request->user()->canDo('medications.controlled.view'), 404);
-            if (! $record->is_controlled_drug || $record->client_medication_id === null || ! $request->filled('client_request_uuid')) {
+            // EA-173 (Lane C2): a controlled destruction is voided only through the
+            // register's own command (workflow event, P09 event, replay receipt).
+            abort_if($record->is_controlled_drug && ! $request->filled('client_request_uuid'), 422,
+                'Void a controlled-drug destruction in Medication › Stock & controlled drugs › Controlled register › Destructions.');
+            if (! $record->is_controlled_drug || $record->client_medication_id === null) {
                 return app(EmarController::class)->voidDestruction($request, $record);
             }
             $request->merge(['notes' => $request->input('notes', $request->input('void_reason'))]);
@@ -134,9 +154,9 @@ final class ControlledProductController extends Controller
 
     private function read(Request $request): array
     {
-        $filters = $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_medication_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d']]);
+        $filters = $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_medication_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'], 'entry_id' => ['nullable', 'integer', 'min:1'], 'destruction_id' => ['nullable', 'integer', 'min:1']]);
 
-        return $this->payload->forActor($request->user(), isset($filters['site_id']) ? (int) $filters['site_id'] : null, isset($filters['client_medication_id']) ? (int) $filters['client_medication_id'] : null, isset($filters['client_id']) ? (int) $filters['client_id'] : null, $filters['date'] ?? null);
+        return $this->payload->forActor($request->user(), isset($filters['site_id']) ? (int) $filters['site_id'] : null, isset($filters['client_medication_id']) ? (int) $filters['client_medication_id'] : null, isset($filters['client_id']) ? (int) $filters['client_id'] : null, $filters['date'] ?? null, isset($filters['entry_id']) ? (int) $filters['entry_id'] : null, isset($filters['destruction_id']) ? (int) $filters['destruction_id'] : null);
     }
 
     private function redirectRead(Request $request, string $view)

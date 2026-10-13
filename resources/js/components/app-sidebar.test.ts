@@ -8,6 +8,76 @@ import {
 } from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
+    it('selects only the queue entry for queue pages and preserves other Rostering views', () => {
+        for (const url of [
+            '/operations/rostering/conflicts?week=2026-11-09',
+            '/operations/rostering/conflicts/',
+            '/operations/rostering/conflicts/review/42',
+        ]) {
+            expect(isSubItemActive(url, '/operations/rostering')).toBe(false);
+            expect(isSubItemActive(url, '/operations/rostering/conflicts')).toBe(true);
+        }
+        for (const url of [
+            '/operations/rostering?tab=availability',
+            '/operations/rostering/templates',
+            '/operations/rostering/conflicts-history',
+        ]) {
+            expect(isSubItemActive(url, '/operations/rostering')).toBe(true);
+            expect(isSubItemActive(url, '/operations/rostering/conflicts')).toBe(false);
+        }
+    });
+
+    it.each([
+        ['/operations/workforce-settings', '/operations/workforce-settings'],
+        [
+            '/operations/workforce-settings/?tab=safety',
+            '/operations/workforce-settings',
+        ],
+        [
+            '/operations/availability?week=2026-10-12',
+            '/operations/availability',
+        ],
+        ['/operations/rostering?tab=availability', '/operations/rostering'],
+        ['/operations/shifts/42', '/operations/shifts'],
+        ['/attendance', '/attendance'],
+    ])('keeps %s out of the Operations dashboard match', (url, href) => {
+        expect(isSubItemActive(url, '/operations')).toBe(false);
+        expect(isSubItemActive(url, href)).toBe(true);
+        expect(
+            isIconActive(
+                url,
+                { id: 'operations', subPanel: true } as any,
+                [
+                    {
+                        label: 'Overview',
+                        items: [{ title: 'Dashboard', href: '/operations' }],
+                    },
+                ] as any,
+            ),
+        ).toBe(false);
+        expect(
+            isIconActive(
+                url,
+                { id: 'workforce', subPanel: true } as any,
+                [
+                    {
+                        label: 'Workforce',
+                        items: [{ title: 'Current page', href }],
+                    },
+                ] as any,
+            ),
+        ).toBe(true);
+    });
+
+    it.each([
+        '/operations',
+        '/operations/clients/42',
+        '/operations/workforce-settings-history',
+    ])(
+        'preserves Operations matching for %s outside Workforce route boundaries',
+        (url) => expect(isSubItemActive(url, '/operations')).toBe(true),
+    );
+
     it.each(['viewAny', 'availabilityUpdateSelf', 'availabilityUpdateAny'])(
         'keeps %s discoverable without granting roster navigation',
         (permission) => {
@@ -278,6 +348,18 @@ describe('app sidebar workforce navigation', () => {
             can: {
                 shifts: { viewAny: true },
                 rostering: { viewAny: true },
+                timesheets: { viewAssigned: true },
+            },
+        });
+
+        expect(catalog.map((item) => item.section)).toContain('Workforce');
+        expect(catalog.map((item) => item.section)).not.toContain('Operations');
+    });
+
+    it('keeps Operations absent for workforce readers without roster access', () => {
+        const catalog = buildNavSearchCatalog({
+            can: {
+                shifts: { viewAny: true },
                 timesheets: { viewAssigned: true },
             },
         });
@@ -570,3 +652,43 @@ describe('finance sidebar highlighting', () => {
         ).toEqual([]);
     });
 });
+
+it('shows a single Workforce settings entry only with roster access', () => {
+    expect(
+        buildNavSearchCatalog({ can: { rostering: { viewAny: true } } }).filter(
+            (item) => item.href === '/operations/workforce-settings',
+        ),
+    ).toHaveLength(1);
+    expect(
+        buildNavSearchCatalog({
+            can: { staff: { availabilityUpdateSelf: true } },
+        }).some((item) => item.href === '/operations/workforce-settings'),
+    ).toBe(false);
+});
+
+it.each([
+    [{ rostering: { viewAny: true } }, true],
+    [{ qualifications: { viewAny: true } }, false],
+    [
+        {
+            rostering: { viewAny: true },
+            qualifications: { viewAny: true },
+        },
+        true,
+    ],
+    [{}, false],
+])(
+    'matches Qualifications navigation to its installed roster read gate for %j',
+    (can, visible) => {
+        const qualifications = buildNavSearchCatalog({ can }).filter(
+            (item) => item.href === '/operations/qualifications',
+        );
+        expect(qualifications).toHaveLength(visible ? 1 : 0);
+        if (visible) {
+            expect(qualifications[0]).toMatchObject({
+                label: 'Qualifications',
+                section: 'Workforce',
+            });
+        }
+    },
+);

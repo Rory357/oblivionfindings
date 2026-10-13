@@ -226,7 +226,7 @@ export function ControlledChecksContent({
                     {workspace.error.message}
                     <Button
                         variant="outline"
-                        className="mt-2 min-h-11"
+                        className="frontline-tap mt-2"
                         onClick={() => void workspace.refresh()}
                     >
                         <RefreshCw className="size-4" />
@@ -255,7 +255,7 @@ export function ControlledChecksContent({
                     . Counts and register changes still need a witness.
                     <Button
                         variant="outline"
-                        className="mt-2 min-h-11"
+                        className="frontline-tap mt-2"
                         onClick={() =>
                             dialogs.detail({
                                 kind: 'override',
@@ -304,7 +304,7 @@ export function ControlledChecksContent({
                             </div>
                             {payload.can.record ? (
                                 <Button
-                                    className="min-h-11"
+                                    className="frontline-tap"
                                     disabled={!eligible || !hasWitness}
                                     onClick={() =>
                                         dialogs.count(
@@ -349,7 +349,7 @@ export function ControlledChecksContent({
                 right={
                     <Button
                         variant="outline"
-                        className="min-h-11"
+                        className="frontline-tap"
                         disabled={workspace.loading}
                         onClick={() => void workspace.refresh()}
                     >
@@ -423,7 +423,7 @@ export function ControlledChecksContent({
                                   cell: (medicine: ControlledMedicine) => (
                                       <Button
                                           variant="outline"
-                                          className="min-h-11"
+                                          className="frontline-tap"
                                           disabled={
                                               !(
                                                   medicine.can_count ??

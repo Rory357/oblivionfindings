@@ -1,6 +1,18 @@
 /* eslint-disable no-restricted-syntax -- The template wizard mirrors the bespoke
  * Add-client modal surface (stepper rail + scroll-contained body + custom footer).
  * Every colour is a semantic design token, per design_styles/DESIGN_TOKENS.md. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
+import { RecordPicker } from '@/components/people-locations/record-picker';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+} from '@/components/wizard/shell';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -22,6 +34,12 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { TemplateCommandNotice } from './template-command-notice';
+import type {
+    TemplateCommand,
+    TemplateResult,
+    TemplateValues,
+} from './use-template-command';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -303,8 +321,8 @@ function toWizardRow(
             serviceContexts,
         ),
         day_of_week: String(shift.day_of_week ?? 0),
-        start_time: shift.start_time || '07:00',
-        end_time: shift.end_time || '15:00',
+        start_time: shift.start_time?.slice(0, 5) || '07:00',
+        end_time: shift.end_time?.slice(0, 5) || '15:00',
         shift_type: shift.shift_type || 'standard',
         is_sleepover: !!shift.is_sleepover,
         is_on_call: !!shift.is_on_call,
@@ -357,31 +375,14 @@ export type TemplateWizardDialogProps = {
     clients: TemplateClientOption[];
     staff: TemplateStaffOption[];
     serviceContexts: TemplateServiceContextOption[];
+    workerTimezone?: string;
+    command: TemplateCommand;
 };
 
 export function TemplateWizardDialog(props: TemplateWizardDialogProps) {
-    const { open, onOpenChange } = props;
-    const isEdit = !!props.template;
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                className="overflow-hidden p-0 [&>button]:hidden"
-                style={{
-                    maxWidth: 'min(94vw, 980px)',
-                    width: 'min(94vw, 980px)',
-                }}
-            >
-                <DialogTitle className="sr-only">
-                    {isEdit ? 'Edit roster template' : 'New roster template'}
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                    Build a reusable weekly roster pattern that can be applied
-                    to any week.
-                </DialogDescription>
-                {open ? <WizardBody {...props} /> : null}
-            </DialogContent>
-        </Dialog>
-    );
+    return props.open ? (
+        <WizardBody key={props.template?.id ?? 'create'} {...props} />
+    ) : null;
 }
 
 function WizardBody({
@@ -390,6 +391,8 @@ function WizardBody({
     clients,
     staff,
     serviceContexts,
+    workerTimezone = WORKER_TIMEZONE,
+    command,
 }: TemplateWizardDialogProps) {
     const isEdit = !!template;
     const form = useForm<WizardForm>({
@@ -403,9 +406,41 @@ function WizardBody({
               )
             : [emptyRow()],
     });
-    const { data, setData, processing } = form;
+    const { data, setData } = form;
+    const [receipt, setReceipt] = useState<TemplateResult | null>(null);
+    const [uncertain, setUncertain] = useState(false);
+    const [recoveryChecked, setRecoveryChecked] = useState(false);
+    const [recoveryRows, setRecoveryRows] = useState<
+        RosterTemplateRow[] | null
+    >(null);
+    const processing = command.busy;
+    const saved = receipt !== null;
+    const blocked = command.blocked || uncertain;
+    useEffect(() => {
+        if (command.notice?.kind === 'unknown') setUncertain(true);
+    }, [command.notice]);
 
     const [stepIndex, setStepIndex] = useState(0);
+    const [discardOpen, setDiscardOpen] = useState(false);
+    const requestClose = () => {
+        if (processing || command.isBusy()) return;
+        if ((form.isDirty || uncertain) && !saved) setDiscardOpen(true);
+        else onOpenChange(false);
+    };
+    const completedFields =
+        Number(Boolean(data.name.trim())) +
+        Number(Boolean(data.description.trim())) +
+        data.template_shifts.reduce(
+            (count, row) =>
+                count +
+                Number(Boolean(row.client_id)) +
+                Number(Boolean(row.start_time)) +
+                Number(Boolean(row.end_time)),
+            0,
+        );
+    const completeness = Math.round(
+        (completedFields / (2 + data.template_shifts.length * 3)) * 100,
+    );
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
     const cur = WIZARD_STEPS[stepIndex];
     const isLast = stepIndex === WIZARD_STEPS.length - 1;
@@ -473,6 +508,12 @@ function WizardBody({
         data.template_shifts.forEach((row, i) => {
             if (!row.client_id) {
                 e[`row-${i}`] = 'Each row needs a client.';
+            } else if (
+                ![row.start_time, row.end_time].every((time) =>
+                    /^([01]\d|2[0-3]):[0-5]\d$/.test(time),
+                )
+            ) {
+                e[`row-${i}`] = 'Choose a valid start and end time.';
             } else if (row.start_time === row.end_time) {
                 e[`row-${i}`] = 'Start and end time cannot be the same.';
             }
@@ -492,6 +533,7 @@ function WizardBody({
     };
 
     const submit = () => {
+        if (processing || command.isBusy() || blocked) return;
         if (!validateDetails()) {
             setStepIndex(0);
             return;
@@ -501,12 +543,13 @@ function WizardBody({
             return;
         }
 
-        form.transform((payload) => ({
-            name: payload.name,
-            description: payload.description || null,
-            template_type: payload.template_type,
-            is_active: payload.is_active,
-            template_shifts: payload.template_shifts.map((row) => ({
+        form.clearErrors();
+        const values: TemplateValues = {
+            name: data.name,
+            description: data.description || null,
+            template_type: data.template_type,
+            is_active: data.is_active,
+            template_shifts: data.template_shifts.map((row) => ({
                 client_id: row.client_id ? Number(row.client_id) : null,
                 user_id: row.user_id ? Number(row.user_id) : null,
                 service_context_id: row.service_context_id
@@ -524,317 +567,366 @@ function WizardBody({
                     : null,
                 required_skills: row.required_skills
                     .split(',')
-                    .map((s) => s.trim())
+                    .map((skill) => skill.trim())
                     .filter(Boolean),
                 location: row.location || null,
                 notes: row.notes || null,
             })),
-        }));
-
-        const options = {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => onOpenChange(false),
         };
-
-        if (isEdit && template) {
-            form.put(`/operations/rostering/templates/${template.id}`, options);
-        } else {
-            form.post('/operations/rostering/templates', options);
-        }
+        void command.submit(
+            {
+                action: isEdit ? 'update' : 'create',
+                source: template
+                    ? {
+                          template_id: template.id,
+                          source_revision: template.source_revision ?? '',
+                      }
+                    : null,
+                values,
+                rowCount: values.template_shifts.length,
+            },
+            setReceipt,
+            (errors) => {
+                form.setError(errors);
+                setStepIndex(
+                    Object.keys(errors).some((key) =>
+                        [
+                            'name',
+                            'description',
+                            'template_type',
+                            'is_active',
+                        ].includes(key),
+                    )
+                        ? 0
+                        : 1,
+                );
+            },
+        );
     };
 
     // Server-side validation errors (e.g. normalizeTemplateShift) → surface on the rows step.
-    const serverErrors = Object.values(form.errors);
+    const serverErrors = [...new Set(Object.values(form.errors))];
+    const reload = () =>
+        command.refresh((current) => {
+            setRecoveryRows(current.rosterTemplates);
+            setRecoveryChecked(false);
+        });
+    const sourceUnchanged =
+        !template ||
+        recoveryRows?.some(
+            (row) =>
+                row.id === template.id &&
+                row.source_revision === template.source_revision,
+        );
 
     return (
-        <div className="flex h-[min(92vh,820px)] min-h-0 overflow-hidden">
-            {/* Stepper rail */}
-            <aside className="hidden w-[248px] shrink-0 flex-col gap-1 border-r border-border bg-muted/30 p-4 sm:flex">
-                <div className="mb-3 flex items-center gap-2.5">
-                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-fill text-primary-fill-foreground">
-                        <LayoutTemplate className="h-5 w-5" />
-                    </span>
-                    <div>
-                        <div className="text-sm leading-tight font-bold">
-                            {isEdit ? 'Edit template' : 'New template'}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                            Reusable roster pattern
-                        </div>
-                    </div>
-                </div>
-                {WIZARD_STEPS.map((s, i) => {
-                    const active = i === stepIndex;
-                    const complete = i < stepIndex;
-                    const Icon = s.icon;
-                    return (
-                        <button
-                            key={s.key}
-                            type="button"
-                            onClick={() => setStepIndex(i)}
-                            className={cn(
-                                'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors',
-                                active
-                                    ? 'bg-primary-fill/10'
-                                    : 'hover:bg-muted',
-                            )}
-                        >
-                            <span
-                                className={cn(
-                                    'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors',
-                                    active
-                                        ? 'bg-primary-fill text-primary-fill-foreground'
-                                        : complete
-                                          ? 'bg-status-success-bg text-status-success'
-                                          : 'bg-muted text-muted-foreground',
-                                )}
-                            >
-                                {complete ? (
-                                    <Check className="h-3.5 w-3.5" />
-                                ) : (
-                                    <Icon className="h-3.5 w-3.5" />
-                                )}
-                            </span>
-                            <span className="min-w-0">
-                                <span
-                                    className={cn(
-                                        'block text-[13px]',
-                                        active
-                                            ? 'font-bold text-foreground'
-                                            : 'font-semibold text-muted-foreground',
-                                    )}
-                                >
-                                    {s.label}
-                                </span>
-                                <span className="block truncate text-[11px] text-muted-foreground">
-                                    {s.blurb}
-                                </span>
-                            </span>
-                        </button>
-                    );
-                })}
-            </aside>
-
-            {/* Main column */}
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
-                    <div className="text-[13px] font-semibold text-muted-foreground">
-                        Step {stepIndex + 1} of {WIZARD_STEPS.length} ·{' '}
-                        <span className="text-foreground">{cur.label}</span>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => onOpenChange(false)}
-                        aria-label="Close"
-                        className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                </header>
-
-                <div className="h-[3px] shrink-0 bg-muted">
-                    <div
-                        className="h-full bg-primary transition-[width] duration-300"
-                        style={{
-                            width: `${((stepIndex + 1) / WIZARD_STEPS.length) * 100}%`,
-                        }}
-                    />
-                </div>
-
-                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6">
-                    {cur.key === 'details' ? (
-                        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
-                            <StepHeading
-                                icon={LayoutTemplate}
-                                title="Template details"
-                                blurb="Name it for the house or team it covers — you'll apply it to a chosen week later."
-                            />
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Field
-                                    label="Template name"
-                                    required
-                                    span
-                                    error={localErrors.name}
-                                >
-                                    <Input
-                                        value={data.name}
-                                        onChange={(e) =>
-                                            setData('name', e.target.value)
-                                        }
-                                        placeholder="e.g. North House weekday support"
-                                        aria-invalid={!!localErrors.name}
-                                    />
-                                </Field>
-                                <Field label="Cadence">
-                                    <SelectInput
-                                        value={data.template_type}
-                                        onChange={(v) =>
-                                            setData('template_type', v)
-                                        }
-                                        placeholder="Weekly"
-                                        options={[
-                                            {
-                                                value: 'weekly',
-                                                label: 'Weekly',
-                                            },
-                                            {
-                                                value: 'fortnightly',
-                                                label: 'Fortnightly',
-                                            },
-                                            {
-                                                value: 'monthly',
-                                                label: 'Monthly',
-                                            },
-                                        ]}
-                                    />
-                                </Field>
-                                <Field label="Status">
-                                    <label className="flex h-10 items-center gap-3 rounded-md border border-border bg-card px-3">
-                                        <Switch
-                                            checked={data.is_active}
-                                            onCheckedChange={(v) =>
-                                                setData('is_active', v)
-                                            }
-                                        />
-                                        <span className="text-sm">
-                                            {data.is_active
-                                                ? 'Active'
-                                                : 'Inactive'}
-                                        </span>
-                                    </label>
-                                </Field>
-                                <Field label="Description" span>
-                                    <Textarea
-                                        rows={3}
-                                        value={data.description}
-                                        onChange={(e) =>
-                                            setData(
-                                                'description',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="What this pattern is for, and when to use it."
-                                    />
-                                </Field>
-                            </div>
-                        </div>
-                    ) : cur.key === 'shifts' ? (
-                        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
-                            <StepHeading
-                                icon={ListChecks}
-                                title="Shift rows"
-                                blurb="Each row becomes one shift when the template is applied. Day 1 is the Monday of the chosen week."
-                            />
-
-                            {serverErrors.length > 0 ? (
-                                <Alert variant="destructive" className="mb-4">
-                                    <AlertTriangle className="h-4 w-4" />
-                                    <AlertTitle>
-                                        Please fix the following
-                                    </AlertTitle>
-                                    <AlertDescription>
-                                        <ul className="list-disc space-y-0.5 pl-4">
-                                            {serverErrors
-                                                .slice(0, 5)
-                                                .map((m, i) => (
-                                                    <li key={i}>{m}</li>
-                                                ))}
-                                        </ul>
-                                    </AlertDescription>
-                                </Alert>
-                            ) : null}
-
-                            <div className="space-y-3">
-                                {data.template_shifts.map((row, index) => (
-                                    <RowEditor
-                                        key={index}
-                                        index={index}
-                                        row={row}
-                                        canRemove={
-                                            data.template_shifts.length > 1
-                                        }
-                                        error={localErrors[`row-${index}`]}
-                                        clientOptions={clientOptions}
-                                        staffOptions={staffOptions}
-                                        serviceContexts={serviceContexts}
-                                        clients={clients}
-                                        onChange={(patch) =>
-                                            setRow(index, patch)
-                                        }
-                                        onRemove={() => removeRow(index)}
-                                        onDuplicate={() => duplicateRow(index)}
-                                    />
-                                ))}
-                            </div>
-
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="mt-3"
-                                onClick={addRow}
-                            >
-                                <Plus className="h-4 w-4" /> Add shift row
-                            </Button>
-                        </div>
-                    ) : (
-                        <ReviewPane
-                            shifts={data.template_shifts}
-                            cadence={data.template_type}
-                        />
-                    )}
-                </div>
-
-                <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5">
-                    <div>
-                        {stepIndex > 0 ? (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={goBack}
-                            >
-                                <ChevronLeft className="h-4 w-4" /> Back
-                            </Button>
-                        ) : null}
-                    </div>
-                    <div className="flex items-center gap-2.5">
+        <>
+            <WizardShell
+                open
+                onClose={requestClose}
+                title={isEdit ? 'Edit roster template' : 'New roster template'}
+                description="Build and review a reusable roster pattern before saving."
+                railIcon={LayoutTemplate}
+                railTitle={isEdit ? 'Edit template' : 'New template'}
+                railSub="Reusable roster pattern"
+                steps={WIZARD_STEPS}
+                stepIndex={stepIndex}
+                onStepClick={(index) => !processing && setStepIndex(index)}
+                pct={completeness}
+                footerStart={
+                    stepIndex > 0 ? (
                         <Button
-                            type="button"
+                            variant="ghost"
+                            onClick={goBack}
+                            disabled={processing}
+                        >
+                            <ChevronLeft className="h-4 w-4" /> Back
+                        </Button>
+                    ) : null
+                }
+                footerEnd={
+                    <>
+                        <Button
                             variant="outline"
-                            onClick={() => onOpenChange(false)}
+                            onClick={requestClose}
+                            disabled={processing}
                         >
                             Cancel
                         </Button>
                         {isLast ? (
                             <Button
-                                type="button"
                                 onClick={submit}
-                                disabled={processing}
+                                disabled={processing || blocked}
                             >
                                 {processing ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        {isEdit ? 'Saving…' : 'Creating…'}
-                                    </>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                    <>
-                                        <Check className="h-4 w-4" />
-                                        {isEdit
-                                            ? 'Save changes'
-                                            : 'Create template'}
-                                    </>
+                                    <Check className="h-4 w-4" />
                                 )}
+                                {processing
+                                    ? 'Saving…'
+                                    : isEdit
+                                      ? 'Save changes'
+                                      : 'Create template'}
                             </Button>
                         ) : (
-                            <Button type="button" onClick={goNext}>
+                            <Button onClick={goNext} disabled={processing}>
                                 Continue <ChevronRight className="h-4 w-4" />
                             </Button>
                         )}
-                    </div>
-                </footer>
-            </div>
-        </div>
+                    </>
+                }
+                success={
+                    saved ? (
+                        <WizardSuccessPane
+                            title={
+                                isEdit ? 'Template updated' : 'Template created'
+                            }
+                            blurb="Your roster pattern has been saved. Apply it to a chosen week when you are ready; saving the pattern does not create shifts."
+                            actions={
+                                <Button onClick={() => onOpenChange(false)}>
+                                    Done
+                                </Button>
+                            }
+                        />
+                    ) : undefined
+                }
+            >
+                <WizardStepPane>
+                    {command.notice?.kind !== 'confirmed' ? (
+                        <TemplateCommandNotice
+                            command={command}
+                            onReload={reload}
+                        />
+                    ) : null}
+                    {uncertain && recoveryRows && !command.needsRead ? (
+                        <Alert className="mb-4">
+                            <AlertTitle>Check the saved library</AlertTitle>
+                            <AlertDescription>
+                                <p>
+                                    Your draft is still here. The library
+                                    currently contains:
+                                </p>
+                                <ul className="my-2 max-h-32 list-disc overflow-auto pl-4">
+                                    {recoveryRows.map((row) => (
+                                        <li key={row.id}>
+                                            {row.name} ·{' '}
+                                            {row.template_shifts_count} rows
+                                        </li>
+                                    ))}
+                                </ul>
+                                {sourceUnchanged ? (
+                                    <>
+                                        <p>
+                                            Check whether this attempt already
+                                            saved before sending it again.
+                                        </p>
+                                        <label className="my-2 flex items-center gap-2">
+                                            <Checkbox
+                                                checked={recoveryChecked}
+                                                onCheckedChange={(value) =>
+                                                    setRecoveryChecked(
+                                                        value === true,
+                                                    )
+                                                }
+                                            />{' '}
+                                            I checked the current templates and
+                                            want to continue with this draft.
+                                        </label>
+                                        <Button
+                                            variant="outline"
+                                            disabled={!recoveryChecked}
+                                            onClick={() => setUncertain(false)}
+                                        >
+                                            Continue editing
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <p>
+                                        The saved template has changed or is no
+                                        longer available. Keep this draft open
+                                        for reference, or close it and open the
+                                        current template before editing.
+                                    </p>
+                                )}
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
+                    {serverErrors.length > 0 ? (
+                        <Alert variant="destructive" className="mb-4">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Template not saved</AlertTitle>
+                            <AlertDescription>
+                                <ul className="list-disc space-y-1 pl-4">
+                                    {serverErrors.map((message, index) => (
+                                        <li key={index}>{message}</li>
+                                    ))}
+                                </ul>
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
+                    <fieldset
+                        disabled={processing || blocked}
+                        className="min-w-0"
+                    >
+                        {cur.key === 'details' ? (
+                            <div className="animate-in duration-300 fade-in slide-in-from-right-2">
+                                <StepHeading
+                                    icon={LayoutTemplate}
+                                    title="Template details"
+                                    blurb="Name it for the house or team it covers — you'll apply it to a chosen week later."
+                                />
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Field
+                                        label="Template name"
+                                        required
+                                        span
+                                        error={
+                                            localErrors.name ?? form.errors.name
+                                        }
+                                    >
+                                        <Input
+                                            value={data.name}
+                                            onChange={(e) =>
+                                                setData('name', e.target.value)
+                                            }
+                                            placeholder="e.g. North House weekday support"
+                                            aria-invalid={
+                                                !!(
+                                                    localErrors.name ??
+                                                    form.errors.name
+                                                )
+                                            }
+                                        />
+                                    </Field>
+                                    <Field label="Cadence">
+                                        <SelectInput
+                                            value={data.template_type}
+                                            onChange={(v) =>
+                                                setData('template_type', v)
+                                            }
+                                            placeholder="Weekly"
+                                            options={[
+                                                {
+                                                    value: 'weekly',
+                                                    label: 'Weekly',
+                                                },
+                                                {
+                                                    value: 'fortnightly',
+                                                    label: 'Fortnightly',
+                                                },
+                                                {
+                                                    value: 'monthly',
+                                                    label: 'Monthly',
+                                                },
+                                            ]}
+                                        />
+                                    </Field>
+                                    <Field label="Status">
+                                        <label className="flex h-10 items-center gap-3 rounded-md border border-border bg-card px-3">
+                                            <Switch
+                                                checked={data.is_active}
+                                                onCheckedChange={(v) =>
+                                                    setData('is_active', v)
+                                                }
+                                            />
+                                            <span className="text-sm">
+                                                {data.is_active
+                                                    ? 'Active'
+                                                    : 'Inactive'}
+                                            </span>
+                                        </label>
+                                    </Field>
+                                    <Field label="Description" span>
+                                        <Textarea
+                                            rows={3}
+                                            value={data.description}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'description',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="What this pattern is for, and when to use it."
+                                        />
+                                    </Field>
+                                </div>
+                            </div>
+                        ) : cur.key === 'shifts' ? (
+                            <div className="animate-in duration-300 fade-in slide-in-from-right-2">
+                                <StepHeading
+                                    icon={ListChecks}
+                                    title="Shift rows"
+                                    blurb="Each row becomes one shift when the template is applied. Day 1 is the Monday of the chosen week."
+                                />
+
+                                <p className="mb-4 text-sm text-muted-foreground">
+                                    Times use {workerTimezone}. An earlier end
+                                    time continues into the next day.
+                                </p>
+
+                                <div className="space-y-3">
+                                    {data.template_shifts.map((row, index) => (
+                                        <RowEditor
+                                            key={index}
+                                            index={index}
+                                            row={row}
+                                            canRemove={
+                                                data.template_shifts.length > 1
+                                            }
+                                            error={localErrors[`row-${index}`]}
+                                            clientOptions={clientOptions}
+                                            staffOptions={staffOptions}
+                                            serviceContexts={serviceContexts}
+                                            clients={clients}
+                                            onChange={(patch) =>
+                                                setRow(index, patch)
+                                            }
+                                            onRemove={() => removeRow(index)}
+                                            onDuplicate={() =>
+                                                duplicateRow(index)
+                                            }
+                                        />
+                                    ))}
+                                </div>
+
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-3"
+                                    onClick={addRow}
+                                >
+                                    <Plus className="h-4 w-4" /> Add shift row
+                                </Button>
+                            </div>
+                        ) : (
+                            <ReviewPane
+                                data={data}
+                                clients={clients}
+                                staff={staff}
+                                serviceContexts={serviceContexts}
+                                workerTimezone={workerTimezone}
+                                onEdit={setStepIndex}
+                            />
+                        )}
+                    </fieldset>
+                </WizardStepPane>
+            </WizardShell>
+            <ConfirmDialog
+                open={discardOpen}
+                onClose={() => setDiscardOpen(false)}
+                onConfirm={() => onOpenChange(false)}
+                title="Discard template changes?"
+                description={
+                    uncertain
+                        ? 'The save result is unknown. Closing removes this draft from the screen. Check the template list before creating or saving it again.'
+                        : 'Your unsaved template changes will be lost. Saved templates and roster shifts will stay as they are.'
+                }
+                confirmText="Discard changes"
+                cancelText="Keep editing"
+            />
+        </>
     );
 }
 
@@ -955,19 +1047,19 @@ function RowEditor({
                     />
                 </Field>
                 <Field label="Start">
-                    <Input
-                        type="time"
+                    <TimePicker
+                        id={`template-row-${index}-start`}
+                        label={`Shift row ${index + 1} start time`}
                         value={row.start_time}
-                        onChange={(e) =>
-                            onChange({ start_time: e.target.value })
-                        }
+                        onChange={(value) => onChange({ start_time: value })}
                     />
                 </Field>
                 <Field label="End">
-                    <Input
-                        type="time"
+                    <TimePicker
+                        id={`template-row-${index}-end`}
+                        label={`Shift row ${index + 1} end time`}
                         value={row.end_time}
-                        onChange={(e) => onChange({ end_time: e.target.value })}
+                        onChange={(value) => onChange({ end_time: value })}
                     />
                 </Field>
                 <Field label="Shift type">
@@ -981,7 +1073,8 @@ function RowEditor({
 
                 <SubHead icon={Users}>Who</SubHead>
                 <Field label="Client" required>
-                    <SelectInput
+                    <RecordPicker
+                        label={`Shift row ${index + 1} client`}
                         value={row.client_id}
                         onChange={(v) => {
                             const clientId = v;
@@ -996,29 +1089,28 @@ function RowEditor({
                             };
                             onChange(patch);
                         }}
-                        placeholder="Select a client"
                         options={clientOptions}
                     />
                 </Field>
                 <Field label="Assigned staff">
-                    <SelectInput
+                    <RecordPicker
+                        label={`Shift row ${index + 1} staff member`}
                         value={row.user_id || NONE}
                         onChange={(v) =>
                             onChange({ user_id: v === NONE ? '' : v })
                         }
-                        placeholder="Unassigned / open"
                         options={staffOptions}
                     />
                 </Field>
                 <Field label="Service context" span>
-                    <SelectInput
+                    <RecordPicker
+                        label={`Shift row ${index + 1} service context`}
                         value={row.service_context_id || NONE}
                         onChange={(v) =>
                             onChange({
                                 service_context_id: v === NONE ? '' : v,
                             })
                         }
-                        placeholder="No service context"
                         options={contextOptions}
                     />
                 </Field>
@@ -1107,135 +1199,152 @@ function RowEditor({
 /* ------------------------------------------------------------------ */
 
 function ReviewPane({
-    shifts,
-    cadence,
+    data,
+    clients,
+    staff,
+    serviceContexts,
+    workerTimezone,
+    onEdit,
 }: {
-    shifts: WizardShiftRow[];
-    cadence: string;
+    data: WizardForm;
+    clients: TemplateClientOption[];
+    staff: TemplateStaffOption[];
+    serviceContexts: TemplateServiceContextOption[];
+    workerTimezone: string;
+    onEdit: (step: number) => void;
 }) {
-    const byDay = useMemo(() => {
-        const counts = [0, 0, 0, 0, 0, 0, 0];
-        for (const s of shifts) {
-            const d = Number(s.day_of_week);
-            if (d >= 0 && d < 7) counts[d]++;
-        }
-        return counts;
-    }, [shifts]);
-
-    const assigned = shifts.filter((s) => s.user_id).length;
-    const open = shifts.length - assigned;
-    const cadenceNote =
-        cadence === 'fortnightly'
-            ? 'Each apply cycle advances 2 weeks.'
-            : cadence === 'monthly'
-              ? 'Each apply cycle advances 4 weeks.'
-              : 'Each apply cycle advances 1 week.';
-
+    const shifts = data.template_shifts;
     return (
-        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
+        <div className="space-y-4">
             <StepHeading
                 icon={ClipboardCheck}
-                title="Review"
-                blurb="This is the week each apply will stamp. Day 1 is the Monday of the chosen week."
+                title="Review template"
+                blurb="Check the people, exact times and support details. Saving does not create roster shifts."
             />
-
-            <div className="mb-4 grid grid-cols-7 gap-1">
-                {DAY_SHORT.map((day, i) => {
-                    const count = byDay[i];
-                    return (
-                        <div
-                            key={day}
-                            className={cn(
-                                'flex h-12 flex-col items-center justify-center rounded-md border text-[11px] font-semibold',
-                                count
-                                    ? 'border-primary/30 bg-primary/10 text-primary'
-                                    : 'border-border bg-muted/40 text-muted-foreground',
-                            )}
-                        >
-                            <span className="tracking-wide uppercase">
-                                {day}
-                            </span>
-                            <span className="tabular-nums">{count || '·'}</span>
-                        </div>
-                    );
-                })}
+            <ReviewCard
+                icon={LayoutTemplate}
+                title="Template details"
+                onEdit={() => onEdit(0)}
+            >
+                <ReviewRow label="Name" value={data.name} />
+                <ReviewRow label="Description" value={data.description} />
+                <ReviewRow
+                    label="Cadence"
+                    value={
+                        data.template_type === 'monthly'
+                            ? 'Every four weeks (monthly pattern)'
+                            : data.template_type === 'fortnightly'
+                              ? 'Every two weeks'
+                              : 'Every week'
+                    }
+                />
+                <ReviewRow
+                    label="Status"
+                    value={data.is_active ? 'Active' : 'Inactive'}
+                />
+                <ReviewRow label="Time zone" value={workerTimezone} />
+            </ReviewCard>
+            <div
+                className="grid grid-cols-7 gap-1"
+                aria-label="Shift rows by weekday"
+            >
+                {DAY_SHORT.map((day, index) => (
+                    <div
+                        key={day}
+                        className="text-caption rounded-md border border-border bg-muted/40 p-2 text-center"
+                    >
+                        <span className="block">{day}</span>
+                        <strong>
+                            {
+                                shifts.filter(
+                                    (row) => Number(row.day_of_week) === index,
+                                ).length
+                            }
+                        </strong>
+                    </div>
+                ))}
             </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
-                    {shifts.length} {shifts.length === 1 ? 'shift' : 'shifts'} /
-                    week
-                </span>
-                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
-                    {assigned} assigned
-                </span>
-                {open > 0 ? (
-                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 font-semibold text-status-warning">
-                        {open} open
-                    </span>
-                ) : null}
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary capitalize">
-                    {cadence}
-                </span>
-            </div>
-            <p className="mt-2 text-[13px] text-muted-foreground">
-                {cadenceNote}
-            </p>
-
-            <div className="mt-4 space-y-2.5">
-                {DAY_LABELS.map((label, dayIdx) => {
-                    const dayRows = shifts.filter(
-                        (s) => Number(s.day_of_week) === dayIdx,
-                    );
-                    if (dayRows.length === 0) return null;
-                    return (
-                        <div
-                            key={label}
-                            className="rounded-lg border border-border p-3"
-                        >
-                            <div className="text-sm font-semibold">{label}</div>
-                            <ul className="mt-1.5 space-y-1 text-[13px] text-muted-foreground">
-                                {dayRows.map((r, i) => {
-                                    const overnight =
-                                        r.end_time <= r.start_time;
-                                    return (
-                                        <li
-                                            key={i}
-                                            className="flex flex-wrap items-center gap-x-2"
-                                        >
-                                            <span className="font-medium text-foreground tabular-nums">
-                                                {r.start_time}–{r.end_time}
-                                                {overnight ? ' (+1)' : ''}
-                                            </span>
-                                            <span aria-hidden>·</span>
-                                            <span>
-                                                {r.user_id
-                                                    ? 'Assigned'
-                                                    : 'Open'}
-                                            </span>
-                                            {r.is_sleepover ? (
-                                                <span className="rounded bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">
-                                                    Sleepover
-                                                </span>
-                                            ) : null}
-                                            {r.is_on_call ? (
-                                                <span className="rounded bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">
-                                                    On-call
-                                                </span>
-                                            ) : null}
-                                            {r.is_lone_worker ? (
-                                                <span className="rounded bg-status-warning/15 px-1.5 text-[11px] font-semibold text-status-warning">
-                                                    Lone worker
-                                                </span>
-                                            ) : null}
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </div>
-                    );
-                })}
-            </div>
+            {shifts.map((row, index) => {
+                const person = clients.find(
+                    (client) => String(client.id) === row.client_id,
+                );
+                return (
+                    <ReviewCard
+                        key={index}
+                        icon={Clock}
+                        title={`Shift row ${index + 1} · ${DAY_LABELS[Number(row.day_of_week)]}`}
+                        onEdit={() => onEdit(1)}
+                    >
+                        <ReviewRow
+                            label="Client"
+                            value={
+                                person ? clientLabel(person) : 'Select a client'
+                            }
+                        />
+                        <ReviewRow
+                            label="Staff"
+                            value={
+                                staff.find(
+                                    (worker) =>
+                                        String(worker.id) === row.user_id,
+                                )?.name ?? 'Unassigned / open'
+                            }
+                        />
+                        <ReviewRow
+                            label="Service context"
+                            value={
+                                serviceContexts.find(
+                                    (context) =>
+                                        String(context.id) ===
+                                        row.service_context_id,
+                                )?.name ?? 'None selected'
+                            }
+                        />
+                        <ReviewRow
+                            label="Times"
+                            value={`${row.start_time}–${row.end_time}${row.end_time < row.start_time ? ' (ends next day)' : ''}`}
+                        />
+                        <ReviewRow
+                            label="Shift type"
+                            value={
+                                SHIFT_TYPE_OPTIONS.find(
+                                    (type) => type.value === row.shift_type,
+                                )?.label ?? row.shift_type
+                            }
+                        />
+                        <ReviewRow
+                            label="Sleepover / on-call / lone worker"
+                            value={
+                                [
+                                    (row.is_sleepover ||
+                                        row.shift_type === 'sleepover') &&
+                                        'Sleepover',
+                                    (row.is_on_call ||
+                                        row.shift_type === 'on_call') &&
+                                        'On-call',
+                                    row.is_lone_worker && 'Lone worker',
+                                ]
+                                    .filter(Boolean)
+                                    .join(', ') || 'None selected'
+                            }
+                        />
+                        <ReviewRow
+                            label="Expected break"
+                            value={
+                                row.expected_break_minutes
+                                    ? `${row.expected_break_minutes} minutes`
+                                    : 'Not specified'
+                            }
+                        />
+                        <ReviewRow
+                            label="Required skills"
+                            value={row.required_skills}
+                        />
+                        <ReviewRow label="Location" value={row.location} />
+                        <ReviewRow label="Notes" value={row.notes} />
+                    </ReviewCard>
+                );
+            })}
         </div>
     );
 }
@@ -1250,8 +1359,11 @@ export type TemplateDetailDialogProps = {
     onOpenChange: (open: boolean) => void;
     canManage: boolean;
     canDelete: boolean;
+    canApply: boolean;
+    actionsBlocked: boolean;
     onEdit: (template: RosterTemplateRow) => void;
     onDelete: (template: RosterTemplateRow) => void;
+    onCloseAutoFocus?: (event: Event) => void;
 };
 
 export function TemplateDetailDialog({
@@ -1260,13 +1372,18 @@ export function TemplateDetailDialog({
     onOpenChange,
     canManage,
     canDelete,
+    canApply,
+    actionsBlocked,
     onEdit,
     onDelete,
+    onCloseAutoFocus,
 }: TemplateDetailDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
-                className="max-h-[92vh] overflow-hidden p-0"
+                showCloseButton={false}
+                className="frontline-dialog max-h-[92vh] min-w-0 grid-cols-1 overflow-hidden p-0"
+                onCloseAutoFocus={onCloseAutoFocus}
                 style={{
                     maxWidth: 'min(94vw, 940px)',
                     width: 'min(94vw, 940px)',
@@ -1276,7 +1393,9 @@ export function TemplateDetailDialog({
                     {template?.name ?? 'Roster template'}
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                    Review the template rows and apply the pattern to a week.
+                    {canApply
+                        ? 'Review the template rows and apply the pattern to a week.'
+                        : 'Review the saved template rows and support details.'}
                 </DialogDescription>
                 {open && template ? (
                     <DetailBody
@@ -1284,6 +1403,8 @@ export function TemplateDetailDialog({
                         onOpenChange={onOpenChange}
                         canManage={canManage}
                         canDelete={canDelete}
+                        canApply={canApply}
+                        actionsBlocked={actionsBlocked}
                         onEdit={onEdit}
                         onDelete={onDelete}
                     />
@@ -1298,6 +1419,8 @@ function DetailBody({
     onOpenChange,
     canManage,
     canDelete,
+    canApply,
+    actionsBlocked,
     onEdit,
     onDelete,
 }: {
@@ -1305,6 +1428,8 @@ function DetailBody({
     onOpenChange: (open: boolean) => void;
     canManage: boolean;
     canDelete: boolean;
+    canApply: boolean;
+    actionsBlocked: boolean;
     onEdit: (template: RosterTemplateRow) => void;
     onDelete: (template: RosterTemplateRow) => void;
 }) {
@@ -1313,7 +1438,6 @@ function DetailBody({
         cycles: 1,
         confirm_warnings: false,
     });
-    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
     const intervalWeeks =
         template.template_type === 'fortnightly'
@@ -1358,6 +1482,7 @@ function DetailBody({
     }, [warningLines.length]);
 
     const postApply = (confirmWarnings: boolean) => {
+        if (!canApply || actionsBlocked || applyForm.processing) return;
         applyForm.transform((d) => ({
             ...d,
             confirm_warnings: confirmWarnings,
@@ -1370,10 +1495,10 @@ function DetailBody({
     };
 
     return (
-        <div className="flex max-h-[92vh] min-h-0 flex-col">
-            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4">
-                <div className="min-w-0">
-                    <h2 className="truncate text-lg font-bold tracking-tight">
+        <div className="flex max-h-[92vh] min-h-0 min-w-0 flex-col">
+            <header className="relative min-w-0 shrink-0 border-b border-border px-5 py-4">
+                <div className="min-w-0 pr-[52px] [overflow-wrap:anywhere]">
+                    <h2 className="text-lg font-bold tracking-tight">
                         {template.name}
                     </h2>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -1399,40 +1524,53 @@ function DetailBody({
                         </span>
                     </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                    {canManage ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onEdit(template)}
-                        >
-                            <Pencil className="h-3.5 w-3.5" /> Edit
-                        </Button>
-                    ) : null}
-                    {canDelete ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-status-critical hover:text-status-critical"
-                            onClick={() => setConfirmDeleteOpen(true)}
-                        >
-                            <Trash2 className="h-3.5 w-3.5" /> Delete
-                        </Button>
-                    ) : null}
-                    <button
-                        type="button"
-                        onClick={() => onOpenChange(false)}
-                        aria-label="Close"
-                        className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
+                {canManage || canDelete ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {canManage ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                    actionsBlocked || applyForm.processing
+                                }
+                                onClick={() => onEdit(template)}
+                            >
+                                <Pencil className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                        ) : null}
+                        {canDelete ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-status-critical hover:text-status-critical"
+                                disabled={
+                                    actionsBlocked || applyForm.processing
+                                }
+                                onClick={() => onDelete(template)}
+                            >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
+                <button
+                    type="button"
+                    onClick={() => onOpenChange(false)}
+                    aria-label="Close"
+                    className="absolute top-3 right-3 grid h-[44px] w-[44px] place-items-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <X className="h-5 w-5" />
+                </button>
             </header>
 
-            <div className="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[1fr_320px]">
+            <div
+                className={cn(
+                    'grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden',
+                    canApply && 'lg:grid-cols-[minmax(0,1fr)_320px]',
+                )}
+            >
                 {/* Rows */}
-                <div className="min-h-0 overflow-y-auto px-5 py-4">
+                <div className="min-h-0 min-w-0 overflow-y-auto px-5 py-4 [overflow-wrap:anywhere]">
                     {template.description ? (
                         <p className="mb-3 text-sm text-muted-foreground">
                             {template.description}
@@ -1452,120 +1590,127 @@ function DetailBody({
                 </div>
 
                 {/* Apply panel */}
-                <div
-                    className="min-h-0 overflow-y-auto border-t border-border bg-muted/20 px-5 py-4 lg:border-t-0 lg:border-l"
-                    data-test="template-apply-card"
-                >
-                    <div className="flex items-center gap-2 text-sm font-bold">
-                        <CalendarPlus className="h-4 w-4 text-primary" />
-                        Apply to a week
-                    </div>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                        Creates draft shifts for the chosen week (snapped to its
-                        Monday). Apply more than one cycle to stamp several
-                        weeks.
-                    </p>
-
-                    {blockLines.length > 0 ? (
-                        <Alert
-                            variant="destructive"
-                            className="mt-3"
-                            data-test="template-apply-blocks"
-                        >
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Template cannot be applied</AlertTitle>
-                            <AlertDescription>
-                                <ul className="list-disc space-y-1 pl-4">
-                                    {blockLines.map((line, i) => (
-                                        <li key={i}>{line}</li>
-                                    ))}
-                                </ul>
-                            </AlertDescription>
-                        </Alert>
-                    ) : null}
-
-                    <form
-                        className="mt-3 space-y-3"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            postApply(false);
-                        }}
+                {canApply ? (
+                    <div
+                        className="min-h-0 min-w-0 overflow-y-auto border-t border-border bg-muted/20 px-5 py-4 lg:border-t-0 lg:border-l"
+                        data-test="template-apply-card"
                     >
-                        <div className="space-y-1.5">
-                            <Label htmlFor="week-start">Week start</Label>
-                            <Input
-                                id="week-start"
-                                type="date"
-                                value={applyForm.data.week_start}
-                                onChange={(e) =>
-                                    applyForm.setData(
-                                        'week_start',
-                                        e.target.value,
-                                    )
-                                }
-                            />
+                        <div className="flex items-center gap-2 text-sm font-bold">
+                            <CalendarPlus className="h-4 w-4 text-primary" />
+                            Apply to a week
                         </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="apply-cycles">
-                                Cycles
-                                {intervalWeeks > 1
-                                    ? ` · every ${intervalWeeks} weeks`
-                                    : ''}
-                            </Label>
-                            <Input
-                                id="apply-cycles"
-                                type="number"
-                                min={1}
-                                max={12}
-                                value={applyForm.data.cycles}
-                                onChange={(e) =>
-                                    applyForm.setData(
-                                        'cycles',
-                                        Math.max(
-                                            1,
-                                            Math.min(
-                                                12,
-                                                Number(e.target.value) || 1,
-                                            ),
-                                        ),
-                                    )
-                                }
-                            />
-                        </div>
-                        {template.template_shifts_count > 0 ? (
-                            <div
-                                className="rounded-md border border-border bg-card/60 p-2.5 text-[12px] text-muted-foreground"
-                                data-test="template-apply-preview"
+                        <p className="mt-1 text-[13px] text-muted-foreground">
+                            Creates draft shifts for the chosen week (snapped to
+                            its Monday). Apply more than one cycle to stamp
+                            several weeks.
+                        </p>
+
+                        {blockLines.length > 0 ? (
+                            <Alert
+                                variant="destructive"
+                                className="mt-3"
+                                data-test="template-apply-blocks"
                             >
-                                Creates{' '}
-                                <span className="font-semibold text-foreground tabular-nums">
-                                    {totalShifts}
-                                </span>{' '}
-                                draft shift{totalShifts === 1 ? '' : 's'} across{' '}
-                                <span className="font-semibold text-foreground tabular-nums">
-                                    {cycles}
-                                </span>{' '}
-                                week{cycles === 1 ? '' : 's'} —{' '}
-                                <span className="text-foreground">
-                                    {cycleWeeks.join(', ')}
-                                </span>
-                            </div>
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>
+                                    Template cannot be applied
+                                </AlertTitle>
+                                <AlertDescription>
+                                    <ul className="list-disc space-y-1 pl-4">
+                                        {blockLines.map((line, i) => (
+                                            <li key={i}>{line}</li>
+                                        ))}
+                                    </ul>
+                                </AlertDescription>
+                            </Alert>
                         ) : null}
-                        <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={applyForm.processing}
-                            data-test="template-apply-submit"
+
+                        <form
+                            className="mt-3 space-y-3"
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                postApply(false);
+                            }}
                         >
-                            {applyForm.processing ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <CalendarRange className="h-4 w-4" />
-                            )}
-                            Apply to roster
-                        </Button>
-                    </form>
-                </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="week-start">Week start</Label>
+                                <Input
+                                    id="week-start"
+                                    type="date"
+                                    value={applyForm.data.week_start}
+                                    onChange={(e) =>
+                                        applyForm.setData(
+                                            'week_start',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="apply-cycles">
+                                    Cycles
+                                    {intervalWeeks > 1
+                                        ? ` · every ${intervalWeeks} weeks`
+                                        : ''}
+                                </Label>
+                                <Input
+                                    id="apply-cycles"
+                                    type="number"
+                                    min={1}
+                                    max={12}
+                                    value={applyForm.data.cycles}
+                                    onChange={(e) =>
+                                        applyForm.setData(
+                                            'cycles',
+                                            Math.max(
+                                                1,
+                                                Math.min(
+                                                    12,
+                                                    Number(e.target.value) || 1,
+                                                ),
+                                            ),
+                                        )
+                                    }
+                                />
+                            </div>
+                            {template.template_shifts_count > 0 ? (
+                                <div
+                                    className="rounded-md border border-border bg-card/60 p-2.5 text-[12px] text-muted-foreground"
+                                    data-test="template-apply-preview"
+                                >
+                                    Creates{' '}
+                                    <span className="font-semibold text-foreground tabular-nums">
+                                        {totalShifts}
+                                    </span>{' '}
+                                    draft shift{totalShifts === 1 ? '' : 's'}{' '}
+                                    across{' '}
+                                    <span className="font-semibold text-foreground tabular-nums">
+                                        {cycles}
+                                    </span>{' '}
+                                    week{cycles === 1 ? '' : 's'} —{' '}
+                                    <span className="text-foreground">
+                                        {cycleWeeks.join(', ')}
+                                    </span>
+                                </div>
+                            ) : null}
+                            <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={
+                                    applyForm.processing || actionsBlocked
+                                }
+                                data-test="template-apply-submit"
+                            >
+                                {applyForm.processing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <CalendarRange className="h-4 w-4" />
+                                )}
+                                Apply to roster
+                            </Button>
+                        </form>
+                    </div>
+                ) : null}
             </div>
 
             <AlertDialog open={warningOpen} onOpenChange={setWarningOpen}>
@@ -1591,7 +1736,7 @@ function DetailBody({
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            disabled={applyForm.processing}
+                            disabled={applyForm.processing || actionsBlocked}
                             onClick={(e) => {
                                 e.preventDefault();
                                 setWarningOpen(false);
@@ -1599,38 +1744,6 @@ function DetailBody({
                             }}
                         >
                             Apply anyway
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <AlertDialog
-                open={confirmDeleteOpen}
-                onOpenChange={setConfirmDeleteOpen}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Delete “{template.name}”?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This removes the template and its{' '}
-                            {template.template_shifts_count} shift rows. Shifts
-                            already created from it are not affected. This
-                            cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            variant="destructive"
-                            onClick={() => {
-                                setConfirmDeleteOpen(false);
-                                onOpenChange(false);
-                                onDelete(template);
-                            }}
-                        >
-                            Delete template
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1644,7 +1757,7 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
     const dayLabel =
         DAY_LABELS[shift.day_of_week] ?? `Day ${shift.day_of_week}`;
     return (
-        <div className="rounded-lg border border-border p-3">
+        <div className="min-w-0 rounded-lg border border-border p-3 [overflow-wrap:anywhere]">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-semibold">
                     {dayLabel} · {shift.start_time}–{shift.end_time}
@@ -1675,7 +1788,7 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
                     ) : null}
                 </div>
             </div>
-            <div className="mt-2 grid gap-x-4 gap-y-1 text-[13px] text-muted-foreground sm:grid-cols-2">
+            <div className="mt-2 grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-[13px] text-muted-foreground sm:grid-cols-2">
                 <span>
                     Client:{' '}
                     <span className="font-medium text-foreground">

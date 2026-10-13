@@ -54,9 +54,9 @@ return [
         // them. On by default (Stephan, 30 Sep 2026: approved with PIN-1).
         'login_check_to_set' => (bool) env('MEDICATION_WITNESS_PIN_LOGIN_CHECK', true),
 
-        // Eligible non-controlled doses can request confirmation in the colleague's
-        // own session. Pending, disputed and expired states remain explicit.
-        'forgotten_fallback_enabled' => (bool) env('MEDICATION_FORGOTTEN_PIN_ENABLED', true),
+        // The forgotten-PIN fallback is an organisation setting (Medication
+        // settings › Staff & PINs › Witness PINs), off until a manager turns
+        // it on (Stephan, 9 Oct 2026). WitnessPinSettings::FORGOTTEN_FALLBACK.
 
         // Server-managed PIN pepper; never reuse the login/session APP_KEY.
         // Existing pin_v1 hashes remain valid until the owner sets a new PIN.

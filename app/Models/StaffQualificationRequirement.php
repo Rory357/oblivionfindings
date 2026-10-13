@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,7 @@ class StaffQualificationRequirement extends Model
     protected $fillable = [
         'client_id',
         'service_context_id',
+        'hr_compliance_requirement_id',
         'qualification_name',
         'qualification_type',
         'is_mandatory',
@@ -23,7 +25,13 @@ class StaffQualificationRequirement extends Model
 
     protected $casts = [
         'is_mandatory' => 'boolean',
+        'hr_compliance_requirement_id' => 'integer',
     ];
+
+    public function hrComplianceRequirement(): BelongsTo
+    {
+        return $this->belongsTo(HrComplianceRequirement::class);
+    }
 
     public function client(): BelongsTo
     {

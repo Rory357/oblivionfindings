@@ -13,6 +13,9 @@ import {
 } from './helpers';
 
 test.describe('attendance readiness workflows', () => {
+    // Reserve the full journey budget for seeded sign-in, clock-out and the
+    // redirected My Day read; keep the response and visible-state checks.
+    test.setTimeout(60_000);
     test.beforeEach(() => {
         resetFrontlineLifecycleReadinessFixtures();
     });
@@ -134,6 +137,8 @@ test.describe('attendance readiness workflows', () => {
 });
 
 test.describe('timesheet approval readiness workflows', () => {
+    // Sign-in and the canonical approval redirects share CI's single PHP worker.
+    test.setTimeout(60_000);
     test.beforeEach(() => {
         resetFrontlineLifecycleReadinessFixtures();
     });

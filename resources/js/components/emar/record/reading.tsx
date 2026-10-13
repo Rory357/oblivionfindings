@@ -1,6 +1,8 @@
+import { withMedicationReturn } from '@/lib/medication-navigation';
 import { Link } from '@inertiajs/react';
 import {
     ArrowUpRight,
+    Camera,
     ClipboardList,
     History,
     Pill,
@@ -28,6 +30,8 @@ import {
 } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
 
+import { Notice } from '@/components/emar/record-dose/parts';
+import { MedicinePackPhoto, PackPhotoCell } from './photo-bits';
 import {
     isConcealed,
     type MaybeConcealed,
@@ -57,6 +61,47 @@ const STATUS = {
     paused: ['Paused', 'neutral'],
     stopped: ['Stopped', 'neutral'],
 } as const;
+
+/**
+ * EA-208 (Lane C9): a refresh that failed keeps the records on screen and
+ * says so, as Meds today does — refresh before relying on them.
+ */
+export function StaleNotice({
+    stale,
+    loadedAt,
+    reload,
+}: {
+    stale: boolean;
+    loadedAt: number | null;
+    reload: () => void;
+}) {
+    if (!stale) return null;
+    const time = loadedAt
+        ? new Date(loadedAt).toLocaleTimeString('en-NZ', {
+              hour: 'numeric',
+              minute: '2-digit',
+              timeZone: 'Pacific/Auckland',
+          })
+        : null;
+    return (
+        <Notice
+            tone="warning"
+            live="status"
+            title={
+                time
+                    ? `Not updated since ${time} (NZ time)`
+                    : 'Not updated since the last load'
+            }
+            actions={
+                <Button size="sm" variant="outline" onClick={reload}>
+                    Refresh
+                </Button>
+            }
+        >
+            Refresh before you record or rely on this.
+        </Notice>
+    );
+}
 
 export function ReadingState({
     load,
@@ -96,13 +141,22 @@ export function MedicinesSection({
     stopped,
     search,
     onMedicine,
+    onPhotos,
+    type = 'all',
+    attention = false,
 }: {
     clientId: number;
     stopped: boolean;
     search: string;
+    /** EA-109 (Lane C9): the approved Medicines filters. */
+    type?: 'all' | 'scheduled' | 'prn';
+    /** Waiting to be checked or on hold. */
+    attention?: boolean;
     onMedicine: (id: number) => void;
+    /** C11: open Medicines › Photos for one medicine. */
+    onPhotos?: (id: number) => void;
 }) {
-    const { data, load, reload } = useRecordJson<{
+    const { data, load, reload, stale, loadedAt } = useRecordJson<{
         rows: MaybeConcealed<RecordMedicine>[];
         hidden: number;
     }>(
@@ -111,16 +165,23 @@ export function MedicinesSection({
     if (load !== 'ready' || !data)
         return <ReadingState load={load} reload={reload} />;
     const query = search.trim().toLocaleLowerCase('en-NZ');
+    const filtering = Boolean(query) || type !== 'all' || attention;
     const rows = data.rows.filter(
         (row) =>
-            !query ||
+            !filtering ||
             (!isConcealed(row) &&
-                `${row.name} ${row.strength ?? ''}`
-                    .toLocaleLowerCase('en-NZ')
-                    .includes(query)),
+                (!query ||
+                    `${row.name} ${row.strength ?? ''}`
+                        .toLocaleLowerCase('en-NZ')
+                        .includes(query)) &&
+                (type === 'all' || row.kind === type) &&
+                (!attention ||
+                    row.status === 'awaiting' ||
+                    row.status === 'paused')),
     );
     return (
         <div className="flex min-w-0 flex-col gap-5">
+            <StaleNotice stale={stale} loadedAt={loadedAt} reload={reload} />
             <ListCaption
                 title={stopped ? 'Stopped medicines' : 'Current medicines'}
                 caption={
@@ -130,7 +191,12 @@ export function MedicinesSection({
                     </>
                 }
             />
-            <MedicineTable rows={rows} onMedicine={onMedicine} />
+            <MedicineTable
+                rows={rows}
+                onMedicine={onMedicine}
+                onPhotos={onPhotos}
+                photoColumn={!stopped}
+            />
         </div>
     );
 }
@@ -139,10 +205,14 @@ function MedicineTable({
     rows,
     onMedicine,
     supportPlan,
+    onPhotos,
+    photoColumn = false,
 }: {
     rows: MaybeConcealed<RecordMedicine>[];
     onMedicine: (id: number) => void;
     supportPlan?: RecordSupportPlan;
+    onPhotos?: (id: number) => void;
+    photoColumn?: boolean;
 }) {
     const context = useEntityContextMenu<MaybeConcealed<RecordMedicine>>();
     const open = (row: MaybeConcealed<RecordMedicine>) => {
@@ -164,6 +234,15 @@ function MedicineTable({
                       icon: Pill,
                       onClick: () => open(row),
                   },
+                  ...(onPhotos && row.pack_photo?.kind === 'staff'
+                      ? [
+                            {
+                                label: 'View pack photos',
+                                icon: Camera,
+                                onClick: () => onPhotos(row.id),
+                            },
+                        ]
+                      : []),
               ];
     if (!rows.length)
         return (
@@ -294,6 +373,25 @@ function MedicineTable({
                                           </StatusBadge>
                                       ),
                               },
+                              ...(photoColumn
+                                  ? [
+                                        {
+                                            key: 'photo',
+                                            label: 'Pack photo',
+                                            width: '1.1fr',
+                                            cell: (
+                                                row: MaybeConcealed<RecordMedicine>,
+                                            ) =>
+                                                isConcealed(row) ? (
+                                                    '—'
+                                                ) : (
+                                                    <PackPhotoCell
+                                                        photo={row.pack_photo}
+                                                    />
+                                                ),
+                                        },
+                                    ]
+                                  : []),
                           ]
                 }
                 actionsFor={menu}
@@ -418,6 +516,13 @@ const DETAIL_SECTIONS = [
         blurb: 'Instructions and support',
         icon: Users,
     },
+    // C11 (approved P02): the photo staff see when recording, and its history.
+    {
+        key: 'photo',
+        label: 'Pack photo & supply',
+        blurb: 'Check the label',
+        icon: Camera,
+    },
     {
         key: 'doses',
         label: 'Recent doses',
@@ -430,10 +535,13 @@ export function RecordMedicineDialog({
     clientId,
     medicationId,
     onClose,
+    onPhotos,
 }: {
     clientId: number;
     medicationId: number;
     onClose: () => void;
+    /** C11: open Medicines › Photos for this medicine. */
+    onPhotos?: (medicationId: number) => void;
 }) {
     const { data, load, reload } = useRecordJson<RecordMedicineDetail>(
         `/emar/clients/${clientId}/record/medicines/${medicationId}`,
@@ -503,7 +611,11 @@ export function RecordMedicineDialog({
                             ) : null}
                             <Button variant="link" asChild>
                                 <Link
-                                    href={`/emar/orders?client_id=${clientId}`}
+                                    href={withMedicationReturn(
+                                        `/emar/prescriptions?client_id=${clientId}&order_id=${order.id}`,
+                                        window.location.pathname +
+                                            window.location.search,
+                                    )}
                                 >
                                     Open Orders & reviews{' '}
                                     <ArrowUpRight className="size-4" />
@@ -540,6 +652,15 @@ export function RecordMedicineDialog({
                         </>
                     ) : null}
                     {section === 2 ? (
+                        <MedicinePackPhoto
+                            name={`${order.name} ${order.strength ?? ''}`.trim()}
+                            photo={data.pack_photo ?? null}
+                            onHistory={
+                                onPhotos ? () => onPhotos(order.id) : undefined
+                            }
+                        />
+                    ) : null}
+                    {section === 3 ? (
                         data.recent_doses.length ? (
                             data.recent_doses.map((dose) => (
                                 <ReviewRow

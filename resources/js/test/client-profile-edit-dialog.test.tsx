@@ -75,5 +75,11 @@ describe('client profile edit dialog', () => {
         expect(
             screen.queryByRole('heading', { name: 'Edit client' }),
         ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /Health & medical/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /Contacts & consent/ }),
+        ).not.toBeInTheDocument();
     });
 });

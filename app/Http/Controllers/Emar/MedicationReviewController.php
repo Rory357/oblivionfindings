@@ -11,6 +11,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Reviews\MedicationReviewCadence;
 use App\Services\Medication\Reviews\MedicationReviewReader;
 use App\Services\Medication\Reviews\MedicationReviewWorkflow;
+use App\Support\MedicationJourney;
 use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -30,7 +31,7 @@ final class MedicationReviewController extends Controller
     {
         $actor = $request->user();
         $filters = $request->validate(['site_id' => ['nullable', 'integer'], 'client_id' => ['nullable', 'integer'],
-            'review' => ['nullable', 'integer'], 'view' => ['nullable', Rule::in(['due', 'booked', 'recorded', 'closed', 'changes'])],
+            'review' => ['nullable', 'integer', 'min:1'], 'item' => ['nullable', 'integer', 'min:1'], 'view' => ['nullable', Rule::in(['due', 'booked', 'recorded', 'closed', 'changes'])],
             'kind' => ['nullable', Rule::in(['regular', 'triggered'])], 'search' => ['nullable', 'string', 'max:200'], 'page' => ['nullable', 'integer', 'min:1']]);
         $siteId = $request->integer('site_id') ?: null;
         $clientId = $request->integer('client_id') ?: null;
@@ -71,13 +72,21 @@ final class MedicationReviewController extends Controller
         if ($selected !== null) {
             abort_if(($siteId !== null && (int) $selected->client->site_id !== $siteId) || ($clientId !== null && (int) $selected->client_id !== $clientId), 404);
         }
+        $selectedItemId = $request->integer('item') ?: null;
+        if ($selectedItemId !== null) {
+            abort_unless($selected !== null, 404);
+            $item = $selected->items->firstWhere('id', $selectedItemId);
+            abort_unless($item !== null && (int) $item->client_id === (int) $selected->client_id, 404);
+            abort_if($item->isRestricted() && ! $actor->canDo('medications.controlled.view'), 404);
+        }
         $selectedClient = $clientId ?? $selected?->client_id;
 
         return Inertia::render('emar/reviews/index', [
-            'reviews' => $reviews, 'meters' => $meters, 'filters' => [...$filters, 'view' => $view, 'site_id' => $siteId, 'client_id' => $clientId],
+            'reviews' => $reviews, 'meters' => $meters, 'filters' => [...$filters, 'view' => $view, 'site_id' => $siteId, 'client_id' => $clientId, 'return_to' => MedicationJourney::returnTo($request->query('return_to'))],
             'sites' => $this->scope->sitePicker($this->scope->readerSiteIds($actor, 'medications.view'))->map->only(['id', 'name'])->values(),
             'can' => ['manage' => $actor->canDo(MedicationReviewWorkflow::MANAGE), 'orders' => $actor->canDo('medications.orders.manage'),
                 'controlled' => $actor->canDo('medications.controlled.view'), 'summary' => $selected ? $this->reader->canReadSource($selected, $actor) : $actor->canDo(MedicationReviewWorkflow::MANAGE)],
+            'selected_item_id' => $selectedItemId,
             'selected' => $selected ? $this->reader->serialize($selected, $actor, true) : null,
             'person' => $selectedClient ? $this->reader->person($actor, $selectedClient) : null,
             'default_interval' => $this->cadence->organisation(), 'today' => $today,

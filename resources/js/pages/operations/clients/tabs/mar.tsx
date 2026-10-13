@@ -5,6 +5,7 @@
  * and a Report for this person. Recording goes through the one P02 seam
  * (use-dose-recorder). The tab loads its own day (the Fleet profile pattern). */
 import { OutstandingMedicationWork } from '@/components/emar/followups/outstanding-work';
+import { withMedicationReturn } from '@/lib/medication-navigation';
 import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -209,10 +210,29 @@ export function MarTab({
     initialDate = null,
     onDateChange,
 }: MarTabProps) {
-    const [date, setDate] = useState<string | null>(initialDate);
+    const [date, setDate] = useState<string | null>(() => {
+        const selected =
+            initialDate ??
+            (!embedded && typeof window !== 'undefined'
+                ? new URLSearchParams(window.location.search).get('date')
+                : null);
+        return selected && /^\d{4}-\d{2}-\d{2}$/.test(selected)
+            ? selected
+            : null;
+    });
     const chooseDate = (next: string | null) => {
         setDate(next);
         onDateChange?.(next);
+        if (!embedded) {
+            const url = new URL(window.location.href);
+            if (next) url.searchParams.set('date', next);
+            else url.searchParams.delete('date');
+            window.history.replaceState(
+                window.history.state,
+                '',
+                url.pathname + url.search + url.hash,
+            );
+        }
     };
     const { load, reload } = useMedicationDay(clientId, date);
     const day = load.data;
@@ -327,10 +347,14 @@ export function MarTab({
                                             Report
                                         </Button>
                                     ) : null}
-                                    {!embedded && (
+                                    {!embedded && day && (
                                         <Button variant="outline" asChild>
                                             <Link
-                                                href={`/emar/mar?client_id=${clientId}`}
+                                                href={withMedicationReturn(
+                                                    `/emar/mar?client_id=${clientId}&date=${day.date}`,
+                                                    window.location.pathname +
+                                                        window.location.search,
+                                                )}
                                             >
                                                 Open MAR chart
                                             </Link>
@@ -346,11 +370,11 @@ export function MarTab({
                                                         !day.can.record ||
                                                         recordable.length === 0
                                                     }
-                                                    title={
-                                                        recordReason ??
-                                                        (recordable.length === 0
-                                                            ? 'Nothing due right now'
-                                                            : undefined)
+                                                    aria-describedby={
+                                                        recordReason ||
+                                                        recordable.length === 0
+                                                            ? 'mar-record-reason'
+                                                            : undefined
                                                     }
                                                 >
                                                     <Plus className="size-4" />
@@ -407,6 +431,19 @@ export function MarTab({
                                         </DropdownMenu>
                                     ) : null}
                                 </div>
+                                {/* EA-187 (Lane C9): why recording is unavailable,
+                                    shown — a disabled button's tooltip never is. */}
+                                {day &&
+                                day.can.record_reason !== 'no_permission' &&
+                                (recordReason || recordable.length === 0) ? (
+                                    <p
+                                        id="mar-record-reason"
+                                        className="text-caption text-muted-foreground"
+                                    >
+                                        {recordReason ??
+                                            'Nothing due right now.'}
+                                    </p>
+                                ) : null}
                             </div>
                         ) : null}
 

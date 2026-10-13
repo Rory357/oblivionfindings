@@ -288,12 +288,13 @@ export default function EmailSettings() {
                                     ? 'Access required'
                                     : state?.capture_mode
                                       ? 'Local capture'
-                                      : settings?.support_enabled
-                                        ? 'Support delivery enabled'
+                                      : (settings?.configuration_version ?? 0) >
+                                          0
+                                        ? 'Configuration saved'
                                         : 'Server mail settings'}
                             </PageHeaderStatusChip>
                         }
-                        subline="IT support messages · Sender identity, public replies and delivery checks"
+                        subline="Shared email provider and sender · Protected eMAR backups and IT support"
                         actions={
                             <>
                                 <PageHeaderGlassButton
@@ -318,12 +319,13 @@ export default function EmailSettings() {
                             state && (
                                 <>
                                     <PageHeaderMeterBlock
-                                        label="Provider"
+                                        label="Configured provider"
                                         onClick={() => setTab('delivery')}
                                     >
                                         <PageHeaderMeterBig>
                                             <span className="text-section-title">
-                                                {settings?.support_enabled
+                                                {(settings?.configuration_version ??
+                                                    0) > 0
                                                     ? EMAIL_PROVIDERS[
                                                           state.settings
                                                               .provider
@@ -504,7 +506,10 @@ export default function EmailSettings() {
                                                 Delivery and sender
                                             </CardTitle>
                                             <CardDescription>
-                                                Saved configuration version{' '}
+                                                Protected eMAR backups use the
+                                                saved provider independently of
+                                                the IT support switch. Saved
+                                                configuration version{' '}
                                                 {settings.configuration_version}
                                             </CardDescription>
                                         </CardHeader>
@@ -514,15 +519,18 @@ export default function EmailSettings() {
                                                 value={
                                                     settings.support_enabled
                                                         ? 'Enabled'
-                                                        : 'Disabled — server mailer applies'
+                                                        : 'Disabled — IT uses server mailer'
                                                 }
                                             />
                                             <ReviewRow
                                                 label="Saved provider"
                                                 value={
-                                                    EMAIL_PROVIDERS[
-                                                        settings.provider
-                                                    ]
+                                                    settings.configuration_version >
+                                                    0
+                                                        ? EMAIL_PROVIDERS[
+                                                              settings.provider
+                                                          ]
+                                                        : 'No saved provider'
                                                 }
                                             />
                                             <ReviewRow

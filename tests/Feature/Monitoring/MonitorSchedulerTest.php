@@ -237,6 +237,7 @@ it('omits collectors assigned outside the device canonical Site and raw collecto
         'status' => 'online',
     ]);
     $unsafe['monitor']->update(['collector_id' => $unsafeCollector->id]);
+    Queue::fake(); // Observe omitted work after all staff and Site fixtures.
 
     $result = app(MonitorScheduler::class)->dispatchDue($now);
 
@@ -252,6 +253,7 @@ it('honours the shared scheduler lock before scanning monitors', function () {
     $scheduleKey = intdiv($now->timestamp, 60) * 60;
     $heldLock = Cache::store('array')->lock("monitoring:schedule:{$scheduleKey}", 120);
     expect($heldLock->get())->toBeTrue();
+    Queue::fake(); // Observe the locked scheduler after the monitor's Site fixture.
 
     $result = app(MonitorScheduler::class)->dispatchDue($now);
 

@@ -6,11 +6,16 @@ export type Pager<T> = {
 };
 export type StockItem = {
     id: number;
+    client_id: number;
+    site_id: number | null;
     name: string;
     client_name: string;
     site_name: string | null;
     controlled: boolean;
     active: boolean;
+    /** EA-073: active or held (a held medicine can still be received and reordered). */
+    receivable?: boolean;
+    held?: boolean;
     stock_id: number | null;
     on_hand: number | null;
     physical_on_hand?: number | string | null;
@@ -33,6 +38,8 @@ export type PackPhoto = {
     bytes: number;
     taken_at: string;
     description: string | null;
+    /** C11: taken because the pack or brand looked different. */
+    pack_changed?: boolean;
     taken_by_name: string | null;
     preview_url: string;
     download_url: string;
@@ -52,6 +59,9 @@ export type Pack = {
     short_expiry_reason: string | null;
     notes: string | null;
     revision: number;
+    /** C11: "Batch AB12 · Expires 05/2027" and who supplied it. */
+    label?: string | null;
+    supplier?: string | null;
     photos: PackPhoto[];
 };
 export type ItemDetail = StockItem & {
@@ -60,6 +70,9 @@ export type ItemDetail = StockItem & {
     movements?: Movement[];
     orders?: SupplyOrder[];
     history_truncated?: boolean;
+    /** C11 (P06 Q6, P11 Medicine photos). */
+    photo_policy?: PhotoPolicy;
+    latest_photo?: LatestPackPhoto | null;
     packs: Pack[];
     outward: {
         id: number;
@@ -122,6 +135,8 @@ export type Movement = {
     recorded_by_name: string | null;
 };
 export type Capabilities = {
+    /** C11: the Medicine photos "who" setting. */
+    photograph?: boolean;
     receive: boolean;
     receive_controlled?: boolean;
     manage: boolean;
@@ -136,4 +151,25 @@ export type StockResponse = {
     count_id?: number;
     movement_id?: number;
     stock_id?: number;
+    photo_id?: number;
+};
+/** C11: whether this receipt asks for a photo, and who may take one. */
+export type PhotoPolicy = {
+    can_photograph: boolean;
+    mode: 'off' | 'needed' | 'always';
+    prompt: boolean;
+    required: boolean;
+    has_photo: boolean;
+};
+/** C11: the picture staff see for a medicine (staff photo first, else a reference image). */
+export type LatestPackPhoto = {
+    kind: 'staff' | 'reference';
+    url: string;
+    taken_at: string | null;
+    taken_by: string | null;
+    pack: string | null;
+    pharmacy: string | null;
+    pack_changed?: boolean;
+    now_pack?: string | null;
+    source?: string | null;
 };

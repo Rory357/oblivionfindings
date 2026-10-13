@@ -1,55 +1,78 @@
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
+import { PageHeaderRail } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { ErrorState } from '@/components/ui/error-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { LoadingState } from '@/components/ui/loading-state';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
+import { CheckCircle2, ListChecks, Pencil, Send } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import {
+    useHandoverFilters,
+    type HandoverFilters,
+} from './components/use-handover-filters';
 
 import { BoardView } from './components/board-view';
 import { CardsView } from './components/cards-view';
 import { HandoverDetailDialog } from './components/handover-detail-dialog';
 import { HandoverRail } from './components/handover-rail';
 import { HandoverWizard } from './components/handover-wizard';
+import type { HeroCounts } from './components/handovers-hero';
 import { HandoversHero } from './components/handovers-hero';
 import { ListView } from './components/list-view';
 import {
+    clientName,
+    ymd,
     type Catalogue,
-    type Filters,
     type Handover,
     type StatusTab,
     type ViewMode,
-    clientName,
-    ymd,
 } from './components/shared';
-import { Toolbar } from './components/toolbar';
 
 type Props = {
     handovers: Handover[];
     weekStart: string;
     weekEnd: string;
-    filters: { week: string };
+    filters: HandoverFilters;
+    summary: HeroCounts;
+    evidence: { checked_at: string; timezone: string };
+    handoverPagination: {
+        current_page: number;
+        last_page: number;
+        total: number;
+        from: number | null;
+        to: number | null;
+        links: { url: string | null; label: string; active: boolean }[];
+    };
     catalogue: Catalogue;
     can: { create: boolean; manage: boolean; view_medications?: boolean };
     currentUser: { id: number; name: string };
 };
 
-const EMPTY_FILTERS: Filters = { staff: null, client: null, site: null };
+export default function HandoversIndex(props: Props) {
+    return <HandoversBody key={props.currentUser.id} {...props} />;
+}
 
-export default function HandoversIndex({
+function HandoversBody({
     handovers = [],
     weekStart,
     catalogue,
     can = { create: false, manage: false },
     currentUser,
+    filters: serverFilters,
+    summary: counts,
+    evidence,
+    handoverPagination,
 }: Props) {
     const weekStartDate = useMemo(
         () => new Date(`${weekStart}T00:00:00`),
         [weekStart],
     );
 
-    const [search, setSearch] = useState('');
-    const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-    const [tab, setTab] = useState<StatusTab>('all');
+    const query = useHandoverFilters(serverFilters);
+    const { draft: filters } = query;
     const [view, setView] = useState<ViewMode>('cards');
     const [wizardOpen, setWizardOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
@@ -70,67 +93,6 @@ export default function HandoversIndex({
     const [addClientOpen, setAddClientOpen] = useState(false);
     const [pendingClientId, setPendingClientId] = useState<number | null>(null);
 
-    const counts = useMemo(
-        () => ({
-            total: handovers.length,
-            draft: handovers.filter((h) => h.status === 'draft').length,
-            submitted: handovers.filter((h) => h.status === 'submitted').length,
-            acknowledged: handovers.filter((h) => h.status === 'acknowledged')
-                .length,
-            openIncoming: handovers.filter((h) => h.incoming_staff == null)
-                .length,
-            incidents: handovers.reduce(
-                (sum, h) => sum + (h.incidents_to_note?.length ?? 0),
-                0,
-            ),
-        }),
-        [handovers],
-    );
-
-    const baseFiltered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        return handovers.filter((h) => {
-            if (
-                filters.staff != null &&
-                h.outgoing_staff?.id !== filters.staff &&
-                h.incoming_staff?.id !== filters.staff &&
-                h.acknowledger?.id !== filters.staff
-            )
-                return false;
-            if (filters.client != null && h.client?.id !== filters.client)
-                return false;
-            if (filters.site != null && h.site?.id !== filters.site)
-                return false;
-            if (q) {
-                const hay = [
-                    h.handover_notes,
-                    clientName(h.client),
-                    h.outgoing_staff?.name,
-                    h.incoming_staff?.name,
-                    h.site?.name,
-                    h.client_mood,
-                    ...(h.medications_due ?? []),
-                    ...(h.incidents_to_note ?? []),
-                    ...(h.follow_up_items ?? []),
-                    ...(h.tasks_pending ?? []),
-                ]
-                    .filter(Boolean)
-                    .join(' ')
-                    .toLowerCase();
-                if (!hay.includes(q)) return false;
-            }
-            return true;
-        });
-    }, [handovers, filters, search]);
-
-    const filtered = useMemo(
-        () =>
-            tab === 'all'
-                ? baseFiltered
-                : baseFiltered.filter((h) => h.status === tab),
-        [baseFiltered, tab],
-    );
-
     const detailHandover =
         detailId != null
             ? (handovers.find((h) => h.id === detailId) ?? null)
@@ -141,22 +103,41 @@ export default function HandoversIndex({
             : null;
 
     const hasFilters =
-        search.trim() !== '' ||
+        filters.q.trim() !== '' ||
         filters.staff != null ||
         filters.client != null ||
-        filters.site != null;
+        filters.site != null ||
+        filters.status !== 'all';
 
-    const firstName = currentUser?.name?.split(' ')?.[0] ?? 'team';
-
-    // ---- navigation + actions --------------------------------------------
+    const shownView =
+        view === 'board' && serverFilters.status !== 'all' ? 'cards' : view;
+    const unapplied = ['week', 'q', 'staff', 'client', 'site', 'status'].some(
+        (key) =>
+            filters[key as keyof HandoverFilters] !==
+            serverFilters[key as keyof HandoverFilters],
+    );
+    const readNotice = query.error
+        ? 'Results were not updated. Counts refer to the last loaded filters.'
+        : unapplied && !query.loading
+          ? 'Choices changed. Select Search to apply them; counts refer to the last loaded filters.'
+          : null;
+    const rangeLabel =
+        handoverPagination.total === 0
+            ? 'No matching handovers'
+            : `Showing ${handoverPagination.from ?? 0}–${handoverPagination.to ?? 0} of ${handoverPagination.total} · Page ${handoverPagination.current_page} of ${handoverPagination.last_page}`;
+    const selectStatus = (status: StatusTab) => {
+        if (query.change({ status }) && view === 'board') setView('cards');
+    };
+    const selectView = (next: ViewMode) => {
+        if (query.loading) return;
+        if (next === 'board' && filters.status !== 'all') {
+            if (!query.change({ status: 'all' })) return;
+        }
+        setView(next);
+    };
     const goWeek = (week: Date) => {
         const target = ymd(week);
-        if (target === weekStart) return;
-        router.get(
-            '/operations/handovers',
-            { week: target },
-            { preserveState: true, preserveScroll: true },
-        );
+        if (target !== weekStart) query.change({ week: target });
     };
 
     const openNew = () => {
@@ -209,68 +190,136 @@ export default function HandoversIndex({
     };
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Handovers', href: '/operations/handovers' },
+            ]}
+        >
             <Head title="Shift Handovers" />
             <PageShell>
                 <HandoversHero
-                    firstName={firstName}
                     weekStart={weekStartDate}
                     counts={counts}
-                    search={search}
-                    onSearch={setSearch}
+                    search={filters.q}
+                    onSearch={query.editSearch}
+                    onSearchSubmit={() => query.change()}
                     filters={filters}
-                    onFilters={setFilters}
+                    onFilter={(changes) => query.change(changes)}
                     catalogue={catalogue}
                     onNewHandover={openNew}
                     onWeekChange={goWeek}
                     canCreate={can.create}
+                    onStatus={selectStatus}
+                    evidence={evidence}
+                    view={shownView}
+                    onView={selectView}
+                    hasFilters={hasFilters}
+                    onClear={query.clear}
+                    loading={query.loading}
+                    rangeLabel={rangeLabel}
+                    readNotice={readNotice}
+                    rail={
+                        <fieldset
+                            disabled={query.loading}
+                            className="w-full min-w-0"
+                        >
+                            <PageHeaderRail
+                                value={filters.status}
+                                onSelect={selectStatus}
+                                items={[
+                                    {
+                                        key: 'all',
+                                        label: 'All',
+                                        icon: ListChecks,
+                                        count: counts.total,
+                                    },
+                                    {
+                                        key: 'draft',
+                                        label: 'Drafts',
+                                        icon: Pencil,
+                                        count: counts.draft,
+                                    },
+                                    {
+                                        key: 'submitted',
+                                        label: 'Awaiting acknowledgement',
+                                        icon: Send,
+                                        count: counts.submitted,
+                                    },
+                                    {
+                                        key: 'acknowledged',
+                                        label: 'Acknowledged',
+                                        icon: CheckCircle2,
+                                        count: counts.acknowledged,
+                                    },
+                                ]}
+                            />
+                        </fieldset>
+                    }
                 />
-
-                <div className="space-y-4">
-                    <Toolbar
-                        tab={tab}
-                        onTab={setTab}
-                        view={view}
-                        onView={setView}
-                        counts={counts}
-                        shown={
-                            (view === 'board' ? baseFiltered : filtered).length
-                        }
-                        total={counts.total}
-                        hasFilters={hasFilters}
-                        onClearFilters={() => {
-                            setFilters(EMPTY_FILTERS);
-                            setSearch('');
-                        }}
-                    />
-
-                    {view === 'board' ? (
-                        <BoardView handovers={baseFiltered} {...handlers} />
-                    ) : (
-                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-                            <main className="min-w-0">
-                                {view === 'cards' ? (
-                                    <CardsView
-                                        handovers={filtered}
-                                        {...handlers}
-                                    />
-                                ) : (
-                                    <ListView
-                                        handovers={filtered}
-                                        {...handlers}
-                                    />
-                                )}
-                            </main>
-                            <HandoverRail
-                                handovers={handovers}
-                                counts={counts}
-                                weekStart={weekStartDate}
-                                onOpen={(h) => setDetailId(h.id)}
-                                onSubmit={submitHandover}
-                                onAcknowledge={acknowledgeHandover}
-                                onEdit={openEdit}
+                <div className="space-y-4" aria-busy={query.loading}>
+                    {query.loading ? (
+                        <LoadingState message="Loading matching handovers…" />
+                    ) : query.error ? (
+                        <div role="alert">
+                            <ErrorState
+                                title="Handovers could not be updated"
+                                message={query.error}
+                                onRetry={query.retry}
                             />
                         </div>
+                    ) : (
+                        <>
+                            {shownView === 'board' ? (
+                                <div className="space-y-3">
+                                    <p className="text-caption">
+                                        Board columns show records on this page.
+                                        Use the status tabs to see every
+                                        matching handover in that status.
+                                    </p>
+                                    <BoardView
+                                        timeZone={evidence.timezone}
+                                        handovers={handovers}
+                                        {...handlers}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+                                    <section
+                                        aria-label="Records"
+                                        className="min-w-0"
+                                    >
+                                        {shownView === 'cards' ? (
+                                            <CardsView
+                                                timeZone={evidence.timezone}
+                                                handovers={handovers}
+                                                {...handlers}
+                                            />
+                                        ) : (
+                                            <ListView
+                                                timeZone={evidence.timezone}
+                                                handovers={handovers}
+                                                {...handlers}
+                                            />
+                                        )}
+                                    </section>
+                                    <HandoverRail
+                                        timeZone={evidence.timezone}
+                                        handovers={handovers}
+                                        counts={counts}
+                                        weekStart={weekStartDate}
+                                        onAwaiting={() =>
+                                            selectStatus('submitted')
+                                        }
+                                        {...handlers}
+                                    />
+                                </div>
+                            )}
+                            <LaravelPagination
+                                links={handoverPagination.links}
+                                lastPage={handoverPagination.last_page}
+                            />
+                        </>
                     )}
                 </div>
             </PageShell>

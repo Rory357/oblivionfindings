@@ -7,6 +7,7 @@ use App\Providers\FortifyServiceProvider;
 use App\Providers\LlmServiceProvider;
 use App\Providers\MedicationSupportServiceProvider;
 use App\Providers\ObliServiceProvider;
+use App\Providers\WorkforceEligibilityServiceProvider;
 
 return [
     ObliServiceProvider::class,
@@ -14,6 +15,7 @@ return [
     AuthServiceProvider::class,
     EventServiceProvider::class,
     MedicationSupportServiceProvider::class,
+    WorkforceEligibilityServiceProvider::class,
     FortifyServiceProvider::class,
     LlmServiceProvider::class,
 ];

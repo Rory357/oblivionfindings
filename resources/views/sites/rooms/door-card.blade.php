@@ -245,25 +245,25 @@
             </div>
         @endif
 
-        @if ($client->medicalProfile)
+        @if ($canReadMedical && ($client->medicalProfile || $allergyLabels !== []))
             <div class="section">
                 <h2>Medical — at a glance</h2>
-                @if ($client->medicalProfile->allergies)
+                @if ($allergyLabels !== [])
                     <div class="row">
                         <span class="label">Allergies</span>
-                        <span class="value">{{ $client->medicalProfile->allergies }}</span>
+                        <span class="value">{{ implode(', ', $allergyLabels) }}</span>
                     </div>
                 @endif
-                @if ($client->medicalProfile->blood_type)
+                @if ($client->medicalProfile?->blood_type)
                     <div class="row">
                         <span class="label">Blood type</span>
-                        <span class="value">{{ $client->medicalProfile->blood_type }}</span>
+                        <span class="value">{{ $client->medicalProfile?->blood_type }}</span>
                     </div>
                 @endif
-                @if ($client->medicalProfile->dietary_requirements)
+                @if ($client->medicalProfile?->dietary_requirements)
                     <div class="row">
                         <span class="label">Dietary</span>
-                        <span class="value">{{ $client->medicalProfile->dietary_requirements }}</span>
+                        <span class="value">{{ $client->medicalProfile?->dietary_requirements }}</span>
                     </div>
                 @endif
             </div>

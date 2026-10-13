@@ -1,5 +1,6 @@
 /* Shared types, helpers and small UI primitives for the Shift Notes page. */
 import { avatarHueStyle } from '@/components/rostering/avatar-hue';
+import { WORKER_LOCALE, WORKER_TIMEZONE, toDateInput } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     AlertTriangle,
@@ -57,6 +58,8 @@ export type ShiftNote = {
     site: NoteSite | null;
     shift: NoteShift | null;
     can_edit: boolean;
+    can_flag: boolean;
+    can_review: boolean;
     lock: NoteLock;
 };
 
@@ -89,6 +92,13 @@ export type Catalogue = {
     staff: CatalogueStaff[];
     sites: CatalogueSite[];
     shifts: CatalogueShift[];
+    note_shift_ids?: number[];
+    shift_results?: {
+        total: number;
+        shown: number;
+        limit: number;
+        truncated: boolean;
+    };
 };
 
 export type ViewMode = 'cards' | 'list';
@@ -99,39 +109,38 @@ export type Filters = {
     type: NoteType | null;
 };
 
-/** Note-type metadata. Colours are brand-distinct category hues (no semantic
- *  token exists for them) — applied via inline style for the badge + card edge. */
+/** Note-type metadata uses shared category and safety tokens. */
 export const TYPE_META: Record<
     NoteType,
     { label: string; color: string; icon: LucideIcon; desc: string }
 > = {
     shift_note: {
         label: 'Shift Note',
-        color: '#64748b',
+        color: 'var(--category-ops)',
         icon: NotebookPen,
         desc: 'End-of-shift summary of how the shift went.',
     },
     progress_note: {
         label: 'Progress Note',
-        color: '#6366f1',
+        color: 'var(--category-compliance)',
         icon: TrendingUp,
         desc: 'Progress against a goal or support plan.',
     },
     handover: {
         label: 'Handover',
-        color: '#3b82f6',
+        color: 'var(--category-ops)',
         icon: ArrowLeftRight,
         desc: 'Pass key info to the incoming worker.',
     },
     incident: {
         label: 'Incident',
-        color: '#ef4444',
+        color: 'var(--status-critical)',
         icon: AlertTriangle,
-        desc: 'Something went wrong — links to an incident.',
+        desc: 'Record context for an incident. This note does not submit an incident report.',
     },
     note: {
         label: 'General',
-        color: '#10b981',
+        color: 'var(--category-hr)',
         icon: PenLine,
         desc: 'General observation or note for the record.',
     },
@@ -178,35 +187,62 @@ export function clientName(
 /** The calendar day a note belongs to — its documented shift's start, falling
  *  back to the created timestamp. Used for day grouping, the week strip and the
  *  week filter (mirrors the server-side week scope). */
-export function noteDate(note: ShiftNote): Date {
-    const iso = note.shift?.starts_at ?? note.created_at;
-    return iso ? new Date(iso) : new Date();
+export function noteDate(note: ShiftNote, timeZone = WORKER_TIMEZONE): Date {
+    return noteCalendarDate(note.shift?.starts_at ?? note.created_at, timeZone);
+}
+/** A worker calendar day carrier for date-only grouping, never an instant. */
+export function noteCalendarDate(
+    iso: string | null | undefined,
+    timeZone = WORKER_TIMEZONE,
+): Date {
+    const day = toDateInput(iso, timeZone);
+    return day ? new Date(`${day}T12:00:00`) : new Date(Number.NaN);
 }
 
 /** Day vs night support, inferred from the shift start hour (mirrors the design). */
-export function shiftRole(shift: NoteShift | null | undefined): string {
+export function shiftRole(
+    shift: NoteShift | null | undefined,
+    timeZone = WORKER_TIMEZONE,
+): string {
     if (!shift?.starts_at) return 'Support';
-    const h = new Date(shift.starts_at).getHours();
+    const h = Number(
+        new Intl.DateTimeFormat(WORKER_LOCALE, {
+            timeZone,
+            hour: '2-digit',
+            hourCycle: 'h23',
+        }).format(new Date(shift.starts_at)),
+    );
     return h >= 22 || h < 6 ? 'Night support' : 'Day support';
 }
 
 /** 12-hour clock without a space before am/pm, e.g. "7:00am" (design spec). */
-export function fmtClock(iso: string | null | undefined): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    const ap = d.getHours() < 12 ? 'am' : 'pm';
-    const h = d.getHours() % 12 || 12;
-    return `${h}:${mm}${ap}`;
+export function fmtClock(
+    iso: string | null | undefined,
+    timeZone = WORKER_TIMEZONE,
+): string {
+    if (!iso || !Number.isFinite(new Date(iso).getTime())) return '';
+    return new Intl.DateTimeFormat(WORKER_LOCALE, {
+        timeZone,
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    })
+        .format(new Date(iso))
+        .replace(/\s+/g, '')
+        .toLowerCase();
 }
 
 /** Shift chip label, e.g. "Mon 7:00am–3:00pm". */
-export function fmtShiftChip(shift: NoteShift | null | undefined): string {
+export function fmtShiftChip(
+    shift: NoteShift | null | undefined,
+    timeZone = WORKER_TIMEZONE,
+): string {
     if (!shift?.starts_at) return shift?.label ?? '';
-    const day = new Date(shift.starts_at).toLocaleDateString('en-NZ', {
+    const day = new Date(shift.starts_at).toLocaleDateString(WORKER_LOCALE, {
+        timeZone,
         weekday: 'short',
     });
-    return `${day} ${fmtClock(shift.starts_at)}–${fmtClock(shift.ends_at)}`;
+    return `${day} ${fmtClock(shift.starts_at, timeZone)}–${fmtClock(shift.ends_at, timeZone)}`;
 }
 
 export function relTime(iso: string | null | undefined): string {
@@ -283,10 +319,10 @@ export function TypeBadge({
     return (
         <span
             className={cn(
-                'inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-white',
+                'inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-foreground',
                 className,
             )}
-            style={{ backgroundColor: meta.color }}
+            style={{ borderInlineStart: `3px solid ${meta.color}` }}
         >
             {meta.label}
         </span>

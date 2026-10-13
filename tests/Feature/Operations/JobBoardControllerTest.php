@@ -585,8 +585,9 @@ class JobBoardControllerTest extends TestCase
             'outbox' => ShiftSignalOutbox::query()->count(),
         ];
         $attempt = 0;
+        // Failed approval, successful retry, and the committed Workforce observation each evaluate once.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt): void {
-            $mock->shouldReceive('evaluate')->twice()->andReturnUsing(function () use (&$attempt) {
+            $mock->shouldReceive('evaluate')->times(3)->andReturnUsing(function () use (&$attempt) {
                 if (++$attempt === 1) {
                     throw new \RuntimeException('private eligibility provider detail');
                 }

@@ -70,11 +70,11 @@ export function TimeOffPane({
     });
 
     return (
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-5">
             <MicroStats stats={stats} />
 
-            <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
-                <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
+            <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+                <section className="min-w-0 rounded-[14px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3 flex items-center justify-between">
                         <div>
                             <h3 className="text-sm font-bold tracking-tight">
@@ -158,16 +158,21 @@ export function TimeOffPane({
                     </div>
                 </section>
 
-                <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
+                <section className="min-w-0 rounded-[14px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3">
                         <h3 className="text-sm font-bold tracking-tight">
                             On leave · next 14 days
                         </h3>
                         <div className="text-[11px] text-muted-foreground">
-                            Approved leave overlay
+                            Approved leave and pending requests
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div
+                        role="region"
+                        aria-label="Leave calendar for the next 14 days"
+                        tabIndex={0}
+                        className="frontline-focus max-w-full overflow-x-auto rounded-sm"
+                    >
                         <div
                             className="grid border-b border-border"
                             style={{

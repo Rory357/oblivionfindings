@@ -63,6 +63,8 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
         $notifications = $this->mock(ControlRoomNotificationService::class);
         $notifications->shouldReceive('notifyAlert')->andReturnNull();
         $notifications->shouldReceive('stageAlertNotifications')->andReturn(collect());
+
+        Queue::fake(); // Observe Facility actions after the staff and Site fixtures.
     }
 
     protected function tearDown(): void
@@ -145,6 +147,8 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
                 'result' => 'fail',
             ]),
         ];
+
+        Queue::fake(); // The additional Site fixture also stages eligibility work.
 
         foreach ($records as $record) {
             try {

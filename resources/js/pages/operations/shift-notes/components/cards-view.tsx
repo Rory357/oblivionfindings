@@ -26,6 +26,7 @@ import {
     TypeBadge,
     clientName,
     fmtShiftChip,
+    noteCalendarDate,
     noteDate,
     relTime,
     shiftRole,
@@ -34,6 +35,9 @@ import {
 } from './shared';
 
 export type NoteHandlers = {
+    timeZone?: string;
+    canFlag?: boolean;
+    canReview?: boolean;
     onOpen: (note: ShiftNote) => void;
     onFlag: (note: ShiftNote) => void;
     onReview: (note: ShiftNote) => void;
@@ -151,6 +155,9 @@ function NoteCard({
     onOpen,
     onFlag,
     onReview,
+    timeZone,
+    canFlag = false,
+    canReview = false,
 }: { note: ShiftNote } & NoteHandlers) {
     const meta = typeMeta(note.type);
     const author = note.user?.name ?? 'Unknown';
@@ -158,15 +165,9 @@ function NoteCard({
 
     return (
         <div
-            role="button"
-            tabIndex={0}
+            role="group"
+            aria-label={`Note #${note.id} for ${clientName(note.client)}`}
             onClick={() => onOpen(note)}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onOpen(note);
-                }
-            }}
             className="group cursor-pointer rounded-[12px] border border-l-[4px] border-border bg-card px-4 py-[15px] text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_12px_30px_-16px_rgba(20,12,40,0.22)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ borderLeftColor: meta.color }}
         >
@@ -197,7 +198,7 @@ function NoteCard({
                             ) : null}
                         </div>
                         <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-                            {shiftRole(note.shift)}
+                            {shiftRole(note.shift, timeZone)}
                             {house ? ` · ${house}` : ''}
                         </div>
                     </div>
@@ -222,7 +223,7 @@ function NoteCard({
                 {note.shift ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground">
                         <Clock className="h-3 w-3" />
-                        {fmtShiftChip(note.shift)}
+                        {fmtShiftChip(note.shift, timeZone)}
                     </span>
                 ) : null}
                 {house ? (
@@ -242,7 +243,7 @@ function NoteCard({
                     {note.type === 'incident' ? (
                         <span className="inline-flex items-center gap-1 text-status-critical">
                             <AlertTriangle className="h-3.5 w-3.5" />
-                            <b>1</b> incident
+                            Incident note
                         </span>
                     ) : null}
                     {note.reviewed_at ? (
@@ -267,19 +268,21 @@ function NoteCard({
                     className="flex items-center gap-1.5"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {!note.reviewed_at ? (
+                    {!note.reviewed_at && canReview && note.can_review ? (
                         <ActionButton onClick={() => onReview(note)}>
                             <Check className="h-3.5 w-3.5" />
                             Mark reviewed
                         </ActionButton>
                     ) : null}
-                    <ActionButton
-                        danger={!note.is_flagged}
-                        onClick={() => onFlag(note)}
-                    >
-                        <Flag className="h-3.5 w-3.5" />
-                        {note.is_flagged ? 'Unflag' : 'Flag'}
-                    </ActionButton>
+                    {canFlag && note.can_flag && (
+                        <ActionButton
+                            danger={!note.is_flagged}
+                            onClick={() => onFlag(note)}
+                        >
+                            <Flag className="h-3.5 w-3.5" />
+                            {note.is_flagged ? 'Unflag' : 'Flag'}
+                        </ActionButton>
+                    )}
                     <ActionButton onClick={() => onOpen(note)}>
                         <Eye className="h-3.5 w-3.5" />
                         Open
@@ -290,9 +293,11 @@ function NoteCard({
     );
 }
 
-function dayLabel(date: Date): string {
-    const today = ymd(new Date());
-    const yesterday = new Date();
+function dayLabel(date: Date, timeZone?: string): string {
+    if (!Number.isFinite(date.getTime())) return 'Date unavailable';
+    const todayDate = noteCalendarDate(new Date().toISOString(), timeZone);
+    const today = ymd(todayDate);
+    const yesterday = new Date(todayDate);
     yesterday.setDate(yesterday.getDate() - 1);
     if (ymd(date) === today) return 'Today';
     if (ymd(date) === ymd(yesterday)) return 'Yesterday';
@@ -310,7 +315,7 @@ export function CardsView({
     const groups = useMemo(() => {
         const byDay = new Map<string, { date: Date; items: ShiftNote[] }>();
         for (const n of notes) {
-            const date = noteDate(n);
+            const date = noteDate(n, handlers.timeZone);
             const key = ymd(date);
             if (!byDay.has(key)) byDay.set(key, { date, items: [] });
             byDay.get(key)!.items.push(n);
@@ -324,7 +329,7 @@ export function CardsView({
             );
         arr.sort((a, b) => b.date.getTime() - a.date.getTime());
         return arr;
-    }, [notes]);
+    }, [notes, handlers.timeZone]);
 
     return (
         <div className="space-y-6">
@@ -332,7 +337,7 @@ export function CardsView({
                 <div key={ymd(g.date)} className="space-y-3">
                     <div className="flex items-center gap-3">
                         <span className="text-sm font-bold">
-                            {dayLabel(g.date)}
+                            {dayLabel(g.date, handlers.timeZone)}
                         </span>
                         <span className="h-px flex-1 bg-border" />
                         <span className="text-xs text-muted-foreground tabular-nums">

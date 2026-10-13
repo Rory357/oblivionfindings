@@ -3,6 +3,7 @@ import { addDaysWP } from '@/components/rostering';
 import { Activity, Bell, CalendarRange, ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
 
+import { toDateInput } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 import { Button as GuardrailButton } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import {
     type Handover,
     HueAvatar,
     clientName,
-    handoverDate,
+    handoverCalendarDate,
     relTime,
     ymd,
 } from './shared';
@@ -29,6 +30,8 @@ export function HandoverRail({
     handovers,
     counts,
     weekStart,
+    timeZone,
+    onAwaiting,
     onOpen,
     onSubmit,
     onAcknowledge,
@@ -37,6 +40,8 @@ export function HandoverRail({
     handovers: Handover[];
     counts: RailCounts;
     weekStart: Date;
+    timeZone?: string;
+    onAwaiting?: () => void;
 } & HandoverCtxHandlers) {
     const { openCtx, menu } = useHandoverContextMenu({
         onOpen,
@@ -50,21 +55,23 @@ export function HandoverRail({
     );
 
     const days = useMemo(() => {
-        const todayKey = ymd(new Date());
+        const todayKey = timeZone
+            ? toDateInput(new Date(), timeZone)
+            : ymd(new Date());
         return Array.from({ length: 7 }, (_, i) => {
             const d = addDaysWP(weekStart, i);
             const key = ymd(d);
             const n = handovers.filter(
-                (h) => ymd(handoverDate(h)) === key,
+                (h) => ymd(handoverCalendarDate(h, timeZone)) === key,
             ).length;
             return { d, n, isToday: key === todayKey };
         });
-    }, [handovers, weekStart]);
+    }, [handovers, weekStart, timeZone]);
 
     const legend = [
         { label: 'Draft', color: 'bg-muted-foreground', n: counts.draft },
         {
-            label: 'Awaiting sign-off',
+            label: 'Awaiting acknowledgement',
             color: 'bg-status-warning',
             n: counts.submitted,
         },
@@ -80,13 +87,24 @@ export function HandoverRail({
             <div className="rounded-2xl border border-border bg-card p-4">
                 <h3 className="flex items-center gap-2 text-[13px] font-bold">
                     <Bell className="h-4 w-4 shrink-0 text-status-warning" />
-                    Awaiting your sign-off
+                    Awaiting acknowledgement
                 </h3>
                 <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    {awaiting.length === 0
-                        ? 'Nothing waiting — nice work.'
-                        : `${awaiting.length} handover${awaiting.length === 1 ? '' : 's'} need${awaiting.length === 1 ? 's' : ''} acknowledging.`}
+                    {counts.submitted === 0
+                        ? 'No handovers awaiting acknowledgement in this selection.'
+                        : awaiting.length === 0
+                          ? `${counts.submitted} match these filters on other pages or statuses.`
+                          : `Showing ${awaiting.length} from this page · ${counts.submitted} match these filters in total.`}
                 </p>
+                {counts.submitted > 0 && onAwaiting ? (
+                    <GuardrailButton
+                        variant="link"
+                        className="frontline-hit mt-2 px-0"
+                        onClick={onAwaiting}
+                    >
+                        View all awaiting acknowledgement
+                    </GuardrailButton>
+                ) : null}
                 <div className="mt-3 space-y-1">
                     {awaiting.map((h) => (
                         <GuardrailButton
@@ -128,7 +146,7 @@ export function HandoverRail({
                     This week
                 </h3>
                 <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    Handovers logged per day
+                    Loaded handovers per day
                 </p>
                 <div className="mt-3 grid grid-cols-7 gap-1.5">
                     {days.map((c, i) => (
@@ -170,7 +188,9 @@ export function HandoverRail({
                     Status breakdown
                 </h3>
                 <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    Across the displayed week
+                    {onAwaiting
+                        ? 'All matching records, across every page'
+                        : 'Loaded handovers in the selected week'}
                 </p>
                 <div className="mt-3 space-y-2">
                     {legend.map((s) => (

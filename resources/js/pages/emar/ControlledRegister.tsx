@@ -14,6 +14,7 @@ import {
 import { EntryList } from '@/components/emar/controlled/record-views';
 import { useControlledDialogs } from '@/components/emar/controlled/workspace-dialogs';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { ListCaption } from '@/components/lists/list-caption';
@@ -35,6 +36,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly } from '@/lib/datetime';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -50,7 +52,7 @@ import {
     ShieldCheck,
     Undo2,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type View = 'register' | 'discrepancies' | 'losses' | 'destructions';
 const VIEWS = [
@@ -81,11 +83,26 @@ export default function ControlledRegister({
     initialPayload?: ControlledProductPayload;
 }) {
     const { url: pageUrl } = usePage();
+    // EA-079/EA-091 (Lane C8): the trail opens pages this viewer can open.
+    const breadcrumbs = useEmarBreadcrumbs(pageUrl);
     const workspace = useControlledProduct(product ?? initialPayload, pageUrl);
     const dialogs = useControlledDialogs(workspace);
     const [filters, setFilters] = useState(() => initialFilters(pageUrl));
     useEffect(() => setFilters(initialFilters(pageUrl)), [pageUrl]);
     const payload = workspace.payload;
+    const openedSelection = useRef<string | null>(null);
+    useEffect(() => {
+        const selection = `${payload?.selected_entry_id ?? ''}:${payload?.selected_destruction_id ?? ''}`;
+        if (selection === openedSelection.current) return;
+        openedSelection.current = selection;
+        if (payload?.selected_entry_id)
+            dialogs.detail({ kind: 'entry', id: payload.selected_entry_id });
+        else if (payload?.selected_destruction_id)
+            dialogs.detail({
+                kind: 'destruction',
+                id: payload.selected_destruction_id,
+            });
+    }, [payload?.selected_entry_id, payload?.selected_destruction_id, dialogs]);
     const change = (patch: Partial<typeof filters>) => {
         const next = { ...filters, ...patch };
         const siteChanged =
@@ -220,6 +237,7 @@ export default function ControlledRegister({
             subline="Current stock, counts and follow-up · register history by NZ date"
             actions={
                 <>
+                    <MedicationJourneyReturn />
                     <PageHeaderSearch
                         value={filters.search}
                         onChange={(search) => change({ search })}
@@ -603,7 +621,7 @@ export default function ControlledRegister({
                     right={
                         payload.can.record ? (
                             <Button
-                                className="min-h-11"
+                                className="frontline-tap"
                                 onClick={() =>
                                     dialogs.action({ action: 'loss_report' })
                                 }
@@ -844,14 +862,7 @@ export default function ControlledRegister({
             </>
         );
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/meds/today' },
-                { title: 'Stock & controlled drugs', href: '/emar/stock' },
-                { title: 'Controlled register', href: '/emar/controlled' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Controlled register" />
             <div className="space-y-5">
                 {header}

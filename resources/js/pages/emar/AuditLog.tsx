@@ -282,6 +282,7 @@ export default function AuditLog({
         // Both destination readers accept these scope/date fields. Neither has
         // an equivalent for the historical projection's event_types filter.
         const query = new URLSearchParams();
+        if (path === '/emar/reports') query.set('view', 'exports');
         if (filters.client_id)
             query.set('client_id', String(filters.client_id));
         if (siteFilter) query.set('site_id', String(siteFilter));
@@ -330,11 +331,15 @@ export default function AuditLog({
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            {
-                icon: <FileText className="h-3.5 w-3.5" />,
-                label: `Open on ${link.label}`,
-                onClick: () => router.visit(link.href),
-            },
+            ...(link
+                ? [
+                      {
+                          icon: <FileText className="h-3.5 w-3.5" />,
+                          label: `Open on ${link.label}`,
+                          onClick: () => router.visit(link.href),
+                      },
+                  ]
+                : []),
             {
                 icon: <Fingerprint className="h-3.5 w-3.5" />,
                 label: 'Check source record',

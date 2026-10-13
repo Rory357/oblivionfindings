@@ -149,6 +149,9 @@ export default [
                     'no-sidebar-bg-without-foreground': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-rem-tap-floor': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -175,6 +178,29 @@ export default [
                         "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/])",
                     message:
                         'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Tap targets sized in rem" (EA-210): the root font is 13–16 px, so
+        // min-h-11 / min-w-11 (2.75rem) render at 35.75–44 px. Medication
+        // screens are frontline: use .frontline-tap (max(44px, 2.75rem)), or
+        // .frontline-hit for a compact control that keeps its drawn size.
+        files: [
+            'resources/js/pages/emar/**/*.{ts,tsx}',
+            'resources/js/components/emar/**/*.{ts,tsx}',
+            'resources/js/pages/meds/**/*.{ts,tsx}',
+        ],
+        ignores: ['**/*.test.tsx', '**/*.test.ts'],
+        rules: {
+            'design/no-rem-tap-floor': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/(?:^|\\s)(?:[^\\s:]+:)*min-[hw]-11(?=\\s|$)/], TemplateElement[value.raw=/(?:^|\\s)(?:[^\\s:]+:)*min-[hw]-11(?=\\s|$)/])',
+                    message:
+                        'min-h-11 / min-w-11 render below 44 px at the 13–14 px root font. Use .frontline-tap (or .frontline-hit for a compact control). See DESIGN.md "Tap targets sized in rem".',
                 },
             ],
         },

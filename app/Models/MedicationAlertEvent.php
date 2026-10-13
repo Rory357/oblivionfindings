@@ -14,6 +14,9 @@ class MedicationAlertEvent extends Model
 
     public const NOT_TOLD_CONTROLLED = 'not_told_controlled';
 
+    /** In the alert's groups, but can't open this person's medication record (EA-015). */
+    public const NOT_TOLD_PERSON = 'not_told_person';
+
     /** In the alert's groups, but no channel reached them (in-app off; no work email or push). */
     public const NOT_REACHABLE = 'not_reachable';
 

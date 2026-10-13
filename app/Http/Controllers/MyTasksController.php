@@ -1001,7 +1001,7 @@ class MyTasksController extends Controller
             $briefing['medications_due_during_shift'] = (
                 $user->canDo('medications.view')
                 || $user->canDo('medications.administer.record')
-            )
+            ) && app(\App\Services\Medication\ShiftMedicationCardAccess::class)->canRead($user, $shift->client) // EA-126
                 ? $this->getShiftMedicationsDue($shift, $workerNow, $canOpenEmar, $canAccessControlled)
                 : [];
             $briefing['what_to_know'] = $shift->notes;

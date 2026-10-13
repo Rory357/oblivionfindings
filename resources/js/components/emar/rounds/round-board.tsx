@@ -13,6 +13,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import type { MouseEvent } from 'react';
+import { RoundActions, roundMenuKey } from './round-actions';
 import { DoseStatusBadge, RoundStatusBadge } from './round-bits';
 import {
     notOwedCaption,
@@ -189,6 +190,10 @@ export default function RoundBoard({
                                 return (
                                     <tr
                                         key={r.id}
+                                        tabIndex={0}
+                                        onKeyDown={(e) =>
+                                            roundMenuKey(e, r, onContext)
+                                        }
                                         onContextMenu={(e) => onContext(e, r)}
                                         className="border-b last:border-b-0"
                                     >
@@ -247,6 +252,10 @@ export default function RoundBoard({
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="inline-flex items-center justify-end gap-1.5">
+                                                <RoundActions
+                                                    round={r}
+                                                    open={onContext}
+                                                />
                                                 {canOpen ? (
                                                     <Button
                                                         size="sm"
@@ -298,6 +307,8 @@ export default function RoundBoard({
                 return (
                     <div
                         key={r.id}
+                        tabIndex={0}
+                        onKeyDown={(e) => roundMenuKey(e, r, onContext)}
                         onContextMenu={(e) => onContext(e, r)}
                         className="flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm"
                     >
@@ -313,7 +324,10 @@ export default function RoundBoard({
                                         min
                                     </div>
                                 </div>
-                                <RoundStatusBadge status={r.status} />
+                                <div className="flex items-center gap-2">
+                                    <RoundStatusBadge status={r.status} />
+                                    <RoundActions round={r} open={onContext} />
+                                </div>
                             </div>
 
                             <div className="mt-3">

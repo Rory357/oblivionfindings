@@ -41,11 +41,13 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /** Route-level regressions across P01/P07, P08a/P09 and P08b/Tasks. */
 class MedicationRecoveryIntegrationRegressionTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 
@@ -64,7 +66,8 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
         Queue::fake();
         Cache::flush();
         $this->seed(RbacSeeder::class);
-        config(['medications.witness_pin.forgotten_fallback_enabled' => true]);
+        // The forgotten-PIN fallback is off until a manager switches it on (Stephan, 9 Oct).
+        AppSetting::query()->updateOrCreate(['key' => \App\Services\Medication\WitnessPinSettings::FORGOTTEN_FALLBACK], ['value' => 'yes']);
         $this->site = Site::factory()->create([
             'name' => 'Synthetic recovery house', 'type' => 'house',
             'is_active' => true, 'archived' => false, 'archived_at' => null,

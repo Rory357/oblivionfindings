@@ -34,11 +34,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /** P07a: an approved, prospective dose waiver is scoped and never becomes witness evidence. */
 class ControlledDoseOverrideTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 

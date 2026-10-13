@@ -28,10 +28,12 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationScopeAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 
@@ -141,6 +143,9 @@ class MedicationScopeAuthorizationTest extends TestCase
 
     public function test_a_shift_for_another_resident_at_the_same_site_does_not_authorize_the_action(): void
     {
+        // EA-006 (Stephan's D1): a shift at the house covers the residents the
+        // worker is assigned to support (LaneASharedHouseTest), never anyone else.
+        $this->client->supportWorkers()->detach($this->worker->id);
         $otherClient = Client::factory()->create([
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
@@ -451,8 +456,9 @@ class MedicationScopeAuthorizationTest extends TestCase
         ]);
         $foreignMedication = $this->scheduledMedication($otherClient, ['name' => 'Foreign resident medicine']);
 
+        // EA-053 (Lane C3): the old prescriber-order register is read only.
         $this->actingAs($this->worker)
-            ->post('/emar/prescriptions', [
+            ->postJson('/emar/prescriptions', [
                 'client_id' => $this->client->id,
                 'client_medication_id' => $foreignMedication->id,
                 'order_type' => 'cease',
@@ -463,7 +469,7 @@ class MedicationScopeAuthorizationTest extends TestCase
                 'frequency' => 'Once daily',
                 'order_date' => today()->toDateString(),
             ])
-            ->assertNotFound();
+            ->assertStatus(409);
 
         $this->assertDatabaseCount('medication_prescriber_orders', 0);
         $this->assertTrue((bool) $foreignMedication->fresh()->active);
@@ -534,11 +540,10 @@ class MedicationScopeAuthorizationTest extends TestCase
         $replacement = $this->scheduledMedication($this->client, ['name' => 'Replacement medicine']);
 
         $this->actingAs($this->worker)
-            ->put("/emar/prescriptions/{$order->id}", [
+            ->putJson("/emar/prescriptions/{$order->id}", [
                 'client_medication_id' => $replacement->id,
             ])
-            ->assertRedirect()
-            ->assertSessionHasErrors('client_medication_id');
+            ->assertStatus(409);
 
         $this->assertSame($this->medication->id, (int) $order->fresh()->client_medication_id);
     }

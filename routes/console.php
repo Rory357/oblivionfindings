@@ -75,6 +75,7 @@ use App\Jobs\ShiftTaskDueJob;
 use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\SyncWorkCalendarsJob;
 use App\Models\MedicationIdempotencyResult;
+use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\Fleet\FinanceReviewNotices;
 use App\Services\Medication\PharmacyConnect\PharmacyDispatchService;
 use App\Services\MedicationAlertService;
@@ -1011,3 +1012,12 @@ app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()
 
 // Media watchdogs enforce 15-second authority; this erases expired central signalling.
 Illuminate\Support\Facades\Schedule::command('cctv:expire-live-sessions')->everyMinute()->withoutOverlapping();
+
+// EA-188: 14-day reminders before prescriber access, identities and catalogue reviews end.
+app(Schedule::class)->command('medications:connected-expiry-reminders')->dailyAt('07:00')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
+// Durable workforce eligibility recovery uses the existing minute scheduler.
+Artisan::command('workforce:recover-eligibility-refresh', function () {
+    $this->info((string) app(WorkforceEligibilityRefresh::class)->recover());
+})->purpose('Recover pending or interrupted workforce eligibility checks');
+app(Schedule::class)->command('workforce:recover-eligibility-refresh')->everyMinute()->withoutOverlapping();

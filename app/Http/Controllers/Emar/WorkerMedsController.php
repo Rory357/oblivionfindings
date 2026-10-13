@@ -27,9 +27,11 @@ use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
 use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MarLinkService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Recording\DoseRecordingRequirements;
+use App\Services\Medication\Recording\OfflineReplayReview;
 use App\Services\Medication\Recording\PrnEffectCheckQueue;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Reporting\MedicationReportAccess;
@@ -49,6 +51,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -230,7 +233,10 @@ class WorkerMedsController extends Controller
             'my_eligibility' => app(StaffEligibilityRegister::class)->myEligibility($user),
             'board_can' => [
                 'export_round' => app(MedicationReportAccess::class)->canExport($user, 'doses'),
-                'view_emar' => $user->canDo('medications.view'),
+                // EA-168 (Lane C8): finance-only users don't get the MAR hub link.
+                'view_emar' => $user->canDo('medications.view') && ! ($user->canDo('medications.stock.update')
+                    && ! $user->canDo('medications.orders.manage') && ! $user->canDo('medications.orders.verify')
+                    && ! $user->canDo('medications.settings.manage') && ! $user->canDo('medications.audit.view')),
                 'view_audit' => $user->canDo('medications.audit.view'),
                 'record_administration' => $user->canDo('medications.administer.record'),
                 'record_controlled' => $user->canDo('medications.controlled.record'),
@@ -238,6 +244,9 @@ class WorkerMedsController extends Controller
                     && $user->canDo('medications.controlled.view'),
                 'manage_stock' => $user->canDo('medications.view')
                     && $user->canDo('medications.stock.update'),
+                // P06 (Stephan, 10 Oct): stock.receive holders — house leads — receive deliveries.
+                'receive_stock' => $user->canDo('medications.view')
+                    && ($user->canDo('medications.stock.receive') || $user->canDo('medications.stock.update')),
             ],
             'has_shift_context' => $hasShift || ! empty($assignedClientIds),
             // People on their shift whose medicines show once they're clocked
@@ -267,7 +276,8 @@ class WorkerMedsController extends Controller
                 : Inertia::optional(fn () => $this->activityPageFor($request, $assignedClientIds, $now, $includeControlled)),
             'board_extra_can' => [
                 'report_error' => $user->canDo('medications.administer.record'),
-                'view_handovers' => $user->canDo('medications.view'),
+                // EA-044 (Lane C8): only people who can open the handover workflow.
+                'view_handovers' => app(\App\Services\ShiftHandoverService::class)->canAccessWorkflow($user),
             ],
             // Whose medication record (MAR) the row menus may offer to open.
             'mar_client_ids' => $user->canDo('medications.view')
@@ -615,6 +625,12 @@ class WorkerMedsController extends Controller
         }
     }
 
+    /** Review item 3: what a dose without the order it showed is told. */
+    private const ORDER_FINGERPRINT_MESSAGES = [
+        'order_fingerprint.required' => 'This dose doesn’t say which order it was given from, so it wasn’t recorded. Open the dose again and record it from the current order.',
+        'order_fingerprint.required_if' => 'This dose doesn’t say which order it was given from, so it wasn’t recorded. Open the dose again and record it from the current order.',
+    ];
+
     /**
      * Record the outcome of a scheduled dose (given / refused / withheld) from
      * the desktop Record Dose wizard.
@@ -655,7 +671,9 @@ class WorkerMedsController extends Controller
             ...RecordingContract::rules(),
             ...$this->recordingContextRules(),
             ...$this->medicationOfflineSubmissionRules($request),
-        ]);
+            // Review item 3: a "given" always says which order it showed (EA-008).
+            'order_fingerprint' => ['required_if:status,given', 'nullable', 'string', 'max:128'],
+        ], self::ORDER_FINGERPRINT_MESSAGES);
 
         $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
         $round = isset($data['medication_round_id']) ? MedicationRound::findOrFail($data['medication_round_id']) : null;
@@ -665,6 +683,9 @@ class WorkerMedsController extends Controller
         $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
             $submittedAdministrationAt ?? now()->toIso8601String()
         ));
+        if ($changed = $this->refuseQueuedDoseForChangedOrder($request, $user, $medication, $data)) {
+            return $changed;
+        }
 
         return $this->medicationScope->forAdministration(
             $user,
@@ -677,6 +698,9 @@ class WorkerMedsController extends Controller
             function (MedicationScopeDecision $scope) use ($request, $user, $data, $submittedAdministrationAt) {
                 $medication = $scope->medication;
                 $shiftId = $scope->shiftId();
+                if ($tooOld = $this->refuseTooOldQueuedDose($request, $scope, $user, $data)) {
+                    return $tooOld;
+                }
                 $scan = $this->validatedRecordingScan($scope, $data);
 
                 $notes = trim((string) ($data['notes'] ?? ''));
@@ -690,7 +714,7 @@ class WorkerMedsController extends Controller
                     $medication,
                     [
                         'status' => $data['status'],
-                        'reason' => $data['reason'] ?? null,
+                        'reason' => RecordingContract::notGivenReason($data),
                         'reason_code' => $data['status'] === 'given' ? null : ($data['reason_code'] ?? null),
                         'dose_given' => $data['status'] === 'given' ? $medication->dosage : null,
                         'quantity_administered' => $data['quantity_administered'] ?? null,
@@ -724,6 +748,7 @@ class WorkerMedsController extends Controller
                 if (! ($result['success'] ?? false)) {
                     $field = $result['error_field'] ?? 'status';
                     $message = $result['error'] ?? 'Could not record this dose.';
+                    $this->raiseOfflineReview($scope, $user, $data, OfflineReplayReview::reasonForStatus(422, $field), $message);
 
                     if ($request->expectsJson()) {
                         return response()->json(
@@ -736,6 +761,8 @@ class WorkerMedsController extends Controller
                                     'errors' => [$field => [$message]],
                                     'competency_state' => $result['competency_state'] ?? null,
                                     'safety_check' => $result['safety_check'] ?? null,
+                                    // EA-008: the dialog reloads and shows the new order.
+                                    'order_changed' => ($result['order_changed'] ?? false) ? true : null,
                                 ], fn ($value) => $value !== null),
                                 $data,
                                 'rejected',
@@ -752,6 +779,11 @@ class WorkerMedsController extends Controller
                 $clientName = trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? ''));
 
                 if ($result['duplicate'] ?? false) {
+                    // EA-004: a dose saved on a device while someone else
+                    // recorded this one is a conflict for a lead, never "sent".
+                    if (! (bool) ($result['replayed'] ?? false) && (bool) ($data['queued_offline'] ?? false)) {
+                        return $this->queuedDuplicateConflict($request, $scope, $user, $data, $result);
+                    }
                     // P01 (JSON): someone else's record for this dose is
                     // "Already recorded"; a retry of this same request is the
                     // worker's own record coming back, so it confirms it.
@@ -890,7 +922,9 @@ class WorkerMedsController extends Controller
             ...RecordingContract::rules(),
             ...$this->recordingContextRules(),
             ...$this->medicationOfflineSubmissionRules($request),
-        ]);
+            // Review item 3: an as-needed dose is always "given".
+            'order_fingerprint' => ['required', 'string', 'max:128'],
+        ], self::ORDER_FINGERPRINT_MESSAGES);
 
         $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
         abort_unless($medication->client, 404);
@@ -898,6 +932,9 @@ class WorkerMedsController extends Controller
         $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
             $submittedAdministrationAt ?? now()->toIso8601String()
         ));
+        if ($changed = $this->refuseQueuedDoseForChangedOrder($request, $user, $medication, $data)) {
+            return $changed;
+        }
 
         return $this->medicationScope->forAdministration(
             $user,
@@ -910,6 +947,9 @@ class WorkerMedsController extends Controller
             function (MedicationScopeDecision $scope) use ($request, $user, $data, $submittedAdministrationAt) {
                 $medication = $scope->medication;
                 $shiftId = $scope->shiftId();
+                if ($tooOld = $this->refuseTooOldQueuedDose($request, $scope, $user, $data)) {
+                    return $tooOld;
+                }
                 $scan = $this->validatedRecordingScan($scope, $data);
 
                 $result = $this->marService->recordAdministration(
@@ -934,17 +974,11 @@ class WorkerMedsController extends Controller
                         'queued_offline' => (bool) ($data['queued_offline'] ?? false),
                         'administered_at' => $submittedAdministrationAt,
                         'scope_authorized' => true,
-                        // P01 C1: amount, second person and the effect-check time.
-                        ...Arr::only($data, [
-                            'amount_mode',
-                            'amount_reason',
-                            'quantity_given',
-                            'more_severity',
-                            'more_immediate_action',
-                            'second_person_unavailable',
-                            'second_person_pin_forgotten',
-                            'effect_check_due_at',
-                        ]),
+                        // P01 C1 recording contract, exactly as a scheduled
+                        // dose forwards it (EA-003): the amount, second
+                        // person and effect-check time, plus the actual pack
+                        // lines, waste and the connected recording review.
+                        ...Arr::only($data, RecordingContract::fields()),
                         ...$scan,
                     ],
                     $user->id,
@@ -957,6 +991,7 @@ class WorkerMedsController extends Controller
                 if (! ($result['success'] ?? false)) {
                     $field = $result['error_field'] ?? 'reason';
                     $message = $result['error'] ?? 'Could not record this PRN dose.';
+                    $this->raiseOfflineReview($scope, $user, $data, OfflineReplayReview::reasonForStatus(422, $field), $message);
 
                     if ($request->expectsJson()) {
                         return response()->json(
@@ -969,6 +1004,7 @@ class WorkerMedsController extends Controller
                                     'errors' => [$field => [$message]],
                                     'competency_state' => $result['competency_state'] ?? null,
                                     'safety_check' => $result['safety_check'] ?? null,
+                                    'order_changed' => ($result['order_changed'] ?? false) ? true : null,
                                 ], fn ($value) => $value !== null),
                                 $data,
                                 'rejected',
@@ -1030,6 +1066,123 @@ class WorkerMedsController extends Controller
      *
      * @return array<string, mixed>
      */
+    /**
+     * eMAR audit Lane A3 (EA-049, EA-050, EA-131): a dose saved on a device
+     * that the server refuses gets ONE lead follow-up with what the device
+     * captured. Online submissions are answered in the open dialog instead.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function raiseOfflineReview(
+        MedicationScopeDecision $scope,
+        User $user,
+        array $data,
+        string $reasonKey,
+        string $reason,
+        ?ClientMedicationAdministration $existing = null,
+    ): void {
+        if (! (bool) ($data['queued_offline'] ?? false) || blank($data['client_request_uuid'] ?? null)) {
+            return;
+        }
+
+        app(OfflineReplayReview::class)->raise($scope->client, $scope->medication, $user, $data, $reasonKey, $reason, $existing);
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function queuedRefusal(Request $request, array $data, string $field, string $message, int $status = 422): JsonResponse|RedirectResponse
+    {
+        if (! $request->expectsJson()) {
+            return back()->withErrors([$field => $message]);
+        }
+
+        return response()->json($this->withMedicationSync([
+            'success' => false,
+            'message' => $message,
+            'error' => $message,
+            'error_field' => $field,
+            'errors' => [$field => [$message]],
+        ], $data, 'rejected', false, $message), $status);
+    }
+
+    /**
+     * EA-131: a dose saved on a device longer ago than the policy allows is
+     * not added to the chart as new; it goes to reviewed paper recovery. A
+     * request that already reached the chart is still replayed as itself.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function refuseTooOldQueuedDose(Request $request, MedicationScopeDecision $scope, User $user, array $data): JsonResponse|RedirectResponse|null
+    {
+        $message = app(OfflineReplayReview::class)->refuseIfTooOld($request, $scope->client, $scope->medication, $user, $data);
+
+        return $message === null ? null : $this->queuedRefusal($request, $data, 'queued_offline', $message);
+    }
+
+    /**
+     * EA-050: a dose saved on a device before its order was changed (the
+     * order row was superseded) gets a clear refusal and a lead follow-up,
+     * not a bare "not found" retried forever. Only someone who could record
+     * for this person learns why; anyone else still gets "not found".
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function refuseQueuedDoseForChangedOrder(Request $request, User $user, ClientMedication $medication, array $data): JsonResponse|RedirectResponse|null
+    {
+        if (! (bool) ($data['queued_offline'] ?? false) || $medication->superseded_by === null || blank($data['client_request_uuid'] ?? null)) {
+            return null;
+        }
+        if ($medication->controlled_drug && ! $user->canDo('medications.controlled.record')) {
+            return null;
+        }
+        // Review item 4: current authority for this person, not just the house.
+        if (! in_array((int) $medication->client_id, $this->medicationScope->clientIdsWithCurrentAuthority($user, [(int) $medication->client_id], now()), true)) {
+            return null;
+        }
+        if (ClientMedicationAdministration::withTrashed()->where('client_request_uuid', (string) $data['client_request_uuid'])->exists()) {
+            return null;
+        }
+        $message = 'Not recorded — this order changed after the dose was saved on the device. Check the new order. If the dose was given, record it on paper and tell your lead; they have a follow-up.';
+        DB::transaction(function () use ($user, $medication, $data, $message): void {
+            $client = Client::query()->whereKey($medication->client_id)->lockForUpdate()->firstOrFail();
+            $locked = ClientMedication::query()->whereKey($medication->id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
+            app(OfflineReplayReview::class)->raise($client, $locked, $user, $data, OfflineReplayReview::ORDER_CHANGED, $message);
+        });
+
+        return $this->queuedRefusal($request, $data, 'client_medication_id', $message);
+    }
+
+    /**
+     * EA-004: someone else recorded this dose while this one waited on a
+     * device. Nothing is saved; the worker and a lead are told, with what
+     * each recorded, so a double dose or a wrong outcome is reviewed.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $result
+     */
+    private function queuedDuplicateConflict(Request $request, MedicationScopeDecision $scope, User $user, array $data, array $result): JsonResponse|RedirectResponse
+    {
+        $message = 'Someone else recorded this dose while you were offline — a lead must review it.';
+        $existing = ($result['administration'] ?? null) instanceof ClientMedicationAdministration ? $result['administration'] : null;
+        $this->raiseOfflineReview($scope, $user, $data, OfflineReplayReview::DUPLICATE, $message, $existing);
+        if (! $request->expectsJson()) {
+            return back()->with('warning', $message);
+        }
+
+        return response()->json($this->withMedicationSync([
+            'success' => false,
+            'message' => $message,
+            'error' => $message,
+            'error_field' => 'scheduled_for',
+            'duplicate_of' => $result['duplicate_of'] ?? null,
+            'scheduled_for' => $data['scheduled_for'] ?? null,
+            'captured' => array_filter([
+                'status' => $data['status'] ?? null,
+                'administered_at' => $data['administered_at'] ?? null,
+                'captured_offline_at' => $data['captured_offline_at'] ?? null,
+            ], fn ($value) => $value !== null),
+        ], $data, 'conflict', false, $message), 409);
+    }
+
     private function appendDoseEvent(MedicationScopeDecision $scope, ClientMedicationAdministration $administration): void
     {
         // Last domain write in the authorized source transaction. A recorder
@@ -1108,7 +1261,9 @@ class WorkerMedsController extends Controller
      * selected day (or the day after, so late shifts crossing midnight keep
      * their context) whom they may open — the person rule My Day and the
      * badge use (C6): people they're assigned to at their Sites, or on a
-     * shift they're clocked in to now. So before clock-in a worker sees no
+     * shift they're clocked in to now. A shift at a house also brings in
+     * every resident there the worker is assigned to support, whoever the
+     * shift names (EA-006, D1). So before clock-in a worker sees no
      * other person's medicines unless they're assigned to them. With no
      * shift context (e.g. a medication lead opening the worker view) the
      * board falls back to the people at their Sites they may open.
@@ -1128,7 +1283,7 @@ class WorkerMedsController extends Controller
         }
 
         try {
-            $shiftClientIds = Shift::where('user_id', $user->id)
+            $shifts = Shift::where('user_id', $user->id)
                 ->where('starts_at', '<=', $to)
                 ->where(function ($overlap) use ($from): void {
                     $overlap
@@ -1148,9 +1303,34 @@ class WorkerMedsController extends Controller
                         });
                 })
                 ->where('status', '!=', 'cancelled')
-                ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds))
+                ->where(function ($house) use ($siteIds): void {
+                    $house->whereIn('site_id', $siteIds)
+                        ->orWhere(fn ($derived) => $derived->whereNull('site_id')
+                            ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds)));
+                })
+                ->with('client:id,site_id')
+                ->get(['id', 'client_id', 'site_id']);
+
+            // EA-006 (D1): a shift at a house covers every resident there the
+            // worker is assigned to support, whoever the shift names.
+            $houseIds = $shifts
+                ->map(fn (Shift $shift): ?int => $shift->site_id !== null ? (int) $shift->site_id : ($shift->client?->site_id !== null ? (int) $shift->client->site_id : null))
+                ->filter(fn (?int $siteId): bool => $siteId !== null && in_array($siteId, $siteIds, true))
+                ->unique()
+                ->values()
+                ->all();
+            $supported = $houseIds === [] ? [] : Client::query()
+                ->whereIn('site_id', $houseIds)
+                ->whereHas('supportWorkers', fn ($workers) => $workers->whereKey($user->id))
+                ->orderBy('id')
+                ->pluck('id')
+                ->all();
+            $shiftClientIds = $shifts
+                ->filter(fn (Shift $shift): bool => $shift->client !== null && in_array((int) $shift->client->site_id, $siteIds, true))
                 ->pluck('client_id')
+                ->merge($supported)
                 ->filter()
+                ->map(fn ($id): int => (int) $id)
                 ->unique()
                 ->values()
                 ->all();

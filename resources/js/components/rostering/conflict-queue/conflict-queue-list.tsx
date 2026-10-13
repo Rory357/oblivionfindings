@@ -80,16 +80,16 @@ function QueueRow({
 function ListEmpty({ allClear }: { allClear: boolean }) {
     return (
         <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-status-success-bg text-status-success">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <Check className="h-7 w-7" />
             </span>
             <p className="mt-3 text-sm font-semibold">
-                {allClear ? 'Queue clear — nice work' : 'Nothing here'}
+                {allClear ? 'No findings returned' : 'No matching findings'}
             </p>
             <p className="mt-1 max-w-[260px] text-xs text-muted-foreground">
                 {allClear
-                    ? 'Every conflict for this week is resolved. The roster is ready to publish.'
-                    : 'No items match this filter right now.'}
+                    ? 'Refresh after changing the roster. Publication checks run separately.'
+                    : 'Try another view or clear the filters.'}
             </p>
         </div>
     );
@@ -121,7 +121,7 @@ export function ConflictQueueList({
         : [];
 
     return (
-        <div className="rounded-2xl border bg-card">
+        <div className="min-w-0 rounded-2xl border bg-card">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
                 <span className="text-sm font-semibold">{headerLabel}</span>
                 <span className="text-xs text-muted-foreground">

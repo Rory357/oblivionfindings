@@ -4,10 +4,11 @@
  * their own components. Keys owned by show.tsx's pre-existing dialogs
  * (daily/quick/communication note, edit profile) are delegated before this
  * component is reached. */
+import { DosePicker } from '@/components/emar/record/record-dose-launch';
 import type { WitnessPickerOption } from '@/lib/witness-pin';
 import { AbcEntryDialog, type AbcEntryRow } from './abc-dialog';
 import { CarePlanWizardDialog, type CarePlanForEdit } from './care-plan-dialog';
-import { EmarRecordDialog, type EmarMedication } from './emar-dialog';
+import type { EmarMedication } from './emar-dialog';
 import { FamilyChatPopup } from './family-chat';
 import { PROFILE_FLOWS, type ProfileFlowContext } from './flows';
 import { GoalWizardDialog, type GoalCard } from './goal-dialog';
@@ -24,10 +25,7 @@ export function ProfileDialogs({
     dialog,
     onClose,
     flowContext,
-    medications,
     canRecord,
-    canRecordControlled,
-    witnessOptions,
 }: {
     dialog: ProfileDialogState;
     onClose: () => void;
@@ -103,20 +101,19 @@ export function ProfileDialogs({
         if (!canRecord) return null;
 
         return (
-            <EmarRecordDialog
-                open
+            <DosePicker
+                key={`${flowContext.clientId}:${dialog.ctx?.medicationId ?? 'all'}`}
                 onClose={onClose}
                 clientId={flowContext.clientId}
-                clientLabel={flowContext.clientLabel}
-                medications={medications}
-                canRecord={canRecord}
-                canRecordControlled={canRecordControlled}
-                witnessOptions={witnessOptions}
-                initialMedicationId={
+                personName={flowContext.preferredName}
+                medicationId={
                     typeof dialog.ctx?.medicationId === 'number'
                         ? dialog.ctx.medicationId
                         : undefined
                 }
+                asNeeded={false}
+                entry="client-profile"
+                returnFocus={() => null}
             />
         );
     }

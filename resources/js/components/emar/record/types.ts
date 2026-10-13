@@ -14,7 +14,19 @@ export interface RecordPerson {
     service: string | null;
 }
 
+/** EA-110: today's doses from the same schedule as Meds today; null when the day's history is unavailable. */
+export interface RecordDoseMeters {
+    scheduled: number;
+    due: number;
+    due_until: string | null;
+    late: number;
+    oldest_late: string | null;
+    recorded: number;
+    so_far: number;
+}
+
 export interface RecordMeters {
+    doses?: RecordDoseMeters | null;
     medicines: {
         count: number;
         hidden: number;
@@ -56,6 +68,21 @@ export interface RecordMedicine {
     started: string | null;
     verified: { at: string; by: string | null } | null;
     stopped: { at: string; by: string | null; reason: string | null } | null;
+    /** C11: the latest staff photo (or a bound reference image), else null. */
+    pack_photo?: RecordPackPhotoSummary | null;
+}
+
+/** C11: the picture shown for a medicine (PackPhotoReader payload). */
+export interface RecordPackPhotoSummary {
+    kind: 'staff' | 'reference';
+    url: string;
+    taken_at: string | null;
+    taken_by: string | null;
+    pack: string | null;
+    pharmacy: string | null;
+    pack_changed?: boolean;
+    now_pack?: string | null;
+    source?: string | null;
 }
 
 /** A controlled medicine shown to a reader without controlled-medicine access. */
@@ -87,6 +114,8 @@ export interface RecordMedicineDetail {
         at: string | null;
         by: string | null;
     }[];
+    /** C11: the photo staff see when recording. */
+    pack_photo?: RecordPackPhotoSummary | null;
 }
 
 export interface RecordSupportPlan {
@@ -112,7 +141,11 @@ export type RecordPageProps =
               manage_orders: boolean;
               view_controlled: boolean;
               view_audit: boolean;
+              /** EA-110: reports.view + reports.export (Print MAR). */
+              print?: boolean;
           };
+          /** The NZ day, for Print MAR's ranges. */
+          today?: string;
           as_at: string;
       }
     | { unavailable: 'no_access' | 'not_found' };

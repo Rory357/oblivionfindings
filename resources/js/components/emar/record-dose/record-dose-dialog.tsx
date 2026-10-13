@@ -18,6 +18,7 @@ import {
     validateStockPackLines,
     type StockPackLine,
 } from '@/components/medications/stock-pack-fields';
+import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -46,6 +47,7 @@ import {
     prepareMedicationMutationReplayState,
     submitEmarMutation,
 } from '@/lib/emar-offline';
+import { medicationRecorded } from '@/lib/medication-record-events';
 import {
     emptyMedicationScanCapture,
     hasVerifiedMedicationScan,
@@ -57,7 +59,10 @@ import {
     secondPersonDisplay,
     type SecondPersonEvidence,
 } from '@/lib/medication-second-person';
-import { readServerSyncOutcome } from '@/lib/offline-queue';
+import {
+    getOfflineQueueActorId,
+    readServerSyncOutcome,
+} from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 import {
@@ -98,6 +103,7 @@ import {
     type Errors,
     type SecondState,
 } from './fields';
+import { PackPhotoCard, packLabelTickNeeded } from './pack-photo';
 import {
     AllergyNotice,
     BlockedPanel,
@@ -111,12 +117,23 @@ import {
     activeBlock,
 } from './parts';
 import {
+    clearDoseRecovery,
+    doseRecoveryKey,
+    findDoseRecovery,
+    keepDoseRecovery,
+    formatPendingDoseWhen as localLabel,
+    readDoseRecovery,
+} from './recovery';
+import {
     ENTRY_LABEL,
     isBlockedAnswer,
     type DoseRequirements,
     type DoseTarget,
     type EntryPoint,
+    type OrderChange,
+    type OrderVersionFacts,
     type RecordMode,
+    type RequirementsAnswer,
     type SecondPersonKind,
 } from './types';
 import { useDoseRequirements } from './use-dose-requirements';
@@ -171,7 +188,18 @@ interface FormState {
     /** Controlled medicines: what's left in the stock after this dose (Q-C2a, counted). */
     cdBalance: string;
     packChecked: boolean;
+    /** "I've checked the new instructions and the label" (P01 v2, EA-059). */
+    changeAck?: boolean;
+    /** A11: "I’ve checked the label" when there's no pack photo and the organisation asks for it. */
+    labelChecked?: boolean;
 }
+export type PendingDose = {
+    form: FormState;
+    uuid: string;
+    body: Record<string, unknown>;
+    display: DoseRequirements;
+    target: DoseTarget;
+};
 
 /** Recording context an entry point locks (shown on step 1 and the review). */
 export interface TransportContext {
@@ -216,21 +244,31 @@ const timeLabel = (iso: string | null | undefined) =>
               timeZone: TZ,
           })
         : '—';
-const localLabel = (local: string) => {
-    if (!local) return '—';
-    const [d, t] = local.split('T');
-    const [h, m] = (t ?? '00:00').split(':').map(Number);
-    const ampm = h >= 12 ? 'pm' : 'am';
-    const h12 = h % 12 === 0 ? 12 : h % 12;
-    const date = new Date(`${d}T12:00:00Z`).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-    });
-
-    return `${date} · ${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-};
+/** One order version in the words the "Order changed" notice uses (P01 v2). */
+function orderVersionWords(v: OrderVersionFacts): string {
+    const amount =
+        v.dosage ??
+        (v.dose_amount != null
+            ? formatAmount(v.dose_amount, v.dose_unit)
+            : null);
+    const times = v.dose_times?.length
+        ? v.dose_times
+              .map((t) => {
+                  const [h, m] = t.split(':').map(Number);
+                  if (!Number.isFinite(h)) return t;
+                  return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'pm' : 'am'}`;
+              })
+              .join(' and ')
+        : (v.frequency ?? null);
+    return [amount ?? 'Dose not recorded', times].filter(Boolean).join(' · ');
+}
+const orderFacts = (o: DoseRequirements['order']): OrderVersionFacts => ({
+    dosage: o.dosage,
+    dose_amount: o.dose_amount,
+    dose_unit: o.dose_unit,
+    route: o.route,
+    instructions: o.instructions,
+});
 
 /** "NZDT" or "NZST" — the zone the times are in, as the approved review shows it. */
 const nzZone = (date: Date = new Date()) =>
@@ -349,6 +387,31 @@ export function RecordDoseDialog({
     returnFocus?: () => HTMLElement | null;
 }) {
     const requirements = useDoseRequirements(target);
+    const [pending, setPending] = useState(() =>
+        findDoseRecovery<PendingDose>(
+            target.orderId,
+            target.kind === 'scheduled' ? target.scheduledFor : 'prn',
+        ),
+    );
+    const [resumeOriginal, setResumeOriginal] = useState(false);
+    // A committed PRN may now be blocked by its interval limit. Confirm the
+    // original request independently of the permission to record another dose.
+    if (pending && !resumeOriginal) {
+        const canResume =
+            requirements.status === 'ready' &&
+            !isBlockedAnswer(requirements.data) &&
+            JSON.stringify(requirements.data.order) ===
+                JSON.stringify(pending.draft.display.order);
+        return (
+            <PendingDoseConfirmation
+                pending={pending}
+                onClose={onClose}
+                onRecorded={onRecorded}
+                onResume={canResume ? () => setResumeOriginal(true) : undefined}
+                returnFocus={returnFocus}
+            />
+        );
+    }
 
     if (requirements.status !== 'ready') {
         return (
@@ -390,11 +453,183 @@ export function RecordDoseDialog({
             shiftContext={shiftContext}
             onClose={onClose}
             onRecorded={onRecorded}
+            onRefresh={requirements.refresh}
+            onCheckSaved={() => {
+                const original = findDoseRecovery<PendingDose>(
+                    target.orderId,
+                    target.kind === 'scheduled' ? target.scheduledFor : 'prn',
+                );
+                if (!original) return false;
+                setPending(original);
+                setResumeOriginal(false);
+                return true;
+            }}
             onEligibility={onEligibility}
             onNext={onNext}
             nextLabel={nextLabel}
             returnFocus={returnFocus}
         />
+    );
+}
+
+function PendingDoseConfirmation({
+    pending,
+    onClose,
+    onRecorded,
+    onResume,
+    returnFocus,
+}: {
+    pending: { key: string; draft: PendingDose; person: number; order: number };
+    onClose: () => void;
+    onRecorded?: (result: RecordedResult) => void;
+    onResume?: () => void;
+    returnFocus?: () => HTMLElement | null;
+}) {
+    const resuming = useRef(false);
+    const [state, setState] = useState<
+        'loading' | 'recorded' | 'unconfirmed' | 'unavailable'
+    >('loading');
+    const [chart, setChart] = useState<string | null>(null);
+    const [attempt, setAttempt] = useState(0);
+    const callbacks = useRef({ onClose, onRecorded });
+    useEffect(() => {
+        callbacks.current = { onClose, onRecorded };
+    }, [onClose, onRecorded]);
+    useEffect(() => {
+        let active = true;
+        const actor = getOfflineQueueActorId();
+        const closeForActor = () => {
+            active = false;
+            callbacks.current.onClose();
+        };
+        window.addEventListener('emar:actor-changed', closeForActor);
+        setState('loading');
+        axios
+            .get('/meds/today/recording-status', {
+                params: {
+                    client_medication_id: pending.order,
+                    client_request_uuid: pending.draft.uuid,
+                },
+                headers: { Accept: 'application/json' },
+            })
+            .then(({ data }) => {
+                if (!active || getOfflineQueueActorId() !== actor) return;
+                if (
+                    data.status === 'recorded' &&
+                    Number.isInteger(data.administration_id) &&
+                    typeof data.chart_url === 'string' &&
+                    data.chart_url.startsWith('/emar/mar?')
+                ) {
+                    clearDoseRecovery(pending.key);
+                    medicationRecorded(pending.person);
+                    setChart(data.chart_url);
+                    setState('recorded');
+                    callbacks.current.onRecorded?.({
+                        status: 'recorded',
+                        administrationId: data.administration_id,
+                    });
+                } else setState('unconfirmed');
+            })
+            .catch(() => {
+                if (active) setState('unavailable');
+            });
+        return () => {
+            active = false;
+            window.removeEventListener('emar:actor-changed', closeForActor);
+        };
+    }, [
+        pending.key,
+        pending.order,
+        pending.person,
+        pending.draft.uuid,
+        attempt,
+    ]);
+    return (
+        <SettingsModal
+            title="Check an unconfirmed dose"
+            description="Check the original request before recording anything else for this dose."
+            width={480}
+            onClose={onClose}
+            onCloseAutoFocus={(event) => {
+                if (resuming.current) {
+                    event.preventDefault();
+                    return;
+                }
+                const element = returnFocus?.();
+                if (element) {
+                    event.preventDefault();
+                    element.focus();
+                }
+            }}
+        >
+            <div className="space-y-4">
+                {state === 'loading' ? (
+                    <LoadingState message="Checking whether the original request was recorded…" />
+                ) : state === 'recorded' ? (
+                    <>
+                        <p role="status">
+                            The original dose is recorded. No new dose was
+                            created.
+                        </p>
+                        {chart && (
+                            <Button asChild>
+                                <a href={chart}>Open the recorded dose</a>
+                            </Button>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <p role="alert">
+                            {state === 'unavailable'
+                                ? 'The result could not be checked with your current access or connection.'
+                                : 'The server has not confirmed the original request. This does not mean it failed.'}
+                        </p>
+                        {state === 'unconfirmed' && (
+                            <ReviewCard title="Original attempt" icon={Pill}>
+                                <ReviewRow
+                                    label="Medicine"
+                                    value={`${pending.draft.display.order.name} · ${pending.draft.display.order.dosage ?? 'See order'}`}
+                                />
+                                <ReviewRow
+                                    label="Outcome"
+                                    value={
+                                        pending.draft.form.outcome ??
+                                        'Not confirmed'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="When"
+                                    value={localLabel(pending.draft.form.when)}
+                                />
+                            </ReviewCard>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                            {onResume
+                                ? 'You can review and retry the same request. Its original dose details and request identity are retained.'
+                                : 'Current recording checks or the order have changed. Keep this browser tab open and ask the medication lead to check the chart.'}{' '}
+                            Do not create a replacement dose while its result is
+                            unknown.
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={() => setAttempt((value) => value + 1)}
+                        >
+                            Check again
+                        </Button>
+                        {state === 'unconfirmed' && onResume && (
+                            <Button
+                                onClick={() => {
+                                    resuming.current = true;
+                                    onResume();
+                                }}
+                            >
+                                Review original attempt
+                            </Button>
+                        )}
+                    </>
+                )}
+            </div>
+        </SettingsModal>
     );
 }
 
@@ -472,6 +707,8 @@ function RecordDoseForm({
     shiftContext,
     onClose,
     onRecorded,
+    onRefresh,
+    onCheckSaved,
     onEligibility,
     onNext,
     nextLabel,
@@ -487,11 +724,17 @@ function RecordDoseForm({
     shiftContext?: ShiftRecordingContext;
     onClose: () => void;
     onRecorded?: (result: RecordedResult) => void;
+    /** Fetch the current requirements again, keeping this draft (EA-008, EA-060). */
+    onRefresh?: (
+        renewReview?: string | null,
+    ) => Promise<RequirementsAnswer | null>;
+    onCheckSaved: () => boolean;
     onEligibility?: () => void;
     onNext?: () => void;
     nextLabel?: string | null;
     returnFocus?: () => HTMLElement | null;
 }) {
+    const confirmingOriginal = useRef(false);
     const isPrn = req.kind === 'prn';
     const p = req.person.preferred_name;
     const med = req.order.name;
@@ -506,32 +749,43 @@ function RecordDoseForm({
             ? formatAmount(req.order.dose_amount, req.order.dose_unit)
             : '—');
 
-    const [f, setF] = useState<FormState>(() => ({
-        step: mode === 'notgiven' || mode === 'reoffer' ? 1 : 0,
-        outcome: null,
-        reason: '',
-        lateReason: '',
-        note: '',
-        when: nzLocal(),
-        followBy: '',
-        prnReason: '',
-        checkBy: '',
-        amount: {
-            mode: 'asOrdered',
-            amount: req.order.dose_amount,
-            reason: '',
-            severity: '',
-            immediate: '',
-        },
-        obs: {},
-        second: { id: null, pin: '' },
-        stockQuantity: '',
-        packLines: [],
-        cdBalance: '',
-        packChecked: false,
-    }));
+    const recoveryKey = doseRecoveryKey(
+        req.person.id,
+        req.order.id,
+        target.kind === 'scheduled' ? target.scheduledFor : 'prn',
+    );
+    const [recovered] = useState(() =>
+        readDoseRecovery<PendingDose>(recoveryKey),
+    );
+    const [f, setF] = useState<FormState>(
+        () =>
+            recovered?.form ?? {
+                step: mode === 'notgiven' || mode === 'reoffer' ? 1 : 0,
+                outcome: null,
+                reason: '',
+                lateReason: '',
+                note: '',
+                when: nzLocal(),
+                followBy: '',
+                prnReason: '',
+                checkBy: '',
+                amount: {
+                    mode: 'asOrdered',
+                    amount: req.order.dose_amount,
+                    reason: '',
+                    severity: '',
+                    immediate: '',
+                },
+                obs: {},
+                second: { id: null, pin: '' },
+                stockQuantity: '',
+                packLines: [],
+                cdBalance: '',
+                packChecked: false,
+            },
+    );
     const [errors, setErrors] = useState<Errors>({});
-    const [phase, setPhase] = useState<Phase>('edit');
+    const [phase, setPhase] = useState<Phase>(recovered ? 'uncertain' : 'edit');
     const [serverMessage, setServerMessage] = useState<string | null>(null);
     const [duplicateOf, setDuplicateOf] = useState<{
         by: string | null;
@@ -547,11 +801,55 @@ function RecordDoseForm({
         reference: string | null;
         incidentId: number | null;
     } | null>(null);
-    const dirty = useRef(false);
+    // EA-008: the order the worker was shown before the server said it changed.
+    const [orderChangedFrom, setOrderChangedFrom] = useState<
+        DoseRequirements['order'] | null
+    >(null);
+    // EA-060: the pack review expired inside this open dialog.
+    const [reviewExpired, setReviewExpired] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    // EA-149: the last attempt never left the browser (what to do next).
+    const [notSent, setNotSent] = useState<string | null>(null);
+    const dirty = useRef(Boolean(recovered));
     const bodyRef = useRef<HTMLDivElement>(null);
     const replay = useRef(createMedicationMutationReplayState());
+    const submitted = useRef<PendingDose | null>(recovered);
+    const saveInFlight = useRef(false);
+    const actorAtOpen = useRef(getOfflineQueueActorId());
+    const actorChanged = useRef(false);
+    useEffect(() => {
+        const closeForActorChange = () => {
+            actorChanged.current = true;
+            clearDoseRecovery(recoveryKey);
+            onClose();
+        };
+        window.addEventListener('emar:actor-changed', closeForActorChange);
+        return () =>
+            window.removeEventListener(
+                'emar:actor-changed',
+                closeForActorChange,
+            );
+    }, [onClose, recoveryKey]);
+    if (recovered && replay.current.fingerprint === null)
+        replay.current.uuid = recovered.uuid;
+
+    useEffect(() => {
+        const preventLoss = (event: BeforeUnloadEvent) => {
+            if (dirty.current && phase !== 'done' && phase !== 'duplicate') {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', preventLoss);
+        return () => window.removeEventListener('beforeunload', preventLoss);
+    }, [phase]);
 
     const set = (patch: Partial<FormState>) => {
+        if (
+            phase === 'uncertain' &&
+            !Object.keys(patch).every((key) => key === 'second')
+        )
+            return;
         dirty.current = true;
         setF((x) => ({ ...x, ...patch }));
         // Fixing a field clears its own message; other messages stay.
@@ -881,13 +1179,34 @@ function RecordDoseForm({
                   : null;
         const base: Record<string, unknown> = {
             live_recording_context: req.live_recording_context ?? undefined,
+            // EA-008: the order shown here; the server refuses a "given" if it changed.
+            order_fingerprint: req.order_fingerprint ?? undefined,
             client_medication_id: req.order.id,
             administered_at: givenLike ? `${f.when}:00` : `${nowLocal}:00`,
             notes: f.note.trim() || null,
             medication_round_id: roundId,
             shift_id: shiftContext?.shiftId,
             ...(controlledGiven && req.stock_packs?.lots_started
-                ? { pack_lines: f.packLines }
+                ? {
+                      pack_lines: f.packLines,
+                      // EA-009: when the dose and stock units can't be
+                      // compared, the waste is what each pack says, in the
+                      // stock unit; the server never converts it.
+                      ...(fromOrder
+                          ? {}
+                          : {
+                                quantity_wasted: Number(
+                                    f.packLines
+                                        .reduce(
+                                            (sum, line) =>
+                                                sum +
+                                                Number(line.quantity_wasted),
+                                            0,
+                                        )
+                                        .toFixed(2),
+                                ),
+                            }),
+                  }
                 : {}),
             ...(givenLike && shiftContext?.scanVerification
                 ? toMedicationScanPayload(scanCapture)
@@ -960,6 +1279,11 @@ function RecordDoseForm({
                 target.kind === 'scheduled' ? target.scheduledFor : null,
             status,
             reason_code: reasonCode,
+            // EA-058: "Other (say what happened)" is said in the note.
+            reason:
+                f.outcome === 'withheld' && f.reason === 'other'
+                    ? f.note.trim().slice(0, 500) || null
+                    : null,
             late_reason: givenLike && outsideWindow ? f.lateReason : null,
             follow_up_due_at:
                 f.outcome === 'refused' ? f.followBy || null : null,
@@ -976,22 +1300,61 @@ function RecordDoseForm({
     }
 
     async function save() {
-        const body = Object.fromEntries(
-            Object.entries(payload()).filter(
-                ([, v]) => v !== null && v !== undefined,
-            ),
-        );
+        if (
+            actorChanged.current ||
+            getOfflineQueueActorId() !== actorAtOpen.current
+        ) {
+            onClose();
+            return;
+        }
+        if (saveInFlight.current) return;
+        const retry = phase === 'uncertain' ? submitted.current : null;
+        const body: Record<string, unknown> = retry
+            ? {
+                  ...retry.body,
+                  ...(f.second.pin ? { witness_credential: f.second.pin } : {}),
+              }
+            : Object.fromEntries(
+                  Object.entries(payload()).filter(
+                      ([, v]) => v !== null && v !== undefined,
+                  ),
+              );
         // The PIN is never part of the replay identity: re-typing it must not
         // create a new request (or a duplicate record).
         const material = { ...body };
         delete material.witness_credential;
-        replay.current = prepareMedicationMutationReplayState(
-            replay.current,
-            material,
-        );
+        replay.current = retry
+            ? { uuid: retry.uuid, fingerprint: replay.current.fingerprint }
+            : prepareMedicationMutationReplayState(replay.current, material);
         const needsPin = typeof body.witnessed_by === 'number';
+        if (
+            needsPin &&
+            !body.second_person_pin_forgotten &&
+            !body.witness_credential
+        ) {
+            setServerMessage(
+                'Your colleague needs to re-enter their PIN before this same request can be checked again.',
+            );
+            return;
+        }
+        const safeBody = { ...body };
+        delete safeBody.witness_credential;
+        submitted.current = {
+            form: { ...f, step: 2, second: { ...f.second, pin: '' } },
+            uuid: replay.current.uuid,
+            body: safeBody,
+            display: retry?.display ?? req,
+            target,
+        };
+        keepDoseRecovery(recoveryKey, submitted.current);
+        setF((current) => ({
+            ...current,
+            second: { ...current.second, pin: '' },
+        }));
+        saveInFlight.current = true;
         setPhase('sending');
         setServerMessage(null);
+        setNotSent(null);
         try {
             const outcome = await submitEmarMutation<Record<string, unknown>>(
                 isPrn ? '/meds/today/prn' : '/meds/today/record',
@@ -1009,19 +1372,47 @@ function RecordDoseForm({
                                 req.stock_packs?.lots_started)
                         ),
                     queuedMessage: `Saved on this device — ${med} for ${p} isn’t on the chart yet. It will send when you reconnect. Don’t record it again.`,
+                    // EA-010: online, this is the server not answering.
+                    unansweredMessage: `The server didn’t answer. ${med} for ${p} is saved on this device and isn’t on the chart yet — we’ll keep trying. Don’t record it again.`,
+                    // EA-046: what a waiting or refused item says it was.
+                    display: {
+                        person: p,
+                        medicine: [med, req.order.dosage]
+                            .filter(Boolean)
+                            .join(' '),
+                        outcome:
+                            tiles.find((t) => t.key === f.outcome)?.label ??
+                            'Recorded',
+                        at:
+                            target.kind === 'scheduled'
+                                ? target.scheduledFor
+                                : new Date().toISOString(),
+                    },
                 },
             );
-            handleOutcome(outcome.status, outcome.data);
+            if (
+                !actorChanged.current &&
+                getOfflineQueueActorId() === actorAtOpen.current
+            )
+                handleOutcome(outcome.status, outcome.data, outcome.sent);
         } catch (error) {
-            handleError(error);
+            if (
+                !actorChanged.current &&
+                getOfflineQueueActorId() === actorAtOpen.current
+            )
+                handleError(error);
+        } finally {
+            saveInFlight.current = false;
         }
     }
 
     function handleOutcome(
         status: string,
         data: Record<string, unknown> | undefined,
+        sent?: boolean,
     ) {
         if (status === 'queued') {
+            clearDoseRecovery(recoveryKey);
             onRecorded?.({ status: 'queued', administrationId: null });
             onClose();
             return;
@@ -1031,6 +1422,34 @@ function RecordDoseForm({
             status === 'storage_unavailable' ||
             status === 'requires_authentication'
         ) {
+            // EA-149: nothing left the browser, so nothing was saved. Keep
+            // the entries and say so; "may already have been saved" is only
+            // for a request that was actually sent.
+            if (sent === false) {
+                clearDoseRecovery(recoveryKey);
+                submitted.current = null;
+                setNotSent(
+                    status === 'requires_authentication'
+                        ? 'Sign in again, then record the outcome.'
+                        : status === 'storage_unavailable'
+                          ? 'This device can’t keep it either. Reconnect, then record the outcome.'
+                          : 'Reconnect, then record the outcome.',
+                );
+                setPhase('edit');
+                // A witness PIN is never kept: the colleague enters it again.
+                if (
+                    secondKind &&
+                    !unconfirmed &&
+                    f.second.id &&
+                    !forgottenPin
+                ) {
+                    setErrors({
+                        pin: 'Not sent — your colleague enters their PIN again once you’re connected.',
+                    });
+                    setF((x) => ({ ...x, step: 1 }));
+                }
+                return;
+            }
             setPhase('uncertain');
             return;
         }
@@ -1040,6 +1459,8 @@ function RecordDoseForm({
         ) {
             setDuplicateOf((data?.duplicate_of as typeof duplicateOf) ?? null);
             setPhase('duplicate');
+            clearDoseRecovery(recoveryKey);
+            medicationRecorded(req.person.id);
             onRecorded?.({ status: 'duplicate', administrationId: null });
             return;
         }
@@ -1051,6 +1472,8 @@ function RecordDoseForm({
             const administration = data?.administration as
                 | ({ id?: number } & SecondPersonEvidence)
                 | undefined;
+            clearDoseRecovery(recoveryKey);
+            medicationRecorded(req.person.id);
             onRecorded?.({
                 status: 'recorded',
                 administrationId: administration?.id ?? null,
@@ -1111,7 +1534,12 @@ function RecordDoseForm({
             setPhase('done');
             return;
         }
-        setPhase('rejected');
+        const confirmedRejection =
+            status === 'rejected' &&
+            readServerSyncOutcome(data).kind === 'rejected' &&
+            phase !== 'uncertain';
+        setPhase(confirmedRejection ? 'rejected' : 'uncertain');
+        if (confirmedRejection) clearDoseRecovery(recoveryKey);
         setServerMessage('The server didn’t confirm this was saved.');
     }
 
@@ -1149,10 +1577,15 @@ function RecordDoseForm({
             setPhase('uncertain');
             return;
         }
-        if (error.response.status >= 500) {
+        if (phase === 'uncertain' || error.response.status >= 500) {
             setPhase('uncertain');
+            setServerMessage(
+                error.response.data?.message ??
+                    'The result is still unconfirmed. Keep this attempt and check the chart.',
+            );
             return;
         }
+        clearDoseRecovery(recoveryKey);
         const body = error.response.data as
             | {
                   error?: string;
@@ -1161,6 +1594,19 @@ function RecordDoseForm({
                   errors?: Record<string, string[] | string>;
               }
             | undefined;
+        // EA-008: the order changed while this dialog was open. Nothing was
+        // saved; show the new order beside the one given and ask again.
+        if (body?.error_field === 'order_changed' && onRefresh) {
+            void reloadForOrderChange(body.error ?? null);
+            return;
+        }
+        // EA-060: the pack review expired. Keep the draft and offer a refresh.
+        if (body?.error_field === 'live_recording_context' && onRefresh) {
+            setReviewExpired(true);
+            setServerMessage(null);
+            setPhase('edit');
+            return;
+        }
         const fieldErrors: Errors = {};
         if (
             readServerSyncOutcome(body).kind === 'rejected' &&
@@ -1188,6 +1634,61 @@ function RecordDoseForm({
         }
         setServerMessage(body?.error ?? body?.message ?? null);
         setPhase('rejected');
+    }
+
+    async function reloadForOrderChange(message: string | null) {
+        const shown = req.order;
+        setRefreshing(true);
+        const next = await onRefresh?.();
+        setRefreshing(false);
+        if (!next) {
+            setServerMessage(
+                `${message ?? 'Order changed — check the new instructions'}. The new order couldn’t be loaded. Close this dose and open it again.`,
+            );
+            setPhase('rejected');
+            return;
+        }
+        if (isBlockedAnswer(next)) return;
+        setOrderChangedFrom(shown);
+        setErrors({});
+        setServerMessage(null);
+        setF((x) => ({
+            ...x,
+            step: mode === 'record' ? 0 : 1,
+            changeAck: false,
+            // The dose and amount use the new order; anything else stays.
+            amount: {
+                ...x.amount,
+                mode: 'asOrdered',
+                amount: next.order.dose_amount,
+            },
+            second: { ...x.second, pin: '' },
+        }));
+        setPhase('edit');
+    }
+
+    async function refreshReview() {
+        setRefreshing(true);
+        const next = await onRefresh?.(req.live_recording_context ?? null);
+        setRefreshing(false);
+        if (next && !isBlockedAnswer(next)) {
+            setReviewExpired(false);
+            setServerMessage(null);
+            // A witness PIN is never kept: the colleague enters it again.
+            if (secondKind && !unconfirmed && f.second.id && !forgottenPin) {
+                const e: Errors = {
+                    pin: 'Your colleague enters their PIN again, then record the outcome.',
+                };
+                setErrors(e);
+                setF((x) => ({ ...x, step: 1 }));
+                focusFirst(e);
+            }
+            return;
+        }
+        if (!next)
+            setServerMessage(
+                'The safety check couldn’t be refreshed. Check your connection and try again.',
+            );
     }
 
     function requestClose() {
@@ -1260,6 +1761,13 @@ function RecordDoseForm({
                     <SupportChip support={req.support} />
                 </div>
             </div>
+            <PackPhotoCard
+                photo={req.pack_photo}
+                policy={req.pack_photo_policy}
+                medicine={med}
+                labelChecked={f.labelChecked === true}
+                onLabelChecked={(v) => set({ labelChecked: v })}
+            />
             <KV
                 rows={[
                     [
@@ -1413,6 +1921,66 @@ function RecordDoseForm({
         return null;
     })();
 
+    // EA-059 / EA-008: the order changed since its last recorded dose, or
+    // while this dialog was open. "Before" is what the worker was shown.
+    const change: OrderChange | null = (() => {
+        if (!req.order_change && !orderChangedFrom) return null;
+        const server = req.order_change;
+        return {
+            version: server?.version ?? req.order.version,
+            prescriber: server?.prescriber ?? req.order.prescriber,
+            changed_at: server?.changed_at ?? null,
+            verified_at: server?.verified_at ?? req.order.verified?.at ?? null,
+            verified_by: server?.verified_by ?? req.order.verified?.by ?? null,
+            before: orderChangedFrom
+                ? orderFacts(orderChangedFrom)
+                : (server?.before ?? null),
+            now: server?.now ?? orderFacts(req.order),
+        };
+    })();
+    const changeTime = change?.verified_at ?? change?.changed_at ?? null;
+    const changeNotice = change ? (
+        <Notice
+            tone="warning"
+            live="alert"
+            title={`This order changed${changeTime ? ` at ${timeLabel(changeTime)}` : ''} — check the new instructions`}
+        >
+            <p>
+                {change.prescriber ?? 'The prescriber'} changed {p}’s {med}
+                {change.changed_at ? ` at ${timeLabel(change.changed_at)}` : ''}
+                {orderChangedFrom ? ', while this dose was open' : ''}.
+                {change.verified_by
+                    ? ` ${change.verified_by} verified the new order${change.verified_at ? ` at ${timeLabel(change.verified_at)}` : ''}.`
+                    : ''}
+                {orderChangedFrom
+                    ? ' Nothing was recorded for this dose yet.'
+                    : ''}
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+                {change.before ? (
+                    <li>Before: {orderVersionWords(change.before)}</li>
+                ) : null}
+                <li>
+                    Now: <strong>{orderVersionWords(change.now)}</strong> — the
+                    dose and amount below use the new order
+                </li>
+            </ul>
+            <div
+                className="mt-2 flex items-center gap-2"
+                data-field="changeAck"
+            >
+                <Checkbox
+                    id="rd-change-ack"
+                    checked={f.changeAck === true}
+                    onCheckedChange={(v) => set({ changeAck: v === true })}
+                />
+                <Label htmlFor="rd-change-ack" className="text-sm font-normal">
+                    I’ve checked the new instructions and the label
+                </Label>
+            </div>
+        </Notice>
+    ) : null;
+
     const step0 = (
         <div className="space-y-4">
             {entry === 'transport' && transport ? (
@@ -1427,6 +1995,7 @@ function RecordDoseForm({
                 </Notice>
             ) : null}
             <IdentityHeader req={req} />
+            {changeNotice}
             <AllergyNotice req={req} />
             {req.allergy.match && !req.block_given ? (
                 <Notice
@@ -1535,6 +2104,7 @@ function RecordDoseForm({
     const step1 = (
         <div className="space-y-4">
             <IdentityHeader req={req} compact />
+            {mode !== 'record' ? changeNotice : null}
             <AllergyNotice req={req} compact />
             {reofferClosed ? (
                 <Notice
@@ -1979,6 +2549,43 @@ function RecordDoseForm({
     const step2 = (
         <div className="space-y-4">
             <IdentityHeader req={req} compact />
+            {notSent && phase === 'edit' ? (
+                <Notice
+                    tone="warning"
+                    live="alert"
+                    title="Not sent — nothing was saved"
+                >
+                    This dose isn’t on the chart and wasn’t saved on this
+                    device. Your entries are kept. {notSent}
+                </Notice>
+            ) : null}
+            {reviewExpired ? (
+                <Notice
+                    tone="warning"
+                    live="alert"
+                    title="The pack safety check expired — nothing was saved"
+                    actions={
+                        <Button
+                            type="button"
+                            onClick={() => void refreshReview()}
+                            disabled={refreshing}
+                        >
+                            {refreshing ? (
+                                <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+                            ) : (
+                                <RefreshCw className="size-4" />
+                            )}
+                            Refresh the safety check
+                        </Button>
+                    }
+                >
+                    This medicine’s packs are checked against the current stock
+                    when the dose is opened, and that check lasts 30 minutes.
+                    Refresh it to keep everything you entered, including the
+                    time it was given, then record the outcome.
+                    {serverMessage ? <p>{serverMessage}</p> : null}
+                </Notice>
+            ) : null}
             {phase === 'sending' ? (
                 <Notice
                     tone="info"
@@ -2008,16 +2615,56 @@ function RecordDoseForm({
                     live="alert"
                     title="Not confirmed — check before trying again"
                     actions={
-                        <Button asChild variant="outline">
-                            <a href={`/emar/mar?client_id=${req.person.id}`}>
-                                <Search className="size-4" /> Check the chart
-                            </a>
-                        </Button>
+                        <>
+                            <Button
+                                onClick={() => {
+                                    confirmingOriginal.current = onCheckSaved();
+                                }}
+                            >
+                                <Search className="size-4" /> Check saved result
+                            </Button>
+                            <Button asChild variant="outline">
+                                <a
+                                    href={`/emar/mar?client_id=${req.person.id}&date=${encodeURIComponent((target.kind === 'scheduled' ? nzLocal(new Date(target.scheduledFor)) : f.when).slice(0, 10))}&tab=history`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Open medication history
+                                </a>
+                            </Button>
+                        </>
                     }
                 >
-                    We didn’t get confirmation that this was saved, so it isn’t
-                    shown as recorded. Check {p}’s chart first. Trying again
-                    won’t create a duplicate.
+                    This dose may already have been saved. Check the original
+                    result without recording another dose, or open {p}’s history
+                    in a new tab. Your entries and this request’s identity are
+                    kept; trying again checks the same request. Do not start
+                    another record for this dose.
+                    {serverMessage ? <p>{serverMessage}</p> : null}
+                    {typeof submitted.current?.body.witnessed_by === 'number' &&
+                    !submitted.current.body.second_person_pin_forgotten ? (
+                        <Field
+                            id="retry-pin"
+                            label="Colleague’s PIN"
+                            required
+                            error={errors.pin}
+                        >
+                            <Input
+                                id="rd-retry-pin"
+                                type="password"
+                                autoComplete="off"
+                                value={f.second.pin}
+                                onChange={(event) =>
+                                    set({
+                                        second: {
+                                            ...f.second,
+                                            pin: event.target.value,
+                                        },
+                                    })
+                                }
+                            />
+                        </Field>
+                    ) : null}
                 </Notice>
             ) : null}
             {phase === 'duplicate' ? (
@@ -2219,17 +2866,27 @@ function RecordDoseForm({
 
     /* ── footer ── */
     // An as-needed dose is only ever "given", so a block on "given" stops it.
+    const changeStep = mode === 'record' ? 0 : 1;
     const blockedContinue =
         f.step === 0 && isPrn && givenWhy
             ? `Can’t continue: ${givenWhy.charAt(0).toLowerCase()}${givenWhy.slice(1)}`
             : f.step === 0 && entry === 'transport' && !f.packChecked
               ? 'Tick the pack check to continue'
-              : null;
+              : f.step === 0 &&
+                  packLabelTickNeeded(req.pack_photo, req.pack_photo_policy) &&
+                  f.labelChecked !== true
+                ? 'Tick “I’ve checked the label” to continue'
+                : f.step === changeStep && change && f.changeAck !== true
+                  ? 'Confirm you’ve checked the new instructions'
+                  : f.step === 2 && reviewExpired
+                    ? 'Refresh the safety check first'
+                    : null;
     const lockedForward = mode !== 'record' && f.step === 1;
     const footerStart =
         phase === 'duplicate' ? null : f.step > 0 &&
           !lockedForward &&
-          phase !== 'sending' ? (
+          phase !== 'sending' &&
+          phase !== 'uncertain' ? (
             <Button
                 type="button"
                 variant="ghost"
@@ -2279,7 +2936,10 @@ function RecordDoseForm({
                 <Button
                     type="button"
                     onClick={() => void save()}
-                    disabled={phase === 'sending'}
+                    disabled={
+                        phase === 'sending' || refreshing || !!blockedContinue
+                    }
+                    aria-describedby={blockedContinue ? 'rd-cant' : undefined}
                 >
                     {phase === 'sending' ? (
                         <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
@@ -2362,6 +3022,10 @@ function RecordDoseForm({
                 open
                 onClose={requestClose}
                 onCloseAutoFocus={(e) => {
+                    if (confirmingOriginal.current) {
+                        e.preventDefault();
+                        return;
+                    }
                     const el = returnFocus?.();
                     if (el) {
                         e.preventDefault();
@@ -2378,11 +3042,17 @@ function RecordDoseForm({
                     disabled:
                         i > f.step ||
                         (mode !== 'record' && i === 0) ||
-                        phase === 'sending',
+                        phase === 'sending' ||
+                        phase === 'uncertain',
                 }))}
                 stepIndex={f.step}
                 onStepClick={(i) => {
-                    if (i <= f.step) setF((x) => ({ ...x, step: i }));
+                    if (
+                        phase !== 'uncertain' &&
+                        phase !== 'sending' &&
+                        i <= f.step
+                    )
+                        setF((x) => ({ ...x, step: i }));
                 }}
                 pct={pct}
                 pctLabel="Completeness"
@@ -2427,11 +3097,22 @@ function RecordDoseForm({
                 onClose={() => setDiscard(false)}
                 onConfirm={() => {
                     setDiscard(false);
+                    if (phase !== 'uncertain') clearDoseRecovery(recoveryKey);
                     onClose();
                 }}
-                title="Discard this record?"
-                description="Nothing has been saved. What you entered for this dose will be lost, and the dose stays as not yet recorded."
-                confirmText="Discard"
+                title={
+                    phase === 'uncertain'
+                        ? 'Keep this unconfirmed attempt?'
+                        : 'Discard this record?'
+                }
+                description={
+                    phase === 'uncertain'
+                        ? 'The dose may already be recorded. This recovery draft stays in this browser session so you can reopen this same dose and retry the same request. Keep this browser tab open; check the chart before recording anything else for this dose.'
+                        : 'Nothing has been saved. What you entered for this dose will be lost, and the dose stays as not yet recorded.'
+                }
+                confirmText={
+                    phase === 'uncertain' ? 'Keep draft and close' : 'Discard'
+                }
                 cancelText="Keep recording"
             />
         </>

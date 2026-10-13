@@ -21,6 +21,8 @@ vi.mock('@/components/emar/controlled/product-ui', async (importOriginal) => ({
 afterEach(() => vi.unstubAllGlobals());
 
 const item: ItemDetail = {
+    client_id: 1,
+    site_id: 1,
     id: 1,
     name: 'Synthetic medicine',
     client_name: 'Synthetic person',

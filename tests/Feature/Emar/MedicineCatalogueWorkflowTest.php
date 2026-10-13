@@ -17,6 +17,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\Support\ConnectedCareSwitches;
 use Tests\TestCase;
 
 class MedicineCatalogueWorkflowTest extends TestCase
@@ -32,6 +33,10 @@ class MedicineCatalogueWorkflowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // D4: the catalogue runs only while switched on; the two-person review
+        // rule is switched back on in the test_b10_ tests below.
+        ConnectedCareSwitches::on('picture_catalogue');
+        ConnectedCareSwitches::off('two_person_catalogue');
         Carbon::setTestNow(Carbon::parse('2026-10-07 00:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
         foreach (['medications.catalogue.manage', 'medications.backups.manage'] as $key) {
@@ -180,6 +185,37 @@ class MedicineCatalogueWorkflowTest extends TestCase
         Storage::disk('private')->put($product->photo_path, 'Invalid changed image bytes');
         $this->actingAs($this->manager)->getJson('/emar/catalogue/medicines/'.$this->medicine->id.'/binding')->assertOk()->assertJsonPath('status', 'review_required')->assertJsonMissingPath('product');
         $this->actingAs($this->manager)->get('/emar/catalogue/products/'.$product->id.'/photo')->assertNotFound();
+    }
+
+    /** EA-104: with the two-person rule on (its default), whoever added a source doesn't also review it. */
+    public function test_b10_catalogue_source_review_needs_a_second_person(): void
+    {
+        ConnectedCareSwitches::on('two_person_catalogue');
+        [$source] = $this->draft();
+        try {
+            app(MedicineCatalogueService::class)->review($this->manager, $source->id, $source->version, now()->addMonth()->toIso8601String());
+            $this->fail('The person who added a source must not also review it.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('source', $exception->errors());
+        }
+        $this->assertSame('draft', $source->fresh()->status);
+        $second = User::factory()->create(['role' => 'team_lead', 'approved_at' => now()]);
+        ensureCanonicalHrStaffProfile($second, $this->site, ['start_date' => '2025-01-01']);
+        $second->permissionOverrides()->sync(Permission::query()->whereIn('key', ['medications.view', 'medications.catalogue.manage'])->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
+        $this->assertSame('reviewed', app(MedicineCatalogueService::class)->review($second->fresh(), $source->id, $source->version, now()->addMonth()->toIso8601String())->status);
+    }
+
+    /** EA-186: the catalogue page (drafts, licences, revoked sources) is for catalogue managers only. */
+    public function test_b10_medication_readers_cannot_open_the_catalogue_page(): void
+    {
+        $reader = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        ensureCanonicalHrStaffProfile($reader, $this->site, ['start_date' => '2025-01-01']);
+        $reader->permissionOverrides()->sync(Permission::query()->whereIn('key', ['medications.view'])->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
+        $this->draft();
+        $this->actingAs($reader->fresh())->get('/emar/catalogue')->assertForbidden();
+        $this->actingAs($this->manager)->get('/emar/catalogue')->assertOk();
     }
 
     private function reviewed(): array

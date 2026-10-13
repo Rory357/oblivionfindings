@@ -18,10 +18,15 @@ use App\Services\Fleet\ResidentTransportJourneyService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Stock\MedicationStockService;
+use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Services\Medication\Transit\MedicationTransitReadScope;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationScanVerificationService;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\SchemaCache;
+use App\Support\WorkerClock;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -36,6 +41,7 @@ class ResidentTransportController extends Controller
         protected ResidentTransportJourneyScope $journeyScope,
         protected ResidentTransportJourneyService $journeys,
         protected ControlledMedicationTransportWitnessService $transportWitnesses,
+        protected MedicationTransitReadScope $transitRead,
     ) {}
 
     private function canManageMedicationTransit(?User $user): bool
@@ -50,6 +56,17 @@ class ResidentTransportController extends Controller
             403,
             'You do not have permission to manage medications in transit.'
         );
+    }
+
+    /** A Y-m-d filter value as that NZ calendar day, or null when absent or malformed. */
+    private function workerDay(mixed $value): ?CarbonImmutable
+    {
+        if (! is_string($value) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value)) {
+            return null;
+        }
+        $day = CarbonImmutable::createFromFormat('!Y-m-d', $value, config('app.worker_timezone', 'Pacific/Auckland'));
+
+        return $day instanceof CarbonImmutable && $day->format('Y-m-d') === $value ? $day : null;
     }
 
     private function buildMedicationScanPayload(Client $client, ClientMedication $medication): array
@@ -123,12 +140,13 @@ class ResidentTransportController extends Controller
             $query->where('resident_name', 'like', '%'.$request->input('search').'%');
         }
 
-        if ($request->filled('date_from')) {
-            $query->where('departed_at', '>=', $request->input('date_from'));
+        // NZ days, not UTC days: a 7:30 am departure on the 9th is on the 9th.
+        if ($from = $this->workerDay($request->input('date_from'))) {
+            $query->where('departed_at', '>=', $from->utc());
         }
 
-        if ($request->filled('date_to')) {
-            $query->where('departed_at', '<=', $request->input('date_to').' 23:59:59');
+        if ($to = $this->workerDay($request->input('date_to'))) {
+            $query->where('departed_at', '<', $to->addDay()->utc());
         }
 
         // CSV export
@@ -167,8 +185,8 @@ class ResidentTransportController extends Controller
         $transports = $query->latest('departed_at')->paginate(25)->withQueryString();
 
         // Summary stats
-        $monthStart = now()->startOfMonth();
-        $monthEnd = now()->endOfMonth();
+        $monthStart = WorkerClock::today()->startOfMonth()->utc();
+        $monthEnd = WorkerClock::today()->endOfMonth()->utc();
 
         $monthQuery = FleetResidentTransport::query()
             ->whereBetween('departed_at', [$monthStart, $monthEnd]);
@@ -254,11 +272,13 @@ class ResidentTransportController extends Controller
             $medications = FleetMedicationTransitLog::query()
                 ->where('created_at', '>=', now()->subDays(7));
             $this->journeyScope->applyMedicationTransitScope($medications, $request->user());
+            $this->transitRead->applyToLogs($medications, $request->user());
             $withMedications = $medications->distinct('transport_id')->count('transport_id');
         }
 
         return [
-            'today' => (clone $base)->whereDate('departed_at', today())->count(),
+            'today' => (clone $base)->where('departed_at', '>=', WorkerClock::today()->utc())
+                ->where('departed_at', '<', WorkerClock::today()->addDay()->utc())->count(),
             'in_progress' => (clone $base)->where('status', 'in_progress')->count(),
             'completed_7d' => (clone $base)
                 ->where('status', 'completed')
@@ -352,11 +372,15 @@ class ResidentTransportController extends Controller
 
         $clientMedications = collect();
         $medicationWitnesses = collect();
-        if ($selectedClient && $this->canManageMedicationTransit($actor) && SchemaCache::hasTable('client_medications')) {
-            $clientMedications = ClientMedication::query()
+        if ($selectedClient
+            && $this->canManageMedicationTransit($actor)
+            && $this->transitRead->canReadClient($actor, $selectedClient)
+            && SchemaCache::hasTable('client_medications')) {
+            $clientMedicationQuery = ClientMedication::query()
                 ->active()
                 ->where('client_id', $selectedClient->id)
-                ->where(fn ($query) => $query->where('is_prn', true)->orWhereNotNull('dose_times'))
+                ->where(fn ($query) => $query->where('is_prn', true)->orWhereNotNull('dose_times'));
+            $clientMedications = $this->transitRead->applyToOrders($clientMedicationQuery, $actor)
                 ->get([
                     'id', 'client_id', 'name', 'dosage', 'frequency', 'is_prn',
                     'controlled_drug', 'witness_required', 'dose_times', 'route', 'instructions',
@@ -534,16 +558,21 @@ class ResidentTransportController extends Controller
         $transportClient = $transport->resident_id && $canViewMedicationTransit
             ? $this->journeyScope->clientFor($request->user(), (int) $transport->resident_id)
             : null;
+        // The journey is Fleet's; its medicines follow the eMAR person rule.
+        if ($transportClient && ! $this->transitRead->canReadClient($request->user(), $transportClient)) {
+            $transportClient = null;
+        }
 
         $availableMedications = [];
         if ($transportClient && $canManageMedicationTransit && SchemaCache::hasTable('client_medications')) {
-            $availableMedications = ClientMedication::query()
+            $availableMedicationQuery = ClientMedication::query()
                 ->active()
                 ->where('client_id', $transportClient->id)
                 ->where(function ($query) {
                     $query->where('is_prn', true)
                         ->orWhereNotNull('dose_times');
-                })
+                });
+            $availableMedications = $this->transitRead->applyToOrders($availableMedicationQuery, $request->user())
                 ->get([
                     'id',
                     'client_id',
@@ -577,7 +606,7 @@ class ResidentTransportController extends Controller
 
         $transitLogs = [];
         $packingAttestationHistory = [];
-        if ($canViewMedicationTransit && SchemaCache::hasTable('fleet_medication_transit_logs')) {
+        if ($transportClient && SchemaCache::hasTable('fleet_medication_transit_logs')) {
             $transitQuery = FleetMedicationTransitLog::query()
                 ->with([
                     'client:id,first_name,last_name,site_id',
@@ -591,6 +620,7 @@ class ResidentTransportController extends Controller
                 ->where('transport_id', $transport->id)
                 ->orderByDesc('packed_at');
             $this->journeyScope->applyMedicationTransitScope($transitQuery, $request->user());
+            $this->transitRead->applyToLogs($transitQuery, $request->user());
             $transitLogs = $transitQuery->get()
                 ->map(fn ($log) => [
                     'id' => $log->id,
@@ -653,8 +683,10 @@ class ResidentTransportController extends Controller
                     ->where('transport_id', $transport->id)
                     ->where('client_id', $transport->resident_id)
                     ->where('site_id', $transport->site_id)
-                    ->whereHas('medication', fn ($medication) => $medication
-                        ->where('client_id', $transport->resident_id))
+                    ->whereHas('medication', fn ($medication) => $this->transitRead->applyToOrders(
+                        $medication->where('client_id', $transport->resident_id),
+                        $request->user(),
+                    ))
                     ->whereIn('action', [
                         'medication_packed',
                         'medication_packing_refused',
@@ -893,22 +925,25 @@ class ResidentTransportController extends Controller
                 'medication',
             ]);
         $this->journeyScope->applyMedicationTransitScope($query, $request->user());
+        $this->transitRead->applyToLogs($query, $request->user());
 
         if ($request->filled('transport_id')) {
             $query->where('transport_id', (int) $request->input('transport_id'));
         }
 
         if ($request->filled('client_id')) {
-            $this->journeyScope->clientFor($request->user(), (int) $request->input('client_id'));
+            $filteredClient = $this->journeyScope->clientFor($request->user(), (int) $request->input('client_id'));
+            abort_unless($this->transitRead->canReadClient($request->user(), $filteredClient), 404);
             $query->where('client_id', (int) $request->input('client_id'));
         }
 
-        if ($request->filled('date_from')) {
-            $query->where('packed_at', '>=', $request->input('date_from'));
+        // Filters are NZ calendar days (EA-032), stored packed_at is UTC.
+        if ($from = $this->workerDay($request->input('date_from'))) {
+            $query->where('packed_at', '>=', $from->startOfDay()->utc());
         }
 
-        if ($request->filled('date_to')) {
-            $query->where('packed_at', '<=', $request->input('date_to').' 23:59:59');
+        if ($to = $this->workerDay($request->input('date_to'))) {
+            $query->where('packed_at', '<=', $to->endOfDay()->utc());
         }
 
         if ($request->filled('status')) {
@@ -926,40 +961,17 @@ class ResidentTransportController extends Controller
             }
         }
 
-        // CSV export for compliance
-        if ($request->input('export') === 'csv') {
-            $exportQuery = (clone $query)->latest('packed_at');
-
-            return response()->streamDownload(function () use ($exportQuery) {
-                $handle = fopen('php://output', 'w');
-                $this->putCsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packing Witness', 'Packing Attested At', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
-                foreach ($exportQuery->lazy(200) as $log) {
-                    $this->putCsv($handle, [
-                        $log->id,
-                        trim(($log->client?->first_name ?? '').' '.($log->client?->last_name ?? '')),
-                        $log->medication_name,
-                        $log->is_controlled_drug ? 'Yes' : 'No',
-                        $log->packedBy?->name ?? '',
-                        $log->packedWitness?->name ?? ($log->packed_witness_name ? '[legacy label] '.$log->packed_witness_name : ''),
-                        optional($log->packed_witnessed_at)->format('Y-m-d H:i') ?? '',
-                        optional($log->packed_at)->format('Y-m-d H:i') ?? '',
-                        $log->administeredBy?->name ?? '',
-                        optional($log->administered_at)->format('Y-m-d H:i') ?? '',
-                        $log->witnessedBy?->name ?? '',
-                        optional($log->returned_to_house_at)->format('Y-m-d H:i') ?? '',
-                        $log->notes ?? '',
-                    ]);
-                }
-                fclose($handle);
-            }, 'medication-transit-audit-'.now()->format('Y-m-d').'.csv');
-        }
+        // The custody CSV is a medication export: it is made through the P09
+        // export flow (purpose, person rule, export register) as type
+        // "transit", never streamed from this page (EA-002).
 
         $logs = $query->latest('packed_at')->paginate(25)->withQueryString();
 
-        // Stats
-        $today = now()->startOfDay();
+        // Stats — "today" is the NZ day.
+        $today = WorkerClock::today()->utc();
         $statsQuery = FleetMedicationTransitLog::query();
         $this->journeyScope->applyMedicationTransitScope($statsQuery, $request->user());
+        $this->transitRead->applyToLogs($statsQuery, $request->user());
         $totalPackedToday = (clone $statsQuery)->where('packed_at', '>=', $today)->count();
         $outstandingStock = fn ($q) => $q->where(fn ($legacy) => $legacy->whereNull('administered_at')->whereNull('returned_to_house_at'))
             ->orWhere('stock_reconciliation_status', 'shortfall')
@@ -973,8 +985,12 @@ class ResidentTransportController extends Controller
         if (SchemaCache::hasTable('clients')) {
             $clientQuery = Client::query()->orderBy('first_name')->limit(200);
             $this->journeyScope->applyClientScope($clientQuery, $request->user());
-            $clients = $clientQuery
-                ->get(['id', 'first_name', 'last_name'])
+            $clientQuery->whereIn('site_id', $this->transitRead->siteIds($request->user()) ?: [0]);
+            $candidates = $clientQuery->get(['id', 'first_name', 'last_name']);
+            $readable = app(MedicationRecordAccess::class)->readableClientIds($request->user(), $candidates->pluck('id'));
+            $clients = $candidates
+                ->filter(fn ($c) => in_array((int) $c->id, $readable, true))
+                ->values()
                 ->map(fn ($c) => [
                     'id' => $c->id,
                     'name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
@@ -1058,6 +1074,8 @@ class ResidentTransportController extends Controller
             'can_manage' => $canManageMedicationTransit,
             'can_administer' => $canAdministerMedicationTransit,
             'can_record_controlled' => $canRecordControlledMedication,
+            // The CSV lives in the P09 export flow (purpose step + export register).
+            'can_export' => app(MedicationReportAccess::class)->canExport($request->user(), 'transit'),
             'transport_scope' => $selectedTransport ? [
                 'id' => $selectedTransport->id,
                 'resident_name' => $selectedTransport->resident_name,

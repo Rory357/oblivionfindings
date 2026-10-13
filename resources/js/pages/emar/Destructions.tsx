@@ -9,6 +9,7 @@ import {
     type DestructionRow,
 } from '@/components/emar/destruction-detail-dialog';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import {
     EmarMeters,
     EmarViewFilter,
@@ -29,6 +30,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import { medicationReturnParams } from '@/lib/medication-navigation';
 import {
     CdPill,
     RecordDestructionDialog,
@@ -49,11 +51,17 @@ import {
     User,
     X,
 } from 'lucide-react';
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+    useEffect,
+    useMemo,
+    useState,
+    type MouseEvent as ReactMouseEvent,
+} from 'react';
 
 type Props = {
     can_record: boolean;
     destructions: DestructionRow[];
+    selected_destruction_id?: number | null;
     medications: CdMedication[];
     staff: StaffOption[];
     clients: { id: number; first_name: string; last_name: string }[];
@@ -191,6 +199,7 @@ function exportCsv(rows: DestructionRow[]) {
 export default function Destructions({
     can_record: canRecord,
     destructions,
+    selected_destruction_id,
     medications,
     staff,
     clients,
@@ -212,6 +221,12 @@ export default function Destructions({
     );
     const [search, setSearch] = useState('');
     const [modal, setModal] = useState<Modal>(null);
+    useEffect(() => {
+        const row = destructions.find(
+            (row) => row.id === selected_destruction_id,
+        );
+        if (row) setModal({ type: 'detail', row });
+    }, [selected_destruction_id, destructions]);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [dismissed, setDismissed] = useState<string[]>(() =>
         readDismissedAlerts(),
@@ -476,6 +491,7 @@ export default function Destructions({
                     }
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <PageHeaderSearch
                                 value={search}
                                 onChange={setSearch}
@@ -517,6 +533,9 @@ export default function Destructions({
                                         router.get(
                                             '/emar/destructions',
                                             {
+                                                ...medicationReturnParams(
+                                                    pageUrl,
+                                                ),
                                                 ...(id ? { site_id: id } : {}),
                                                 ...(clientFilter
                                                     ? {
@@ -705,16 +724,9 @@ export default function Destructions({
 
                 {activeTab === 'reports' && (
                     <div className="flex flex-col gap-4">
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            <StatCard
-                                label="Live records"
-                                value={liveFiltered.length}
-                                hint={
-                                    isFiltered
-                                        ? 'Matching filters'
-                                        : 'Excludes voided'
-                                }
-                            />
+                        {/* EA-228 (Lane C9): the header meters already give the
+                            live and 30-day counts; only the breakdowns repeat here. */}
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <StatCard
                                 label="Controlled-drug disposals"
                                 value={
@@ -724,15 +736,6 @@ export default function Destructions({
                                 hint={
                                     isFiltered ? 'Matching filters' : 'All time'
                                 }
-                            />
-                            <StatCard
-                                label="Destroyed (30 days)"
-                                value={
-                                    liveFiltered.filter((d) =>
-                                        withinDays(d.destroyed_at, 30),
-                                    ).length
-                                }
-                                hint="Rolling"
                             />
                             <StatCard
                                 label="Voided records"
@@ -996,7 +999,7 @@ function StatCard({
             <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {label}
             </div>
-            <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
+            <div className="text-page-title mt-1 tabular-nums">{value}</div>
             {hint && (
                 <div className="text-xs text-muted-foreground">{hint}</div>
             )}

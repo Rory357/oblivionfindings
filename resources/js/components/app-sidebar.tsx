@@ -319,6 +319,12 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     const normalizedCurrentPath = normalizePath(currentPath);
     const normalizedItemPath = normalizePath(itemPath);
 
+    // Workforce retains legacy /operations URLs, but belongs to its own module.
+    // Apply this to child links too, even when Operations is manually expanded.
+    if (normalizedItemPath === '/operations' && isWorkforceUrl(current)) {
+        return -1;
+    }
+
     if (normalizedItemPath === '/vendors') {
         const selected = vendorRegisterTab(current);
         return selected ? 3000 + item.length : -1;
@@ -353,6 +359,16 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     );
     if (emarActive !== undefined) return emarActive ? 2000 + item.length : -1;
 
+    // The Conflict Queue has its own Workforce entry; select that destination.
+    const conflictQueuePath = '/operations/rostering/conflicts';
+    if (
+        normalizedItemPath === '/operations/rostering' &&
+        (normalizedCurrentPath === conflictQueuePath ||
+            normalizedCurrentPath.startsWith(`${conflictQueuePath}/`))
+    ) {
+        return -1;
+    }
+
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
             currentQuery === itemQuery
@@ -375,6 +391,9 @@ const WORKFORCE_ROUTE_PREFIXES = [
     '/operations/shifts',
     '/operations/job-board',
     '/operations/rostering',
+    '/operations/workforce-settings',
+    '/operations/qualifications',
+    '/operations/availability',
     '/operations/handovers',
     '/operations/shift-notes',
     '/operations/timesheets',
@@ -552,21 +571,10 @@ function buildIconNavItems({
         return buildPortalNavItems(portalClients, unreadMessageCount);
     }
 
-    // PR 3 — `/my-day` is the single canonical frontline home. Staff users
-    // should see ONE clear home destination; managers and HR admins keep the
-    // traditional `/dashboard`. Dashboard routing itself redirects staff to
-    // `/my-day`, so even a stale link stays safe.
-    const isManager = !!can?.shifts?.manageAny || !!can?.timesheets?.manageAny;
-    const isHrAdmin = !!can?.hr?.analytics?.view && !can?.shifts?.manageAny;
-    const showDashboardHome = isManager || isHrAdmin;
+    // Overview summarises permitted work; My Day remains the personal care workspace.
+    const showDashboardHome = true;
 
     const items: IconNavItem[] = [
-        {
-            id: 'my-day',
-            icon: CheckCircle2,
-            label: 'My Day',
-            href: '/my-day',
-        },
         ...(showDashboardHome
             ? [
                   {
@@ -577,6 +585,12 @@ function buildIconNavItems({
                   } as IconNavItem,
               ]
             : []),
+        {
+            id: 'my-day',
+            icon: CheckCircle2,
+            label: 'My Day',
+            href: '/my-day',
+        },
         {
             id: 'my-calendar',
             icon: CalendarDays,
@@ -637,7 +651,6 @@ function buildIconNavItems({
         !!can?.evv?.viewAny ||
         !!can?.family_portal?.viewAny ||
         !!can?.family_portal?.manage ||
-        !!can?.qualifications?.viewAny ||
         !!can?.operations?.reports?.view ||
         !!can?.reports?.viewAny ||
         !!can?.timeline?.viewAny ||
@@ -1229,12 +1242,6 @@ function buildOperationsSubPanelGroups({
             href: '/settings/calendar-sync',
             icon: CalendarDays,
         });
-    if (can?.qualifications?.viewAny)
-        tools.push({
-            title: 'Qualifications',
-            href: '/operations/qualifications',
-            icon: ShieldCheck,
-        });
     if (tools.length > 0) groups.push({ label: 'Tools', items: tools });
 
     // Reports
@@ -1334,6 +1341,18 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Conflict Queue',
             href: '/operations/rostering/conflicts',
             icon: AlertTriangle,
+        });
+    if (can?.rostering?.viewAny)
+        workforce.push({
+            title: 'Qualifications',
+            href: '/operations/qualifications',
+            icon: ShieldCheck,
+        });
+    if (can?.rostering?.viewAny)
+        workforce.push({
+            title: 'Workforce settings',
+            href: '/operations/workforce-settings',
+            icon: Settings,
         });
 
     return workforce.length > 0

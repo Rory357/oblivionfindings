@@ -1,4 +1,5 @@
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import {
     StockDetailDialog,
     type OpenOrderSummary,
@@ -63,7 +64,7 @@ import {
     User,
     X,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useStockFilters } from './stock/_filters';
 import {
@@ -97,6 +98,7 @@ type Props = {
     expiredCount: number;
     controlledRegister: ControlledRegisterRow[];
     pharmacyOrders: OrderRow[];
+    selected_pharmacy_order?: OrderRow | null;
     clients: ClientOpt[];
     activeMedications: StockMed[];
     witnesses: StaffOpt[];
@@ -133,6 +135,7 @@ export default function StockManagement({
     expiredCount,
     controlledRegister,
     pharmacyOrders,
+    selected_pharmacy_order,
     clients,
     activeMedications,
     witnesses,
@@ -186,6 +189,10 @@ export default function StockManagement({
         [siteFilter, clientFilter],
     );
     const [modal, setModal] = useState<Modal>(null);
+    useEffect(() => {
+        if (selected_pharmacy_order)
+            setModal({ type: 'order-detail', order: selected_pharmacy_order });
+    }, [selected_pharmacy_order]);
     const orderAdvanceReplay = useRef(
         new Map<number, MedicationMutationReplayState>(),
     );
@@ -424,7 +431,12 @@ export default function StockManagement({
                 icon: FileText,
                 label: 'Open CD register',
                 onClick: () =>
-                    router.visit(emarScopedHref('/emar/controlled', pageUrl)),
+                    router.visit(
+                        emarScopedHref(
+                            `/emar/controlled?client_id=${row.client_id}&client_medication_id=${row.medication_id}`,
+                            pageUrl,
+                        ),
+                    ),
             },
             row.discrepancy !== null &&
                 row.discrepancy !== 0 && {
@@ -434,7 +446,7 @@ export default function StockManagement({
                     onClick: () =>
                         router.visit(
                             emarScopedHref(
-                                '/emar/controlled?view=discrepancies',
+                                `/emar/controlled?view=discrepancies&client_id=${row.client_id}&client_medication_id=${row.medication_id}`,
                                 pageUrl,
                             ),
                         ),
@@ -647,6 +659,7 @@ export default function StockManagement({
                     }
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <PageHeaderSearch
                                 value={search}
                                 onChange={setSearch}

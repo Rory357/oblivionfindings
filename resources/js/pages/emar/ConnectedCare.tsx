@@ -9,12 +9,15 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
-import { Link, router } from '@inertiajs/react';
+import { emarScopedHref } from '@/lib/emar-navigation';
+import { withMedicationReturn } from '@/lib/medication-navigation';
+import { Link, router, usePage } from '@inertiajs/react';
 import { ArrowLeftRight } from 'lucide-react';
 import { useState } from 'react';
 import {
     AccessWizard,
     ProposalDecision,
+    RegistrationCheckWizard,
     RevokeAccess,
     TransferAction,
     TransferWizard,
@@ -29,11 +32,22 @@ import {
 import type { ConnectedProps, Transfer } from './connected/_types';
 
 export default function ConnectedCare(props: ConnectedProps) {
-    const [view, setView] = useWorkspaceView('access', [
-        'access',
-        'requests',
-        'transfers',
-    ]);
+    // EA-086: only the tabs this person can use, opening on the first of them.
+    const tabs = [
+        props.can.manage_access && {
+            key: 'access',
+            label: 'Prescriber access',
+        },
+        props.can.manage_orders && { key: 'requests', label: 'Requests' },
+        props.can.transfer && {
+            key: 'transfers',
+            label: 'Provider handovers',
+        },
+    ].filter((t): t is { key: string; label: string } => !!t);
+    const [view, setView] = useWorkspaceView(
+        tabs[0]?.key ?? 'requests',
+        tabs.map((t) => t.key),
+    );
     const [q, setQ] = useState('');
     const [modal, setModal] = useState<
         'clinician' | 'grant' | 'transfer' | null
@@ -42,12 +56,16 @@ export default function ConnectedCare(props: ConnectedProps) {
         ConnectedProps['proposals'][number] | null
     >(null);
     const [transfer, setTransfer] = useState<Transfer | null>(null);
+    const [registrationCheck, setRegistrationCheck] = useState<
+        ConnectedProps['clinicians'][number] | null
+    >(null);
     const [transition, setTransition] = useState<string | null>(null);
     const [revoke, setRevoke] = useState<{
         kind: 'clinicians' | 'grants';
         id: number;
         name: string;
     } | null>(null);
+    const { url: pageUrl } = usePage();
     const matches = (s: string) => s.toLowerCase().includes(q.toLowerCase());
     const saved = () => router.reload();
     const person = props.selected_client;
@@ -62,17 +80,18 @@ export default function ConnectedCare(props: ConnectedProps) {
                 setView(v);
                 setQ('');
             }}
-            tabs={[
-                { key: 'access', label: 'Prescriber access' },
-                { key: 'requests', label: 'Requests' },
-                { key: 'transfers', label: 'Provider handovers' },
-            ]}
+            tabs={tabs}
             query={q}
             onQuery={setQ}
             actions={
                 <>
                     <PageHeaderGlassButton asChild>
-                        <Link href="/emar/prescriptions">
+                        <Link
+                            href={withMedicationReturn(
+                                emarScopedHref('/emar/prescriptions', pageUrl),
+                                pageUrl,
+                            )}
+                        >
                             Medication orders
                         </Link>
                     </PageHeaderGlassButton>
@@ -139,11 +158,67 @@ export default function ConnectedCare(props: ConnectedProps) {
                     caption: 'Open in this batch',
                     view: 'transfers',
                 },
-            ]}
+            ].filter((m) => tabs.some((t) => t.key === m.view))}
         >
-            {!person ? (
+            {view === 'requests' ? (
+                <>
+                    {person && (
+                        <p className="text-caption">
+                            {person.name} ·{' '}
+                            {formatDateOnly(person.date_of_birth)}
+                        </p>
+                    )}
+                    <BoundedTable
+                        rows={props.proposals.filter((p) =>
+                            matches(
+                                p.client_name +
+                                    ' ' +
+                                    p.clinician_name +
+                                    ' ' +
+                                    p.reason +
+                                    ' ' +
+                                    (p.prescription?.name ?? ''),
+                            ),
+                        )}
+                        identity={(p) => ({
+                            name:
+                                p.prescription?.name ??
+                                'Stop medication request',
+                            subline: person
+                                ? p.clinician_name
+                                : p.client_name + ' · ' + p.clinician_name,
+                        })}
+                        columns={[
+                            {
+                                key: 'kind',
+                                label: 'Request',
+                                width: '1fr',
+                                cell: (p) => p.kind,
+                            },
+                            {
+                                key: 'date',
+                                label: 'Submitted',
+                                width: '1fr',
+                                cell: (p) => formatDateTime(p.submitted_at),
+                            },
+                            {
+                                key: 'status',
+                                label: 'State',
+                                width: '1fr',
+                                cell: (p) => <StatusBadge status={p.status} />,
+                            },
+                        ]}
+                        open={setDecision}
+                        empty={
+                            person
+                                ? 'No prescriber requests for this person.'
+                                : 'No prescriber requests for the people you can see.'
+                        }
+                    />
+                </>
+            ) : !person ? (
                 <SettingsNotice>
-                    Choose a person to review access, requests and handovers.
+                    Choose a person to review access and handovers.
                 </SettingsNotice>
             ) : (
                 <>
@@ -197,6 +272,24 @@ export default function ConnectedCare(props: ConnectedProps) {
                                         width: '1fr',
                                         cell: (g) =>
                                             formatDateTime(g.expires_at),
+                                    },
+                                    {
+                                        key: 'views',
+                                        label: 'Chart opened',
+                                        width: '1fr',
+                                        cell: (g) =>
+                                            g.views
+                                                ? g.views +
+                                                  (g.views === 1
+                                                      ? ' time'
+                                                      : ' times') +
+                                                  (g.last_viewed_at
+                                                      ? ' · last ' +
+                                                        formatDateTime(
+                                                            g.last_viewed_at,
+                                                        )
+                                                      : '')
+                                                : 'Not yet',
                                     },
                                     {
                                         key: 'state',
@@ -264,12 +357,67 @@ export default function ConnectedCare(props: ConnectedProps) {
                                     {
                                         key: 'registration',
                                         label: 'Registration',
-                                        width: '1fr',
-                                        cell: (c) =>
-                                            c.registration_authority +
-                                            ' ' +
-                                            c.registration_number,
+                                        width: '1.5fr',
+                                        // EA-104: structured evidence, a due re-check, or a free-text record.
+                                        cell: (c) => (
+                                            <div className="space-y-1">
+                                                <div>
+                                                    {(props.registration
+                                                        ?.councils?.[
+                                                        c.registration_authority
+                                                    ] ??
+                                                        c.registration_authority) +
+                                                        ' ' +
+                                                        c.registration_number}
+                                                </div>
+                                                {c.needs_structured_check ? (
+                                                    <StatusBadge variant="warning">
+                                                        Needs structured check
+                                                    </StatusBadge>
+                                                ) : c.register_recheck_due ? (
+                                                    <StatusBadge variant="warning">
+                                                        Re-check due
+                                                    </StatusBadge>
+                                                ) : c.register_checked_at ? (
+                                                    <span className="text-caption">
+                                                        {c.registration_scope} ·
+                                                        checked{' '}
+                                                        {formatDateOnly(
+                                                            c.register_checked_at,
+                                                        )}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        ),
                                     },
+                                    ...(props.can.manage_access
+                                        ? [
+                                              {
+                                                  key: 'check',
+                                                  label: '',
+                                                  width: '160px',
+                                                  cell: (
+                                                      c: ConnectedProps['clinicians'][number],
+                                                  ) =>
+                                                      !c.revoked_at &&
+                                                      (c.needs_structured_check ||
+                                                          c.register_recheck_due) ? (
+                                                          <Button
+                                                              size="sm"
+                                                              variant="outline"
+                                                              onClick={(e) => {
+                                                                  e.stopPropagation();
+                                                                  setRegistrationCheck(
+                                                                      c,
+                                                                  );
+                                                              }}
+                                                          >
+                                                              Record check
+                                                          </Button>
+                                                      ) : null,
+                                              },
+                                          ]
+                                        : []),
                                     {
                                         key: 'expiry',
                                         label: 'Identity review ends',
@@ -302,49 +450,6 @@ export default function ConnectedCare(props: ConnectedProps) {
                                 access above to stop access for one person.
                             </SettingsNotice>
                         </>
-                    )}
-                    {view === 'requests' && (
-                        <BoundedTable
-                            rows={props.proposals.filter((p) =>
-                                matches(
-                                    p.clinician_name +
-                                        ' ' +
-                                        p.reason +
-                                        ' ' +
-                                        (p.prescription?.name ?? ''),
-                                ),
-                            )}
-                            identity={(p) => ({
-                                name:
-                                    p.prescription?.name ??
-                                    'Stop medication request',
-                                subline: p.clinician_name,
-                            })}
-                            columns={[
-                                {
-                                    key: 'kind',
-                                    label: 'Request',
-                                    width: '1fr',
-                                    cell: (p) => p.kind,
-                                },
-                                {
-                                    key: 'date',
-                                    label: 'Submitted',
-                                    width: '1fr',
-                                    cell: (p) => formatDateTime(p.submitted_at),
-                                },
-                                {
-                                    key: 'status',
-                                    label: 'State',
-                                    width: '1fr',
-                                    cell: (p) => (
-                                        <StatusBadge status={p.status} />
-                                    ),
-                                },
-                            ]}
-                            open={setDecision}
-                            empty="No prescriber requests for this person."
-                        />
                     )}
                     {view === 'transfers' && (
                         <BoundedTable
@@ -388,7 +493,7 @@ export default function ConnectedCare(props: ConnectedProps) {
                     )}
                 </>
             )}
-            {person && (
+            {(person || view === 'requests') && (
                 <ServerPages
                     meta={
                         props.pagination?.[
@@ -431,6 +536,14 @@ export default function ConnectedCare(props: ConnectedProps) {
                         onSaved={saved}
                     />
                 ))}
+            {registrationCheck && (
+                <RegistrationCheckWizard
+                    clinician={registrationCheck}
+                    props={props}
+                    onClose={() => setRegistrationCheck(null)}
+                    onSaved={saved}
+                />
+            )}
             {decision && (
                 <ProposalDecision
                     proposal={decision}
@@ -528,10 +641,16 @@ export default function ConnectedCare(props: ConnectedProps) {
                     {transfer.reconciliation_id && (
                         <Button asChild variant="outline">
                             <Link
-                                href={
-                                    '/emar/prescriptions?view=reconciliation&client_id=' +
-                                    transfer.client_id
-                                }
+                                href={withMedicationReturn(
+                                    emarScopedHref(
+                                        '/emar/prescriptions?view=reconciliation&client_id=' +
+                                            transfer.client_id +
+                                            '&reconciliation_id=' +
+                                            transfer.reconciliation_id,
+                                        pageUrl,
+                                    ),
+                                    pageUrl,
+                                )}
                             >
                                 Open medication reconciliation
                             </Link>

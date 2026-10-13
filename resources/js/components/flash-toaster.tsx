@@ -32,10 +32,53 @@ function asToastText(value: unknown): string | null {
 }
 
 export default function FlashToaster() {
-    const props = usePage().props as any;
+    const page = usePage();
+    const props = page.props as {
+        flash?: Flash;
+        errors?: Record<string, unknown>;
+    };
     const flash = props.flash as Flash | undefined;
-    const errors = props.errors as Record<string, any> | undefined;
-    const success = asToastText(flash?.success);
+    const errors = props.errors;
+    // Shift Notes owns confirmation in its command dialog after matching the
+    // committed receipt. A generic redirect message must not bypass that check.
+    const rawSuccess = asToastText(flash?.success);
+    const timesheetDialogOwnsResult =
+        ['operations/timesheets/index', 'operations/rostering/index'].includes(
+            page.component,
+        ) &&
+        [
+            'Timesheet created.',
+            'Timesheet updated.',
+            'Timesheet submitted.',
+            'Timesheet updated and resubmitted.',
+            'Timesheet approved.',
+            'Timesheet already approved.',
+            'Timesheet rejected.',
+            'Timesheet returned for changes.',
+        ].includes(rawSuccess ?? '');
+    const adjustmentDialogOwnsResult =
+        page.component === 'operations/timesheets/payroll-adjustments' &&
+        [
+            'Payroll adjustment marked as processed.',
+            'This adjustment has already been marked as processed.',
+        ].includes(rawSuccess ?? '');
+    const shiftDialogOwnsResult =
+        [
+            'operations/shifts/index',
+            'operations/rostering/index',
+            'operations/shifts/create',
+            'operations/shifts/show',
+            'operations/clients/show',
+            'operations/rostering/conflicts',
+        ].includes(page.component) &&
+        ['Shift created.', 'Shift updated.'].includes(rawSuccess ?? '');
+    const success =
+        page.component === 'operations/shift-notes/Index' ||
+        timesheetDialogOwnsResult ||
+        adjustmentDialogOwnsResult ||
+        shiftDialogOwnsResult
+            ? null
+            : rawSuccess;
     const error = asToastText(flash?.error);
     const warning = asToastText(flash?.warning);
     const info = asToastText(flash?.info);

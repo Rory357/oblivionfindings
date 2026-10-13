@@ -80,7 +80,7 @@ function scopeClientProfileFoundationUserToSite(
 it('hydrates every Add Client step when completing an existing profile', function () {
     $site = Site::factory()->create(['is_active' => true]);
     $user = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
-    grantClientProfileFoundationPermissions($user, ['clients.update']);
+    grantClientProfileFoundationPermissions($user, ['clients.update', 'clients.viewAny', 'medications.view']);
     scopeClientProfileFoundationUserToSite($user, $site, 'coordinator');
     $client = Client::factory()->create([
         'site_id' => $site->id,
@@ -113,9 +113,14 @@ it('hydrates every Add Client step when completing an existing profile', functio
         'can_receive_updates' => true,
     ]);
 
+    expect($user->can('update', $client))->toBeTrue()
+        ->and($user->can('view', $client))->toBeTrue()
+        ->and($user->can('viewMedications', $client))->toBeTrue();
+
     $this->actingAs($user)
         ->getJson("/operations/clients/{$client->id}/edit?modal=1")
         ->assertOk()
+        ->assertJsonPath('can_edit_medical', true)
         ->assertJsonPath('initialValues.ethnicity', 'Māori')
         ->assertJsonPath('initialValues.languages.1', 'Te Reo Māori')
         ->assertJsonPath('initialValues.mobility_needs', 'Walking frame')
@@ -143,7 +148,7 @@ it('round trips the complete profile wizard payload through update and edit hydr
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
-    grantClientProfileFoundationPermissions($manager, ['clients.update']);
+    grantClientProfileFoundationPermissions($manager, ['clients.update', 'clients.viewAny', 'medications.view']);
     scopeClientProfileFoundationUserToSite($manager, $site, 'coordinator');
     scopeClientProfileFoundationUserToSite($worker, $site);
     $room = SiteHouseRoom::query()->create([
@@ -251,6 +256,10 @@ it('round trips the complete profile wizard payload through update and edit hydr
         ],
     ];
 
+    expect($manager->can('update', $client))->toBeTrue()
+        ->and($manager->can('view', $client))->toBeTrue()
+        ->and($manager->can('viewMedications', $client))->toBeTrue();
+
     $this->actingAs($manager)
         ->from("/operations/clients/{$client->id}")
         ->put("/operations/clients/{$client->id}", $payload)
@@ -347,6 +356,7 @@ it('round trips the complete profile wizard payload through update and edit hydr
     $this->actingAs($manager)
         ->getJson("/operations/clients/{$client->id}/edit?modal=1")
         ->assertOk()
+        ->assertJsonPath('can_edit_medical', true)
         ->assertJsonPath('initialValues.first_name', 'Ariana')
         ->assertJsonPath('initialValues.languages.1', 'Te Reo Māori')
         ->assertJsonPath('initialValues.transport_needs.1', 'support_person')

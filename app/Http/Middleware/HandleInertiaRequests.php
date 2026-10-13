@@ -313,6 +313,63 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'attendance_result' => fn () => $request->session()->get('attendance_result'),
                 'staff_availability_result' => fn () => $request->session()->get('staff_availability_result'),
+                'workforce_settings_result' => function () use ($request) {
+                    $outcome = $request->session()->get('workforce_settings_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'shift_note_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_note_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'timesheet_result' => function () use ($request) {
+                    $outcome = $request->session()->get('timesheet_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'coverage_gap_result' => function () use ($request) {
+                    $outcome = $request->session()->get('coverage_gap_result');
+
+                    return is_array($outcome) && ($outcome['version'] ?? null) === 1 && ($outcome['scope'] ?? null) === 'coverage_gap'
+                        && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'house_qualification_result' => function () use ($request) {
+                    $outcome = $request->session()->get('house_qualification_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'qualification_requirement_result' => function () use ($request) {
+                    $outcome = $request->session()->get('qualification_requirement_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'eligibility_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id
+                        ? $request->session()->get('eligibility_result') : null;
+                },
+                'roster_template_result' => function () use ($request) {
+                    $outcome = $request->session()->get('roster_template_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'roster_suggestion_result' => function () use ($request) {
+                    $outcome = $request->session()->get('roster_suggestion_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'shift_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'timesheet_payroll_adjustment_result' => function () use ($request) {
+                    $outcome = $request->session()->get('timesheet_payroll_adjustment_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
                 // Many controllers use 'status' (starter-kit convention). Treat it as success.
                 'success' => session('success') ?? session('status'),
                 'error' => session('error'),
@@ -510,7 +567,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v11';
+    protected const PERMISSIONS_CACHE_VERSION = 'v12';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -583,6 +640,7 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('shifts.create'),
                 'update' => $user->canDo('shifts.update'),
                 'manageAny' => $user->canDo('shifts.manageAny'),
+                'overrideEligibility' => $user->canDo('shifts.overrideEligibility'),
                 'tasksUpdateSelf' => $user->canDo('shifts.tasks.updateSelf'),
             ],
 

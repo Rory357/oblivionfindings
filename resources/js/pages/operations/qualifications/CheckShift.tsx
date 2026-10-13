@@ -12,8 +12,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { CheckCircle2, ShieldCheck, XCircle } from 'lucide-react';
+import { formatDateTimeInZone } from '@/lib/datetime';
+import { Head, Link, usePage } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    CircleHelp,
+    ShieldCheck,
+    XCircle,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type Shift = {
@@ -31,6 +38,10 @@ type QualificationResult = {
         qualification_type?: string | null;
         description?: string | null;
     };
+    status?: string;
+    severity?: 'info' | 'warning' | 'block';
+    reasons?: string[];
+    requires_acknowledgement?: boolean;
     met: boolean;
     is_mandatory: boolean;
 };
@@ -39,18 +50,9 @@ type Props = {
     shift: Shift;
     results: QualificationResult[];
     allMandatoryMet: boolean;
+    hasBlocks?: boolean;
+    hasWarnings?: boolean;
 };
-
-function formatDateTime(value: string | null): string {
-    if (!value) return '-';
-    return new Date(value).toLocaleString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
 
 export default function QualificationCheckShift({
     shift,
@@ -58,12 +60,31 @@ export default function QualificationCheckShift({
     allMandatoryMet,
 }: Props) {
     const [search, setSearch] = useState('');
+    const page = usePage().props as unknown as { workerTimezone?: string };
+    const timezone = page.workerTimezone ?? 'Pacific/Auckland';
+    const formatDateTime = (value: string | null) =>
+        formatDateTimeInZone(value, timezone);
+    const severity = (result: QualificationResult) =>
+        result.severity ??
+        (result.met ? 'info' : result.is_mandatory ? 'block' : 'warning');
+    const blocks = results.filter(
+        (result) => severity(result) === 'block',
+    ).length;
+    const warnings = results.filter(
+        (result) => severity(result) === 'warning',
+    ).length;
+    const statusLabel = (result: QualificationResult) => {
+        if (result.met) return 'Met';
+        if (result.status === 'unassigned') return 'Worker not assigned';
+        if (result.status === 'unmapped') return 'Qualification not linked';
+        if (result.status === 'unavailable') return 'Evidence unavailable';
+        if (result.status === 'expired') return 'Expired or no longer valid';
+        if (result.status === 'not_started') return 'Evidence missing';
+        return 'Needs review';
+    };
 
     const title = shift.staff?.name ?? `Shift #${shift.id}`;
     const metCount = results.filter((r) => r.met).length;
-    const mandatoryGaps = results.filter(
-        (r) => r.is_mandatory && !r.met,
-    ).length;
 
     const sublineParts = [
         'Qualification check',
@@ -92,17 +113,31 @@ export default function QualificationCheckShift({
             icon={ShieldCheck}
             title={title}
             titleChip={
-                allMandatoryMet ? (
-                    <PageHeaderStatusChip variant="success">
-                        Mandatory requirements met
-                    </PageHeaderStatusChip>
-                ) : (
-                    <PageHeaderStatusChip variant="critical">
-                        Mandatory gaps found
-                    </PageHeaderStatusChip>
-                )
+                <PageHeaderStatusChip
+                    variant={
+                        blocks
+                            ? 'critical'
+                            : warnings
+                              ? 'warning'
+                              : !shift.staff || results.length === 0
+                                ? 'neutral'
+                                : 'success'
+                    }
+                >
+                    {blocks
+                        ? 'Qualification blockers'
+                        : warnings
+                          ? 'Qualification warnings'
+                          : !shift.staff
+                            ? 'Worker not assigned'
+                            : results.length === 0
+                              ? 'No requirements recorded'
+                              : allMandatoryMet
+                                ? 'Mandatory requirements met'
+                                : 'Review qualifications'}
+                </PageHeaderStatusChip>
             }
-            subline={sublineParts.join(' · ')}
+            subline={sublineParts.join(' · ') + ' · ' + timezone}
             actions={
                 <PageHeaderSearch
                     value={search}
@@ -131,16 +166,18 @@ export default function QualificationCheckShift({
                         </PageHeaderMeterBlock>
                     ) : null}
                     <PageHeaderMeterBlock
-                        label="Mandatory gaps"
-                        tone={mandatoryGaps > 0 ? 'critical' : 'success'}
+                        label="Qualification blockers"
+                        tone={blocks > 0 ? 'critical' : undefined}
                         ariaLabel="Review qualification requirements"
                         href="/operations/qualifications"
                     >
-                        <PageHeaderMeterBig>{mandatoryGaps}</PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{blocks}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {mandatoryGaps > 0
-                                ? 'must be resolved before the shift'
-                                : 'nothing outstanding'}
+                            {blocks > 0
+                                ? 'resolve before assignment'
+                                : warnings > 0
+                                  ? `${warnings} ${warnings === 1 ? 'warning needs' : 'warnings need'} review`
+                                  : 'no qualification blockers recorded'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -160,13 +197,18 @@ export default function QualificationCheckShift({
                 },
                 {
                     title: 'Qualification check',
-                    href: `/operations/qualifications/check-shift/${shift.id}`,
+                    href: `/operations/qualifications/check/${shift.id}`,
                 },
             ]}
         >
             <Head title={`Qualification check · ${title}`} />
 
             <PageLayout hero={header}>
+                <p className="mb-4 text-sm text-muted-foreground">
+                    This checks Client qualification requirements against the
+                    recorded worker and duty. House coverage and other safety
+                    checks are assessed separately when assigning or publishing.
+                </p>
                 <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
                     <Card>
                         <CardHeader>
@@ -234,9 +276,14 @@ export default function QualificationCheckShift({
                                 </div>
                             )}
                             {shownResults.map((result) => {
+                                const tone = severity(result);
                                 const Icon = result.met
                                     ? CheckCircle2
-                                    : XCircle;
+                                    : tone === 'block'
+                                      ? XCircle
+                                      : tone === 'warning'
+                                        ? AlertTriangle
+                                        : CircleHelp;
                                 return (
                                     <div
                                         key={result.requirement.id}
@@ -246,7 +293,11 @@ export default function QualificationCheckShift({
                                             className={
                                                 result.met
                                                     ? 'mt-0.5 h-5 w-5 text-status-success'
-                                                    : 'mt-0.5 h-5 w-5 text-status-critical'
+                                                    : tone === 'block'
+                                                      ? 'mt-0.5 h-5 w-5 text-status-critical'
+                                                      : tone === 'warning'
+                                                        ? 'mt-0.5 h-5 w-5 text-status-warning'
+                                                        : 'mt-0.5 h-5 w-5 text-muted-foreground'
                                             }
                                         />
                                         <div className="min-w-0 flex-1">
@@ -269,16 +320,35 @@ export default function QualificationCheckShift({
                                                     variant={
                                                         result.met
                                                             ? 'success'
-                                                            : result.is_mandatory
+                                                            : tone === 'block'
                                                               ? 'critical'
-                                                              : 'warning'
+                                                              : tone ===
+                                                                  'warning'
+                                                                ? 'warning'
+                                                                : 'neutral'
                                                     }
                                                 >
-                                                    {result.met
-                                                        ? 'Met'
-                                                        : 'Missing'}
+                                                    {statusLabel(result)}
                                                 </StatusBadge>
                                             </div>
+                                            {result.reasons?.map(
+                                                (reason, index) => (
+                                                    <p
+                                                        key={index}
+                                                        className="mt-2 text-sm"
+                                                    >
+                                                        {reason}
+                                                    </p>
+                                                ),
+                                            )}
+                                            {result.requires_acknowledgement ? (
+                                                <p className="mt-2 text-sm text-status-warning">
+                                                    An authorised manager must
+                                                    acknowledge this warning and
+                                                    record a reason when
+                                                    proceeding.
+                                                </p>
+                                            ) : null}
                                             {result.requirement.description && (
                                                 <p className="mt-1 text-sm text-muted-foreground">
                                                     {

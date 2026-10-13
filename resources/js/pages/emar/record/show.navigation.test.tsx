@@ -136,7 +136,10 @@ describe('person medication record context', () => {
         );
         expect(back.searchParams.get('date')).toBe('2026-10-04');
         expect(back.searchParams.get('site_id')).toBe('3');
-        expect(back.searchParams.has('client_id')).toBe(false);
+        expect(back.pathname).toBe('/meds/today');
+        // EA-108 (Lane C8): back returns to everyone in the house, not a
+        // one-person list that reopens this record.
+        expect(back.searchParams.get('client_id')).toBeNull();
     });
 
     it('opens allergies inside the medication record without wider profile access', () => {

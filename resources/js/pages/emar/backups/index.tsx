@@ -28,7 +28,12 @@ import {
 type Recipient = {
     user_id: number;
     name: string;
-    email: string;
+    /** Their HR work email: backups never go to a sign-in email. */
+    email: string | null;
+    /** Authenticator two-step sign-in, without which they can't get a password (EA-141). */
+    can_open: boolean;
+    /** EA-141: their own backup passphrase is set (opens in an outage). */
+    has_passphrase?: boolean;
     status: string;
 };
 type Schedule = {
@@ -40,9 +45,20 @@ type Schedule = {
     version: number;
     retention_days: number;
     recipients: Recipient[];
+    /** Who the daily job runs as, and whether they still can (EA-142). */
+    runs_as?: string | null;
+    runs_as_current?: boolean | null;
+    last_run?: {
+        nz_date: string;
+        state: string;
+        code: string | null;
+        at: string | null;
+    } | null;
 };
 type Delivery = {
     id: number;
+    /** "B12": also in the email subject and file name (EA-140). */
+    reference?: string;
     version: number;
     site_id: number;
     nz_date: string;
@@ -71,6 +87,18 @@ type Props = {
         encryption_ready: boolean;
         send_enabled: boolean;
         reason: string | null;
+        email_ready?: boolean;
+        email_capture_mode?: 'array' | 'log' | null;
+        email_reason?: string | null;
+        email_source?: 'saved' | 'server';
+    };
+    can_view_email_settings?: boolean;
+    /** EA-141: this person's own backup passphrase. */
+    my_passphrase?: {
+        set: boolean;
+        set_at: string | null;
+        can_set: boolean;
+        reason: string | null;
     };
     can_manage: boolean;
     notice: string;
@@ -80,6 +108,32 @@ type Props = {
         total: number;
     };
 };
+/** EA-142/EA-143: what the daily job is really doing, not just its switch. */
+function scheduleStatus(s: Schedule, readiness: Props['readiness']): string {
+    if (!s.enabled) return 'Schedule off';
+    if (s.runs_as_current === false)
+        return (
+            'Stopped — ' +
+            (s.runs_as ?? 'whoever set it') +
+            ' can no longer manage backups. Save the schedule again.'
+        );
+    if (!readiness.encryption_ready)
+        return 'Not running — strong PDF encryption isn’t set up';
+    const today = toDateInput(new Date());
+    const run = s.last_run && s.last_run.nz_date === today ? s.last_run : null;
+    if (run?.state === 'sent') return 'Delivered today';
+    if (run?.state === 'failed')
+        return 'Today’s backup failed — see Delivery history';
+    if (run?.state === 'uncertain')
+        return 'Today’s email result is unknown — see Delivery history';
+    if (run?.state === 'prepared_not_emailed')
+        return 'Prepared today, not emailed — email sending is off';
+    if (!readiness.send_enabled)
+        return 'Daily — prepared, not emailed (email sending is off)';
+
+    return 'Daily schedule enabled';
+}
+
 export default function Backups(props: Props) {
     const [view, setView] = useWorkspaceView('schedules', [
         'schedules',
@@ -93,6 +147,7 @@ export default function Backups(props: Props) {
     const [action, setAction] = useState<'send' | 'retry' | 'password' | null>(
         null,
     );
+    const [passphrase, setPassphrase] = useState(false);
     const house = (id: number) =>
         props.sites.find((s) => s.id === id)?.name ?? 'House unavailable';
     const refresh = () => {
@@ -165,8 +220,49 @@ export default function Backups(props: Props) {
                 },
             ]}
         >
-            {props.readiness.reason && (
-                <SettingsNotice>{props.readiness.reason}</SettingsNotice>
+            {(props.readiness.reason || props.readiness.email_reason) && (
+                <SettingsNotice>
+                    {props.readiness.reason && <p>{props.readiness.reason}</p>}
+                    {props.readiness.email_reason && (
+                        <p>{props.readiness.email_reason}</p>
+                    )}
+                </SettingsNotice>
+            )}
+            <SettingsNotice role="note">
+                <p>
+                    Email provider and sender are configured in Main Settings →
+                    Email. Manage house schedules, approved recipients and
+                    backup protection here.
+                </p>
+                {props.readiness.email_source === 'server' && (
+                    <p>
+                        No shared email settings are saved; server mail settings
+                        apply.
+                    </p>
+                )}
+                {props.can_view_email_settings && (
+                    <Button asChild variant="link" size="sm">
+                        <Link href="/settings/email">Open email settings</Link>
+                    </Button>
+                )}
+            </SettingsNotice>
+            {props.my_passphrase &&
+                (props.my_passphrase.set ||
+                    props.my_passphrase.can_set ||
+                    props.my_passphrase.reason) && (
+                    <MyPassphrase
+                        status={props.my_passphrase}
+                        onSet={() => setPassphrase(true)}
+                    />
+                )}
+            {passphrase && (
+                <PassphraseDialog
+                    replacing={!!props.my_passphrase?.set}
+                    onClose={() => {
+                        setPassphrase(false);
+                        router.reload();
+                    }}
+                />
             )}
             <SettingsNotice>
                 {props.notice ||
@@ -181,9 +277,7 @@ export default function Backups(props: Props) {
                     )}
                     identity={(s) => ({
                         name: house(s.site_id),
-                        subline: s.enabled
-                            ? 'Daily schedule enabled'
-                            : 'Schedule off',
+                        subline: scheduleStatus(s, props.readiness),
                     })}
                     columns={[
                         {
@@ -196,11 +290,53 @@ export default function Backups(props: Props) {
                             key: 'recipients',
                             label: 'Recipients',
                             width: '2fr',
-                            cell: (s) =>
-                                s.recipients
-                                    .filter((r) => r.status === 'approved')
-                                    .map((r) => r.name)
-                                    .join(', ') || 'None approved',
+                            cell: (s) => {
+                                // A recipient whose work email changed (or who was
+                                // approved against a sign-in email) gets nothing
+                                // until approved again — say so, don't hide them.
+                                const review = s.recipients.filter(
+                                    (r) => r.status === 'review_required',
+                                );
+                                return (
+                                    <div className="space-y-1">
+                                        <div>
+                                            {s.recipients
+                                                .filter(
+                                                    (r) =>
+                                                        r.status === 'approved',
+                                                )
+                                                .map(
+                                                    (r) =>
+                                                        r.name +
+                                                        (!r.can_open
+                                                            ? ' (can’t open yet)'
+                                                            : r.has_passphrase
+                                                              ? ''
+                                                              : ' (can’t open during an outage — set a backup passphrase)'),
+                                                )
+                                                .join(', ') || 'None approved'}
+                                        </div>
+                                        {review.length > 0 && (
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <StatusBadge variant="warning">
+                                                    {review.length === 1
+                                                        ? '1 to approve again'
+                                                        : review.length +
+                                                          ' to approve again'}
+                                                </StatusBadge>
+                                                <span className="text-caption">
+                                                    {review
+                                                        .map((r) => r.name)
+                                                        .join(', ')}{' '}
+                                                    — not sent backups until
+                                                    approved with their work
+                                                    email
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            },
                         },
                         {
                             key: 'retention',
@@ -250,7 +386,9 @@ export default function Backups(props: Props) {
                         )}
                         identity={(d) => ({
                             name: house(d.site_id),
-                            subline: formatDateOnly(d.nz_date),
+                            subline:
+                                formatDateOnly(d.nz_date) +
+                                (d.reference ? ' · ' + d.reference : ''),
                         })}
                         columns={[
                             {
@@ -297,6 +435,7 @@ export default function Backups(props: Props) {
                 <ScheduleWizard
                     sites={props.sites}
                     schedule={schedule === 'new' ? null : schedule}
+                    encryptionReady={props.readiness.encryption_ready}
                     onClose={refresh}
                 />
             )}
@@ -322,7 +461,8 @@ export default function Backups(props: Props) {
                     description={
                         house(delivery.site_id) +
                         ' · ' +
-                        formatDateOnly(delivery.nz_date)
+                        formatDateOnly(delivery.nz_date) +
+                        (delivery.reference ? ' · ' + delivery.reference : '')
                     }
                     onClose={refresh}
                     footer={
@@ -351,16 +491,18 @@ export default function Backups(props: Props) {
                                     Show password securely
                                 </Button>
                             )}
-                            {delivery.can_send && (
-                                <Button onClick={() => setAction('send')}>
-                                    Review email delivery
-                                </Button>
-                            )}
-                            {delivery.can_retry && (
-                                <Button onClick={() => setAction('retry')}>
-                                    Review retry
-                                </Button>
-                            )}
+                            {delivery.can_send &&
+                                props.readiness.email_ready !== false && (
+                                    <Button onClick={() => setAction('send')}>
+                                        Review email delivery
+                                    </Button>
+                                )}
+                            {delivery.can_retry &&
+                                props.readiness.email_ready !== false && (
+                                    <Button onClick={() => setAction('retry')}>
+                                        Review retry
+                                    </Button>
+                                )}
                         </>
                     }
                 >
@@ -413,10 +555,12 @@ export default function Backups(props: Props) {
 function ScheduleWizard({
     sites,
     schedule: s,
+    encryptionReady,
     onClose,
 }: {
     sites: Props['sites'];
     schedule: Schedule | null;
+    encryptionReady: boolean;
     onClose: () => void;
 }) {
     const command = useCommand();
@@ -488,8 +632,15 @@ function ScheduleWizard({
                             <Toggle
                                 label="Enable daily preparation and delivery"
                                 checked={enabled}
+                                disabled={!encryptionReady && !enabled}
                                 onChange={setEnabled}
                             />
+                            {!encryptionReady && (
+                                <SettingsNotice>
+                                    Strong PDF encryption isn’t set up yet, so
+                                    the daily backup can’t be switched on.
+                                </SettingsNotice>
+                            )}
                             <SettingsNotice>
                                 Recipients must be approved separately. Sending
                                 also requires the organisation’s encryption and
@@ -546,7 +697,7 @@ function RecipientWizard({
             .map((r) => ({
                 value: String(r.user_id),
                 label: r.name,
-                description: r.email,
+                description: r.email ?? undefined,
             })),
     ];
     return (
@@ -633,10 +784,12 @@ function RecipientWizard({
                                 }}
                             />
                             <SettingsNotice>
-                                Only current staff with a verified email and
+                                Only current staff with a work email on their HR
+                                profile, authenticator two-step sign-in and
                                 complete chart-export authority can receive this
-                                house’s backup. Switching approval off revokes
-                                this recipient.
+                                house’s backup. It goes to their work email,
+                                never their sign-in email. Switching approval
+                                off revokes this recipient.
                             </SettingsNotice>
                         </div>
                     ),
@@ -651,7 +804,7 @@ function RecipientWizard({
                         options.find((o) => o.value === user)?.label,
                 },
                 {
-                    label: 'Verified email',
+                    label: 'Work email',
                     value:
                         chosen?.email ??
                         options.find((o) => o.value === user)?.description,
@@ -896,6 +1049,168 @@ function PasswordDialog({
                         />
                     </Field>
                     <Field label="Your authenticator code" required>
+                        <Input
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            value={code}
+                            onChange={(e) =>
+                                setCode(e.target.value.replace(/\D/g, ''))
+                            }
+                        />
+                    </Field>
+                </>
+            )}
+        </SettingsModal>
+    );
+}
+
+/** EA-141: your own backup passphrase — so your copy opens during an outage. */
+function MyPassphrase({
+    status,
+    onSet,
+}: {
+    status: NonNullable<Props['my_passphrase']>;
+    onSet: () => void;
+}) {
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border p-4">
+            <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">
+                        Your backup passphrase
+                    </span>
+                    {status.set ? (
+                        <StatusBadge variant="success">Set</StatusBadge>
+                    ) : (
+                        <StatusBadge variant="warning">Not set</StatusBadge>
+                    )}
+                </div>
+                <p className="text-caption">
+                    {status.set
+                        ? 'Set ' +
+                          formatDateTime(status.set_at) +
+                          '. Your copy of each backup opens with it — no app needed during an outage.'
+                        : 'Can’t open during an outage — set a backup passphrase. Until you do, a backup needs its password from this page while the app is working.'}
+                </p>
+                {status.reason && (
+                    <p className="text-caption">{status.reason}</p>
+                )}
+            </div>
+            {status.can_set && (
+                <Button variant="outline" onClick={onSet}>
+                    {status.set ? 'Change passphrase' : 'Set backup passphrase'}
+                </Button>
+            )}
+        </div>
+    );
+}
+
+function PassphraseDialog({
+    replacing,
+    onClose,
+}: {
+    replacing: boolean;
+    onClose: () => void;
+}) {
+    const command = useCommand();
+    const [passphrase, setPassphrase] = useState('');
+    const [confirmation, setConfirmation] = useState('');
+    const [password, setPassword] = useState('');
+    const [code, setCode] = useState('');
+    const [saved, setSaved] = useState(false);
+    const save = async () => {
+        const result = await command.run('/emar/backups/passphrase', {
+            passphrase,
+            passphrase_confirmation: confirmation,
+            password,
+            verification_code: code,
+        });
+        setPassword('');
+        setCode('');
+        if (result) {
+            setPassphrase('');
+            setConfirmation('');
+            setSaved(true);
+        }
+    };
+    return (
+        <SettingsModal
+            width={480}
+            title={
+                replacing
+                    ? 'Change your backup passphrase'
+                    : 'Set your backup passphrase'
+            }
+            description="Confirm your own account and authenticator"
+            onClose={onClose}
+            footer={
+                <>
+                    <Button variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
+                    {!saved && (
+                        <Button
+                            disabled={
+                                passphrase.length < 12 ||
+                                passphrase !== confirmation ||
+                                !password ||
+                                code.length !== 6 ||
+                                command.busy ||
+                                command.uncertain
+                            }
+                            onClick={() => void save()}
+                        >
+                            Save passphrase
+                        </Button>
+                    )}
+                </>
+            }
+        >
+            {command.error && (
+                <SettingsNotice role="alert">{command.error}</SettingsNotice>
+            )}
+            {saved ? (
+                <SettingsNotice>
+                    Saved. Backups made from now on open with this passphrase.
+                    Keep it somewhere you can reach without the app.
+                </SettingsNotice>
+            ) : (
+                <>
+                    <SettingsNotice>
+                        {replacing
+                            ? 'A new passphrase applies to backups made from now on. Backups you already received still open with the passphrase they were made with.'
+                            : 'Your copy of each backup will open with this passphrase, without the app. It is never stored — if you forget it, set a new one; it applies to new backups.'}
+                    </SettingsNotice>
+                    <Field label="Backup passphrase" required>
+                        <Input
+                            type="password"
+                            autoComplete="new-password"
+                            value={passphrase}
+                            onChange={(e) => setPassphrase(e.target.value)}
+                        />
+                    </Field>
+                    <p className="text-caption">
+                        12 to 128 ordinary keyboard characters, with no space at
+                        the start or end. Not your account password.
+                    </p>
+                    <Field label="Type it again" required>
+                        <Input
+                            type="password"
+                            autoComplete="new-password"
+                            value={confirmation}
+                            onChange={(e) => setConfirmation(e.target.value)}
+                        />
+                    </Field>
+                    <Field label="Your account password" required>
+                        <Input
+                            type="password"
+                            autoComplete="current-password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                    </Field>
+                    <Field label="Authenticator code" required>
                         <Input
                             inputMode="numeric"
                             autoComplete="one-time-code"

@@ -90,6 +90,7 @@ class ClientLocationAssignmentConcurrencyTest extends CommittedDatabaseTestCase
     public function test_a_removal_cannot_complete_while_the_save_holds_relationship_evidence(): void
     {
         extract(ClientLocationWorkspaceFixture::make(assignedOnly: true));
+        Queue::fake(); // Observe the concurrent save and removal after the canonical fixtures.
         $this->actingAs($actor);
         $other = DB::connection('zone_interleaving');
         $attempted = false;

@@ -26,7 +26,7 @@ class ClientRiskController extends Controller
         return inertia('operations/clients/risks', [
             'client' => $client->only(['id', 'first_name', 'last_name', 'status']),
             'risks' => $risks,
-            'safety' => ClientSafetyPayload::forClient($client),
+            'safety' => ClientSafetyPayload::forViewer($client, $request->user()),
             'can' => [
                 'update' => $request->user()?->canDo('risks.update') ?? false,
                 'create' => $request->user()?->canDo('risks.create') ?? false,

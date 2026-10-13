@@ -54,7 +54,7 @@ function StockAlertRow({
                     className="bg-card/70"
                     asChild
                 >
-                    <Link href="/emar/stock">{actionLabel}</Link>
+                    <Link href="/emar/stock/packs">{actionLabel}</Link>
                 </Button>
             ) : null}
         </div>
@@ -219,9 +219,12 @@ export function RoundsTab({
 export function StockTab({
     alerts,
     canManage,
+    canReceive = false,
 }: {
     alerts: StockAlert[];
     canManage: boolean;
+    /** P06: holders of stock.receive (house leads) or stock.update receive deliveries. */
+    canReceive?: boolean;
 }) {
     return (
         <Card>
@@ -231,8 +234,8 @@ export function StockTab({
                     Stock &amp; controlled-drug alerts
                 </CardTitle>
                 <CardDescription>
-                    Items needing action soon. Full counts live in Stock
-                    Management.
+                    Items needing action soon. Packs, deliveries and counts
+                    live in Stock &amp; controlled drugs.
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
@@ -245,12 +248,18 @@ export function StockTab({
                 {alerts.map((a) => (
                     <StockAlertRow key={a.id} alert={a} canManage={canManage} />
                 ))}
-                {canManage ? (
+                {canManage || canReceive ? (
                     <Link
-                        href="/emar/stock"
+                        href={
+                            canManage
+                                ? '/emar/stock/packs'
+                                : '/emar/stock/packs?view=orders'
+                        }
                         className="mt-1 inline-flex items-center gap-1 self-start text-[12px] font-semibold text-primary hover:underline"
                     >
-                        Open Stock Management
+                        {canManage
+                            ? 'Open Stock & controlled drugs'
+                            : 'Receive deliveries'}
                         <ArrowRight className="h-3 w-3" />
                     </Link>
                 ) : (

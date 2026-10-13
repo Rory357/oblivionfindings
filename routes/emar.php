@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\BreakGlassController;
+use App\Http\Middleware\MedicationCapturedByGuard;
+use Inertia\Middleware\EncryptHistory;
 use App\Http\Controllers\ClientAllergyRecordController;
 use App\Http\Controllers\Emar\ClientMedicationDayController;
 use App\Http\Controllers\Emar\CompetencyExemptionController;
@@ -14,10 +16,12 @@ use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationFollowupController;
 use App\Http\Controllers\Emar\MedicationOrdersController;
 use App\Http\Controllers\Emar\MedicationReportsController;
+use App\Http\Controllers\Emar\MedicationRecordingStatusController;
 use App\Http\Controllers\Emar\MedicationReviewController;
 use App\Http\Controllers\Emar\MedicationSecondPersonConfirmationController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\MedicationSupportController;
+use App\Http\Controllers\Emar\OfflineReplayReviewController;
 use App\Http\Controllers\Emar\PersonMedicationClinicalController;
 use App\Http\Controllers\Emar\PersonMedicationCorrectionController;
 use App\Http\Controllers\Emar\PersonMedicationRecordController;
@@ -30,6 +34,7 @@ use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationsReportController;
 use App\Http\Middleware\MedicationExportGuard;
+use App\Http\Middleware\ShareConnectedCareSwitches;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -45,7 +50,10 @@ use Illuminate\Support\Facades\Route;
 // `/emar` dashboard ever being their default destination. Gated by the
 // administer/update permissions so support workers can load it, with manager
 // permissions also allowed for oversight roles that want the operational view.
-Route::middleware(['auth'])->group(function () {
+// Review item 7: medication pages encrypt their browser history, so Back after
+// signing out shows nothing (the sign-out clears the key). Review item 5: an
+// action saved on a device by another worker is never sent under this session.
+Route::middleware(['auth', EncryptHistory::class, MedicationCapturedByGuard::class])->group(function () {
     Route::post('/medication-followups/administrations/{administration}/prepare', [MedicationFollowupController::class, 'prepare'])
         ->whereNumber('administration')->middleware('permission:medications.administer.record')->name('medication_followups.prepare');
     Route::get('/medication-followups', [MedicationFollowupController::class, 'index'])
@@ -87,6 +95,15 @@ Route::middleware(['auth'])->group(function () {
 
     // eMAR P01 — what recording a dose needs and allows (the recording
     // dialog's safety checks, blocks and second-person candidates).
+    Route::get('/meds/today/recording-status', MedicationRecordingStatusController::class)
+        ->name('meds.today.recording_status');
+
+    // eMAR audit Lane A3 (EA-049, EA-050): a device reports a dose it saved
+    // that the server refused, so a lead gets a follow-up.
+    Route::post('/meds/today/offline-review', [OfflineReplayReviewController::class, 'store'])
+        ->middleware('permission:medications.administer.record')->middleware('throttle:60,1')
+        ->name('meds.today.offline_review');
+
     Route::get('/meds/today/doses/requirements', [DoseRequirementsController::class, 'scheduled'])
         ->middleware('permission:medications.administer.record')
         ->name('meds.today.requirements');
@@ -96,7 +113,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('meds.today.prn_requirements');
 });
 
-Route::middleware(['auth'])->prefix('emar')->group(function () {
+Route::middleware(['auth', ShareConnectedCareSwitches::class, EncryptHistory::class, MedicationCapturedByGuard::class])->prefix('emar')->group(function () {
     // Dashboard
     Route::get('/', [EmarController::class, 'dashboard'])
         ->middleware('permission:medications.view')
@@ -325,20 +342,22 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // ─── CRUD Routes (permission-gated) ─────────────────────
 
-    Route::post('/prescriptions/{order}/confirm', [EmarController::class, 'confirmPrescription'])
+    // EA-053 (Lane C3): the old prescriber-order register is read only; its
+    // writes answer with LegacyPrescriberOrderController (orders go through P04).
+    Route::post('/prescriptions/{order}/confirm', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])
         ->middleware('permission:medications.orders.verify')
         ->name('emar.prescriptions.confirm');
-    Route::post('/prescriptions/{order}/countersign', [EmarController::class, 'countersignPrescription'])
+    Route::post('/prescriptions/{order}/countersign', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])
         ->middleware('permission:medications.orders.verify')
         ->name('emar.prescriptions.countersign');
 
     Route::middleware('permission:medications.orders.manage')->group(function () {
 
         // Prescriber Orders
-        Route::post('/prescriptions', [EmarController::class, 'storePrescription'])->name('emar.prescriptions.store');
-        Route::put('/prescriptions/{order}', [EmarController::class, 'updatePrescription'])->name('emar.prescriptions.update');
-        Route::post('/prescriptions/{order}/dispense', [EmarController::class, 'dispensePrescription'])->name('emar.prescriptions.dispense');
-        Route::post('/prescriptions/{order}/cancel', [EmarController::class, 'cancelPrescription'])->name('emar.prescriptions.cancel');
+        Route::post('/prescriptions', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])->name('emar.prescriptions.store');
+        Route::put('/prescriptions/{order}', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])->name('emar.prescriptions.update');
+        Route::post('/prescriptions/{order}/dispense', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])->name('emar.prescriptions.dispense');
+        Route::post('/prescriptions/{order}/cancel', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])->name('emar.prescriptions.cancel');
 
         // Covert Authorisations
         Route::post('/prescriptions/covert', [EmarController::class, 'storeCovert'])->name('emar.covert.store');
@@ -377,7 +396,8 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
         // Medications CRUD
         Route::post('/medications', [EmarController::class, 'storeMedication'])->name('emar.medications.store');
-        Route::post('/medications/import', [EmarController::class, 'importMedications'])->name('emar.medications.import');
+        // EA-023 (Lane C3): no bulk import outside P04; each order is entered and checked.
+        Route::post('/medications/import', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuseImport'])->name('emar.medications.import');
         Route::put('/medications/{medication}', [EmarController::class, 'updateMedication'])->name('emar.medications.update');
         Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
 

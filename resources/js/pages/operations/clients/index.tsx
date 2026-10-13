@@ -5,7 +5,10 @@
  * list surfaces (components/lists/). */
 import { AssignWorkerDialog } from '@/components/assign-worker-dialog';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
-import { type ClientSafetySummary } from '@/components/client-safety-ribbon';
+import {
+    allergyReviewCaption,
+    type ClientSafetySummary,
+} from '@/components/client-safety-ribbon';
 import {
     PageHeader,
     PageHeaderFilterCheck,
@@ -56,6 +59,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
+    compactMenu,
     CounterPill,
     EmptyValue,
     EntityCard,
@@ -66,11 +70,10 @@ import {
     EntityStatusChip,
     EntityTable,
     type EntityTableColumn,
+    initialsFromName,
     ListCaption,
     type MenuItem,
     PersonCell,
-    compactMenu,
-    initialsFromName,
     useEntityContextMenu,
 } from '@/components/lists';
 import { Button } from '@/components/ui/button';
@@ -270,15 +273,40 @@ function ClientMark({ c, size = 40 }: { c: Client; size?: number }) {
 /** Alert/safety chips — the fixed status pairs; honest "All clear". */
 function SafetyChips({ c }: { c: Client }) {
     const s = c.safety;
+    const allergyCaption = allergyReviewCaption(s?.allergy_record);
     if (!s?.has_any) {
         return (
-            <EntityStatusChip variant="neutral" icon={CheckCircle2}>
-                {s ? 'No alerts shown' : 'Safety details unavailable'}
+            <EntityStatusChip
+                variant={
+                    allergyCaption && allergyCaption !== 'No known allergies'
+                        ? 'warning'
+                        : 'neutral'
+                }
+                icon={
+                    allergyCaption && allergyCaption !== 'No known allergies'
+                        ? AlertTriangle
+                        : CheckCircle2
+                }
+            >
+                {allergyCaption ??
+                    (s ? 'No alerts shown' : 'Safety details unavailable')}
             </EntityStatusChip>
         );
     }
     return (
         <>
+            {allergyCaption && (
+                <EntityStatusChip
+                    variant={
+                        allergyCaption === 'No known allergies'
+                            ? 'neutral'
+                            : 'warning'
+                    }
+                    icon={AlertTriangle}
+                >
+                    {allergyCaption}
+                </EntityStatusChip>
+            )}
             {s.safeguarding ? (
                 <EntityStatusChip variant="critical" icon={Shield}>
                     Safeguarding
@@ -954,12 +982,16 @@ export default function ClientsIndex() {
         {
             key: 'allergies',
             label: 'Allergies',
-            width: '0.55fr',
+            width: '1fr',
             cell: (c) =>
                 (c.safety?.allergies_count ?? 0) > 0 ? (
                     <CounterPill tone="critical">
                         {c.safety?.allergies_count}
                     </CounterPill>
+                ) : allergyReviewCaption(c.safety?.allergy_record) ? (
+                    <span className="text-xs text-muted-foreground">
+                        {allergyReviewCaption(c.safety?.allergy_record)}
+                    </span>
                 ) : (
                     <EmptyValue />
                 ),

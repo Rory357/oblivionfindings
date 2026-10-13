@@ -76,7 +76,7 @@ export function RecordPicker({
                         : 'w-[var(--radix-popover-trigger-width)] max-w-[90vw] min-w-72 p-0'
                 }
             >
-                <Command>
+                <Command label={`Search ${label.toLowerCase()}`}>
                     <CommandInput
                         placeholder={`Search ${label.toLowerCase()}…`}
                         aria-label={`Search ${label.toLowerCase()}`}

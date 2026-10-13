@@ -30,7 +30,7 @@ class BackupDeliveryAccess
         return CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($actor, $siteId): array {
             abort_unless($reads->query(app(HrCurrentStaffService::class)->currentUsersQuery()->whereKey($actor->id))->exists()
                 && $actor->canDo('medications.reports.view') && $actor->canDo('medications.reports.export'), 403);
-            abort_if($actor->hasRole('finance') && ! $actor->hasRole('admin', 'provider_manager', 'coordinator', 'clinical_lead', 'team_lead', 'auditor'), 403);
+            abort_if($this->financeOnly($actor), 403);
             $site = $reads->query(Site::query()->whereKey($siteId))->first();
             abort_unless($site && $site->is_active && ! $site->archived && $site->archived_at === null, 404);
             $ids = app(UserSiteAccessService::class)->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS, $reads);
@@ -52,23 +52,55 @@ class BackupDeliveryAccess
         });
     }
 
+    /** Finance without a clinical or managing role: no backup action, and no backups page (EA-144). */
+    public function financeOnly(User $actor): bool
+    {
+        return $actor->hasRole('finance') && ! $actor->hasRole('admin', 'provider_manager', 'coordinator', 'clinical_lead', 'team_lead', 'auditor');
+    }
+
+    /**
+     * A backup recipient: a current staff member with a work email on their
+     * HR profile (never the sign-in email, which can be personal — fixed, not
+     * a setting) and authenticator two-step sign-in, without which they could
+     * never open a backup's password (EA-141).
+     */
     public function recipient(User $user, int $siteId): User
     {
         $current = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($user, ['*']);
-        abort_unless($current->email_verified_at && filter_var($current->email, FILTER_VALIDATE_EMAIL), 422, 'Approve a verified staff mailbox.');
+        abort_unless($current->email_verified_at !== null, 422, 'Approve a verified staff account.');
+        // Current staff with whole-house chart authority first (403/404),
+        // then what they need to receive and open a backup (422).
         $this->complete($current, $siteId);
+        abort_unless($this->workEmail($current) !== null, 422, 'Approve someone with a work email on their HR profile. Backups never go to a sign-in email.');
+        abort_unless($this->canOpen($current), 422, 'They need authenticator two-step sign-in before they can open a backup.');
 
         return $current;
     }
 
+    /** The recipient's HR work email, or null (backups never use the sign-in email). */
+    public function workEmail(User $user): ?string
+    {
+        $email = $user->medicationAlertWorkEmail();
+
+        return is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL) ? mb_strtolower(trim($email)) : null;
+    }
+
+    /** Whether they can reveal a backup's password (needs authenticator 2FA). */
+    public function canOpen(User $user): bool
+    {
+        return $user->two_factor_confirmed_at !== null && filled($user->two_factor_secret);
+    }
+
     public function emailHash(User $user): string
     {
-        return hash_hmac('sha256', mb_strtolower(trim($user->email)), (string) config('app.key'));
+        return hash_hmac('sha256', (string) $this->workEmail($user), (string) config('app.key'));
     }
 
     public function emailHashMatches(User $user, string $approvedHash): bool
     {
-        return $this->matchesConfiguredKeyHash($approvedHash, mb_strtolower(trim($user->email)));
+        $email = $this->workEmail($user);
+
+        return $email !== null && $this->matchesConfiguredKeyHash($approvedHash, $email);
     }
 
     public function recipientDigest(array $recipients): string

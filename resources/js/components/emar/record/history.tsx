@@ -17,11 +17,12 @@ import {
 import axios from 'axios';
 import { ClipboardCheck, History, Info, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { ReadingState } from './reading';
+import { ReadingState, StaleNotice } from './reading';
 import { isConcealed, type MaybeConcealed } from './types';
 import { concealedIdentity, SectionCard } from './ui';
 import { useDraftClose } from './use-draft-close';
 import { useRecordJson } from './use-record-json';
+import { useRowMenu } from './use-row-menu';
 
 type Dose = SecondPersonEvidence & {
     key: string;
@@ -74,16 +75,22 @@ export function HistorySection({
     onPage,
     initialDoseId,
     onDetailClose,
+    range = '7d',
+    outcome = 'all',
 }: {
     clientId: number;
     view: string;
     page: number;
+    /** EA-109 (Lane C9): the approved History filters, applied by the server. */
+    range?: '7d' | '30d' | 'all';
+    outcome?: 'all' | 'given' | 'notgiven' | 'corrected';
     onPage: (page: number) => void;
     initialDoseId?: number | null;
     onDetailClose?: () => void;
 }) {
-    const { data, load, reload } = useRecordJson<HistoryData>(
-        `/emar/clients/${clientId}/record/history?view=${view}&page=${page}`,
+    const { data, load, reload, stale, loadedAt } = useRecordJson<HistoryData>(
+        `/emar/clients/${clientId}/record/history?view=${view}&page=${page}` +
+            (view === 'changes' ? '' : `&range=${range}&outcome=${outcome}`),
     );
     const [detail, setDetail] = useState<number | null>(initialDoseId ?? null);
     const [command, setCommand] = useState<{
@@ -91,6 +98,76 @@ export function HistorySection({
         action: 'request' | 'approve' | 'reject';
     } | null>(null);
     const [change, setChange] = useState<Change | null>(null);
+    // EA-217 (Lane C9): the same actions from the kebab and on right-click.
+    const historyActions = (row: HistoryData['page']['data'][number]) => {
+        if (isConcealed(row)) return [];
+        if ('action' in row)
+            return [
+                {
+                    label: 'View recorded change',
+                    icon: Info,
+                    onClick: () => setChange(row),
+                },
+            ];
+        return [
+            {
+                label: 'View dose and correction chain',
+                icon: Info,
+                onClick: () => setDetail(row.id),
+            },
+            ...(data?.can_correct
+                ? row.is_correction && row.correction_status === 'pending'
+                    ? [
+                          {
+                              label:
+                                  row.requested_by === data?.actor_id
+                                      ? 'Another person must approve your correction'
+                                      : 'Approve correction',
+                              icon: ClipboardCheck,
+                              disabled:
+                                  row.requested_by === data?.actor_id
+                                      ? 'A different person must approve this correction.'
+                                      : undefined,
+                              onClick: () =>
+                                  setCommand({
+                                      row,
+                                      action: 'approve' as const,
+                                  }),
+                          },
+                          {
+                              label: 'Decline correction',
+                              icon: ClipboardCheck,
+                              onClick: () =>
+                                  setCommand({
+                                      row,
+                                      action: 'reject' as const,
+                                  }),
+                          },
+                      ]
+                    : [
+                          {
+                              label: 'Request a correction',
+                              icon: RefreshCw,
+                              onClick: () =>
+                                  setCommand({
+                                      row,
+                                      action: 'request' as const,
+                                  }),
+                          },
+                      ]
+                : []),
+        ];
+    };
+    const rowMenu = useRowMenu(
+        historyActions,
+        (row) =>
+            isConcealed(row)
+                ? 'Medicine'
+                : 'action' in row
+                  ? row.action.replaceAll('.', ' · ')
+                  : row.medicine,
+        History,
+    );
     if (!data || load !== 'ready')
         return <ReadingState load={load} reload={reload} />;
     const caption = `${data.page.from ?? 0}–${data.page.to ?? 0} of ${data.page.total} records`;
@@ -105,6 +182,7 @@ export function HistorySection({
                       : 'Dose history'
             }
         >
+            <StaleNotice stale={stale} loadedAt={loadedAt} reload={reload} />
             <p className="text-caption text-muted-foreground">
                 {caption} · newest first · Pacific/Auckland
             </p>
@@ -196,72 +274,13 @@ export function HistorySection({
                                 isConcealed(row) ? '—' : (row.by ?? '—'),
                         },
                     ]}
-                    actionsFor={(row) => {
-                        if (isConcealed(row)) return [];
-                        if ('action' in row)
-                            return [
-                                {
-                                    label: 'View recorded change',
-                                    icon: Info,
-                                    onClick: () => setChange(row),
-                                },
-                            ];
-                        return [
-                            {
-                                label: 'View dose and correction chain',
-                                icon: Info,
-                                onClick: () => setDetail(row.id),
-                            },
-                            ...(data.can_correct
-                                ? row.is_correction &&
-                                  row.correction_status === 'pending'
-                                    ? [
-                                          {
-                                              label:
-                                                  row.requested_by ===
-                                                  data.actor_id
-                                                      ? 'Another person must approve your correction'
-                                                      : 'Approve correction',
-                                              icon: ClipboardCheck,
-                                              disabled:
-                                                  row.requested_by ===
-                                                  data.actor_id
-                                                      ? 'A different person must approve this correction.'
-                                                      : undefined,
-                                              onClick: () =>
-                                                  setCommand({
-                                                      row,
-                                                      action: 'approve' as const,
-                                                  }),
-                                          },
-                                          {
-                                              label: 'Decline correction',
-                                              icon: ClipboardCheck,
-                                              onClick: () =>
-                                                  setCommand({
-                                                      row,
-                                                      action: 'reject' as const,
-                                                  }),
-                                          },
-                                      ]
-                                    : [
-                                          {
-                                              label: 'Request a correction',
-                                              icon: RefreshCw,
-                                              onClick: () =>
-                                                  setCommand({
-                                                      row,
-                                                      action: 'request' as const,
-                                                  }),
-                                          },
-                                      ]
-                                : []),
-                        ];
-                    }}
+                    actionsFor={historyActions}
+                    onRowContextMenu={rowMenu.onRowContextMenu}
                 />
             ) : (
                 <p className="text-sm">No records in this view.</p>
             )}
+            {rowMenu.menu}
             <div className="flex items-center justify-between gap-3">
                 <Button
                     variant="outline"

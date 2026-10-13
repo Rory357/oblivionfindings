@@ -7,9 +7,8 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { PageHeaderRail } from '@/components/page/page-header';
 
-import { Button as GuardrailButton } from '@/components/ui/button';
 import type { JobBoardScope } from './types';
 
 interface ScopeTabsProps {
@@ -70,54 +69,18 @@ export function ScopeTabs({
         (tab) => !tab.coordinatorOnly || showApprovals,
     );
     return (
-        <nav
-            role="tablist"
-            aria-label="Job board view"
-            className="flex w-max max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm"
-        >
-            {visibleTabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = scope === tab.id;
-                return (
-                    <GuardrailButton
-                        unstyled
-                        key={tab.id}
-                        type="button"
-                        role="tab"
-                        data-test={tab.testId}
-                        aria-selected={isActive}
-                        onClick={() => onScopeChange(tab.id)}
-                        className={cn(
-                            'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors',
-                            isActive
-                                ? 'bg-accent text-[var(--brand-deep,var(--primary))]'
-                                : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                        )}
-                    >
-                        <Icon
-                            className={cn(
-                                'h-4 w-4',
-                                isActive
-                                    ? 'text-primary'
-                                    : 'text-muted-foreground/80',
-                            )}
-                        />
-                        <span>{tab.label}</span>
-                        <span
-                            className={cn(
-                                'min-w-[22px] rounded-full px-1.5 py-[1px] text-center text-[11px] font-bold',
-                                isActive
-                                    ? 'bg-primary-fill text-primary-fill-foreground'
-                                    : 'bg-muted text-muted-foreground',
-                            )}
-                        >
-                            {counts[tab.id] ?? 0}
-                        </span>
-                    </GuardrailButton>
-                );
-            })}
-        </nav>
+        <PageHeaderRail
+            items={visibleTabs.map((tab) => ({
+                key: tab.id,
+                label: tab.label,
+                icon: tab.icon,
+                count: counts[tab.id] ?? 0,
+                testId: tab.testId,
+            }))}
+            value={scope}
+            onSelect={onScopeChange}
+            ariaLabel="Job board view"
+        />
     );
 }
-
 export default ScopeTabs;

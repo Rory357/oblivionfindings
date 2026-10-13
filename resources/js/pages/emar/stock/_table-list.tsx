@@ -60,7 +60,7 @@ export function TableList<T extends { id: number }>({
                                     icon={Package}
                                     name={name(row)}
                                     subline={subline(row)}
-                                    className="min-w-0 [&_button]:min-h-11 [&_button]:min-w-11 [&_h3]:break-words [&_h3]:whitespace-normal"
+                                    className="min-w-0 [&_button]:min-h-[max(44px,2.75rem)] [&_button]:min-w-[max(44px,2.75rem)] [&_h3]:break-words [&_h3]:whitespace-normal"
                                     actions={actions(row)}
                                     onOpen={() => open(row)}
                                     onContextMenu={(event) =>

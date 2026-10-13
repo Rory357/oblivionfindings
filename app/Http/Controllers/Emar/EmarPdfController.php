@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
-use App\Models\MedicationRound;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
@@ -169,45 +168,6 @@ class EmarPdfController extends Controller
      */
     public function roundSheet(Request $request)
     {
-        $request->validate([
-            'date' => 'nullable|date',
-        ]);
-
-        $date = $request->input('date', Carbon::today()->toDateString());
-
-        $actor = $request->user();
-        abort_unless($actor, 403);
-        $siteIds = $this->governanceScope->reportSiteIds($actor);
-        $includeControlled = $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
-
-        $rounds = MedicationRound::where('round_date', $date)
-            ->whereIn('site_id', $siteIds)
-            ->with([
-                'assignedTo',
-                'administrations' => function ($query) use ($includeControlled, $siteIds): void {
-                    $administrationQuery = $query->getQuery()->effectiveClinicalEvidence();
-                    $this->governanceScope
-                        ->scopeCanonicalClientMedicationRows(
-                            $administrationQuery,
-                            $siteIds,
-                            false,
-                        );
-                    if (! $includeControlled) {
-                        $this->governanceScope->scopeWithoutControlledMedicationRows($administrationQuery);
-                    }
-                    $administrationQuery->with(['medication', 'client']);
-                },
-            ])
-            ->orderBy('scheduled_time')
-            ->get();
-
-        $pdf = Pdf::loadView('pdf.round-sheet', [
-            'rounds' => $rounds,
-            'date' => $date,
-        ]);
-
-        $pdf->setPaper('A4', 'portrait');
-
-        return $pdf->download("round-sheet-{$date}.pdf");
+        return app(MedicationReportsController::class)->legacyRoundSheet($request);
     }
 }

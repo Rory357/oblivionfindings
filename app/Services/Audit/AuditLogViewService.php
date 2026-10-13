@@ -6,6 +6,7 @@ use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\User;
+use App\Services\Medication\MedicationGeneralAuditPrivacy;
 use App\Support\SafeOperationalData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
@@ -13,7 +14,10 @@ use Illuminate\Support\Str;
 
 final class AuditLogViewService
 {
-    public function __construct(private readonly BoardPackAccessService $boardPackAccess) {}
+    public function __construct(
+        private readonly BoardPackAccessService $boardPackAccess,
+        private readonly MedicationGeneralAuditPrivacy $medicationAudit,
+    ) {}
 
     /** @var array<string, array{actions: array<int, string>, subjects: array<int, string>}> */
     private const MODULES = [
@@ -90,6 +94,9 @@ final class AuditLogViewService
             ->orderByDesc('id');
 
         $this->boardPackAccess->scopeAuditVisibility($query, $viewer);
+        // EA-020: medication rows follow the medication Site scope, person
+        // rule and controlled view; without a viewer none are shown.
+        $this->medicationAudit->apply($query, $viewer);
 
         if ($filters['search'] ?? null) {
             $needle = $filters['search'];
