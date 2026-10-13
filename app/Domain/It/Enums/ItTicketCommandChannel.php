@@ -6,6 +6,7 @@ namespace App\Domain\It\Enums;
 enum ItTicketCommandChannel: string
 {
     case Browser = 'browser';
+    case Obli = 'obli';
     case Email = 'email';
     case ServiceApi = 'service_api';
 }

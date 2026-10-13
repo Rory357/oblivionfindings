@@ -102,9 +102,9 @@ class DashboardControllerTest extends TestCase
     {
         $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
         $user = $this->grant($this->actor('support_worker', $site), ['progress_notes.viewAny', 'progress_notes.create']);
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'first_name' => 'Merewhiua', 'preferred_name' => 'Mere']);
         $client->supportWorkers()->attach($user->id);
-        $hidden = Client::factory()->create(['site_id' => $site->id]);
+        $hidden = Client::factory()->create(['site_id' => $site->id, 'first_name' => 'Hiddenperson', 'preferred_name' => null]);
         $foreign = Client::factory()->create();
         $base = ['client_id' => $client->id, 'user_id' => $user->id, 'type' => 'daily_note', 'body' => 'Private care narrative', 'subject' => 'Private care subject', 'is_draft' => true];
         $draft = ClientNote::query()->create($base);
@@ -117,9 +117,10 @@ class DashboardControllerTest extends TestCase
         ClientNote::query()->create([...$base, 'shift_id' => $incoherent->id]);
         $this->actingAs($user)->getJson('/dashboard/data?role=worker')->assertOk()->assertJsonPath('partial', false)
             ->assertJsonPath('blocks.worker-notes.state', 'ready')->assertJsonPath('blocks.worker-notes.total', 1)
-            ->assertJsonPath('blocks.worker-notes.rows.0.label', 'Daily note draft #'.$draft->id)
+            // The preferred name says whose note it is; the contents stay private.
+            ->assertJsonPath('blocks.worker-notes.rows.0.label', 'Daily note for Mere')
             ->assertJsonPath('blocks.worker-notes.rows.0.href', '/operations/clients/'.$client->id.'?tab=progress_notes')
-            ->assertDontSee('Private care narrative')->assertDontSee('Private care subject');
+            ->assertDontSee('Private care narrative')->assertDontSee('Private care subject')->assertDontSee('Hiddenperson');
         $user->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'progress_notes.viewAny')->sole()->id => ['allowed' => false]]);
         $this->actingAs($user->fresh())->getJson('/dashboard/data?role=worker')->assertOk()->assertJsonPath('blocks.worker-notes.state', 'restricted');
     }

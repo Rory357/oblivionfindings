@@ -92,6 +92,7 @@ export type FeedPost = {
 };
 
 export type FeedAnnouncement = {
+    version: string;
     id: number;
     title: string;
     content: string;
@@ -540,7 +541,7 @@ export function AnnouncementCard({
     const acknowledge = () => {
         router.post(
             `/hr/announcements/${a.id}/acknowledge`,
-            {},
+            { version: a.version },
             {
                 preserveScroll: true,
                 preserveState: true,

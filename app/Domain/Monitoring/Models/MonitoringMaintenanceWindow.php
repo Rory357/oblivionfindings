@@ -23,6 +23,8 @@ final class MonitoringMaintenanceWindow extends Model
         'recurrence',
         'recurrence_until',
         'timezone',
+        'dst_overlap',
+        'dst_gap',
         'policy',
         'status',
         'reason',
@@ -46,6 +48,12 @@ final class MonitoringMaintenanceWindow extends Model
     {
         self::saving(function (self $window): void {
             $window->timezone ??= 'UTC';
+            $window->dst_overlap ??= 'reject';
+            $window->dst_gap ??= 'reject';
+            if (! in_array($window->dst_overlap, ['reject', 'earlier', 'later'], true)
+                || ! in_array($window->dst_gap, ['reject', 'skip'], true)) {
+                throw new UnexpectedValueException('Maintenance clock choice is unsupported.');
+            }
             if ($window->ends_at === null || $window->starts_at === null || $window->ends_at <= $window->starts_at) {
                 throw new UnexpectedValueException('Maintenance window must end after it starts.');
             }

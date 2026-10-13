@@ -2,14 +2,21 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\Monitoring\Topology\Data\TopologyEvidence;
+use App\Domain\Monitoring\Topology\Models\TopologyNode;
+use App\Domain\Monitoring\Topology\Models\TopologySnapshot;
+use App\Domain\Monitoring\Topology\Services\TopologySnapshotBuilder;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
+use App\Models\Asset;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
 use App\Models\Permission;
@@ -19,6 +26,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -430,6 +438,282 @@ class NetworkItWorkspaceTest extends TestCase
                     json_encode($network, JSON_THROW_ON_ERROR),
                 );
             });
+    }
+
+    public function test_network_map_rejects_malformed_cursor_before_empty_scope_and_ignores_it_on_other_tabs(): void
+    {
+        $sentinel = 'SENTINEL_INVALID_TOPOLOGY_CURSOR';
+        $this->actingAs($this->admin)->getJson('/security-devices/network-it?tab=map&topology_cursor='.$sentinel)
+            ->assertStatus(400)->assertJsonPath('message', 'Topology history cursor is invalid.')
+            ->assertDontSee($sentinel, false);
+        $this->actingAs($this->admin)->getJson('/security-devices/network-it?tab=map&topology_cursor[id]=1')->assertStatus(400);
+        $this->actingAs($this->admin)->getJson('/security-devices/network-it?tab=map&topology_cursor=')->assertStatus(400);
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=devices&topology_cursor[id]=1')->assertOk();
+    }
+
+    public function test_network_map_retains_explicit_reset_metadata_when_no_runtime_snapshots_are_visible(): void
+    {
+        $cursor = new Cursor(['captured_at' => '2026-10-08 00:00:00', 'id' => 999]);
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&topology_cursor='.$cursor->encode())
+            ->assertOk()->assertInertia(function ($page): void {
+                $history = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology']['history'];
+                $this->assertSame('latest', $history['pageKey']);
+                $this->assertFalse($history['isOlderPage']);
+                $this->assertTrue($history['positionReset']);
+                $this->assertNull($history['previousHref']);
+                $this->assertNull($history['nextHref']);
+                $this->assertSame([], $history['entries']);
+                $this->assertSame('/security-devices/network-it?tab=map', $history['latestHref']);
+            });
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map')->assertOk()->assertInertia(function ($page): void {
+            $this->assertFalse($page->toArray()['props']['networkItWorkspace']['activeTab']['topology']['history']['positionReset']);
+        });
+    }
+
+    public function test_network_map_pages_older_and_newer_snapshots_without_copying_request_queries(): void
+    {
+        $site = Site::factory()->create(['name' => 'Paged topology Site', 'is_active' => true, 'archived' => false]);
+        $device = $this->networkDevice('Paged topology device');
+        $this->assignToSite($device, $site);
+        $snapshots = collect(range(1, 12))->map(fn () => TopologySnapshot::factory()->create([
+            'site_id' => $site->id, 'source' => 'native:snmp', 'status' => 'completed', 'captured_at' => now(),
+        ]));
+        $firstIds = $snapshots->pluck('id')->reverse()->take(10)->values()->all();
+        $olderIds = $snapshots->pluck('id')->reverse()->skip(10)->values()->all();
+        $nextHref = null;
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&return_to=https%3A%2F%2Fexternal.example%2F')
+            ->assertOk()->assertInertia(function ($page) use ($firstIds, &$nextHref): void {
+                $topology = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology'];
+                $history = $topology['history'];
+                $this->assertSame($firstIds, array_column($history['entries'], 'id'));
+                $this->assertSame('latest', $history['pageKey']);
+                $this->assertNull($history['previousHref']);
+                $nextHref = $history['nextHref'];
+                $this->assertStringStartsWith('/security-devices/network-it?tab=map&topology_cursor=', $nextHref);
+                $this->assertStringNotContainsString('external', $nextHref);
+                $this->assertStringNotContainsString('return_to', $nextHref);
+            });
+        $previousHref = null;
+        $this->actingAs($this->admin)->get($nextHref)->assertOk()->assertInertia(function ($page) use ($olderIds, &$previousHref): void {
+            $history = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology']['history'];
+            $this->assertSame($olderIds, array_column($history['entries'], 'id'));
+            $this->assertTrue($history['isOlderPage']);
+            $this->assertFalse($history['positionReset']);
+            $this->assertNull($history['nextHref']);
+            $previousHref = $history['previousHref'];
+        });
+        $this->actingAs($this->admin)->get($previousHref)->assertOk()->assertInertia(function ($page) use ($firstIds): void {
+            $history = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology']['history'];
+            $this->assertSame($firstIds, array_column($history['entries'], 'id'));
+            $this->assertSame('latest', $history['pageKey']);
+            $this->assertFalse($history['isOlderPage']);
+        });
+    }
+
+    public function test_map_filter_validation_is_generic_and_isolated_from_other_tabs(): void
+    {
+        foreach (['map_site_id=0', 'map_site_id[]=1', 'map_device_cursor=', 'map_device_cursor[]=1', 'map_search[]=name', 'map_search='.rawurlencode("name\nsecret"), 'map_search='.rawurlencode(str_repeat('ā', 201))] as $query) {
+            $this->actingAs($this->admin)->getJson('/security-devices/network-it?tab=map&'.$query)
+                ->assertStatus(400)->assertJsonPath('message', 'Network map filters are invalid.');
+        }
+        $device = $this->networkDevice('Other-tab inventory preserved');
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=devices&map_site_id[]=1&map_search[]=bad&map_device_cursor[]=bad')
+            ->assertOk()->assertInertia(function ($page) use ($device): void {
+                $active = $page->toArray()['props']['networkItWorkspace']['activeTab'];
+                $this->assertSame([$device->id], array_column($active['devices'], 'id'));
+                $this->assertArrayNotHasKey('inventory', $active['topology']);
+            });
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&map_site_id=999999999')->assertNotFound();
+    }
+
+    public function test_map_inventory_pages_and_searches_full_current_approved_site_scope(): void
+    {
+        $site = Site::factory()->create(['name' => 'Inventory approved Site', 'is_active' => true, 'archived' => false]);
+        $otherSite = Site::factory()->create(['name' => 'Other approved Site', 'is_active' => true, 'archived' => false]);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden inventory Site', 'is_active' => true, 'archived' => false]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $viewer->permissionOverrides()->syncWithoutDetaching(Permission::query()->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])->get()->mapWithKeys(fn ($permission): array => [$permission->id => ['allowed' => true]]));
+        $profile = HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [$otherSite->id], 'is_active' => true]);
+        $devices = collect(range(1, 105))->map(function (int $index) use ($site): Device {
+            $device = $this->networkDevice($index === 105 ? 'Far %_! switch' : "Scoped inventory {$index}");
+            $this->assignToSite($device, $site);
+
+            return $device;
+        });
+        $other = $this->networkDevice('Other approved %_! switch');
+        $this->assignToSite($other, $otherSite);
+        $hidden = $this->networkDevice('Hidden matching %_! switch');
+        $this->assignToSite($hidden, $hiddenSite);
+        $unassigned = $this->networkDevice('Unassigned matching %_! switch');
+        $healthcare = Device::factory()->iotHealthcare()->create(['name' => 'Healthcare matching %_! switch']);
+        $this->assignToSite($healthcare, $site);
+        $builder = app(TopologySnapshotBuilder::class);
+        $before = $builder->build($site, [new TopologyEvidence('lldp', $devices[103]->id, $devices[104]->id, 'ethernet', '1', '2', 0.95, [])], source: 'native:snmp', sourceCheckpoint: 'inventory-http');
+        // Retained records alone must not make a hidden device visible.
+        TopologyNode::query()->create(['topology_snapshot_id' => $before->id, 'canonical_device_id' => $hidden->id, 'node_key_hash' => hash('sha256', 'hidden-inventory-node')]);
+        $nextHref = null;
+        $base = '/security-devices/network-it?tab=map&map_site_id='.$site->id;
+        $this->actingAs($viewer)->get($base.'&return_to=https%3A%2F%2Fexternal.example')->assertOk()->assertInertia(function ($page) use ($devices, $site, $otherSite, &$nextHref): void {
+            $active = $page->toArray()['props']['networkItWorkspace']['activeTab'];
+            $map = $active['topology'];
+            $meta = $map['inventory'];
+            $this->assertSame($devices->take(100)->pluck('id')->all(), array_column($map['nodes'], 'id'));
+            $this->assertSame(105, $meta['total']);
+            $this->assertSame(100, $meta['shown']);
+            $this->assertTrue($meta['isPartial']);
+            $this->assertSame('partial', $map['state']);
+            $this->assertSame(105, $active['inventoryTotal']);
+            $this->assertSame(100, $active['inventoryShown']);
+            $this->assertEqualsCanonicalizing([$site->id, $otherSite->id], array_column($meta['sites'], 'id'));
+            $nextHref = $meta['nextHref'];
+            $this->assertStringNotContainsString('external', $nextHref);
+            $this->assertStringNotContainsString('return_to', $nextHref);
+        });
+        $this->actingAs($viewer)->get($nextHref)->assertOk()->assertInertia(function ($page) use ($devices, $site): void {
+            $map = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology'];
+            $this->assertSame($devices->skip(100)->pluck('id')->all(), array_column($map['nodes'], 'id'));
+            $this->assertSame(1, $map['edgeCount']);
+            $this->assertSame(105, $map['inventory']['total']);
+            $this->assertNull($map['inventory']['nextHref']);
+            $this->assertStringContainsString('map_site_id='.$site->id, $map['history']['latestHref']);
+            $this->assertStringContainsString('map_device_cursor=', $map['history']['latestHref']);
+        });
+        $this->actingAs($viewer)->get($base.'&map_search='.rawurlencode('  %_!  '))->assertOk()->assertInertia(function ($page) use ($devices, $hidden, $unassigned, $healthcare, $other): void {
+            $map = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology'];
+            $this->assertSame([$devices->last()->id], array_column($map['nodes'], 'id'));
+            $this->assertSame(1, $map['inventory']['total']);
+            $this->assertSame('%_!', $map['inventory']['search']);
+            $this->assertSame([$devices->last()->id], array_column($map['history']['entries'][0]['nodes'], 'id'));
+            foreach ([$hidden, $unassigned, $healthcare, $other] as $denied) {
+                $this->assertStringNotContainsString($denied->name, json_encode($map));
+            }
+        });
+        $this->actingAs($viewer)->get('/security-devices/network-it?tab=map&map_site_id='.$hiddenSite->id)->assertNotFound();
+        $this->actingAs($viewer)->get('/security-devices/devices/'.$hidden->id)->assertNotFound();
+        // A valid position is only seek state: losing its Site grant rebuilds current visibility.
+        $profile->update(['primary_site_id' => $otherSite->id, 'secondary_site_ids' => []]);
+        $this->actingAs($viewer->fresh())->get($nextHref)->assertNotFound();
+        $this->actingAs($viewer->fresh())->get('/security-devices/network-it?tab=map&map_device_cursor='.(new Cursor(['id' => $other->id]))->encode())->assertOk()->assertInertia(function ($page) use ($other): void {
+            $map = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology'];
+            $this->assertSame([$other->id], array_column($map['nodes'], 'id'));
+            $this->assertTrue($map['inventory']['positionReset']);
+            $this->assertStringNotContainsString('map_device_cursor', $map['history']['latestHref']);
+        });
+    }
+
+    public function test_selected_site_does_not_reuse_other_site_snapshots_for_ambiguous_custody(): void
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $otherSite = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $ambiguous = $this->networkDevice('Ambiguous Site inventory');
+        $this->assignToSite($ambiguous, $site);
+        // The canonical schema allows one active assignment; an approved Asset link can still provide conflicting Site provenance.
+        $asset = Asset::factory()->create(['site_id' => $otherSite->id, 'home_site_id' => $otherSite->id, 'client_id' => null, 'category' => 'IT Equipment', 'status' => 'active']);
+        DeviceAssetLink::query()->create(['device_id' => $ambiguous->id, 'asset_id' => $asset->id, 'link_type' => 'installed_in', 'linked_at' => now()]);
+        TopologySnapshot::factory()->create(['site_id' => $otherSite->id, 'source' => 'native:snmp', 'status' => 'completed', 'captured_at' => now()]);
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&map_site_id='.$site->id)->assertOk()->assertInertia(function ($page) use ($ambiguous): void {
+            $map = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology'];
+            $this->assertSame([$ambiguous->id], array_column($map['nodes'], 'id'));
+            $this->assertTrue($map['inventory']['isPartial']);
+            $this->assertSame([], $map['snapshots']);
+            $this->assertSame([], $map['history']['entries']);
+        });
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&map_anchor_id='.$ambiguous->id)->assertNotFound();
+    }
+
+    public function test_current_connection_inputs_are_strict_map_only_and_reject_mixed_modes(): void
+    {
+        foreach (['map_anchor_id=0', 'map_anchor_id[]=1', 'map_neighbor_cursor=bad', 'map_anchor_id=1&map_neighbor_cursor=', 'map_anchor_id=1&map_search=name', 'map_anchor_id=1&map_device_cursor=', 'map_anchor_id=1&topology_cursor=bad'] as $query) {
+            $this->actingAs($this->admin)->getJson('/security-devices/network-it?tab=map&'.$query)
+                ->assertStatus(400)->assertJsonPath('message', 'Network map filters are invalid.');
+        }
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=devices&map_anchor_id[]=1&map_neighbor_cursor[]=bad')->assertOk();
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&map_anchor_id=99999999')->assertNotFound();
+    }
+
+    public function test_current_connections_use_canonical_site_privacy_and_keep_empty_runtime_separate_from_manual(): void
+    {
+        $site = Site::factory()->create(['name' => 'Connection Site', 'is_active' => true, 'archived' => false]);
+        $otherSite = Site::factory()->create(['name' => 'Inaccessible Connection Site', 'is_active' => true, 'archived' => false]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $viewer->permissionOverrides()->syncWithoutDetaching(Permission::query()->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])->get()->mapWithKeys(fn ($permission): array => [$permission->id => ['allowed' => true]]));
+        HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [], 'is_active' => true]);
+        $anchor = $this->networkDevice('Current connection anchor');
+        $this->assignToSite($anchor, $site);
+        $neighbor = $this->networkDevice('Visible current neighbor');
+        $this->assignToSite($neighbor, $site);
+        $moved = $this->networkDevice('Moved neighbor sentinel');
+        $this->assignToSite($moved, $site);
+        $manualNeighbor = $this->networkDevice('Manual neighbor sentinel');
+        $this->assignToSite($manualNeighbor, $site);
+        $builder = app(TopologySnapshotBuilder::class);
+        $builder->build($site, [
+            new TopologyEvidence('lldp', $anchor->id, $neighbor->id, 'ethernet', 'Gi1', 'eth0', 0.95, []),
+            new TopologyEvidence('lldp', $anchor->id, $moved->id, 'ethernet', 'Gi2', 'eth0', 0.95, []),
+        ], source: 'native:snmp', sourceCheckpoint: 'connection-http');
+        $moved->assignments()->active()->update(['released_at' => now()]);
+        $this->assignToSite($moved, $otherSite);
+        DeviceRelationship::query()->create(['parent_device_id' => $anchor->id, 'child_device_id' => $manualNeighbor->id, 'relationship_type' => 'uplinks_to', 'created_by_user_id' => $this->admin->id]);
+        $href = '/security-devices/network-it?tab=map&map_anchor_id='.$anchor->id;
+        $this->actingAs($viewer)->get($href.'&return_to=https%3A%2F%2Fexternal.example')->assertOk()->assertInertia(function ($page) use ($anchor, $neighbor, $site, $moved, $manualNeighbor): void {
+            $map = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology'];
+            $meta = $map['exploration'];
+            $this->assertEqualsCanonicalizing([$anchor->id, $neighbor->id], array_column($map['nodes'], 'id'));
+            $this->assertSame(1, $map['edgeCount']);
+            $this->assertSame($site->id, $meta['siteId']);
+            $this->assertSame(1, $meta['neighborsTotal']);
+            $this->assertSame(1, $meta['neighborsShown']);
+            $this->assertSame('runtime_topology', $map['source']);
+            $this->assertSame('partial', $map['state']);
+            $this->assertArrayNotHasKey('inventory', $map);
+            $this->assertSame([], $map['history']['entries']);
+            $this->assertStringContainsString('map_site_id='.$site->id, $meta['refreshHref']);
+            $this->assertStringNotContainsString('return_to', $meta['refreshHref']);
+            $this->assertStringNotContainsString('external', $meta['refreshHref']);
+            $this->assertStringNotContainsString($moved->name, json_encode($map));
+            $this->assertStringNotContainsString($manualNeighbor->name, json_encode($map));
+            foreach ($map['nodes'] as $node) {
+                $this->assertStringContainsString('map_anchor_id='.$node['id'], $node['exploreHref']);
+            }
+        });
+        $this->actingAs($viewer)->get('/security-devices/network-it?tab=map&map_anchor_id='.$moved->id)->assertNotFound();
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&map_anchor_id='.$anchor->id.'&map_site_id='.$otherSite->id)->assertNotFound();
+        $neighbor->assignments()->active()->update(['released_at' => now()]);
+        $this->assignToSite($neighbor, $otherSite);
+        $this->actingAs($viewer)->get($href)->assertOk()->assertInertia(function ($page) use ($anchor): void {
+            $map = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology'];
+            $this->assertSame([$anchor->id], array_column($map['nodes'], 'id'));
+            $this->assertSame(0, $map['edgeCount']);
+            $this->assertSame(0, $map['exploration']['neighborsTotal']);
+            $this->assertSame('runtime_topology', $map['source']);
+        });
+        $fallback = $this->networkDevice('Independent manual anchor');
+        $this->assignToSite($fallback, $otherSite);
+        DeviceRelationship::query()->create(['parent_device_id' => $fallback->id, 'child_device_id' => $moved->id, 'relationship_type' => 'uplinks_to', 'created_by_user_id' => $this->admin->id]);
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&map_anchor_id='.$fallback->id)->assertOk()->assertInertia(function ($page) use ($fallback, $moved): void {
+            $map = $page->toArray()['props']['networkItWorkspace']['activeTab']['topology'];
+            $this->assertSame('manual_relationships', $map['source']);
+            $this->assertEqualsCanonicalizing([$fallback->id, $moved->id], array_column($map['nodes'], 'id'));
+            $this->assertSame(1, $map['edgeCount']);
+        });
+        HrEmployeeProfile::query()->where('user_id', $viewer->id)->firstOrFail()->update(['primary_site_id' => $otherSite->id, 'secondary_site_ids' => []]);
+        $this->actingAs($viewer->fresh())->get($href)->assertNotFound();
+    }
+
+    public function test_connection_candidate_budget_returns_to_verified_site_map_with_generic_feedback(): void
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $anchor = $this->networkDevice('Budget anchor');
+        $this->assignToSite($anchor, $site);
+        // Stock devices are currently visible to this admin, but do not supply any Site authority for the anchor.
+        $neighbors = Device::factory()->count(1001)->itInfrastructure()->create();
+        foreach ($neighbors as $neighbor) {
+            DeviceRelationship::query()->create(['parent_device_id' => $anchor->id, 'child_device_id' => $neighbor->id, 'relationship_type' => 'uplinks_to', 'created_by_user_id' => $this->admin->id]);
+        }
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&map_anchor_id='.$anchor->id.'&return_to=https%3A%2F%2Fexternal.example')
+            ->assertRedirect('/security-devices/network-it?tab=map&map_site_id='.$site->id)
+            ->assertSessionHas('error', 'Connection exploration is unavailable for this view. The site map is still available.');
+        $this->actingAs($this->admin)->get('/security-devices/network-it?tab=map&map_anchor_id=99999999')->assertNotFound();
     }
 
     private function networkDevice(string $name, array $attributes = []): Device

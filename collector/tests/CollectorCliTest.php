@@ -10,50 +10,6 @@ use Oblivion\Collector\Spool\CheckpointFile;
 use Oblivion\Collector\Spool\EncryptedSpool;
 use Symfony\Component\Process\Process;
 
-/** @return array{certificate: string, private_key: string} */
-function collectorCertificatePair(string $commonName): array
-{
-    $configPath = tempnam(sys_get_temp_dir(), 'oblivion-collector-openssl-');
-    if ($configPath === false || file_put_contents($configPath, <<<'CONFIG'
-[req]
-distinguished_name = subject
-prompt = no
-
-[subject]
-CN = oblivion-collector-test
-CONFIG
-    ) === false) {
-        throw new RuntimeException('Collector test OpenSSL configuration failed.');
-    }
-
-    try {
-        $options = [
-            'config' => $configPath,
-            'digest_alg' => 'sha256',
-            'private_key_bits' => 2048,
-            'private_key_type' => OPENSSL_KEYTYPE_RSA,
-        ];
-        $privateKey = openssl_pkey_new($options);
-        $request = $privateKey === false ? false : openssl_csr_new(
-            ['commonName' => $commonName],
-            $privateKey,
-            $options,
-        );
-        $certificate = $request === false || $privateKey === false
-            ? false
-            : openssl_csr_sign($request, null, $privateKey, 1, $options);
-        if ($privateKey === false || $certificate === false
-            || ! openssl_x509_export($certificate, $certificatePem)
-            || ! openssl_pkey_export($privateKey, $privateKeyPem, null, $options)) {
-            throw new RuntimeException('Collector test certificate generation failed.');
-        }
-
-        return ['certificate' => $certificatePem, 'private_key' => $privateKeyPem];
-    } finally {
-        @unlink($configPath);
-    }
-}
-
 it('provides version and database-free doctor commands', function () {
     $state = __DIR__.'/tmp/doctor-state';
     removeCollectorDirectory($state);
@@ -289,4 +245,35 @@ it('binds signed runtime requests to a nonce and mTLS identity files', function 
         'CURLOPT_SSLKEY',
         '$nonce."\\n".hash',
     );
+});
+
+it('accepts a correctly bound valid certificate during legacy enrolment', function () {
+    $root = collectorTempDirectory('legacy-valid-certificate');
+    $uuid = '2df1d87c-2d04-4e57-80ab-8a15f39c944d';
+    $certificate = collectorCertificatePair('oblivion-collector-'.$uuid);
+    $previous = getenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN');
+    putenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN=fixture-token');
+    $output = '';
+    try {
+        $application = new CollectorApplication(
+            enrolmentTransport: fn () => [
+                'site_id' => 9, 'central_signing_public_key' => base64_encode(collectorPublicKey()),
+                'client_certificate' => $certificate['certificate'], 'client_private_key' => $certificate['private_key'],
+                'client_certificate_fingerprint' => strtolower(openssl_x509_fingerprint($certificate['certificate'], 'sha256')),
+                'acknowledged_source_sequence' => 0,
+            ],
+            output: function (string $message) use (&$output): void {
+                $output .= $message;
+            },
+        );
+        expect($application->run(['oblivion-collector', 'enrol', '--identity='.$root.'/collector.identity.json',
+            '--collector-id='.$uuid, '--central-url=https://central.example.test',
+            '--tls-public-key-pin=sha256//'.base64_encode(str_repeat('P', 32)), '--state-directory='.$root]))->toBe(0)
+            ->and($root.'/collector.identity.json')->toBeFile()
+            ->and(file_get_contents($root.'/collector.crt.pem'))->toBe($certificate['certificate'])
+            ->and($output)->not->toContain('PRIVATE KEY', 'fixture-token');
+    } finally {
+        $previous === false ? putenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN') : putenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN='.$previous);
+        removeCollectorDirectory($root);
+    }
 });

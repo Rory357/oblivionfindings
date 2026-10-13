@@ -1,0 +1,27 @@
+{
+  "kind": "coordinator_read_only_source_closure_and_question_review",
+  "source_closure": {
+    "id": "HS-PARTICIPATION-UNAVAILABLE-HEADER-01",
+    "status": "SOURCE_ADDRESSED_RUNTIME_UNVERIFIED",
+    "source_path": "resources/js/pages/health-safety/worker-participation/participation-viewer-boundary.tsx",
+    "source_sha256": "5FAB449B1C312EE2CE12E89AA9F76CA364576902A48B7928A9D2BE07DE46F792",
+    "test_sha256": "A791737273F787CAEB69655B9D031E507FAD7EF1165E877ED9256CDB5D163D20",
+    "layout_sha256": "8F131A51363BE62C2805C42B825CD7525774961C4D5CC2D8A06ECE500DC61310",
+    "independent_inverse": "Replacing hero with header reproduces entire reviewed predecessor73131BBF byte-exact. Removing only added real-layout heading assertion reproduces entire test predecessor8AD2F15D byte-exact. Privacy mask, reload and remaining five-case suite otherwise unchanged. No tests executed.",
+    "source_check_receipt": "storage/logs/participation-derived-ui-source-check.json",
+    "receipt_sha256": "F66544BE09B77BD2322CB688898A5E3AA0CA2DC37CAB5E4A00114C6E9ABED7F2",
+    "receipt_observation": "Thirteen source-check entries report empty syntax errors and formatting true. Two boundary entries match current source/test. No full current pin check or acceptance for the other eleven active source files. Semantic typing, components, native and browser explicitly UNRUN."
+  },
+  "new_human_question": {
+    "thread_id": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+    "turn_id": "01a131b8-3c0d-7501-b2e6-096691d76ee4",
+    "question_call": "call_ec97b31a3b124e2795e0e9955cd698bf",
+    "question": "For H&S committee meetings, what should invited support workers be able to see without general H&S register access? Current invitation links to a page many cannot open.",
+    "options": ["Their invitation, meeting time/location and explicitly shared agenda; private register details remain restricted", "Full meeting record including minutes and attachments", "Informational invitations; contact representative"],
+    "state": "No direct human reply observed in current turn read. Existing question left for user; no duplicate asynchronous prompt or assumed grant.",
+    "recommendation": "Invitation/time/location/explicitly shared agenda only, preserving private register authority; recommendation is not a human decision or implementation approval."
+  },
+  "active_work": "H&S calendar JSON/subscription routes and current-source lifetime, retained detail refusal and Up next opening, restricted chart/table states and truthful representative/meeting labels remain active owner reports. No completed new calendar package and no duplicated parent audit.",
+  "standing_holds": "Incident source-write implementation and Client response wrapper stay pending under direct human instructions; invitation question neither replaces nor approves them.",
+  "coordination": "CR and WF unchanged idle, no new questions/packages. H&S active same turn. No restart, owner acknowledgement-only message, application edit, test/build/DB/browser/process probe or provider call. All three scopes incomplete."
+}

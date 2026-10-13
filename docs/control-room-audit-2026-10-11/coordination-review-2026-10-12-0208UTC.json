@@ -1,0 +1,46 @@
+{
+  "reviewed_at_utc": "2026-10-12T02:08:28Z",
+  "status": "CORRECTED_OVERBROAD_INTERNAL_HOLD_AND_ANSWERED_RUNTIME_OWNER",
+  "cursors": {
+    "control_room": "a8154e4a-be4a-449b-a690-548c53e7eaf3:31",
+    "workforce": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:31",
+    "health_safety": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:49"
+  },
+  "snapshot": {
+    "control_room": "Unchanged notLoaded R23 acknowledgement; no restart.",
+    "workforce": "Active turn 01a12dd3-612f-79a3-b471-755b2d58ebfd. Prepared retention successor source-reviewed; investigating internal hold and preparing a bounded component runner.",
+    "health_safety": "Active turn 01a12dd6-5ddf-7d11-8601-7418204c9512. Original child/evidence admission and My Day binding composed in isolated source; incident owner controls and remaining integrations active."
+  },
+  "authority_review": {
+    "sources": ["AGENTS.md", "docs/control-room-audit-2026-10-11/APPROVED-SCOPE.txt", "test-results/check-calendar-assessment-components-r2-20261011.ps1", "test-results/check-workforce-calendar-move-ui-r5-20261012.ps1", "H&S .playwright-cli/hs-process-classifier.ps1", "vitest.config.ts", "resources/js/test/setup.ts"],
+    "finding": "AGENTS constrains architecture; approved scope expressly permits implementation and necessary isolated tests. Later status expanded an internally precautionary unknown-host classifier condition into a blanket ban on owned app edits, parsers and every lightweight check. No direct human or automatic-review blanket prohibition was established by this audit. That expansion is withdrawn; historical holds are not silently relabelled as passes.",
+    "unchanged": "Shared source ownership, resource/concurrency/database isolation, protected previews and no peer stop/restart/plugin-source substitution. Specific automatic rejection of private-risk guard and recovery-picker expansion remains separately binding. Missing loaded source still means host classification unknown, not idle/safe."
+  },
+  "answered_workforce_question": {
+    "incoming": "Authorised Workforce report independently located the original direct human reply permitting completed-work/questions back. It asked which guard the bounded independent timesheet job should use, preserving R5 rather than silently bypassing it.",
+    "decision": "A new job-specific isolated component runner may use the Calendar assessment R2 resource admission as baseline, with the later 4GiB free-memory floor. R5 and H&S classifier remain unchanged. This is a narrower explicit policy for the finite no-database job, not a source-identity exemption or admission for R5/native/database/build/browser jobs.",
+    "baseline_sha256": "701BABFFB347E09A69AE540A98390DD5385B98E5988CBD01382308699EA4253F",
+    "conditions": [
+      "Workforce alone arranges the next test slot; zero-wait shared mutex and finally release.",
+      "Fresh complete process and child enumeration; heavy-job detection first. Missing/invalid observations, known competing tests/builds/native work or identified shared-target conflict hold the run.",
+      "Two resource observations; at least 4GiB free memory and CPU below85 percent. One worker, no file parallelism, explicit conservative heap cap and finite wall-time limit.",
+      "Review actual config/setup/import closure; isolated candidate input/output, no shared source overwrite, DB/provider/preview/build action. Pin before/after inputs and retain real counts/failures/diagnostics.",
+      "For this job only, complete but unclassified background Node observations can remain UNKNOWN and be counted in resource load. They need not be reclassified or their absent source reconstructed when the actual capacity/isolation conditions pass. No blanket PID/daemon/eval exemption or trusted-host certificate.",
+      "Stop only this runner's own processes if resources become unsafe; never terminate peers. Actual guard and finite runner review must pass before launch; no execution or passage inferred."
+    ],
+    "messages": "General authority correction delivered once to each active owner; one additional concrete guard decision answered the new Workforce question. CR not restarted.",
+    "current_run_status": "Runner preparation/review pending. No completed run or current slot reservation established by this coordinator turn."
+  },
+  "source_progress": {
+    "workforce_manifest": "test-results/workforce-timesheet-review-retention-proposal-r2-20261012/manifest.json",
+    "workforce_manifest_sha256": "7CDC34DB38F4ED28447E5EBF961117429315577147E15AB6D52B0EF93750A612",
+    "workforce_review_sha256": "1B526E8F701CDEB3F30F0849F3CD643DF128CD873623F0B7225C4F03391151EC",
+    "workforce_limit": "Parent matched named receipt identities and read review. Owner-reviewed fixture-only lawful can_return/current-cohort correction, original HOLD retained; all99 workflow/16 foundation/28 workspace/2 Index prospective controls UNRUN. No independent full parent source or runtime acceptance claimed this turn.",
+    "health_safety": "Read current HS18-CHILD-PROVENANCE-AND-MY-DAY-COMPOSITION and binding handoffs. They record isolated root/child/evidence metadata-before-body checks, separate legacy assignment vs later completion, current request viewer binding and Always myTasks/data_unavailable props on partials, honest unavailable state and shared typography. Canonical private provider remains unregistered, shared capability TTL remains existing, task/notification/HTTP/reminder/owner routing remain open. Source reports are not runtime/privacy/concurrency/browser acceptance.",
+    "new_owner_managed_question": "H&S optional reminder timing question: retain existing overdue nudge and72-hour escalation or change it. Provisional settings proposal only; no parent clinical threshold, product answer or notification activation inferred.",
+    "shared_ownership": "H&S continues combined five-consumer CR/exposure proposal; CR canonical adapter and Company Hub/WF MAIN changes remain protected. No completed combined API package reviewed this turn."
+  },
+  "next_gate": "Workforce's finite reviewed runner and measured guarded result, plus completed combined notification/CR API and source/HTTP integration packets. Keep candidate, integrated and actually verified states distinct.",
+  "parent_actions": "Read-only oversight, authorised owner coordination and status docs. No application-source edit, tests/builds/DB/browser/process/resource probing, providers/live records, peer stop/restart or deployment.",
+  "completion": "All three approved scopes incomplete; hourly heartbeat ACTIVE. No previous failure, source pin or approval rejection erased."
+}

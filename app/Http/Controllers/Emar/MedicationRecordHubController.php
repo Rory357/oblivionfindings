@@ -33,7 +33,7 @@ final class MedicationRecordHubController extends Controller
         $now = Carbon::now(app(MarScheduleService::class)->workerTimezone());
         $data = $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'],
             'date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.$now->copy()->addDay()->toDateString()], 'q' => ['nullable', 'string', 'max:100'],
-            'work' => ['nullable', 'in:all,due,overdue'], 'return_to' => ['nullable', 'string', 'max:2048'],
+            'work' => ['nullable', 'in:all,due,overdue,help'], 'return_to' => ['nullable', 'string', 'max:2048'],
             'status' => ['nullable', 'in:current,stopped'], 'range' => ['nullable', 'integer', 'in:7,30,90'], 'page' => ['nullable', 'integer', 'min:1']]);
         $scope = app(MedicationGovernanceScopeService::class);
         $access = app(MedicationRecordAccess::class);
@@ -83,7 +83,10 @@ final class MedicationRecordHubController extends Controller
 
                 return $this->identity($person) + ['key' => 'person'.$person->id, 'id' => $person->id, 'href' => $this->recordHref($person, $date, $returnTo),
                     'due' => $doses->filter(fn ($row) => ($row['state'] ?? '') === 'due' && $row['recorded'] === null)->count(), 'overdue' => $doses->where('status', 'overdue')->count(),
-                    'recorded' => $staff->filter(fn ($row) => $row['recorded'] !== null)->count(), 'so_far' => $staff->count(), 'waiting' => $doses->where('status', 'pending_check')->count(), 'next' => $next['time'] ?? null,
+                    'recorded' => $staff->filter(fn ($row) => $row['recorded'] !== null)->count(), 'so_far' => $staff->count(), 'waiting' => $doses->where('status', 'pending_check')->count(),
+                    // EA-111 (Lane C9): Needs help — doses that can't be recorded yet because the order is waiting to be checked.
+                    'help' => $doses->where('status', 'pending_check')->count(), 'help_reason' => $doses->where('status', 'pending_check')->isNotEmpty() ? 'A change to the order is waiting to be checked' : null,
+                    'next' => $next ? $next['time'].' · '.$next['medication_name'] : null,
                     'can_record' => $date === $now->toDateString() && in_array((int) $person->id, $authority, true)];
             })->filter(fn ($row) => ! $query || str_contains(mb_strtolower($row['person']), $query))
                 ->filter(fn ($row) => $work === 'all' || $row[$work] > 0)->sortBy('person')->values();
@@ -127,8 +130,7 @@ final class MedicationRecordHubController extends Controller
         return Inertia::render('emar/record/hub', ['view' => $view, 'filters' => ['site_id' => $siteId, 'client_id' => $clientId, 'date' => $date, 'q' => $data['q'] ?? '', 'status' => $data['status'] ?? 'current', 'range' => $data['range'] ?? 30, 'work' => $work, 'return_to' => MedicationJourney::returnTo($data['return_to'] ?? null)],
             'page' => $page, 'sites' => $scope->sitePicker($sites)->map->only(['id', 'name'])->values(), 'today' => $now->toDateString(), 'as_at' => $now->toIso8601String(), 'controlled_left_out' => ! $controlled,
             'can_report' => $actor->canDo('medications.reports.view') && $actor->canDo('medications.reports.export'),
-            'coverage' => app(DoseSlotCoverage::class)->forPeriod($date, CarbonImmutable::now()), 'meters' => ['people' => $current->pluck('client_id')->unique()->count(), 'medicines' => $current->count(),
-                'due' => $selectedRows->filter(fn ($row) => ($row['state'] ?? '') === 'due' && $row['recorded'] === null)->count(), 'overdue' => $selectedRows->where('status', 'overdue')->count()]]);
+            'coverage' => app(DoseSlotCoverage::class)->forPeriod($date, CarbonImmutable::now()), 'meters' => $this->meters($actor, $current, $todayRows, $ids, $sites, $siteId, $controlled, $now)]);
     }
 
     private function recordHref(Client $person, string $date, ?string $returnTo, array $params = []): string
@@ -147,5 +149,44 @@ final class MedicationRecordHubController extends Controller
     private function stopped(ClientMedication $order): bool
     {
         return $order->trashed() || $order->superseded_by !== null || $order->ceased_at !== null || $order->state === 'ceased';
+    }
+
+    /**
+     * EA-111 (Lane C9): the approved P02 hub meters — Due now, Late, Needs
+     * help, Recorded today, Medicines and As needed · 24 h — counted from
+     * today's schedule (the same rows the charts list shows for today) and the
+     * reader's permitted people.
+     */
+    private function meters($actor, $current, $todayRows, array $ids, array $sites, ?int $siteId, bool $controlled, Carbon $now): array
+    {
+        $due = $todayRows->filter(fn ($row) => ($row['state'] ?? '') === 'due' && $row['recorded'] === null)->sortBy('window_ends_at');
+        $late = $todayRows->where('status', 'overdue')->sortBy('scheduled_for');
+        $staff = $todayRows->reject(fn ($row) => in_array($row['state'] ?? '', ['self_managed', 'away', 'pending_check', 'not_due', 'upcoming'], true));
+        $scope = app(MedicationGovernanceScopeService::class);
+        $prn = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->effectiveClinicalEvidence()->whereIn('client_id', $ids), $siteId ? [$siteId] : $sites, false)
+            ->where('status', 'given')->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when(! $controlled, fn ($q) => $scope->scopeWithoutControlledMedicationRows($q))
+            ->where('administered_at', '>=', $now->copy()->subDay()->utc());
+        $prnIds = (clone $prn)->pluck('id');
+
+        return [
+            // Kept for older callers; the header shows the approved six.
+            'people' => $current->pluck('client_id')->unique()->count(),
+            'medicines' => $current->count(),
+            'to_check' => $current->filter(fn ($order) => ! $order->isVerifiedForAdministration())->count(),
+            'controlled_hidden' => $controlled ? 0 : ClientMedication::query()->whereIn('client_id', $ids)->where('controlled_drug', true)
+                ->whereNull('superseded_by')->whereNull('ceased_at')->where('state', '!=', 'ceased')->count(),
+            'due' => $due->count(),
+            'due_people' => $due->pluck('client_id')->unique()->count(),
+            'due_until' => $due->first()['window_ends_at'] ?? null,
+            'overdue' => $late->count(),
+            'oldest_late' => $late->first()['scheduled_for'] ?? null,
+            'help' => $todayRows->where('status', 'pending_check')->count(),
+            'recorded' => $staff->filter(fn ($row) => $row['recorded'] !== null)->count(),
+            'so_far' => $staff->count(),
+            'as_needed' => $prnIds->count(),
+            'effect_overdue' => $prnIds->isEmpty() ? 0 : app(MedicationFollowupService::class)->visibleQuery($actor)->where('type', 'effect')
+                ->whereIn('administration_id', $prnIds)->whereNull('completed_at')->where('due_at', '<', now())->count(),
+        ];
     }
 }

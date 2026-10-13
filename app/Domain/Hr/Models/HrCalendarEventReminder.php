@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A reminder that fires `offset_minutes` before an event (or each occurrence of a
  * recurring series) on the given channel. Dispatched by the every-minute
- * hr:dispatch-calendar-reminders command.
+ * hr:dispatch-calendar-reminders command. Delivery receipts now live in
+ * hr_calendar_reminder_deliveries; last_sent_at is retained for legacy deduplication.
  */
 class HrCalendarEventReminder extends Model
 {

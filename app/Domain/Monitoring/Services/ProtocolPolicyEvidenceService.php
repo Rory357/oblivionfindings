@@ -301,17 +301,12 @@ final class ProtocolPolicyEvidenceService
             ->filter($suppressedWithinWindow)
             ->filter(function (Monitor $monitor) use ($recentMaintenanceWindows): bool {
                 try {
-                    $siteId = app(CanonicalDeviceSiteResolver::class)->resolve((int) $monitor->device_id);
+                    $window = $this->maintenance->activeWindow($monitor, $monitor->suppressed_at);
+
+                    return $window !== null && $recentMaintenanceWindows->contains('id', $window->id);
                 } catch (UnexpectedValueException) {
                     return false;
                 }
-
-                return $recentMaintenanceWindows->contains(
-                    fn (MonitoringMaintenanceWindow $window): bool => (int) $window->site_id === $siteId
-                        && ($window->monitor_id === null || (int) $window->monitor_id === (int) $monitor->id)
-                        && ($window->device_id === null || (int) $window->device_id === (int) $monitor->device_id)
-                        && $this->maintenance->containsOccurrence($window, $monitor->suppressed_at),
-                );
             })
             ->count();
 

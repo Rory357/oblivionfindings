@@ -1,5 +1,6 @@
 import {
     PageHeaderFilterButton,
+    PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -67,7 +68,9 @@ export function HandoversHero({
     counts: HeroCounts;
     search: string;
     onSearch: (value: string) => void;
-    filters: Filters;
+    // Status is a server filter too, but changes only through onStatus so
+    // the page can leave the board view (board lists every status).
+    filters: Filters & { status: StatusTab };
     onFilter: (next: Partial<Filters>) => void;
     catalogue: Catalogue;
     onNewHandover: () => void;
@@ -216,6 +219,23 @@ export function HandoversHero({
                         disabled={loading}
                         className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5"
                     >
+                        <PageHeaderFilterSelect
+                            label="Handover status"
+                            value={filters.status}
+                            options={stats.map(([value, label, count]) => {
+                                const statusLabel =
+                                    value === 'all'
+                                        ? 'All handovers'
+                                        : value === 'submitted'
+                                          ? 'Awaiting acknowledgement'
+                                          : label;
+                                return {
+                                    value,
+                                    label: `${statusLabel} · ${count}`,
+                                };
+                            })}
+                            onChange={(status) => onStatus(status as StatusTab)}
+                        />
                         <div className="flex flex-wrap items-center gap-1.5">
                             <PageHeaderFilterButton
                                 icon={ChevronLeft}

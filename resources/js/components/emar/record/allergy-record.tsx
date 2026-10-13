@@ -351,7 +351,7 @@ function AllergyEditor({
                                 />
                             </Field>
                             {summary.entries.length === 0 && (
-                                <label className="flex min-h-11 items-center gap-3 text-sm">
+                                <label className="frontline-tap flex items-center gap-3 text-sm">
                                     <input
                                         type="checkbox"
                                         checked={noKnown}

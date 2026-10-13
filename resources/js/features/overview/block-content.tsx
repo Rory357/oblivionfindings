@@ -1,4 +1,6 @@
-/* eslint-disable no-restricted-syntax -- The approved focus action and chart date selectors have purpose-specific geometry inside overview cards. */
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
@@ -9,12 +11,11 @@ import {
     CircleDashed,
     Clock3,
     GraduationCap,
-    Info,
     LockKeyhole,
     TriangleAlert,
     UsersRound,
 } from 'lucide-react';
-import { useState } from 'react';
+import { createContext, Fragment, useContext, useState } from 'react';
 import {
     Area,
     CartesianGrid,
@@ -41,8 +42,8 @@ function RowContent({ row }: { row: Row }) {
         <>
             {date ? (
                 <span className="ov-date-tile" aria-hidden="true">
-                    <b>{date[1]}</b>
                     <span>{date[2]}</span>
+                    <b>{date[1]}</b>
                 </span>
             ) : (
                 <span className="ov-row-mark">
@@ -94,28 +95,196 @@ function RowContent({ row }: { row: Row }) {
     );
 }
 
+/**
+ * Opens the read-only detail panel for a row that carries facts (approved
+ * mockup: rows open their details in place; the panel links on to the
+ * module). Absent in previews, where rows stay inert.
+ */
+export const OverviewDetailContext = createContext<((row: Row) => void) | null>(
+    null,
+);
+
 function SummaryItem({
     row,
     preview,
     children,
     className,
+    tone,
 }: {
     row: Row;
     preview: boolean;
     children: React.ReactNode;
     className: string;
+    tone?: Row['tone'];
 }) {
+    const openDetail = useContext(OverviewDetailContext);
+    if (!preview && openDetail && row.facts?.length)
+        return (
+            // eslint-disable-next-line no-restricted-syntax -- the whole summary row opens its detail panel
+            <button
+                type="button"
+                className={className}
+                data-tone={tone}
+                aria-haspopup="dialog"
+                onClick={() => openDetail(row)}
+            >
+                {children}
+            </button>
+        );
     return row.href && !preview ? (
-        <Link href={row.href} className={className}>
+        <Link href={row.href} className={className} data-tone={tone}>
             {children}
         </Link>
     ) : (
-        <div className={className}>{children}</div>
+        <div className={className} data-tone={tone}>
+            {children}
+        </div>
+    );
+}
+
+/**
+ * An outline of a block's shape for the library when it has nothing to show
+ * yet — honest about the layout without inventing sample figures.
+ */
+export function BlockSketch({ kind }: { kind: BlockMeta['kind'] }) {
+    return (
+        <svg
+            className="ov-sketch"
+            viewBox="0 0 120 64"
+            aria-hidden="true"
+            data-kind={kind}
+        >
+            {kind === 'donut' || kind === 'progress' ? (
+                <>
+                    <circle
+                        cx="32"
+                        cy="32"
+                        r="22"
+                        className="ov-sketch-track"
+                    />
+                    <circle
+                        cx="32"
+                        cy="32"
+                        r="22"
+                        className="ov-sketch-line"
+                        strokeDasharray="88 139"
+                        transform="rotate(-90 32 32)"
+                    />
+                    {[18, 32, 46].map((y) => (
+                        <rect
+                            key={y}
+                            x="68"
+                            y={y - 3}
+                            width={y === 32 ? 36 : 44}
+                            height="6"
+                            rx="3"
+                            className="ov-sketch-bar"
+                        />
+                    ))}
+                </>
+            ) : kind === 'trend' ? (
+                <>
+                    {[16, 32, 48].map((y) => (
+                        <line
+                            key={y}
+                            x1="4"
+                            x2="116"
+                            y1={y}
+                            y2={y}
+                            className="ov-sketch-grid"
+                        />
+                    ))}
+                    <polyline
+                        points="4,44 22,34 40,38 58,22 76,28 94,14 116,20"
+                        className="ov-sketch-line"
+                    />
+                </>
+            ) : kind === 'bars' ? (
+                [10, 26, 42].map((y, i) => (
+                    <g key={y}>
+                        <rect
+                            x="4"
+                            y={y}
+                            width="112"
+                            height="8"
+                            rx="4"
+                            className="ov-sketch-track-fill"
+                        />
+                        <rect
+                            x="4"
+                            y={y}
+                            width={[92, 64, 38][i]}
+                            height="8"
+                            rx="4"
+                            className="ov-sketch-bar"
+                        />
+                    </g>
+                ))
+            ) : (
+                [10, 28, 46].map((y) => (
+                    <g key={y}>
+                        <rect
+                            x="4"
+                            y={y}
+                            width="10"
+                            height="10"
+                            rx="3"
+                            className="ov-sketch-bar"
+                        />
+                        <rect
+                            x="22"
+                            y={y + 1}
+                            width="62"
+                            height="4"
+                            rx="2"
+                            className="ov-sketch-track-fill"
+                        />
+                        <rect
+                            x="22"
+                            y={y + 7}
+                            width="40"
+                            height="3"
+                            rx="1.5"
+                            className="ov-sketch-track-fill"
+                        />
+                    </g>
+                ))
+            )}
+        </svg>
     );
 }
 
 function connectionCheckLabel(hour: NonNullable<Row['history']>[number]) {
     return `${formatDateTime(hour.at)} · ${hour.checks ? `${hour.checks} recorded checks · ${hour.state === 'healthy' ? 'all healthy' : hour.state === 'failed' ? 'failure recorded' : hour.state === 'degraded' ? 'degraded result recorded' : 'state unknown'}` : 'No checks recorded'}`;
+}
+
+/** 24 hourly connection-check windows for a site, oldest first. */
+export function ConnectionHistoryStrip({ row }: { row: Row }) {
+    if (!row.history?.length) return null;
+    return (
+        <>
+            <span
+                className="ov-connection-history"
+                role="img"
+                aria-label={`${row.label} recorded connection checks: ${row.history.map(connectionCheckLabel).join('; ')}`}
+            >
+                {row.history.map((hour) => (
+                    <i
+                        key={hour.at}
+                        data-state={hour.state}
+                        title={connectionCheckLabel(hour)}
+                    />
+                ))}
+            </span>
+            <span className="ov-connection-axis">
+                <span>{formatDateTime(row.history[0].at)}</span>
+                <span>
+                    {formatTime(row.history[row.history.length - 1].at)} ·
+                    current hour
+                </span>
+            </span>
+        </>
+    );
 }
 
 export function BlockContent({
@@ -132,11 +301,14 @@ export function BlockContent({
     onAction?: () => void;
 }) {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const openDetail = useContext(OverviewDetailContext);
     if (!data)
         return (
-            <div className="ov-empty" role="status">
-                <CircleDashed className="ov-loading" />
-                <strong>Loading this summary…</strong>
+            <div className="ov-block-skeleton" role="status" aria-busy="true">
+                <span className="sr-only">Loading this summary…</span>
+                <Skeleton className="h-4 w-2/5" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
             </div>
         );
     if (data.state !== 'ready')
@@ -194,13 +366,15 @@ export function BlockContent({
                         </div>
                     ))
                 ) : (
-                    <div className="ov-empty">
-                        <CheckCheck />
-                        <strong>No open records</strong>
-                        <p>
-                            {data.empty ?? 'There are no records in this view.'}
-                        </p>
-                    </div>
+                    <EmptyState
+                        variant="compact"
+                        icon={CheckCheck}
+                        heading="No open records"
+                        description={
+                            data.empty ?? 'There are no records in this view.'
+                        }
+                        className="ov-block-empty"
+                    />
                 )}
             </div>
         );
@@ -226,14 +400,13 @@ export function BlockContent({
                     </SummaryItem>
                 )}
                 {data.decisions === null ? (
-                    <div className="ov-assurance-empty">
-                        <LockKeyhole size={20} />
-                        <strong>Decision permission required</strong>
-                        <span>
-                            Your permitted priorities remain available in Needs
-                            attention.
-                        </span>
-                    </div>
+                    <EmptyState
+                        variant="compact"
+                        icon={LockKeyhole}
+                        heading="Decision permission required"
+                        description="Your permitted priorities remain available in Needs attention."
+                        className="ov-block-empty"
+                    />
                 ) : data.decisions?.length ? (
                     data.decisions.map((row, i) => (
                         <SummaryItem
@@ -259,14 +432,13 @@ export function BlockContent({
                         </SummaryItem>
                     ))
                 ) : (
-                    <div className="ov-assurance-empty">
-                        <CheckCheck size={20} />
-                        <strong>No open decisions</strong>
-                        <span>
-                            No proposed or open decision papers in your
-                            permitted view.
-                        </span>
-                    </div>
+                    <EmptyState
+                        variant="compact"
+                        icon={CheckCheck}
+                        heading="No open decisions"
+                        description="No proposed or open decision papers in your permitted view."
+                        className="ov-block-empty"
+                    />
                 )}
             </div>
         );
@@ -281,14 +453,13 @@ export function BlockContent({
                             <span>{section.caption}</span>
                         </div>
                         {section.state === 'restricted' ? (
-                            <div className="ov-assurance-empty">
-                                <LockKeyhole size={20} />
-                                <strong>Permission required</strong>
-                                <span>
-                                    This register is outside your permitted
-                                    view.
-                                </span>
-                            </div>
+                            <EmptyState
+                                variant="compact"
+                                icon={LockKeyhole}
+                                heading="Permission required"
+                                description="This register is outside your permitted view."
+                                className="ov-block-empty"
+                            />
                         ) : section.rows.length ? (
                             section.rows.map((row, i) => (
                                 <SummaryItem
@@ -327,15 +498,17 @@ export function BlockContent({
                                 </SummaryItem>
                             ))
                         ) : (
-                            <div className="ov-assurance-empty">
-                                <CheckCheck size={20} />
-                                <strong>No items recorded</strong>
-                                <span>
-                                    {section.title === 'Risks to watch'
+                            <EmptyState
+                                variant="compact"
+                                icon={CheckCheck}
+                                heading="No items recorded"
+                                description={
+                                    section.title === 'Risks to watch'
                                         ? 'No current risks in this register.'
-                                        : 'No evidence or sign-off gaps recorded in the due window.'}
-                                </span>
-                            </div>
+                                        : 'No evidence or sign-off gaps recorded in the due window.'
+                                }
+                                className="ov-block-empty"
+                            />
                         )}
                     </section>
                 ))}
@@ -372,50 +545,18 @@ export function BlockContent({
                             >
                                 {row.status}
                             </StatusBadge>
-                            {!!row.history?.length && (
-                                <>
-                                    <span
-                                        className="ov-connection-history"
-                                        role="img"
-                                        aria-label={`${row.label} recorded connection checks: ${row.history.map(connectionCheckLabel).join('; ')}`}
-                                    >
-                                        {row.history.map((hour) => (
-                                            <i
-                                                key={hour.at}
-                                                data-state={hour.state}
-                                                title={connectionCheckLabel(
-                                                    hour,
-                                                )}
-                                            />
-                                        ))}
-                                    </span>
-                                    <span className="ov-connection-axis">
-                                        <span>
-                                            {formatDateTime(row.history[0].at)}
-                                        </span>
-                                        <span>
-                                            {formatTime(
-                                                row.history[
-                                                    row.history.length - 1
-                                                ].at,
-                                            )}{' '}
-                                            · current hour
-                                        </span>
-                                    </span>
-                                </>
-                            )}
+                            <ConnectionHistoryStrip row={row} />
                             <small>{row.detail}</small>
                         </SummaryItem>
                     ))
                 ) : (
-                    <div className="ov-assurance-empty">
-                        <CircleDashed />
-                        <strong>No permitted device sites</strong>
-                        <span>
-                            Device observations will appear when equipment is
-                            assigned.
-                        </span>
-                    </div>
+                    <EmptyState
+                        variant="compact"
+                        icon={CircleDashed}
+                        heading="No permitted device sites"
+                        description="Device observations will appear when equipment is assigned."
+                        className="ov-block-empty"
+                    />
                 )}
                 {data.rows.some((row) => row.history?.length) && (
                     <div className="ov-connection-legend">
@@ -497,14 +638,13 @@ export function BlockContent({
                         </SummaryItem>
                     ))
                 ) : (
-                    <div className="ov-assurance-empty">
-                        <CircleDashed />
-                        <strong>No current approved priorities</strong>
-                        <span>
-                            Goals appear here when their approved plan is in its
-                            active period.
-                        </span>
-                    </div>
+                    <EmptyState
+                        variant="compact"
+                        icon={CircleDashed}
+                        heading="No current approved priorities"
+                        description="Goals appear here when their approved plan is in its active period."
+                        className="ov-block-empty"
+                    />
                 )}
             </div>
         );
@@ -663,6 +803,67 @@ export function BlockContent({
                                                         className: `ov-coverage-cell ${window.gap ? 'has-gap' : ''}`,
                                                         'aria-label': `${site.name}, ${periods[index][0]}: ${window.assigned === null ? 'not assessed' : `${window.assigned} of ${window.required} assigned`}${window.gap ? ', staffing review needed' : ''}`,
                                                     };
+                                                    if (!preview && openDetail)
+                                                        return (
+                                                            // eslint-disable-next-line no-restricted-syntax -- a coverage cell opens its window details
+                                                            <button
+                                                                type="button"
+                                                                key={window.id}
+                                                                aria-haspopup="dialog"
+                                                                {...props}
+                                                                onClick={() =>
+                                                                    openDetail({
+                                                                        label: `${site.name} · ${periods[index][0].toLowerCase()}`,
+                                                                        detail: 'Rostered cover against the recorded staffing requirement',
+                                                                        status:
+                                                                            window.assigned ===
+                                                                            null
+                                                                                ? 'Not assessed'
+                                                                                : window.gap
+                                                                                  ? 'Needs cover'
+                                                                                  : 'Covered',
+                                                                        tone: window.gap
+                                                                            ? 'warning'
+                                                                            : 'neutral',
+                                                                        href: window.href,
+                                                                        actionLabel:
+                                                                            'Open roster',
+                                                                        facts: [
+                                                                            {
+                                                                                label: 'Window',
+                                                                                value: `${formatTime(window.starts)} – ${formatTime(window.ends)}`,
+                                                                            },
+                                                                            {
+                                                                                label: 'Assigned',
+                                                                                value:
+                                                                                    window.assigned ===
+                                                                                    null
+                                                                                        ? 'Not assessed'
+                                                                                        : String(
+                                                                                              window.assigned,
+                                                                                          ),
+                                                                            },
+                                                                            {
+                                                                                label: 'Required',
+                                                                                value: String(
+                                                                                    window.required,
+                                                                                ),
+                                                                            },
+                                                                            ...(window.roleGap
+                                                                                ? [
+                                                                                      {
+                                                                                          label: 'Roles',
+                                                                                          value: 'A required role is not covered',
+                                                                                      },
+                                                                                  ]
+                                                                                : []),
+                                                                        ],
+                                                                    })
+                                                                }
+                                                            >
+                                                                {content}
+                                                            </button>
+                                                        );
                                                     return preview ? (
                                                         <div
                                                             key={window.id}
@@ -800,9 +1001,13 @@ export function BlockContent({
                     </div>
                 ))}
                 {!data.rows.length && (
-                    <p className="ov-chart-note">
-                        No sites are available in this view.
-                    </p>
+                    <EmptyState
+                        variant="compact"
+                        icon={UsersRound}
+                        heading="No sites in your view"
+                        description="Sites appear here when you're assigned to lead them."
+                        className="ov-block-empty"
+                    />
                 )}
             </div>
         );
@@ -919,13 +1124,48 @@ export function BlockContent({
     }
     if (meta.kind === 'focus') {
         const first = data.rows[0];
+        const target = first ? first.href || data.href : data.href;
+        const label = first
+            ? (data.actionLabel ?? 'Open workspace')
+            : (data.emptyActionLabel ?? data.actionLabel ?? 'Open workspace');
+        // Something to act on gets the primary action; an empty card keeps a
+        // quiet route to the workspace instead of a call to action.
+        const variant = first ? 'default' : 'outline';
+        const action =
+            preview || !target ? null : data.actionTarget === 'attention' ? (
+                <Button
+                    className="ov-focus-action"
+                    variant={variant}
+                    onClick={onAction}
+                >
+                    <ArrowUpRight />
+                    {label}
+                </Button>
+            ) : (
+                <Button asChild className="ov-focus-action" variant={variant}>
+                    <Link href={target}>
+                        <ArrowUpRight />
+                        {label}
+                    </Link>
+                </Button>
+            );
         return (
             <div className="ov-focus">
-                <span className="ov-focus-chip">
+                <StatusBadge
+                    variant={
+                        first?.tone === 'critical'
+                            ? 'critical'
+                            : first?.tone === 'warning'
+                              ? 'warning'
+                              : first
+                                ? 'info'
+                                : 'neutral'
+                    }
+                >
                     {data.focusTag ??
                         first?.status ??
                         (first ? 'Next step' : 'Nothing scheduled')}
-                </span>
+                </StatusBadge>
                 {first ? (
                     <>
                         <strong className="ov-focus-number">
@@ -964,60 +1204,20 @@ export function BlockContent({
                                 </span>
                             </div>
                         )}
-                        {!preview &&
-                            (first.href || data.href) &&
-                            (data.actionTarget === 'attention' ? (
-                                <button
-                                    className="ov-focus-link"
-                                    onClick={onAction}
-                                >
-                                    <ArrowUpRight size={16} />
-                                    {data.actionLabel}
-                                </button>
-                            ) : (
-                                <Link
-                                    className="ov-focus-link"
-                                    href={first.href || data.href!}
-                                >
-                                    <ArrowUpRight size={16} />{' '}
-                                    {data.actionLabel ?? 'Open workspace'}
-                                </Link>
-                            ))}
+                        {action}
                     </>
                 ) : (
                     <>
-                        <strong className="ov-focus-number">
-                            {data.headline ?? 'No upcoming item'}
+                        <strong className="ov-focus-number ov-focus-empty">
+                            {data.headline ?? 'Nothing scheduled'}
                         </strong>
                         <p>
                             {data.empty ??
-                                'No item is currently recorded in this view.'}
+                                'Nothing is recorded for you in this view yet.'}
                         </p>
-                        {!preview &&
-                            data.href &&
-                            (data.actionTarget === 'attention' ? (
-                                <button
-                                    className="ov-focus-link"
-                                    onClick={onAction}
-                                >
-                                    <ArrowUpRight size={16} />
-                                    {data.actionLabel}
-                                </button>
-                            ) : (
-                                <Link
-                                    className="ov-focus-link"
-                                    href={data.href}
-                                >
-                                    <ArrowUpRight size={16} />{' '}
-                                    {data.actionLabel ?? 'Open workspace'}
-                                </Link>
-                            ))}
+                        {action}
                     </>
                 )}
-                <div className="ov-focus-note">
-                    <Info size={14} />
-                    <span>{data.subtitle}</span>
-                </div>
             </div>
         );
     }
@@ -1045,6 +1245,11 @@ export function BlockContent({
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                             data={data.series}
+                            className={preview ? undefined : 'ov-chart-pick'}
+                            onClick={(state) => {
+                                if (!preview && state?.activeLabel != null)
+                                    setSelectedDate(String(state.activeLabel));
+                            }}
                             margin={{
                                 top: 10,
                                 right: 12,
@@ -1089,7 +1294,7 @@ export function BlockContent({
                                 minTickGap={38}
                                 tick={{
                                     fill: 'var(--muted-foreground)',
-                                    fontSize: 11,
+                                    fontSize: '0.75rem',
                                 }}
                             />
                             <YAxis
@@ -1104,7 +1309,7 @@ export function BlockContent({
                                 tickLine={false}
                                 tick={{
                                     fill: 'var(--muted-foreground)',
-                                    fontSize: 11,
+                                    fontSize: '0.75rem',
                                 }}
                             />
                             <Tooltip
@@ -1153,47 +1358,17 @@ export function BlockContent({
                     </ResponsiveContainer>
                 </div>
                 {!preview && data.series.length > 0 && (
-                    <div
-                        className="ov-chart-inspector"
-                        aria-label="Inspect chart values"
-                    >
-                        <div>
-                            {(() => {
-                                const lastMeasured = data.series
-                                    .map(
-                                        (point) =>
-                                            point.value !== null ||
-                                            point.comparison != null,
-                                    )
-                                    .lastIndexOf(true);
-                                const start = Math.max(
-                                    0,
-                                    Math.min(
-                                        data.series.length - 7,
-                                        lastMeasured - 3,
-                                    ),
-                                );
-                                return data.series.slice(start, start + 7);
-                            })().map((point) => (
-                                <button
-                                    key={point.label}
-                                    aria-pressed={selectedDate === point.label}
-                                    onClick={() => setSelectedDate(point.label)}
-                                >
-                                    {formatDate(point.label)
-                                        .split(' ')
-                                        .slice(0, 2)
-                                        .join(' ')}
-                                </button>
-                            ))}
-                        </div>
+                    <div className="ov-chart-inspector">
+                        {/* The chart is the date picker (as in the approved
+                            mockup); keyboard and screen-reader users get
+                            every figure from the table below. */}
                         <p aria-live="polite">
                             {(() => {
                                 const point = data.series.find(
                                     (p) => p.label === selectedDate,
                                 );
                                 if (!point)
-                                    return 'Select a date to see the figures.';
+                                    return 'Select a date on the chart to see its figures.';
                                 if (
                                     data.unit === '%' &&
                                     point.planned !== undefined
@@ -1510,7 +1685,17 @@ export function BlockContent({
         (!data.rows.length && !(expanded && data.reviews !== undefined)) ||
         ((meta.kind === 'donut' || meta.kind === 'progress') && total === 0)
     )
-        return (
+        return meta.id !== 'attention' && !data.partial && !data.total ? (
+            <EmptyState
+                variant="compact"
+                icon={CheckCheck}
+                heading="Nothing recorded yet"
+                description={
+                    data.empty ?? 'This summary updates as work is recorded.'
+                }
+                className="ov-block-empty"
+            />
+        ) : (
             <div className="ov-empty">
                 <span className="ov-empty-icon">
                     <CheckCheck />
@@ -1615,7 +1800,7 @@ export function BlockContent({
                 )}
                 {(expanded ? data.rows : data.rows.slice(0, 3)).map(
                     (row, index) => {
-                        const featured = index === 0 && !expanded;
+                        const featured = index === 0;
                         const content = (
                             <>
                                 {featured && (
@@ -1639,7 +1824,18 @@ export function BlockContent({
                                         />
                                     )}
                                     <span className="ov-priority-copy">
-                                        <strong>{row.label}</strong>
+                                        <strong>
+                                            {!featured && row.tone && (
+                                                <span className="sr-only">
+                                                    {row.tone === 'critical'
+                                                        ? 'Urgent: '
+                                                        : row.tone === 'warning'
+                                                          ? 'Due soon: '
+                                                          : ''}
+                                                </span>
+                                            )}
+                                            {row.label}
+                                        </strong>
                                         <small>
                                             {row.detail ??
                                                 `${row.value ?? 0} items to review`}
@@ -1654,23 +1850,34 @@ export function BlockContent({
                                 </div>
                             </>
                         );
-                        return row.href && !preview ? (
-                            <Link
-                                key={`${row.label}-${index}`}
-                                href={row.href}
-                                className={`ov-priority ${featured ? 'ov-priority-featured' : ''}`}
-                                data-tone={row.tone}
-                            >
-                                {content}
-                            </Link>
+                        const item =
+                            row.href && !preview ? (
+                                <Link
+                                    key={`${row.label}-${index}`}
+                                    href={row.href}
+                                    className={`ov-priority ${featured ? 'ov-priority-featured' : ''}`}
+                                    data-tone={row.tone}
+                                >
+                                    {content}
+                                </Link>
+                            ) : (
+                                <div
+                                    key={`${row.label}-${index}`}
+                                    className={`ov-priority ${featured ? 'ov-priority-featured' : ''}`}
+                                    data-tone={row.tone}
+                                >
+                                    {content}
+                                </div>
+                            );
+                        return expanded && index === 1 ? (
+                            <Fragment key={`${row.label}-${index}`}>
+                                <p className="ov-also-heading">
+                                    Also on your list
+                                </p>
+                                {item}
+                            </Fragment>
                         ) : (
-                            <div
-                                key={`${row.label}-${index}`}
-                                className={`ov-priority ${featured ? 'ov-priority-featured' : ''}`}
-                                data-tone={row.tone}
-                            >
-                                {content}
-                            </div>
+                            item
                         );
                     },
                 )}
@@ -1678,32 +1885,18 @@ export function BlockContent({
         );
     }
     return (
-        <div
-            className={`ov-rows ${meta.id === 'attention' ? 'ov-attention' : ''}`}
-        >
-            {(meta.id === 'attention' && !expanded
-                ? data.rows.slice(0, 3)
-                : data.rows
-            ).map((row, index) =>
-                row.href && !preview ? (
-                    <Link
-                        key={`${row.label}-${index}`}
-                        href={row.href}
-                        className="ov-row"
-                        data-tone={row.tone}
-                    >
-                        <RowContent row={row} />
-                    </Link>
-                ) : (
-                    <div
-                        key={`${row.label}-${index}`}
-                        className="ov-row"
-                        data-tone={row.tone}
-                    >
-                        <RowContent row={row} />
-                    </div>
-                ),
-            )}
+        <div className="ov-rows">
+            {data.rows.map((row, index) => (
+                <SummaryItem
+                    key={`${row.label}-${index}`}
+                    row={row}
+                    preview={preview}
+                    className="ov-row"
+                    tone={row.tone}
+                >
+                    <RowContent row={row} />
+                </SummaryItem>
+            ))}
         </div>
     );
 }

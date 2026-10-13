@@ -362,7 +362,7 @@ export function ActionDialog({
         />
     );
     const check = (name: keyof typeof flags, label: string) => (
-        <div className="flex min-h-11 items-start gap-3 rounded-lg border p-3">
+        <div className="frontline-tap flex items-start gap-3 rounded-lg border p-3">
             <Checkbox
                 id={`controlled-${name}`}
                 checked={flags[name]}
@@ -914,7 +914,7 @@ export function ActionDialog({
                 .map((record) => (
                     <div
                         key={record.id}
-                        className="flex min-h-11 items-center gap-3 rounded-lg border p-3"
+                        className="frontline-tap flex items-center gap-3 rounded-lg border p-3"
                     >
                         <Checkbox
                             id={`controlled-med-${record.id}`}
@@ -1781,7 +1781,7 @@ export function ActionDialog({
                 footerStart={
                     <Button
                         variant="outline"
-                        className="min-h-11"
+                        className="frontline-tap"
                         disabled={saving || uncertain}
                         onClick={
                             step > 0 ? () => setStep(step - 1) : requestClose
@@ -1792,7 +1792,7 @@ export function ActionDialog({
                 }
                 footerEnd={
                     <Button
-                        className="min-h-11 max-w-full whitespace-normal"
+                        className="frontline-tap max-w-full whitespace-normal"
                         variant={
                             ['void', 'destruction_void'].includes(action) &&
                             key === 'review'
@@ -1828,7 +1828,10 @@ export function ActionDialog({
                             title="Recorded"
                             blurb={message}
                             actions={
-                                <Button className="min-h-11" onClick={onClose}>
+                                <Button
+                                    className="frontline-tap"
+                                    onClick={onClose}
+                                >
                                     Done
                                 </Button>
                             }

@@ -7,6 +7,8 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAdminRule;
+use App\Models\MedicationOrderRevision;
+use App\Models\MedicationOrderVersion;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\Shift;
 use App\Models\User;
@@ -17,6 +19,7 @@ use App\Services\Medication\Controlled\ControlledDoseOverrideService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseWindowResolver;
+use App\Services\Medication\Downtime\PaperEntryService;
 use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
@@ -27,6 +30,7 @@ use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Settings\MedicineRuleWording;
 use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
+use App\Services\Medication\WitnessPinSettings;
 use App\Services\MedicationRuleService;
 use App\Services\MedicationSafetyService;
 use App\Services\UserSiteAccessService;
@@ -34,6 +38,7 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
@@ -67,6 +72,9 @@ final class DoseRecordingRequirements
     public const BLOCK_NOT_CLOCKED_IN = 'notClockedIn';
 
     public const BLOCK_NOT_ON_SHIFT = 'notOnShift';
+
+    /** EA-006 (D1): clocked in at the house, but not assigned to support this person. */
+    public const BLOCK_NOT_ASSIGNED = 'notAssigned';
 
     public const BLOCK_SITE_NOT_APPROVED = 'siteNotApproved';
 
@@ -167,24 +175,25 @@ final class DoseRecordingRequirements
      *
      * @return array<string, mixed>
      */
-    public function forScheduledDose(User $viewer, ClientMedication $order, CarbonInterface $dueAt, ?CarbonInterface $now = null): array
+    public function forScheduledDose(User $viewer, ClientMedication $order, CarbonInterface $dueAt, ?CarbonInterface $now = null, ?string $renewReview = null): array
     {
         $now = CarbonImmutable::instance($now ?? CarbonImmutable::now())->utc();
         $dueAt = CarbonImmutable::instance($dueAt)->utc();
 
-        return $this->build($viewer, $order, $now, $dueAt);
+        return $this->build($viewer, $order, $now, $dueAt, renewReview: $renewReview);
     }
 
     /**
      * Everything the recording dialog needs for one as-needed dose.
      *
+     * @param  string|null  $renewReview  the open dialog's own previous connected review (EA-060)
      * @return array<string, mixed>
      */
-    public function forAsNeeded(User $viewer, ClientMedication $order, ?CarbonInterface $now = null): array
+    public function forAsNeeded(User $viewer, ClientMedication $order, ?CarbonInterface $now = null, ?string $renewReview = null): array
     {
         $now = CarbonImmutable::instance($now ?? CarbonImmutable::now())->utc();
 
-        return $this->build($viewer, $order, $now, null);
+        return $this->build($viewer, $order, $now, null, renewReview: $renewReview);
     }
 
     /**
@@ -251,6 +260,7 @@ final class DoseRecordingRequirements
         ?CarbonImmutable $dueAt,
         ?RequirementsCache $cache = null,
         bool $detail = true,
+        ?string $renewReview = null,
     ): array {
         $cache ??= new RequirementsCache;
         $order->loadMissing(['client.site:id,name', 'covertAuthorisation']);
@@ -305,14 +315,19 @@ final class DoseRecordingRequirements
             'order' => $orderFacts,
             // C11: the latest staff photo of the supplied pack (else a bound
             // catalogue reference image, else null), concealed for a
-            // controlled medicine the viewer can't see. Merge note for Lane
-            // A11: pack_photo_policy also carries A11's {show, no_photo}.
-            'pack_photo' => app(\App\Services\Medication\Stock\PackPhotoReader::class)->forOrder($viewer, $order),
-            'pack_photo_policy' => ['receipt_prompt' => app(\App\Services\Medication\Stock\PackPhotoReceiptSettings::class)->receiptPromptOn()],
+            // controlled medicine the viewer can't see. A11: only when the
+            // organisation shows it at recording; left out when that's off.
+            ...(app(PackPhotoSettings::class)->showAtRecording()
+                ? ['pack_photo' => app(\App\Services\Medication\Stock\PackPhotoReader::class)->forOrder($viewer, $order)]
+                : []),
+            // A11 {show, no_photo} and C11's receipt prompt, in one place.
+            'pack_photo_policy' => [...app(PackPhotoSettings::class)->policy(), 'receipt_prompt' => app(\App\Services\Medication\Stock\PackPhotoReceiptSettings::class)->receiptPromptOn()],
             'due' => $due,
             'block_all' => null,
             'block_given' => $blockGiven,
             'competency' => $competency,
+            // Review P1: the device stops replaying doses older than this.
+            'offline_max_hours' => OfflineReplayReview::maxAgeHours(),
             'stock_tracking' => ['lots_started' => $stockStarted, 'offline_given_allowed' => ! $order->controlled_drug && ! $stockStarted],
             'witness_override' => $doseOverride === null ? null : ['id' => (int) $doseOverride->id, 'expires_at' => $doseOverride->expires_at->toIso8601String(), 'followup_due_at' => $doseOverride->followup_due_at->toIso8601String()],
             'second_person' => [
@@ -326,7 +341,7 @@ final class DoseRecordingRequirements
                 'forgotten_pin_amount_allowed' => app(ForgottenWitnessPinService::class)->available()
                     && ! $order->controlled_drug
                     && ! $order->requiresWitness(),
-                'confirm_within_minutes' => ForgottenWitnessPinService::CONFIRM_WITHIN_MINUTES,
+                'confirm_within_minutes' => app(WitnessPinSettings::class)->confirmWithinMinutes(),
                 'rule_sentences' => $detail && $kind === RecordingContract::SECOND_RULE
                     ? $this->ruleSentences($adminRules, true)
                     : [],
@@ -372,7 +387,12 @@ final class DoseRecordingRequirements
                 'more_severities' => RecordingContract::MORE_SEVERITIES,
             ];
             $result['checked_at'] = $now->toIso8601String();
-            $result['live_recording_context'] = LiveRecordingContext::issue($viewer, $order, $now);
+            $result['live_recording_context'] = LiveRecordingContext::issue($viewer, $order, $now, $renewReview);
+            // EA-008: the order this answer shows; a "given" saved against
+            // any other version of it is refused.
+            $result['order_fingerprint'] = PaperEntryService::orderFingerprint($order);
+            // EA-059: checked at a new version since its last recorded dose.
+            $result['order_change'] = $this->orderChangeFacts($order);
         }
 
         return $result;
@@ -422,7 +442,11 @@ final class DoseRecordingRequirements
         }
 
         if ($this->clockedInShiftAtSite($viewer, (int) $client->site_id, $now) !== null) {
-            return ['key' => self::BLOCK_NOT_ON_SHIFT, 'facts' => []];
+            // D1: a shift at the house covers everyone there the worker
+            // supports, so the reason is the missing assignment.
+            $assigned = DB::table('client_user')->where('client_id', $clientId)->where('user_id', $viewer->id)->exists();
+
+            return ['key' => $assigned ? self::BLOCK_NOT_ON_SHIFT : self::BLOCK_NOT_ASSIGNED, 'facts' => []];
         }
 
         return ['key' => self::BLOCK_NOT_CLOCKED_IN, 'facts' => []];
@@ -752,6 +776,77 @@ final class DoseRecordingRequirements
                 default => 'late',
             },
             'late_minutes' => $now->gt($dueAt) ? (int) $dueAt->diffInMinutes($now) : 0,
+        ];
+    }
+
+    /**
+     * EA-059 (approved P01 v2 "This order changed — check the new
+     * instructions"): the order's current version was checked as a change
+     * after its last recorded dose. "before" is the version it replaced and
+     * "now" is the order in effect; the dialog asks the worker to confirm
+     * they checked the new instructions and the label.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function orderChangeFacts(ClientMedication $order): ?array
+    {
+        if ($order->version === null || (int) $order->version < 2) {
+            return null;
+        }
+        $revision = MedicationOrderRevision::query()
+            ->where('client_medication_id', $order->id)
+            ->where('client_id', $order->client_id)
+            ->whereIn('status', ['checked', 'checked_alone'])
+            ->whereNotNull('checked_at')
+            ->whereHas('version', fn (Builder $version) => $version
+                ->where('client_medication_id', $order->id)
+                ->where('version_number', (int) $order->version))
+            ->with(['version', 'checker:id,name'])
+            ->orderByDesc('checked_at')
+            ->orderByDesc('id')
+            ->first();
+        if ($revision === null || $revision->base_version === null || (int) $revision->base_version >= (int) $order->version) {
+            return null;
+        }
+        $checkedAt = DoseOrderTimelineFactory::rawInstant($revision->getRawOriginal('checked_at'));
+        if ($checkedAt === null) {
+            return null;
+        }
+        $lastDose = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->where('client_id', $order->client_id)
+            ->where('client_medication_id', $order->id)
+            ->max('administered_at');
+        $lastDoseAt = $lastDose !== null ? DoseOrderTimelineFactory::rawInstant((string) $lastDose) : null;
+        if ($lastDoseAt !== null && $lastDoseAt->gte($checkedAt)) {
+            return null;
+        }
+        $before = MedicationOrderVersion::query()
+            ->where('client_medication_id', $order->id)
+            ->where('client_id', $order->client_id)
+            ->where('version_number', (int) $revision->base_version)
+            ->orderByDesc('id')
+            ->first();
+        $version = fn (ClientMedication|MedicationOrderVersion $v): array => [
+            'dosage' => $v->dosage,
+            'dose_amount' => $v instanceof ClientMedication
+                ? $this->contract->orderedAmount($v)
+                : ($v->dose_amount !== null ? (float) $v->dose_amount : null),
+            'dose_unit' => $v->dose_unit,
+            'route' => $v->route,
+            'frequency' => $v->frequency,
+            'dose_times' => array_values(array_filter((array) ($v->dose_times ?? []), 'is_string')),
+            'instructions' => $v->instructions,
+        ];
+
+        return [
+            'version' => (int) $order->version,
+            'prescriber' => $order->prescriber,
+            'changed_at' => DoseOrderTimelineFactory::rawInstant($revision->version?->getRawOriginal('changed_at'))?->toIso8601String(),
+            'verified_at' => $checkedAt->toIso8601String(),
+            'verified_by' => $revision->checker?->name,
+            'before' => $before !== null ? $version($before) : null,
+            'now' => $version($order),
         ];
     }
 

@@ -5,7 +5,7 @@
  * (P01 C6(b)). "Remind staff to offer again" waits for P08a follow-ups, and
  * time-critical medicines for P01 — no stubs. */
 import { StatusBadge } from '@/components/ui/status-badge';
-import { AlarmClock, Clock, Repeat, RotateCcw } from 'lucide-react';
+import { AlarmClock, Clock, Repeat, RotateCcw, WifiOff } from 'lucide-react';
 import { useSettings } from './_context';
 import { decisionReviewer, isDirty, savedValue } from './_model';
 import { NoMatches, useRow } from './_sections';
@@ -20,6 +20,8 @@ import {
 } from './_ui';
 
 const G = 'timing';
+/** Lane A: how long a dose saved on a device can wait to be sent (EA-131). */
+const OFFLINE = 'offline';
 
 const match = (q: string, ...s: string[]) =>
     !q || s.some((x) => x.toLowerCase().includes(q.toLowerCase()));
@@ -34,7 +36,13 @@ export function DoseTiming({
     clear: () => void;
 }) {
     const { s, value, edit, state, disabled, shown } = useRow(G);
+    const offline = useRow(OFFLINE);
+    const offlineDef = s.definitions[OFFLINE]?.max_hours;
     const { draft, errors, clearError, open } = useSettings();
+    const offlineError = errors[`${OFFLINE}.max_hours`];
+    const offlineLabel = 'Can still be sent for';
+    const offlineHint =
+        'Older than this, it isn’t added to the chart. It goes to paper recovery, and the house lead gets a follow-up.';
     const def = (key: string) => s.definitions[G]?.[key];
     const input = (
         key: string,
@@ -172,6 +180,48 @@ export function DoseTiming({
                                 )}
                             </span>
                         </GroupRow>
+                    </SettingGroup>
+                ) : null}
+                {offlineDef ? (
+                    <SettingGroup
+                        id="offline"
+                        icon={WifiOff}
+                        title="Saved on a device"
+                        caption="A dose recorded with no connection, sent later"
+                    >
+                        <GroupRow
+                            id="tm-offline-max_hours"
+                            label={offlineLabel}
+                            hint={offlineHint}
+                            state={offline.state('max_hours')}
+                            error={offlineError}
+                            errorId="tm-offline-max_hours-error"
+                            hidden={
+                                !offline.shown(
+                                    show,
+                                    q,
+                                    'max_hours',
+                                    offlineLabel,
+                                    offlineHint,
+                                    offlineDef.label,
+                                )
+                            }
+                            control={
+                                <NumberInput
+                                    id="tm-offline-max_hours"
+                                    value={offline.value('max_hours')}
+                                    unit="hours"
+                                    min={offlineDef.range?.[0]}
+                                    max={offlineDef.range?.[1]}
+                                    disabled={offline.disabled}
+                                    error={offlineError}
+                                    onChange={(v) => {
+                                        offline.edit('max_hours', v);
+                                        clearError(`${OFFLINE}.max_hours`);
+                                    }}
+                                />
+                            }
+                        />
                     </SettingGroup>
                 ) : null}
             </GroupGrid>

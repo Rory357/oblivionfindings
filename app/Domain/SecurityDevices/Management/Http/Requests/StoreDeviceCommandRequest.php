@@ -22,6 +22,7 @@ class StoreDeviceCommandRequest extends FormRequest
             'assignment_id' => ['missing'],
             'consent_id' => ['missing'],
             'access_fingerprint' => ['missing'],
+            'expected_actor_id' => ['required_if:capability,endpoint.service.manage,endpoint.computer.restart,endpoint.software.install', 'integer', 'min:1'],
             'capability' => ['required', 'string', 'max:120'],
             'parameters' => ['present', 'array'],
             'reason' => ['required', 'string', 'min:10', 'max:1000'],

@@ -149,6 +149,12 @@ export default [
                     'no-sidebar-bg-without-foreground': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-destructive-foreground-off-fill': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                    'no-rem-tap-floor': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -180,6 +186,29 @@ export default [
         },
     },
     {
+        // DESIGN.md "Tap targets sized in rem" (EA-210): the root font is 13–16 px, so
+        // min-h-11 / min-w-11 (2.75rem) render at 35.75–44 px. Medication
+        // screens are frontline: use .frontline-tap (max(44px, 2.75rem)), or
+        // .frontline-hit for a compact control that keeps its drawn size.
+        files: [
+            'resources/js/pages/emar/**/*.{ts,tsx}',
+            'resources/js/components/emar/**/*.{ts,tsx}',
+            'resources/js/pages/meds/**/*.{ts,tsx}',
+        ],
+        ignores: ['**/*.test.tsx', '**/*.test.ts'],
+        rules: {
+            'design/no-rem-tap-floor': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/(?:^|\\s)(?:[^\\s:]+:)*min-[hw]-11(?=\\s|$)/], TemplateElement[value.raw=/(?:^|\\s)(?:[^\\s:]+:)*min-[hw]-11(?=\\s|$)/])',
+                    message:
+                        'min-h-11 / min-w-11 render below 44 px at the 13–14 px root font. Use .frontline-tap (or .frontline-hit for a compact control). See DESIGN.md "Tap targets sized in rem".',
+                },
+            ],
+        },
+    },
+    {
         // DESIGN.md "A light panel painted bg-sidebar": the app sidebar has
         // been near-black since 7 Sep, so bg-sidebar is a dark surface. A
         // class string that paints it must also set the sidebar foreground;
@@ -196,6 +225,27 @@ export default [
                         ':matches(Literal[value=/^(?![\\s\\S]*(?:^|\\s)text-sidebar-(?:accent-)?foreground(?:\\x2f\\d+)?(?:\\s|$))[\\s\\S]*(?:^|\\s)bg-sidebar(?:\\s|$)/], TemplateElement[value.raw=/^(?![\\s\\S]*(?:^|\\s)text-sidebar-(?:accent-)?foreground(?:\\x2f\\d+)?(?:\\s|$))[\\s\\S]*(?:^|\\s)bg-sidebar(?:\\s|$)/])',
                     message:
                         'bg-sidebar is the near-black app sidebar: pair it with text-sidebar-foreground in the same class string. A light panel (wizard rail, card, table header) uses bg-muted/30 like the WizardShell rail. See DESIGN.md "A light panel painted bg-sidebar".',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Fill foregrounds off their fill": --destructive-foreground
+        // is text for a solid bg-destructive fill and is white in light mode,
+        // so on a card or the page ground it vanishes (the destructive Alert
+        // rendered white on white). A class string that uses it must also
+        // paint the solid fill; error/danger text on a light surface uses the
+        // status-critical pair.
+        files: ['resources/js/**/*.{ts,tsx}'],
+        ignores: ['**/*.test.tsx', '**/*.test.ts'],
+        rules: {
+            'design/no-destructive-foreground-off-fill': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/^(?![\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*bg-destructive(?:\\s|$))[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*text-destructive-foreground(?:\\x2f\\d+)?(?:\\s|$)/], TemplateElement[value.raw=/^(?![\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*bg-destructive(?:\\s|$))[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*text-destructive-foreground(?:\\x2f\\d+)?(?:\\s|$)/])',
+                    message:
+                        'text-destructive-foreground is text for a solid bg-destructive fill (white in light mode); without that fill in the same class string it disappears on cards. On a light surface use the critical status pair: bg-status-critical-bg + text-status-critical-foreground (icon text-status-critical). See DESIGN.md "Fill foregrounds off their fill".',
                 },
             ],
         },

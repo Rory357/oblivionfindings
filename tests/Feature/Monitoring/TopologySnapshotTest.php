@@ -676,6 +676,42 @@ it('discards provider topology when its mapped Site is retired during collection
         ->and(MonitoringOutbox::query()->count())->toBe(0);
 });
 
+it('projects topology history and removal comparisons through current canonical device visibility', function () {
+    $site = topologySite();
+    $gateway = topologyDevice($site, ['name' => 'History gateway']);
+    $switch = topologyDevice($site, ['name' => 'History switch']);
+    $hidden = topologyDevice($site, ['name' => 'Hidden history device']);
+    $unobserved = topologyDevice($site, ['name' => 'Visible without topology']);
+    $builder = app(TopologySnapshotBuilder::class);
+    $before = $builder->build($site, [
+        new TopologyEvidence('lldp', $gateway->id, $switch->id, 'ethernet', '1', 'eth0', 0.95, []),
+        new TopologyEvidence('lldp', $gateway->id, $hidden->id, 'ethernet', '2', 'eth0', 0.95, []),
+    ], source: 'native:snmp', sourceCheckpoint: 'history-visible-before');
+    $after = $builder->build($site, [], source: 'native:snmp', sourceCheckpoint: 'history-visible-after');
+    $viewer = User::factory()->create(['approved_at' => now()]);
+    $workspace = app(NetworkItWorkspacePresenter::class)->present(
+        $viewer,
+        Device::query()->whereKey([$gateway->id, $switch->id, $unobserved->id]),
+        ['key' => 'map', 'label' => 'Map', 'description' => 'Retained topology history'],
+    );
+    $topology = $workspace['activeTab']['topology'];
+    $history = collect($topology['history']['entries']);
+    $latest = $history->first();
+
+    expect($latest['id'])->toBe($after->id)
+        ->and($latest['comparison']['previousSnapshotId'])->toBe($before->id)
+        ->and($latest['comparison']['removedEdges'])->toHaveCount(1)
+        ->and($latest['comparison']['removedEdges'][0]['childId'])->toBe($switch->id)
+        ->and($latest['changeCount'])->toBe(1)
+        ->and($history->last()['nodeCount'])->toBe(2)
+        ->and($history->last()['edgeCount'])->toBe(1)
+        ->and($topology['visibleDeviceCount'])->toBe(3)
+        ->and($topology['unlinkedCount'])->toBe(3)
+        ->and($topology['state'])->toBe('partial')
+        ->and(json_encode($history))->not->toContain('Hidden history device')
+        ->and($before->fresh()->node_count)->toBe(3)
+        ->and($before->fresh()->edge_count)->toBe(2);
+});
 function topologySite(): Site
 {
     return Site::factory()->create([

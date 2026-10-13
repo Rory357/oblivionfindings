@@ -25,6 +25,17 @@ use InvalidArgumentException;
 /** Internal atomic adapters. Authorization and witness policy belong to the canonical caller. */
 trait IntegratesPackEvidence
 {
+    /**
+     * Was the pack started by the dose time? Doses are recorded in whole
+     * minutes, so a pack started during the dose's minute counts; an
+     * earlier minute never does (walk finding F3, Main 10 Oct).
+     */
+    public static function packStartedBy(\Carbon\CarbonInterface $startedAt, \Carbon\CarbonInterface $doseAt): bool
+    {
+        return ! \Carbon\CarbonImmutable::instance($startedAt)->startOfMinute()
+            ->gt(\Carbon\CarbonImmutable::instance($doseAt)->startOfMinute());
+    }
+
     public function controlledDeliveryAfterRegister(ClientMedicationStock $stock, User $actor, array $data, ClientControlledDrugEntry $entry, ?MedicationPharmacyOrder $order = null): array
     {
         $this->requireLots($stock);
@@ -250,7 +261,7 @@ trait IntegratesPackEvidence
             if (! array_key_exists('quantity_wasted', $line) || Qty::greaterThan(0, $line['quantity_wasted'])
                 || Qty::greaterThan($line['quantity_wasted'], $line['quantity'])
                 || Qty::greaterThan($line['quantity'], $lot->quantity_remaining)
-                || $lot->received_at->gt($admin->administered_at)
+                || ! self::packStartedBy($lot->received_at, $admin->administered_at)
                 || ! StockLotRules::usable($lot->toArray(), $this->today())) {
                 $this->packError('Enter the actual selected pack and its witnessed waste; expired or unavailable packs cannot be used.');
             }

@@ -75,6 +75,8 @@ class IntegrationsHubTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/integrations')
+                ->where('actor_id', $this->admin->id)
+                ->has('as_of')
                 ->has('providers', 3)
                 ->has('stats.providers_total')
                 ->missing('stats.providers_live')
@@ -864,5 +866,41 @@ class IntegrationsHubTest extends TestCase
                 }
             });
         }
+    }
+
+    public function test_provider_events_use_an_inclusive_past_window_and_exclude_future_events(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $device = Device::factory()->create(['provider' => 'unifi']);
+        foreach ([now()->subDay(), now(), now()->subDay()->subSecond(), now()->addSecond()] as $index => $at) {
+            DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'window_'.$index, 'severity' => 'warning', 'occurred_at' => $at]);
+        }
+        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('actor_id', $this->admin->id)
+            ->where('as_of', now()->toISOString())
+            ->where('stats.events_24h', 2)
+            ->where('providers.0.events_24h', 2));
+    }
+
+    public function test_provider_counts_do_not_inherit_foreign_occurrence_history_after_a_device_moves(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $allowed = Site::factory()->create();
+        $hidden = Site::factory()->create();
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, 'primary_site_id' => $allowed->id, 'secondary_site_ids' => [], 'is_active' => true]);
+        foreach (['securityDevices.viewAny', 'securityDevices.integrations.view', 'securityDevices.devices.view'] as $key) {
+            $permission = Permission::query()->where('key', $key)->firstOrFail();
+            $viewer->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+        }
+        $device = Device::factory()->create(['provider' => 'unifi']);
+        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $hidden->id, 'assigned_at' => now()->subDays(2), 'released_at' => now()->subHour()]);
+        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $allowed->id, 'assigned_at' => now()->subHour()]);
+        DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'foreign_history', 'severity' => 'critical', 'occurred_at' => now()->subHours(2)]);
+        DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'current_permitted', 'severity' => 'warning', 'occurred_at' => now()->subMinutes(30)]);
+        $this->actingAs($viewer)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('actor_id', $viewer->id)->where('can.manage', false)
+            ->where('stats.events_24h', 1)->where('providers.0.events_24h', 1));
+        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page->where('stats.events_24h', 2));
     }
 }

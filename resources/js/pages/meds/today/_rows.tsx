@@ -8,6 +8,11 @@ import { EntityChip } from '@/components/lists/entity-cells';
 import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useOfflineQueueState } from '@/hooks/use-offline-queue';
+import {
+    getOfflineQueueSnapshot,
+    type OfflineQueueState,
+} from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import {
     AlertTriangle,
@@ -15,6 +20,7 @@ import {
     CheckCircle2,
     ClipboardList,
     Clock3,
+    CloudUpload,
     Flag,
     HelpCircle,
     Info,
@@ -30,6 +36,86 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { ScheduleRow } from './types';
+
+/* ───────────── saved on this device (EA-010, EA-116) ───────────── */
+const slotInstant = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? new Date(time).toISOString() : null;
+};
+
+/**
+ * A dose recorded on this device that hasn't reached the chart: "pending"
+ * while it waits to send, "refused" when the server refused it. Matched by
+ * order and due time, the same identity the dialog sends.
+ */
+export function deviceStateFor(
+    row: ScheduleRow,
+    queue: Pick<
+        OfflineQueueState,
+        'pendingSubmissions' | 'rejectedSubmissions' | 'strandedSubmissions'
+    > = getOfflineQueueSnapshot(),
+): 'pending' | 'other' | 'refused' | null {
+    if (row.recorded) return null;
+    const due = slotInstant(row.scheduled_for);
+    const matches = (item: {
+        action: string;
+        payload: Record<string, unknown>;
+    }) =>
+        (item.action === 'administration' || item.action === 'round_admin') &&
+        Number(item.payload.client_medication_id) === row.medication_id &&
+        due !== null &&
+        slotInstant(item.payload.scheduled_for) === due;
+    if ((queue.pendingSubmissions ?? []).some(matches)) return 'pending';
+    // Review P0: another worker's saved dose for this row blocks a second
+    // recording, matched by order and due time only.
+    if (
+        (queue.strandedSubmissions ?? []).some(
+            (item) =>
+                item.orderId === row.medication_id &&
+                due !== null &&
+                slotInstant(item.dueAt) === due,
+        )
+    )
+        return 'other';
+    if ((queue.rejectedSubmissions ?? []).some(matches)) return 'refused';
+    return null;
+}
+
+/**
+ * A pending saved dose that stopped retrying on its own (walk finding,
+ * 10 Oct): the worker checks the chart and retries it from the banner.
+ */
+export function deviceNeedsManualRetry(
+    row: ScheduleRow,
+    queue: Pick<
+        OfflineQueueState,
+        'pendingSubmissions'
+    > = getOfflineQueueSnapshot(),
+): boolean {
+    const due = slotInstant(row.scheduled_for);
+    return (
+        !row.recorded &&
+        due !== null &&
+        (queue.pendingSubmissions ?? []).some(
+            (item) =>
+                item.needsAttention === true &&
+                (item.action === 'administration' ||
+                    item.action === 'round_admin') &&
+                Number(item.payload.client_medication_id) ===
+                    row.medication_id &&
+                slotInstant(item.payload.scheduled_for) === due,
+        )
+    );
+}
+
+function useDeviceState(row: ScheduleRow) {
+    return deviceStateFor(row, useOfflineQueueState());
+}
+
+function useDeviceNeedsManualRetry(row: ScheduleRow) {
+    return deviceNeedsManualRetry(row, useOfflineQueueState());
+}
 
 export const TZ = 'Pacific/Auckland';
 
@@ -101,6 +187,8 @@ export function blockLine(
             return { text: 'You’re not clocked in', critical: false };
         case 'notOnShift':
             return { text: `${person} isn’t on your shift`, critical: false };
+        case 'notAssigned':
+            return { text: 'Not assigned to you', critical: false };
         case 'siteNotApproved':
             return { text: 'This house isn’t in your access', critical: false };
         case 'controlledNotAllowed':
@@ -136,6 +224,7 @@ export function blockLine(
 export const BLOCK_CAPTION: Record<string, string> = {
     notClockedIn: 'not clocked in',
     notOnShift: 'not on your shift',
+    notAssigned: 'not assigned to you',
     siteNotApproved: 'house not in your access',
     controlledNotAllowed: 'controlled medicine',
     awaitingVerification: 'order to check',
@@ -290,6 +379,48 @@ export function DoseStateCell({
     const open = isOpen(row);
     const opens = nzTime(row.window_opens_at);
     const ends = nzTime(row.window_ends_at);
+    const device = useDeviceState(row);
+    const manualRetry = useDeviceNeedsManualRetry(row);
+    if (device === 'other')
+        return (
+            <span className="flex flex-col items-start gap-1 py-0.5">
+                <StatusBadge
+                    variant="info"
+                    className="rounded-[8px] font-semibold"
+                >
+                    <CloudUpload className="size-3" aria-hidden="true" />
+                    Saved on this device by another worker
+                </StatusBadge>
+                <Line tone="warning">
+                    Not on the chart yet — it sends when they sign in here.
+                    Don’t record it again.
+                </Line>
+            </span>
+        );
+    if (device === 'pending')
+        return (
+            <span className="flex flex-col items-start gap-1 py-0.5">
+                <StatusBadge
+                    variant="info"
+                    className="rounded-[8px] font-semibold"
+                >
+                    <CloudUpload className="size-3" aria-hidden="true" />
+                    Saved on this device
+                </StatusBadge>
+                <Line tone="warning">
+                    {manualRetry
+                        ? 'Not on the chart yet — it stopped retrying. Check the chart, then use “Retry safely” at the top. Don’t record it again.'
+                        : 'Not on the chart yet — it sends automatically. Don’t record it again.'}
+                </Line>
+            </span>
+        );
+    if (device === 'refused')
+        lines.push(
+            <Line key="device" tone="critical">
+                Saved on this device but refused when sent — not recorded. Check
+                the banner and tell your lead.
+            </Line>,
+        );
     if (r) {
         const word = r.reoffer_of_id
             ? r.status === 'given'
@@ -510,6 +641,8 @@ export function mainAction(
     can: RowPermissions,
     a: RowActions,
 ): (() => void) | null {
+    const device = deviceStateFor(row);
+    if (device === 'pending' || device === 'other') return null;
     if (isOpen(row) && can.canRecord(row)) {
         if (blockOf(row)) return () => a.why(row);
         if (needsHelp(row)) return () => a.notGiven(row);
@@ -536,6 +669,32 @@ export function DoseActionCell({
         fn();
     };
     const recordable = can.canRecord(row);
+    const device = useDeviceState(row);
+    // EA-116: recording again would double the dose; it sends on its own.
+    if (device === 'other')
+        return (
+            <Button
+                data-return={row.key}
+                variant="outline"
+                className="frontline-tap"
+                disabled
+            >
+                <CloudUpload className="size-4" aria-hidden="true" /> Saved by
+                another worker
+            </Button>
+        );
+    if (device === 'pending')
+        return (
+            <Button
+                data-return={row.key}
+                variant="outline"
+                className="frontline-tap"
+                disabled
+            >
+                <CloudUpload className="size-4" aria-hidden="true" /> Waiting to
+                send
+            </Button>
+        );
     if (isOpen(row) && recordable && blockOf(row))
         return (
             <Button
@@ -615,7 +774,10 @@ export function doseMenu(
 ): MenuItem[] {
     const items: (MenuItem | false)[] = [];
     const recordable = can.canRecord(row);
-    if (isOpen(row) && recordable) {
+    const device = deviceStateFor(row);
+    if (device === 'pending' || device === 'other') {
+        // Saved on this device: nothing to record until it sends.
+    } else if (isOpen(row) && recordable) {
         if (blockOf(row)) {
             if (!row.req?.block_all)
                 items.push({

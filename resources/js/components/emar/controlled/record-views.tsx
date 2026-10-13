@@ -220,7 +220,7 @@ export function DetailDialog({
                 sequential={false}
                 headerLabel="Record unavailable"
                 footerStart={
-                    <Button className="min-h-11" onClick={onClose}>
+                    <Button className="frontline-tap" onClick={onClose}>
                         Close
                     </Button>
                 }
@@ -269,7 +269,7 @@ export function DetailDialog({
             footer = (
                 <Button
                     variant="outline"
-                    className="min-h-11"
+                    className="frontline-tap"
                     onClick={() =>
                         onAction({
                             action: 'class_review',
@@ -321,7 +321,7 @@ export function DetailDialog({
             footer = (
                 <Button
                     variant="destructive"
-                    className="min-h-11"
+                    className="frontline-tap"
                     onClick={() =>
                         onAction({
                             action: 'void',
@@ -379,7 +379,7 @@ export function DetailDialog({
         if (discrepancy.can_resolve)
             footer = (
                 <Button
-                    className="min-h-11"
+                    className="frontline-tap"
                     onClick={() =>
                         onAction({
                             action: 'resolve',
@@ -459,7 +459,7 @@ export function DetailDialog({
                     {payload.can.record ? (
                         <Button
                             variant="outline"
-                            className="min-h-11"
+                            className="frontline-tap"
                             onClick={() =>
                                 onAction({
                                     action: 'loss_note',
@@ -474,7 +474,7 @@ export function DetailDialog({
                     {payload.can.record ? (
                         <Button
                             variant="outline"
-                            className="min-h-11"
+                            className="frontline-tap"
                             onClick={() =>
                                 onAction({
                                     action: 'loss_notify',
@@ -488,7 +488,7 @@ export function DetailDialog({
                     ) : null}
                     {payload.can.close_loss ? (
                         <Button
-                            className="min-h-11"
+                            className="frontline-tap"
                             onClick={() =>
                                 onAction({
                                     action: 'loss_close',
@@ -543,7 +543,7 @@ export function DetailDialog({
                 'Photo',
                 <Button
                     variant="outline"
-                    className="min-h-11"
+                    className="frontline-tap"
                     onClick={() =>
                         setPreview({
                             id: destruction.id,
@@ -570,7 +570,7 @@ export function DetailDialog({
                     {destruction.method === 'pharmacy_return' &&
                     !destruction.received_at ? (
                         <Button
-                            className="min-h-11"
+                            className="frontline-tap"
                             onClick={() =>
                                 onAction({
                                     action: 'destruction_receipt',
@@ -585,7 +585,7 @@ export function DetailDialog({
                     ) : null}
                     <Button
                         variant="destructive"
-                        className="min-h-11"
+                        className="frontline-tap"
                         onClick={() =>
                             onAction({
                                 action: 'destruction_void',
@@ -615,7 +615,7 @@ export function DetailDialog({
             <>
                 {request.can_answer ? (
                     <Button
-                        className="min-h-11"
+                        className="frontline-tap"
                         onClick={() =>
                             onAction({
                                 action: 'witness_answer',
@@ -630,7 +630,7 @@ export function DetailDialog({
                 {request.can_cancel ? (
                     <Button
                         variant="outline"
-                        className="min-h-11"
+                        className="frontline-tap"
                         onClick={() =>
                             onAction({
                                 action: 'witness_cancel',
@@ -707,7 +707,7 @@ export function DetailDialog({
                 {payload.can.override &&
                 ['waiting', 'pending'].includes(override.status) ? (
                     <Button
-                        className="min-h-11"
+                        className="frontline-tap"
                         onClick={() =>
                             onAction({
                                 action: 'override_decide',
@@ -722,7 +722,7 @@ export function DetailDialog({
                 {override.can_signoff &&
                 override.doses.some((dose) => !dose.signed_off_at) ? (
                     <Button
-                        className="min-h-11"
+                        className="frontline-tap"
                         onClick={() => onFollowup(override)}
                     >
                         Check and sign off
@@ -774,7 +774,7 @@ export function DetailDialog({
                 footerStart={
                     <Button
                         variant="outline"
-                        className="min-h-11"
+                        className="frontline-tap"
                         onClick={onClose}
                     >
                         Close

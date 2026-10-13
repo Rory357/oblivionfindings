@@ -68,6 +68,7 @@ class MaintenanceHealthControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/maintenance-health')
+                ->where('actor_id', $this->admin->id)
                 ->has('stats')
                 ->has('records.data')
                 ->has('records.meta')

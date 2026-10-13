@@ -38,6 +38,15 @@ final class CredentialLeaseLifecycleService
         ]);
     }
 
+    /** Terminate a registered lease by its canonical lifecycle record after a domain result commits. */
+    public function releaseGrant(int $grantId): void
+    {
+        $grant = CredentialLeaseGrant::query()->find($grantId);
+        if ($grant !== null) {
+            $this->terminate($grant, 'released');
+        }
+    }
+
     public function release(CredentialLease $lease): void
     {
         $grant = CredentialLeaseGrant::query()

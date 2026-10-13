@@ -8,6 +8,9 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommands;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommands;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
@@ -123,6 +126,7 @@ class DeviceProfilePresenter
             'audit' => $audit->values(),
             'management' => $management,
             'capabilities' => $this->capabilities($viewer, $device, $management),
+            'cctv' => app(CctvNavigation::class)->forDevice($viewer, $device),
         ];
     }
 
@@ -1025,7 +1029,7 @@ class DeviceProfilePresenter
                     'confirmationMode' => $definition->confirmationMode->value,
                     'executionMode' => $route?->mode === 'collector'
                         ? 'collector_runtime'
-                        : ($adapterAvailable ? 'central_runtime' : 'unavailable'),
+                        : ($adapterAvailable ? ($route->mode === 'endpoint' ? 'endpoint_runtime' : 'central_runtime') : 'unavailable'),
                     'executionGuidance' => $route?->reason
                         ?? 'No approved central or remote collector execution route is available.',
                     'allowed' => $allowed,
@@ -1079,7 +1083,7 @@ class DeviceProfilePresenter
 
                             return [
                                 'name' => $name,
-                                'label' => $profileSource ? 'Approved configuration profile' : Str::headline($name),
+                                'label' => $profileSource ? 'Approved configuration profile' : ($name === 'package_uuid' ? 'Approved software' : Str::headline($name)),
                                 'type' => $schema['type'],
                                 'min' => $schema['min'] ?? null,
                                 'max' => $schema['max'] ?? $schema['max_length'] ?? null,
@@ -1090,7 +1094,7 @@ class DeviceProfilePresenter
                                     ? $compatibleConfigurationProfiles->mapWithKeys(fn ($profile): array => [
                                         (string) $profile->id => $profile->name.' · v'.$profile->version,
                                     ])->all()
-                                    : [],
+                                    : ($schema['option_labels'] ?? []),
                             ];
                         })->values()->all(),
                 ];
@@ -1254,6 +1258,8 @@ class DeviceProfilePresenter
                         'confirmationMode' => $command->confirmation_mode?->value,
                         'impactAcknowledgedAt' => $command->impact_acknowledged_at?->toISOString(),
                         'reason' => $command->reason,
+                        'restart' => app(EndpointRestartCommands::class)->projection($command, $viewer, $latestAttempt),
+                        'software' => app(EndpointSoftwareCommands::class)->projection($command, $viewer, $latestAttempt),
                         'safeParameters' => $command->safe_parameter_summary ?? [],
                         'expectedState' => $command->expected_state ?? [],
                         'requestedBy' => $command->requestedBy?->name,
@@ -1328,6 +1334,7 @@ class DeviceProfilePresenter
         $canUseAnyAction = $actions->contains(fn (array $action): bool => $action['allowed']);
 
         return [
+            'actorId' => (int) $viewer->id,
             'visible' => $canObserve || $canUseAnyAction,
             'actions' => $actions->all(),
             'history' => $history,

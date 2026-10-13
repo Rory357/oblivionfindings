@@ -117,6 +117,7 @@ class MaintenanceHealthController extends Controller
             ]);
 
         return Inertia::render('security-devices/maintenance-health', [
+            'actor_id' => $user->id,
             'pageMeta' => $request->routeIs('security-devices.maintenance')
                 ? [
                     'title' => 'Maintenance',

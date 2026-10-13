@@ -1,0 +1,38 @@
+{
+  "scope": "R23 narrow successor to the R22 operator writer finding",
+  "candidate_root": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "manifest_sha256": "4F5FD43489E3C55118E0E92BDC8AC9DB865304587D6D2C1D1BB806D0D1FA6014",
+  "patch_sha256": "5B2C0253915030DEEC28D62C635CFC96003652F5C38272304DB81CA02EDACA3C",
+  "owner_source_checks_sha256": "977D3D6D9707A5616366997DDFF67FF9828584F290ABC854EF4EFC715ADBA47A",
+  "parent_checks": {
+    "current_package_entries": 179,
+    "package_drift": [],
+    "main_shared_files": 6,
+    "main_drift": [],
+    "r22_manifest_sha256": "CDCE6EEE69CB806C59314BC8C35EFEA07000452DD4E6B0A907D6BC8AF322EC0B",
+    "r22_to_r23_changed_source_entries": 3,
+    "distinct_changed_source_files": 2,
+    "changed_files": [
+      "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+      "tests/Feature/ControlRoom/ControlRoomOperatorRootNoteTest.php"
+    ],
+    "r23_archive_matches_current_manifest": true
+  },
+  "review": {
+    "status": "SPECIFIC_R22_SOURCE_CORRECTION_ACCEPTED_RUNTIME_UNRUN",
+    "read": "Two-file patch/current final writer and raw tuple verifier, actual AuditLogger and SLA write behavior, new regression callbacks and rollback assertions.",
+    "conclusion": "Literal intended alert/context/history and note tuples are captured before normal write callbacks. Actual alert, note and one new audit core are verified with raw locked reads after all normal writes. Changed or missing activity, prior history, note/root/resolution or audit core throws within the transaction; no normal write or retrieved-model callback follows final verification. This addresses the specific R22 early-verification finding.",
+    "new_concrete_findings": [],
+    "owner_notified": "01a12a29-0449-7150-ba1e-0a66a970110e"
+  },
+  "limits": {
+    "owner_syntax_style": "Two syntax and two style checks passed; source evidence only.",
+    "operator_suite": "20 authored declarations including 13 retained; two added methods consume 27 source-authored provider rows each. All UNRUN; not an executed case count.",
+    "source_writer": "Actual H&S same-text source-ownership invalidation remains pending.",
+    "other_dependencies": "Canonical exposure API, explicit H&S helper composition, full mutation authority/physical receipt and combined workflow acceptance remain pending.",
+    "product_applied": false,
+    "parent_runtime": false,
+    "runtime_admission_changed": false,
+    "overall_scope_complete": false
+  }
+}

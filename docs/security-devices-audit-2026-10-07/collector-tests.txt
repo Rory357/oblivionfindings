@@ -1,0 +1,53 @@
+
+   PASS  Tests\CollectorBoundaryTest
+  ✓ it contains no application framework or database client dependency                                           0.44s  
+  ✓ it loads only a valid signed configuration for the pinned collector and Site                                 0.10s  
+  ✓ it rejects wrong identity expiry rollback revocation and unapproved check scope with dataset "collector"
+  ✓ it rejects wrong identity expiry rollback revocation and unapproved check scope with dataset "Site"
+  ✓ it rejects wrong identity expiry rollback revocation and unapproved check scope with dataset "expired"
+  ✓ it rejects wrong identity expiry rollback revocation and unapproved check scope with dataset "revoked"
+  ✓ it rejects wrong identity expiry rollback revocation and unapproved check scope with dataset "network"       0.01s  
+  ✓ it rejects wrong identity expiry rollback revocation and unapproved check scope with dataset "device"
+  ✓ it rejects wrong identity expiry rollback revocation and unapproved check scope with dataset "protocol"
+  ✓ it rejects wrong identity expiry rollback revocation and unapproved check scope with dataset "rate limit"
+  ✓ it persists the accepted sequence and rejects a signed rollback after restart                                0.01s  
+  ✓ it revalidates target scope immediately before every probe and rejects expired leases                        0.04s  
+  ✓ it contains no command opcode shell field or arbitrary executable path                                       0.10s  
+
+   PASS  Tests\CollectorCliTest
+  ✓ it provides version and database-free doctor commands                                                        0.83s  
+  ✓ it binds transport evidence to opaque collector and identity-generation references                           0.26s  
+  ✓ it rejects a fingerprint-valid but misbound mTLS identity before persisting enrolment with dataset "certifi… 0.33s  
+  ✓ it rejects a fingerprint-valid but misbound mTLS identity before persisting enrolment with dataset "certifi… 0.20s  
+  ✓ it allows an exact accepted configuration replay but rejects a changed same-sequence envelope                0.02s  
+  ✓ it treats an over-age retained frame as buffer full without deleting it                                      0.02s  
+  ✓ it requires a clean HTTPS origin and a TLS public-key pin
+  ✓ it binds signed runtime requests to a nonce and mTLS identity files
+
+   PASS  Tests\CollectorCommandTest
+  ✓ it executes one exact signed typed command and durably spools a reconciled result once                       0.06s  
+  ✓ it soaks one hundred signed commands through buffered restart ordered return and replay protection           2.25s  
+  ✓ it never repeats a side effect after restart with only durable execution intent                              0.03s  
+  ✓ it surfaces an ambiguous provider response as uncertain and observes before any retry                        0.03s  
+  ✓ it rejects changed expired or executable command work before execution
+
+   PASS  Tests\CollectorTransportEvidenceTest
+  ✓ it reuses one signed request for each active replay sample and emits conservative evidence                   0.11s  
+  ✓ it reports only the revoked response contract and rejects non-exact bodies
+  ✓ it keeps token enrolment and signed runtime requests on separate transport modes                             0.01s  
+
+   PASS  Tests\EncryptedSpoolTest
+  ✓ it encrypts length-prefixed frames at rest and restores ordered items after restart                          0.03s  
+  ✓ it deduplicates item IDs and removes frames only after an acknowledged checkpoint                            0.03s  
+  ✓ it reports the collector checkpoint and spool high-water mark in every heartbeat                             0.02s  
+  ✓ it stops new scheduled work at the cap without discarding old frames                                         0.16s  
+  ✓ it quarantines a corrupted encrypted frame instead of treating it as acknowledged                            0.03s  
+
+   PASS  Tests\RemoteDiscoveryRunnerTest
+  ✓ it accepts signed version 2 discovery work without requiring an existing Device check                        0.01s  
+  ✓ it executes only exact signed discovery targets and returns bounded candidate evidence                       0.01s  
+  ✓ it rejects discovery targets and returned evidence outside the signed network scope                          0.01s  
+
+  Tests:    37 passed (335 assertions)
+  Duration: 8.43s
+

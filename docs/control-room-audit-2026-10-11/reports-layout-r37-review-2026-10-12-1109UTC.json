@@ -1,0 +1,59 @@
+{
+  "reviewed_at_utc": "2026-10-12T11:09:07Z",
+  "reviewed_at_local": "2026-10-13T00:09:07+13:00",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "receipt": "docs/control-room-audit-2026-10-11/reports-layout-source-r37b.json",
+  "receipt_sha256": "1806CE8C042119DD06234EC6F755956CD7B00C15164CF2C488F68910A96447CE",
+  "status": "CR-REPORTS-RORY-01_AND_02_ADDRESSED_IN_CANDIDATE_SOURCE_ONLY",
+  "parent_verification": {
+    "current_products": 1,
+    "stable_products": 4,
+    "evidence_pins": 7,
+    "before_pins": 2,
+    "drift": [],
+    "current_report_sha256": "2063B49BD08A06F8AAFC264A9EADF522DB1209B11ED4608AD419E6436FF24143",
+    "read": "Entire one-file diff, previous saved page, relevant shared wrapper spacing and actual R38 result/stdout/stderr.",
+    "whole_r35_page_restored_by_reversing_only_layout": true,
+    "shared_header_to_body": "CommandCentrePage has min-w-0 space-y-5. PageShell has one rendered content child for this page; the added body wrapper supplies one gap-5 stack.",
+    "not_repeated": "Full 3175 input image rehash; syntax/format/lint/test/DB/build/browser/resource execution."
+  },
+  "finding_resolution": {
+    "CR-REPORTS-RORY-01": "One flex/gap-5 body stack, all three card grids gap-5, previous per-row top margins removed; no extra shell gutter.",
+    "CR-REPORTS-RORY-02": "Local chart region has scrollbar-pretty, min-w-0/max-w-full/overflow-x-auto; existing tabIndex and accessible name retained.",
+    "additional_source_findings": [],
+    "figures_links_and_backend": "Restored page byte equality and stable pins preserve all counts/timing/table/links and prior native/component files."
+  },
+  "formatter": {
+    "result": "test-results/control-room-owned-format-a-r38-20261012/result.json",
+    "sha256": "9B3544E9CF5A28BD7C33B0BD9D916E80586CB4EC98ADDAF1B59CEC0CC9B44AAA",
+    "classification": "STARTED_THEN_RESOURCE_ABORTED",
+    "started": true,
+    "actual_exit": null,
+    "after_read_complete": true,
+    "own_child_exit_confirmed": true,
+    "streams_closed": true,
+    "stdout": "Checking formatting...",
+    "stderr_empty": true,
+    "completion_or_pass": false,
+    "resource_reason": "Receipt reports CPU71 above the conservative less-than70 runtime guard, free4135MiB; historical sample is not future job admission."
+  },
+  "unchanged_test_evidence": {
+    "duty_history_prospective": 75,
+    "reports_native_methods": 29,
+    "frontend_authored_cases": 37,
+    "all_unrun": true
+  },
+  "open_gates": [
+    "Desktop/narrow/zoom/keyboard geometry",
+    "Local chart scrolling without body overflow and real40date/table parity",
+    "Actual formatting/type/component/native verification",
+    "CSV canonical source-note admission and shaping",
+    "Deployed stats500 cause",
+    "Full Rory/workflow/integration acceptance"
+  ],
+  "owner_source_closure_sent_once": true,
+  "last_observed_cursor": "a8154e4a-be4a-449b-a690-548c53e7eaf3:48",
+  "application_edit_or_runtime_action_by_coordinator": false,
+  "integrated_or_deployed": false,
+  "heartbeat": "ACTIVE"
+}

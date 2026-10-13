@@ -1,17 +1,25 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
-import { dismissRejectedOfflineSubmissions } from '@/lib/offline-queue';
+import { dismissRejectedOfflineSubmission } from '@/lib/offline-queue';
 
 import OfflineStatusBanner from './offline-status-banner';
 
 vi.mock('@/hooks/use-offline-queue', () => ({
     useOfflineQueueState: vi.fn(),
 }));
-vi.mock('@/lib/offline-queue', () => ({
-    dismissRejectedOfflineSubmissions: vi.fn(),
+vi.mock('@/lib/offline-queue', async (importOriginal) => ({
+    // The real wording for another worker's saved items (review P0).
+    strandedSummary: (await importOriginal<typeof import('@/lib/offline-queue')>())
+        .strandedSummary,
+    clearMedicationHistory: vi.fn(),
+    dismissRejectedOfflineSubmission: vi.fn(),
+    purgeMedicationDeviceData: vi.fn(async () => undefined),
     retryOfflineSubmissionsNeedingAttention: vi.fn(),
+}));
+vi.mock('@inertiajs/react', () => ({
+    router: { flushAll: vi.fn(), post: vi.fn() },
 }));
 
 const mockedUseOfflineQueueState = vi.mocked(useOfflineQueueState);
@@ -110,7 +118,64 @@ describe('OfflineStatusBanner', () => {
         ).toBeInTheDocument();
     });
 
-    it('keeps a server-refused saved action visible as not recorded until dismissed', () => {
+    const refusedDose = {
+        id: 'a92be861-e38f-4cb0-8daf-87bd65dfcae7',
+        actorId: '101',
+        action: 'prn' as const,
+        method: 'post' as const,
+        url: '/meds/today/prn',
+        payload: {},
+        createdAt: '2026-04-30T09:00:00.000Z',
+        lastAttemptAt: '2026-04-30T09:05:00.000Z',
+        attempts: 1,
+        lastError: 'PRN limit reached (4 of 4 in 24 hours).',
+        needsAttention: true,
+        rejected: true,
+        display: {
+            person: 'Mary',
+            medicine: 'Paracetamol 500mg',
+            outcome: 'Given',
+            at: '2026-04-29T21:00:00.000Z',
+        },
+    };
+
+    it('keeps a refused saved dose visible beside the waiting line, and names it (EA-046)', () => {
+        mockedUseOfflineQueueState.mockReturnValue({
+            online: false,
+            pendingCount: 2,
+            needsAttentionCount: 0,
+            pendingSubmissions: [],
+            rejectedCount: 1,
+            rejectedSubmissions: [refusedDose],
+            syncing: false,
+        });
+
+        render(<OfflineStatusBanner />);
+
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'A saved medication record was not recorded. Check it and tell your lead.',
+        );
+        // The offline / waiting line is still there (it used to be hidden).
+        expect(screen.getByRole('status')).toHaveTextContent(
+            /Offline — 2 items will send/,
+        );
+        expect(
+            screen.queryByRole('button', { name: 'Dismiss' }),
+        ).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+        expect(
+            screen.getByText('Mary · Paracetamol 500mg'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('PRN limit reached (4 of 4 in 24 hours).'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Lead not told yet — tell your lead'),
+        ).toBeInTheDocument();
+    });
+
+    it('removes a refused dose only after the worker says it is dealt with (EA-049)', () => {
         mockedUseOfflineQueueState.mockReturnValue({
             online: true,
             pendingCount: 0,
@@ -118,31 +183,134 @@ describe('OfflineStatusBanner', () => {
             pendingSubmissions: [],
             rejectedCount: 1,
             rejectedSubmissions: [
+                { ...refusedDose, reportedAt: '2026-04-30T09:06:00.000Z' },
+            ],
+            syncing: false,
+        });
+        vi.mocked(dismissRejectedOfflineSubmission).mockResolvedValue(true);
+
+        render(<OfflineStatusBanner />);
+        fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+        expect(screen.getByText('Lead follow-up created')).toBeInTheDocument();
+        const remove = screen.getByRole('button', {
+            name: 'Remove from this device',
+        });
+        expect(remove).toBeDisabled();
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'I’ve recorded this on paper or told my lead',
+            }),
+        );
+        fireEvent.click(remove);
+        expect(dismissRejectedOfflineSubmission).toHaveBeenCalledWith(
+            refusedDose.id,
+            'told_lead',
+        );
+    });
+
+    it('says only how many records another worker saved, and who (EA-048, review P0)', () => {
+        mockedUseOfflineQueueState.mockReturnValue({
+            online: true,
+            pendingCount: 0,
+            needsAttentionCount: 0,
+            pendingSubmissions: [],
+            rejectedCount: 0,
+            rejectedSubmissions: [],
+            strandedSubmissions: [
                 {
-                    id: 'a92be861-e38f-4cb0-8daf-87bd65dfcae7',
-                    actorId: '101',
-                    action: 'prn',
-                    method: 'post',
-                    url: '/meds/today/prn',
-                    payload: {},
+                    id: 'theirs',
                     createdAt: '2026-04-30T09:00:00.000Z',
-                    lastAttemptAt: '2026-04-30T09:05:00.000Z',
-                    attempts: 1,
-                    lastError: 'PRN limit reached (4 of 4 in 24 hours).',
-                    needsAttention: true,
-                    rejected: true,
+                    actorName: 'Mere Tane',
+                    orderId: 41,
+                    dueAt: '2026-04-30T09:00:00+12:00',
+                },
+                {
+                    id: 'theirs-2',
+                    createdAt: '2026-04-30T09:05:00.000Z',
+                    actorName: 'Mere Tane',
+                    orderId: 42,
+                    dueAt: null,
                 },
             ],
             syncing: false,
         });
 
+        // Whoever signs in next — with or without medication access — sees a
+        // count and a name: never the person, medicine, outcome or time.
+        const { container } = render(<OfflineStatusBanner />);
+
+        expect(screen.getByRole('status')).toHaveTextContent(
+            '2 medication records saved on this device by Mere Tane — they send when Mere Tane signs in.',
+        );
+        expect(
+            screen.queryByRole('button', { name: 'Review' }),
+        ).not.toBeInTheDocument();
+        for (const hidden of [
+            'Mary',
+            'Paracetamol',
+            '9:00',
+            'Given',
+            'Refused',
+        ])
+            expect(container).not.toHaveTextContent(hidden);
+    });
+
+    it('says to sign in again instead of retrying forever (EA-050)', () => {
+        mockedUseOfflineQueueState.mockReturnValue({
+            online: true,
+            pendingCount: 1,
+            needsAttentionCount: 0,
+            pendingSubmissions: [],
+            rejectedCount: 0,
+            rejectedSubmissions: [],
+            signInRequired: true,
+            syncing: false,
+        });
+
         render(<OfflineStatusBanner />);
 
-        expect(screen.getByRole('alert')).toHaveTextContent(
-            'A saved medication action was not recorded: PRN limit reached (4 of 4 in 24 hours).',
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Sign in again to send the medication records saved on this device.',
         );
+    });
 
-        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-        expect(dismissRejectedOfflineSubmissions).toHaveBeenCalledTimes(1);
+    it('says the server didn’t answer, not offline, while online (EA-010)', () => {
+        mockedUseOfflineQueueState.mockReturnValue({
+            online: true,
+            pendingCount: 1,
+            needsAttentionCount: 0,
+            pendingSubmissions: [],
+            rejectedCount: 0,
+            rejectedSubmissions: [],
+            syncing: false,
+        });
+
+        render(<OfflineStatusBanner />);
+
+        expect(screen.getByRole('status')).toHaveTextContent(
+            /server didn’t answer; we’ll keep trying/,
+        );
+    });
+
+    it('asks before signing out while doses are saved only on this device (EA-048)', () => {
+        render(<OfflineStatusBanner />);
+        act(() => {
+            window.dispatchEvent(
+                new CustomEvent('emar:sign-out-blocked', {
+                    detail: { pending: 2 },
+                }),
+            );
+        });
+        expect(
+            screen.getByText(
+                'Medication records are saved only on this device',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Stay signed in' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Sign out anyway' }),
+        ).toBeInTheDocument();
     });
 });

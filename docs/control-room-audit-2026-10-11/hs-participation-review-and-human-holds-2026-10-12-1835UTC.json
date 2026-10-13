@@ -1,0 +1,45 @@
+{
+  "reviewed_at_utc": "2026-10-12T18:35:29Z",
+  "kind": "coordinator_read_only_source_review",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "packet": "docs/health-safety-audit-2026-10-07/participation-stay-fleet-source-2026-10-13.json",
+  "packet_sha256": "D2A160FAE2AE1E88B5B732F2466DCC17FE5CCFE05E4D0B9396A75A4F50B66BB7",
+  "packet_pins": {"checked": 23, "matched": 22, "changed": 1},
+  "changed_pin": {
+    "path": "app/Http/Controllers/HealthSafety/HealthSafetyDashboardController.php",
+    "receipt_sha256": "9AEE34BF0EE214095FF0B50987F19BFE94BCC9F423418F05120FDADC4B8420C5",
+    "observed_sha256": "E992332CB2AA76D2CE1B98AA6A3BFF56BD2D2E5B568C7EF78835AA7C6BBDAE4D",
+    "interpretation": "Owner actively working on Dashboard Client picker; do not carry earlier receipt forward or duplicate active audit."
+  },
+  "reviewed_source": {
+    "participation_header_sha256": "953A15ADF429979DE33780E63EE67A89CEA37547F2DB2FF326D382FA04E01581",
+    "participation_header_test_sha256": "4459EDC216F27E9CB5623DDB42C7444287CF0935994EF6A993D8FE4D04DC21F7",
+    "participation_index_sha256": "7C2B484BE13B8284A5F43F381035CCD68BFC1B7FFB05A42106F29E9653B2F281",
+    "participation_controller_sha256": "C53866C411B5ADC428B3C0273E15A00CBD65F282FE89AC70A4811A1AA322B6B3",
+    "page_layout_sha256": "8F131A51363BE62C2805C42B825CD7525774961C4D5CC2D8A06ECE500DC61310",
+    "scope": "Full new header and six declared component cases; index header/rail/actions/layout composition; controller index, three row queries, periodStart, hero and detail; representative/committee models; PageLayout; canonical header guide. Not entire participation workflow or backend privacy acceptance."
+  },
+  "confirmed_source_improvement": "Shared PageHeader, Home breadcrumb, connected rail with correct key/count adapter, filters inside, PageLayout default no extra gutter and gap-5. This is source presence, not browser acceptance.",
+  "finding": {
+    "id": "HS-PARTICIPATION-DRILLDOWN-01",
+    "status": "OPEN_OWNER_NOTIFIED",
+    "priority": "P2",
+    "details": [
+      "Active committees counts HsCommittee but links to quarter meeting rows; quarter list lower-bound filtering also includes meetings beyond quarter end.",
+      "Minutes missing counts completed meetings with null minutes path but links to all completed meetings.",
+      "Rep training below 2 days counts active representatives below two days but links to all active representatives.",
+      "Meeting actions due sums actions_due_count on noncancelled meetings but links to all meetings without a matching action filter or sum explanation in the destination."
+    ],
+    "acceptance": "Truthfully labelled linked metrics and supported matching views, retained original information, mixed records/Site/time boundaries/unrelated rows and return navigation evidence. Existing six component cases encode mismatched destinations and are not acceptance."
+  },
+  "human_holds": {
+    "incident_writes": {"user_message": "01a13138-db99-7711-bb6a-04fd021d2806", "answer": "Keep these write changes pending"},
+    "client_wrapper": {"user_message": "01a1315e-2e8b-7cb2-b8f9-e3a1af07d930", "answer": "Keep the Client wrapper pending until protocol validation (Recommended)", "plan_sha256": "6F2A07B6895EC737D5F45F844B692A36FCCE7A621BE15B29A51E5DBD937D46B0"},
+    "confirmed_absent": ["app/Services/HealthSafety/HsSourceCommandContext.php", "app/Models/Concerns/HasHealthSafetyCommandSourceGuard.php", "app/Services/HealthSafety/ClientProfileSourceReadLifetime.php"],
+    "preserved_pins": ["app/Http/Middleware/HandleInertiaRequests.php", "app/Http/Controllers/ClientController.php"],
+    "scope": "No retry/substitute/coordinator override; unaffected authorised work continues."
+  },
+  "runtime_limits": "Packet reports syntax/formatting and 106 pure runner checks, not new application execution. Six participation cases and native Stay/Fleet/Client suites unrun. Current runner BC655520 differs from earlier reviewed runner; full successor not reviewed here. No tests/build/browser/process probes performed by coordinator.",
+  "owner_message": "One bounded finding/action/acceptance message sent to H&S, no acknowledgement-only turn requested; CR/WF unchanged idle, no restart.",
+  "programme": "All three approved scopes incomplete; no integration, deployment or full Rory/workflow sign-off."
+}

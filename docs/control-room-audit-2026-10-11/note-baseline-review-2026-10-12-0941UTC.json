@@ -1,0 +1,68 @@
+{
+  "reviewed_at_utc": "2026-10-12T09:41:02Z",
+  "reviewer": "coordinator",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "receipt": "docs/control-room-audit-2026-10-11/note-baseline-source-increment-r34.json",
+  "receipt_sha256": "6CA6A6706F8A4F033EA6DB0E72FB6116E7ACBF4CD90BE2FF120D9B52217E52EF",
+  "status": "CR-HANDOVER-NOTES-04 ADDRESSED_IN_CANDIDATE_SOURCE_ONLY; RUNTIME_AND_INTEGRATION_UNVERIFIED",
+  "hash_verification": {
+    "product": 17,
+    "evidence": 8,
+    "predecessor": 3,
+    "differences": []
+  },
+  "source_review": {
+    "complete_changed_files_read": [
+      "app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+      "tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php"
+    ],
+    "current_service_sha256": "862FD98D0B3CCD4F192B841E6DFFCF7BC95EAE9B9A164E8B1BCB691682C4C4F5",
+    "current_test_sha256": "C7A3BC762AC7010F580249C23C6C3A12914800D2B149F32AC28E649A48E4C49C",
+    "finding_resolution": "Before transition writes, seal the complete originally reviewed selected-note tuple. Both final persisted checks compare against that immutable seal, alongside existing current canonical note admission. No expected content or metadata is relearned from refreshed saved copies.",
+    "normalization": "JSON object ordering, representation whitespace and escaping only; preserve list shape and order, all fields and values, exact text and scalar types.",
+    "independent_read_only_comparisons": {
+      "prepare_outside_seal_capture_and_passing_byte_equal": true,
+      "accept_outside_seal_capture_and_passing_byte_equal": true,
+      "whole_service_outside_seal_capture_passing_and_final_helper_region_byte_equal": true
+    },
+    "additional_findings": [],
+    "authored_controls": "Existing 65 prospective native cases retained; 8 coherent replacement/metadata rollback cases and 2 JSON key-order positive cases added for prepare/accept. 75 prospective native and 33 frontend cases are UNRUN."
+  },
+  "verification": {
+    "syntax_result_sha256": "3DFDE6B0E30EBE8960B27846D4B49CF1FDC79EC22E61DD50862874E64766C1D2",
+    "syntax_children_started": 0,
+    "grammar_files_checked": 0,
+    "after_read_complete": true,
+    "component_result": "Prior R32 held before child; no new component pass.",
+    "parent_ran_application_or_tests": false,
+    "main_changed": false,
+    "migration_executed": false,
+    "integration_or_rory_browser_workflow_acceptance": false,
+    "not_reaudited": "Owner's 3177 unchanged frontend image pins were not independently rehashed. Packaging script was read, not executed."
+  },
+  "coordination": {
+    "cr": "Source-only closure sent once. Cursor a8154e4a-be4a-449b-a690-548c53e7eaf3:45 confirms active independent Reports work.",
+    "workforce": {
+      "cursor": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:50",
+      "lifetime_review_sha256": "A45616D9C7C26F2656D95BF6D90AF56E694C3EBFDEDF46A90C919BAAD0EFACCA",
+      "review_scope": "Receipt matched and read; CLEAR_SOURCE_ONLY for two unmounted lifetime files, 12 declarations/14 scenarios UNRUN. Parent did not duplicate implementation source audit.",
+      "new_helpers": "Owner reports source-clear save-result/preparation helpers, 15 UNRUN cases. Backend and both owning-page composition incomplete.",
+      "shared_service": "MAIN app/Services/ShiftHandoverService.php clean, SHA42FD49277DF8E137FF8A0FCC3982FAC5202AC9A8B4478E72EB6CBE2179A3B1E9, last commit0b3c7b922. Read three proposed save locations and actual consumers.",
+      "decision": "No recorded competing active claim. WF owns narrow Operations adapter proposal, minimal rebased patch retaining base save and all lock/audit/timeline/medication/witness ordering. No global base-service binding: Attendance, eMAR, My Day and Overview also resolve it. Actual Operations opt-in and Attendance endpoint must be shown in completed package.",
+      "emar": "Read-only unchanged notLoaded snapshot e79be3d4-d8b8-4169-8322-a0ea195cf505:1 is not ownership release. No eMAR message or edit.",
+      "timesheet": "Latest A-c held-before-child is owner reported, counts null; no new runtime pass."
+    },
+    "health_safety": {
+      "cursor": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:61",
+      "status": "Active new turn reviewing notification delivery and staff pickers; no completed combined packet reviewed or new coordinator message."
+    }
+  },
+  "open_gates": [
+    "H&S canonical source-copy API and source-writer invalidation",
+    "Actual tests and command rollback verification",
+    "Current minimal shared composition and integration",
+    "Rory all-page and actual browser/workflow acceptance",
+    "Remaining full approved Control Room, Workforce and H&S delivery"
+  ],
+  "heartbeat": "ACTIVE"
+}

@@ -22,7 +22,7 @@ export function medicationReturnTo(
         const url = new URL(value, 'https://medication.invalid');
         if (
             url.origin !== 'https://medication.invalid' ||
-            !/^\/(?:emar(?:\/[a-z0-9_-]+)*|meds\/today|my-day|my-calendar|calendar|attendance|clients\/\d+|tasks|sites\/\d+(?:\/calendar)?|operations\/(?:clients|shifts|handovers)(?:\/\d+)?|health-clinical(?:\/[a-z0-9_-]+)*)\/?$/.test(
+            !/^\/(?:emar(?:\/[a-z0-9_-]+)*|meds\/today|my-day|my-calendar|calendar|attendance|clients\/\d+|tasks|medication-followups|sites\/\d+(?:\/calendar)?|operations\/(?:clients|shifts|handovers)(?:\/\d+)?|health-clinical(?:\/[a-z0-9_-]+)*)\/?$/.test(
                 url.pathname,
             )
         )

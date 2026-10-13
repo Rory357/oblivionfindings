@@ -17,6 +17,7 @@ use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\Connected\ConnectedCareAlerts;
+use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use Carbon\CarbonImmutable;
@@ -286,6 +287,9 @@ final class PharmacyDispatchService
                     'acknowledgment_code' => 'contradicts_recorded_check', 'supplier_reference' => $data['supplier_reference'],
                     'acknowledged_at' => now(), 'result_code' => 'authenticated_pharmacy_'.$data['outcome'].'_after_manual_check'])->save();
                 $this->event($client, $medication, $order, $dispatch, null, 'acknowledged');
+                // A lead checks whether the pharmacy now holds two orders (one per dispatch).
+                app(MedicationFollowupService::class)->ensureForSource('duplicate-supply', (int) $dispatch->id, $client, $medication, null, null,
+                    now()->addDay(), ['pharmacy_order_id' => (int) $order->id, 'dispatch_id' => (int) $dispatch->id, 'source_url' => '/emar/stock?view=orders']);
 
                 return ['received' => true, 'duplicate' => false, 'applied' => false, 'code' => 'contradicts_recorded_check'];
             }

@@ -20,6 +20,7 @@ use App\Models\MedicationRound;
 use App\Models\User;
 use App\Models\UserWitnessPin;
 use App\Services\Medication\DoseTimingSettings;
+use App\Services\Medication\Downtime\PaperEntryService;
 use App\Services\Medication\Recording\DoseRecordingRequirements;
 use Carbon\Carbon;
 use Database\Seeders\FrontlineLifecycleDemoSeeder;
@@ -88,6 +89,7 @@ test('synthetic medication acceptance fixtures satisfy real recording and indepe
         'quantity_administered' => 1, 'cd_balance' => 11, 'witnessed_by' => $witness->id,
         'witness_credential' => MedicationReadinessAcceptanceSeeder::WITNESS_PIN,
         'client_request_uuid' => (string) Str::uuid(),
+        'order_fingerprint' => PaperEntryService::orderFingerprint($order->fresh()),
     ])->assertOk();
     expect(ClientMedicationAdministration::query()->where('client_medication_id', $order->id)->count())->toBe(1)
         ->and((float) $order->stock()->sole()->on_hand)->toBe(11.0);
@@ -102,6 +104,7 @@ test('synthetic medication acceptance fixtures satisfy real recording and indepe
         'client_medication_id' => $scheduled->id, 'status' => 'given',
         'scheduled_for' => $morningDue->toIso8601String(), 'administered_at' => now()->toIso8601String(),
         'client_request_uuid' => (string) Str::uuid(),
+        'order_fingerprint' => PaperEntryService::orderFingerprint($scheduled->fresh()),
     ])->assertOk();
     $scheduledDose = ClientMedicationAdministration::query()->where('client_medication_id', $scheduled->id)->sole();
     $slot = MedicationDoseSlot::query()->where('outcome_administration_id', $scheduledDose->id)->sole();
@@ -258,6 +261,7 @@ test('later synthetic fixture schedules get a new independently checked version 
         'client_medication_id' => $vitamin->id, 'status' => 'given',
         'scheduled_for' => $vitaminDue->toIso8601String(), 'administered_at' => now()->toIso8601String(),
         'client_request_uuid' => (string) Str::uuid(),
+        'order_fingerprint' => PaperEntryService::orderFingerprint($vitamin->fresh()),
     ])->assertOk();
     $dose = ClientMedicationAdministration::query()->where('client_medication_id', $vitamin->id)->sole();
     expect($dose->status)->toBe('given')

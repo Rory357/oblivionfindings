@@ -35,9 +35,10 @@ import {
     WizardStepPane,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { toDatetimeLocal, workerTimeOffsets } from '@/lib/datetime';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Check, ClipboardCheck, Link2 } from 'lucide-react';
 import {
@@ -133,15 +134,17 @@ export function ConnectedHeader({
     }[];
     children: ReactNode;
 }) {
+    // EA-079/EA-134 (Lane C8): Home-rooted trail from the hub map; the
+    // page's own title is added when the mapped view is named differently.
+    const page = usePage();
+    const mapped = useEmarBreadcrumbs();
+    const trail = mapped.length > 2 ? mapped : [...mapped, parent];
+    const breadcrumbs =
+        trail.at(-1)?.title === title
+            ? trail
+            : [...trail, { title, href: page.url }];
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/my-day' },
-                { title: 'Medication', href: '/meds/today' },
-                parent,
-                { title, href: '#' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={title} />
             <div className="space-y-5">
                 <PageHeader

@@ -16,7 +16,9 @@ use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationSupportChange;
 use App\Models\MedicationSyringeDriver;
 use App\Models\User;
+use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotCoverage;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationConcealment;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -26,6 +28,7 @@ use App\Services\Medication\MedicationRecordSafetyPrivacy;
 use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\Support\MedicationSupport;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -84,6 +87,8 @@ class PersonMedicationRecordController extends Controller
         return Inertia::render('emar/record/show', [
             'person' => $this->person($client),
             'meters' => [
+                // EA-110 (Lane C9): approved P02 Due now / Late / Recorded today.
+                'doses' => $this->todayDoses($actor, $client),
                 'medicines' => [
                     'count' => $current->count(),
                     'hidden' => $hidden->count(),
@@ -99,9 +104,47 @@ class PersonMedicationRecordController extends Controller
                 'manage_orders' => $actor->canDo('medications.orders.manage'),
                 'view_controlled' => $actor->canDo('medications.controlled.view'),
                 'view_audit' => $actor->canDo('medications.audit.view'),
+                // EA-110: Print MAR uses the P09 export (purpose, review, download).
+                'print' => $actor->canDo('medications.reports.view') && $actor->canDo('medications.reports.export'),
             ],
+            'today' => Carbon::now($this->schedule->workerTimezone())->toDateString(),
             'as_at' => Carbon::now($this->schedule->workerTimezone())->toIso8601String(),
         ]);
+    }
+
+    /**
+     * Today's doses for the header meters, counted from the same schedule as
+     * Meds today and the MAR hub (MedsBoardPayloadService). Null when the
+     * day's scheduled-dose history is unavailable: the header says so rather
+     * than showing zeros.
+     *
+     * @return array{scheduled: int, due: int, due_until: ?string, late: int, oldest_late: ?string, recorded: int, so_far: int}|null
+     */
+    private function todayDoses(User $actor, Client $client): ?array
+    {
+        $now = Carbon::now($this->schedule->workerTimezone());
+        $day = $now->copy()->startOfDay();
+        if (! app(DoseSlotCoverage::class)->forPeriod($day->toDateString(), CarbonImmutable::now())['complete']) {
+            return null;
+        }
+        $board = app(MedsBoardPayloadService::class);
+        $controlled = $actor->canDo('medications.controlled.view');
+        $ids = [(int) $client->id];
+        $rows = collect($board->scheduleForDate($ids, $day, $now, $board->slotIndex($board->administrationsForDay($ids, $day, $controlled)), $controlled));
+        $due = $rows->filter(fn (array $row): bool => ($row['state'] ?? '') === 'due' && $row['recorded'] === null)->sortBy('window_ends_at');
+        $late = $rows->where('status', 'overdue')->sortBy('scheduled_for');
+        // Staff doses due so far: not self-managed, away, waiting for a check or still to come.
+        $staff = $rows->reject(fn (array $row): bool => in_array($row['state'] ?? '', ['self_managed', 'away', 'pending_check', 'not_due', 'upcoming'], true));
+
+        return [
+            'scheduled' => $rows->count(),
+            'due' => $due->count(),
+            'due_until' => $due->first()['window_ends_at'] ?? null,
+            'late' => $late->count(),
+            'oldest_late' => $late->first()['scheduled_for'] ?? null,
+            'recorded' => $staff->filter(fn (array $row): bool => $row['recorded'] !== null)->count(),
+            'so_far' => $staff->count(),
+        ];
     }
 
     /** Current or stopped medicines (?status=stopped). */
@@ -275,7 +318,9 @@ class PersonMedicationRecordController extends Controller
     {
         $actor = $this->actor($request);
         $client = $this->access->client($actor, $clientId);
-        $data = $request->validate(['page' => ['nullable', 'integer', 'min:1'], 'view' => ['nullable', 'in:doses,corrections,changes']]);
+        $data = $request->validate(['page' => ['nullable', 'integer', 'min:1'], 'view' => ['nullable', 'in:doses,corrections,changes'],
+            // EA-109 (Lane C9): the approved History filters (doses and corrections).
+            'range' => ['nullable', 'in:7d,30d,all'], 'outcome' => ['nullable', 'in:all,given,notgiven,corrected']]);
         if (($data['view'] ?? '') === 'changes') {
             abort_unless($actor->canDo('medications.audit.view'), 403);
             $privacy = app(MedicationProfileAuditPrivacy::class);
@@ -324,6 +369,17 @@ class PersonMedicationRecordController extends Controller
         } else {
             $query->effectiveClinicalEvidence();
         }
+        // NZ days: "Last 7 days" is today and the six days before.
+        $days = ['7d' => 7, '30d' => 30][$data['range'] ?? 'all'] ?? null;
+        if ($days !== null) {
+            $query->where('administered_at', '>=', Carbon::now($this->schedule->workerTimezone())->startOfDay()->subDays($days - 1)->utc());
+        }
+        match ($data['outcome'] ?? 'all') {
+            'given' => $query->where('status', 'given'),
+            'notgiven' => $query->whereIn('status', ['refused', 'withheld', 'missed']),
+            'corrected' => $query->where('is_correction', true),
+            default => null,
+        };
         $records = $query->latest('administered_at')->latest('id')->paginate(25);
         $concealment = MedicationConcealment::for($actor);
         $records->setCollection($records->getCollection()->map(fn ($dose) => $concealment->hides((bool) $dose->medication?->controlled_drug) ? ['concealed' => true, 'key' => 'dose'.$dose->id] : ['key' => (string) $dose->id, 'id' => $dose->id, 'medicine' => $dose->medication?->name, 'status' => $dose->status, 'at' => $dose->administered_at?->toIso8601String(), 'scheduled_for' => $dose->scheduled_for?->toIso8601String(), 'by' => $dose->administeredBy?->name, 'dose' => $dose->dose_given, 'reason' => $dose->reason, 'notes' => $dose->notes, 'is_correction' => (bool) $dose->is_correction, 'correction_status' => $dose->correction_status, 'correction_reason' => $dose->correction_reason, 'requested_by' => $dose->correction_requested_by ?? $dose->administered_by]));

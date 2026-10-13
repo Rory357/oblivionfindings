@@ -6,6 +6,7 @@
  * Source of truth: Emar/WorkerMedsController. What each dose needs and
  * allows comes from the same requirements the dialog reads; saving checks
  * everything again on the server. */
+import { inEmarHubOrder } from '@/lib/emar-navigation';
 import { withMedicationReturn } from '@/lib/medication-navigation';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -769,7 +770,7 @@ export default function MedsToday(props: MedsTodayProps) {
         <PageHeaderRail<View>
             value={view}
             onSelect={setView}
-            items={[
+            items={inEmarHubOrder('today', [
                 {
                     key: 'schedule',
                     label: 'Schedule',
@@ -804,7 +805,7 @@ export default function MedsToday(props: MedsTodayProps) {
                           },
                       ]
                     : []),
-            ]}
+            ])}
         />
     );
 

@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Domain\Finance\Events\JournalPosted;
+use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
@@ -69,6 +71,9 @@ use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultSecretStore;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerSecretStore;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommandAdapter;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCommandAdapter;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\DatabaseReleaseFixtureCommandRuntime;
 use App\Domain\SecurityDevices\Management\Adapters\QueclinkTrackingCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandAdapter;
@@ -115,6 +120,7 @@ use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
 use App\Models\HouseLedgerEntry;
+use App\Models\ItCatalogSubmission;
 use App\Models\ItChange;
 use App\Models\ItInboundEmail;
 use App\Models\ItMajorIncident;
@@ -234,6 +240,9 @@ class AppServiceProvider extends ServiceProvider
             UnifiAccessCommandAdapter::class,
             QueclinkTrackingCommandAdapter::class,
             ReleaseFixtureCommandAdapter::class,
+            EndpointServiceCommandAdapter::class,
+            EndpointRestartCommandAdapter::class,
+            EndpointSoftwareCommandAdapter::class,
         ], 'device-command-adapters');
         $this->app->bind(ReleaseFixtureCommandRuntime::class, DatabaseReleaseFixtureCommandRuntime::class);
         $this->app->bind(CredentialLeaseProvider::class, GovernedCredentialLeaseBroker::class);
@@ -471,7 +480,7 @@ class AppServiceProvider extends ServiceProvider
             'it_major_incident_update' => ItMajorIncidentUpdate::class,
             'it_problem' => ItProblem::class,
             'it_ticket_comment' => ItTicketComment::class,
-            'it_catalog_submission' => \App\Models\ItCatalogSubmission::class,
+            'it_catalog_submission' => ItCatalogSubmission::class,
             'it_inbound_email' => ItInboundEmail::class,
             'it_team' => ItTeam::class,
             'it_queue' => ItQueue::class,
@@ -481,9 +490,9 @@ class AppServiceProvider extends ServiceProvider
             'security_device' => Device::class,
             'control_room_alert' => ControlRoomAlert::class,
             'site' => Site::class,
-            'resolution' => \App\Domain\Governance\Models\Resolution::class,
-            'meeting' => \App\Domain\Governance\Models\GovernanceMeeting::class,
-            'governance_meeting' => \App\Domain\Governance\Models\GovernanceMeeting::class,
+            'resolution' => Resolution::class,
+            'meeting' => GovernanceMeeting::class,
+            'governance_meeting' => GovernanceMeeting::class,
         ]);
 
         Shift::observe(ShiftObserver::class);
@@ -607,8 +616,32 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureRateLimiting(): void
     {
+        // Obli has separate token/session limits; allow shared-site networks here.
+        // The general guest limit must not silently cap a whole staffed site.
         // Standard API rate limit
         RateLimiter::for('api', function (Request $request) {
+            if ($request->is('api/endpoints/agent/*')) {
+                $credential = $request->bearerToken() ?? '';
+                if (! preg_match('/\A[a-f0-9]{64}\z/', $credential)) {
+                    return Limit::perMinute(30)->by('endpoint-invalid:'.$request->ip());
+                }
+                // Many approved computers can share one Site's public IP.
+                // Keep Stop out of the polling bucket so traffic cannot starve it.
+                $stop = $request->is('api/endpoints/agent/remote/*/stop');
+                $limit = $stop ? 60 : max(1, min(1200, (int) config('endpoint_management.agent_requests_per_minute', 180)));
+                $identity = hash_hmac('sha256', $credential, (string) config('app.key'));
+
+                return [
+                    Limit::perMinute(max(1000, min(120000, (int) config('endpoint_management.ingress_requests_per_minute', 12000))))
+                        ->by('endpoint-'.($stop ? 'stop-ingress:' : 'ingress:').$request->ip()),
+                    Limit::perMinute($limit)->by('endpoint-'.($stop ? 'stop:' : 'traffic:').$identity),
+                ];
+            }
+
+            if ($request->is('api/obli/*')) {
+                return Limit::perMinute(1000)->by('obli-surface:'.$request->ip());
+            }
+
             // Service identities have their configured per-identity limit in
             // AuthenticateItServiceIdentity. Keep a wider IP ceiling here so
             // invalid credentials are still throttled without silently

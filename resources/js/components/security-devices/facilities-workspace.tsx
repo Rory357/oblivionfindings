@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
@@ -240,7 +241,6 @@ function State({ value, label }: { value: string | null; label?: string }) {
 }
 
 function Metric({
-    icon,
     value,
     label,
     note,
@@ -250,17 +250,19 @@ function Metric({
     label: string;
     note: string;
 }) {
+    const factLabel = label
+        .replace(/^\d+\s+/, '')
+        .replace(/^./, (character) => character.toUpperCase());
     return (
-        <Card className="min-w-0 shadow-xs">
-            <CardContent className="p-4">
-                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    {icon}
-                </div>
-                <p className="text-2xl font-semibold tabular-nums">{value}</p>
-                <p className="text-sm font-medium break-words">{label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-            </CardContent>
-        </Card>
+        <ReviewRow
+            label={factLabel}
+            value={
+                <span className="inline-flex flex-col items-end gap-0.5">
+                    <span className="tabular-nums">{value}</span>
+                    <span className="text-caption font-normal">{note}</span>
+                </span>
+            }
+        />
     );
 }
 
@@ -299,46 +301,50 @@ function Overview({ data }: { data: FacilitiesWorkspaceData }) {
                     Technical condition, evidence freshness, site impact, and
                     required operational follow-up.
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                    <Metric
-                        icon={<Gauge className="h-5 w-5" />}
-                        value={overview.inventory.devices}
-                        label={`${overview.inventory.devices} facility devices`}
-                        note={`${overview.inventory.sites} authorised sites`}
-                    />
-                    <Metric
-                        icon={<Thermometer className="h-5 w-5" />}
-                        value={overview.inventory.environment}
-                        label={`${overview.inventory.environment} environmental devices`}
-                        note="Leak, gas, cold-chain, and environmental sensors"
-                    />
-                    <Metric
-                        icon={<Building2 className="h-5 w-5" />}
-                        value={overview.inventory.building_systems}
-                        label={`${overview.inventory.building_systems} building systems`}
-                        note="Mechanical, access, and safety equipment"
-                    />
-                    <Metric
-                        icon={<Zap className="h-5 w-5" />}
-                        value={overview.inventory.utilities}
-                        label={`${overview.inventory.utilities} utilities`}
-                        note="Metering and utility-service devices"
-                    />
-                    <Metric
-                        icon={<CloudCog className="h-5 w-5" />}
-                        value={overview.inventory.automations}
-                        label={`${overview.inventory.automations} automations`}
-                        note="Explicit execution evidence only"
-                    />
-                    <Metric
-                        icon={<AlertTriangle className="h-5 w-5" />}
-                        value={
-                            overview.attention.devices +
-                            overview.attention.monitoring
-                        }
-                        label="Technical attention"
-                        note={`${overview.attention.unmonitored} unmonitored · ${overview.attention.stale} stale`}
-                    />
+                <div className="grid gap-5 xl:grid-cols-2">
+                    <ReviewCard icon={Gauge} title="Equipment and coverage">
+                        <Metric
+                            icon={<Gauge className="h-5 w-5" />}
+                            value={overview.inventory.devices}
+                            label={`${overview.inventory.devices} facility devices`}
+                            note={`${overview.inventory.sites} authorised sites`}
+                        />
+                        <Metric
+                            icon={<Thermometer className="h-5 w-5" />}
+                            value={overview.inventory.environment}
+                            label={`${overview.inventory.environment} environmental devices`}
+                            note="Leak, gas, cold-chain, and environmental sensors"
+                        />
+                        <Metric
+                            icon={<Building2 className="h-5 w-5" />}
+                            value={overview.inventory.building_systems}
+                            label={`${overview.inventory.building_systems} building systems`}
+                            note="Mechanical, access, and safety equipment"
+                        />
+                    </ReviewCard>
+                    <ReviewCard icon={Zap} title="Services and attention">
+                        <Metric
+                            icon={<Zap className="h-5 w-5" />}
+                            value={overview.inventory.utilities}
+                            label={`${overview.inventory.utilities} utilities`}
+                            note="Metering and utility-service devices"
+                        />
+                        <Metric
+                            icon={<CloudCog className="h-5 w-5" />}
+                            value={overview.inventory.automations}
+                            label={`${overview.inventory.automations} automations`}
+                            note="Explicit execution evidence only"
+                        />
+                        <Metric
+                            icon={<AlertTriangle className="h-5 w-5" />}
+                            value={
+                                overview.attention.devices +
+                                overview.attention.monitoring
+                            }
+                            label="Technical attention"
+                            note={`${overview.attention.unmonitored} unmonitored · ${overview.attention.stale} stale`}
+                        />
+                    </ReviewCard>
                 </div>
             </section>
 

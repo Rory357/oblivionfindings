@@ -19,6 +19,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * eMAR role baseline (1 Oct 2026): house leads (team_lead) hold the same
@@ -29,6 +30,7 @@ use Tests\TestCase;
 class TeamLeadMedicationBaselineTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private const MIGRATION = 'database/migrations/2026_10_01_100000_grant_team_lead_frontline_medication_keys.php';
 

@@ -1,0 +1,42 @@
+{
+  "reviewedAtUtc": "2026-10-12T16:29:11Z",
+  "finding": "HS-RUNNER-GUARDS-01",
+  "state": "SOURCE_REMEDIATION_CLOSED_ONLY; ACTUAL_RUNTIME_PROTOCOL_UNVERIFIED",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "runnerPath": "storage/logs/hs-overview-recovery-vitest-runner.ps1",
+  "runnerSha256": "3EC385D65B5F01FCB0FCA2586DB0B40C5F994515162A28F2A0DE24514CDF7634",
+  "receiptSha256": "C887D4951D60713BD53539F54049FEA1C775AA9A079C5B6CD44A18DAA4FC3304",
+  "resultsSha256": "231BE79351C685E0FC48B7F098A96EDCC07FA758AC7BA2D1061BF66D86343F31",
+  "casesSha256": "23D8E9DE3683B0E5923F1B4303746F85E380D060B45BA9F2EC88CC6D1491839A",
+  "classifierSha256": "19B90A2B70EF320A0FD639AA8752111A16E88513AC9FB98198AC84596D232DEC",
+  "originalConfigSha256": "3F6A75858E47EE67F81FCA4DA250264DE980F12F1325184F5A944BA6122AF367",
+  "independentReview": {
+    "completeRunnerAndClassifierSourceRead": true,
+    "selectedGuardConfigEvidencePinsMatched": 5,
+    "drift": 0,
+    "savedPureCases": 66,
+    "savedPureCasesPassed": 66,
+    "actualCaseDetails": 66,
+    "nonPassingCaseDetails": 0,
+    "savedPureCheckResourceProbes": 0,
+    "savedPureCheckTestChildren": 0,
+    "savedPureCheckMainInvocations": 0,
+    "sourceCaseMechanism": "Parses/extracts named pure helpers and the hash-pinned classifier; does not dot-source/invoke the runtime runner. Deadline callback compiled without invocation, Process instance or Timer.",
+    "controlsPresent": [
+      "Two fresh valid CPU/memory observations, CPU below85 and free memory at least4GiB, unsafe/missing evidence holds.",
+      "Complete observed process inventory with heavy-first pinned classification, individual child handling and unknown identities retained.",
+      "Zero-wait shared mutex with finally release; original config retained, one worker and bounded heaps.",
+      "Finite test deadline, retained-process .NET watchdog and ongoing resource checks.",
+      "Own process/retained child handles only for cleanup; stdout/stderr bounded drain and separate actual test/gate exits.",
+      "Before/after path-set and byte accounting, whole-file actual assertion counts, immutable prior run outputs."
+    ]
+  },
+  "actualRunState": "At the last saved-file inspection R5 input snapshot existed; no R5 admission/results completion evidence existed. Owner still active. No inference of launch success, safe cleanup or passing components.",
+  "remainingLimits": [
+    "Actual CIM/process ancestry/watchdog scheduling and cancellation/cleanup/pipe drain need the real finite-run receipt; pure helpers do not prove them.",
+    "Full input hashing cost and live resource timing remain unmeasured by coordinator.",
+    "Historical R4 result remains84/84 only for its saved candidate image. The66 guard cases are not application component tests and are not added to84.",
+    "Privacy-aware metrics/page-state/current authority work remains active. No backend/privacy/query/performance/browser/integration/full-Rory acceptance.",
+    "Coordinator performed no runtime/test/resource/process/browser probe or app-source edit. Other two chats unchanged; no restart."
+  ]
+}

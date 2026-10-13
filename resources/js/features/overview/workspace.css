@@ -1,69 +1,51 @@
-/* Mockup surfaces are scoped to the overview and its dialogs.
-   Brand accents and the shared page header inherit the app's selected colour. */
+/* Overview scope (DESIGN.md "Role overview pilot", approved by Stephan
+   13 Oct 2026). Light mode uses the app's own tokens. Two overview-only
+   choices remain, both in tokens and both candidates for the whole app:
+   the calm categorical chart palette, and the graphite dark palette.
+   Status colours always use the app's verified pairs. */
 .ov-workspace,
 .ov-dialog {
-    --background: #e0e0e3;
-    --card: #fff;
-    --foreground: #191a2a;
-    --card-foreground: #191a2a;
-    --muted-foreground: #595d70;
-    --border: #dfe0e8;
-    --muted: #f5f5f9;
-    --popover: #fff;
-    --ov-soft: color-mix(in oklch, var(--primary) 12%, var(--card));
+    --ov-soft: color-mix(in oklab, var(--primary) 12%, var(--card));
     --ov-brand-text: var(--primary-strong);
+    --ov-shadow: color-mix(in oklch, var(--foreground) 4%, transparent);
     --chart-1: var(--primary-strong);
-    --chart-2: #42a8a0;
-    --chart-3: #e4ae55;
-    --chart-4: #afb4c9;
-    --chart-5: #8096ba;
-    --status-critical-bg: #fbe9ee;
-    --status-critical-foreground: #9e3150;
-    --status-warning-bg: #fff3df;
-    --status-warning-foreground: #8d601c;
-    --status-success-bg: #e8f5ef;
-    --status-success-foreground: #267559;
-    /* Resolve utility colours inside this workspace, including shared status badges. */
-    --color-muted: var(--muted);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-border: var(--border);
-    --color-foreground: var(--foreground);
-    --color-status-warning: var(--status-warning-foreground);
-    --color-status-warning-bg: var(--status-warning-bg);
-    --color-status-critical: var(--status-critical-foreground);
-    --color-status-critical-bg: var(--status-critical-bg);
+    --chart-2: oklch(0.67 0.094 188);
+    --chart-3: oklch(0.784 0.123 78);
+    --chart-4: oklch(0.773 0.03 275);
+    --chart-5: oklch(0.669 0.059 260);
     color: var(--foreground);
-    font-family: Inter, 'Segoe UI', sans-serif;
 }
 .dark .ov-workspace,
 .dark .ov-dialog {
-    --background: #1c1d26;
-    --card: #272833;
-    --foreground: #f0f0f6;
-    --card-foreground: #f0f0f6;
-    --muted-foreground: #bec0cf;
-    --border: #3d3e4c;
-    --muted: #30313f;
-    --popover: #272833;
-    --ov-soft: color-mix(in oklch, var(--primary) 20%, var(--card));
+    --background: oklch(0.234 0.017 280);
+    --card: oklch(0.281 0.02 281);
+    --foreground: oklch(0.957 0.008 286);
+    --card-foreground: var(--foreground);
+    --muted-foreground: oklch(0.811 0.021 280);
+    --border: oklch(0.369 0.024 282);
+    --muted: oklch(0.318 0.025 282);
+    --popover: var(--card);
+    --ov-soft: color-mix(in oklab, var(--primary) 20%, var(--card));
     --ov-brand-text: oklch(from var(--primary) max(l, 0.76) min(c, 0.18) h);
     --chart-1: var(--ov-brand-text);
-    --chart-2: #63c8ba;
-    --chart-3: #e9bb6e;
-    --chart-4: #828ba9;
-    --chart-5: #9cb8e0;
-    --status-critical-bg: #4b2b36;
-    --status-critical-foreground: #ff9cb2;
-    --status-warning-bg: #443822;
-    --status-warning-foreground: #f1c279;
-    --status-success-bg: #253e36;
-    --status-success-foreground: #79d7b4;
-}
-main:has(.ov-workspace) {
-    background: #e0e0e3;
+    --chart-2: oklch(0.768 0.097 184);
+    --chart-3: oklch(0.817 0.109 79);
+    --chart-4: oklch(0.64 0.046 272);
+    --chart-5: oklch(0.776 0.065 257);
+    /* Utilities resolve their colour where the token is declared, so the
+       graphite neutrals are re-declared for utilities inside this scope. */
+    --color-background: var(--background);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--foreground);
+    --color-foreground: var(--foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-border: var(--border);
 }
 .dark main:has(.ov-workspace) {
-    background: #1c1d26;
+    background: oklch(0.234 0.017 280);
 }
 .ov-workspace {
     --ov-line: var(--border);
@@ -71,87 +53,23 @@ main:has(.ov-workspace) {
     min-width: 0;
     container: overview / inline-size;
 }
-.ov-workspace .eh-header {
-    border-radius: 16px 16px 0 0;
-}
-.ov-workspace .ov-role-chip {
-    color: #fff;
-    background: #ffffff1c;
-    border: 1px solid #ffffff20;
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 6px;
-}
-.ov-workspace .eh-meter {
-    min-height: 90px;
-    padding: 10px 12px;
-}
-.ov-workspace [data-slot='page-header-meters'] {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.ov-workspace [data-slot='page-header-meter-caption'] {
-    overflow: visible;
-    text-overflow: clip;
-    white-space: normal;
-    line-height: 1.45;
-}
 /* Respond to the space beside the sidebar, including a narrow desktop panel. */
 @container overview (max-width: 760px) {
-    .ov-workspace [data-slot='page-header-meters'] {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
     .ov-header-scope {
         display: none;
     }
 }
-@container overview (max-width: 340px) {
-    .ov-workspace [data-slot='page-header-meters'] {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-.ov-workspace .eh-meter-label {
-    letter-spacing: 0.25px;
-}
-.ov-workspace .eh-meter-big {
-    font-size: 24px;
-}
-.ov-workspace .eh-header button[aria-haspopup='dialog'] {
-    min-height: 36px;
-    padding: 0 12px;
-    font-weight: 500;
-    border-radius: 8px;
-    background: #ffffff0d;
-}
-.ov-workspace .eh-header div.inline-flex:has(> button[aria-haspopup='dialog']) {
-    height: 38px;
-    font-size: 12px;
-    border-color: #ffffff26;
-    box-shadow: 0 1px 2px #20133414;
-}
-.ov-workspace .eh-header button[aria-haspopup='dialog'] svg {
-    width: 14px;
-    height: 14px;
-}
-.ov-workspace .eh-header button[aria-haspopup='dialog'] {
-    gap: 8px;
-}
-.ov-workspace .eh-header [role='tab'][aria-selected='true'] {
-    background: var(--background);
-    color: var(--ov-brand-text);
-}
-.ov-workspace button,
-.ov-dialog button {
+/* Raw overview controls (drag handles, chart and library tiles) share one
+   focus ring; shared <Button>s keep their own. */
+:is(.ov-workspace, .ov-dialog) :is(button, a):not([data-slot='button']) {
     cursor: pointer;
 }
-.ov-workspace button:disabled,
-.ov-dialog button:disabled {
+:is(.ov-workspace, .ov-dialog) button:not([data-slot='button']):disabled {
     cursor: default;
     opacity: 0.5;
 }
-.ov-workspace button:focus-visible,
-.ov-dialog button:focus-visible,
-.ov-workspace a:focus-visible {
+:is(.ov-workspace, .ov-dialog)
+    :is(button, a):not([data-slot='button']):focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 3px;
 }
@@ -160,9 +78,8 @@ main:has(.ov-workspace) {
     gap: 7px;
     align-items: center;
     margin-right: auto;
-    color: var(--band-foreground);
-    opacity: 0.8;
-    font-size: 11px;
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
+    font-size: calc(11rem / 14);
 }
 .ov-urgent {
     display: flex;
@@ -175,21 +92,16 @@ main:has(.ov-workspace) {
     border-radius: 10px;
     padding: 11px 16px;
     margin-top: 20px;
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-urgent > span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.ov-urgent button {
+.ov-urgent > [data-slot='button'] {
     margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    white-space: nowrap;
-    min-height: 26px;
+    flex-shrink: 0;
 }
 .ov-unavailable {
     display: flex;
@@ -200,7 +112,7 @@ main:has(.ov-workspace) {
     background: var(--status-warning-bg);
     color: var(--status-warning-foreground);
     margin-top: 12px;
-    font-size: 13px;
+    font-size: calc(13rem / 14);
 }
 .ov-unavailable > span {
     flex: 1;
@@ -211,26 +123,28 @@ main:has(.ov-workspace) {
     gap: 18px;
     padding: 15px 2px;
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
 }
-.ov-context > span:first-child {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--foreground);
-}
-.ov-context button {
+.ov-context-refresh {
     display: flex;
     align-items: center;
     gap: 7px;
     margin-left: auto;
 }
-.ov-context button:before {
+.ov-context-refresh:before {
     content: '';
     width: 5px;
     height: 5px;
     border-radius: 50%;
     background: var(--status-success);
+}
+.ov-tool-button {
+    width: 30px;
+    height: 30px;
+    color: var(--muted-foreground);
+}
+.ov-tool-button[aria-pressed='true'] {
+    color: var(--ov-brand-text);
 }
 .ov-board {
     display: grid;
@@ -246,7 +160,7 @@ main:has(.ov-workspace) {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    box-shadow: 0 2px 5px #00000008;
+    box-shadow: 0 2px 5px var(--ov-shadow);
     overflow: hidden;
     min-width: 0;
     position: relative;
@@ -276,7 +190,7 @@ main:has(.ov-workspace) {
     min-width: 0;
 }
 .ov-card-head h2 {
-    font-size: 16px;
+    font-size: calc(16rem / 14);
     font-weight: 650;
     letter-spacing: -0.15px;
     margin: 0;
@@ -284,7 +198,7 @@ main:has(.ov-workspace) {
 }
 .ov-card-head p {
     color: var(--muted-foreground);
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     line-height: 1.5;
     margin: 5px 0 0;
     max-width: 70ch;
@@ -339,7 +253,7 @@ main:has(.ov-workspace) {
     justify-content: space-between;
     gap: 12px;
     margin-top: auto;
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     color: var(--muted-foreground);
 }
 .ov-card-foot > span {
@@ -359,12 +273,12 @@ main:has(.ov-workspace) {
     border-radius: 8px;
     background: var(--muted);
     text-align: center;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
 }
 .ov-day > b {
     display: block;
-    font-size: 19px;
+    font-size: calc(19rem / 14);
     font-weight: 600;
     margin: 5px 0 12px;
     color: var(--foreground);
@@ -378,11 +292,12 @@ main:has(.ov-workspace) {
     flex-direction: column;
     justify-content: center;
     min-height: 52px;
-    background: var(--primary);
-    color: #fff;
+    /* Text on a solid brand fill: the fill pair keeps 4.5:1 for any brand. */
+    background: var(--primary-fill);
+    color: var(--primary-fill-foreground);
     border-radius: 5px;
     padding: 5px 2px;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
 }
 .ov-shift-off {
     border: 1px dashed var(--border);
@@ -390,7 +305,7 @@ main:has(.ov-workspace) {
     color: var(--muted-foreground);
 }
 .ov-week .ov-chart-head small {
-    font-size: 14px;
+    font-size: calc(14rem / 14);
     font-weight: 500;
     letter-spacing: 0;
 }
@@ -399,7 +314,7 @@ main:has(.ov-workspace) {
     align-items: center;
     gap: 6px;
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     margin: 18px 0 4px;
 }
 .ov-shortcuts {
@@ -425,13 +340,13 @@ main:has(.ov-workspace) {
     color: var(--ov-brand-text);
 }
 .ov-shortcuts strong {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     display: block;
     font-weight: 600;
 }
 .ov-shortcuts small {
     display: block;
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
     margin-top: 4px;
     line-height: 1.6;
@@ -441,7 +356,7 @@ main:has(.ov-workspace) {
     align-items: center;
     gap: 6px;
     color: var(--ov-brand-text);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     font-weight: 600;
     flex-shrink: 0;
 }
@@ -456,28 +371,19 @@ main:has(.ov-workspace) {
     flex-shrink: 0;
 }
 .ov-icon-button:hover {
-    color: var(--primary);
+    color: var(--ov-brand-text);
     background: var(--muted);
 }
 .ov-fixed-scope {
     display: flex;
     align-items: center;
     gap: 5px;
-    color: var(--primary);
-    font-size: 10px;
+    color: var(--ov-brand-text);
+    font-size: calc(10.5rem / 14);
     padding: 8px 20px 0;
 }
-.ov-proposal {
-    font-size: 9px;
-    letter-spacing: 0.3px;
-    padding: 3px 6px;
-    border-radius: 5px;
-    background: var(--muted);
-    color: var(--muted-foreground);
-    white-space: nowrap;
-}
 .ov-eyebrow {
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     letter-spacing: 1px;
     font-weight: 650;
     color: var(--muted-foreground);
@@ -492,7 +398,7 @@ main:has(.ov-workspace) {
     text-align: center;
     gap: 10px;
     color: var(--muted-foreground);
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-empty-icon {
     display: grid;
@@ -501,10 +407,10 @@ main:has(.ov-workspace) {
     height: 42px;
     border-radius: 12px;
     background: var(--muted);
-    color: var(--primary);
+    color: var(--ov-brand-text);
 }
 .ov-empty strong {
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     color: var(--foreground);
     font-weight: 600;
 }
@@ -515,9 +421,6 @@ main:has(.ov-workspace) {
 }
 .ov-empty svg {
     flex-shrink: 0;
-}
-.ov-empty .text-caption {
-    font-size: 10px;
 }
 .ov-rows {
     display: flex;
@@ -536,7 +439,7 @@ main:has(.ov-workspace) {
     border-bottom: 0;
 }
 .ov-row:hover:where(a) {
-    background: color-mix(in oklch, var(--primary) 3%, var(--card));
+    background: color-mix(in oklab, var(--primary) 3%, var(--card));
 }
 .ov-row-mark {
     display: grid;
@@ -545,7 +448,7 @@ main:has(.ov-workspace) {
     height: 31px;
     border-radius: 9px;
     background: var(--ov-soft);
-    color: var(--primary);
+    color: var(--ov-brand-text);
     flex-shrink: 0;
 }
 .ov-row[data-tone='critical'] .ov-row-mark {
@@ -564,18 +467,18 @@ main:has(.ov-workspace) {
     min-width: 0;
 }
 .ov-row-copy strong {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     line-height: 1.4;
     font-weight: 600;
 }
 .ov-row-copy > span {
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
     line-height: 1.5;
 }
 .ov-row-value {
     font-variant-numeric: tabular-nums;
-    font-size: 16px;
+    font-size: calc(16rem / 14);
     line-height: 1;
     font-weight: 650;
 }
@@ -585,19 +488,6 @@ main:has(.ov-workspace) {
 }
 .ov-row [data-slot='badge'] {
     flex-shrink: 0;
-}
-.ov-attention .ov-row {
-    padding: 13px 0;
-}
-.ov-attention .ov-row:first-child[data-tone='critical'] {
-    padding: 14px;
-    border-left: 3px solid var(--status-critical-foreground);
-    background: var(--status-critical-bg);
-    border-radius: 10px;
-    margin-bottom: 3px;
-}
-.ov-attention .ov-row:first-child[data-tone='critical'] .ov-row-copy strong {
-    font-size: 14px;
 }
 .ov-date-tile {
     width: 37px;
@@ -611,11 +501,12 @@ main:has(.ov-workspace) {
 }
 .ov-date-tile b {
     display: block;
-    font-size: 15px;
+    font-size: calc(15rem / 14);
     font-weight: 650;
 }
 .ov-date-tile span {
-    font-size: 8px;
+    display: block;
+    font-size: calc(10.5rem / 14);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--muted-foreground);
@@ -627,29 +518,33 @@ main:has(.ov-workspace) {
     flex-direction: column;
     gap: 9px;
 }
-.ov-focus-chip {
-    color: var(--ov-brand-text);
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 6px;
-    border-radius: 5px;
-    background: var(--ov-soft);
-}
 .ov-focus-meta {
     display: flex;
     align-items: center;
     gap: 6px;
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     margin: 3px 0;
 }
 .ov-focus-number {
-    font-size: 25px;
+    font-size: calc(25rem / 14);
     line-height: 1.2;
     letter-spacing: -0.7px;
     font-weight: 650;
     color: var(--foreground);
     font-variant-numeric: tabular-nums;
+}
+.ov-focus-number.ov-focus-empty {
+    font-size: calc(19rem / 14);
+    letter-spacing: -0.3px;
+}
+.ov-block-skeleton {
+    display: grid;
+    gap: 10px;
+    padding: 4px 0 8px;
+}
+.ov-block-empty {
+    margin: 4px 0 6px;
 }
 .ov-coverage-head,
 .ov-coverage-head > span:first-child {
@@ -660,7 +555,7 @@ main:has(.ov-workspace) {
 .ov-coverage-head {
     justify-content: space-between;
     flex-wrap: wrap;
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
     margin-bottom: 16px;
 }
@@ -674,7 +569,7 @@ main:has(.ov-workspace) {
     table-layout: fixed;
     width: 100%;
     min-width: 500px;
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-coverage th {
     text-align: left;
@@ -686,7 +581,7 @@ main:has(.ov-workspace) {
 }
 .ov-coverage thead small {
     display: block;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     font-weight: 400;
     color: var(--muted-foreground);
     margin-top: 4px;
@@ -735,19 +630,19 @@ main:has(.ov-workspace) {
     border-color: var(--ov-brand-text);
 }
 .ov-coverage-cell strong {
-    font-size: 20px;
+    font-size: calc(20rem / 14);
     font-variant-numeric: tabular-nums;
 }
 .ov-coverage-cell em {
     color: var(--muted-foreground);
     font-style: normal;
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     font-weight: 400;
 }
 .ov-coverage-cell small,
 .ov-coverage-missing,
 .ov-cover-time {
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
     line-height: 1.4;
 }
@@ -775,7 +670,7 @@ main:has(.ov-workspace) {
 }
 .ov-coverage-note {
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     line-height: 1.6;
     margin-top: 12px;
 }
@@ -783,7 +678,7 @@ main:has(.ov-workspace) {
     margin-bottom: 15px;
 }
 .ov-pipeline .ov-chart-head small {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     font-weight: 400;
     color: var(--muted-foreground);
     letter-spacing: 0;
@@ -794,7 +689,7 @@ main:has(.ov-workspace) {
     align-items: center;
     gap: 12px;
     padding: 10px 0;
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-pipeline-stage {
     display: flex;
@@ -803,7 +698,7 @@ main:has(.ov-workspace) {
 }
 .ov-pipeline-stage i {
     font-style: normal;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
     background: var(--muted);
     width: 24px;
@@ -855,23 +750,6 @@ main:has(.ov-workspace) {
     align-items: center;
     gap: 14px;
 }
-.ov-duty-avatars {
-    display: flex;
-    padding-left: 5px;
-}
-.ov-duty-avatars > span {
-    width: 28px;
-    height: 28px;
-    border: 2px solid var(--card);
-    border-radius: 50%;
-    background: var(--ov-soft);
-    color: var(--ov-brand-text);
-    display: grid;
-    place-items: center;
-    margin-left: -5px;
-    font-size: 10px;
-    font-weight: 600;
-}
 .ov-team-head,
 .ov-team-row {
     display: grid;
@@ -881,7 +759,7 @@ main:has(.ov-workspace) {
 }
 .ov-team-head {
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
 }
@@ -920,11 +798,11 @@ main:has(.ov-workspace) {
     color: var(--ov-brand-text);
 }
 .ov-team-row strong {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     font-weight: 600;
 }
 .ov-team-row small {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
 }
 .ov-team-row [data-tone='warning'] {
@@ -948,7 +826,7 @@ main:has(.ov-workspace) {
 }
 .ov-card[data-span='4'] .ov-team-mobile-label {
     display: block;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
 }
 .ov-review-queue {
@@ -964,54 +842,22 @@ main:has(.ov-workspace) {
 }
 .ov-review-queue-heading span,
 .ov-review-queue > p {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     color: var(--muted-foreground);
 }
 .ov-focus h3 {
-    font-size: 14px;
+    font-size: calc(14rem / 14);
     font-weight: 600;
     margin: 0;
 }
 .ov-focus p {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     color: var(--muted-foreground);
     margin: 0;
     line-height: 1.7;
 }
-.ov-focus-note {
-    border-top: 1px solid var(--border);
-    padding: 12px 0 0;
+.ov-focus-action {
     margin-top: 6px;
-    font-size: 11px;
-    line-height: 1.7;
-    color: var(--muted-foreground);
-    width: 100%;
-    display: none;
-    gap: 8px;
-}
-.ov-focus-note svg {
-    flex-shrink: 0;
-    margin-top: 3px;
-    color: var(--ov-brand-text);
-}
-.ov-focus-link {
-    font-size: 12px;
-    font-weight: 600;
-    color: #fff;
-    background: linear-gradient(
-        135deg,
-        var(--primary-fill),
-        oklch(from var(--primary-fill) calc(l * 0.9) c h)
-    );
-    border: 1px solid #ffffff20;
-    border-radius: 7px;
-    padding: 8px 12px;
-    box-shadow: 0 3px 9px color-mix(in oklch, var(--primary) 11%, transparent);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 6px;
-    min-height: 34px;
 }
 .ov-chart-head {
     display: flex;
@@ -1020,14 +866,14 @@ main:has(.ov-workspace) {
     margin: 2px 0 4px;
 }
 .ov-chart-head strong {
-    font-size: 27px;
+    font-size: calc(27rem / 14);
     line-height: 1.3;
     font-weight: 650;
     font-variant-numeric: tabular-nums;
     letter-spacing: -1px;
 }
 .ov-chart-head span {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
 }
 .ov-area {
@@ -1038,7 +884,7 @@ main:has(.ov-workspace) {
 .ov-chart-legend {
     display: flex;
     gap: 16px;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
     margin: 12px 0 5px;
 }
@@ -1051,25 +897,23 @@ main:has(.ov-workspace) {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 11px;
-    color: #eee5f6cc;
+    font-size: calc(11rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
 }
 .ov-meter-no-data > span {
     width: 34px;
     height: 34px;
-    border: 4px solid #ffffff26;
+    border: 4px solid
+        color-mix(in oklch, var(--band-foreground) 15%, transparent);
     border-radius: 50%;
     display: grid;
     place-items: center;
-}
-.ov-workspace .eh-meter-bar {
-    margin: 16px 0 10px;
 }
 .ov-focus-facts {
     display: grid;
     gap: 9px;
     color: var(--muted-foreground);
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     margin: 14px 0;
 }
 .ov-focus-facts > span {
@@ -1077,25 +921,30 @@ main:has(.ov-workspace) {
     align-items: center;
     gap: 7px;
 }
-.ov-focus:has(.ov-focus-facts) .ov-focus-note {
-    display: none;
-}
 .ov-context .ov-context-priorities {
-    margin-left: 0;
+    display: flex;
+    align-items: center;
     margin-right: auto;
     color: var(--foreground);
     gap: 7px;
 }
-.ov-context .ov-context-priorities:before {
-    display: none;
+span.ov-context-priorities > svg {
+    color: var(--status-success-foreground);
 }
 .ov-context .ov-context-priorities + span {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
 }
 .ov-priority {
     display: block;
-    padding: 14px 0;
+    padding: 11px 0;
     border-bottom: 1px solid var(--border);
+}
+.ov-also-heading {
+    margin: 4px 0 -4px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font-size: calc(11rem / 14);
 }
 .ov-priority:last-child {
     border-bottom: 0;
@@ -1108,17 +957,17 @@ main:has(.ov-workspace) {
 }
 .ov-priority-featured[data-tone='critical'] {
     background: var(--status-critical-bg);
-    border-left-color: var(--status-critical-foreground);
+    border-left-color: var(--status-critical);
 }
 .ov-priority-featured[data-tone='warning'] {
     background: var(--status-warning-bg);
-    border-left-color: var(--status-warning-foreground);
+    border-left-color: var(--status-warning);
 }
 .ov-priority-eyebrow {
     display: flex;
     justify-content: space-between;
     gap: 10px;
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     margin-bottom: 8px;
     color: var(--ov-brand-text);
 }
@@ -1144,13 +993,13 @@ main:has(.ov-workspace) {
 }
 .ov-priority-copy strong {
     display: block;
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     line-height: 1.4;
     font-weight: 600;
 }
 .ov-priority-copy small {
     display: block;
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     line-height: 1.5;
     margin-top: 4px;
     color: var(--muted-foreground);
@@ -1160,7 +1009,7 @@ main:has(.ov-workspace) {
     align-items: center;
     gap: 7px;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--ov-brand-text);
 }
 .ov-priority-featured .ov-priority-action {
@@ -1174,41 +1023,28 @@ main:has(.ov-workspace) {
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
+    /* Sit on the title's first line, as in the approved mockup. */
+    align-self: flex-start;
+    margin-top: 0.5em;
     background: var(--muted-foreground);
 }
 .ov-priority[data-tone='warning'] .ov-priority-dot {
-    background: var(--status-warning-foreground);
+    background: var(--status-warning);
 }
 .ov-priority[data-tone='critical'] .ov-priority-dot {
-    background: var(--status-critical-foreground);
+    background: var(--status-critical);
 }
 .ov-chart-legend > small {
     margin-left: auto;
-    font-size: 11px;
+    font-size: calc(11rem / 14);
 }
-.ov-chart-inspector > div {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin: 6px 0;
-}
-.ov-chart-inspector button {
-    flex: 1;
-    min-height: 30px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    color: var(--muted-foreground);
-    font-size: 11px;
-}
-.ov-chart-inspector button[aria-pressed='true'] {
-    background: var(--ov-soft);
-    border-color: var(--ov-brand-text);
-    color: var(--ov-brand-text);
+.ov-chart-pick {
+    cursor: pointer;
 }
 .ov-chart-inspector p {
     min-height: 18px;
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     margin: 7px 0 2px;
 }
 .ov-delivery-labels {
@@ -1216,7 +1052,7 @@ main:has(.ov-workspace) {
     justify-content: space-between;
     gap: 12px;
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     padding: 4px 0 10px;
 }
 .ov-delivery-sites {
@@ -1236,13 +1072,13 @@ main:has(.ov-workspace) {
     min-width: 0;
 }
 .ov-delivery-name strong {
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     font-weight: 600;
     display: block;
 }
 .ov-delivery-name small,
 .ov-delivery-percent small {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     display: block;
     color: var(--muted-foreground);
     margin-top: 4px;
@@ -1252,13 +1088,13 @@ main:has(.ov-workspace) {
     text-align: right;
 }
 .ov-delivery-percent b {
-    font-size: 25px;
+    font-size: calc(25rem / 14);
     font-weight: 650;
     letter-spacing: -1px;
     font-variant-numeric: tabular-nums;
 }
 .ov-delivery-percent em {
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     font-style: normal;
     letter-spacing: 0;
     margin-left: 2px;
@@ -1280,7 +1116,7 @@ main:has(.ov-workspace) {
     padding-top: 12px;
     border-top: 1px solid var(--border);
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
 }
 @media (max-width: 620px) {
     .ov-priority-main {
@@ -1308,7 +1144,7 @@ main:has(.ov-workspace) {
     border-radius: 2px;
 }
 .ov-chart-empty {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
     line-height: 1.7;
 }
@@ -1319,7 +1155,7 @@ main:has(.ov-workspace) {
     margin-top: 10px;
     gap: 12px;
     color: var(--muted-foreground);
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
 }
 .ov-breakdown-total a {
     display: inline-flex;
@@ -1331,7 +1167,7 @@ main:has(.ov-workspace) {
 .ov-data-table {
     margin-top: 6px;
     color: var(--muted-foreground);
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
 }
 .ov-data-table summary {
     cursor: pointer;
@@ -1377,14 +1213,14 @@ main:has(.ov-workspace) {
     gap: 2px;
 }
 .ov-donut strong {
-    font-size: 30px;
+    font-size: calc(30rem / 14);
     font-weight: 650;
     letter-spacing: -1px;
     line-height: 1.3;
     font-variant-numeric: tabular-nums;
 }
 .ov-donut span {
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
     max-width: 88px;
     text-align: center;
@@ -1400,7 +1236,7 @@ main:has(.ov-workspace) {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11px;
+    font-size: calc(11rem / 14);
 }
 .ov-legend i {
     width: 7px;
@@ -1443,7 +1279,7 @@ main:has(.ov-workspace) {
     background: var(--ov-soft);
     border-radius: 9px;
     color: var(--ov-brand-text);
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     font-weight: 650;
     flex-shrink: 0;
 }
@@ -1454,7 +1290,7 @@ main:has(.ov-workspace) {
 .ov-site-content small {
     display: block;
     color: var(--muted-foreground);
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     margin-top: 5px;
 }
 .ov-between {
@@ -1464,11 +1300,11 @@ main:has(.ov-workspace) {
     gap: 12px;
 }
 .ov-bars strong {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     font-weight: 550;
 }
 .ov-bars b {
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     font-variant-numeric: tabular-nums;
 }
 .ov-track {
@@ -1490,26 +1326,53 @@ main:has(.ov-workspace) {
     align-items: center;
     margin-top: 20px;
     color: var(--muted-foreground);
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     line-height: 1.5;
 }
-.ov-footer button {
-    color: var(--primary);
-    min-height: 28px;
-}
-.ov-text-button {
+.ov-default-note {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
-    min-height: 30px;
-    color: var(--muted-foreground);
-    border-radius: 7px;
-    padding: 0 6px;
 }
-.ov-text-button:hover {
-    background: var(--muted);
-    color: var(--foreground);
+.ov-filter-count {
+    font-size: calc(10.5rem / 14);
+    opacity: 0.75;
+}
+.ov-available-only {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ov-sketch {
+    width: 120px;
+    height: 64px;
+    flex-shrink: 0;
+}
+.ov-sketch :is(.ov-sketch-track, .ov-sketch-line) {
+    fill: none;
+    stroke-width: 6;
+}
+.ov-sketch .ov-sketch-track {
+    stroke: var(--muted);
+}
+.ov-sketch .ov-sketch-line {
+    stroke: color-mix(in oklch, var(--chart-1) 55%, transparent);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.ov-sketch[data-kind='trend'] .ov-sketch-line {
+    stroke-width: 3;
+}
+.ov-sketch .ov-sketch-grid {
+    stroke: var(--border);
+    stroke-dasharray: 3 5;
+}
+.ov-sketch .ov-sketch-bar {
+    fill: color-mix(in oklch, var(--chart-1) 45%, transparent);
+}
+.ov-sketch .ov-sketch-track-fill {
+    fill: var(--muted);
 }
 .ov-editor-toolbar {
     margin-top: 20px;
@@ -1525,12 +1388,12 @@ main:has(.ov-workspace) {
     gap: 20px;
 }
 .ov-editor-top h2 {
-    font-size: 17px;
+    font-size: calc(17rem / 14);
     font-weight: 650;
     margin-top: 3px;
 }
 .ov-editor-top p {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
     margin-top: 5px;
 }
@@ -1549,27 +1412,12 @@ main:has(.ov-workspace) {
     border-top: 1px solid var(--border);
 }
 .ov-editor-secondary > span {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
     margin-right: auto;
 }
-.ov-density {
-    display: flex;
-    gap: 2px;
-    background: var(--muted);
-    border-radius: 7px;
-    padding: 3px;
-}
-.ov-density button {
-    font-size: 10px;
-    padding: 5px 8px;
-    border-radius: 5px;
-    color: var(--muted-foreground);
-}
-.ov-density button[aria-pressed='true'] {
-    background: var(--card);
-    color: var(--primary);
-    box-shadow: 0 1px 3px color-mix(in oklch, var(--foreground) 8%, transparent);
+.ov-density [data-state='on'] {
+    color: var(--ov-brand-text);
 }
 .ov-editor-stage {
     height: 520px;
@@ -1603,7 +1451,7 @@ main:has(.ov-workspace) {
     border-radius: 12px 12px 0 0;
 }
 .ov-block-tools > span {
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
     margin-right: auto;
 }
@@ -1626,12 +1474,12 @@ main:has(.ov-workspace) {
     padding: 10px 28px 10px 14px;
 }
 .ov-block-bottom > span {
-    font-size: 9px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
 }
 .ov-scope-select {
     max-width: 190px;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     height: 30px;
 }
 .ov-resize {
@@ -1643,7 +1491,7 @@ main:has(.ov-workspace) {
     display: grid;
     place-items: center;
     cursor: nwse-resize !important;
-    color: var(--primary);
+    color: var(--ov-brand-text);
     touch-action: none;
     border-radius: 5px;
 }
@@ -1660,14 +1508,14 @@ main:has(.ov-workspace) {
     justify-content: center;
     flex-direction: column;
     gap: 12px;
-    color: var(--primary);
+    color: var(--ov-brand-text);
     background: color-mix(in oklch, var(--card) 75%, transparent);
 }
 .ov-add-tile strong {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-add-tile span {
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
 }
 .ov-save-error {
@@ -1676,7 +1524,7 @@ main:has(.ov-workspace) {
     border-radius: 8px;
     background: var(--status-critical-bg);
     color: var(--status-critical-foreground);
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-board-empty {
     padding: 50px;
@@ -1688,12 +1536,12 @@ main:has(.ov-workspace) {
     border-radius: 12px;
 }
 .ov-board-empty h2 {
-    font-size: 17px;
+    font-size: calc(17rem / 14);
     font-weight: 600;
 }
 .ov-board-empty p {
     color: var(--muted-foreground);
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-workspace[data-density='compact'] .ov-row {
     padding: 10px 0;
@@ -1711,24 +1559,19 @@ main:has(.ov-workspace) {
 .ov-workspace[data-density='compact'] .ov-empty {
     min-height: 96px;
 }
+/* Width comes from the popup guide's inline style tokens. */
 .ov-dialog {
-    width: min(780px, calc(100vw - 40px));
-    max-width: 780px !important;
-    max-height: 88vh;
+    max-height: 90vh;
     overflow-y: auto;
     overflow-x: hidden;
     gap: 20px;
-    border-radius: 16px !important;
-    padding: 28px !important;
 }
 .ov-library-dialog {
-    width: min(1000px, calc(100vw - 40px));
-    max-width: 1000px !important;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
-.ov-library-dialog > :not(.ov-library-grid):not(.ov-large-preview) {
+.ov-library-dialog > :not(.ov-library-grid) {
     flex-shrink: 0;
 }
 .ov-library-toolbar {
@@ -1755,34 +1598,6 @@ main:has(.ov-workspace) {
     align-items: center;
     gap: 5px;
     flex-wrap: wrap;
-}
-.ov-library-filters button {
-    font-size: 11px;
-    color: var(--muted-foreground);
-    padding: 7px 10px;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-.ov-library-filters button[aria-pressed='true'] {
-    background: color-mix(in oklch, var(--primary) 10%, var(--card));
-    color: var(--primary);
-}
-.ov-library-filters button > span {
-    font-size: 9px;
-    opacity: 0.75;
-}
-.ov-library-filters label {
-    margin-left: auto;
-    display: flex;
-    gap: 7px;
-    align-items: center;
-    font-size: 10px;
-    color: var(--muted-foreground);
-}
-.ov-library-filters input {
-    accent-color: var(--primary);
 }
 .ov-library-grid {
     display: grid;
@@ -1812,7 +1627,7 @@ main:has(.ov-workspace) {
     justify-content: space-between;
 }
 .ov-library-card-top button[aria-pressed='true'] {
-    color: var(--primary);
+    color: var(--ov-brand-text);
 }
 .ov-preview-thumb {
     height: 98px;
@@ -1821,26 +1636,26 @@ main:has(.ov-workspace) {
     background: linear-gradient(
         145deg,
         var(--background),
-        color-mix(in oklch, var(--primary) 5%, var(--card))
+        color-mix(in oklab, var(--primary) 5%, var(--card))
     );
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 15px;
     padding: 12px;
-    color: var(--primary);
+    color: var(--ov-brand-text);
     text-align: left;
     overflow: hidden;
 }
 .ov-preview-thumb strong {
-    font-size: 28px;
+    font-size: calc(28rem / 14);
     font-weight: 600;
 }
 .ov-preview-thumb > span {
     display: flex;
     flex-direction: column;
     gap: 7px;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
     min-width: 0;
 }
@@ -1854,12 +1669,12 @@ main:has(.ov-workspace) {
     white-space: nowrap;
 }
 .ov-library-card h3 {
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     font-weight: 650;
     margin: 0;
 }
 .ov-library-card > p {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
     line-height: 1.6;
     flex: 1;
@@ -1870,9 +1685,6 @@ main:has(.ov-workspace) {
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-}
-.ov-library-card-footer button {
-    font-size: 11px;
 }
 .ov-full-preview {
     border: 1px solid var(--border);
@@ -1885,7 +1697,7 @@ main:has(.ov-workspace) {
     padding: 16px;
     background: var(--muted);
     border-radius: 10px;
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-next-note p {
     color: var(--muted-foreground);
@@ -1906,7 +1718,7 @@ main:has(.ov-workspace) {
     border-radius: 12px;
 }
 .ov-starter-icon {
-    color: var(--primary);
+    color: var(--ov-brand-text);
     width: 28px;
     flex-shrink: 0;
     margin-top: 8px;
@@ -1915,19 +1727,15 @@ main:has(.ov-workspace) {
     flex: 1;
 }
 .ov-starters h3 {
-    font-size: 15px;
+    font-size: calc(15rem / 14);
     font-weight: 650;
     margin-top: 5px;
 }
 .ov-starters p {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
     margin-top: 7px;
     line-height: 1.7;
-}
-.ov-starters article > button {
-    font-size: 11px;
-    align-self: center;
 }
 .ov-starter-tags {
     display: flex;
@@ -1939,7 +1747,7 @@ main:has(.ov-workspace) {
     background: var(--muted);
     border-radius: 5px;
     padding: 5px 7px;
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
 }
 .ov-saved-list {
@@ -1956,14 +1764,14 @@ main:has(.ov-workspace) {
     padding: 15px;
 }
 .ov-saved-list article > svg {
-    color: var(--primary);
+    color: var(--ov-brand-text);
 }
 .ov-saved-list article > div {
     flex: 1;
-    font-size: 13px;
+    font-size: calc(13rem / 14);
 }
 .ov-saved-list p {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
     margin-top: 4px;
 }
@@ -1973,7 +1781,7 @@ main:has(.ov-workspace) {
     gap: 10px;
 }
 .ov-save-copy label {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     font-weight: 600;
 }
 .ov-save-copy > div {
@@ -1981,7 +1789,7 @@ main:has(.ov-workspace) {
     gap: 10px;
 }
 .ov-save-copy p {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
     color: var(--status-critical);
 }
 .ov-find-results {
@@ -1999,7 +1807,7 @@ main:has(.ov-workspace) {
     padding: 14px;
     border-radius: 8px;
     background: var(--muted);
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-find-results > button > span,
 .ov-find-urgent > strong {
@@ -2010,18 +1818,14 @@ main:has(.ov-workspace) {
     background: var(--status-warning-bg);
     color: var(--status-warning-foreground);
 }
+.ov-find-urgent[data-tone='critical'] {
+    background: var(--status-critical-bg);
+    color: var(--status-critical-foreground);
+}
 .ov-find-urgent a {
     display: flex;
     gap: 6px;
     align-items: center;
-}
-.ov-loading {
-    animation: ov-spin 1s linear infinite;
-}
-@keyframes ov-spin {
-    to {
-        transform: rotate(360deg);
-    }
 }
 @media (min-width: 1500px) {
     .ov-distribution {
@@ -2084,9 +1888,6 @@ main:has(.ov-workspace) {
     .ov-urgent > span {
         display: none;
     }
-    .ov-urgent button {
-        min-height: 44px;
-    }
     .ov-context {
         flex-wrap: wrap;
         gap: 10px;
@@ -2096,9 +1897,6 @@ main:has(.ov-workspace) {
     }
     .ov-starters article {
         flex-wrap: wrap;
-    }
-    .ov-starters article > button {
-        margin-left: 44px;
     }
     .ov-dialog {
         padding: 20px !important;
@@ -2121,15 +1919,10 @@ main:has(.ov-workspace) {
     .ov-block-bottom > span {
         display: none;
     }
-    .ov-workspace[data-role='worker'] .ov-text-button,
     .ov-workspace[data-role='worker'] .ov-icon-button,
-    .ov-workspace[data-role='worker'] .ov-footer button,
-    .ov-workspace[data-role='worker'] .ov-context button {
+    .ov-workspace[data-role='worker'] .ov-context-refresh {
         min-height: 44px;
         min-width: 44px;
-    }
-    .ov-library-card-footer button {
-        min-height: 44px;
     }
     .ov-add-tile {
         min-height: 160px;
@@ -2140,7 +1933,7 @@ main:has(.ov-workspace) {
     }
     .ov-header-scope {
         width: 100%;
-        font-size: 10px;
+        font-size: calc(10.5rem / 14);
     }
 }
 .ov-assurance-columns {
@@ -2160,7 +1953,7 @@ main:has(.ov-workspace) {
     margin-bottom: 12px;
 }
 .ov-section-heading strong {
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-section-heading span,
 .ov-assurance-item span,
@@ -2168,7 +1961,7 @@ main:has(.ov-workspace) {
 .ov-service-tile small,
 .ov-priority-row > div:last-child > span {
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     line-height: 1.5;
 }
 .ov-assurance-item {
@@ -2192,7 +1985,7 @@ main:has(.ov-workspace) {
 .ov-assurance-item strong,
 .ov-service-tile strong,
 .ov-priority-row strong {
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     font-weight: 600;
     line-height: 1.5;
     overflow-wrap: anywhere;
@@ -2200,22 +1993,6 @@ main:has(.ov-workspace) {
 .ov-assurance-item svg,
 .ov-service-tile svg {
     color: var(--muted-foreground);
-}
-.ov-assurance-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    min-height: 170px;
-    text-align: center;
-    color: var(--muted-foreground);
-    padding: 16px;
-    font-size: 12px;
-}
-.ov-assurance-empty strong {
-    color: var(--foreground);
-    font-size: 13px;
 }
 .ov-service-grid {
     display: grid;
@@ -2257,14 +2034,14 @@ main:has(.ov-workspace) {
     padding: 8px 12px;
     border: 1px solid var(--border);
     border-radius: 10px;
-    font-size: 12px;
+    font-size: calc(12rem / 14);
 }
 .ov-connection-legend {
     display: flex;
     flex-wrap: wrap;
     gap: 8px 14px;
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: calc(11rem / 14);
 }
 .ov-connection-legend span {
     display: inline-flex;
@@ -2278,13 +2055,13 @@ main:has(.ov-workspace) {
     background: var(--muted-foreground);
 }
 .ov-connection-legend [data-state='healthy'] {
-    background: var(--status-success-foreground);
+    background: var(--status-success);
 }
 .ov-connection-legend [data-state='degraded'] {
-    background: var(--status-warning-foreground);
+    background: var(--status-warning);
 }
 .ov-connection-legend [data-state='failed'] {
-    background: var(--status-critical-foreground);
+    background: var(--status-critical);
 }
 .ov-connection-history {
     display: grid;
@@ -2301,17 +2078,17 @@ main:has(.ov-workspace) {
     opacity: 0.32;
 }
 .ov-connection-history [data-state='healthy'] {
-    background: var(--status-success-foreground);
+    background: var(--status-success);
     border-color: transparent;
     opacity: 1;
 }
 .ov-connection-history [data-state='degraded'] {
-    background: var(--status-warning-foreground);
+    background: var(--status-warning);
     border-color: transparent;
     opacity: 1;
 }
 .ov-connection-history [data-state='failed'] {
-    background: var(--status-critical-foreground);
+    background: var(--status-critical);
     border-color: transparent;
     opacity: 1;
 }
@@ -2321,7 +2098,7 @@ main:has(.ov-workspace) {
     gap: 12px;
     width: 100%;
     color: var(--muted-foreground);
-    font-size: 10px;
+    font-size: calc(10.5rem / 14);
 }
 .ov-health-dot {
     width: 9px;
@@ -2330,10 +2107,10 @@ main:has(.ov-workspace) {
     background: var(--muted-foreground);
 }
 .ov-health-dot.warning {
-    background: var(--status-warning-foreground);
+    background: var(--status-warning);
 }
 .ov-health-dot.critical {
-    background: var(--status-critical-foreground);
+    background: var(--status-critical);
 }
 .ov-priorities {
     display: flex;
@@ -2364,7 +2141,7 @@ main:has(.ov-workspace) {
     height: 100%;
 }
 .ov-priority-ring b {
-    font-size: 16px;
+    font-size: calc(16rem / 14);
 }
 .ov-priority-copy {
     flex: 1;
@@ -2375,7 +2152,7 @@ main:has(.ov-workspace) {
     gap: 7px;
 }
 .ov-priority-copy small {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
 }
 .ov-decision-alert {
@@ -2394,11 +2171,11 @@ main:has(.ov-workspace) {
     gap: 4px;
 }
 .ov-decisions strong {
-    font-size: 13px;
+    font-size: calc(13rem / 14);
     line-height: 1.5;
 }
 .ov-decisions small {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     line-height: 1.5;
 }
 .ov-decision-row {
@@ -2409,7 +2186,7 @@ main:has(.ov-workspace) {
     border-bottom: 1px solid var(--border);
 }
 .ov-decision-row > span:first-child {
-    font-size: 11px;
+    font-size: calc(11rem / 14);
     color: var(--muted-foreground);
 }
 .ov-decision-row > div {
@@ -2432,18 +2209,6 @@ main:has(.ov-workspace) {
 }
 .ov-priority-row:last-child {
     border-bottom: 0;
-}
-.ov-priority-track {
-    height: 7px;
-    background: var(--muted);
-    border-radius: 4px;
-    overflow: hidden;
-}
-.ov-priority-track span {
-    display: block;
-    height: 100%;
-    background: var(--chart-1);
-    border-radius: inherit;
 }
 .ov-assurance-item:focus-visible,
 .ov-service-tile:focus-visible,
@@ -2505,4 +2270,37 @@ main:has(.ov-workspace) {
 }
 .ov-progress-item progress::-moz-progress-bar {
     background: var(--primary);
+}
+.ov-detail-facts {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    border-top: 1px solid var(--border);
+}
+.ov-detail-facts > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: calc(13rem / 14);
+}
+.ov-detail-facts dt {
+    color: var(--muted-foreground);
+}
+.ov-detail-facts dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+}
+.ov-detail-history {
+    display: grid;
+    gap: 8px;
+    font-size: calc(12rem / 14);
+}
+:is(.ov-row, .ov-assurance-item, .ov-priority-row, .ov-service-tile, .ov-coverage-cell):is(button) {
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
 }

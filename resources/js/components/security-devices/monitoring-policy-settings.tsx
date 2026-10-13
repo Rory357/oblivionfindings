@@ -1,6 +1,14 @@
-import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EntityCard, EntityCardGrid } from '@/components/lists/entity-card';
+import {
+    EntityContextMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
+import { ListCaption } from '@/components/lists/list-caption';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
+import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -12,17 +20,63 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-    TabsContent,
-    TabsList,
-    TabsRoot,
-    TabsTrigger,
-} from '@/components/ui/tabs';
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+} from '@/components/wizard/shell';
+import {
+    formatDateTimeInZone,
+    timeOffsetInZone,
+    timeOffsetsInZone,
+    toDatetimeLocal,
+} from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
-import { Pencil, Plus, ShieldCheck } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import {
+    Activity,
+    Archive,
+    ArrowUpRight,
+    CalendarClock,
+    ClipboardCheck,
+    GitBranch,
+    Layers,
+    LayoutDashboard,
+    Pencil,
+    Plus,
+    ShieldCheck,
+} from 'lucide-react';
+import type { ReactElement, ReactNode } from 'react';
+import {
+    Children,
+    Fragment,
+    cloneElement,
+    isValidElement,
+    useEffect,
+    useId,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
+import {
+    maintenanceClockPreview,
+    type MaintenanceClockPreview,
+} from './maintenance-clock-preview';
+import type {
+    MaintenanceCommandReply,
+    MaintenanceCommandScope,
+} from './maintenance-command';
+import { useMaintenanceCommand } from './use-maintenance-command';
 
 type Option = { value: string; label: string };
 type SiteOption = { id: number; name: string };
@@ -95,6 +149,8 @@ type MaintenancePolicy = PolicyBase & {
     recurrence: string | null;
     recurrence_until: string | null;
     timezone: string;
+    dst_overlap?: 'reject' | 'earlier' | 'later';
+    dst_gap?: 'reject' | 'skip';
     status: string;
     reason: string;
 };
@@ -113,6 +169,7 @@ type RetentionPolicy = PolicyBase & {
 };
 
 export type MonitoringPolicyWorkspace = {
+    actor_id?: number;
     visible: boolean;
     can_manage: boolean;
     can_manage_application: boolean;
@@ -170,40 +227,92 @@ const endpoints: Record<Kind, string> = {
     retention: '/security-devices/settings/monitoring/retention',
 };
 
-function dateInput(value: unknown): string {
-    return typeof value === 'string' ? value.slice(0, 16) : '';
+function dateInput(value: unknown, timezone = 'Pacific/Auckland'): string {
+    return typeof value === 'string' ? toDatetimeLocal(value, timezone) : '';
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
+    const generated = useId();
+    let inputId: string | undefined;
+    const controls = Children.map(children, (child) => {
+        if (
+            !inputId &&
+            isValidElement(child) &&
+            [
+                Input,
+                Textarea,
+                SelectField,
+                'input',
+                'select',
+                'textarea',
+            ].includes(child.type as typeof Input)
+        ) {
+            const control = child as ReactElement<{ id?: string }>;
+            inputId = control.props.id ?? generated;
+            return cloneElement(control, { id: inputId });
+        }
+        return child;
+    });
     return (
         <div className="space-y-1.5">
-            <Label>{label}</Label>
-            {children}
+            <Label htmlFor={inputId}>{label}</Label>
+            {controls}
         </div>
     );
 }
 
 function SelectField({
+    id,
     value,
     onChange,
     children,
     disabled = false,
 }: {
+    id?: string;
     value: unknown;
     onChange: (value: string) => void;
     children: ReactNode;
     disabled?: boolean;
 }) {
+    const options = Children.toArray(children).filter(
+        isValidElement,
+    ) as ReactElement<{
+        value?: string | number;
+        disabled?: boolean;
+        children: ReactNode;
+    }>[];
     return (
-        <select
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            value={String(value ?? '')}
+        <Select
+            value={String(value ?? '') || '__empty__'}
             disabled={disabled}
-            onChange={(event) => onChange(event.target.value)}
+            onValueChange={(next) => onChange(next === '__empty__' ? '' : next)}
         >
-            {children}
-        </select>
+            <SelectTrigger id={id} className="w-full">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                {options.map((option, index) => (
+                    <SelectItem
+                        key={String(option.props.value ?? index)}
+                        value={String(option.props.value ?? '') || '__empty__'}
+                        disabled={option.props.disabled}
+                    >
+                        {option.props.children}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
     );
+}
+
+function summaryParts(node: ReactNode): ReactNode[] {
+    if (Array.isArray(node)) return node.flatMap(summaryParts);
+    if (
+        isValidElement<{ children?: ReactNode }>(node) &&
+        node.type === Fragment
+    )
+        return Children.toArray(node.props.children).flatMap(summaryParts);
+    return [node];
 }
 
 function RecordCard({
@@ -223,56 +332,143 @@ function RecordCard({
     onDeactivate?: () => void;
     lifecycleLabel?: string;
 }) {
+    const context = useEntityContextMenu<string>();
+    const parts = summaryParts(summary);
+    const breakAt = parts.findIndex(
+        (part) => isValidElement(part) && part.type === 'br',
+    );
+    const subline = breakAt < 0 ? summary : <>{parts.slice(0, breakAt)}</>;
+    const facts =
+        breakAt < 0
+            ? null
+            : parts
+                  .slice(breakAt + 1)
+                  .map((part) =>
+                      isValidElement(part) && part.type === 'br' ? ' · ' : part,
+                  );
+    const actions: MenuItem[] = [];
+    if (canManage && onEdit)
+        actions.push({ label: 'Edit', icon: Pencil, onClick: onEdit });
+    if (canManage && onDeactivate)
+        actions.push({
+            label: lifecycleLabel,
+            onClick: onDeactivate,
+            danger: lifecycleLabel !== 'Reactivate',
+        });
     return (
-        <article className="rounded-xl border p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <strong>{title}</strong>
-                        <Badge variant="outline">
-                            {state.replaceAll('_', ' ')}
-                        </Badge>
-                    </div>
-                    <div className="mt-2 text-sm text-muted-foreground">
-                        {summary}
-                    </div>
-                </div>
-                {canManage ? (
-                    <div className="flex gap-2">
-                        {onEdit ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={onEdit}
-                            >
-                                <Pencil /> Edit
-                            </Button>
+        <>
+            <EntityCard
+                meridian="neutral"
+                icon={ShieldCheck}
+                name={title}
+                subline={subline}
+                chips={
+                    <>
+                        <StatusBadge status={state} />
+                        {facts ? (
+                            <span className="text-caption">{facts}</span>
                         ) : null}
-                        {onDeactivate ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={onDeactivate}
-                            >
-                                {lifecycleLabel}
-                            </Button>
-                        ) : null}
-                    </div>
-                ) : null}
-            </div>
-        </article>
+                    </>
+                }
+                actions={actions}
+                onOpen={canManage ? onEdit : undefined}
+                onContextMenu={
+                    actions.length
+                        ? (event) => context.open(event, title)
+                        : undefined
+                }
+                muted={state !== 'active'}
+                footer={{
+                    personIcon: ShieldCheck,
+                    primary: canManage ? 'Review this rule' : 'Read only',
+                    trailing: canManage ? (
+                        <div className="flex gap-2">
+                            {onEdit ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onEdit();
+                                    }}
+                                >
+                                    Edit
+                                </Button>
+                            ) : null}
+                            {onDeactivate ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onDeactivate();
+                                    }}
+                                >
+                                    {lifecycleLabel}
+                                </Button>
+                            ) : null}
+                        </div>
+                    ) : undefined,
+                }}
+            />
+            {context.ctx ? (
+                <EntityContextMenu
+                    x={context.ctx.x}
+                    y={context.ctx.y}
+                    title={title}
+                    items={actions}
+                    onClose={context.close}
+                />
+            ) : null}
+        </>
     );
 }
+type PolicyView = Kind | 'overview';
+type MonitoringSettingsProps = {
+    workspace: MonitoringPolicyWorkspace;
+    initialView?: PolicyView;
+    searchQuery?: string;
+    onDraftChange?: (open: boolean) => void;
+};
 
 export function MonitoringPolicySettings({
     workspace,
-}: {
-    workspace: MonitoringPolicyWorkspace;
-}) {
+    ...options
+}: MonitoringSettingsProps) {
+    const identity = JSON.stringify([
+        workspace.actor_id ?? 0,
+        workspace.visible,
+        workspace.can_manage,
+        workspace.can_manage_application,
+        workspace.sites.map((s) => s.id),
+        workspace.devices.map((d) => [d.id, d.site_id]),
+        workspace.monitors.map((m) => [m.id, m.device_id, m.site_id]),
+    ]);
+    return (
+        <MonitoringPolicyEditor
+            key={identity}
+            workspace={workspace}
+            {...options}
+        />
+    );
+}
+
+function MonitoringPolicyEditor({
+    workspace,
+    initialView = 'profiles',
+    searchQuery = '',
+    onDraftChange,
+}: MonitoringSettingsProps) {
     const [editor, setEditor] = useState<{
         kind: Kind;
         record?: PolicyRecord;
     } | null>(null);
+    const [policyView, setPolicyView] = useState<PolicyView>(initialView);
+    const panelBase = useId();
+    const editorBaseline = useRef('');
+    const [discardDraft, setDiscardDraft] = useState<
+        'editor' | 'lifecycle' | null
+    >(null);
     const [form, setForm] = useState<Record<string, unknown>>({});
     const [lifecycle, setLifecycle] = useState<{
         kind: Kind;
@@ -282,6 +478,30 @@ export function MonitoringPolicySettings({
     const [confirmation, setConfirmation] = useState('');
     const [replacementProfileId, setReplacementProfileId] = useState('');
     const [preview, setPreview] = useState<Preview | null>(null);
+    const [clockPreview, setClockPreview] =
+        useState<MaintenanceClockPreview | null>(null);
+    const [maintenanceStep, setMaintenanceStep] = useState(0);
+    const clockCall = useRef<AbortController | null>(null);
+    const clockBody = useRef('');
+    const saving = useRef(false);
+    const living = useRef(true);
+    const [maintenanceUnconfirmed, setMaintenanceUnconfirmed] = useState(false);
+    useEffect(() => {
+        living.current = true;
+        return () => {
+            living.current = false;
+            clockCall.current?.abort();
+        };
+    }, []);
+    const command = useMaintenanceCommand({
+        actorId: workspace.actor_id,
+        active: workspace.visible && workspace.can_manage,
+        context: JSON.stringify([
+            workspace.sites.map((s) => s.id),
+            workspace.devices.map((d) => [d.id, d.site_id]),
+            workspace.monitors.map((m) => [m.id, m.device_id, m.site_id]),
+        ]),
+    });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [busy, setBusy] = useState(false);
 
@@ -303,7 +523,17 @@ export function MonitoringPolicySettings({
         [form.site_id, workspace.devices],
     );
 
-    if (!workspace.visible) return null;
+    const draftOpen = editor !== null || lifecycle !== null || command.blocked;
+    useEffect(() => {
+        onDraftChange?.(draftOpen);
+    }, [draftOpen, onDraftChange]);
+    useEffect(() => () => onDraftChange?.(false), [onDraftChange]);
+    if (!workspace.visible)
+        return (
+            <SettingsNotice>
+                You need monitoring permission to review these settings.
+            </SettingsNotice>
+        );
 
     function defaults(kind: Kind): Record<string, unknown> {
         const siteId = workspace.sites[0]?.id ?? '';
@@ -353,6 +583,8 @@ export function MonitoringPolicySettings({
                 recurrence: '',
                 recurrence_until: '',
                 timezone: 'Pacific/Auckland',
+                dst_overlap: 'reject',
+                dst_gap: 'reject',
                 reason: '',
             };
         return {
@@ -382,11 +614,25 @@ export function MonitoringPolicySettings({
                 : row?.device_id
                   ? 'device'
                   : 'site';
-            values.starts_at = dateInput(values.starts_at);
-            values.ends_at = dateInput(values.ends_at);
-            values.recurrence_until = dateInput(values.recurrence_until);
+            const zone = String(values.timezone ?? 'Pacific/Auckland');
+            for (const field of ['starts_at', 'ends_at', 'recurrence_until']) {
+                const original = values[field];
+                values[field] = dateInput(original, zone);
+                values[field + '_offset'] =
+                    typeof original === 'string'
+                        ? timeOffsetInZone(original, zone)
+                        : '';
+            }
+            values.dst_overlap ??= 'reject';
+            values.dst_gap ??= 'reject';
         }
+        clockCall.current?.abort();
+        clockBody.current = '';
+        setClockPreview(null);
+        setMaintenanceStep(0);
+        setMaintenanceUnconfirmed(false);
         setEditor({ kind, record });
+        editorBaseline.current = JSON.stringify(values);
         setForm(values);
         setErrors({});
         setPreview(null);
@@ -395,6 +641,38 @@ export function MonitoringPolicySettings({
     }
 
     function update(key: string, value: unknown) {
+        if (
+            saving.current ||
+            (editor?.kind === 'maintenance' && command.blocked)
+        )
+            return;
+        if (editor?.kind === 'maintenance') command.clearErrors();
+        clockCall.current?.abort();
+        clockBody.current = '';
+        setClockPreview(null);
+        setMaintenanceStep(0);
+        setBusy(false);
+        if (
+            ['starts_at', 'ends_at', 'recurrence_until', 'timezone'].includes(
+                key,
+            )
+        ) {
+            setForm((current) => ({
+                ...current,
+                starts_at_offset:
+                    key === 'starts_at' || key === 'timezone'
+                        ? ''
+                        : current.starts_at_offset,
+                ends_at_offset:
+                    key === 'ends_at' || key === 'timezone'
+                        ? ''
+                        : current.ends_at_offset,
+                recurrence_until_offset:
+                    key === 'recurrence_until' || key === 'timezone'
+                        ? ''
+                        : current.recurrence_until_offset,
+            }));
+        }
         setForm((current) => ({ ...current, [key]: value }));
         setErrors((current) => ({ ...current, [key]: '' }));
         if (editor?.kind === 'retention') setPreview(null);
@@ -404,6 +682,7 @@ export function MonitoringPolicySettings({
         const payload = { ...form };
         delete payload.id;
         delete payload.state;
+        delete payload.status;
         delete payload.is_active;
         delete payload.can_manage;
         delete payload.used_by_count;
@@ -424,6 +703,42 @@ export function MonitoringPolicySettings({
             delete payload.scope_mode;
             payload.monitor_id = mode === 'monitor' ? form.monitor_id : null;
             payload.device_id = mode === 'device' ? form.device_id : null;
+            payload.dst_overlap = form.dst_overlap ?? 'reject';
+            payload.dst_gap = form.dst_gap ?? 'reject';
+            payload.expected_actor_id = workspace.actor_id;
+            const zone = String(form.timezone ?? 'Pacific/Auckland');
+            for (const field of ['starts_at', 'ends_at', 'recurrence_until']) {
+                const local = String(form[field] ?? '');
+                const choices = local ? timeOffsetsInZone(local, zone) : [];
+                const selected = String(form[field + '_offset'] ?? '');
+                delete payload[field + '_offset'];
+                const offset =
+                    choices.length === 1
+                        ? choices[0]
+                        : choices.includes(selected)
+                          ? selected
+                          : '';
+                const original = editor?.record as
+                    | MaintenancePolicy
+                    | undefined;
+                const initial =
+                    original?.[
+                        field as 'starts_at' | 'ends_at' | 'recurrence_until'
+                    ];
+                payload[field] = !local
+                    ? null
+                    : original &&
+                        zone === original.timezone &&
+                        local === dateInput(initial, zone) &&
+                        offset ===
+                            (typeof initial === 'string'
+                                ? timeOffsetInZone(initial, zone)
+                                : '')
+                      ? initial
+                      : offset
+                        ? local + ':00' + offset
+                        : local;
+            }
         }
         if (kind === 'retention') {
             const scope = form.scope_kind;
@@ -467,24 +782,182 @@ export function MonitoringPolicySettings({
         }
     }
 
-    async function submitEditor() {
-        if (!editor) return;
+    async function previewMaintenance() {
+        if (
+            !editor ||
+            editor.kind !== 'maintenance' ||
+            !workspace.actor_id ||
+            busy
+        )
+            return;
+        const payload = cleanPayload('maintenance');
+        delete payload.version;
+        const signature = JSON.stringify(payload);
+        clockCall.current?.abort();
+        const controller = new AbortController();
+        clockCall.current = controller;
+        clockBody.current = signature;
+        setClockPreview(null);
         setBusy(true);
         setErrors({});
+        try {
+            const response = await axios.post(
+                endpoints.maintenance + '/preview',
+                payload,
+                { signal: controller.signal },
+            );
+            if (!controller.signal.aborted && clockBody.current === signature) {
+                setClockPreview(
+                    maintenanceClockPreview(
+                        response.data.preview,
+                        workspace.actor_id,
+                        payload,
+                    ),
+                );
+                setMaintenanceStep(1);
+            }
+        } catch (failure) {
+            if (!controller.signal.aborted) {
+                if (axios.isAxiosError(failure)) captureError(failure);
+                else
+                    setErrors({
+                        form: 'The maintenance time preview could not be verified. Review the dates and try again.',
+                    });
+            }
+        } finally {
+            if (!controller.signal.aborted) setBusy(false);
+        }
+    }
+
+    function commandScope(
+        values: Record<string, unknown>,
+    ): MaintenanceCommandScope {
+        const id = (value: unknown) =>
+            value === null || value === undefined || value === ''
+                ? null
+                : Number(value);
+        const monitor = id(values.monitor_id);
+        return {
+            site_id: Number(values.site_id),
+            device_id: id(values.device_id),
+            monitor_id: monitor,
+            monitor_device_id:
+                monitor === null
+                    ? null
+                    : (workspace.monitors.find((row) => row.id === monitor)
+                          ?.device_id ?? null),
+        };
+    }
+    function acceptMaintenance(_reply: MaintenanceCommandReply) {
+        if (!living.current) return;
+        setEditor(null);
+        setLifecycle(null);
+        setMaintenanceUnconfirmed(false);
+        router.reload({
+            only: [
+                'monitoringPolicyWorkspace',
+                'monitoringProfiles',
+                'monitoringRetention',
+            ],
+        });
+    }
+    async function recoverMaintenance(retry = false) {
+        if (busy || saving.current) return;
+        setBusy(true);
+        saving.current = true;
+        try {
+            const reply = await (retry ? command.retry() : command.recover());
+            if (reply) acceptMaintenance(reply);
+        } finally {
+            saving.current = false;
+            if (living.current) setBusy(false);
+        }
+    }
+    function maintenanceRecovery() {
+        if (!command.message && Object.keys(command.errors).length === 0)
+            return null;
+        return (
+            <div
+                className="space-y-3 rounded-lg border border-border p-3 text-sm"
+                role="status"
+            >
+                {command.message && <p>{command.message}</p>}
+                {Object.values(command.errors).map((message) => (
+                    <p key={message} role="alert" className="text-destructive">
+                        {message}
+                    </p>
+                ))}
+                {command.pending && (
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            variant="outline"
+                            className="frontline-tap frontline-focus"
+                            disabled={
+                                busy || command.busy || !workspace.can_manage
+                            }
+                            onClick={() => void recoverMaintenance()}
+                        >
+                            Check saved request
+                        </Button>
+                        {command.canRetry && (
+                            <Button
+                                variant="outline"
+                                className="frontline-tap frontline-focus"
+                                disabled={
+                                    busy ||
+                                    command.busy ||
+                                    !workspace.can_manage
+                                }
+                                onClick={() => void recoverMaintenance(true)}
+                            >
+                                Retry same request
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    }
+    async function submitEditor() {
+        if (!editor || busy || saving.current) return;
         const payload = cleanPayload(editor.kind);
+        if (editor.kind === 'maintenance') {
+            const reviewed = { ...payload };
+            delete reviewed.version;
+            if (
+                !clockPreview ||
+                clockBody.current !== JSON.stringify(reviewed) ||
+                command.blocked
+            )
+                return;
+            setBusy(true);
+            saving.current = true;
+            setErrors({});
+            try {
+                const reply = await command.submit(
+                    editor.record ? 'update' : 'create',
+                    editor.record?.id ?? null,
+                    payload,
+                    commandScope(payload),
+                );
+                if (reply) acceptMaintenance(reply);
+            } finally {
+                saving.current = false;
+                if (living.current) setBusy(false);
+            }
+            return;
+        }
+        setBusy(true);
+        setErrors({});
         try {
             if (editor.kind === 'retention' && preview === null) {
                 const previewPayload = { ...payload };
                 delete previewPayload.version;
                 const response = await axios.post<{ preview: Preview }>(
-                    `${endpoints.retention}/preview`,
-                    {
-                        ...previewPayload,
-                        policy_id: editor.record?.id ?? null,
-                    },
+                    endpoints.retention + '/preview',
+                    { ...previewPayload, policy_id: editor.record?.id ?? null },
                 );
                 setPreview(response.data.preview);
-                setBusy(false);
                 return;
             }
             if (editor.kind === 'retention' && preview?.requires_confirmation) {
@@ -492,10 +965,12 @@ export function MonitoringPolicySettings({
                 payload.reason = reason;
             }
             const url = editor.record
-                ? `${endpoints[editor.kind]}/${editor.record.id}`
+                ? endpoints[editor.kind] + '/' + editor.record.id
                 : endpoints[editor.kind];
+            saving.current = true;
             if (editor.record) await axios.patch(url, payload);
             else await axios.post(url, payload);
+            if (!living.current) return;
             setEditor(null);
             router.reload({
                 only: [
@@ -505,9 +980,10 @@ export function MonitoringPolicySettings({
                 ],
             });
         } catch (error) {
-            captureError(error);
+            if (living.current) captureError(error);
         } finally {
-            setBusy(false);
+            saving.current = false;
+            if (living.current) setBusy(false);
         }
     }
 
@@ -520,7 +996,27 @@ export function MonitoringPolicySettings({
     }
 
     async function submitLifecycle() {
-        if (!lifecycle) return;
+        if (!lifecycle || busy || saving.current) return;
+        if (lifecycle.kind === 'maintenance') {
+            if (command.blocked) return;
+            const row = lifecycle.record as MaintenancePolicy;
+            setBusy(true);
+            saving.current = true;
+            setErrors({});
+            try {
+                const reply = await command.submit(
+                    'cancel',
+                    row.id,
+                    { version: row.version, reason },
+                    commandScope(row),
+                );
+                if (reply) acceptMaintenance(reply);
+            } finally {
+                saving.current = false;
+                if (living.current) setBusy(false);
+            }
+            return;
+        }
         setBusy(true);
         setErrors({});
         try {
@@ -528,12 +1024,7 @@ export function MonitoringPolicySettings({
                 lifecycle.record.state === 'inactive' &&
                 (lifecycle.kind === 'coverage' ||
                     lifecycle.kind === 'retention');
-            const verb =
-                lifecycle.kind === 'maintenance'
-                    ? 'cancel'
-                    : reactivating
-                      ? 'reactivate'
-                      : 'deactivate';
+            const verb = reactivating ? 'reactivate' : 'deactivate';
             await axios.post(
                 `${endpoints[lifecycle.kind]}/${lifecycle.record.id}/${verb}`,
                 {
@@ -560,275 +1051,419 @@ export function MonitoringPolicySettings({
 
     const canCreate = (kind: Kind) =>
         workspace.can_manage &&
+        !busy &&
+        (kind !== 'maintenance' ||
+            (!!workspace.actor_id && !command.blocked)) &&
         (kind !== 'profiles' || workspace.can_manage_application) &&
         workspace.sites.length > 0;
 
+    function closeDraft(target: 'editor' | 'lifecycle') {
+        if (target === 'editor') {
+            clockCall.current?.abort();
+            clockBody.current = '';
+            setClockPreview(null);
+            setEditor(null);
+            setBusy(false);
+        } else {
+            setLifecycle(null);
+            setReason('');
+            setConfirmation('');
+            setReplacementProfileId('');
+        }
+    }
+    function requestClose(target: 'editor' | 'lifecycle') {
+        if (
+            saving.current ||
+            ((target === 'editor' ? editor?.kind : lifecycle?.kind) ===
+                'maintenance' &&
+                command.blocked)
+        )
+            return;
+        const changed =
+            target === 'editor'
+                ? JSON.stringify(form) !== editorBaseline.current
+                : Boolean(
+                      reason.trim() || confirmation || replacementProfileId,
+                  );
+        if (changed) setDiscardDraft(target);
+        else closeDraft(target);
+    }
+    const policyVisible = (row: PolicyRecord) =>
+        Object.entries(row)
+            .filter(
+                ([key, value]) =>
+                    [
+                        'name',
+                        'description',
+                        'reason',
+                        'rationale',
+                        'capability',
+                        'site_name',
+                        'device_name',
+                        'monitor_name',
+                        'device_domain',
+                        'device_category',
+                        'data_class',
+                        'privacy_class',
+                    ].includes(key) && typeof value === 'string',
+            )
+            .map(([, value]) => value)
+            .join(' ')
+            .toLowerCase()
+            .includes(searchQuery.trim().toLowerCase());
+    const policyTabs = [
+        { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { key: 'profiles', label: 'Profiles', icon: Activity },
+        { key: 'coverage', label: 'Coverage', icon: Layers },
+        { key: 'dependencies', label: 'Dependencies', icon: GitBranch },
+        { key: 'maintenance', label: 'Maintenance', icon: CalendarClock },
+        { key: 'retention', label: 'Retention', icon: Archive },
+    ];
     return (
-        <Card>
-            <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <CardTitle className="flex items-center gap-2">
-                        <ShieldCheck className="h-5 w-5" />
-                        Monitoring policy
-                    </CardTitle>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Govern detection, coverage, dependency suppression,
-                        planned maintenance, and evidence retention from one
-                        auditable workspace.
-                    </p>
-                </div>
-                {!workspace.can_manage_application ? (
-                    <Badge variant="outline">Accessible Sites only</Badge>
-                ) : (
-                    <Badge variant="outline">Application-wide manager</Badge>
-                )}
-            </CardHeader>
-            <CardContent>
-                <TabsRoot defaultValue="profiles">
-                    <TabsList className="grid h-auto w-full grid-cols-5">
-                        {(
-                            [
-                                'profiles',
-                                'coverage',
-                                'dependencies',
-                                'maintenance',
-                                'retention',
-                            ] as Kind[]
-                        ).map((kind) => (
-                            <TabsTrigger
-                                key={kind}
-                                value={kind}
-                                className="min-h-10"
-                            >
-                                {kind[0].toUpperCase() + kind.slice(1)}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
-
-                    <TabsContent value="profiles" className="space-y-3 pt-4">
-                        <TabIntro
-                            title="Profiles"
-                            action="New profile"
-                            enabled={canCreate('profiles')}
-                            onAction={() => openEditor('profiles')}
-                        />
-                        {workspace.profiles.map((row) => (
-                            <RecordCard
-                                key={row.id}
-                                title={row.name}
-                                state={row.state}
-                                summary={
-                                    <>
-                                        {row.description || 'No description'}
-                                        <br />
-                                        Every {row.interval_seconds}s · stale
-                                        after {row.stale_after_seconds}s ·{' '}
-                                        {row.used_by_count} monitors
-                                    </>
-                                }
-                                canManage={workspace.can_manage_application}
-                                onEdit={
-                                    row.state === 'active'
-                                        ? () => openEditor('profiles', row)
-                                        : undefined
-                                }
-                                onDeactivate={
-                                    row.state === 'active'
-                                        ? () => openLifecycle('profiles', row)
-                                        : undefined
-                                }
-                            />
-                        ))}
-                    </TabsContent>
-
-                    <TabsContent value="coverage" className="space-y-3 pt-4">
-                        <TabIntro
-                            title="Coverage"
-                            action="New expectation"
-                            enabled={canCreate('coverage')}
-                            onAction={() => openEditor('coverage')}
-                        />
-                        {workspace.coverage.map((row) => (
-                            <RecordCard
-                                key={row.id}
-                                title={`${row.site_name} · ${row.capability.replaceAll('_', ' ')}`}
-                                state={row.state}
-                                summary={
-                                    <>
-                                        {row.device_domain.replaceAll('_', ' ')}
-                                        {row.device_category
-                                            ? ` / ${row.device_category.replaceAll('_', ' ')}`
-                                            : ''}{' '}
-                                        · minimum {row.minimum_count}
-                                        <br />
-                                        {row.rationale}
-                                    </>
-                                }
-                                canManage={Boolean(row.can_manage)}
-                                onEdit={
-                                    row.state === 'active'
-                                        ? () => openEditor('coverage', row)
-                                        : undefined
-                                }
-                                onDeactivate={
-                                    row.state === 'active' ||
-                                    row.state === 'inactive'
-                                        ? () => openLifecycle('coverage', row)
-                                        : undefined
-                                }
-                                lifecycleLabel={
-                                    row.state === 'inactive'
-                                        ? 'Reactivate'
-                                        : 'Deactivate'
-                                }
-                            />
-                        ))}
-                    </TabsContent>
-
-                    <TabsContent
-                        value="dependencies"
-                        className="space-y-3 pt-4"
+        <section className="space-y-5" aria-label="Monitoring settings">
+            <TierTwoTabs
+                tabs={policyTabs}
+                testIdPrefix={panelBase}
+                panelId={panelBase + '-panel'}
+                activeTab={policyView}
+                onTab={(key) => setPolicyView(key as PolicyView)}
+                ariaLabel="Monitoring settings sections"
+                renderLink={(tab, className, inner, accessibility) => (
+                    <Button
+                        key={tab.key}
+                        variant="ghost"
+                        className={className}
+                        {...accessibility}
+                        onClick={() => setPolicyView(tab.key as PolicyView)}
                     >
-                        <TabIntro
-                            title="Dependencies"
-                            action="New manual dependency"
-                            enabled={canCreate('dependencies')}
-                            onAction={() => openEditor('dependencies')}
+                        {inner}
+                    </Button>
+                )}
+            />
+            {policyView === 'overview' ? (
+                <section
+                    role="tabpanel"
+                    id={panelBase + '-panel'}
+                    aria-label="Overview"
+                    className="space-y-5"
+                >
+                    <div className="grid gap-5 md:grid-cols-2">
+                        {policyTabs
+                            .filter((tab) => tab.key !== 'overview')
+                            .map((tab) => (
+                                <ReviewCard
+                                    key={tab.key}
+                                    icon={tab.icon}
+                                    title={tab.label}
+                                >
+                                    <ReviewRow
+                                        label="Saved rules"
+                                        value={
+                                            workspace[tab.key as Kind].length
+                                        }
+                                    />
+                                    <Button
+                                        variant="link"
+                                        className="px-0"
+                                        onClick={() =>
+                                            setPolicyView(tab.key as PolicyView)
+                                        }
+                                    >
+                                        Review {tab.label.toLowerCase()}{' '}
+                                        <ArrowUpRight className="size-3.5" />
+                                    </Button>
+                                </ReviewCard>
+                            ))}
+                    </div>
+                    <SettingsNotice role="note">
+                        Each rule has its own review and save. Technical
+                        maintenance does not cancel a real safety response.
+                    </SettingsNotice>
+                </section>
+            ) : null}
+            <PolicyPanel kind="profiles" view={policyView} base={panelBase}>
+                <TabIntro
+                    caption={
+                        workspace.profiles.filter(policyVisible).length +
+                        ' of ' +
+                        workspace.profiles.length +
+                        ' shown'
+                    }
+                    title="Profiles"
+                    action="New profile"
+                    enabled={canCreate('profiles')}
+                    onAction={() => openEditor('profiles')}
+                />
+                <EntityCardGrid>
+                    {workspace.profiles.filter(policyVisible).map((row) => (
+                        <RecordCard
+                            key={row.id}
+                            title={row.name}
+                            state={row.state}
+                            summary={
+                                <>
+                                    {row.description || 'No description'}
+                                    <br />
+                                    Every {row.interval_seconds}s · stale after{' '}
+                                    {row.stale_after_seconds}s ·{' '}
+                                    {row.used_by_count} monitors
+                                </>
+                            }
+                            canManage={workspace.can_manage_application}
+                            onEdit={
+                                row.state === 'active'
+                                    ? () => openEditor('profiles', row)
+                                    : undefined
+                            }
+                            onDeactivate={
+                                row.state === 'active'
+                                    ? () => openLifecycle('profiles', row)
+                                    : undefined
+                            }
                         />
-                        {workspace.dependencies.map((row) => (
-                            <RecordCard
-                                key={row.id}
-                                title={`${row.upstream_monitor_name} → ${row.downstream_monitor_name}`}
-                                state={row.state}
-                                summary={
-                                    <>
-                                        {row.site_name} · {row.source} evidence
-                                        · confidence{' '}
-                                        {Number(row.confidence).toFixed(2)}
-                                        <br />
-                                        Downstream notifications and ticketing
-                                        are suppressed only while the upstream
-                                        dependency explains the outage.
-                                    </>
-                                }
-                                canManage={Boolean(row.can_manage)}
-                                onEdit={
-                                    row.state === 'active' &&
-                                    row.source === 'manual'
-                                        ? () => openEditor('dependencies', row)
-                                        : undefined
-                                }
-                                onDeactivate={
-                                    row.state === 'active' &&
-                                    row.source === 'manual'
-                                        ? () =>
-                                              openLifecycle('dependencies', row)
-                                        : undefined
-                                }
-                            />
-                        ))}
-                    </TabsContent>
+                    ))}
+                </EntityCardGrid>
+            </PolicyPanel>
 
-                    <TabsContent value="maintenance" className="space-y-3 pt-4">
-                        <TabIntro
-                            title="Maintenance"
-                            action="Schedule window"
-                            enabled={canCreate('maintenance')}
-                            onAction={() => openEditor('maintenance')}
+            <PolicyPanel kind="coverage" view={policyView} base={panelBase}>
+                <TabIntro
+                    caption={
+                        workspace.coverage.filter(policyVisible).length +
+                        ' of ' +
+                        workspace.coverage.length +
+                        ' shown'
+                    }
+                    title="Coverage"
+                    action="New expectation"
+                    enabled={canCreate('coverage')}
+                    onAction={() => openEditor('coverage')}
+                />
+                <EntityCardGrid>
+                    {workspace.coverage.filter(policyVisible).map((row) => (
+                        <RecordCard
+                            key={row.id}
+                            title={`${row.site_name} · ${row.capability.replaceAll('_', ' ')}`}
+                            state={row.state}
+                            summary={
+                                <>
+                                    {row.device_domain.replaceAll('_', ' ')}
+                                    {row.device_category
+                                        ? ` / ${row.device_category.replaceAll('_', ' ')}`
+                                        : ''}{' '}
+                                    · minimum {row.minimum_count}
+                                    <br />
+                                    {row.rationale}
+                                </>
+                            }
+                            canManage={Boolean(row.can_manage)}
+                            onEdit={
+                                row.state === 'active'
+                                    ? () => openEditor('coverage', row)
+                                    : undefined
+                            }
+                            onDeactivate={
+                                row.state === 'active' ||
+                                row.state === 'inactive'
+                                    ? () => openLifecycle('coverage', row)
+                                    : undefined
+                            }
+                            lifecycleLabel={
+                                row.state === 'inactive'
+                                    ? 'Reactivate'
+                                    : 'Deactivate'
+                            }
                         />
-                        {workspace.maintenance.map((row) => (
-                            <RecordCard
-                                key={row.id}
-                                title={row.name}
-                                state={row.status}
-                                summary={
-                                    <>
-                                        {row.site_name}
-                                        {row.device_name
-                                            ? ` · ${row.device_name}`
-                                            : ''}
-                                        {row.monitor_name
-                                            ? ` · ${row.monitor_name}`
-                                            : ''}
-                                        <br />
-                                        {new Date(
-                                            row.starts_at,
-                                        ).toLocaleString()}{' '}
-                                        –{' '}
-                                        {new Date(row.ends_at).toLocaleString()}{' '}
-                                        · {row.timezone}
-                                    </>
-                                }
-                                canManage={workspace.can_manage}
-                                onEdit={
-                                    row.status === 'active'
-                                        ? () => openEditor('maintenance', row)
-                                        : undefined
-                                }
-                                onDeactivate={
-                                    row.status === 'active'
-                                        ? () =>
-                                              openLifecycle('maintenance', row)
-                                        : undefined
-                                }
-                                lifecycleLabel="Cancel"
-                            />
-                        ))}
-                    </TabsContent>
+                    ))}
+                </EntityCardGrid>
+            </PolicyPanel>
 
-                    <TabsContent value="retention" className="space-y-3 pt-4">
-                        <TabIntro
-                            title="Retention"
-                            action="New retention policy"
-                            enabled={canCreate('retention')}
-                            onAction={() => openEditor('retention')}
+            <PolicyPanel kind="dependencies" view={policyView} base={panelBase}>
+                <TabIntro
+                    caption={
+                        workspace.dependencies.filter(policyVisible).length +
+                        ' of ' +
+                        workspace.dependencies.length +
+                        ' shown'
+                    }
+                    title="Dependencies"
+                    action="New manual dependency"
+                    enabled={canCreate('dependencies')}
+                    onAction={() => openEditor('dependencies')}
+                />
+                <EntityCardGrid>
+                    {workspace.dependencies.filter(policyVisible).map((row) => (
+                        <RecordCard
+                            key={row.id}
+                            title={`${row.upstream_monitor_name} → ${row.downstream_monitor_name}`}
+                            state={row.state}
+                            summary={
+                                <>
+                                    {row.site_name} · {row.source} evidence ·
+                                    confidence{' '}
+                                    {Number(row.confidence).toFixed(2)}
+                                    <br />
+                                    Downstream notifications and ticketing are
+                                    suppressed only while the upstream
+                                    dependency explains the outage.
+                                </>
+                            }
+                            canManage={Boolean(row.can_manage)}
+                            onEdit={
+                                row.state === 'active' &&
+                                row.source === 'manual'
+                                    ? () => openEditor('dependencies', row)
+                                    : undefined
+                            }
+                            onDeactivate={
+                                row.state === 'active' &&
+                                row.source === 'manual'
+                                    ? () => openLifecycle('dependencies', row)
+                                    : undefined
+                            }
                         />
-                        <p className="text-sm text-muted-foreground">
-                            The most restrictive matching policy applies. Legal
-                            hold preserves matching evidence.
-                        </p>
-                        {workspace.retention.map((row) => (
-                            <RecordCard
-                                key={row.id}
-                                title={row.name}
-                                state={row.state}
-                                summary={
-                                    <>
-                                        {row.scope_kind.replaceAll('_', ' ')} ·{' '}
-                                        {row.scope_name}
-                                        {row.legal_hold ? ' · legal hold' : ''}
-                                        <br />
-                                        Raw {row.raw_days} days · hourly{' '}
-                                        {row.hourly_days} days · daily{' '}
-                                        {row.daily_days} days
-                                    </>
-                                }
-                                canManage={Boolean(row.can_manage)}
-                                onEdit={
-                                    row.state === 'active'
-                                        ? () => openEditor('retention', row)
-                                        : undefined
-                                }
-                                onDeactivate={
-                                    row.state === 'active' ||
-                                    row.state === 'inactive'
-                                        ? () => openLifecycle('retention', row)
-                                        : undefined
-                                }
-                                lifecycleLabel={
-                                    row.state === 'inactive'
-                                        ? 'Reactivate'
-                                        : 'Deactivate'
-                                }
-                            />
-                        ))}
-                    </TabsContent>
-                </TabsRoot>
-            </CardContent>
+                    ))}
+                </EntityCardGrid>
+            </PolicyPanel>
 
+            <PolicyPanel kind="maintenance" view={policyView} base={panelBase}>
+                <TabIntro
+                    caption={
+                        workspace.maintenance.filter(policyVisible).length +
+                        ' of ' +
+                        workspace.maintenance.length +
+                        ' shown'
+                    }
+                    title="Maintenance"
+                    action="Schedule window"
+                    enabled={canCreate('maintenance')}
+                    onAction={() => openEditor('maintenance')}
+                />
+                <EntityCardGrid>
+                    {workspace.maintenance.filter(policyVisible).map((row) => (
+                        <RecordCard
+                            key={row.id}
+                            title={row.name}
+                            state={row.status}
+                            summary={
+                                <>
+                                    {row.site_name}
+                                    {row.device_name
+                                        ? ` · ${row.device_name}`
+                                        : ''}
+                                    {row.monitor_name
+                                        ? ` · ${row.monitor_name}`
+                                        : ''}
+                                    <br />
+                                    {formatDateTimeInZone(
+                                        row.starts_at,
+                                        row.timezone,
+                                    )}{' '}
+                                    –{' '}
+                                    {formatDateTimeInZone(
+                                        row.ends_at,
+                                        row.timezone,
+                                    )}{' '}
+                                    · {row.timezone}
+                                </>
+                            }
+                            canManage={
+                                workspace.can_manage &&
+                                !busy &&
+                                !command.blocked
+                            }
+                            onEdit={
+                                row.status === 'active'
+                                    ? () => openEditor('maintenance', row)
+                                    : undefined
+                            }
+                            onDeactivate={
+                                row.status === 'active'
+                                    ? () => openLifecycle('maintenance', row)
+                                    : undefined
+                            }
+                            lifecycleLabel="Cancel"
+                        />
+                    ))}
+                </EntityCardGrid>
+            </PolicyPanel>
+
+            <PolicyPanel kind="retention" view={policyView} base={panelBase}>
+                <TabIntro
+                    caption={
+                        workspace.retention.filter(policyVisible).length +
+                        ' of ' +
+                        workspace.retention.length +
+                        ' shown'
+                    }
+                    title="Retention"
+                    action="New retention policy"
+                    enabled={canCreate('retention')}
+                    onAction={() => openEditor('retention')}
+                />
+                <p className="text-sm text-muted-foreground">
+                    The most restrictive matching policy applies. Legal hold
+                    preserves matching evidence.
+                </p>
+                <EntityCardGrid>
+                    {workspace.retention.filter(policyVisible).map((row) => (
+                        <RecordCard
+                            key={row.id}
+                            title={row.name}
+                            state={row.state}
+                            summary={
+                                <>
+                                    {row.scope_kind.replaceAll('_', ' ')} ·{' '}
+                                    {row.scope_name}
+                                    {row.legal_hold ? ' · legal hold' : ''}
+                                    <br />
+                                    Raw {row.raw_days} days · hourly{' '}
+                                    {row.hourly_days} days · daily{' '}
+                                    {row.daily_days} days
+                                </>
+                            }
+                            canManage={Boolean(row.can_manage)}
+                            onEdit={
+                                row.state === 'active'
+                                    ? () => openEditor('retention', row)
+                                    : undefined
+                            }
+                            onDeactivate={
+                                row.state === 'active' ||
+                                row.state === 'inactive'
+                                    ? () => openLifecycle('retention', row)
+                                    : undefined
+                            }
+                            lifecycleLabel={
+                                row.state === 'inactive'
+                                    ? 'Reactivate'
+                                    : 'Deactivate'
+                            }
+                        />
+                    ))}
+                </EntityCardGrid>
+            </PolicyPanel>
+
+            {editor?.kind !== 'maintenance' && lifecycle?.kind !== 'maintenance'
+                ? maintenanceRecovery()
+                : null}
+
+            <ConfirmDialog
+                open={discardDraft !== null}
+                onClose={() => setDiscardDraft(null)}
+                title="Discard this settings draft?"
+                description="Your unsaved changes will be lost. Saved rules and any separately unconfirmed request are kept."
+                confirmText="Discard draft"
+                cancelText="Keep reviewing"
+                variant="destructive"
+                onConfirm={() => {
+                    const target = discardDraft;
+                    setDiscardDraft(null);
+                    if (target) closeDraft(target);
+                }}
+            />
             <Dialog
-                open={editor !== null}
-                onOpenChange={(open) => !open && setEditor(null)}
+                open={editor !== null && editor.kind !== 'maintenance'}
+                onOpenChange={(open) => !open && requestClose('editor')}
             >
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
                     <DialogHeader>
@@ -887,7 +1522,7 @@ export function MonitoringPolicySettings({
                     <DialogFooter>
                         <Button
                             variant="outline"
-                            onClick={() => setEditor(null)}
+                            onClick={() => requestClose('editor')}
                         >
                             Cancel
                         </Button>
@@ -914,9 +1549,185 @@ export function MonitoringPolicySettings({
                 </DialogContent>
             </Dialog>
 
+            <WizardShell
+                open={editor?.kind === 'maintenance'}
+                onClose={() => requestClose('editor')}
+                title={
+                    editor?.record
+                        ? 'Edit maintenance window'
+                        : 'Create maintenance window'
+                }
+                description="Review the approved scope and exact local clock times before saving."
+                railIcon={CalendarClock}
+                railTitle="Technical maintenance"
+                railSub="Monitoring policy"
+                steps={[
+                    {
+                        key: 'plan',
+                        label: 'Plan',
+                        blurb: 'Scope and local times',
+                        icon: CalendarClock,
+                    },
+                    {
+                        key: 'review',
+                        label: 'Review',
+                        blurb: 'Exact occurrence preview',
+                        icon: ClipboardCheck,
+                        disabled: !clockPreview,
+                    },
+                ]}
+                stepIndex={maintenanceStep}
+                onStepClick={setMaintenanceStep}
+                frontline
+                footerStart={
+                    <Button
+                        variant="outline"
+                        className="frontline-tap frontline-focus"
+                        disabled={busy}
+                        onClick={() =>
+                            maintenanceStep
+                                ? setMaintenanceStep(0)
+                                : requestClose('editor')
+                        }
+                    >
+                        {maintenanceStep ? 'Back' : 'Cancel'}
+                    </Button>
+                }
+                footerEnd={
+                    <Button
+                        className="frontline-tap frontline-focus"
+                        disabled={
+                            busy ||
+                            maintenanceUnconfirmed ||
+                            command.blocked ||
+                            !workspace.actor_id
+                        }
+                        onClick={() =>
+                            void (maintenanceStep
+                                ? submitEditor()
+                                : previewMaintenance())
+                        }
+                    >
+                        {busy
+                            ? maintenanceStep
+                                ? 'Saving…'
+                                : 'Checking times…'
+                            : maintenanceStep
+                              ? 'Save maintenance window'
+                              : 'Preview times'}
+                    </Button>
+                }
+            >
+                <WizardStepPane>
+                    {maintenanceStep === 0 ? (
+                        <fieldset disabled={saving.current || command.blocked}>
+                            {renderFields('maintenance')}
+                        </fieldset>
+                    ) : clockPreview ? (
+                        <div className="space-y-4">
+                            <p>
+                                Times use {clockPreview.timezone}. This preview
+                                has not saved a policy. Saving checks current
+                                permission and scope again.
+                            </p>
+                            <p>
+                                {clockPreview.scheduled_occurrences} scheduled
+                                occurrences · {clockPreview.skipped_occurrences}{' '}
+                                explicitly skipped
+                            </p>
+                            <ul className="space-y-3">
+                                {clockPreview.occurrences.map((row) => (
+                                    <li
+                                        key={row.local_start}
+                                        className="rounded-lg border border-border p-3"
+                                    >
+                                        <p>
+                                            {row.state === 'ready'
+                                                ? formatDateTimeInZone(
+                                                      row.starts_at,
+                                                      row.timezone,
+                                                  ) +
+                                                  ' – ' +
+                                                  formatDateTimeInZone(
+                                                      row.ends_at,
+                                                      row.timezone,
+                                                  )
+                                                : row.local_start
+                                                      .slice(0, 16)
+                                                      .replace('T', ' ') +
+                                                  ' · Skipped because this clock time does not occur'}
+                                        </p>
+                                        {row.state === 'ready' && (
+                                            <p className="text-sm text-muted-foreground">
+                                                UTC
+                                                {timeOffsetInZone(
+                                                    row.starts_at!,
+                                                    row.timezone,
+                                                )}{' '}
+                                                – UTC
+                                                {timeOffsetInZone(
+                                                    row.ends_at!,
+                                                    row.timezone,
+                                                )}
+                                            </p>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                            {clockPreview.truncated && (
+                                <p>
+                                    The first ten occurrences are shown; the
+                                    complete bounded schedule was checked.
+                                </p>
+                            )}
+                            <p>
+                                Maintenance affects technical failure alerts. It
+                                does not establish equipment health or cancel a
+                                real safety event.
+                            </p>
+                        </div>
+                    ) : null}
+                    {errors.form && (
+                        <p role="alert" className="text-sm text-destructive">
+                            {errors.form}
+                        </p>
+                    )}
+                    {Object.keys(errors).some(
+                        (key) => key !== 'form' && errors[key],
+                    ) && (
+                        <div role="alert" className="text-sm text-destructive">
+                            <p>
+                                Review the fields before previewing or saving:
+                            </p>
+                            <ul className="list-disc pl-5">
+                                {[
+                                    ...new Set(
+                                        Object.entries(errors)
+                                            .filter(
+                                                ([key, value]) =>
+                                                    key !== 'form' && value,
+                                            )
+                                            .map(([, value]) => value),
+                                    ),
+                                ].map((message) => (
+                                    <li key={message}>{message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {maintenanceRecovery()}
+                    {!workspace.actor_id && (
+                        <p role="alert">
+                            Reopen monitoring settings to verify the current
+                            account before reviewing maintenance.
+                        </p>
+                    )}
+                </WizardStepPane>
+            </WizardShell>
+
             <Dialog
                 open={lifecycle !== null}
-                onOpenChange={(open) => !open && setLifecycle(null)}
+                onOpenChange={(open) => !open && requestClose('lifecycle')}
             >
                 <DialogContent>
                     <DialogHeader>
@@ -935,6 +1746,11 @@ export function MonitoringPolicySettings({
                     <Field label="Operational reason">
                         <Textarea
                             value={reason}
+                            disabled={
+                                busy ||
+                                (lifecycle?.kind === 'maintenance' &&
+                                    command.blocked)
+                            }
                             onChange={(event) => setReason(event.target.value)}
                         />
                     </Field>
@@ -980,10 +1796,14 @@ export function MonitoringPolicySettings({
                             {errors.form}
                         </p>
                     ) : null}
+                    {lifecycle?.kind === 'maintenance'
+                        ? maintenanceRecovery()
+                        : null}
                     <DialogFooter>
                         <Button
                             variant="outline"
-                            onClick={() => setLifecycle(null)}
+                            disabled={busy}
+                            onClick={() => requestClose('lifecycle')}
                         >
                             {lifecycle?.record.state === 'inactive'
                                 ? 'Keep inactive'
@@ -997,6 +1817,8 @@ export function MonitoringPolicySettings({
                             }
                             disabled={
                                 busy ||
+                                (lifecycle?.kind === 'maintenance' &&
+                                    command.blocked) ||
                                 reason.trim().length < 10 ||
                                 Boolean(
                                     lifecycle?.kind === 'retention' &&
@@ -1020,13 +1842,36 @@ export function MonitoringPolicySettings({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </Card>
+        </section>
     );
 
     function errorFor(key: string) {
         return errors[key] ? (
             <p className="text-xs text-destructive">{errors[key]}</p>
         ) : null;
+    }
+
+    function clockOffsetField(field: string, label: string) {
+        const choices = timeOffsetsInZone(
+            String(form[field] ?? ''),
+            String(form.timezone ?? 'Pacific/Auckland'),
+        );
+        if (choices.length < 2) return null;
+        return (
+            <Field label={label + ' clock occurrence'}>
+                <SelectField
+                    value={form[field + '_offset']}
+                    onChange={(value) => update(field + '_offset', value)}
+                >
+                    <option value="">Choose which repeated time</option>
+                    {choices.map((offset, i) => (
+                        <option key={offset} value={offset}>
+                            {i === 0 ? 'First' : 'Second'} ({offset})
+                        </option>
+                    ))}
+                </SelectField>
+            </Field>
+        );
     }
 
     function renderFields(kind: Kind) {
@@ -1432,6 +2277,8 @@ export function MonitoringPolicySettings({
                                 update('starts_at', e.target.value)
                             }
                         />
+                        {clockOffsetField('starts_at', 'Starts')}
+                        {errorFor('starts_at')}
                     </Field>
                     <Field label="Ends">
                         <Input
@@ -1439,6 +2286,39 @@ export function MonitoringPolicySettings({
                             value={String(form.ends_at ?? '')}
                             onChange={(e) => update('ends_at', e.target.value)}
                         />
+                        {clockOffsetField('ends_at', 'Ends')}
+                        {errorFor('ends_at')}
+                    </Field>
+                    <Field label="Repeated local hour">
+                        <SelectField
+                            value={form.dst_overlap}
+                            onChange={(v) => update('dst_overlap', v)}
+                        >
+                            <option value="reject">
+                                Require a schedule change
+                            </option>
+                            <option value="earlier">
+                                Use the first occurrence
+                            </option>
+                            <option value="later">
+                                Use the second occurrence
+                            </option>
+                        </SelectField>
+                        {errorFor('dst_overlap')}
+                    </Field>
+                    <Field label="Skipped local hour">
+                        <SelectField
+                            value={form.dst_gap}
+                            onChange={(v) => update('dst_gap', v)}
+                        >
+                            <option value="reject">
+                                Require a schedule change
+                            </option>
+                            <option value="skip">
+                                Skip that maintenance occurrence
+                            </option>
+                        </SelectField>
+                        {errorFor('dst_gap')}
                     </Field>
                     <Field label="Recurrence">
                         <SelectField
@@ -1459,6 +2339,11 @@ export function MonitoringPolicySettings({
                                     update('recurrence_until', e.target.value)
                                 }
                             />
+                            {clockOffsetField(
+                                'recurrence_until',
+                                'Recurrence ends',
+                            )}
+                            {errorFor('recurrence_until')}
                         </Field>
                     ) : null}
                     <div className="sm:col-span-2">
@@ -1586,14 +2471,23 @@ export function MonitoringPolicySettings({
                         onChange={(e) => update('daily_days', e.target.value)}
                     />
                 </Field>
-                <label className="flex items-center gap-2 self-end rounded-md border p-3 text-sm">
-                    <input
-                        type="checkbox"
-                        checked={Boolean(form.legal_hold)}
-                        onChange={(e) => update('legal_hold', e.target.checked)}
-                    />{' '}
-                    Preserve matching evidence under legal hold
-                </label>
+                <div className="flex items-center justify-between gap-4 border-b border-border py-3">
+                    <Label htmlFor={panelBase + '-legal-hold'}>
+                        Preserve matching evidence under legal hold
+                    </Label>
+                    <div className="flex items-center gap-2">
+                        <span className="text-caption">
+                            {form.legal_hold ? 'On' : 'Off'}
+                        </span>
+                        <Switch
+                            id={panelBase + '-legal-hold'}
+                            checked={Boolean(form.legal_hold)}
+                            onCheckedChange={(value) =>
+                                update('legal_hold', value)
+                            }
+                        />
+                    </div>
+                </div>
             </div>
         );
     }
@@ -1601,23 +2495,52 @@ export function MonitoringPolicySettings({
 
 function TabIntro({
     title,
+    caption,
     action,
     enabled,
     onAction,
 }: {
     title: string;
+    caption?: string;
     action: string;
     enabled: boolean;
     onAction: () => void;
 }) {
     return (
-        <div className="flex items-center justify-between gap-3">
-            <h3 className="font-semibold">{title}</h3>
-            {enabled ? (
-                <Button size="sm" onClick={onAction}>
-                    <Plus /> {action}
-                </Button>
-            ) : null}
-        </div>
+        <ListCaption
+            title={title}
+            caption={caption}
+            right={
+                enabled ? (
+                    <Button size="sm" onClick={onAction}>
+                        <Plus />
+                        {action}
+                    </Button>
+                ) : undefined
+            }
+        />
     );
+}
+
+function PolicyPanel({
+    kind,
+    view,
+    base,
+    children,
+}: {
+    kind: Kind;
+    view: PolicyView;
+    base: string;
+    children: ReactNode;
+}) {
+    return view === kind ? (
+        <section
+            role="tabpanel"
+            id={base + '-panel'}
+            aria-label={labels[kind]}
+            className="space-y-5"
+        >
+            {children}
+        </section>
+    ) : null;
 }

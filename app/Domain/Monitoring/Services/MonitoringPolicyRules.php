@@ -6,11 +6,14 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
+use App\Support\ZonedLocalTime;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use DateTimeZone;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 final class MonitoringPolicyRules
 {
@@ -155,10 +158,12 @@ final class MonitoringPolicyRules
             'device_id' => ['nullable', 'integer', 'exists:devices,id'],
             'name' => ['required', 'string', 'min:3', 'max:128'],
             'starts_at' => ['required', 'date'],
-            'ends_at' => ['required', 'date', 'after:starts_at'],
+            'ends_at' => ['required', 'date'],
             'recurrence' => ['nullable', Rule::in(['daily', 'weekly'])],
             'recurrence_until' => ['nullable', 'date'],
             'timezone' => ['required', 'string', 'max:64'],
+            'dst_overlap' => ['sometimes', Rule::in(['reject', 'earlier', 'later'])],
+            'dst_gap' => ['sometimes', Rule::in(['reject', 'skip'])],
             'reason' => ['required', 'string', 'min:10', 'max:500'],
         ])->validate();
 
@@ -169,11 +174,16 @@ final class MonitoringPolicyRules
             $this->fail('timezone', 'Choose a valid IANA timezone.');
         }
 
-        $startsAt = CarbonImmutable::parse((string) $values['starts_at'])->utc();
-        $endsAt = CarbonImmutable::parse((string) $values['ends_at'])->utc();
+        $overlap = $values['dst_overlap'] ?? 'reject';
+        $gap = $values['dst_gap'] ?? 'reject';
+        $startsAt = $this->maintenanceInstant($values['starts_at'], $values['timezone'], $overlap, 'starts_at');
+        $endsAt = $this->maintenanceInstant($values['ends_at'], $values['timezone'], $overlap, 'ends_at');
+        if ($endsAt <= $startsAt) {
+            $this->fail('ends_at', 'Maintenance must end after it starts.');
+        }
         $recurrence = $values['recurrence'] ?? null;
         $recurrenceUntil = isset($values['recurrence_until'])
-            ? CarbonImmutable::parse((string) $values['recurrence_until'])->utc()
+            ? $this->maintenanceInstant($values['recurrence_until'], $values['timezone'], $overlap, 'recurrence_until')
             : null;
 
         if ($recurrence === null && $recurrenceUntil !== null) {
@@ -185,13 +195,7 @@ final class MonitoringPolicyRules
         if ($recurrenceUntil !== null && $recurrenceUntil > $startsAt->addYear()) {
             $this->fail('recurrence_until', 'Recurring maintenance cannot extend beyond one year.');
         }
-        $duration = $startsAt->diffInSeconds($endsAt);
-        $maximum = $recurrence === 'weekly' ? 604800 : 86400;
-        if ($recurrence !== null && $duration >= $maximum) {
-            $this->fail('ends_at', 'A recurring occurrence must be shorter than its recurrence period.');
-        }
-
-        return [
+        $schedule = [
             'site_id' => (int) $values['site_id'],
             'monitor_id' => isset($values['monitor_id']) ? (int) $values['monitor_id'] : null,
             'device_id' => isset($values['device_id']) ? (int) $values['device_id'] : null,
@@ -201,9 +205,43 @@ final class MonitoringPolicyRules
             'recurrence' => $recurrence,
             'recurrence_until' => $recurrenceUntil,
             'timezone' => (string) $values['timezone'],
+            'dst_overlap' => $overlap,
+            'dst_gap' => $gap,
             'policy' => 'suppress_notifications_and_ticketing',
             'reason' => trim((string) $values['reason']),
         ];
+        try {
+            (new MaintenanceSchedule)->occurrences($schedule);
+        } catch (InvalidArgumentException $exception) {
+            $code = $exception->getMessage();
+            $this->fail($code === 'ambiguous_local_time' ? 'dst_overlap' : ($code === 'nonexistent_local_time' ? 'dst_gap' : 'ends_at'), match ($code) {
+                'ambiguous_local_time' => 'A repeated local hour occurs in this schedule. Choose its first or second occurrence.',
+                'nonexistent_local_time' => 'A local time is skipped in this schedule. Choose another time or explicitly skip that occurrence.',
+                'invalid_recurring_duration', 'overlapping_occurrences' => 'A repeated maintenance window must finish before its next occurrence.',
+                default => 'The maintenance schedule could not be resolved. Review its dates and clock choices.',
+            });
+        }
+
+        return $schedule;
+    }
+
+    private function maintenanceInstant(DateTimeInterface|string $value, string $zone, string $overlap, string $field): CarbonImmutable
+    {
+        try {
+            $instant = (new ZonedLocalTime)->parse($value, $zone, $overlap);
+        } catch (InvalidArgumentException $exception) {
+            $this->fail($field, match ($exception->getMessage()) {
+                'ambiguous_local_time' => 'This local time occurs twice. Choose its first or second occurrence or include the selected UTC offset.',
+                'nonexistent_local_time' => 'This local time does not exist when clocks move forward. Choose another time.',
+                'invalid_local_offset' => 'The selected UTC offset does not match this local time and timezone.',
+                default => 'Enter an exact date and time in the selected timezone.',
+            });
+        }
+        if ($instant->micro !== 0) {
+            $this->fail($field, 'Maintenance times use whole seconds. Remove fractional seconds.');
+        }
+
+        return $instant;
     }
 
     /** @param array<string, mixed> $attributes

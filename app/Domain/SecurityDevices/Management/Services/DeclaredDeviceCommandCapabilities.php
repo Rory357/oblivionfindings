@@ -2,6 +2,9 @@
 
 namespace App\Domain\SecurityDevices\Management\Services;
 
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Queclink\QueclinkDevice;
 use Illuminate\Support\Collection;
@@ -34,6 +37,19 @@ final class DeclaredDeviceCommandCapabilities
 
         if ($this->hasNativeQueclinkManagement($device)) {
             $declared->push('tracking.location_refresh', 'configuration.refresh', 'configuration.apply', 'device.reboot');
+        }
+
+        $declared = $declared->reject(fn (string $key): bool => in_array($key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install'], true));
+        if (app(EndpointServiceAuthority::class)->supports($device)) {
+            $declared->push('endpoint.service.manage');
+        }
+
+        if (app(EndpointRestartAuthority::class)->supports($device)) {
+            $declared->push('endpoint.computer.restart');
+        }
+
+        if (app(EndpointSoftwareAuthority::class)->supports($device)) {
+            $declared->push('endpoint.software.install');
         }
 
         return $declared->unique()->values();

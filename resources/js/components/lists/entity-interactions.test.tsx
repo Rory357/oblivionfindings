@@ -20,6 +20,32 @@ vi.mock('@inertiajs/react', () => ({
 }));
 
 describe('Canonical list interactions', () => {
+    it('keeps a nullable per-record destination unlinked and keyboard-openable', () => {
+        const opened = vi.fn();
+        render(
+            <EntityTable
+                rows={[{ id: 1 }, { id: 2 }]}
+                rowKey={(row) => row.id}
+                identity={(row) => ({ name: 'Record ' + row.id })}
+                columns={[]}
+                actionsFor={() => []}
+                hrefFor={(row) => (row.id === 1 ? '/it/tickets/1' : null)}
+                onOpen={opened}
+            />,
+        );
+        expect(screen.getByRole('link', { name: 'Record 1' })).toHaveAttribute(
+            'href',
+            '/it/tickets/1',
+        );
+        expect(
+            screen.queryByRole('link', { name: 'Record 2' }),
+        ).not.toBeInTheDocument();
+        const row = screen.getByText('Record 2').closest('[role="row"]')!;
+        expect(row).toHaveAttribute('tabindex', '0');
+        fireEvent.keyDown(row, { key: 'Enter' });
+        expect(opened).toHaveBeenCalledWith({ id: 2 });
+    });
+
     it('preserves legacy table activation and isolates child keyboard events', () => {
         const opened = vi.fn();
         render(

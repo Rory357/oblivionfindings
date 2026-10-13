@@ -16,6 +16,8 @@ use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventSearchIndexing;
 use App\Http\Middleware\ProtectItDraftResponses;
+use App\Http\Middleware\ProtectObliResponses;
+use App\Http\Middleware\ProtectRemoteSupportResponses;
 use App\Http\Middleware\ProtectVendorVaultResponses;
 use App\Http\Middleware\RecordItApiRequest;
 use App\Http\Middleware\RoleScope;
@@ -46,6 +48,8 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('api')
                 ->prefix('api')
                 ->group(base_path('routes/monitoring-collector.php'));
+            Route::middleware('api')->prefix('api')->group(base_path('routes/endpoint-agent.php'));
+            Route::middleware('api')->prefix('api')->group(base_path('routes/obli-api.php'));
         },
     )
     ->withBroadcasting(
@@ -53,6 +57,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ['middleware' => ['web', 'auth']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(ProtectObliResponses::class);
+        $middleware->prepend(ProtectRemoteSupportResponses::class);
+        // SDP is a wire protocol: retain exact CRLF and fingerprint bytes.
+        $middleware->trimStrings(except: [fn (Request $request): bool => $request->is(
+            'api/endpoints/agent/remote/*/media/offer', 'it/remote-support/sessions/*/media/answer',
+        )]);
         $middleware->prepend(TraceItTicketCreation::class);
         $middleware->prepend(ProtectItDraftResponses::class);
         $middleware->prepend(ProtectVendorVaultResponses::class);
@@ -88,11 +98,22 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(fn (Throwable $exception, Request $request) => ProtectRemoteSupportResponses::render($exception, $request));
+        $exceptions->report(fn (Throwable $exception) => ProtectRemoteSupportResponses::report($exception));
+        $exceptions->render(fn (Throwable $exception, Request $request) => ProtectObliResponses::render($exception, $request));
+        $exceptions->report(fn (Throwable $exception) => ProtectObliResponses::report($exception));
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectItDraftResponses::render($exception, $request));
         $exceptions->report(fn (Throwable $exception) => ProtectItDraftResponses::report($exception));
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectVendorVaultResponses::render($exception, $request));
         $exceptions->report(fn (Throwable $exception) => ProtectVendorVaultResponses::report($exception));
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request): Response {
+            if (ProtectObliResponses::applies($request)) {
+                ProtectObliResponses::headers($response);
+            }
+            if ($request->is('api/endpoints/agent/*', 'security-devices/devices/*/endpoint/*')) {
+                $response->headers->set('Cache-Control', 'private, no-store, max-age=0');
+                $response->headers->set('Pragma', 'no-cache');
+            }
             // dontFlash only covers top-level keys; witness PINs posted inside
             // arrays (fleet transport medications) are removed here.
             ScrubNestedWitnessSecrets::fromFlashedInput($exception, $request);
@@ -107,6 +128,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'rotation_evidence',
             'secret_manager_reference',
             'credential_material',
+            'code_verifier',
+            'code',
+            'credential',
+            'enrolment_token',
             'lease_id',
             'token',
             'access_token',

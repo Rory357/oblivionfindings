@@ -139,9 +139,9 @@ describe('TrackingWorkspacePanels', () => {
         expect(
             screen.getByRole('heading', { name: 'Tracking at a glance' }),
         ).toBeInTheDocument();
-        expect(screen.getByText('2 personal safety')).toBeInTheDocument();
-        expect(screen.getByText('1 Fleet')).toBeInTheDocument();
-        expect(screen.getByText('2 asset tracking')).toBeInTheDocument();
+        expectFact('Personal safety', '2');
+        expectFact('Fleet', '1');
+        expectFact('Asset tracking', '2');
         expect(
             screen.getByRole('heading', {
                 name: 'Location access follows purpose',
@@ -178,7 +178,7 @@ describe('TrackingWorkspacePanels', () => {
         expect(
             screen.getByText(/Counts below describe the first 100/),
         ).toBeInTheDocument();
-        expect(screen.getByText('2 personal safety shown')).toBeInTheDocument();
+        expectFact('Personal safety shown', '2');
         expect(
             screen.getByText(/1 matching authorised trackers shown/),
         ).toBeInTheDocument();
@@ -379,3 +379,10 @@ describe('TrackingWorkspacePanels', () => {
         expect(screen.queryByTestId('tracking-map')).not.toBeInTheDocument();
     });
 });
+
+function expectFact(label: string, value: string) {
+    const labelElement = screen.getByText(label, { exact: true });
+    expect(
+        within(labelElement.parentElement!).getByText(value, { exact: true }),
+    ).toBeInTheDocument();
+}

@@ -30,6 +30,7 @@ import {
 } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
 
+import { Notice } from '@/components/emar/record-dose/parts';
 import { MedicinePackPhoto, PackPhotoCell } from './photo-bits';
 import {
     isConcealed,
@@ -60,6 +61,47 @@ const STATUS = {
     paused: ['Paused', 'neutral'],
     stopped: ['Stopped', 'neutral'],
 } as const;
+
+/**
+ * EA-208 (Lane C9): a refresh that failed keeps the records on screen and
+ * says so, as Meds today does — refresh before relying on them.
+ */
+export function StaleNotice({
+    stale,
+    loadedAt,
+    reload,
+}: {
+    stale: boolean;
+    loadedAt: number | null;
+    reload: () => void;
+}) {
+    if (!stale) return null;
+    const time = loadedAt
+        ? new Date(loadedAt).toLocaleTimeString('en-NZ', {
+              hour: 'numeric',
+              minute: '2-digit',
+              timeZone: 'Pacific/Auckland',
+          })
+        : null;
+    return (
+        <Notice
+            tone="warning"
+            live="status"
+            title={
+                time
+                    ? `Not updated since ${time} (NZ time)`
+                    : 'Not updated since the last load'
+            }
+            actions={
+                <Button size="sm" variant="outline" onClick={reload}>
+                    Refresh
+                </Button>
+            }
+        >
+            Refresh before you record or rely on this.
+        </Notice>
+    );
+}
 
 export function ReadingState({
     load,
@@ -100,15 +142,21 @@ export function MedicinesSection({
     search,
     onMedicine,
     onPhotos,
+    type = 'all',
+    attention = false,
 }: {
     clientId: number;
     stopped: boolean;
     search: string;
+    /** EA-109 (Lane C9): the approved Medicines filters. */
+    type?: 'all' | 'scheduled' | 'prn';
+    /** Waiting to be checked or on hold. */
+    attention?: boolean;
     onMedicine: (id: number) => void;
     /** C11: open Medicines › Photos for one medicine. */
     onPhotos?: (id: number) => void;
 }) {
-    const { data, load, reload } = useRecordJson<{
+    const { data, load, reload, stale, loadedAt } = useRecordJson<{
         rows: MaybeConcealed<RecordMedicine>[];
         hidden: number;
     }>(
@@ -117,16 +165,23 @@ export function MedicinesSection({
     if (load !== 'ready' || !data)
         return <ReadingState load={load} reload={reload} />;
     const query = search.trim().toLocaleLowerCase('en-NZ');
+    const filtering = Boolean(query) || type !== 'all' || attention;
     const rows = data.rows.filter(
         (row) =>
-            !query ||
+            !filtering ||
             (!isConcealed(row) &&
-                `${row.name} ${row.strength ?? ''}`
-                    .toLocaleLowerCase('en-NZ')
-                    .includes(query)),
+                (!query ||
+                    `${row.name} ${row.strength ?? ''}`
+                        .toLocaleLowerCase('en-NZ')
+                        .includes(query)) &&
+                (type === 'all' || row.kind === type) &&
+                (!attention ||
+                    row.status === 'awaiting' ||
+                    row.status === 'paused')),
     );
     return (
         <div className="flex min-w-0 flex-col gap-5">
+            <StaleNotice stale={stale} loadedAt={loadedAt} reload={reload} />
             <ListCaption
                 title={stopped ? 'Stopped medicines' : 'Current medicines'}
                 caption={

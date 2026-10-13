@@ -63,7 +63,9 @@ final class MonitoringObservationIngestor
 
             [$metricDataClass, $metricPrivacyClass] = $this->metricClassification($locked);
 
+            $maintenanceEvidence = app(MaintenanceHistory::class)->resolve($locked, $input->observedAt);
             $observation = MonitorObservation::create([
+                'maintenance_policy_evidence' => $maintenanceEvidence,
                 'monitor_id' => $locked->id,
                 'source_key' => $input->sourceKey,
                 'state' => $input->state,
@@ -109,7 +111,7 @@ final class MonitoringObservationIngestor
             $locked->save();
             $locked->refresh()->load('profile');
 
-            [$effectiveTo, $rootCauseMonitorId, $suppressionReason] = $this->effectiveState($locked, $input);
+            [$effectiveTo, $rootCauseMonitorId, $suppressionReason] = $this->effectiveState($locked, $input, $maintenanceEvidence);
             $effectiveChanged = $effectiveTo !== $effectiveFrom;
             $locked->effective_state = $effectiveTo;
             $locked->root_cause_monitor_id = $rootCauseMonitorId;
@@ -336,11 +338,10 @@ final class MonitoringObservationIngestor
     }
 
     /** @return array{MonitorState, ?int, ?string} */
-    private function effectiveState(Monitor $monitor, ObservationInput $input): array
+    private function effectiveState(Monitor $monitor, ObservationInput $input, array $maintenanceEvidence): array
     {
         if ($monitor->current_state->isFailure()) {
-            $window = $this->maintenance->activeWindow($monitor, $input->observedAt);
-            if ($window !== null && $window->policy === 'suppress_notifications_and_ticketing') {
+            if ($maintenanceEvidence['state'] === 'applied') {
                 return [MonitorState::Suppressed, null, 'maintenance'];
             }
 

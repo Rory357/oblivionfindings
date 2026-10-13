@@ -1,0 +1,76 @@
+{
+  "reviewed_at_utc": "2026-10-11T21:32:53Z",
+  "scope": "H&S source delta: Fleet dashboard adapter, deferred Fleet read extraction and bounded private exact-model projection repair",
+  "candidate_root": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "status": "BOUNDED_SOURCE_REVIEW_ONLY_NOT_FREEZE_NOT_INTEGRATION_OR_RUNTIME_ACCEPTANCE",
+  "root_observation": {
+    "path": "storage/logs/hs18-root-private-ui-fleet-source-delta-2026-10-12.json",
+    "sha256": "974B3DB0D29AECF157CE27129755EE0136A9374F4A4A11D76A7BA64124DB4DCF",
+    "selected_files": 17,
+    "matched": 17
+  },
+  "fleet": {
+    "proposal": "docs/health-safety-audit-2026-10-07/FLEET-INCIDENT-CURRENT-READ-PROPOSAL.md",
+    "proposal_sha256": "A6DB53968DFD992ED614C0CAC212AA9488106C21834C32FD9D58F1B1A445B2C4",
+    "unapplied_patch_sha256": "0ADFC23075E8E6A368A993657EA5D50BDBBBC1DD934F3597A6EE674D9E80C0DF",
+    "source_service_sha256": "33DF18E00423E74183C7AC7FB12EE7C7A5405C3540E88AD3DB82D65A568445A7",
+    "hs_consumer_sha256": "4FAD60CD0C944E94F400C668683B2BD64758E860E817A2C80495396632C4319D",
+    "hero_sha256": "071A5581FEBD5B5101B0EC98BF30012C1500584FAE88CAED9AC2DE5D83D68535",
+    "proposal_pins": 17,
+    "matched": 16,
+    "moving_test": {
+      "path": "tests/Feature/FleetAssets/FleetIncidentReadScopeTest.php",
+      "proposal_sha256": "C0170928A593190FCA825E8E0E28D664E6DCA441F6C0515E4F0B194304012198",
+      "observed_sha256": "74F0B471FFEB3B3945C7AA3DD5AAC4FADC4125C67808FE1CA106D5619A30363A"
+    },
+    "main_controller_unchanged_sha256": "74B96EC877CD172B35123A378A5790454942AB156A14C1002D22B3BBECEE9E07",
+    "main_routes_unchanged_sha256": "2EFBBC3015614E969220BD9C5BD9A1C3D57722FFD92AAAF988150C36C791DC59"
+  },
+  "source_observations": [
+    "Same active context prepares permission union without granting it; independent Fleet read requires fleet.viewAny OR assets.viewAny; fleet.manage remains only canonical Site bypass.",
+    "H&S selected/current Sites intersect Fleet asset.site_id scope; home_site_id cannot confer access. Existing resolver preserved.",
+    "Denied or empty admitted Site intersection returns restricted/null without Fleet count query. Readable no-match returns zero. Hero restricted meter is an in-page explanation, not a destination link.",
+    "Rolling interval lower inclusive / upper exclusive is normalized UTC; open count uses actual reported/investigating scope with no occurrence cutoff, retaining older unresolved records.",
+    "Whole service read, semantic controller patch read, representative service/actual H&S GET/prospective HTTP cases sampled. Tests not executed.",
+    "Deferred extraction includes fresh callbacks for list/count/stats/detail/options and stream-time CSV; existing HR/Client/HSE copied-field privacy remains an explicit prerequisite. Semantic patch is not adopted.",
+    "Dashboard still intentionally links rolling meter to honestly described full register. Identical observed instant bounds must eventually reach destination/pagination/return before matching drilldown acceptance."
+  ],
+  "evidence_correction": {
+    "site_isolation_sha256": "C72DB2196A0B1E0470593DA59708B16453920A5D5F4A1D2E356FF40F77D5D349",
+    "finding": "Proposal prose incorrectly says two historical positive fixtures are untouched/pending; actual source and continuation have Fleet read/bypass grants while retaining count assertions. Proposal service-test pin differs from current source.",
+    "action": "Owner notified once to reconcile prose and identify finite completed test delta in next bounded handoff; no silent repin or interruption of active work.",
+    "selected_site_erratum": "Prior coordinator claim withdrawn; resolver already narrows explicit selected Site. Not reintroduced."
+  },
+  "private_projection": {
+    "manifest": "storage/logs/chemical-exposure-workspace-transport-source-candidate.json",
+    "manifest_sha256": "310482B69F02275A1FEB841F52401E3230407CAE4A361DCDCB981CFA6FA9C54D",
+    "owned_files": 9,
+    "matched": 9,
+    "workspace_sha256": "19E8587CA39F385DC54348F4A28126C2520573977ABCC9C81B92719EFB3F4872",
+    "review": "Sampled exact presented root/child snapshot comparison, canonical currentVersion proof on the presented model, retained historical metadata/receipt/content digest check, and representative interleaving source cases. Addresses the reported legacy reader refetch pattern in source; not a complete private privacy/concurrency/transport or performance review.",
+    "suite_declarations_unrun": {
+      "workspace": 31,
+      "http": 20,
+      "physical_transport": 12,
+      "return": 6
+    },
+    "controller_routes_aliases": "UNAPPLIED; private page/forms/recovery composition continues."
+  },
+  "open": [
+    "Fleet owner integration and then-current shared source review; independent linked HR/Client/HSE projection privacy.",
+    "Full private proof/body/transport/recovery, notification destination/Tasks, HSE, audit/risk and same-text/no-op CR origin contracts.",
+    "Safeguarding minimal canonical reader proposal under owner preparation.",
+    "All runtime/native/browser/physical filesystem/migration/provider/source-cost checks; source test count is not passing evidence."
+  ],
+  "coordination": {
+    "owner_notified": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+    "hs_cursor": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:43",
+    "hs_status": "active",
+    "other_chats": "No repeated message or restart; last saved cursors unchanged."
+  },
+  "actions_not_performed": [
+    "No app-source edit or shared patch application.",
+    "No executable tests/builds/database/browser/process/provider operations.",
+    "No MAIN integration, live record change or completion claim."
+  ]
+}

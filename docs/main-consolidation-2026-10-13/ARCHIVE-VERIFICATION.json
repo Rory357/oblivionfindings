@@ -1,0 +1,41 @@
+[
+  {
+    "name": "control-room",
+    "archive": "control-room-unfinished-source.tar.xz",
+    "sha256": "7eeb73a96b8a8f61bc2613e666c6ce570b8dd37da79034eb4df07935c52dc558",
+    "archive_bytes": 824076,
+    "files": 493,
+    "source_bytes": 20982947,
+    "omitted": 0,
+    "deleted": 0,
+    "verified": true,
+    "uncompressed_tar_sha256": "cbcafd064f089e5a76013ea9f6d901f369aef442e3ae997e7fc45397f0a6a387",
+    "recompression_verified": true
+  },
+  {
+    "name": "health-safety",
+    "archive": "health-safety-unfinished-source.tar.xz",
+    "sha256": "98030293ea1388b468d7c1e47f7504a1a1a4f5d84fb8e4f1e2f439def6cea2a4",
+    "archive_bytes": 10015396,
+    "files": 2433,
+    "source_bytes": 99814960,
+    "omitted": 0,
+    "deleted": 0,
+    "verified": true,
+    "uncompressed_tar_sha256": "b45a97863a16bc0ad876ceb2938e2a311af5a0588df12f7665b9ed1755a5d280",
+    "recompression_verified": true
+  },
+  {
+    "name": "workforce",
+    "archive": "workforce-unfinished-source.tar.xz",
+    "sha256": "be8934562f5b7359f8681d7b9cf46f95c50885e55f03ff098f5e7091cb4fe875",
+    "archive_bytes": 8054448,
+    "files": 8422,
+    "source_bytes": 339432409,
+    "omitted": 23,
+    "deleted": 0,
+    "verified": true,
+    "uncompressed_tar_sha256": "a751136a6137d8587dc41d0b78764c4d91277b74d3ebf121889fa56a6496af20",
+    "recompression_verified": true
+  }
+]

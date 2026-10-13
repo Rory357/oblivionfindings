@@ -28,7 +28,7 @@ class MonitorObservation extends Model
         'collector_id',
     ];
 
-    private const array IMMUTABLE_EVIDENCE_ATTRIBUTES = [
+    public const array IMMUTABLE_EVIDENCE_ATTRIBUTES = [
         ...self::IMMUTABLE_PROVENANCE_ATTRIBUTES,
         'source_key',
         'state',
@@ -41,6 +41,7 @@ class MonitorObservation extends Model
         'metric_privacy_class',
         'observed_at',
         'ingested_at',
+        'maintenance_policy_evidence',
     ];
 
     private static bool $provenanceColumnsAvailable = false;
@@ -63,10 +64,14 @@ class MonitorObservation extends Model
         'metric_privacy_class',
         'observed_at',
         'ingested_at',
+        'maintenance_policy_evidence',
         'metrics_projected_at',
     ];
 
+    protected $hidden = ['maintenance_policy_evidence'];
+
     protected $casts = [
+        'maintenance_policy_evidence' => 'array',
         'state' => MonitorState::class,
         'value' => 'decimal:6',
         'latency_ms' => 'integer',

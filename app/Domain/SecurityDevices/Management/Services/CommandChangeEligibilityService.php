@@ -7,13 +7,25 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Models\ItChange;
 use App\Models\ItTicket;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 final class CommandChangeEligibilityService
 {
+    private ?CurrentAuthorizationReads $currentReads = null;
+
     public function __construct(private readonly ItWorkAccessService $workAccess) {}
+
+    public function forCurrentEvidence(CurrentAuthorizationReads $reads): self
+    {
+        $reads->assertActive();
+        $current = new self($this->workAccess->forCurrentEvidence($reads));
+        $current->currentReads = $reads;
+
+        return $current;
+    }
 
     /** @return Collection<int, ItChange> */
     public function eligibleFor(
@@ -29,8 +41,8 @@ final class CommandChangeEligibilityService
         $at ??= CarbonImmutable::now('UTC')->startOfSecond();
         $deviceMorph = $device->getMorphClass();
 
-        return ItChange::query()
-            ->with(['ticket.approvals'])
+        return ($this->currentReads ? $this->currentReads->query(ItChange::query()) : ItChange::query())
+            ->with($this->currentReads ? ['ticket' => fn ($query) => $this->currentReads->query($query->getQuery()), 'ticket.approvals' => fn ($query) => $this->currentReads->query($query->getQuery())] : ['ticket.approvals'])
             ->whereNotNull('maintenance_starts_at')
             ->whereNotNull('maintenance_ends_at')
             ->where('maintenance_starts_at', '<=', $at)
@@ -99,6 +111,8 @@ final class CommandChangeEligibilityService
             return false;
         }
 
-        return ! $change->needsApproval() || $ticket->approvalState() === 'approved';
+        return ! $change->needsApproval() || ($this->currentReads
+            ? $this->currentReads->query($ticket->approvals()->getQuery())->first()?->effectiveStatus()
+            : $ticket->approvalState()) === 'approved';
     }
 }

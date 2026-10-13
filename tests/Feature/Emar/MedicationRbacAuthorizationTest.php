@@ -36,10 +36,12 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationRbacAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     protected function setUp(): void
     {
@@ -790,8 +792,9 @@ class MedicationRbacAuthorizationTest extends TestCase
             "/key: 'destructions',\\s*label: '[^']+',\\s*href: '\\/emar\\/destructions',\\s*icon: \\w+,\\s*visible: all\\(view, any\\(controlledView, stockUpdate\\)\\)/s",
             $navigation,
         );
+        // Approved P06: the Stock view lands on the Stock hub (Lane C8).
         $this->assertMatchesRegularExpression(
-            "/key: 'stock',\\s*label: '[^']+',\\s*href: '\\/emar\\/stock',\\s*icon: \\w+,\\s*visible: all\\(view, stockUpdate\\)/s",
+            "/key: 'stock',\\s*label: '[^']+',\\s*href: '\\/emar\\/stock\\/packs',\\s*icon: \\w+,\\s*visible: all\\(view, stockUpdate\\)/s",
             $navigation,
         );
         // Standard reports need the exact module reader; audit adds its own gate.

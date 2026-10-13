@@ -16,8 +16,66 @@ import {
 } from '@/components/security-devices/native-monitor-dialogs';
 
 vi.mock('axios');
+vi.mock('@inertiajs/react', async () => {
+    const actual =
+        await vi.importActual<typeof import('@inertiajs/react')>(
+            '@inertiajs/react',
+        );
+    return {
+        ...actual,
+        usePage: () => ({
+            props: {
+                auth: {
+                    user: { id: 7 },
+                    can: { 'securityDevices.monitoring.manage': true },
+                },
+            },
+        }),
+    };
+});
+function nativeReply(
+    body: Record<string, unknown>,
+    operation: 'create' | 'update' | 'deactivate',
+) {
+    const row = {
+        id: 91,
+        name:
+            typeof body.name === 'string' ? body.name : 'Gateway reachability',
+        kind: body.kind ?? 'icmp',
+        device_id: 41,
+        profile_id: 7,
+        enabled: operation !== 'deactivate',
+        affects_availability: body.affects_availability ?? true,
+        collection_mode: 'central_direct',
+    };
+    return {
+        data: {
+            monitor: row,
+            current_monitor: { ...row, review_token: 'a'.repeat(64) },
+            receipt: {
+                schema_version: 1,
+                owner: 'Native monitoring',
+                request_uuid: body.request_uuid,
+                actor_id: 7,
+                operation,
+                target_monitor_id: operation === 'create' ? null : 91,
+                monitor_id: 91,
+                device_id: 41,
+                site_id: 14,
+                committed_at: '2026-10-13T00:00:00Z',
+                current_matches_saved: true,
+                confirms: 'configuration_saved',
+                confirms_observation: false,
+            },
+        },
+    };
+}
+function nativeStep(label: string) {
+    fireEvent.click(screen.getByText(label, { exact: true }));
+}
 
 const monitorManagement: NativeMonitorManagement = {
+    actor_id: 7,
     can_manage: true,
     create_url: '/security-devices/monitoring/native-monitors',
     kinds: [{ value: 'icmp', label: 'ICMP availability' }],
@@ -38,8 +96,14 @@ const monitor: NativeMonitorTarget = {
     enabled: true,
     affects_availability: true,
     profile: { id: 7, name: 'Standard policy' },
-    device: { id: 41, name: 'SD-WAN gateway' },
+    device: {
+        id: 41,
+        name: 'SD-WAN gateway',
+        site: { id: 14, name: 'Coast Site' },
+    },
     actions: {
+        actor_id: 7,
+        review_token: 'a'.repeat(64),
         can_manage: true,
         update_url: '/security-devices/monitoring/native-monitors/91',
         deactivate_url:
@@ -73,8 +137,19 @@ const scope: GovernedDiscoveryScope = {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(axios.post).mockResolvedValue({ data: {} });
-    vi.mocked(axios.patch).mockResolvedValue({ data: {} });
+    vi.mocked(axios.post).mockImplementation(async (url, body) =>
+        String(url).includes('/monitoring/native-monitors')
+            ? nativeReply(
+                  body as Record<string, unknown>,
+                  String(url).endsWith('/deactivate') ? 'deactivate' : 'create',
+              )
+            : { data: {} },
+    );
+    vi.mocked(axios.patch).mockImplementation(async (url, body) =>
+        String(url).includes('/monitoring/native-monitors')
+            ? nativeReply(body as Record<string, unknown>, 'update')
+            : { data: {} },
+    );
 });
 
 describe('native monitoring operator workflows', () => {
@@ -90,12 +165,15 @@ describe('native monitoring operator workflows', () => {
             />,
         );
 
+        nativeStep('Device and policy');
         fireEvent.change(screen.getByLabelText('Monitor name'), {
             target: { value: 'Gateway reachability' },
         });
+        nativeStep('Connection');
         fireEvent.change(screen.getByLabelText('Approved target'), {
             target: { value: '10.44.0.10' },
         });
+        nativeStep('Review');
         await waitFor(() => {
             expect(
                 screen.getByRole('button', { name: 'Create direct monitor' }),
@@ -115,8 +193,14 @@ describe('native monitoring operator workflows', () => {
                     name: 'Gateway reachability',
                     target: '10.44.0.10',
                 }),
+                expect.objectContaining({ timeout: 30000 }),
             );
         });
+        await screen.findByRole('heading', {
+            name: 'Monitor configuration saved',
+        });
+        expect(onSaved).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
         expect(onSaved).toHaveBeenCalledOnce();
     });
 
@@ -131,9 +215,11 @@ describe('native monitoring operator workflows', () => {
             />,
         );
 
+        nativeStep('Device and policy');
         fireEvent.change(screen.getByLabelText('Monitor name'), {
             target: { value: 'Gateway availability' },
         });
+        nativeStep('Review');
         fireEvent.click(
             screen.getByRole('button', { name: 'Apply monitor update' }),
         );
@@ -142,6 +228,7 @@ describe('native monitoring operator workflows', () => {
             expect(axios.patch).toHaveBeenCalledWith(
                 monitor.actions.update_url,
                 expect.not.objectContaining({ target: expect.anything() }),
+                expect.objectContaining({ timeout: 30000 }),
             );
         });
     });
@@ -173,7 +260,14 @@ describe('native monitoring operator workflows', () => {
         await waitFor(() => {
             expect(axios.post).toHaveBeenCalledWith(
                 monitor.actions.deactivate_url,
-                { reason_code: 'replaced' },
+                expect.objectContaining({
+                    reason_code: 'replaced',
+                    expected_actor_id: 7,
+                    expected_site_id: 14,
+                    expected_device_id: 41,
+                    review_token: 'a'.repeat(64),
+                }),
+                expect.objectContaining({ timeout: 30000 }),
             );
         });
     });

@@ -44,6 +44,7 @@ import {
 } from './calendar-shared';
 import { DayDetailDialog } from './day-detail-dialog';
 import { ShiftContextMenu, type ShiftCtxState } from './shift-context-menu';
+import { useRosterCalendarFeed } from './use-roster-calendar-feed';
 import {
     buildShiftActions,
     type GridConflictPeer,
@@ -983,12 +984,6 @@ export function CalendarPane(props: CalendarPaneProps) {
         : null;
     const siteIdsKey = (props.filters?.site_ids ?? []).join(',');
 
-    const [events, setEvents] = useState<RawCalendarEvent[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const [refreshTick, setRefreshTick] = useState(0);
-    const refetch = useCallback(() => setRefreshTick((t) => t + 1), []);
-
     const [peek, setPeek] = useState<PeekState | null>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [openDayKey, setOpenDayKey] = useState<string | null>(null);
@@ -1022,60 +1017,23 @@ export function CalendarPane(props: CalendarPaneProps) {
         ),
     );
 
-    useEffect(() => {
-        let cancelled = false;
-        const controller = new AbortController();
-        setLoading(true);
-        (async () => {
-            try {
-                const params = new URLSearchParams({
-                    start: rangeStartKey,
-                    end: rangeEndKey,
-                });
-                if (staffIdFilter != null) {
-                    params.set('staff_id', String(staffIdFilter));
-                }
-                if (clientIdFilter != null) {
-                    params.set('client_id', String(clientIdFilter));
-                }
-                const res = await fetch(
-                    `/operations/rostering/calendar/events?${params.toString()}`,
-                    {
-                        headers: { Accept: 'application/json' },
-                        credentials: 'same-origin',
-                        signal: controller.signal,
-                    },
-                );
-                if (!res.ok) {
-                    throw new Error(`Failed to load events (${res.status})`);
-                }
-                const data = (await res.json()) as RawCalendarEvent[];
-                if (!cancelled) {
-                    setEvents(Array.isArray(data) ? data : []);
-                    setLoadError(null);
-                }
-            } catch (e) {
-                if (!cancelled && (e as Error).name !== 'AbortError') {
-                    setLoadError(
-                        (e as Error).message || 'Failed to load the calendar.',
-                    );
-                }
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [
-        rangeStartKey,
-        rangeEndKey,
-        staffIdFilter,
-        clientIdFilter,
-        refreshTick,
-    ]);
-
+    const params = new URLSearchParams({
+        start: rangeStartKey,
+        end: rangeEndKey,
+    });
+    if (staffIdFilter != null) params.set('staff_id', String(staffIdFilter));
+    if (clientIdFilter != null) params.set('client_id', String(clientIdFilter));
+    const {
+        events,
+        assessed,
+        loading,
+        error: loadError,
+        retry: refetch,
+        updateEvents,
+    } = useRosterCalendarFeed(
+        `/operations/rostering/calendar/events?${params.toString()}`,
+        JSON.stringify([auth?.user?.id ?? null, siteIdsKey]),
+    );
     // Every shift mutation in this workspace goes through Inertia
     // (assign/unassign/cancel/duplicate/publish/… and the shared
     // CreateShiftDialog submit). Refetch the JSON feed whenever one succeeds.
@@ -1163,6 +1121,13 @@ export function CalendarPane(props: CalendarPaneProps) {
         setPeek(null);
         setCtx(null);
     }, []);
+
+    useEffect(() => {
+        if (assessed) return;
+        closeFloating();
+        dragShift.current = null;
+        setDragOver(null);
+    }, [assessed, closeFloating]);
 
     // Wrap the page-level handlers so any floating UI closes before a dialog
     // opens on top.
@@ -1271,7 +1236,7 @@ export function CalendarPane(props: CalendarPaneProps) {
             const s = dragShift.current;
             dragShift.current = null;
             setDragOver(null);
-            if (!s || s.dateKey === dateKey || !canUpdate) return;
+            if (!s || s.dateKey === dateKey || !canUpdate || !assessed) return;
             if (!DRAGGABLE_STATUSES.includes(s.status)) return;
 
             const oldStart = new Date(s.starts_at);
@@ -1290,7 +1255,7 @@ export function CalendarPane(props: CalendarPaneProps) {
             );
 
             // Optimistic move so the chip lands instantly.
-            setEvents((prev) =>
+            updateEvents((prev) =>
                 prev.map((ev) =>
                     Number(ev.id) === s.id &&
                     ev.extendedProps?.event_type !== 'coverage_gap'
@@ -1323,7 +1288,7 @@ export function CalendarPane(props: CalendarPaneProps) {
                 refetch();
             }
         },
-        [canUpdate, refetch],
+        [canUpdate, refetch, assessed, updateEvents],
     );
 
     const quickAdd = useCallback(
@@ -1368,10 +1333,13 @@ export function CalendarPane(props: CalendarPaneProps) {
 
     const moveMonth = (delta: number) => {
         closeFloating();
+        setOpenDayKey(null);
         setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
     };
 
     const pickDate = (d: Date) => {
+        closeFloating();
+        setOpenDayKey(null);
         setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
         setPickerOpen(false);
         setFocusDate(ymdKey(d));
@@ -1444,6 +1412,7 @@ export function CalendarPane(props: CalendarPaneProps) {
                             type="button"
                             onClick={() => {
                                 closeFloating();
+                                setOpenDayKey(null);
                                 setCursor(
                                     new Date(
                                         today.getFullYear(),
@@ -1572,7 +1541,7 @@ export function CalendarPane(props: CalendarPaneProps) {
                             'flex flex-col gap-1 border-border px-4 py-3',
                             i > 0 && 'border-l',
                             i === 3 && 'max-lg:border-l-0',
-                            t.alarm && 'bg-status-critical-bg/40',
+                            assessed && t.alarm && 'bg-status-critical-bg/40',
                         )}
                     >
                         <span className="text-[10.5px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
@@ -1580,14 +1549,28 @@ export function CalendarPane(props: CalendarPaneProps) {
                         </span>
                         <span
                             className="text-[22px] leading-none font-bold tracking-tight tabular-nums"
-                            style={t.accent ? { color: t.accent } : undefined}
+                            style={
+                                assessed && t.accent
+                                    ? { color: t.accent }
+                                    : undefined
+                            }
                         >
-                            {t.v}
+                            {assessed ? t.v : '—'}
                         </span>
                     </div>
                 ))}
             </div>
 
+            {!assessed ? (
+                <p
+                    role="status"
+                    className="mx-4 mt-3 text-sm text-muted-foreground"
+                >
+                    {loading
+                        ? 'Loading this calendar range…'
+                        : 'Calendar totals are unavailable until this range loads.'}
+                </p>
+            ) : null}
             {loadError ? (
                 <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg px-4 py-3 text-sm text-status-critical">
                     <span className="flex items-center gap-2">
@@ -1641,10 +1624,10 @@ export function CalendarPane(props: CalendarPaneProps) {
                                         focused={focusDate === key}
                                         shifts={byDay.get(key) ?? []}
                                         hasGap={gapsByDay.has(key)}
-                                        canCreate={canCreate}
-                                        canDrag={canUpdate}
+                                        canCreate={canCreate && assessed}
+                                        canDrag={canUpdate && assessed}
                                         dragOver={dragOver === key}
-                                        onOpen={openDay}
+                                        onOpen={assessed ? openDay : () => {}}
                                         onQuickAdd={quickAdd}
                                         onPeek={onChipPeek}
                                         onCtx={openCtxAt}
@@ -1665,7 +1648,7 @@ export function CalendarPane(props: CalendarPaneProps) {
             </div>
 
             {/* ── floating layers ── */}
-            {peek ? (
+            {assessed && peek ? (
                 <PeekPopover
                     key={peek.key}
                     peek={peek}
@@ -1676,12 +1659,17 @@ export function CalendarPane(props: CalendarPaneProps) {
                     onMore={onMoreFromPeek}
                 />
             ) : null}
-            {ctx ? (
+            {assessed && ctx ? (
                 <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
             ) : null}
 
             <DayDetailDialog
-                open={Boolean(openDayKey)}
+                open={
+                    assessed &&
+                    openDayKey !== null &&
+                    openDayKey >= rangeStartKey &&
+                    openDayKey < rangeEndKey
+                }
                 dayKey={openDayKey ?? todayKey}
                 todayKey={todayKey}
                 shifts={openDayShifts}

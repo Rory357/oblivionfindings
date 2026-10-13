@@ -25,6 +25,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * eMAR P01 C2 live walk follow-ups: a re-offer after a refusal is a second
@@ -38,6 +39,7 @@ use Tests\TestCase;
 class P01ReofferReadersTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 

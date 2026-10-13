@@ -1,0 +1,46 @@
+{
+  "checked_at_utc": "2026-10-12T04:02:00Z",
+  "source": "Authorised incoming Workforce checkpoint; bounded read of saved results, manifest, independent source review and current applied file hashes",
+  "actual_result": {
+    "path": "test-results/timesheet-applied-direct-actual-a-20261012/result.json",
+    "sha256": "AF51D71FF7B8B718CC0983F9F1CC69929BFCEBDEBF90E2573AF3CF11FDE6DF59",
+    "state": "ACTUAL_AFFECTED_SUITES_PASSED",
+    "started": true,
+    "test_exit": 0,
+    "total": 155,
+    "passed": 155,
+    "failed": 0,
+    "pending": 0,
+    "whole_suite_files": 8,
+    "vitest_json_matches": true,
+    "after_read_complete": true,
+    "own_child_exit_confirmed": true,
+    "output_streams_closed": true,
+    "product_applied": true,
+    "typecheck_included": false,
+    "php_database_build_browser": false
+  },
+  "applied_source": {
+    "manifest": "test-results/workforce-timesheet-legacy-owner-r3-20261012/manifest.json",
+    "sha256": "C63F08A2C4D7797FE9665077C26F16A00C41D1005518C696AC6154F58E4C8BE3",
+    "proposed_files_checked": 16,
+    "current_main_matches": 16,
+    "mismatches": [],
+    "independent_review": "test-results/workforce-timesheet-legacy-owner-independent-review-r3-20261012/review.json",
+    "review_sha256": "768936F427E0B795D9058A2C78EC84202991D4027FF7548E26524256E0CA74C8",
+    "review_status": "CLEAR_SOURCE_ONLY",
+    "review_limits": "Legacy owning-page read/lifetime and retained frontend commands only. No correction workspace/backend API activation. Source review is distinct from actual test execution."
+  },
+  "owner_report_only": {
+    "unstaged": true,
+    "last_pushed_main": "bf130109",
+    "next": "Targeted source/style checks then owned-only commit/push under standing authority",
+    "earlier_frozen_image_attempt": "100 passing checks with three collection errors for unchanged relative imports; retained as failure. Direct config runs actual applied files.",
+    "requester_settings": "Three-file backend slice plus two-line operations routes proposal remains inactive until actual requester consumer; named injury-approver authority remains unanswered."
+  },
+  "acceptance": "Verified applied-local frontend checkpoint and actual 155/155 component result. No full workflow, design, browser, type, backend, deployment or overall-scope sign-off.",
+  "parent_actions": "No application/source edits, runtime probes, duplicate tests, process interference, Git staging or owner messages.",
+  "next_gate": "Owner's targeted checks and owned commit/push evidence; then remaining backend/integration/Rory design and real workflow verification.",
+  "heartbeat": "ACTIVE",
+  "all_scopes_complete": false
+}

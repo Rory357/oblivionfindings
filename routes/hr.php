@@ -1120,6 +1120,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/create', [AnnouncementController::class, 'create'])->name('create');
             Route::get('/export', [AnnouncementController::class, 'export'])->name('export');
             Route::get('/preview', [AnnouncementController::class, 'preview'])->name('preview');
+            Route::get('/{announcement}/edit-data', [AnnouncementController::class, 'editData'])->name('edit-data');
             Route::post('/', [AnnouncementController::class, 'store'])->name('store');
             Route::post('/bulk', [AnnouncementController::class, 'bulk'])->name('bulk');
             Route::post('/remind-bulk', [AnnouncementController::class, 'remindBulk'])->name('remind-bulk');

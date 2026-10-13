@@ -1,19 +1,34 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import {
+    EntityChip,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import { EvidenceRecords } from '@/components/lists/evidence-records';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderViewToggle,
+} from '@/components/page';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { GitBranch, LayoutGrid, Plus, Search } from 'lucide-react';
+import { formatDateTime } from '@/lib/datetime';
+import { Head, router, usePage } from '@inertiajs/react';
+import { Eye, GitBranch, LayoutGrid, List, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
+import type { Paginated } from '../devices/shared';
+import { GroupWizard, groupTypeLabel } from './_dialogs';
 
-import { type Paginated, FilterSelect } from '../devices/shared';
-
-// ── Types ─────────────────────────────────────────────────────────
-
-type GroupItem = {
+export type GroupItem = {
     id: number;
     name: string;
     type: string;
@@ -21,207 +36,354 @@ type GroupItem = {
     devices_count: number;
     created_at: string | null;
 };
-
-type Props = {
+export type GroupIndexProps = {
     groups: Paginated<GroupItem>;
     filters: Record<string, string>;
 };
-
-function typeLabel(type: string): string {
+type GroupView = 'all' | 'with_devices' | 'empty';
+const pageUrl = '/security-devices/device-groups';
+export default function DeviceGroupsIndex(props: GroupIndexProps) {
+    const [layout, setLayout] = useState<'cards' | 'table'>('cards');
+    const { auth } = usePage<{
+        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+    }>().props;
     return (
-        {
-            location: 'Location',
-            functional: 'Functional',
-            vendor: 'Vendor',
-            maintenance: 'Maintenance',
-            custom: 'Custom',
-        }[type] ?? type
+        <GroupList
+            key={JSON.stringify([auth?.user?.id, auth?.can, props])}
+            {...props}
+            layout={layout}
+            setLayout={setLayout}
+        />
     );
 }
-
-function typeVariant(type: string): 'default' | 'secondary' | 'outline' {
-    switch (type) {
-        case 'location':
-            return 'default';
-        case 'functional':
-            return 'default';
-        case 'vendor':
-            return 'secondary';
-        case 'maintenance':
-            return 'outline';
-        default:
-            return 'outline';
-    }
-}
-
-// ── Component ─────────────────────────────────────────────────────
-
-export default function DeviceGroupsIndex({ groups, filters }: Props) {
+function GroupList({
+    groups,
+    filters,
+    layout,
+    setLayout,
+}: GroupIndexProps & {
+    layout: 'cards' | 'table';
+    setLayout: (view: 'cards' | 'table') => void;
+}) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [created, setCreated] = useState(false);
     const [search, setSearch] = useState(filters.search ?? '');
-    const pageUrl = '/security-devices/device-groups';
-
-    const applyFilters = (newFilters: Record<string, string>) => {
+    const [view, setView] = useState<GroupView>('all');
+    const applyFilters = (next: Record<string, string>) =>
         router.get(
             pageUrl,
-            { ...filters, ...newFilters, page: '1' },
+            { ...filters, ...next, page: '1' },
             { preserveState: true },
         );
-    };
-
     const clearFilters = () => {
-        router.get(pageUrl, {}, { preserveState: true });
         setSearch('');
+        setView('all');
+        router.get(pageUrl, {}, { preserveState: true });
     };
-
-    const hasActiveFilters = Object.values(filters).some(
-        (v) => v && v !== 'all',
+    const hasServerFilters = Boolean(
+        filters.search || (filters.type && filters.type !== 'all'),
     );
-
+    const rows = groups.data.filter(
+        (group) =>
+            view === 'all' ||
+            (view === 'empty'
+                ? group.devices_count === 0
+                : group.devices_count > 0),
+    );
+    const headerViews = [
+        {
+            key: 'all' as const,
+            label: 'Current page',
+            count: groups.data.length,
+        },
+        {
+            key: 'with_devices' as const,
+            label: 'With devices',
+            count: groups.data.filter((group) => group.devices_count > 0)
+                .length,
+        },
+        {
+            key: 'empty' as const,
+            label: 'Empty groups',
+            count: groups.data.filter((group) => group.devices_count === 0)
+                .length,
+        },
+    ];
+    const actionsFor = (group: GroupItem): MenuItem[] => [
+        {
+            label: 'Open group',
+            icon: Eye,
+            onClick: () => router.visit(`${pageUrl}/${group.id}`),
+        },
+    ];
+    const fields: EntityTableColumn<GroupItem>[] = [
+        {
+            key: 'type',
+            label: 'Group type',
+            width: '130px',
+            cell: (group) => (
+                <EntityChip>{groupTypeLabel(group.type)}</EntityChip>
+            ),
+        },
+        {
+            key: 'members',
+            label: 'Devices in group',
+            width: '130px',
+            cell: (group) => <EntityChip>{group.devices_count}</EntityChip>,
+        },
+        {
+            key: 'description',
+            label: 'Description',
+            width: '1.3fr',
+            cell: (group) => group.description || 'No description recorded',
+        },
+        {
+            key: 'created',
+            label: 'Created',
+            width: '150px',
+            cell: (group) =>
+                group.created_at
+                    ? formatDateTime(group.created_at)
+                    : 'No time recorded',
+        },
+    ];
+    const columns: EntityTableColumn<GroupItem>[] = [
+        {
+            key: 'details',
+            label: 'Group details',
+            width: '1fr',
+            cell: (record) => (
+                <div className="space-y-1">
+                    {fields.map((field) => (
+                        <ReviewRow
+                            key={field.key}
+                            label={field.label}
+                            value={field.cell(record)}
+                        />
+                    ))}
+                </div>
+            ),
+        },
+    ];
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
-                { title: 'Device Groups', href: pageUrl },
+                { title: 'Device groups', href: pageUrl },
             ]}
         >
-            <Head title="Device Groups - Security & Devices" />
-
-            <PageShell>
-                <PageHero
-                    icon={LayoutGrid}
-                    title="Device Groups"
-                    description="Organise devices into logical groups for management, reporting, and operational visibility."
-                    stats={[
-                        { label: 'Groups', value: groups.meta.total },
-                        {
-                            label: 'Devices',
-                            value: groups.data.reduce(
-                                (sum, g) => sum + g.devices_count,
-                                0,
-                            ),
-                        },
-                    ]}
+            <Head title="Device groups - Security & Devices" />
+            <div className="space-y-5">
+                <PageHeader
+                    icon={GitBranch}
+                    title="Device groups"
+                    subline="Organise approved devices for management, reporting and operational visibility."
+                    mobileSummary={`${groups.meta.total} matching groups · page ${groups.meta.current_page} of ${groups.meta.last_page}`}
                     actions={
-                        <Button asChild size="sm">
-                            <Link href="/security-devices/device-groups/create">
-                                <Plus className="mr-2 h-4 w-4" /> Create Group
-                            </Link>
-                        </Button>
+                        <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter')
+                                        applyFilters({ search });
+                                }}
+                                ariaLabel="Search all device groups"
+                                placeholder="Search group names and descriptions…"
+                            />
+                            <PageHeaderGlassButton
+                                icon={Search}
+                                onClick={() => applyFilters({ search })}
+                            >
+                                Search
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={() => {
+                                    setCreated(false);
+                                    setCreateOpen(true);
+                                }}
+                            >
+                                Create group
+                            </PageHeaderPrimaryButton>
+                        </>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Matching groups"
+                                ariaLabel="View current group results"
+                                onClick={() => setView('all')}
+                            >
+                                <PageHeaderMeterBig>
+                                    {groups.meta.total}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Across all pages of this search
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            {headerViews.slice(1).map((item) => (
+                                <PageHeaderMeterBlock
+                                    key={item.key}
+                                    label={item.label}
+                                    ariaLabel={`View ${item.label.toLowerCase()} on this page`}
+                                    onClick={() => setView(item.key)}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {item.count}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        On the current page only
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ))}
+                        </>
+                    }
+                    filters={
+                        <>
+                            <PageHeaderFilterSelect
+                                label="All group types"
+                                value={filters.type || 'all'}
+                                options={[
+                                    'location',
+                                    'functional',
+                                    'vendor',
+                                    'maintenance',
+                                    'custom',
+                                ].map((value) => ({
+                                    value,
+                                    label: groupTypeLabel(value),
+                                }))}
+                                onChange={(type) => applyFilters({ type })}
+                            />
+                            {hasServerFilters || search || view !== 'all' ? (
+                                <PageHeaderFilterButton onClick={clearFilters}>
+                                    Clear filters
+                                </PageHeaderFilterButton>
+                            ) : null}
+                            <PageHeaderViewToggle
+                                value={layout}
+                                onChange={setLayout}
+                                options={[
+                                    {
+                                        value: 'cards',
+                                        label: 'Cards',
+                                        icon: LayoutGrid,
+                                    },
+                                    {
+                                        value: 'table',
+                                        label: 'Table',
+                                        icon: List,
+                                    },
+                                ]}
+                            />
+                        </>
+                    }
+                    rail={
+                        <PageHeaderRail<GroupView>
+                            items={headerViews}
+                            value={view}
+                            onSelect={setView}
+                            ariaLabel="Device group views"
+                        />
                     }
                 />
-
-                {/* Filters */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            placeholder="Search groups..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) =>
-                                e.key === 'Enter' && applyFilters({ search })
-                            }
-                            className="pl-9"
+                <section
+                    aria-label="Device group records"
+                    className="space-y-3"
+                >
+                    {groups.data.length === 0 && !hasServerFilters ? (
+                        <EmptyList
+                            icon={GitBranch}
+                            itemName="group"
+                            onCreate={() => {
+                                setCreated(false);
+                                setCreateOpen(true);
+                            }}
+                            createLabel="Create group"
+                            description="Create a group to organise your approved devices."
                         />
-                    </div>
-                    <FilterSelect
-                        value={filters.type}
-                        onChange={(v) => applyFilters({ type: v })}
-                        placeholder="Type"
-                        options={[
-                            { value: 'location', label: 'Location' },
-                            { value: 'functional', label: 'Functional' },
-                            { value: 'vendor', label: 'Vendor' },
-                            { value: 'maintenance', label: 'Maintenance' },
-                            { value: 'custom', label: 'Custom' },
-                        ]}
-                    />
-                    {hasActiveFilters && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={clearFilters}
-                        >
-                            Clear
-                        </Button>
+                    ) : rows.length === 0 ? (
+                        <EmptySearch
+                            title="No matching groups"
+                            onClear={clearFilters}
+                        />
+                    ) : (
+                        <EvidenceRecords<GroupItem>
+                            key={view}
+                            title="Device groups"
+                            description={`${rows.length} shown from ${groups.data.length} groups on this page · ${groups.meta.total} matching groups across all pages. Devices can belong to more than one group.`}
+                            rows={rows}
+                            total={groups.meta.total}
+                            view={layout}
+                            rowKey={(group) => group.id}
+                            identity={(group) => ({
+                                icon: GitBranch,
+                                name: group.name,
+                                subline: groupTypeLabel(group.type),
+                            })}
+                            hrefFor={(group) => `${pageUrl}/${group.id}`}
+                            actionsFor={actionsFor}
+                            cardFor={(group) => ({
+                                icon: GitBranch,
+                                name: group.name,
+                                subline: groupTypeLabel(group.type),
+                                meridian: 'neutral',
+                                chips: (
+                                    <EntityChip>
+                                        {group.devices_count === 0
+                                            ? 'Empty group'
+                                            : 'Has devices'}
+                                    </EntityChip>
+                                ),
+                                metric: {
+                                    label: 'Devices in group',
+                                    value: group.devices_count,
+                                    percent: null,
+                                },
+                                alerts: (
+                                    <p className="line-clamp-2">
+                                        {group.description ||
+                                            'No description recorded'}
+                                    </p>
+                                ),
+                                footer: {
+                                    primary: 'Created',
+                                    secondary: group.created_at
+                                        ? formatDateTime(group.created_at)
+                                        : 'No time recorded',
+                                },
+                            })}
+                            columns={columns}
+                            compactColumns={[fields[0], fields[1], fields[3]]}
+                            empty="No groups on this page."
+                            icon={GitBranch}
+                            minWidth={850}
+                        />
                     )}
-                </div>
-
-                {/* Group list */}
-                {groups.data.length > 0 ? (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {groups.data.map((group) => (
-                            <Link
-                                key={group.id}
-                                href={`/security-devices/device-groups/${group.id}`}
-                                className="group flex flex-col rounded-lg border p-4 transition-all hover:bg-muted/50 hover:shadow-md"
-                            >
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            <span className="truncate text-sm font-semibold">
-                                                {group.name}
-                                            </span>
-                                        </div>
-                                        {group.description && (
-                                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                                {group.description}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <Badge
-                                        variant={typeVariant(group.type)}
-                                        className="shrink-0 text-[10px]"
-                                    >
-                                        {typeLabel(group.type)}
-                                    </Badge>
-                                </div>
-                                <div className="mt-3 text-xs text-muted-foreground">
-                                    {group.devices_count} device
-                                    {group.devices_count !== 1 ? 's' : ''}
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                ) : hasActiveFilters ? (
-                    <EmptySearch
-                        onClear={clearFilters}
-                        title="No matching groups"
+                    <LaravelPagination
+                        links={groups.links}
+                        lastPage={groups.meta.last_page}
                     />
-                ) : (
-                    <EmptyList
-                        icon={GitBranch}
-                        itemName="group"
-                        createHref="/security-devices/device-groups/create"
-                        createLabel="Create Group"
-                        description="Create device groups to organise your hardware estate."
-                    />
-                )}
-
-                {/* Pagination */}
-                {(groups.meta.last_page ?? 1) > 1 && (
-                    <div className="flex items-center justify-center gap-1">
-                        {groups.links.map((link, i) => (
-                            <Button
-                                key={i}
-                                variant={link.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!link.url}
-                                onClick={() =>
-                                    link.url &&
-                                    router.get(
-                                        link.url,
-                                        {},
-                                        { preserveState: true },
-                                    )
-                                }
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
-                    </div>
-                )}
-            </PageShell>
+                    <p className="text-caption">
+                        Search and group type apply across all pages. The
+                        membership tabs apply to the current page.
+                    </p>
+                </section>
+            </div>
+            <GroupWizard
+                open={createOpen}
+                onSaved={() => setCreated(true)}
+                onClose={() => {
+                    setCreateOpen(false);
+                    if (created)
+                        router.reload({
+                            only: ['groups'],
+                            preserveScroll: true,
+                        });
+                }}
+            />
         </AppLayout>
     );
 }

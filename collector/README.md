@@ -134,3 +134,9 @@ only after correcting its cause, start one manual cycle, confirm ordered upload
 and heartbeat recovery, then restart the timer. A revoked identity is never
 re-enabled; use the audited central replacement-enrolment workflow with new
 identity material.
+
+## Recoverable enrolment development path
+
+The new opt-in `enrol-recoverable` command preserves its pending key before contacting central and can recover a lost reply while the original Site-scoped grant remains valid. See [Recoverable site-collector enrolment](../docs/native-endpoint-management/COLLECTOR-ENROLMENT.md) for the protocol, private-directory prerequisites, CLI and limits. The existing `enrol` route retains its one-time semantics. The Windows service host and Computer/Site/Both operator installer now exist in source. The guided Site profile can also be consumed using `enrol-profile`; see [Combined installation](../docs/native-endpoint-management/COMBINED-INSTALLATION.md) for confirmations, private file/state requirements and current platform evidence. Signed installed operation, graphical Windows setup and complete Linux distribution remain unfinished.
+
+The Windows native service host source now lives in `endpoint-agent/cmd/oblivion-collector`; see [Windows collector host](../docs/native-endpoint-management/WINDOWS-COLLECTOR.md). Its `runtime-check --identity=<path>` call validates local installed identity and runtime only, without network probes. Local readiness does not prove central monitoring health. Windows installation/service registration and signed release acceptance remain unfinished.

@@ -1,5 +1,4 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { EntityTable } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateTime } from '@/lib/datetime';
@@ -9,6 +8,7 @@ import { BellRing, ClipboardCheck, Pill, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { AllergyRecord } from './allergy-record';
 import { ReadingState } from './reading';
+import { RecordTable } from './record-table';
 import { isConcealed, type MaybeConcealed } from './types';
 import { concealedIdentity, SectionCard } from './ui';
 import { useRecordJson } from './use-record-json';
@@ -46,9 +46,12 @@ type Safety = {
 export function SafetySection({
     clientId,
     view,
+    showResolved = false,
 }: {
     clientId: number;
     view: string;
+    /** EA-109 (Lane C9): resolved chart alerts are shown on request. */
+    showResolved?: boolean;
 }) {
     const { data, load, reload } = useRecordJson<Safety>(
         `/emar/clients/${clientId}/record/safety`,
@@ -59,6 +62,10 @@ export function SafetySection({
     if (view === 'allergies') return <AllergyRecord clientId={clientId} />;
     if (!data || load !== 'ready')
         return <ReadingState load={load} reload={reload} />;
+    const alerts = data.alerts.filter(
+        (row) => showResolved || isConcealed(row) || !row.resolved_at,
+    );
+    const resolvedHidden = data.alerts.length - alerts.length;
     return (
         <>
             {view === 'interactions' ? (
@@ -69,7 +76,7 @@ export function SafetySection({
                         not establish that other interactions are absent.
                     </p>
                     {data.interactions.rows.length ? (
-                        <EntityTable
+                        <RecordTable
                             rows={data.interactions.rows}
                             rowKey={(row) => row.key}
                             identityLabel="Medicines"
@@ -143,9 +150,16 @@ export function SafetySection({
                             : ''}
                         .
                     </p>
-                    {data.alerts.length ? (
-                        <EntityTable
-                            rows={data.alerts}
+                    {resolvedHidden ? (
+                        <p className="text-caption text-muted-foreground">
+                            {resolvedHidden} resolved{' '}
+                            {resolvedHidden === 1 ? 'alert' : 'alerts'} not
+                            shown · use “Show resolved alerts” in the header.
+                        </p>
+                    ) : null}
+                    {alerts.length ? (
+                        <RecordTable
+                            rows={alerts}
                             rowKey={(row) => row.key}
                             identityLabel="Alert"
                             identity={(row) =>

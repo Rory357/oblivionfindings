@@ -24,7 +24,8 @@ import { WizardShell } from '@/components/wizard/shell';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
-import { Head, Link, router } from '@inertiajs/react';
+import { emarScopedHref } from '@/lib/emar-navigation';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
     ArrowLeftRight,
@@ -152,6 +153,7 @@ type Props = {
 };
 
 export default function Orders(props: Props) {
+    const page = usePage();
     const [modal, setModal] = useState<Modal>(null);
     const [search, setSearch] = useState(props.filters.search ?? '');
     const request = useRef<AbortController | null>(null);
@@ -624,7 +626,7 @@ export default function Orders(props: Props) {
                                 },
                                 {
                                     key: 'covert',
-                                    label: 'Covert giving',
+                                    label: 'Covert',
                                     icon: ShieldCheck,
                                 },
                                 {
@@ -640,7 +642,13 @@ export default function Orders(props: Props) {
                             ]}
                             onSelect={(value) =>
                                 value === 'reviews'
-                                    ? router.get('/emar/reviews')
+                                    ? // EA-134 (Lane C8): keep the house and person.
+                                      router.get(
+                                          emarScopedHref(
+                                              '/emar/reviews',
+                                              page.url,
+                                          ),
+                                      )
                                     : filter({ view: value, show: '' })
                             }
                         />

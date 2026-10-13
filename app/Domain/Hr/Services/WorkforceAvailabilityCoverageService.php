@@ -35,9 +35,9 @@ class WorkforceAvailabilityCoverageService
     ];
 
     /** @return Collection<int, WorkforceAvailabilityCoverageAction> */
-    public function syncApprovedLeave(HrLeaveRequest $request, User $actor): Collection
+    public function syncApprovedLeave(HrLeaveRequest $request, User $actor, ?callable $persist = null): Collection
     {
-        return DB::transaction(function () use ($request, $actor): Collection {
+        return DB::transaction(function () use ($request, $actor, $persist): Collection {
             $locked = HrLeaveRequest::query()
                 ->lockForUpdate()
                 ->findOrFail($request->getKey());
@@ -47,6 +47,7 @@ class WorkforceAvailabilityCoverageService
                     WorkforceAvailabilityCoverageAction::SOURCE_LEAVE,
                     (int) $locked->id,
                     $actor,
+                    $persist,
                 );
 
                 return collect();
@@ -59,6 +60,7 @@ class WorkforceAvailabilityCoverageService
                 Carbon::parse($locked->starts_at),
                 Carbon::parse($locked->ends_at),
                 $actor,
+                $persist,
             );
         });
     }
@@ -153,6 +155,7 @@ class WorkforceAvailabilityCoverageService
         CarbonInterface $windowStartsAt,
         ?CarbonInterface $windowEndsAt,
         User $actor,
+        ?callable $persist = null,
     ): Collection {
         $now = now();
         $targetShiftIds = $this->targetShiftQuery(
@@ -199,6 +202,7 @@ class WorkforceAvailabilityCoverageService
                 fn (WorkforceAvailabilityCoverageAction $action) => $targetShiftIds->contains((int) $action->shift_id),
             ),
             $actor,
+            $persist,
         );
 
         $actions = $targetShifts->map(function (Shift $shift) use (
@@ -209,7 +213,11 @@ class WorkforceAvailabilityCoverageService
             $subjectUserId,
             $windowEndsAt,
             $windowStartsAt,
+            $persist,
         ): WorkforceAvailabilityCoverageAction {
+            if ($persist) {
+                $shift = $persist($shift, [], false);
+            }
             $action = $existingActions->first(
                 fn (WorkforceAvailabilityCoverageAction $candidate) => (int) $candidate->shift_id === (int) $shift->id,
             );
@@ -219,6 +227,7 @@ class WorkforceAvailabilityCoverageService
                 $subjectUserId,
                 $actor,
                 $sourceType,
+                $persist,
             );
 
             $attributes = [
@@ -239,17 +248,24 @@ class WorkforceAvailabilityCoverageService
             ];
 
             if ($action) {
+                if ($persist) {
+                    return $persist($action, $attributes);
+                }
                 $action->update($attributes);
 
                 return $action->fresh();
             }
 
-            return WorkforceAvailabilityCoverageAction::query()->create(array_merge($attributes, [
+            $attributes = array_merge($attributes, [
                 'source_type' => $sourceType,
                 'source_id' => $sourceId,
                 'shift_id' => $shift->id,
                 'created_by' => $actor->id,
-            ]));
+            ]);
+
+            return $persist
+                ? $persist(new WorkforceAvailabilityCoverageAction, $attributes)
+                : WorkforceAvailabilityCoverageAction::query()->create($attributes);
         });
 
         return $actions->values();
@@ -322,6 +338,7 @@ class WorkforceAvailabilityCoverageService
         int $subjectUserId,
         User $owner,
         string $sourceType,
+        ?callable $persist = null,
     ): array {
         $activeReplacement = ShiftReplacementRequest::query()
             ->where('shift_id', $shift->id)
@@ -336,9 +353,12 @@ class WorkforceAvailabilityCoverageService
             ]);
         }
 
+        if ($activeReplacement && $persist) {
+            $activeReplacement = $persist($activeReplacement, [], false);
+        }
         $managesReplacement = false;
         if (! $activeReplacement) {
-            $activeReplacement = ShiftReplacementRequest::query()->create([
+            $attributes = [
                 'shift_id' => $shift->id,
                 'requested_by' => $owner->id,
                 'current_staff_id' => $subjectUserId,
@@ -349,7 +369,10 @@ class WorkforceAvailabilityCoverageService
                 'notes' => 'Coverage action created from an approved workforce availability change.',
                 'required_skills' => [],
                 'requested_at' => now(),
-            ]);
+            ];
+            $activeReplacement = $persist
+                ? $persist(new ShiftReplacementRequest, $attributes)
+                : ShiftReplacementRequest::query()->create($attributes);
             $managesReplacement = true;
         }
 
@@ -359,6 +382,10 @@ class WorkforceAvailabilityCoverageService
             ->orderBy('id')
             ->lockForUpdate()
             ->first();
+
+        if ($openPosition && $persist) {
+            $openPosition = $persist($openPosition, [], false);
+        }
 
         // A standalone open position predates this source. Link it into the
         // replacement workflow, but do not let a later HR cancellation close
@@ -377,23 +404,32 @@ class WorkforceAvailabilityCoverageService
 
         if ($openPosition) {
             if (! $openPosition->replacement_request_id) {
-                $openPosition->update(['replacement_request_id' => $activeReplacement->id]);
+                if ($persist) {
+                    $persist($openPosition, ['replacement_request_id' => $activeReplacement->id]);
+                } else {
+                    $openPosition->update(['replacement_request_id' => $activeReplacement->id]);
+                }
             }
         } else {
-            ShiftOpenPosition::query()->create([
+            $attributes = [
                 'shift_id' => $shift->id,
                 'replacement_request_id' => $activeReplacement->id,
                 'status' => 'open',
                 'required_skills' => $activeReplacement->required_skills ?? [],
                 'coverage_roles' => $shift->coverage_roles ?? [],
                 'notes' => 'Replacement needed because staff availability changed.',
-            ]);
+            ];
+            if ($persist) {
+                $persist(new ShiftOpenPosition, $attributes);
+            } else {
+                ShiftOpenPosition::query()->create($attributes);
+            }
         }
 
         return [$activeReplacement, $managesReplacement];
     }
 
-    private function cancelSourceActions(string $sourceType, int $sourceId, User $actor): void
+    private function cancelSourceActions(string $sourceType, int $sourceId, User $actor, ?callable $persist = null): void
     {
         $shiftIds = WorkforceAvailabilityCoverageAction::query()
             ->where('source_type', $sourceType)
@@ -417,21 +453,26 @@ class WorkforceAvailabilityCoverageService
             ->lockForUpdate()
             ->get();
 
-        $this->cancelActions($actions, $actor);
+        $this->cancelActions($actions, $actor, $persist);
     }
 
     /** @param Collection<int, WorkforceAvailabilityCoverageAction> $actions */
-    private function cancelActions(Collection $actions, User $actor): void
+    private function cancelActions(Collection $actions, User $actor, ?callable $persist = null): void
     {
         $replacementIds = collect();
 
         foreach ($actions as $action) {
             if ($action->status !== WorkforceAvailabilityCoverageAction::STATUS_CANCELLED) {
-                $action->update([
+                $attributes = [
                     'status' => WorkforceAvailabilityCoverageAction::STATUS_CANCELLED,
                     'cancelled_by' => $actor->id,
                     'cancelled_at' => now(),
-                ]);
+                ];
+                if ($persist) {
+                    $persist($action, $attributes);
+                } else {
+                    $action->update($attributes);
+                }
             }
 
             if ($action->replacement_request_id) {
@@ -465,11 +506,16 @@ class WorkforceAvailabilityCoverageService
                 continue;
             }
 
-            $replacement->update([
+            $attributes = [
                 'status' => ShiftReplacementService::CANCELLED,
                 'cancelled_by' => $actor->id,
                 'cancelled_at' => now(),
-            ]);
+            ];
+            if ($persist) {
+                $persist($replacement, $attributes);
+            } else {
+                $replacement->update($attributes);
+            }
 
             ShiftOpenPosition::query()
                 ->where('replacement_request_id', $replacement->id)
@@ -477,7 +523,9 @@ class WorkforceAvailabilityCoverageService
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get()
-                ->each(fn (ShiftOpenPosition $position) => $position->update(['status' => 'cancelled']));
+                ->each(fn (ShiftOpenPosition $position) => $persist
+                    ? $persist($position, ['status' => 'cancelled'])
+                    : $position->update(['status' => 'cancelled']));
         }
     }
 }

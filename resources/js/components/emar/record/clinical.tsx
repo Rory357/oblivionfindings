@@ -1,5 +1,4 @@
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
-import { EntityTable } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -25,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { ReadingState } from './reading';
+import { RecordTable } from './record-table';
 import { isConcealed, type MaybeConcealed } from './types';
 import { concealedIdentity, FactStrip, recordDate, SectionCard } from './ui';
 import { useDraftClose } from './use-draft-close';
@@ -262,7 +262,7 @@ export function ClinicalSection({
                                         </p>
                                     )}
                                     {driver.checks.length > 0 && (
-                                        <EntityTable
+                                        <RecordTable
                                             rows={driver.checks}
                                             rowKey={(check) => check.id}
                                             identityLabel="Check"
@@ -394,7 +394,7 @@ export function ClinicalSection({
                         )}
                     </SectionCard>
                     {data.inr.rows.length > 0 && (
-                        <EntityTable
+                        <RecordTable
                             rows={data.inr.rows}
                             rowKey={(result) => result.key}
                             identityLabel="Result"
@@ -560,7 +560,7 @@ function ObservationList({
                 when acting on a reading.
             </p>
             {rows.length ? (
-                <EntityTable
+                <RecordTable
                     rows={rows}
                     rowKey={(row) => row.key}
                     identityLabel="Dose reading"

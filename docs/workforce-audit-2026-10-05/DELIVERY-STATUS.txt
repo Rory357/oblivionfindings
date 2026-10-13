@@ -1,0 +1,53 @@
+WORKFORCE DELIVERY STATUS — 12 OCTOBER 2026
+
+The supported-living Workforce programme is incomplete. Preserve existing functionality, approved Site/record/privacy boundaries, the independent Control Room and Claude's eMAR work.
+
+Current menu decision: SIX entries — Rostering, Available shifts, Attendance, Timesheets, Handovers, Settings. Shift notes remains a distinct view under Handovers. The later verified human correction supersedes the earlier seven-entry answer. Shared sidebar reduction is not yet applied; retain all lawful worker/manager entry points before changing it.
+
+Your confirmed settings decisions
+- Unknown mandatory qualification: warning by default; configurable; authorised manager can proceed.
+- House requirements: choose per requirement, every worker or a specified minimum number; retain the agreed first-option default.
+- Staff can request corrections to their own approved timesheets by default; configurable managers-only option.
+- Approved corrections update Attendance, Timesheet and canonical HR together, preserving the original clock history.
+- Work-restriction approvers are selected individually. List management does not grant approval or injury-record access.
+- Self-review of restrictions is configurable and prevented by default, for both approval and removal.
+- Authorised approvers can end retained restrictions for former/inactive staff, with a reason and history retained.
+
+Implemented in current frontend source, still awaiting acceptance
+- Rostering groups its ten existing views into five working sections without replacing the underlying views or routes.
+- Handovers and Shift notes have distinct workspace tabs with their own permissions, records, status filters and canonical links.
+- Contextual roster links retain the week, Sites, staff and person filters. The different full-list search remains independent.
+- The roster view selector retains the percentage of active shifts assigned, and says No active shifts when its denominator is zero. This percentage is not a claim that staffing demand is met.
+
+Prepared, not connected to the application
+- Individually named approver editor using the shared settings overview/review layout. Drafts are retained on close, nonselectable people require explicit removal, and previous-account data is concealed.
+- Exact save validation and original-attempt correlation for checking uncertain saves after reload. Stored correlation excludes people, names, selections and reasons. Server confirmation and local cleanup are separate facts.
+- These 41 new frontend checks are authored but UNRUN. Source reviews are clear for their bounded scope; they do not prove runtime behaviour.
+- Approved-Site-bound approver settings backend: 56 checks authored, UNRUN; source-reviewed. Actual authority/catalogue/shared-route composition and operational approval binding remain open.
+- Atomic Attendance/Timesheet/HR correction backend: narrow R2 has 70 checks authored, UNRUN; independent source review is clear (aa0ba1a9). The final read-authority and protected-record baseline fixes are source-reviewed. Native validation, durable confirmation and recovery still remain open; original failed review evidence is preserved.
+- Operations/Attendance handover draft and pending-attempt lifetime: 15 scenarios authored, UNRUN; bounded R3 source review is clear (f7a74aad). The synchronous permission-change and stale navigation-snapshot findings were fixed. The owning React hook has four additional UNRUN checks and bounded source review is clear (bfe9bc40); React timing and StrictMode remain unverified. This code is unmounted: close, navigation, browser Back and reload protection are not yet delivered.
+- Handover command preparation and receipt checks: 15 checks authored, UNRUN; bounded source review is clear (4b0cc75a). The agreed backend contract separates exact original-save evidence from current record facts; validation errors and missing witnesses remain uncertain. No clinical text or witness credentials are added to browser storage.
+- Restriction decision/settings R5: 85 checks authored, UNRUN. Narrow source review (7c38a084) and coordinator review mark WF-IMPACT-POSTCOMMIT-01 source-closed in candidate2498d6ae. Coordinator matched21 packet files with zero drift and independently restored the whole prior Impact service. The final target/named-audience gate follows both confirmation callback paths without another framework commit. Prior R4 and its original hold remain history. Defaults and former-staff policy remain unchanged; actual SQL/PDO/event ordering, full source/evaluation/AFTER/witness, generation/ABA, API/recovery/host/browser/Rory acceptance remain open. No source/schema/route/grant adoption.
+- Handover backend checkpoint 1879c92a is explicitly incomplete and inactive. Nine PHP source images cover the Operations-only adapter, intent and proposed evidence schema. Controller/orchestrator, checked timeline/audits, trusted witness/recovery and tests are missing; the 20 listed future requirements are not authored tests. No global service replacement is allowed.
+
+Next work
+1. Finish committed-account/read lifetime, original-command transport, safe reconciliation and recovery ownership; connect complete settings pages and authorised navigation only after their backend workflow is ready.
+2. Finish restriction decision/configuration integration using your new self-review and former-staff decisions. Resolve remaining duty, hour, date and severity semantics without inventing clinical fitness or retroactively approving old records.
+3. Protect handover submissions and drafts against dismissal/navigation while saving or uncertain. Keep the shared eMAR behaviour unaffected.
+4. Finish strict correction confirmation/history/recovery evidence and its paired frontend workflow. Do not expose requests that nobody can review or claim saved from a status alone.
+5. Run pending native checks, lint/types/build and real desktop/mobile journeys. Re-audit hero dimensions, tab switching, discoverability and complete worker/manager workflows.
+6. Complete the 31-module/137-link acceptance ledger, then reduce duplicate menu entries with lawful replacement paths.
+   Align the agreed Available shifts label across the current Job Board menu, hero, breadcrumb, browser title and pagination; preserve its existing routes and claim/approval actions. The source still uses Job Board in those locations.
+7. Commit/integrate/push reviewed, verified increments to local and GitHub main, as authorised.
+
+Current verification and delivery
+- Sixteen-file Timesheet lint: passed, zero errors/warnings. Two lint fixes remain uncommitted.
+- Current-source Timesheet rerun: pending all 155 unique checks across two batches. Batch A attempt d was held BEFORE a test worker at 4076 MiB free/CPU 54% with five heavy peer jobs; final input reads complete, all counts null. Prior a/b/c evidence remains retained. Next A attempt is e; B is unrun. Nothing was stopped or weakened to force admission.
+- Shared ReassignDialog is restored to its exact pinned baseline. Its explicit-zone overnight date improvement and two checks are private candidates awaiting paired adoption; privileged-warning UI/backend must also be adopted together.
+- No new runtime/browser pass, commit or GitHub push in this continuation. Current local main is 763572ca8; other owners' changes and Git index remain untouched.
+- The full goal is not complete. The app goal currently reports usageLimited; work in the human-requested continuation proceeds without an agent-side status reset.
+
+Full outstanding ledger: OUTSTANDING-WORK-HANDOFF.md
+Module audit and architecture: audit.md, cross-module-architecture.md, navigation.md, verification.md
+Prior complete status history: history/DELIVERY-STATUS-BEFORE-CONDENSE-2026-10-12.txt
+All original failed/held/source-review receipts remain in test-results; none have been replaced with a claimed test pass.
