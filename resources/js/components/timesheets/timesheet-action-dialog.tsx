@@ -17,7 +17,7 @@ import {
     ExternalLink,
     Loader2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { timesheetText, useTimesheetCommand } from './use-timesheet-command';
 import type { ViewTimesheetRow } from './view-timesheet-dialog';
 export type TimesheetReviewAction = 'submit' | 'approve' | 'reject' | 'return';
@@ -33,27 +33,51 @@ const statuses = {
     reject: 'rejected',
     return: 'returned',
 };
-export function TimesheetActionDialog(props: {
+export type TimesheetActionDialogProps = {
     open: boolean;
-    action: TimesheetReviewAction;
-    record: ViewTimesheetRow;
+    action: TimesheetReviewAction | null;
+    record: ViewTimesheetRow | null;
     canAct: boolean;
+    writeCoordination?: Parameters<typeof useTimesheetCommand>[1];
     onOpenChange: (open: boolean) => void;
-}) {
-    return props.open ? (
-        <TimesheetActionBody
-            key={`${props.record.id}:${props.action}`}
-            {...props}
-        />
-    ) : null;
+};
+/** Keep this component mounted in the owning page, outside transient viewers. */
+export function TimesheetActionDialog(props: TimesheetActionDialogProps) {
+    const requestedKey = props.record && props.action
+        ? `${props.record.id}:${props.action}` : null;
+    const serial = useRef(0), wasOpen = useRef(props.open);
+    const protectedForm = useRef<() => boolean>(() => true);
+    const [session, setSession] = useState<{
+        key: string; serial: number; record: ViewTimesheetRow; action: TimesheetReviewAction;
+    } | null>(() => props.open && requestedKey && props.record && props.action
+        ? { key: requestedKey, serial: 0, record: props.record, action: props.action } : null);
+    useLayoutEffect(() => {
+        const reopening = props.open && !wasOpen.current;
+        wasOpen.current = props.open;
+        if (!props.open || !requestedKey || !props.record || !props.action) return;
+        if (!session || (!protectedForm.current() &&
+            (requestedKey !== session.key || reopening))) {
+            protectedForm.current = () => true;
+            serial.current += 1;
+            setSession({ key: requestedKey, serial: serial.current,
+                record: props.record, action: props.action });
+        }
+    }, [props.open, props.record, props.action, requestedKey, session]);
+    if (!session) return null;
+    const targetAvailable = requestedKey === session.key;
+    return <TimesheetActionBody {...props} key={`${session.key}:${session.serial}`}
+        action={session.action} record={targetAvailable && props.record ? props.record : session.record}
+        canAct={targetAvailable && props.canAct} targetAvailable={targetAvailable}
+        protectedForm={protectedForm} releaseDraft={() => setSession(null)} />;
 }
-function TimesheetActionBody({
-    action,
-    record,
-    canAct,
-    onOpenChange,
-}: Parameters<typeof TimesheetActionDialog>[0]) {
-    const currentActor = Number(usePage<SharedData>().props.auth.user?.id ?? 0);
+function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 'record'> & {
+    action: TimesheetReviewAction; record: ViewTimesheetRow; targetAvailable: boolean;
+    protectedForm: { current: () => boolean }; releaseDraft: () => void;
+}) {
+    const { action, record, canAct, writeCoordination, onOpenChange } = props;
+    const rawActor = usePage<SharedData>().props.auth.user?.id;
+    const currentActor = typeof rawActor === 'number' && Number.isSafeInteger(rawActor) && rawActor > 0
+        ? rawActor : 0;
     const currentClientId =
         record.client_id !== undefined
             ? record.client_id
@@ -65,14 +89,20 @@ function TimesheetActionBody({
         clientId: currentClientId,
         shiftId: record.shift?.id ?? null,
     });
-    const [reason, setReason] = useState(''),
-        [error, setError] = useState(''),
-        [discard, setDiscard] = useState(false);
+    const mutationPending = useRef(false);
+    const [reason, setReasonState] = useState('');
+    const setReason = (value: string) => {
+        mutationPending.current = true;
+        setReasonState(value);
+    };
+    useLayoutEffect(() => { mutationPending.current = false; }, [reason]);
+    const [error, setError] = useState(''), [discard, setDiscard] = useState(false);
     const command = useTimesheetCommand(
-        `${currentActor}:${record.id}:${record.staff?.id ?? record.user_id}:${record.shift?.id ?? ''}:${currentClientId}:${action}`,
+        `${currentActor}:${record.id}:${record.staff?.id ?? record.user_id}:${record.shift?.id ?? ''}:${currentClientId}:${action}:${canAct}`,
+        writeCoordination,
     );
     const allowed =
-        canAct &&
+        canAct && props.targetAvailable &&
         currentActor === initial.actor &&
         initial.actor > 0 &&
         record.id === initial.recordId &&
@@ -84,6 +114,25 @@ function TimesheetActionBody({
         command.outcome?.status === 'confirmed'
             ? command.outcome.receipt
             : null;
+    useEffect(() => { if (!props.open) setDiscard(false); }, [props.open]);
+    useLayoutEffect(() => {
+        props.protectedForm.current = () => mutationPending.current || reason !== '' ||
+            command.busy.current || command.held.current || command.pending ||
+            command.outcome !== null || discard || currentActor !== initial.actor;
+        return () => { props.protectedForm.current = () => true; };
+    }, [props.protectedForm, reason, command.pending, command.outcome, discard,
+        currentActor, initial.actor, command.busy, command.held]);
+    useEffect(() => {
+        const warn = (event: BeforeUnloadEvent) => {
+            if (!confirmed && (mutationPending.current || reason !== '' || command.busy.current ||
+                command.held.current || command.outcome?.status === 'unknown')) {
+                event.preventDefault(); event.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [reason, confirmed, command.outcome, command.busy, command.held]);
+    const releaseAndClose = () => { props.releaseDraft(); onOpenChange(false); };
     const close = () => {
         if (command.busy.current) return;
         if (
@@ -91,7 +140,7 @@ function TimesheetActionBody({
             (reason !== '' || command.outcome?.status === 'unknown')
         )
             setDiscard(true);
-        else onOpenChange(false);
+        else releaseAndClose();
     };
     function save() {
         if (blocked || command.busy.current) return;
@@ -134,9 +183,19 @@ function TimesheetActionBody({
             },
         );
     }
+    if (!props.targetAvailable || currentActor !== initial.actor || initial.actor <= 0)
+        return <Dialog open={props.open} onOpenChange={(open) => !open && onOpenChange(false)}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Timesheet review unavailable</DialogTitle>
+                    <DialogDescription>This view cannot send this review. Any entries are kept in this page.</DialogDescription>
+                </DialogHeader>
+                <Button variant="outline" className="frontline-tap" onClick={() => onOpenChange(false)}>Close</Button>
+            </DialogContent>
+        </Dialog>;
     return (
         <>
-            <Dialog open onOpenChange={(open) => !open && close()}>
+            <Dialog open={props.open} onOpenChange={(open) => !open && close()}>
                 <DialogContent
                     style={{
                         width: 'min(92vw, 600px)',
@@ -164,7 +223,7 @@ function TimesheetActionBody({
                                     ? `Timesheet #${confirmed.timesheet_id} is confirmed ${confirmed.status}.`
                                     : `Timesheet #${confirmed.timesheet_id} was already ${confirmed.status}. Your new reason was not added.`}
                             </p>
-                            <Button onClick={() => onOpenChange(false)}>
+                            <Button className="frontline-tap" onClick={releaseAndClose}>
                                 Done
                             </Button>
                         </div>
@@ -174,7 +233,14 @@ function TimesheetActionBody({
                                 <InfoCard icon={AlertTriangle} tone="warn">
                                     This action is no longer available in the
                                     current records. Your reason is retained;
-                                    close and refresh to check access.
+                                    any entries are kept in this form. Check the
+                                    current record in a new tab to check access.
+                                    <Button asChild variant="outline" className="mt-3 frontline-tap">
+                                        <a href={`/operations/timesheets?view=${initial.recordId}`}
+                                            target="_blank" rel="noopener noreferrer">
+                                            Check current timesheet <ExternalLink className="size-4" />
+                                        </a>
+                                    </Button>
                                 </InfoCard>
                             )}
                             {action !== 'submit' && (
@@ -189,7 +255,7 @@ function TimesheetActionBody({
                                     htmlFor="timesheet-decision-reason"
                                     error={
                                         error ||
-                                        (command.outcome?.status === 'rejected'
+                                        (command.outcome && command.outcome.status !== 'confirmed'
                                             ? Object.values(
                                                   command.outcome.errors ?? {},
                                               )[0]
@@ -233,7 +299,7 @@ function TimesheetActionBody({
                                                     <Button
                                                         asChild
                                                         variant="outline"
-                                                        className="mt-3 min-h-11"
+                                                        className="mt-3 frontline-tap"
                                                     >
                                                         <a
                                                             href={`/operations/timesheets?view=${initial.recordId}`}
@@ -254,12 +320,14 @@ function TimesheetActionBody({
                                 <Button
                                     variant="outline"
                                     onClick={close}
+                                    className="frontline-tap"
                                     disabled={command.pending}
                                 >
                                     Cancel
                                 </Button>
                                 <Button
                                     onClick={save}
+                                    className="frontline-tap"
                                     disabled={blocked}
                                     variant={
                                         action === 'reject'
@@ -280,7 +348,10 @@ function TimesheetActionBody({
             <ConfirmDialog
                 open={discard}
                 onClose={() => setDiscard(false)}
-                onConfirm={() => onOpenChange(false)}
+                onConfirm={() => {
+                    if (command.outcome?.status === 'unknown') onOpenChange(false);
+                    else releaseAndClose();
+                }}
                 title={
                     command.outcome?.status === 'unknown'
                         ? 'Close this unconfirmed attempt?'
@@ -288,8 +359,8 @@ function TimesheetActionBody({
                 }
                 description={
                     command.outcome?.status === 'unknown'
-                        ? 'Closing does not undo an action already saved. Check the record first; your typed reason will be lost.'
-                        : 'Your unsaved reason will be lost.'
+                        ? 'Closing keeps the original reason and attempt in this page. It does not undo a saved action. Reopen the same review to check it.'
+                        : 'Closing removes the reason from this form. It does not undo an action already saved.'
                 }
                 confirmText="Close form"
                 cancelText="Keep editing"

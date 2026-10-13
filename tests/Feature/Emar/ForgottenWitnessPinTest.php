@@ -49,11 +49,13 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /** PIN-2 attestation: named colleague, exact deadline, current authority and safe replay. */
 class ForgottenWitnessPinTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 
@@ -70,7 +72,8 @@ class ForgottenWitnessPinTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
         Cache::flush();
-        config(['medications.witness_pin.forgotten_fallback_enabled' => true]);
+        // Off until a manager switches it on (Stephan, 9 Oct): these tests use it switched on.
+        \App\Models\AppSetting::query()->updateOrCreate(['key' => WitnessPinSettings::FORGOTTEN_FALLBACK], ['value' => 'yes']);
 
         $this->site = Site::factory()->create(['is_active' => true, 'name' => 'Kōwhai House']);
         $this->serviceContext = ServiceContext::factory()->create([
@@ -100,7 +103,7 @@ class ForgottenWitnessPinTest extends TestCase
 
     public function test_the_fallback_is_truthfully_unavailable_until_the_consumer_is_installed(): void
     {
-        config(['medications.witness_pin.forgotten_fallback_enabled' => false]);
+        \App\Models\AppSetting::query()->updateOrCreate(['key' => WitnessPinSettings::FORGOTTEN_FALLBACK], ['value' => 'no']);
         $witness = $this->witnessOnShift();
         $order = $this->order(['09:30'], ['dose_amount' => 1, 'dose_unit' => 'tablet']);
         $this->requirements($order, '09:30')->assertOk()
@@ -109,6 +112,58 @@ class ForgottenWitnessPinTest extends TestCase
         $this->record($order, '09:30', $this->fallback($witness), true)
             ->assertStatus(422)->assertJsonValidationErrors('witness_credential');
         $this->assertDatabaseCount('medication_second_person_confirmations', 0);
+    }
+
+    /**
+     * Lane A settings: the fallback and its time limit are organisation
+     * settings (Staff & PINs › Witness PINs), not installation config. The
+     * installation value is only the default until someone saves one.
+     */
+    public function test_lane_a_the_organisation_setting_switches_the_fallback_and_sets_its_time_limit(): void
+    {
+        \App\Models\AppSetting::query()->updateOrCreate(['key' => WitnessPinSettings::FORGOTTEN_FALLBACK], ['value' => 'no']);
+        $witness = $this->witnessOnShift();
+        $order = $this->order(['09:30'], ['dose_amount' => 1, 'dose_unit' => 'tablet']);
+        $this->requirements($order, '09:30')->assertOk()
+            ->assertJsonPath('second_person.forgotten_pin_amount_allowed', false);
+        $this->record($order, '09:30', $this->fallback($witness), true)
+            ->assertStatus(422)->assertJsonValidationErrors('witness_credential');
+        $this->assertDatabaseCount('medication_second_person_confirmations', 0);
+
+        \App\Models\AppSetting::query()->updateOrCreate(['key' => WitnessPinSettings::FORGOTTEN_FALLBACK], ['value' => 'yes']);
+        \App\Models\AppSetting::query()->updateOrCreate(['key' => WitnessPinSettings::CONFIRM_MINUTES], ['value' => '45']);
+        $this->requirements($order, '09:30')->assertOk()
+            ->assertJsonPath('second_person.forgotten_pin_amount_allowed', true)
+            ->assertJsonPath('second_person.confirm_within_minutes', 45);
+        $this->record($order, '09:30', $this->fallback($witness), true)->assertOk();
+        $this->assertSame(now()->addMinutes(45)->timestamp, MedicationSecondPersonConfirmation::query()->sole()->due_at->timestamp);
+
+        // Switching it off later never strands a nomination already waiting.
+        \App\Models\AppSetting::query()->updateOrCreate(['key' => WitnessPinSettings::FORGOTTEN_FALLBACK], ['value' => 'no']);
+        $answer = app(ForgottenWitnessPinService::class)->respond($witness, MedicationSecondPersonConfirmation::query()->sole()->id, true);
+        $this->assertSame('confirmed', $answer['status']);
+    }
+
+    /** Stephan, 9 Oct: off until a manager switches it on, whatever the installation's environment says. */
+    public function test_lane_a_on_a_fresh_install_no_new_nomination_is_possible(): void
+    {
+        \App\Models\AppSetting::query()->where('key', WitnessPinSettings::FORGOTTEN_FALLBACK)->delete();
+        config(['medications.witness_pin.forgotten_fallback_enabled' => true]);
+        $this->assertFalse(app(WitnessPinSettings::class)->forgottenFallbackAllowed());
+        $witness = $this->witnessOnShift();
+        $order = $this->order(['09:30'], ['dose_amount' => 1, 'dose_unit' => 'tablet']);
+        $this->requirements($order, '09:30')->assertOk()
+            ->assertJsonPath('second_person.forgotten_pin_allowed', false)
+            ->assertJsonPath('second_person.forgotten_pin_amount_allowed', false);
+        $this->record($order, '09:30', $this->fallback($witness), true)
+            ->assertStatus(422)->assertJsonValidationErrors('witness_credential');
+        $this->assertDatabaseCount('medication_second_person_confirmations', 0);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+
+        \App\Models\AppSetting::query()->updateOrCreate(['key' => WitnessPinSettings::FORGOTTEN_FALLBACK], ['value' => 'yes']);
+        $this->assertTrue(app(WitnessPinSettings::class)->forgottenFallbackAllowed());
+        \App\Models\AppSetting::query()->updateOrCreate(['key' => WitnessPinSettings::CONFIRM_MINUTES], ['value' => '9999']);
+        $this->assertSame(30, app(WitnessPinSettings::class)->confirmWithinMinutes());
     }
 
     public function test_a_named_colleague_confirms_in_their_own_login_and_replay_does_not_duplicate(): void

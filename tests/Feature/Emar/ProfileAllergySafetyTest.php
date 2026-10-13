@@ -32,6 +32,7 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * EM-07: allergies staff record on the health profile must reach the
@@ -41,6 +42,7 @@ use Tests\TestCase;
 class ProfileAllergySafetyTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     protected User $worker;
 

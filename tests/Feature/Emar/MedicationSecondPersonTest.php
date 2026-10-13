@@ -29,11 +29,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /** NF19: ordinary confirmations must not borrow controlled-drug authority. */
 class MedicationSecondPersonTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 

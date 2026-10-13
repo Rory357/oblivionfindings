@@ -571,21 +571,10 @@ function buildIconNavItems({
         return buildPortalNavItems(portalClients, unreadMessageCount);
     }
 
-    // PR 3 — `/my-day` is the single canonical frontline home. Staff users
-    // should see ONE clear home destination; managers and HR admins keep the
-    // traditional `/dashboard`. Dashboard routing itself redirects staff to
-    // `/my-day`, so even a stale link stays safe.
-    const isManager = !!can?.shifts?.manageAny || !!can?.timesheets?.manageAny;
-    const isHrAdmin = !!can?.hr?.analytics?.view && !can?.shifts?.manageAny;
-    const showDashboardHome = isManager || isHrAdmin;
+    // Overview summarises permitted work; My Day remains the personal care workspace.
+    const showDashboardHome = true;
 
     const items: IconNavItem[] = [
-        {
-            id: 'my-day',
-            icon: CheckCircle2,
-            label: 'My Day',
-            href: '/my-day',
-        },
         ...(showDashboardHome
             ? [
                   {
@@ -596,6 +585,12 @@ function buildIconNavItems({
                   } as IconNavItem,
               ]
             : []),
+        {
+            id: 'my-day',
+            icon: CheckCircle2,
+            label: 'My Day',
+            href: '/my-day',
+        },
         {
             id: 'my-calendar',
             icon: CalendarDays,

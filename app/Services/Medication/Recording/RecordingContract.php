@@ -108,6 +108,8 @@ final class RecordingContract
             'pack_lines.*.quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:99999999.99'],
             'pack_lines.*.quantity_wasted' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
             'live_recording_context' => ['nullable', 'string', 'max:4096'],
+            // EA-008: the order the dialog showed (DoseRecordingRequirements).
+            'order_fingerprint' => ['nullable', 'string', 'max:128'],
             'quantity_wasted' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
             'waste_reason' => ['nullable', 'string', 'max:4000'],
             'late_reason' => ['nullable', 'string', Rule::in(array_keys(self::LATE_REASONS))],
@@ -129,5 +131,27 @@ final class RecordingContract
     public static function fields(): array
     {
         return array_keys(self::rules());
+    }
+
+    /**
+     * EA-058: the free-text reason a not-given outcome carries. "Other (say
+     * what happened)" is said in the dialog's one note field, so when no
+     * separate reason is sent the worker's note is the reason.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function notGivenReason(array $data): ?string
+    {
+        $reason = trim((string) ($data['reason'] ?? ''));
+        if ($reason !== '') {
+            return $reason;
+        }
+        if (($data['status'] ?? null) !== 'given' && ($data['reason_code'] ?? null) === 'other') {
+            $note = trim((string) ($data['notes'] ?? ''));
+
+            return $note !== '' ? mb_substr($note, 0, 500) : null;
+        }
+
+        return null;
     }
 }

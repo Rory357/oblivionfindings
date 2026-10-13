@@ -9,7 +9,7 @@ test('authenticated user can visit dashboard', function () {
     $this->browse(function (Browser $browser) use ($user) {
         $browser->loginAs($user)
             ->visit('/dashboard')
-            ->waitForText('Dashboard', 10)
+            ->waitForText('Overview', 10)
             ->assertPathIs('/dashboard');
     });
 });
@@ -20,8 +20,8 @@ test('dashboard shows page content', function () {
     $this->browse(function (Browser $browser) use ($user) {
         $browser->loginAs($user)
             ->visit('/dashboard')
-            ->waitForText('Dashboard', 10)
-            ->assertSee('Dashboard');
+            ->waitForText('Overview', 10)
+            ->assertSee('Edit layout');
     });
 });
 

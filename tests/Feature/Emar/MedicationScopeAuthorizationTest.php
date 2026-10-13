@@ -28,10 +28,12 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationScopeAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 
@@ -141,6 +143,9 @@ class MedicationScopeAuthorizationTest extends TestCase
 
     public function test_a_shift_for_another_resident_at_the_same_site_does_not_authorize_the_action(): void
     {
+        // EA-006 (Stephan's D1): a shift at the house covers the residents the
+        // worker is assigned to support (LaneASharedHouseTest), never anyone else.
+        $this->client->supportWorkers()->detach($this->worker->id);
         $otherClient = Client::factory()->create([
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
@@ -201,6 +206,30 @@ class MedicationScopeAuthorizationTest extends TestCase
                     ->assertJsonPath('message', \App\Http\Controllers\Emar\GuidedRoundController::RETIRED_MESSAGE);
             }
         }
+        // A live tap (no replay header) only gets the message.
+        $followups = fn () => \App\Models\MedicationFollowup::query()->where('type', \App\Services\Medication\Recording\OfflineReplayReview::TYPE);
+        $this->assertSame(0, $followups()->count());
+
+        // A queued replay (the device's replay header, here 13 h old — past
+        // Lane A's age limit too) is refused the same way and, for someone
+        // who could record for the person now, raises ONE lead follow-up.
+        $replay = fn (int $medicationId, string $uuid) => $this->actingAs($this->worker)
+            ->postJson("/emar/rounds/{$round->id}/guided/items/{$medicationId}", [
+                'status' => 'given', 'scheduled_for' => now()->toIso8601String(),
+                'client_request_uuid' => $uuid, 'queued_offline' => true,
+                'captured_offline_at' => now()->subHours(13)->toIso8601String(),
+            ], [\App\Services\Medication\Recording\OfflineReplayReview::REPLAY_HEADER => now()->subHours(13)->toIso8601String()])
+            ->assertConflict()
+            ->assertJsonPath('message', \App\Http\Controllers\Emar\GuidedRoundController::RETIRED_MESSAGE);
+        $replay($this->medication->id, '0b7b1f43-5d0e-4c57-8f0d-2a4b8b7f9e21');
+        $replay($this->medication->id, '0b7b1f43-5d0e-4c57-8f0d-2a4b8b7f9e21');
+        $followup = $followups()->sole();
+        $this->assertSame('offline-review:0b7b1f43-5d0e-4c57-8f0d-2a4b8b7f9e21', $followup->source_key);
+        $this->assertSame((int) $this->client->id, (int) $followup->client_id);
+        $this->assertSame(\App\Services\Medication\Recording\OfflineReplayReview::REFUSED, $followup->context['reason_key']);
+        // Someone who can't record for that person raises nothing and learns nothing.
+        $replay($otherMedication->id, '6f1d0e2a-3b4c-4d5e-8f60-718293a4b5c6');
+        $this->assertSame(1, $followups()->count());
 
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertSame(0, $this->administrationTimelineCount());

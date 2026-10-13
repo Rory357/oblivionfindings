@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Exceptions;
 use InvalidArgumentException;
 use RuntimeException;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * P01 foundation C3 invariants: every scheduled administration writes exactly
@@ -33,6 +34,7 @@ use Tests\TestCase;
 class DoseSlotOutcomeWriterTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 

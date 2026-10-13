@@ -284,6 +284,12 @@ final class RecordingContractEnforcer
 
         $given = $mode !== null && $comparable ? $this->stockQuantity($data, $medication, $stockUnit) : null;
         $explicitWaste = ($data['quantity_wasted'] ?? null) !== null ? MedicationStockQuantity::normalizeMovement($data['quantity_wasted']) : null;
+        // EA-009: when the dose and stock units can't be compared, the actual
+        // waste is what the worker entered against each pack, in the stock
+        // unit. The packs are the evidence; nothing is converted or assumed.
+        if ($explicitWaste === null && $given === null && $requireExplicitWaste) {
+            $explicitWaste = $this->packLineWaste($data['pack_lines'] ?? null);
+        }
         if ($explicitWaste !== null && (MedicationStockQuantity::greaterThan(0, $explicitWaste) || ! MedicationStockQuantity::greaterThan($removed, $explicitWaste))) {
             return $this->error('quantity_wasted', 'Actual waste must be zero or more and less than the amount removed for a given dose.');
         }
@@ -310,6 +316,24 @@ final class RecordingContractEnforcer
         }
 
         return ['removed' => $removed, 'wasted' => $explicitWaste ?? (MedicationStockQuantity::greaterThan($wasted, 0) ? $wasted : null)];
+    }
+
+    /** The total waste stated on the actual pack lines, or null when there are none. */
+    private function packLineWaste(mixed $lines): ?string
+    {
+        if (! is_array($lines) || $lines === []) {
+            return null;
+        }
+        $total = '0.00';
+        foreach ($lines as $line) {
+            $waste = is_array($line) ? ($line['quantity_wasted'] ?? null) : null;
+            if ($waste === null || $waste === '' || ! is_numeric($waste)) {
+                return null;
+            }
+            $total = MedicationStockQuantity::add($total, MedicationStockQuantity::normalize($waste));
+        }
+
+        return $total;
     }
 
     /** A stock-precision quantity, or null when it doesn't fit two decimals. */

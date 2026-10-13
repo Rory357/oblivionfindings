@@ -49,11 +49,13 @@ use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /** P07 register workflows use isolated synthetic staff, medicines and balances. */
 class ControlledProductTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 

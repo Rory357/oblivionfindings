@@ -41,6 +41,42 @@ class WitnessPinSettings
         self::RENEWAL_MONTHS => 'none',
     ];
 
+    /**
+     * Forgotten-PIN fallback for ordinary medicines (PIN-2), Staff & PINs ›
+     * Witness PINs › Forgotten PIN. Off until a manager switches it on
+     * (Stephan, 9 Oct); switching it on loosens a check. It is never available for a
+     * controlled or witness-required medicine; that floor is in
+     * ForgottenWitnessPinService, not a setting.
+     */
+    public const FORGOTTEN_FALLBACK = 'medications.witness_pin.forgotten_fallback';
+
+    /** Minutes the named colleague has to confirm before the house lead is told. */
+    public const CONFIRM_MINUTES = 'medications.witness_pin.confirm_minutes';
+
+    public const CONFIRM_MINUTES_DEFAULT = '30';
+
+    public const CONFIRM_MINUTES_RANGE = [10, 240];
+
+    public const FORGOTTEN_FALLBACK_DEFAULT = 'no';
+
+    public function forgottenFallbackAllowed(): bool
+    {
+        $stored = AppSetting::query()->where('key', self::FORGOTTEN_FALLBACK)->value('value');
+
+        return (in_array($stored, ['yes', 'no'], true) ? $stored : self::FORGOTTEN_FALLBACK_DEFAULT) === 'yes';
+    }
+
+    public function confirmWithinMinutes(): int
+    {
+        $stored = AppSetting::query()->where('key', self::CONFIRM_MINUTES)->value('value');
+        $stored = is_int($stored) ? (string) $stored : $stored;
+        [$min, $max] = self::CONFIRM_MINUTES_RANGE;
+
+        return is_string($stored) && preg_match('/^\d{1,6}$/', $stored) === 1 && (int) $stored >= $min && (int) $stored <= $max
+            ? (int) $stored
+            : (int) self::CONFIRM_MINUTES_DEFAULT;
+    }
+
     public function maxAttempts(): int
     {
         return (int) $this->value(self::MAX_ATTEMPTS);

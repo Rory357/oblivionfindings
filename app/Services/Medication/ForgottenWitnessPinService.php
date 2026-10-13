@@ -34,8 +34,6 @@ final class ForgottenWitnessPinService
 
     public const CONFIRMED_METHOD = 'own_session_confirmation';
 
-    public const CONFIRM_WITHIN_MINUTES = 30;
-
     public const REVIEW_DISPUTED = 'second_person_disputed';
 
     public const REVIEW_EXPIRED = 'second_person_confirmation_expired';
@@ -51,7 +49,7 @@ final class ForgottenWitnessPinService
 
     public function available(): bool
     {
-        return (bool) config('medications.witness_pin.forgotten_fallback_enabled', false)
+        return $this->settings->forgottenFallbackAllowed()
             && $this->followups->available();
     }
 
@@ -66,6 +64,11 @@ final class ForgottenWitnessPinService
         Collection $lockedUsers,
         Collection $lockedPresenceShifts,
     ): array {
+        if (! $this->settings->forgottenFallbackAllowed()) {
+            throw ValidationException::withMessages([
+                'witness_credential' => 'Naming a colleague who forgot their PIN is switched off in Medication settings. Ask them to reset their PIN in Settings › Witness PIN, or choose another eligible colleague.',
+            ]);
+        }
         if (! $this->available()) {
             throw ValidationException::withMessages([
                 'witness_credential' => 'Forgotten-PIN confirmation is not configured. Ask the colleague to reset their PIN in Settings › Witness PIN.',
@@ -120,7 +123,7 @@ final class ForgottenWitnessPinService
             'recorded_by' => $dose->administered_by,
             'site_id' => $dose->client->site_id,
             'status' => MedicationSecondPersonConfirmation::PENDING,
-            'due_at' => now()->addMinutes(self::CONFIRM_WITHIN_MINUTES),
+            'due_at' => now()->addMinutes($this->settings->confirmWithinMinutes()),
             'eligibility_evidence' => $evidence['eligibility_evidence'],
         ]);
         AuditLogger::logOrFail('medications.second_person.nominated', $dose, [

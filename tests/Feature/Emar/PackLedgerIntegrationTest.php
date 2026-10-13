@@ -38,10 +38,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class PackLedgerIntegrationTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 

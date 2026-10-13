@@ -4,19 +4,24 @@ namespace App\Http\Controllers\Emar;
 
 use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
+use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Recording\OfflineReplayReview;
 use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Timeline\TimelineEmitter;
 use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -112,14 +117,57 @@ class GuidedRoundController extends Controller
      * refuses without any effect; the answer is 409 so a device's queued
      * offline round item shows as rejected with this message rather than
      * replaying. Remove the route once offline queues have drained.
+     *
+     * Lane A3 floor (Main, 13 Oct): a queued replay (the device's replay
+     * header) is never silently discarded — a lead gets the same "Dose saved
+     * on a device, not recorded" follow-up as any refused queued dose, so
+     * someone checks whether it was given. A live tap just gets the message.
      */
     public function administer(Request $request, MedicationRound $round, int $medication)
     {
-        abort_unless($this->canWork($request->user()), 403);
+        $user = $request->user();
+        abort_unless($this->canWork($user), 403);
+        if (OfflineReplayReview::replayCapturedAt($request) !== null) {
+            $this->raiseRetiredReplayReview($request, $user, $medication);
+        }
 
         return $request->expectsJson()
             ? response()->json(['success' => false, 'message' => self::RETIRED_MESSAGE], 409)
             : back()->with('error', self::RETIRED_MESSAGE);
+    }
+
+    /** What the lead's follow-up says about a refused round item. */
+    public const RETIRED_REVIEW_REASON = 'Saved on a device during a guided round, which no longer records doses — nothing was added to the chart. Check whether it was given and record it.';
+
+    /**
+     * The lead follow-up for a refused round item replayed from a device. As
+     * Meds today's refusals do: only for someone who could record for this
+     * person now (anyone else learns nothing), never twice for one request,
+     * and never for a request that already reached the chart.
+     */
+    private function raiseRetiredReplayReview(Request $request, User $user, int $medicationId): void
+    {
+        $data = $request->only(['client_request_uuid', 'status', 'scheduled_for', 'administered_at', 'captured_offline_at', 'origin_device_id']);
+        $uuid = $data['client_request_uuid'] ?? null;
+        if (! is_string($uuid) || ! Str::isUuid($uuid)) {
+            return;
+        }
+        $data['status'] = in_array($data['status'] ?? null, ['given', 'refused', 'held', 'withheld'], true) ? $data['status'] : 'given';
+        $medication = ClientMedication::query()->find($medicationId);
+        if ($medication === null || ($medication->controlled_drug && ! $user->canDo('medications.controlled.record'))) {
+            return;
+        }
+        if (! in_array((int) $medication->client_id, $this->medicationScope->clientIdsWithCurrentAuthority($user, [(int) $medication->client_id], now()), true)) {
+            return;
+        }
+        if (ClientMedicationAdministration::withTrashed()->where('client_request_uuid', $uuid)->exists()) {
+            return;
+        }
+        DB::transaction(function () use ($user, $medication, $data): void {
+            $client = Client::query()->whereKey($medication->client_id)->lockForUpdate()->firstOrFail();
+            $locked = ClientMedication::query()->whereKey($medication->id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
+            app(OfflineReplayReview::class)->raise($client, $locked, $user, $data, OfflineReplayReview::REFUSED, self::RETIRED_REVIEW_REASON);
+        });
     }
 
     /**

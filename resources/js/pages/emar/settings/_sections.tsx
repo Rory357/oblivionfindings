@@ -23,6 +23,7 @@ import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
+    HelpCircle,
     Home,
     KeyRound,
     ListChecks,
@@ -233,9 +234,12 @@ export function SafetyChecks({
     );
 }
 
-/* ── Staff & PINs › Witness PINs (P11 v5 rules as number inputs, Q-F). The
-   forgotten-PIN fallback and the named-colleague confirmation aren't built,
-   so they aren't shown. ── */
+/* ── Staff & PINs › Witness PINs (P11 v5 rules as number inputs, Q-F), with
+   the forgotten-PIN fallback and the named colleague's time to confirm (Lane
+   A settings). "Who gets the follow-up" stays the house lead (not a setting
+   yet). Controlled drugs never use the fallback: shown, not switchable. ── */
+const FORGOTTEN = 'forgotten';
+
 export function WitnessPins({
     q,
     show,
@@ -246,9 +250,14 @@ export function WitnessPins({
     clear: () => void;
 }) {
     const { s, value, edit, state, disabled, shown } = useRow('pin');
+    const fp = useRow(FORGOTTEN);
     const { errors, clearError } = useSettings();
     const def = (key: string) => s.definitions.pin?.[key];
     const label = (key: string) => def(key)?.label ?? key;
+    const fpDef = (key: string) => s.definitions[FORGOTTEN]?.[key];
+    const fpLabel = (key: string) => fpDef(key)?.label ?? key;
+    const confirmHint =
+        'After this, the house lead gets a follow-up. Colleagues already named keep their time.';
     const input = (key: string, unit: string, inputLabel?: string) => (
         <NumberInput
             id={`pr-${key}`}
@@ -383,6 +392,112 @@ export function WitnessPins({
                         'minutes',
                     )}
                 </SettingGroup>
+                {fpDef('forgotten_fallback') ? (
+                    <SettingGroup
+                        id="forgotten"
+                        icon={HelpCircle}
+                        title="Forgotten PIN"
+                        caption="Naming a colleague who can’t remember theirs"
+                    >
+                        <GroupRow
+                            id="pr-forgotten_fallback"
+                            label="Allowed"
+                            hint="The dose is marked “second person not verified”; they confirm from their own login."
+                            state={fp.state('forgotten_fallback')}
+                            hidden={
+                                !fp.shown(
+                                    show,
+                                    q,
+                                    'forgotten_fallback',
+                                    'Allowed',
+                                    fpLabel('forgotten_fallback'),
+                                )
+                            }
+                            control={
+                                <OnOff
+                                    id="pr-forgotten_fallback"
+                                    checked={
+                                        fp.value('forgotten_fallback') === 'yes'
+                                    }
+                                    disabled={fp.disabled}
+                                    onChange={(v) =>
+                                        fp.edit(
+                                            'forgotten_fallback',
+                                            v ? 'yes' : 'no',
+                                        )
+                                    }
+                                />
+                            }
+                        />
+                        {/* A safety floor, not a setting: a controlled-drug
+                            witness must be physically present. */}
+                        <GroupRow
+                            id="pr-forgotten-controlled"
+                            label="Controlled and witness-required medicines"
+                            hint="Never — a witness must be there and type their own PIN."
+                            hidden={
+                                show !== 'all' ||
+                                !match(
+                                    q,
+                                    'Controlled and witness-required medicines',
+                                    fpLabel('forgotten_fallback'),
+                                )
+                            }
+                            control={
+                                <StatusBadge variant="neutral">
+                                    <LockKeyhole className="size-3" />
+                                    Always off
+                                </StatusBadge>
+                            }
+                        />
+                    </SettingGroup>
+                ) : null}
+                {fpDef('confirm_minutes') ? (
+                    <SettingGroup
+                        id="confirm"
+                        icon={UserCheck}
+                        title="Named colleague confirms"
+                        caption="When someone is named instead of typing a PIN"
+                    >
+                        <GroupRow
+                            id="pr-confirm_minutes"
+                            label="Time to confirm"
+                            hint={confirmHint}
+                            state={fp.state('confirm_minutes')}
+                            error={errors[`${FORGOTTEN}.confirm_minutes`]}
+                            errorId="pr-confirm_minutes-error"
+                            hidden={
+                                !fp.shown(
+                                    show,
+                                    q,
+                                    'confirm_minutes',
+                                    'Time to confirm',
+                                    confirmHint,
+                                    fpLabel('confirm_minutes'),
+                                )
+                            }
+                            control={
+                                <NumberInput
+                                    id="pr-confirm_minutes"
+                                    value={fp.value('confirm_minutes')}
+                                    unit="minutes"
+                                    min={fpDef('confirm_minutes')?.range?.[0]}
+                                    max={fpDef('confirm_minutes')?.range?.[1]}
+                                    disabled={fp.disabled}
+                                    error={
+                                        errors[`${FORGOTTEN}.confirm_minutes`]
+                                    }
+                                    onChange={(v) => {
+                                        fp.edit('confirm_minutes', v);
+                                        clearError(
+                                            `${FORGOTTEN}.confirm_minutes`,
+                                        );
+                                    }}
+                                />
+                            }
+                        />
+                    </SettingGroup>
+                ) : null}
                 {/* Who may reset is a permission (Settings › Roles), so this
                     group only explains it (P11 Q-F). */}
                 <SettingGroup

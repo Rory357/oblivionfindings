@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import TimesheetsIndex, { type TimesheetRow } from './index';
 const { get, post, view, edit } = vi.hoisted(() => ({
@@ -198,7 +198,7 @@ it('withdraws commands from an open viewer when refreshed permissions are remove
     expect(view.mock.lastCall?.[0].canApprove).toBe(false);
     expect(view.mock.lastCall?.[0].canSubmit).toBe(false);
 });
-it('retains the captured edit record but removes its edit permission after fresh denial', () => {
+it('uses the current edit record and removes edit permission after fresh denial', () => {
     window.history.replaceState({}, '', '/operations/timesheets?edit=51');
     const draft = { ...row, status: 'draft' };
     const { rerender } = render(
@@ -212,7 +212,7 @@ it('retains the captured edit record but removes its edit permission after fresh
         />,
     );
     expect(edit.mock.lastCall?.[0].canEdit).toBe(false);
-    expect(edit.mock.lastCall?.[0].timesheet).toBe(draft);
+    expect(edit.mock.lastCall?.[0].timesheet).toEqual({ ...draft, can_edit: false });
 });
 
 it('distinguishes recorded manual activities from linked shift task completion', () => {
@@ -270,4 +270,93 @@ it('provides payroll adjustment navigation only with the current review grant', 
     expect(
         screen.queryByRole('link', { name: 'Payroll adjustments' }),
     ).toBeNull();
+});
+
+it('withdraws viewer details when the current permitted cohort no longer includes the record', () => {
+    const { rerender } = render(<TimesheetsIndex {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open timesheet #51' }));
+    expect(view.mock.lastCall?.[0].timesheet).toBe(row);
+    rerender(<TimesheetsIndex {...props} timesheets={{ data: [] }} />);
+    expect(view.mock.lastCall?.[0].open).toBe(false);
+    expect(view.mock.lastCall?.[0].timesheet).toBeNull();
+});
+
+it('withdraws edit details instead of treating the captured draft as a current read grant', () => {
+    window.history.replaceState({}, '', '/operations/timesheets?edit=51');
+    const { rerender } = render(<TimesheetsIndex {...props} timesheets={{ data: [{ ...row, status: 'draft' }] }} />);
+    expect(edit.mock.lastCall?.[0].canEdit).toBe(true);
+    rerender(<TimesheetsIndex {...props} timesheets={{ data: [] }} />);
+    expect(edit.mock.lastCall?.[0].timesheet).toBeNull();
+    expect(edit.mock.lastCall?.[0].canEdit).toBe(false);
+});
+
+it('retains the actual review reason while current access is withdrawn and restored', () => {
+    const reviewable = { ...row, can_return: true };
+    const { rerender } = render(<TimesheetsIndex {...props} timesheets={{ data: [reviewable] }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open timesheet #51' }));
+    act(() => view.mock.lastCall?.[0].onReviewAction(reviewable, 'return'));
+    const reason = screen.getByRole('textbox', { name: 'What needs changing?' });
+    expect(reason).toBeEnabled();
+    fireEvent.change(reason, { target: { value: 'Please check the recorded break.' } });
+    rerender(<TimesheetsIndex {...props} timesheets={{ data: [] }} />);
+    expect(screen.queryByRole('textbox', { name: 'What needs changing?' })).toBeNull();
+    expect(post).not.toHaveBeenCalled();
+    rerender(<TimesheetsIndex {...props} timesheets={{ data: [reviewable] }} />);
+    expect(screen.getByRole('textbox', { name: 'What needs changing?' })).toHaveValue('Please check the recorded break.');
+    expect(post).not.toHaveBeenCalled();
+});
+
+it('resolves viewer review actions against current rows instead of stale callback permissions', () => {
+    const reviewable = { ...row, can_return: true };
+    const { rerender } = render(<TimesheetsIndex {...props} timesheets={{ data: [reviewable] }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open timesheet #51' }));
+    const staleCallback = view.mock.lastCall?.[0].onReviewAction;
+    expect(staleCallback).toBeTypeOf('function');
+    rerender(<TimesheetsIndex {...props} timesheets={{ data: [{ ...reviewable, can_mutate: false, can_return: false }] }} />);
+    act(() => staleCallback(reviewable, 'return'));
+    expect(screen.queryByRole('textbox', { name: 'What needs changing?' })).toBeNull();
+    expect(post).not.toHaveBeenCalled();
+});
+
+it('refreshes an open row menu from the current cohort when client details and actions change', () => {
+    const reviewable = { ...row, can_return: true };
+    const { rerender } = render(<TimesheetsIndex {...props} timesheets={{ data: [reviewable] }} />);
+    fireEvent.contextMenu(screen.getByRole('checkbox', { name: 'Select timesheet 51' }).closest('tr')!);
+    expect(screen.getByRole('menu')).toHaveTextContent('Aroha Example');
+    expect(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Return for changes' })).toBeTruthy();
+    const current = { ...reviewable, can_mutate: false, client: { id: 14, first_name: 'Pita', last_name: 'Current' } };
+    rerender(<TimesheetsIndex {...props} timesheets={{ data: [current] }} />);
+    expect(screen.getByRole('menu')).toHaveTextContent('Pita Current');
+    expect(screen.getByRole('menu')).not.toHaveTextContent('Aroha Example');
+    expect(within(screen.getByRole('menu')).queryByRole('menuitem', { name: 'Return for changes' })).toBeNull();
+    rerender(<TimesheetsIndex {...props} timesheets={{ data: [] }} />);
+    expect(screen.queryByRole('menu')).toBeNull();
+});
+
+it('refreshes hover details from current rows instead of preserving replaced private client details', () => {
+    vi.useFakeTimers();
+    try {
+        const { rerender } = render(<TimesheetsIndex {...props} />);
+        fireEvent.mouseEnter(screen.getByRole('checkbox', { name: 'Select timesheet 51' }).closest('tr')!);
+        act(() => vi.advanceTimersByTime(400));
+        expect(screen.getByText('Awaiting manager decision.')).toBeTruthy();
+        const current = { ...row, client: { id: 14, first_name: 'Pita', last_name: 'Current' } };
+        rerender(<TimesheetsIndex {...props} timesheets={{ data: [current] }} />);
+        expect(screen.getByText('Awaiting manager decision.')).toBeTruthy();
+        expect(screen.queryByText('Aroha Example')).toBeNull();
+        rerender(<TimesheetsIndex {...props} timesheets={{ data: [] }} />);
+        expect(screen.queryByText('Awaiting manager decision.')).toBeNull();
+    } finally { vi.useRealTimers(); }
+});
+
+it('does not let a delayed hover re-expose a row after its current read grant is withdrawn', () => {
+    vi.useFakeTimers();
+    try {
+        const { rerender } = render(<TimesheetsIndex {...props} />);
+        fireEvent.mouseEnter(screen.getByRole('checkbox', { name: 'Select timesheet 51' }).closest('tr')!);
+        rerender(<TimesheetsIndex {...props} timesheets={{ data: [] }} />);
+        act(() => vi.advanceTimersByTime(400));
+        expect(screen.queryByText('Awaiting manager decision.')).toBeNull();
+        expect(screen.queryByText('Aroha Example')).toBeNull();
+    } finally { vi.useRealTimers(); }
 });
