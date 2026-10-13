@@ -904,6 +904,12 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                 ...(can?.it?.view || can?.it?.request
                     ? [{ title: 'Service desk', href: '/it', icon: Server }]
                     : []),
+                ...(can?.it?.approved_software
+                    ? [{ title: 'Approved software', href: '/security-devices/software', icon: Package }]
+                    : []),
+                ...(can?.it?.remote_support
+                    ? [{ title: 'Remote support', href: '/it/remote-support', icon: Server }]
+                    : []),
                 ...(can?.it?.view ||
                 can?.it?.request ||
                 can?.it?.knowledge_author ||

@@ -123,8 +123,8 @@ final class MonitorObservationBuilder extends Builder
                 ? substr($column, strrpos($column, '.') + 1)
                 : $column;
 
-            if (in_array(strtolower($attribute), MonitorObservation::IMMUTABLE_PROVENANCE_ATTRIBUTES, true)) {
-                throw new LogicException('Monitoring observation provenance is immutable.');
+            if (in_array(strtolower($attribute), MonitorObservation::IMMUTABLE_EVIDENCE_ATTRIBUTES, true)) {
+                throw new LogicException('Monitoring observation evidence is immutable.');
             }
         }
     }

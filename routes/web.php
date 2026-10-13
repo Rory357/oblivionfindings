@@ -4,25 +4,25 @@ use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\Careers\ReferenceController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\It\ItAssistController;
 use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItCatalogFieldOptionController;
 use App\Http\Controllers\It\ItCatalogRequestedForOptionController;
 use App\Http\Controllers\It\ItChangeController;
 use App\Http\Controllers\It\ItControlRoomHandoffController;
+use App\Http\Controllers\It\ItEndpointActionPolicyController;
 use App\Http\Controllers\It\ItKbController;
+use App\Http\Controllers\It\ItKnowledgeFileController;
+use App\Http\Controllers\It\ItKnowledgeWorkspaceController;
 use App\Http\Controllers\It\ItMajorIncidentController;
+use App\Http\Controllers\It\ItObliInvestigationController;
 use App\Http\Controllers\It\ItProblemController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItProvisioningTrackingController;
-use App\Http\Controllers\It\ItReportsController;
-use App\Http\Controllers\It\ItSavedTicketFilterController;
-use App\Http\Controllers\It\ItServiceIdentityController;
-use App\Http\Controllers\It\ItServiceManagementSetupController;
-use App\Http\Controllers\It\ItTechnicalDeliveryController;
-use App\Http\Controllers\It\ItTicketApprovalController;
-use App\Http\Controllers\It\ItTicketController;
-use App\Http\Controllers\It\ItTicketDuplicateSuggestionController;
-use App\Http\Controllers\It\ItTicketRelationshipController;
+use App\Http\Controllers\It\ItProvisioningWorkspaceController;
+use App\Http\Controllers\It\ItRecurrencePlanController;
+use App\Http\Controllers\It\ItRemoteSessionController;
+use App\Http\Controllers\It\ItRemoteSupportController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -51,6 +51,18 @@ use App\Http\Controllers\It\ItTicketRelationshipController;
 |
 */
 
+use App\Http\Controllers\It\ItReplyTemplateController;
+use App\Http\Controllers\It\ItReportsController;
+use App\Http\Controllers\It\ItSavedTicketFilterController;
+use App\Http\Controllers\It\ItServiceIdentityController;
+use App\Http\Controllers\It\ItServiceManagementSetupController;
+use App\Http\Controllers\It\ItTechnicalDeliveryController;
+use App\Http\Controllers\It\ItTicketApprovalController;
+use App\Http\Controllers\It\ItTicketController;
+use App\Http\Controllers\It\ItTicketDuplicateSuggestionController;
+use App\Http\Controllers\It\ItTicketMacroController;
+use App\Http\Controllers\It\ItTicketRelationshipController;
+use App\Http\Controllers\It\ItTicketWorkController;
 use App\Http\Controllers\It\ItWorkspaceRedirectController;
 use App\Http\Controllers\It\ItWorkTaskController;
 use App\Http\Controllers\It\ItWorkTaskHistoryController;
@@ -61,8 +73,10 @@ use App\Http\Controllers\MyDayMedicationsController;
 use App\Http\Controllers\MyDayTaskController;
 use App\Http\Controllers\MyDayTaskDraftController;
 use App\Http\Controllers\MyTasksController;
+use App\Http\Controllers\PersonalCalendarEntryController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\RosterController;
+use App\Http\Middleware\ProtectProvisioningResponses;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -178,30 +192,31 @@ Route::get('/my-roster', [RosterController::class, 'index'])
 // and reviewers. Its grants never open the ticket/provisioning route group.
 Route::middleware(['auth', 'permission:it.request|it.view|it.knowledge.author|it.knowledge.review'])->group(function () {
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
-    Route::get('/it/knowledge', \App\Http\Controllers\It\ItKnowledgeWorkspaceController::class)->name('it.knowledge.index');
-    Route::get('/it/knowledge/from-resolution/{ticket}', [\App\Http\Controllers\It\ItKnowledgeWorkspaceController::class, 'fromResolution'])->whereNumber('ticket')->middleware('permission:it.knowledge.author')->name('it.knowledge.from-resolution');
-    Route::get('/it/knowledge/resolution-documents/{ticket}', [\App\Http\Controllers\It\ItKnowledgeWorkspaceController::class, 'resolutionDocuments'])->whereNumber('ticket')->name('it.knowledge.resolution-documents');
-    Route::get('/it/knowledge/record-options', [\App\Http\Controllers\It\ItKnowledgeWorkspaceController::class, 'recordOptions'])->name('it.knowledge.record-options');
-    Route::get('/it/knowledge/{article}', [\App\Http\Controllers\It\ItKnowledgeWorkspaceController::class, 'show'])->whereNumber('article')->name('it.knowledge.show');
-    Route::post('/it/knowledge/{article}/files', [\App\Http\Controllers\It\ItKnowledgeFileController::class, 'store'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.files.store');
-    Route::get('/it/knowledge/{article}/files/history', [\App\Http\Controllers\It\ItKnowledgeFileController::class, 'history'])->whereNumber('article')->name('it.knowledge.files.history');
-    Route::get('/it/knowledge/{article}/files/unfinished', [\App\Http\Controllers\It\ItKnowledgeFileController::class, 'unfinished'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.files.unfinished');
-    Route::post('/it/knowledge/{article}/files/{file}/retry', [\App\Http\Controllers\It\ItKnowledgeFileController::class, 'retry'])->whereNumber(['article', 'file'])->middleware('permission:it.knowledge.author')->name('it.knowledge.files.retry');
-    Route::post('/it/knowledge/{article}/files/{file}/dismiss', [\App\Http\Controllers\It\ItKnowledgeFileController::class, 'dismiss'])->whereNumber(['article', 'file'])->middleware('permission:it.knowledge.author')->name('it.knowledge.files.dismiss');
-    Route::get('/it/knowledge/{article}/files/{file}', [\App\Http\Controllers\It\ItKnowledgeFileController::class, 'show'])->whereNumber(['article', 'file'])->name('it.knowledge.files.show');
+    Route::get('/it/knowledge', ItKnowledgeWorkspaceController::class)->name('it.knowledge.index');
+    Route::get('/it/knowledge/from-resolution/{ticket}', [ItKnowledgeWorkspaceController::class, 'fromResolution'])->whereNumber('ticket')->middleware('permission:it.knowledge.author')->name('it.knowledge.from-resolution');
+    Route::get('/it/knowledge/resolution-documents/{ticket}', [ItKnowledgeWorkspaceController::class, 'resolutionDocuments'])->whereNumber('ticket')->name('it.knowledge.resolution-documents');
+    Route::get('/it/knowledge/record-options', [ItKnowledgeWorkspaceController::class, 'recordOptions'])->name('it.knowledge.record-options');
+    Route::get('/it/knowledge/{article}', [ItKnowledgeWorkspaceController::class, 'show'])->whereNumber('article')->name('it.knowledge.show');
+    Route::post('/it/knowledge/{article}/files', [ItKnowledgeFileController::class, 'store'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.files.store');
+    Route::get('/it/knowledge/{article}/files/history', [ItKnowledgeFileController::class, 'history'])->whereNumber('article')->name('it.knowledge.files.history');
+    Route::get('/it/knowledge/{article}/files/unfinished', [ItKnowledgeFileController::class, 'unfinished'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.files.unfinished');
+    Route::post('/it/knowledge/{article}/files/{file}/retry', [ItKnowledgeFileController::class, 'retry'])->whereNumber(['article', 'file'])->middleware('permission:it.knowledge.author')->name('it.knowledge.files.retry');
+    Route::post('/it/knowledge/{article}/files/{file}/dismiss', [ItKnowledgeFileController::class, 'dismiss'])->whereNumber(['article', 'file'])->middleware('permission:it.knowledge.author')->name('it.knowledge.files.dismiss');
+    Route::get('/it/knowledge/{article}/files/{file}', [ItKnowledgeFileController::class, 'show'])->whereNumber(['article', 'file'])->name('it.knowledge.files.show');
     Route::get('/it/knowledge/{article}/history', [ItKbController::class, 'history'])->whereNumber('article')->name('it.knowledge.history');
     Route::get('/it/knowledge/{article}/editor-context', [ItKbController::class, 'editorContext'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.editor-context');
-    Route::get('/it/knowledge/{article}/assist', [\App\Http\Controllers\It\ItAssistController::class, 'article'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.assist');
+    Route::get('/it/knowledge/{article}/assist', [ItAssistController::class, 'article'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.assist');
     Route::post('/it/knowledge/{article}/restore-revision', [ItKbController::class, 'restoreRevision'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.restore-revision');
     Route::post('/it/knowledge/{article}/discard-revision', [ItKbController::class, 'discardRevision'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.discard-revision');
+    Route::get('/it/remote-support', ItRemoteSupportController::class)->middleware('permission:it.view')->name('it.remote-support.index');
     Route::get('/it/reports', [ItProvisioningController::class, 'index'])->middleware('permission:it.view')->name('it.reports.index');
-    Route::get('/it/provisioning', [\App\Http\Controllers\It\ItProvisioningWorkspaceController::class, 'index'])->middleware(['permission:it.view', \App\Http\Middleware\ProtectProvisioningResponses::class])->name('it.provisioning.index');
+    Route::get('/it/provisioning', [ItProvisioningWorkspaceController::class, 'index'])->middleware(['permission:it.view', ProtectProvisioningResponses::class])->name('it.provisioning.index');
     Route::get('/it/work', [ItWorkspaceRedirectController::class, 'work'])->middleware('permission:it.view')->name('it.work.index');
-    Route::get('/it/reply-templates', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'index'])->middleware('permission:it.view')->name('it.reply-templates.index');
-    Route::get('/it/tickets/{ticket}/reply-templates/{template}/render', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'render'])->whereNumber(['ticket', 'template'])->middleware('permission:it.view')->name('it.reply-templates.render');
-    Route::get('/it/tickets/{ticket}/assist', [\App\Http\Controllers\It\ItAssistController::class, 'show'])->whereNumber('ticket')->middleware('permission:it.view')->name('it.assist.show');
-    Route::get('/it/tickets/{ticket}/macros', [\App\Http\Controllers\It\ItTicketMacroController::class, 'index'])->whereNumber('ticket')->middleware('permission:it.view')->name('it.macros.index');
-    Route::post('/it/tickets/{ticket}/macros/{macro}/apply', [\App\Http\Controllers\It\ItTicketMacroController::class, 'apply'])->whereNumber(['ticket', 'macro'])->middleware('permission:it.view')->name('it.macros.apply');
+    Route::get('/it/reply-templates', [ItReplyTemplateController::class, 'index'])->middleware('permission:it.view')->name('it.reply-templates.index');
+    Route::get('/it/tickets/{ticket}/reply-templates/{template}/render', [ItReplyTemplateController::class, 'render'])->whereNumber(['ticket', 'template'])->middleware('permission:it.view')->name('it.reply-templates.render');
+    Route::get('/it/tickets/{ticket}/assist', [ItAssistController::class, 'show'])->whereNumber('ticket')->middleware('permission:it.view')->name('it.assist.show');
+    Route::get('/it/tickets/{ticket}/macros', [ItTicketMacroController::class, 'index'])->whereNumber('ticket')->middleware('permission:it.view')->name('it.macros.index');
+    Route::post('/it/tickets/{ticket}/macros/{macro}/apply', [ItTicketMacroController::class, 'apply'])->whereNumber(['ticket', 'macro'])->middleware('permission:it.view')->name('it.macros.apply');
     Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
     Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
     Route::middleware('permission:it.knowledge.author')->group(function () {
@@ -250,11 +265,11 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     // The workspace: agents see every ticket, requesters their own
     // (ItTicketPolicy; internal notes stripped server-side).
     Route::get('/it/tickets/{ticket}', [ItTicketController::class, 'show'])->name('it.tickets.show');
-    Route::post('/it/tickets/{ticket}/work', [\App\Http\Controllers\It\ItTicketWorkController::class, 'store'])->name('it.tickets.work.store');
-    Route::get('/it/tickets/{ticket}/work/commands/{requestUuid}', [\App\Http\Controllers\It\ItTicketWorkController::class, 'recover'])->whereUuid('requestUuid')->name('it.tickets.work.recover');
-    Route::post('/it/tickets/{ticket}/work/commands/{requestUuid}/cancel', [\App\Http\Controllers\It\ItTicketWorkController::class, 'cancel'])->whereUuid('requestUuid')->name('it.tickets.work.cancel');
-    Route::get('/it/tickets/{ticket}/work/people', [\App\Http\Controllers\It\ItTicketWorkController::class, 'people'])->name('it.tickets.work.people');
-    Route::post('/it/tickets/{ticket}/work/split', [\App\Http\Controllers\It\ItTicketWorkController::class, 'split'])->name('it.tickets.work.split');
+    Route::post('/it/tickets/{ticket}/work', [ItTicketWorkController::class, 'store'])->name('it.tickets.work.store');
+    Route::get('/it/tickets/{ticket}/work/commands/{requestUuid}', [ItTicketWorkController::class, 'recover'])->whereUuid('requestUuid')->name('it.tickets.work.recover');
+    Route::post('/it/tickets/{ticket}/work/commands/{requestUuid}/cancel', [ItTicketWorkController::class, 'cancel'])->whereUuid('requestUuid')->name('it.tickets.work.cancel');
+    Route::get('/it/tickets/{ticket}/work/people', [ItTicketWorkController::class, 'people'])->name('it.tickets.work.people');
+    Route::post('/it/tickets/{ticket}/work/split', [ItTicketWorkController::class, 'split'])->name('it.tickets.work.split');
     Route::get('/it/tickets/{ticket}/original', [ItTicketController::class, 'original'])->name('it.tickets.original');
     Route::get('/it/tickets/{ticket}/tasks/{task}/history', ItWorkTaskHistoryController::class)->name('it.tickets.tasks.history');
     Route::post('/it/tickets/{ticket}/comments', [ItTicketController::class, 'storeComment'])->name('it.tickets.comments.store');
@@ -314,15 +329,15 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/setup/api-identities/{identity}', [ItServiceIdentityController::class, 'update'])->whereNumber('identity')->name('it.setup.api-identities.update');
         Route::post('/it/setup/api-identities/{identity}/rotate', [ItServiceIdentityController::class, 'rotate'])->whereNumber('identity')->name('it.setup.api-identities.rotate');
         Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceIdentityController::class, 'revoke'])->whereNumber('identity')->name('it.setup.api-identities.revoke');
-        Route::post('/it/setup/macros', [\App\Http\Controllers\It\ItTicketMacroController::class, 'store'])->name('it.setup.macros.store');
-        Route::patch('/it/setup/macros/{macro}', [\App\Http\Controllers\It\ItTicketMacroController::class, 'update'])->whereNumber('macro')->name('it.setup.macros.update');
-        Route::post('/it/setup/macros/{macro}/active', [\App\Http\Controllers\It\ItTicketMacroController::class, 'archive'])->whereNumber('macro')->name('it.setup.macros.active');
-        Route::post('/it/setup/recurrence-plans', [\App\Http\Controllers\It\ItRecurrencePlanController::class, 'store'])->name('it.setup.recurrence-plans.store');
-        Route::patch('/it/setup/recurrence-plans/{plan}', [\App\Http\Controllers\It\ItRecurrencePlanController::class, 'update'])->whereNumber('plan')->name('it.setup.recurrence-plans.update');
-        Route::post('/it/setup/recurrence-plans/{plan}/status', [\App\Http\Controllers\It\ItRecurrencePlanController::class, 'status'])->whereNumber('plan')->name('it.setup.recurrence-plans.status');
-        Route::post('/it/setup/reply-templates', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'store'])->name('it.setup.reply-templates.store');
-        Route::patch('/it/setup/reply-templates/{template}', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'update'])->whereNumber('template')->name('it.setup.reply-templates.update');
-        Route::post('/it/setup/reply-templates/{template}/active', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'archive'])->whereNumber('template')->name('it.setup.reply-templates.active');
+        Route::post('/it/setup/macros', [ItTicketMacroController::class, 'store'])->name('it.setup.macros.store');
+        Route::patch('/it/setup/macros/{macro}', [ItTicketMacroController::class, 'update'])->whereNumber('macro')->name('it.setup.macros.update');
+        Route::post('/it/setup/macros/{macro}/active', [ItTicketMacroController::class, 'archive'])->whereNumber('macro')->name('it.setup.macros.active');
+        Route::post('/it/setup/recurrence-plans', [ItRecurrencePlanController::class, 'store'])->name('it.setup.recurrence-plans.store');
+        Route::patch('/it/setup/recurrence-plans/{plan}', [ItRecurrencePlanController::class, 'update'])->whereNumber('plan')->name('it.setup.recurrence-plans.update');
+        Route::post('/it/setup/recurrence-plans/{plan}/status', [ItRecurrencePlanController::class, 'status'])->whereNumber('plan')->name('it.setup.recurrence-plans.status');
+        Route::post('/it/setup/reply-templates', [ItReplyTemplateController::class, 'store'])->name('it.setup.reply-templates.store');
+        Route::patch('/it/setup/reply-templates/{template}', [ItReplyTemplateController::class, 'update'])->whereNumber('template')->name('it.setup.reply-templates.update');
+        Route::post('/it/setup/reply-templates/{template}/active', [ItReplyTemplateController::class, 'archive'])->whereNumber('template')->name('it.setup.reply-templates.active');
         Route::post('/it/setup/provisioning-templates', [ItServiceManagementSetupController::class, 'storeProvisioningTemplate'])->name('it.setup.provisioning-templates.store');
         Route::patch('/it/setup/provisioning-templates/{template}', [ItServiceManagementSetupController::class, 'updateProvisioningTemplate'])->name('it.setup.provisioning-templates.update');
         Route::post('/it/setup/email-deliveries/{delivery}/retry', [ItServiceManagementSetupController::class, 'retryEmailDelivery'])->name('it.setup.email-deliveries.retry');
@@ -441,11 +456,11 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/my-calendar', [MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');
 Route::get('/my-calendar/events', [MyCalendarController::class, 'events'])->middleware('auth')->name('my-calendar.events');
 Route::middleware(['auth', 'throttle:60,1'])->prefix('my-calendar/entries')->group(function () {
-    Route::post('/', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'store'])->name('my-calendar.entries.store');
-    Route::get('/{entry}', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'show'])->whereNumber('entry')->name('my-calendar.entries.show');
-    Route::put('/{entry}', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'update'])->whereNumber('entry')->name('my-calendar.entries.update');
-    Route::delete('/{entry}', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'destroy'])->whereNumber('entry')->name('my-calendar.entries.destroy');
-    Route::post('/{entry}/restore', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'restore'])->whereNumber('entry')->name('my-calendar.entries.restore');
+    Route::post('/', [PersonalCalendarEntryController::class, 'store'])->name('my-calendar.entries.store');
+    Route::get('/{entry}', [PersonalCalendarEntryController::class, 'show'])->whereNumber('entry')->name('my-calendar.entries.show');
+    Route::put('/{entry}', [PersonalCalendarEntryController::class, 'update'])->whereNumber('entry')->name('my-calendar.entries.update');
+    Route::delete('/{entry}', [PersonalCalendarEntryController::class, 'destroy'])->whereNumber('entry')->name('my-calendar.entries.destroy');
+    Route::post('/{entry}/restore', [PersonalCalendarEntryController::class, 'restore'])->whereNumber('entry')->name('my-calendar.entries.restore');
 });
 
 // ── Operations module ────────────────────────────────────────────────
@@ -531,3 +546,25 @@ require __DIR__.'/vendor-vault.php';
 require __DIR__.'/people-locations.php';
 
 require __DIR__.'/operational-reports.php';
+
+require __DIR__.'/obli.php';
+
+Route::middleware(['auth'])->prefix('it/remote-support')->name('it.remote-support.')->group(function (): void {
+    Route::get('devices/{device}/action-policy', [ItEndpointActionPolicyController::class, 'show'])->whereNumber('device')->name('action-policy');
+    Route::put('devices/{device}/action-policy', [ItEndpointActionPolicyController::class, 'update'])->whereNumber('device')->middleware('throttle:20,1')->name('action-policy.update');
+    $obli = ItObliInvestigationController::class;
+    Route::get('devices/{device}/obli/options', [$obli, 'options'])->whereNumber('device')->name('obli.options');
+    Route::get('devices/{device}/obli/diagnostics', [$obli, 'diagnostics'])->whereNumber('device')->name('obli.diagnostics');
+    Route::post('devices/{device}/obli/chat', [$obli, 'store'])->whereNumber('device')->middleware('throttle:obli-chat')->name('obli.chat.store');
+    Route::get('devices/{device}/obli/chat/{requestUuid}', [$obli, 'show'])->whereNumber('device')->whereUuid('requestUuid')->name('obli.chat.show');
+    $controller = ItRemoteSessionController::class;
+    Route::get('devices/{device}/policy', [$controller, 'policy'])->name('policy');
+    Route::put('devices/{device}/policy', [$controller, 'savePolicy'])->middleware('throttle:20,1')->name('policy.update');
+    Route::get('devices/{device}/connection-options', [$controller, 'options'])->name('connection-options');
+    Route::post('devices/{device}/sessions', [$controller, 'store'])->middleware('throttle:20,1')->name('sessions.store');
+    Route::get('sessions/{session}', [$controller, 'show'])->whereUuid('session')->name('sessions.show');
+    Route::get('sessions/{session}/relay', [$controller, 'technicianRelay'])->whereUuid('session')->middleware('throttle:20,1')->name('relay');
+    Route::get('sessions/{session}/media', [$controller, 'technicianMedia'])->whereUuid('session')->name('media');
+    Route::post('sessions/{session}/media/answer', [$controller, 'mediaAnswer'])->whereUuid('session')->middleware('throttle:20,1')->name('media.answer');
+    Route::post('sessions/{session}/stop', [$controller, 'stop'])->whereUuid('session')->name('sessions.stop');
+});

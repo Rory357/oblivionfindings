@@ -129,10 +129,7 @@ describe('monitoring policy settings', () => {
             })
             .mockResolvedValueOnce({ data: {} });
         render(<MonitoringPolicySettings workspace={workspace} />);
-        fireEvent.mouseDown(screen.getByRole('tab', { name: 'Retention' }), {
-            button: 0,
-            ctrlKey: false,
-        });
+        fireEvent.click(screen.getByRole('tab', { name: 'Retention' }));
         fireEvent.click(
             await screen.findByRole('button', {
                 name: 'New retention policy',
@@ -210,12 +207,13 @@ describe('monitoring policy settings', () => {
                 }}
             />,
         );
-        fireEvent.mouseDown(screen.getByRole('tab', { name: 'Coverage' }), {
-            button: 0,
-            ctrlKey: false,
-        });
+        fireEvent.click(screen.getByRole('tab', { name: 'Coverage' }));
+        fireEvent.keyDown(
+            screen.getByRole('button', { name: /^Actions for/ }),
+            { key: 'ArrowDown' },
+        );
         fireEvent.click(
-            await screen.findByRole('button', { name: 'Reactivate' }),
+            await screen.findByRole('menuitem', { name: 'Reactivate' }),
         );
         const reasonLabel = screen.getByText('Operational reason');
         const reasonInput =

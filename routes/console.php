@@ -996,3 +996,18 @@ app(Schedule::class)->command('emar:expire-second-person-confirmations')->everyM
 app(Schedule::class)->call(fn () => app(PharmacyDispatchService::class)->recover())
     ->name('emar-pharmacy-dispatch-recovery')->everyMinute()->withoutOverlapping()->onOneServer();
 app(Schedule::class)->command('medications:chart-backups')->everyMinute()->withoutOverlapping()->onOneServer();
+
+// Native helper sign-in material has a bounded lifetime, including when Obli is disabled.
+app(Schedule::class)->command('obli:prune-sessions')->daily()->withoutOverlapping();
+
+Illuminate\Support\Facades\Schedule::command('endpoints:expire-remote-sessions')->everyMinute()->withoutOverlapping();
+
+// Sealed replies remain recoverable through token expiry, including lost replies.
+app(Schedule::class)->command('monitoring:prune-enrolment-recovery')
+    ->everyFiveMinutes()->withoutOverlapping()->name('monitoring.enrolment-recovery.prune');
+
+// Native attempt expiry is bookkeeping only; it never retries a computer action.
+app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
+
+// Media watchdogs enforce 15-second authority; this erases expired central signalling.
+Illuminate\Support\Facades\Schedule::command('cctv:expire-live-sessions')->everyMinute()->withoutOverlapping();

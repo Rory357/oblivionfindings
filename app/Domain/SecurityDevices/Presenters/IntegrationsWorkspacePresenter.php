@@ -50,6 +50,8 @@ class IntegrationsWorkspacePresenter
     /** @return array<string, mixed> */
     public function present(User $viewer): array
     {
+        $asOf = now();
+
         $viewer->loadMissing(['roles.permissions', 'permissionOverrides']);
 
         $canManage = $viewer->canDo('securityDevices.integrations.manage');
@@ -70,9 +72,9 @@ class IntegrationsWorkspacePresenter
             ->groupBy('provider')
             ->pluck('aggregate', 'provider');
         $duplicateCounts = $this->duplicateCandidateCounts(clone $visibleDeviceQuery);
-        $eventsByProvider = DeviceEvent::query()
+        $eventsByProvider = $this->access->applyTemporalEventCustodyScope(DeviceEvent::query(), $viewer)
             ->whereIn('device_id', (clone $visibleDeviceQuery)->select('devices.id'))
-            ->where('occurred_at', '>=', now()->subDay())
+            ->whereBetween('occurred_at', [$asOf->copy()->subDay(), $asOf])
             ->whereNotNull('source')
             ->selectRaw('source, count(*) as aggregate')
             ->groupBy('source')
@@ -385,6 +387,8 @@ class IntegrationsWorkspacePresenter
         })->all();
 
         return [
+            'actor_id' => $viewer->id,
+            'as_of' => $asOf->toISOString(),
             'providers' => $providers,
             'stats' => [
                 'providers_total' => count(self::PROVIDERS),

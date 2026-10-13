@@ -3,6 +3,7 @@ import {
     Activity,
     Building2,
     Cpu,
+    Download,
     HeartPulse,
     LayoutDashboard,
     MapPinned,
@@ -148,6 +149,13 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                 href: '/security-devices/discovery',
                 icon: Radar,
                 visible: (can) => Boolean(can.integrationsView),
+            },
+            {
+                title: 'Agent downloads',
+                href: '/security-devices/agent-downloads',
+                icon: Download,
+                visible: (can) =>
+                    Boolean(can.commandsAdmin || can.integrationsManage),
             },
             {
                 title: 'Integrations',

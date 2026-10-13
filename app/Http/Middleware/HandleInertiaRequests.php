@@ -7,6 +7,8 @@ use App\Domain\Finance\Services\FinanceHubCountsService;
 use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\It\ItModuleNavigation;
+use App\Domain\It\Services\ItRemoteSupportAccess;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
 use App\Models\Announcement;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
@@ -811,6 +813,7 @@ class HandleInertiaRequests extends Middleware
             'integrations' => [
                 'view' => $user->canDo('integrations.view'),
                 'manageSecrets' => $user->canDo('integrations.manage_secrets'),
+                'manageObli' => $user->canDo('settings.access.manage') && $user->canDo('integrations.manage_secrets'),
                 'manageSiteSecrets' => $user->canDo('integrations.manage_site_secrets'),
             ],
 
@@ -1023,6 +1026,8 @@ class HandleInertiaRequests extends Middleware
             'it' => [
                 'view' => $user->canDo('it.view'),
                 'manage' => $user->canDo('it.manage'),
+                'remote_support' => app(ItRemoteSupportAccess::class)->canOpen($user),
+                'approved_software' => EndpointSoftwarePackages::canOpen($user),
                 'request' => $user->canDo('it.request'),
                 'knowledge_author' => $user->canDo('it.knowledge.author'),
                 'knowledge_review' => $user->canDo('it.knowledge.review'),

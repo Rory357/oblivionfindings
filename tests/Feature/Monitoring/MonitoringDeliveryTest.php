@@ -273,7 +273,7 @@ it('classifies semantic observation payload errors as payload invalid', function
 it('replays exact signed bytes after the missing sequence arrives', function () {
     Queue::fake();
     $site = Site::factory()->create();
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $handler = Mockery::mock(RuntimeEnvelopeHandler::class);
@@ -289,6 +289,7 @@ it('replays exact signed bytes after the missing sequence arrives', function () 
     $consumer->consume('observation-projector', $two, $site->id);
 
     $access = Mockery::mock(SecurityDevicesAccessService::class);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
     $access->shouldReceive('accessibleSiteIds')->twice()->with(Mockery::type(User::class))->andReturn([$site->id]);
     $service = new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, $consumer);
     $service->replay($actor, $letter, 'Missing sequence restored');
@@ -316,7 +317,7 @@ it('replays exact signed bytes after the missing sequence arrives', function () 
 
 it('discards without deleting and audits the explicit actor and reason', function () {
     $site = Site::factory()->create();
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $encoded = deliveryEnvelope(4, '018f0000-0000-7000-8000-000000000061');
@@ -332,7 +333,8 @@ it('discards without deleting and audits the explicit actor and reason', functio
         'site_id' => $site->id,
     ]);
     $access = Mockery::mock(SecurityDevicesAccessService::class);
-    $access->shouldReceive('accessibleSiteIds')->once()->with($actor)->andReturn([$site->id]);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
+    $access->shouldReceive('accessibleSiteIds')->once()->with(Mockery::type(User::class))->andReturn([$site->id]);
 
     (new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, app(MonitoringEnvelopeConsumer::class)))
         ->discard($actor, $letter, 'Superseded by canonical sample');
@@ -364,16 +366,18 @@ it('denies replay without operate permission or canonical target access', functi
     ]);
     $deniedActor = User::factory()->create();
     $access = Mockery::mock(SecurityDevicesAccessService::class);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
     $access->shouldNotReceive('accessibleSiteIds');
     $service = new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, app(MonitoringEnvelopeConsumer::class));
 
     expect(fn () => $service->replay($deniedActor, $letter, 'Try replay'))
         ->toThrow(AuthorizationException::class);
 
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $targetAccess = Mockery::mock(SecurityDevicesAccessService::class);
+    $targetAccess->shouldReceive('forCurrentEvidence')->andReturnSelf();
     $targetAccess->shouldReceive('accessibleSiteIds')->once()->andReturn([$site->id]);
     $targetAccess->shouldReceive('assertCanViewDevice')->once()->andThrow(new AuthorizationException('restricted'));
 
@@ -612,7 +616,7 @@ it('rejects a valid signed envelope whose identity does not match its outbox row
 
 it('requires an explicit CLI actor before replaying a dead letter', function () {
     Queue::fake();
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $encoded = deliveryEnvelope(1, '018f0000-0000-7000-8000-000000000091');
@@ -707,7 +711,7 @@ it('parks typed site and target scope violations before observation mutation', f
 
 it('allows an authorised operator to discard poison bytes without decoding them', function () {
     $site = Site::factory()->create();
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $letter = MonitoringDeadLetter::create([
@@ -722,7 +726,8 @@ it('allows an authorised operator to discard poison bytes without decoding them'
         'site_id' => $site->id,
     ]);
     $access = Mockery::mock(SecurityDevicesAccessService::class);
-    $access->shouldReceive('accessibleSiteIds')->once()->with($actor)->andReturn([$site->id]);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
+    $access->shouldReceive('accessibleSiteIds')->once()->with(Mockery::type(User::class))->andReturn([$site->id]);
 
     (new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, app(MonitoringEnvelopeConsumer::class)))
         ->discard($actor, $letter, 'Poison evidence reviewed');
@@ -732,7 +737,7 @@ it('allows an authorised operator to discard poison bytes without decoding them'
 });
 
 it('records no replay success when queue acceptance fails', function () {
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $encoded = deliveryEnvelope(1, '018f0000-0000-7000-8000-000000000121');
@@ -747,7 +752,8 @@ it('records no replay success when queue acceptance fails', function () {
         'envelope_bytes' => $encoded,
     ]);
     $access = Mockery::mock(SecurityDevicesAccessService::class);
-    $access->shouldReceive('accessibleSiteIds')->once()->with($actor)->andReturn([]);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
+    $access->shouldReceive('accessibleSiteIds')->once()->with(Mockery::type(User::class))->andReturn([]);
     $originalDispatcher = app(Dispatcher::class);
     $dispatcher = Mockery::mock(Dispatcher::class);
     $dispatcher->shouldReceive('dispatch')->once()->andThrow(new RuntimeException('queue unavailable'));
@@ -776,7 +782,7 @@ it('authorises the freshly locked dead letter instead of a stale caller model', 
     Queue::fake();
     $allowedSite = Site::factory()->create();
     $deniedSite = Site::factory()->create();
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $encoded = deliveryEnvelope(1, '018f0000-0000-7000-8000-000000000131');
@@ -793,7 +799,8 @@ it('authorises the freshly locked dead letter instead of a stale caller model', 
     ]);
     $letter->setAttribute('site_id', $allowedSite->id);
     $access = Mockery::mock(SecurityDevicesAccessService::class);
-    $access->shouldReceive('accessibleSiteIds')->once()->with($actor)->andReturn([$allowedSite->id]);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
+    $access->shouldReceive('accessibleSiteIds')->once()->with(Mockery::type(User::class))->andReturn([$allowedSite->id]);
 
     expect(fn () => (new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, app(MonitoringEnvelopeConsumer::class)))
         ->replay($actor, $letter, 'Use locked scope'))
@@ -803,7 +810,7 @@ it('authorises the freshly locked dead letter instead of a stale caller model', 
 
 it('redispatches one durable replay intent and blocks discard while it is pending', function () {
     Queue::fake();
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $encoded = deliveryEnvelope(1, '018f0000-0000-7000-8000-000000000141');
@@ -818,7 +825,8 @@ it('redispatches one durable replay intent and blocks discard while it is pendin
         'envelope_bytes' => $encoded,
     ]);
     $access = Mockery::mock(SecurityDevicesAccessService::class);
-    $access->shouldReceive('accessibleSiteIds')->twice()->with($actor)->andReturn([]);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
+    $access->shouldReceive('accessibleSiteIds')->twice()->with(Mockery::type(User::class))->andReturn([]);
     $service = new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, app(MonitoringEnvelopeConsumer::class));
 
     $service->replay($actor, $letter, 'First request');
@@ -833,7 +841,7 @@ it('redispatches one durable replay intent and blocks discard while it is pendin
 
 it('keeps a replay intent recoverable when synchronous handling fails', function () {
     Queue::fake();
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['approved_at' => now()]);
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $encoded = deliveryEnvelope(1, '018f0000-0000-7000-8000-000000000151');
@@ -851,6 +859,7 @@ it('keeps a replay intent recoverable when synchronous handling fails', function
     $handler->shouldReceive('handle')->once()->andThrow(new RuntimeException('handler unavailable'));
     $consumer = deliveryConsumer($handler);
     $access = Mockery::mock(SecurityDevicesAccessService::class);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
     $access->shouldReceive('accessibleSiteIds')->times(2)->with(Mockery::type(User::class))->andReturn([]);
     $service = new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, $consumer);
     $service->replay($actor, $letter, 'Recoverable request');
@@ -885,6 +894,7 @@ it('allows an authorised takeover after the persisted replay actor is deleted', 
     $handler->shouldReceive('handle')->once();
     $consumer = deliveryConsumer($handler);
     $access = Mockery::mock(SecurityDevicesAccessService::class);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
     $access->shouldReceive('accessibleSiteIds')->times(3)->with(Mockery::type(User::class))->andReturn([]);
     $service = new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, $consumer);
 
@@ -935,6 +945,7 @@ it('recovers a replay after permission revocation through an audited operator ta
     $handler->shouldReceive('handle')->once();
     $consumer = deliveryConsumer($handler);
     $access = Mockery::mock(SecurityDevicesAccessService::class);
+    $access->shouldReceive('forCurrentEvidence')->andReturnSelf();
     $access->shouldReceive('accessibleSiteIds')->times(3)->andReturn([$site->id]);
     $access->shouldReceive('assertCanViewDevice')->times(3);
     $service = new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, $consumer);

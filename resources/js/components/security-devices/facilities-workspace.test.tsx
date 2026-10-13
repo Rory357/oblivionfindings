@@ -195,10 +195,10 @@ describe('FacilitiesWorkspacePanels', () => {
                 'Technical facilities evidence, not building control',
             ),
         ).toBeInTheDocument();
-        expect(screen.getByText('1 environmental devices')).toBeInTheDocument();
-        expect(screen.getByText('1 building systems')).toBeInTheDocument();
-        expect(screen.getByText('1 utilities')).toBeInTheDocument();
-        expect(screen.getByText('1 automations')).toBeInTheDocument();
+        expectFact('Environmental devices', '1');
+        expectFact('Building systems', '1');
+        expectFact('Utilities', '1');
+        expectFact('Automations', '1');
         expect(screen.getByText('Active facility events')).toBeInTheDocument();
         expect(screen.getByText('Kauri House')).toBeInTheDocument();
     });
@@ -320,3 +320,10 @@ describe('FacilitiesWorkspacePanels', () => {
         );
     });
 });
+
+function expectFact(label: string, value: string) {
+    const labelElement = screen.getByText(label, { exact: true });
+    expect(
+        within(labelElement.parentElement!).getByText(value, { exact: true }),
+    ).toBeInTheDocument();
+}

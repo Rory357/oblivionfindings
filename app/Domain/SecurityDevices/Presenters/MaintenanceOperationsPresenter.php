@@ -64,6 +64,7 @@ class MaintenanceOperationsPresenter
         $dueSoon = now()->addDays(14)->endOfDay();
 
         return [
+            'actor_id' => (int) $viewer->id,
             'tabs' => [
                 ['key' => 'overview', 'label' => 'Overview'],
                 ['key' => 'due', 'label' => 'Due & overdue'],

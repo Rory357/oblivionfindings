@@ -37,6 +37,7 @@ class DeviceCommandController extends Controller
         DeviceCommandRequestService $commands,
     ): RedirectResponse {
         $validated = $request->validated();
+        abort_if(isset($validated['expected_actor_id']) && (int) $validated['expected_actor_id'] !== (int) $request->user()->id, 409);
         $confirmedAt = $request->session()->get('auth.password_confirmed_at');
         $command = $commands->request($device, $request->user(), new CommandRequestInput(
             capability: $validated['capability'],

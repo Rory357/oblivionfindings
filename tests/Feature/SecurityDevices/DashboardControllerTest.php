@@ -67,6 +67,8 @@ class DashboardControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/dashboard')
+                ->where('actor_id', $this->admin->id)
+                ->has('as_of')
                 ->has('stats')
                 ->has('domainSummary')
                 ->has('healthSummary')
@@ -362,5 +364,17 @@ class DashboardControllerTest extends TestCase
                 collect($props['overdueMaintenance'])->pluck('description')->all(),
             );
         });
+    }
+
+    public function test_estate_findings_use_an_inclusive_past_window_and_exclude_future_signals(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $device = Device::factory()->create();
+        foreach (['window_start' => now()->subHours(24), 'window_end' => now(), 'too_old' => now()->subHours(24)->subSecond(), 'future' => now()->addSecond()] as $type => $at) {
+            DeviceEvent::create(['device_id' => $device->id, 'event_type' => $type, 'severity' => 'critical', 'source' => 'test', 'occurred_at' => $at]);
+        }
+        $this->actingAs($this->admin)->get('/security-devices')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('actor_id', $this->admin->id)->where('as_of', now()->toISOString())->where('stats.criticalEvents24h', 2)->has('recentEvents', 2)
+            ->where('recentEvents.0.event_type', 'window_end')->where('recentEvents.1.event_type', 'window_start')->where('operations.summary.active_findings', 2));
     }
 }

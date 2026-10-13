@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import { AlertCircle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type AutoRuleField =
     | 'domain'
@@ -61,6 +61,13 @@ const operators: Array<{ value: AutoRuleOperator; label: string }> = [
     { value: 'not_equals', label: 'Is not' },
     { value: 'in', label: 'Is one of' },
 ];
+
+export const autoRuleFieldLabel = (value: AutoRuleField) =>
+    fields.find((field) => field.value === value)?.label ?? value;
+export const autoRuleOperatorLabel = (value: AutoRuleOperator) =>
+    operators
+        .find((operator) => operator.value === value)
+        ?.label.toLowerCase() ?? value;
 
 const initialCondition = (): AutoRuleCondition => ({
     field: 'domain',
@@ -121,15 +128,29 @@ function previewErrorMessage(error: unknown): string {
 export function AutoRuleBuilder({
     value,
     onChange,
+    disabled = false,
 }: {
     value: AutoRules | null;
     onChange: (rules: AutoRules | null) => void;
+    disabled?: boolean;
 }) {
+    const active = useRef<AbortController | null>(null);
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            active.current?.abort();
+        };
+    }, []);
     const [preview, setPreview] = useState<PreviewResult | null>(null);
     const [previewError, setPreviewError] = useState<string | null>(null);
     const [previewing, setPreviewing] = useState(false);
 
     const changeRules = (rules: AutoRules | null) => {
+        if (disabled) return;
+        active.current?.abort();
+        setPreviewing(false);
         setPreview(null);
         setPreviewError(null);
         onChange(rules);
@@ -147,6 +168,7 @@ export function AutoRuleBuilder({
     };
 
     const previewMatches = async () => {
+        if (disabled || previewing) return;
         const rules = normaliseAutoRules(value);
         if (
             !rules ||
@@ -159,19 +181,29 @@ export function AutoRuleBuilder({
             return;
         }
 
+        const call = new AbortController();
+        active.current?.abort();
+        active.current = call;
         setPreviewing(true);
         setPreviewError(null);
         try {
             const response = await axios.post<PreviewResult>(
                 '/security-devices/device-groups/auto-rules/preview',
                 { auto_rules: rules },
+                {
+                    signal: call.signal,
+                    headers: { Accept: 'application/json' },
+                    timeout: 30000,
+                },
             );
-            setPreview(response.data);
+            if (mounted.current && !call.signal.aborted)
+                setPreview(response.data);
         } catch (error) {
+            if (!mounted.current || call.signal.aborted) return;
             setPreview(null);
             setPreviewError(previewErrorMessage(error));
         } finally {
-            setPreviewing(false);
+            if (mounted.current && !call.signal.aborted) setPreviewing(false);
         }
     };
 
@@ -191,6 +223,7 @@ export function AutoRuleBuilder({
                     </p>
                 </div>
                 <Switch
+                    disabled={disabled}
                     id="automatic-membership"
                     aria-label="Automatic membership"
                     checked={value !== null}
@@ -223,6 +256,7 @@ export function AutoRuleBuilder({
                             A device must match
                         </label>
                         <Select
+                            disabled={disabled}
                             value={value.match}
                             onValueChange={(match: 'all' | 'any') =>
                                 changeRules({ ...value, match })
@@ -256,6 +290,7 @@ export function AutoRuleBuilder({
                                         Field
                                     </label>
                                     <Select
+                                        disabled={disabled}
                                         value={condition.field}
                                         onValueChange={(field: AutoRuleField) =>
                                             updateCondition(index, { field })
@@ -287,6 +322,7 @@ export function AutoRuleBuilder({
                                         Comparison
                                     </label>
                                     <Select
+                                        disabled={disabled}
                                         value={condition.op}
                                         onValueChange={(op: AutoRuleOperator) =>
                                             updateCondition(index, { op })
@@ -318,6 +354,7 @@ export function AutoRuleBuilder({
                                         Value
                                     </label>
                                     <Input
+                                        disabled={disabled}
                                         id={`auto-rule-value-${index}`}
                                         aria-label="Value"
                                         value={
@@ -351,7 +388,10 @@ export function AutoRuleBuilder({
                                         size="icon"
                                         className="min-h-11 min-w-11 text-muted-foreground hover:text-destructive"
                                         aria-label={`Remove condition ${index + 1}`}
-                                        disabled={value.conditions.length === 1}
+                                        disabled={
+                                            disabled ||
+                                            value.conditions.length === 1
+                                        }
                                         onClick={() =>
                                             changeRules({
                                                 ...value,
@@ -375,7 +415,7 @@ export function AutoRuleBuilder({
                         <Button
                             type="button"
                             variant="outline"
-                            disabled={value.conditions.length >= 8}
+                            disabled={disabled || value.conditions.length >= 8}
                             onClick={() =>
                                 changeRules({
                                     ...value,
@@ -395,7 +435,7 @@ export function AutoRuleBuilder({
                         <Button
                             type="button"
                             onClick={previewMatches}
-                            disabled={previewing}
+                            disabled={disabled || previewing}
                         >
                             {previewing ? 'Checking…' : 'Preview matches'}
                         </Button>

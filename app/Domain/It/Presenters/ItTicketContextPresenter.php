@@ -2,6 +2,7 @@
 
 namespace App\Domain\It\Presenters;
 
+use App\Domain\It\Services\ItRemoteSupportAccess;
 use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTaskReadinessService;
@@ -284,6 +285,10 @@ final class ItTicketContextPresenter
             'health_status' => $this->value($device->health_status),
             'last_seen_at' => $device->last_seen_at?->toIso8601String(),
             'href' => route('security-devices.devices.show', $device),
+            'remote_support_href' => app(ItRemoteSupportAccess::class)->canOpen($viewer)
+                && app(ItRemoteSupportAccess::class)->isComputer($device)
+                && ! $ticket->isMerged() && $this->workAccess->canWork($viewer, $ticket)
+                    ? route('it.remote-support.index', ['device' => $device->id, 'ticket' => $ticket->id]) : null,
             'access' => [
                 'state' => 'available',
                 'message' => null,

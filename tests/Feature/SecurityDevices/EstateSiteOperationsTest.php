@@ -444,4 +444,27 @@ class EstateSiteOperationsTest extends TestCase
             'assigned_at' => now(),
         ]);
     }
+
+    public function test_estate_and_site_findings_do_not_inherit_foreign_event_history_when_a_device_moves(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $allowed = Site::factory()->create();
+        $hidden = Site::factory()->create();
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, 'primary_site_id' => $allowed->id, 'secondary_site_ids' => [], 'is_active' => true]);
+        foreach (['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view'] as $key) {
+            $permission = Permission::query()->where('key', $key)->firstOrFail();
+            $viewer->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+        }
+        $device = Device::factory()->create(['name' => 'Currently permitted device']);
+        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $hidden->id, 'assigned_at' => now()->subDays(2), 'released_at' => now()->subHour()]);
+        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $allowed->id, 'assigned_at' => now()->subHour()]);
+        DeviceEvent::create(['device_id' => $device->id, 'event_type' => 'hidden_past_event', 'severity' => 'critical', 'source' => 'Private foreign history', 'occurred_at' => now()->subHours(2)]);
+        DeviceEvent::create(['device_id' => $device->id, 'event_type' => 'visible_event', 'severity' => 'warning', 'source' => 'test', 'occurred_at' => now()->subMinutes(30)]);
+        $this->actingAs($viewer)->get('/security-devices')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('actor_id', $viewer->id)->where('stats.criticalEvents24h', 0)->where('stats.warningEvents24h', 1)->has('recentEvents', 1)->where('recentEvents.0.event_type', 'visible_event')->where('operations.summary.active_findings', 1));
+        $this->get('/security-devices/sites/'.$allowed->id)->assertOk()->assertInertia(fn ($page) => $page->where('summary.active_findings', 1));
+        $this->assertStringNotContainsString('Private foreign history', $this->get('/security-devices')->getContent());
+        $this->assertStringNotContainsString('hidden_past_event', $this->get('/security-devices')->getContent());
+    }
 }

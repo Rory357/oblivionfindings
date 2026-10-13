@@ -22,7 +22,7 @@ final class CollectorEnrollment extends Model
         'revoked_at',
     ];
 
-    protected $hidden = ['token_hash'];
+    protected $hidden = ['token_hash', 'recovery_response', 'recovery_identity_fingerprint'];
 
     protected $casts = [
         'expires_at' => 'immutable_datetime',

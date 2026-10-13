@@ -1,5 +1,14 @@
-import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
-import { Badge } from '@/components/ui/badge';
+import {
+    EntityCard,
+    EntityChip,
+    EntityContextMenu,
+    useEntityContextMenu,
+    type EntityCardProps,
+    type EntityMeridian,
+    type MenuItem,
+} from '@/components/lists';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+
 import { Card, CardContent } from '@/components/ui/card';
 import {
     Select,
@@ -8,9 +17,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { formatRelative } from '@/lib/datetime';
-import { Link } from '@inertiajs/react';
-import { Battery } from 'lucide-react';
+import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { router } from '@inertiajs/react';
+import { Battery, Cpu, Eye, MapPin } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -175,85 +184,136 @@ export function FilterSelect({
     );
 }
 
-export function DeviceCard({ device }: { device: DeviceListItem }) {
+export function deviceHealthMeridian(device: DeviceListItem): EntityMeridian {
+    // Health is the alert signal; lifecycle status alone never paints an all-clear meridian.
+    if (device.health_status === 'critical') return 'critical';
+    if (
+        device.health_status === 'warning' ||
+        ['attention', 'unmonitored'].includes(device.monitoring_state ?? '')
+    )
+        return 'warning';
+    if (device.health_status === 'healthy') return 'success';
+    return 'neutral';
+}
+
+export function deviceMonitoringVariant(state: string): StatusVariant {
+    if (state === 'healthy') return 'success';
+    if (state === 'attention' || state === 'unmonitored') return 'warning';
+    return 'neutral';
+}
+function signalLabel(state: string) {
+    return state.replaceAll('_', ' ');
+}
+
+export function DeviceCard({
+    device,
+    selection,
+    actions: suppliedActions,
+}: {
+    device: DeviceListItem;
+    selection?: EntityCardProps['selection'];
+    actions?: MenuItem[];
+}) {
+    const contextMenu = useEntityContextMenu<DeviceListItem>();
+    const href = `/security-devices/devices/${device.id}`;
+    const actions: MenuItem[] = suppliedActions ?? [
+        { label: 'Open device', icon: Eye, onClick: () => router.visit(href) },
+    ];
     return (
-        <Link
-            href={`/security-devices/devices/${device.id}`}
-            className="frontline-focus group flex flex-col rounded-lg border p-4 transition-all hover:bg-muted/50 hover:shadow-md"
-        >
-            <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-semibold">
-                            {device.name}
-                        </span>
-                        <Badge
-                            variant="outline"
-                            className="shrink-0 font-mono text-[10px]"
+        <>
+            <EntityCard
+                meridian={deviceHealthMeridian(device)}
+                icon={Cpu}
+                name={device.name}
+                href={href}
+                onOpen={() => router.visit(href)}
+                subline={
+                    [device.manufacturer, device.model]
+                        .filter(Boolean)
+                        .join(' ') || device.device_uid
+                }
+                actions={actions}
+                selection={selection}
+                onContextMenu={(event) => contextMenu.open(event, device)}
+                chips={
+                    <>
+                        <StatusBadge status={device.status} />
+                        <EntityChip>{domainLabel(device.domain)}</EntityChip>
+                        <EntityChip>
+                            {device.category.replaceAll('_', ' ')}
+                        </EntityChip>
+                        {device.subcategory ? (
+                            <EntityChip>
+                                {device.subcategory.replaceAll('_', ' ')}
+                            </EntityChip>
+                        ) : null}
+                        {device.provider ? (
+                            <EntityChip>{device.provider}</EntityChip>
+                        ) : null}
+                        <EntityChip outline>{device.device_uid}</EntityChip>
+                    </>
+                }
+                metric={
+                    device.battery_level !== null
+                        ? {
+                              label: 'Battery',
+                              value: (
+                                  <span className="inline-flex items-center gap-1">
+                                      <Battery className="size-3" />
+                                      {device.battery_level}%
+                                  </span>
+                              ),
+                              percent: device.battery_level,
+                          }
+                        : undefined
+                }
+                alerts={
+                    <>
+                        <StatusBadge
+                            status={device.health_status}
+                            label={`Health: ${signalLabel(device.health_status)}`}
+                        />
+                        {device.monitoring_state ? (
+                            <StatusBadge
+                                variant={deviceMonitoringVariant(
+                                    device.monitoring_state,
+                                )}
+                                label={`Monitoring: ${signalLabel(device.monitoring_state)}`}
+                                status={device.monitoring_state}
+                            />
+                        ) : null}
+                    </>
+                }
+                footer={{
+                    personIcon:
+                        device.assignment_type === 'site' ? MapPin : Cpu,
+                    primary: device.assigned_to || 'Unassigned',
+                    secondary: (
+                        <span
+                            title={
+                                device.last_seen_at
+                                    ? formatDateTime(device.last_seen_at)
+                                    : undefined
+                            }
                         >
-                            {device.device_uid}
-                        </Badge>
-                    </div>
-                    {(device.manufacturer || device.model) && (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                            {[device.manufacturer, device.model]
-                                .filter(Boolean)
-                                .join(' ')}
-                        </p>
-                    )}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                    <OperationalStateBadge
-                        state={device.status}
-                        className="text-[10px]"
-                    />
-                    <OperationalStateBadge
-                        state={device.health_status}
-                        className="text-[10px]"
-                    />
-                </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span>{domainLabel(device.domain)}</span>
-                <span className="text-muted-foreground/50">/</span>
-                <span>{device.category.replace(/_/g, ' ')}</span>
-                {device.subcategory && (
-                    <>
-                        <span className="text-muted-foreground/50">/</span>
-                        <span>{device.subcategory.replace(/_/g, ' ')}</span>
-                    </>
-                )}
-                {device.provider && (
-                    <>
-                        <span className="text-muted-foreground/50">|</span>
-                        <span>{device.provider}</span>
-                    </>
-                )}
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span>Seen: {formatTimeSince(device.last_seen_at)}</span>
-                {device.monitoring_state ? (
-                    <OperationalStateBadge
-                        state={device.monitoring_state}
-                        className="text-[10px]"
-                    />
-                ) : null}
-                {device.battery_level !== null && (
-                    <span className="flex items-center gap-1">
-                        <Battery className="h-3 w-3" />
-                        {device.battery_level}%
-                    </span>
-                )}
-                {device.assigned_to ? (
-                    <span className="text-foreground">
-                        {device.assignment_type}: {device.assigned_to}
-                    </span>
-                ) : (
-                    <span className="italic">Unassigned</span>
-                )}
-            </div>
-        </Link>
+                            {device.assignment_type
+                                ? `${device.assignment_type.replaceAll('_', ' ')} · `
+                                : ''}
+                            Last seen {formatTimeSince(device.last_seen_at)}
+                        </span>
+                    ),
+                }}
+            />
+            {contextMenu.ctx ? (
+                <EntityContextMenu
+                    x={contextMenu.ctx.x}
+                    y={contextMenu.ctx.y}
+                    title={device.name}
+                    icon={Cpu}
+                    items={actions}
+                    onClose={contextMenu.close}
+                />
+            ) : null}
+        </>
     );
 }

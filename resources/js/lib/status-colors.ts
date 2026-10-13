@@ -42,6 +42,12 @@ export const statusColors: Record<string, string> = {
     under_review: WARNING,
     archived: NEUTRAL,
 
+    // Network and device health use the same semantic status palette.
+    healthy: SUCCESS,
+    warning: WARNING,
+    offline: CRITICAL,
+    unknown: NEUTRAL,
+
     // Severity levels
     critical: CRITICAL,
     high: CRITICAL,

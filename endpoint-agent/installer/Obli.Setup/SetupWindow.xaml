@@ -1,0 +1,33 @@
+<Window x:Class="Oblivion.Setup.SetupWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:obli="clr-namespace:Oblivion.Obli" Title="Obli setup" Width="740" Height="720" MinWidth="520" MinHeight="600" WindowStartupLocation="CenterScreen" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource ForegroundBrush}" FontFamily="Segoe UI">
+ <Window.Resources><ResourceDictionary Source="Theme.xaml"/></Window.Resources>
+ <Grid Margin="28"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel Orientation="Horizontal" Margin="0,0,0,18"><obli:ObliOrb x:Name="Orb" Width="42" Height="42" Margin="0,0,8,0"/><StackPanel VerticalAlignment="Center"><TextBlock Text="Obli" FontSize="25" FontWeight="SemiBold"/><TextBlock Text="Computer support and site monitoring" Style="{StaticResource SecondaryText}"/></StackPanel></StackPanel>
+  <TextBlock x:Name="StepText" Grid.Row="1" Text="1 · Choose what to install" Style="{StaticResource SectionTitle}"/>
+  <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,18">
+   <StackPanel>
+    <Border x:Name="NoticeBox" Visibility="Collapsed" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,16"><TextBlock x:Name="Notice" AutomationProperties.LiveSetting="Polite"/></Border>
+    <StackPanel x:Name="FilesPane">
+     <Label Target="{Binding ElementName=ModeChoice}">What would you like to do?</Label><ComboBox x:Name="ModeChoice" SelectedIndex="0" MinHeight="44" SelectionChanged="ModeChanged" Margin="0,0,0,14" AutomationProperties.Name="Setup or repair"><ComboBoxItem Tag="install">Install Obli</ComboBoxItem><ComboBoxItem Tag="repair">Repair Obli services</ComboBoxItem></ComboBox>
+     <TextBlock x:Name="FilesIntroduction" Text="Use the installation package and profiles downloaded from your organisation’s Oblivion." Style="{StaticResource SecondaryText}" Margin="0,0,0,16"/>
+     <Label x:Name="RoleLabel" Target="{Binding ElementName=RoleChoice}">Installation type</Label>
+     <ComboBox x:Name="RoleChoice" SelectedIndex="0" MinHeight="44" SelectionChanged="RoleChanged" AutomationProperties.Name="Installation type">
+      <ComboBoxItem Tag="computer">Computer support</ComboBoxItem><ComboBoxItem Tag="site">Site monitoring</ComboBoxItem><ComboBoxItem Tag="both">Both</ComboBoxItem>
+     </ComboBox>
+     <TextBlock x:Name="RoleHelp" Style="{StaticResource SecondaryText}" Margin="0,8,0,14"/>
+     <Label>Installation package</Label><DockPanel Margin="0,0,0,14"><Button x:Name="PackageBrowse" DockPanel.Dock="Right" Content="Browse…" Click="BrowsePackage" Margin="8,0,0,0" AutomationProperties.Name="Choose installation package"/><TextBox x:Name="PackagePath" IsReadOnly="True" TextWrapping="Wrap" VerticalContentAlignment="Center" AutomationProperties.Name="Installation package"/></DockPanel>
+     <StackPanel x:Name="ComputerFiles"><Label>Computer profile</Label><DockPanel Margin="0,0,0,14"><Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseComputer" Margin="8,0,0,0" AutomationProperties.Name="Choose computer profile"/><TextBox x:Name="ComputerPath" IsReadOnly="True" TextWrapping="Wrap" VerticalContentAlignment="Center" AutomationProperties.Name="Computer profile"/></DockPanel></StackPanel>
+     <StackPanel x:Name="CollectorFiles"><Label>Site monitoring profile</Label><DockPanel Margin="0,0,0,14"><Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseCollector" Margin="8,0,0,0" AutomationProperties.Name="Choose site profile"/><TextBox x:Name="CollectorPath" IsReadOnly="True" TextWrapping="Wrap" VerticalContentAlignment="Center" AutomationProperties.Name="Site monitoring profile"/></DockPanel></StackPanel>
+    </StackPanel>
+    <StackPanel x:Name="ReviewPane" Visibility="Collapsed">
+     <TextBlock x:Name="ReviewIntroduction" Text="Check that these details belong to the organisation and site you intend to connect." Style="{StaticResource SecondaryText}" Margin="0,0,0,16"/>
+     <Border Background="{DynamicResource MutedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="5" Padding="16"><StackPanel x:Name="ReviewRows"/></Border>
+     <CheckBox x:Name="ConfirmDestination" Margin="0,20,0,0" MinHeight="44" Foreground="{DynamicResource ForegroundBrush}" VerticalContentAlignment="Center" Checked="ConfirmationChanged" Unchecked="ConfirmationChanged"><TextBlock x:Name="ConfirmationCopy" Text="I have checked the organisation, server and installation details." TextWrapping="Wrap" MaxWidth="530"/></CheckBox>
+     <TextBlock Text="Installation needs administrator access. Obli will run separately as an ordinary-user helper when someone next signs in." Style="{StaticResource SecondaryText}" Margin="0,10,0,0" x:Name="TrayExplanation"/>
+    </StackPanel>
+    <StackPanel x:Name="WorkingPane" Visibility="Collapsed"><TextBlock x:Name="WorkingTitle" Text="Installing the selected components…" FontSize="18" FontWeight="SemiBold" Margin="0,16,0,12"/><ProgressBar Height="5" IsIndeterminate="True" Margin="0,0,0,18"/><TextBlock x:Name="WorkingExplanation" Text="Keep this window open. Cancelling asks setup to stop and finish its cleanup before returning." Style="{StaticResource SecondaryText}"/></StackPanel>
+    <StackPanel x:Name="ResultPane" Visibility="Collapsed"><TextBlock x:Name="ResultTitle" FontSize="24" FontWeight="SemiBold" Margin="0,20,0,14"/><TextBlock x:Name="ResultBody" Style="{StaticResource SecondaryText}"/></StackPanel>
+   </StackPanel>
+  </ScrollViewer>
+  <Grid Grid.Row="3"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="CancelButton" Content="Close" HorizontalAlignment="Left" Click="CancelClicked"/><Button x:Name="BackButton" Grid.Column="1" Content="Back" Margin="8,0,0,0" Visibility="Collapsed" Click="BackClicked"/><Button x:Name="PrimaryButton" Grid.Column="2" Content="Review setup" Margin="8,0,0,0" Background="{DynamicResource PrimaryBrush}" Foreground="{DynamicResource OnPrimaryBrush}" Click="PrimaryClicked"/></Grid>
+ </Grid>
+</Window>

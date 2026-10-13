@@ -148,9 +148,9 @@ describe('HealthcareWorkspacePanels', () => {
                 name: 'Healthcare devices at a glance',
             }),
         ).toBeInTheDocument();
-        expect(screen.getByText('3 client assigned')).toBeInTheDocument();
-        expect(screen.getByText('2 shared or site')).toBeInTheDocument();
-        expect(screen.getByText('2 unassigned')).toBeInTheDocument();
+        expectFact('Client assigned', '3');
+        expectFact('Shared or site', '2');
+        expectFact('Unassigned', '2');
         expect(
             screen.getByRole('heading', {
                 name: 'Technical device operations only',
@@ -513,3 +513,10 @@ describe('HealthcareWorkspacePanels', () => {
         ).not.toBeInTheDocument();
     });
 });
+
+function expectFact(label: string, value: string) {
+    const labelElement = screen.getByText(label, { exact: true });
+    expect(
+        within(labelElement.parentElement!).getByText(value, { exact: true }),
+    ).toBeInTheDocument();
+}

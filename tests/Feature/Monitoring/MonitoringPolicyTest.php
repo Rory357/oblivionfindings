@@ -5,11 +5,11 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCoverageExpectation;
-use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CoverageAnalyzer;
 use App\Domain\Monitoring\Services\MaintenanceEvaluator;
 use App\Domain\Monitoring\Services\MonitoringObservationIngestor;
+use App\Domain\Monitoring\Services\MonitoringPolicyAuthoringService;
 use App\Domain\Monitoring\Services\MonitoringRollupService;
 use App\Domain\Monitoring\Services\MonitorStateMachine;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
@@ -17,11 +17,15 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\Site;
+use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
     CarbonImmutable::setTestNow('2026-07-23T12:00:00Z');
+    // Explicit isolated history cutover precedes this frozen operational fixture.
+    DB::table('monitoring_policy_history_epochs')->where('owner', 'maintenance')->update(['started_at' => now()->subDay()]);
 });
 
 afterEach(function () {
@@ -133,7 +137,7 @@ it('suppresses during active one off or recurring maintenance and emits the root
         'failure_confirmations' => 1,
         'maintenance_policy' => 'suppress_notifications_and_ticketing',
     ]);
-    $window = MonitoringMaintenanceWindow::query()->create([
+    $window = app(MonitoringPolicyAuthoringService::class)->createMaintenanceWindow(User::factory()->create(), [
         'site_id' => $site->id,
         'monitor_id' => $monitor->id,
         'name' => 'Network change',

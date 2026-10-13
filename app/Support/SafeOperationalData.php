@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Cctv\Models\HikvisionDiscoveryRequest;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
@@ -210,7 +211,8 @@ final class SafeOperationalData
 
         $class = $model::class;
 
-        return $model instanceof BoardPack
+        return $model instanceof HikvisionDiscoveryRequest
+            || $model instanceof BoardPack
             || $model instanceof Device
             || str_starts_with($class, 'App\\Models\\Integration\\')
             || str_starts_with($class, 'App\\Domain\\SecurityDevices\\Models\\');
@@ -228,7 +230,7 @@ final class SafeOperationalData
 
     private static function hasCanonicalDeviceRelation(Model $model): bool
     {
-        return str_starts_with($model::class, 'App\\Domain\\SecurityDevices\\Models\\')
+        return ($model instanceof HikvisionDiscoveryRequest || str_starts_with($model::class, 'App\\Domain\\SecurityDevices\\Models\\'))
             && is_numeric($model->getAttribute('device_id'))
             && method_exists($model, 'device');
     }

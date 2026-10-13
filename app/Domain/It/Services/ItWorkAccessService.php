@@ -10,6 +10,7 @@ use App\Models\ItTicket;
 use App\Models\ItTicketLink;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -23,6 +24,23 @@ use Illuminate\Support\Facades\Schema;
  */
 final class ItWorkAccessService
 {
+    private ?CurrentAuthorizationReads $currentReads = null;
+
+    /** Callback-bounded current evidence; existing non-scoped reads remain unchanged. */
+    public function forCurrentEvidence(CurrentAuthorizationReads $reads): self
+    {
+        $reads->assertActive();
+        $current = clone $this;
+        $current->currentReads = $reads;
+
+        return $current;
+    }
+
+    private function current(Builder $query): Builder
+    {
+        return $this->currentReads ? $this->currentReads->query($query) : $query;
+    }
+
     /**
      * Prelock the union before a multi-account decision performs individual
      * approvedSiteIds current reads. Caller already owns ordered User mutexes.
@@ -40,13 +58,13 @@ final class ItWorkAccessService
             $profile->primary_site_id, ...($profile->secondary_site_ids ?? []),
         ]);
         if (Schema::hasColumn('users', 'site_id')) {
-            $siteIds = $siteIds->merge(User::query()->whereKey($users->keys()->all())
+            $siteIds = $siteIds->merge($this->current(User::query())->whereKey($users->keys()->all())
                 ->orderBy('id')->lockForUpdate()->pluck('site_id'));
         }
         $siteIds = $siteIds->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
             ->map(fn ($id): int => (int) $id)->unique()->sort()->values();
         if ($siteIds->isNotEmpty()) {
-            Site::query()->whereKey($siteIds->all())->orderBy('id')->lockForUpdate()->get(['id']);
+            $this->current(Site::query())->whereKey($siteIds->all())->orderBy('id')->lockForUpdate()->get(['id']);
         }
     }
 
@@ -54,7 +72,7 @@ final class ItWorkAccessService
     public function approvedSiteIds(User $user, bool $lockForUpdate = false): array
     {
         $this->assertEvidenceTransaction($lockForUpdate);
-        $profile = HrEmployeeProfile::query()
+        $profile = $this->current(HrEmployeeProfile::query())
             ->where('user_id', $user->getKey())
             ->where('is_active', true)
             ->where(function (Builder $query): void {
@@ -77,7 +95,7 @@ final class ItWorkAccessService
         // It is compatibility input only; Site remains the canonical scope.
         if (Schema::hasColumn('users', 'site_id')) {
             $candidateIds->push(
-                User::query()->whereKey($user->getKey())
+                $this->current(User::query())->whereKey($user->getKey())
                     ->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())->value('site_id'),
             );
         }
@@ -92,7 +110,7 @@ final class ItWorkAccessService
             return [];
         }
 
-        $operationalIds = Site::query()
+        $operationalIds = $this->current(Site::query())
             ->whereKey($ids->all())
             ->where('is_active', true)
             ->where('archived', false)
@@ -150,14 +168,14 @@ final class ItWorkAccessService
      */
     public function canViewMajorIncidentStatus(User $user, ItMajorIncident $majorIncident): bool
     {
-        $ticketId = ItMajorIncident::query()
+        $ticketId = $this->current(ItMajorIncident::query())
             ->whereKey($majorIncident->getKey())
             ->value('ticket_id');
         if (! is_numeric($ticketId)) {
             return false;
         }
 
-        $ticket = ItTicket::query()->find((int) $ticketId);
+        $ticket = $this->current(ItTicket::query())->find((int) $ticketId);
         if (! $ticket) {
             return false;
         }
@@ -165,13 +183,13 @@ final class ItWorkAccessService
             return true;
         }
 
-        $incidentIds = ItTicketLink::query()
+        $incidentIds = $this->current(ItTicketLink::query())
             ->where('ticket_id', $ticket->id)
             ->where('relationship', 'related_incident')
             ->where('linkable_type', (new ItTicket)->getMorphClass())
             ->pluck('linkable_id');
 
-        return ItTicket::query()
+        return $this->current(ItTicket::query())
             ->whereKey($incidentIds)
             ->where('work_type', 'incident')
             ->where(function (Builder $participant) use ($user): void {
@@ -343,7 +361,7 @@ final class ItWorkAccessService
             return null;
         }
 
-        return ItTicket::query()->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())
+        return $this->current(ItTicket::query())->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())
             ->find($ticket->getKey());
     }
 
@@ -376,7 +394,7 @@ final class ItWorkAccessService
         // Acquire the approved Site set in ascending order before any separate
         // responsibility Site. API callers require membership in this set.
         $lockedSiteIds = $lockForUpdate ? $this->approvedSiteIds($user, true) : null;
-        $siteIsOperational = Site::query()
+        $siteIsOperational = $this->current(Site::query())
             ->whereKey($ticket->site_id)
             ->where('is_active', true)
             ->where('archived', false)
@@ -418,7 +436,7 @@ final class ItWorkAccessService
 
     private function activeTeamIncludes(int $teamId, int $userId): bool
     {
-        return ItTeam::query()
+        return $this->current(ItTeam::query())
             ->whereKey($teamId)
             ->where(fn (Builder $team): Builder => $this->applyActiveTeamScope($team, $userId))
             ->exists();
@@ -426,7 +444,7 @@ final class ItWorkAccessService
 
     private function activeQueueIncludes(int $queueId, int $userId): bool
     {
-        return ItQueue::query()
+        return $this->current(ItQueue::query())
             ->whereKey($queueId)
             ->where('is_active', true)
             ->whereHas('team', fn (Builder $team): Builder => $this->applyActiveTeamScope($team, $userId))
