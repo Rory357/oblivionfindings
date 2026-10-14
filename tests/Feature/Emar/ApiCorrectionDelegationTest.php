@@ -50,6 +50,8 @@ final class ApiCorrectionDelegationTest extends TestCase
 
     public function test_ea106_a_correction_only_actor_who_may_not_reach_the_person_is_not_found(): void
     {
+        // Compare the bodies as production renders them (no debug trace).
+        config()->set('app.debug', false);
         $actor = $this->staff(['medications.administer.correct']);
 
         $missing = $this->actingAs($actor)->postJson($this->url(999999), $this->payload())->assertNotFound();
