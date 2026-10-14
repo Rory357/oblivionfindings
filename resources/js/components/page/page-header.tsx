@@ -590,7 +590,7 @@ export function PageHeaderMeterBlock({
         <>
             <ArrowUpRight aria-hidden="true" className="eh-meter-go" />
             <span className="flex w-full min-w-0 items-baseline justify-between gap-3 pr-2.5">
-                <span className="eh-meter-label min-w-0 text-[10px] leading-snug font-semibold tracking-[0.08em] break-words uppercase">
+                <span className="eh-meter-label min-w-0 text-xs leading-snug font-semibold tracking-[0.08em] break-words uppercase">
                     {label}
                 </span>
                 {value != null ? (
@@ -832,7 +832,7 @@ export function PageHeaderMeterContacts({
                     key={contact.label}
                     className="flex min-w-0 items-baseline gap-1.5 text-[10.5px] leading-tight"
                 >
-                    <span className="eh-meter-label shrink-0 text-[9px] leading-none font-semibold tracking-[0.08em] uppercase">
+                    <span className="eh-meter-label shrink-0 text-xs leading-none font-semibold tracking-[0.08em] uppercase">
                         {contact.label}
                     </span>
                     {contact.name ? (
@@ -909,7 +909,22 @@ export function PageHeaderMeterDonut({
 /* ------------------------------------------------------------------ */
 
 const FILTER_FIELD =
-    'box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70';
+    'box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none';
+
+/**
+ * Focus ring for a focusable filter-row control, drawn on the control
+ * itself and inset so it never changes the drawn 23px / 38px geometry or
+ * spills onto a neighbour. On the glass chip it is band text (white on the
+ * sky); on the white active fill it is the chip's own brand text, so it
+ * stays ≥ 3:1 against whatever it sits on.
+ */
+const filterFocus = (onWhite: boolean) =>
+    cn(
+        'focus-visible:ring-2 focus-visible:ring-inset',
+        onWhite
+            ? 'focus-visible:ring-primary-strong'
+            : 'focus-visible:ring-band-foreground',
+    );
 
 /**
  * Generic 23px glass filter-row button for page-specific controls that
@@ -937,6 +952,7 @@ export function PageHeaderFilterButton({
             className={cn(
                 'inline-flex items-center gap-1 px-2 disabled:pointer-events-none disabled:opacity-50',
                 FILTER_FIELD,
+                filterFocus(active),
                 children == null && 'w-[23px] justify-center px-0',
                 active
                     ? 'border-band-foreground bg-band-foreground text-primary-strong'
@@ -1006,7 +1022,10 @@ export function PageHeaderFilterSelect({
                         type="button"
                         data-test={testId}
                         className={cn(
-                            'inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none',
+                            // relative z-[1]: the trigger stays above the
+                            // clear ✕'s 44px hit area where they meet.
+                            'relative z-[1] inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none',
+                            filterFocus(active),
                             comfortable && 'gap-2 rounded-[10px] pl-3',
                             active ? 'pr-1' : comfortable ? 'pr-3' : 'pr-2',
                             tap,
@@ -1044,9 +1063,12 @@ export function PageHeaderFilterSelect({
                         aria-label={`Clear ${label}`}
                         onClick={() => onChange(allValue)}
                         className={cn(
-                            'mr-1.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-[4px] outline-none hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-band-foreground/70',
-                            tap &&
-                                'frontline-tap mr-0 self-stretch rounded-[7px]',
+                            // The ✕ only shows on the white active chip, so its
+                            // ring is the chip's brand text, not band white.
+                            'mr-1.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-[4px] outline-none hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-primary-strong',
+                            tap
+                                ? 'frontline-tap mr-0 self-stretch rounded-[7px]'
+                                : 'frontline-hit',
                         )}
                     >
                         <X className="size-2.5" />
@@ -1099,6 +1121,7 @@ export function PageHeaderFilterCheck({
             className={cn(
                 'inline-flex items-center gap-1.5 px-2',
                 FILTER_FIELD,
+                filterFocus(checked),
                 tap && 'frontline-tap h-auto max-w-full py-2',
                 checked
                     ? 'border-band-foreground bg-band-foreground text-primary-strong'
@@ -1156,7 +1179,8 @@ export function PageHeaderViewToggle<K extends string>({
                         aria-checked={on}
                         onClick={() => onChange(o.value)}
                         className={cn(
-                            'inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70',
+                            'inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none',
+                            filterFocus(on),
                             tap,
                             on
                                 ? 'bg-band-foreground text-primary-strong'

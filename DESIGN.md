@@ -34,6 +34,7 @@ lucide-react icons, Recharts.
    respect the global reduced-motion block; ≥44 px tap targets on frontline
    surfaces (`.frontline-tap`, or `.frontline-hit` where a compact control
    must keep its drawn size — row kebabs, pagination, tier-2 tabs, the
+   header filter chip's clear ✕, the
    `Dialog`, `WizardShell` and `Sheet` ✕; the `Sheet` ✕ keeps a 16 px
    minimum inset so its 44 px target stays on screen).
    **Desktop geometry:** keep the drawn dimensions of the shared header,
@@ -423,6 +424,27 @@ before.
   under 4.5:1 for the step text). `bg-sidebar` is only for real sidebar
   surfaces, paired with `text-sidebar-foreground` in the same class
   string (ESLint `design/no-sidebar-bg-without-foreground`).
+- **Accent as an active surface** (fixed 2026-10-14, role Overview axe
+  audit) — the shared `Toggle` / `ToggleGroup` marked its on state
+  `bg-accent text-accent-foreground`: 4.03:1 in light mode, and a purple
+  block in dark mode. Selected, pressed and active states use the
+  brand-fill tint with mode-aware brand text, `bg-primary-fill/10
+  text-primary` (≥ 4.5:1 for every sRGB brand in both modes, measured
+  14 Oct), which `components/ui/toggle.tsx` now owns — don't restyle the
+  on state per page. A feature palette with its own lighter dark surfaces
+  re-declares `--text-color-primary` in its scope (the Overview's graphite
+  does). ESLint (`design/no-accent-active-state`) blocks
+  `bg-accent` behind `data-[state=on|active|checked]` and
+  `aria-pressed|selected|checked`; an open menu trigger
+  (`data-[state=open]`) is not a selection.
+- **Focus ring on an element that never takes focus** (fixed 2026-10-14)
+  — the header dropdown chip put `focus-visible:ring` on its wrapper
+  `<div>` while the real trigger `<button>` was `outline-none`, so
+  keyboard users saw nothing. The ring goes on the focusable element.
+  In the header filter row it is inset (the 23px / 38px chips keep their
+  drawn size) and toned by what it sits on: band white on the glass chip,
+  `ring-primary-strong` on the white active chip (a white ring on a white
+  fill is invisible). Both measured ≥ 4.7:1 for every brand.
 - **Band text from the brand** (fixed 2026-10-03) — text on the floored
   dark bands (the `.eh-header` sky and the PageHero band) is
   `--band-foreground`, always white, never `--primary-foreground`, which
@@ -669,7 +691,8 @@ before.
   (`--base-font-size`, 13/14/16px), and 8–10px text was unreadable on the
   Overview. Use the typography helpers, or `calc(Nrem / 14)` in a
   stylesheet (N px at the default size), never below the `.text-caption`
-  size (10.5px at default).
+  size (10.5px at default). Shared chrome too: the header meter labels
+  were `text-[10px]` / `text-[9px]` and are now `text-xs` (2026-10-14).
 - **Non-existent colour tokens** — utilities like `bg-warning/20` or
   `text-warning-foreground` reference a `warning` token that isn't in the
   `@theme` registry, so they silently render as nothing. The real tokens

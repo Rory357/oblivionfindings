@@ -46,6 +46,12 @@
     --color-muted: var(--muted);
     --color-muted-foreground: var(--muted-foreground);
     --color-border: var(--border);
+    /* Graphite is lighter than the app's dark surfaces, so the app's brand
+       text (--primary-text, L ≥ 0.70) fell to 4.0:1 on it for saturated
+       blue, red and orange brands. Brand text here (text-primary, e.g. the
+       shared Toggle's on state) uses the overview's lifted shade instead. */
+    --primary-text: var(--ov-brand-text);
+    --text-color-primary: var(--ov-brand-text);
 }
 .dark main:has(.ov-workspace) {
     background: oklch(0.234 0.017 280);
@@ -1440,9 +1446,6 @@ span.ov-context-priorities > svg {
     color: var(--muted-foreground);
     margin-right: auto;
 }
-.ov-density [data-state='on'] {
-    color: var(--ov-brand-text);
-}
 .ov-editor-stage {
     height: 520px;
     overflow: auto;
@@ -2367,12 +2370,6 @@ span.ov-context-priorities > svg {
             var(--card) 42% 58%,
             transparent 58%
         );
-}
-/* Library category filter: the shared Toggle's "on" pair is under 4.5:1 on
-   this surface, so the selected chip uses the verified brand-fill tint. */
-.ov-library-filters [data-state='on'] {
-    background: color-mix(in oklab, var(--primary-fill) 10%, var(--card));
-    color: var(--ov-brand-text);
 }
 /* A narrow desktop window keeps the title readable: the rail's Find chip
    stays, so the header search field can step aside. */
