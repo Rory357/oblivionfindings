@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\User;
 use App\Services\Medication\MedicationGeneralAuditPrivacy;
 use App\Support\SafeOperationalData;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -126,12 +127,13 @@ final class AuditLogViewService
             $this->applyActionFilter($query, $filters['action']);
         }
 
+        // EA-077 (Lane C7): the filter's dates are NZ calendar days; rows are stored in UTC.
         if ($filters['date_from'] ?? null) {
-            $query->whereDate('created_at', '>=', $filters['date_from']);
+            $query->where('created_at', '>=', WorkerClock::dayStartUtc((string) $filters['date_from']));
         }
 
         if ($filters['date_to'] ?? null) {
-            $query->whereDate('created_at', '<=', $filters['date_to']);
+            $query->where('created_at', '<=', WorkerClock::dayEndUtc((string) $filters['date_to']));
         }
 
         return $query;
@@ -210,10 +212,13 @@ final class AuditLogViewService
     {
         $base = $this->query($filters, $viewer)->reorder();
 
+        // EA-077 (Lane C7): today, this week (from Monday) and this month in NZ time.
+        $today = WorkerClock::today();
+
         return [
-            'today' => (clone $base)->whereDate('created_at', today())->count(),
-            'this_week' => (clone $base)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'this_month' => (clone $base)->where('created_at', '>=', now()->startOfMonth())->count(),
+            'today' => (clone $base)->where('created_at', '>=', $today->utc())->count(),
+            'this_week' => (clone $base)->where('created_at', '>=', $today->startOfWeek()->utc())->count(),
+            'this_month' => (clone $base)->where('created_at', '>=', $today->startOfMonth()->utc())->count(),
         ];
     }
 

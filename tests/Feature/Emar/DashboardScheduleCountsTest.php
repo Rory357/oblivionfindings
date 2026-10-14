@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AssertsOverviewHasNoMedicationData;
 use Tests\TestCase;
 
 /**
@@ -32,6 +33,7 @@ use Tests\TestCase;
  */
 class DashboardScheduleCountsTest extends TestCase
 {
+    use AssertsOverviewHasNoMedicationData;
     use RefreshDatabase;
 
     private const TZ = 'Pacific/Auckland';
@@ -128,14 +130,8 @@ class DashboardScheduleCountsTest extends TestCase
                     && collect($rows)->where('status', 'due')->count() === 3 - $overdue
                     && collect($rows)->where('status', 'given')->count() === 1));
 
-        // NF-25: the home /dashboard eMAR widget shows the dashboard's numbers.
-        $this->actingAs($this->asManager())
-            ->get('/dashboard')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('emarWidgets.dueNow', 3)
-                ->where('emarWidgets.overdue', $overdue)
-                ->where('emarWidgets.adminRate', fn ($rate) => (float) $rate === $adminRate));
+        // The home Overview no longer shows medication numbers (753a7f396).
+        $this->assertOverviewHasNoMedicationData($this->actingAs($this->asManager())->get('/dashboard'));
     }
 
     public function test_admin_rate_is_not_applicable_before_any_dose_is_due(): void
@@ -154,12 +150,7 @@ class DashboardScheduleCountsTest extends TestCase
                 ->where('stats.overdue', 0)
                 ->where('stats.dueNow', 0));
 
-        $this->actingAs($this->asManager())
-            ->get('/dashboard')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('emarWidgets.adminRate', null)
-                ->where('emarWidgets.dueNow', 0));
+        $this->assertOverviewHasNoMedicationData($this->actingAs($this->asManager())->get('/dashboard'));
     }
 
     private function seedOneClientOnShift(): void

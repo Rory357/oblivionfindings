@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationAllergy;
 use App\Models\MedicationSyringeDriver;
 use App\Models\Permission;
 use App\Models\Site;
@@ -220,6 +221,31 @@ class PersonMedicationRecordTest extends TestCase
                 ->where('meters.so_far', 2)->where('meters.recorded', 0)->where('meters.as_needed', 0));
     }
 
+    /** EA-111 (Lane C9g): the charts list is grouped by house, then name, and shows each person's allergy record. */
+    public function test_hub_charts_group_by_house_and_show_allergy_status(): void
+    {
+        $this->site->update(['name' => 'Zzz House']);
+        $second = Site::factory()->create(['is_active' => true, 'name' => 'Aaa House']);
+        // The person rule: an assigned worker reads people at the houses on their HR profile.
+        HrEmployeeProfile::query()->where('user_id', $this->reader->id)->firstOrFail()->update(['secondary_site_ids' => [$second->id]]);
+        $zoe = Client::factory()->create(['site_id' => $second->id, 'first_name' => 'Zoe', 'last_name' => 'Allergic']);
+        $amy = Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Amy', 'last_name' => 'Plain']);
+        foreach ([$zoe, $amy, $this->person] as $person) {
+            $person->supportWorkers()->syncWithoutDetaching([$this->reader->id]);
+            $this->medicine($person->first_name.' medicine', ['client_id' => $person->id]);
+        }
+        MedicationAllergy::query()->create(['client_id' => $zoe->id, 'allergen' => 'Penicillin', 'severity' => 'severe', 'reaction' => 'Rash', 'recorded_by' => $this->reader->id]);
+
+        $this->actingAs($this->reader)->get('/emar/mar')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+            ->has('page.data', 3)
+            ->where('page.data.0.person', 'Zoe Allergic')->where('page.data.0.house_id', $second->id)
+            ->where('page.data.0.allergy.status', 'recorded')->where('page.data.0.allergy.count', 1)->where('page.data.0.allergy.reviewed', false)
+            ->where('page.data.1.person', 'Amy Plain')->where('page.data.1.house_id', $this->site->id)
+            ->where('page.data.1.allergy.status', 'none')->where('page.data.1.allergy.count', 0)
+            ->where('page.data.2.client_id', $this->person->id)
+            ->where('house_counts.'.$second->id, 1)->where('house_counts.'.$this->site->id, 2));
+    }
+
     /** EA-110 (Lane C9): the record header's Due now, Late and Recorded today for one person. */
     public function test_record_header_counts_the_persons_doses_today(): void
     {
@@ -306,6 +332,38 @@ class PersonMedicationRecordTest extends TestCase
         $this->assertSame(2, $count('range=all&outcome=given'));
         $this->assertSame(0, $count('range=all&outcome=corrected'));
         $this->getJson($this->url('/history?range=1y'))->assertUnprocessable()->assertJsonValidationErrors('range');
+    }
+
+    /** EA-109 (Lane C9f): Clinical's Range filter is applied by the server in NZ days; a running driver always shows. */
+    public function test_clinical_range_filter(): void
+    {
+        $order = $this->medicine('Warfarin');
+        foreach (['2026-09-20', '2026-05-01', '2025-06-01'] as $tested) {
+            ClientInrRecord::query()->create(['client_id' => $this->person->id, 'client_medication_id' => $order->id, 'inr_value' => 2.5, 'tested_on' => $tested, 'recorded_by' => $this->reader->id]);
+        }
+        $nz = fn (string $at) => Carbon::parse($at, 'Pacific/Auckland')->utc();
+        $driver = ['client_id' => $this->person->id, 'site_id' => $this->site->id, 'commenced_by' => $this->reader->id, 'contents' => [['client_medication_id' => $order->id, 'name' => $order->name, 'dose' => '1', 'unit' => 'mg']]];
+        MedicationSyringeDriver::query()->create($driver + ['status' => 'running', 'commenced_at' => $nz('2025-08-01 10:00')]);
+        MedicationSyringeDriver::query()->create($driver + ['status' => 'completed', 'commenced_at' => $nz('2026-02-01 10:00'), 'completed_at' => $nz('2026-02-03 10:00')]);
+        MedicationSyringeDriver::query()->create($driver + ['status' => 'completed', 'commenced_at' => $nz('2025-03-01 10:00'), 'completed_at' => $nz('2025-03-04 10:00')]);
+        foreach (['2026-09-01 08:00', '2026-03-01 08:00', '2025-01-10 08:00'] as $at) {
+            ClientMedicationAdministration::query()->create([
+                'client_id' => $this->person->id, 'client_medication_id' => $order->id, 'administered_by' => $this->reader->id,
+                'status' => 'given', 'administered_at' => $nz($at), 'dose_given' => '1 tablet', 'blood_glucose_level' => 6.1,
+            ]);
+        }
+        $counts = function (string $query) {
+            $json = $this->actingAs($this->reader)->getJson($this->url('/clinical'.($query === '' ? '' : '?'.$query)))->assertOk()->json();
+
+            return [count($json['inr']['rows']), count($json['drivers']), count($json['observations']['rows'])];
+        };
+
+        // 3 months back from Sat 3 Oct (NZ) is 3 Jul; the long-running driver still shows.
+        $this->assertSame([1, 1, 1], $counts('range=3m'));
+        $this->assertSame([2, 2, 2], $counts('range=12m'));
+        $this->assertSame([3, 3, 3], $counts('range=all'));
+        $this->assertSame([3, 3, 3], $counts(''), 'Without a range the clinical record stays complete.');
+        $this->getJson($this->url('/clinical?range=7d'))->assertUnprocessable()->assertJsonValidationErrors('range');
     }
 
     public function test_changes_page_combines_retained_audits_with_new_events_and_conceals_controlled_facts(): void

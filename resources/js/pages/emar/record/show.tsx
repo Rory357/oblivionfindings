@@ -13,7 +13,10 @@ import { toast } from 'sonner';
 
 import { MarReportDialog } from '@/components/clients/profile/mar-day/report-dialog';
 import { ChartSection } from '@/components/emar/record/chart';
-import { ClinicalSection } from '@/components/emar/record/clinical';
+import {
+    ClinicalSection,
+    type ClinicalRange,
+} from '@/components/emar/record/clinical';
 import { DoseMeters } from '@/components/emar/record/dose-meters';
 import { HistorySection } from '@/components/emar/record/history';
 import { PhotosSection } from '@/components/emar/record/photos';
@@ -27,7 +30,9 @@ import {
     locationSearch,
     readLocation,
     RECORD_SECTIONS,
+    SUPPORT_FILTERS,
     type RecordLocation,
+    type SupportFilter,
 } from '@/components/emar/record/sections';
 import { CanonicalSupportSection } from '@/components/emar/record/support';
 import type { RecordPageProps } from '@/components/emar/record/types';
@@ -197,12 +202,35 @@ function AvailableRecord({
         ['all', 'given', 'notgiven', 'corrected'] as const,
         'all',
     );
+    // Lane C9f: Clinical's Range, Support's support level and the as-needed
+    // chart's "Show limit reached only" (approved P02).
+    const clinicalRange: ClinicalRange = pick(
+        'range',
+        ['3m', '12m', 'all'] as const,
+        '3m',
+    );
+    const supportFilter: SupportFilter = pick(
+        'sup',
+        SUPPORT_FILTERS.map((item) => item.value),
+        'all',
+    );
+    const limitOnly = query.get('limit') === '1';
+    const openTab = readLocation(page.url.split('?')[1] ?? '').tab;
     const sectionFilters: Record<string, string | null> = {
         type: medType === 'all' ? null : medType,
         attn: attention ? '1' : null,
         resolved: showResolved ? '1' : null,
-        range: range === '7d' ? null : range,
+        range:
+            openTab === 'clinical'
+                ? clinicalRange === '3m'
+                    ? null
+                    : clinicalRange
+                : range === '7d'
+                  ? null
+                  : range,
         out: outcome === 'all' ? null : outcome,
+        sup: supportFilter === 'all' ? null : supportFilter,
+        limit: limitOnly ? '1' : null,
     };
     // "As at" refreshes the header and reloads the open section.
     const [refreshKey, setRefreshKey] = useState(0);
@@ -482,6 +510,57 @@ function AvailableRecord({
                                     ]}
                                 />
                             ) : null}
+                            {location.tab === 'chart' &&
+                            activeView === 'asneeded' ? (
+                                <PageHeaderFilterCheck
+                                    label="Show limit reached only"
+                                    checked={limitOnly}
+                                    onChange={(next) =>
+                                        navigateQuery({
+                                            limit: next ? '1' : null,
+                                        })
+                                    }
+                                />
+                            ) : null}
+                            {location.tab === 'support' &&
+                            activeView === 'bymedicine' ? (
+                                <PageHeaderFilterSelect
+                                    label="Support"
+                                    value={supportFilter}
+                                    allValue="all"
+                                    options={SUPPORT_FILTERS.map((item) => ({
+                                        value: item.value,
+                                        label: item.label,
+                                    }))}
+                                    onChange={(next) =>
+                                        navigateQuery({
+                                            sup: next === 'all' ? null : next,
+                                        })
+                                    }
+                                />
+                            ) : null}
+                            {location.tab === 'clinical' ? (
+                                <PageHeaderFilterSelect
+                                    label="Range"
+                                    value={clinicalRange}
+                                    options={[
+                                        {
+                                            value: '3m',
+                                            label: 'Last 3 months',
+                                        },
+                                        {
+                                            value: '12m',
+                                            label: 'Last 12 months',
+                                        },
+                                        { value: 'all', label: 'All dates' },
+                                    ]}
+                                    onChange={(next) =>
+                                        navigateQuery({
+                                            range: next === '3m' ? null : next,
+                                        })
+                                    }
+                                />
+                            ) : null}
                             {location.tab === 'medicines' &&
                             location.view !== 'photos' ? (
                                 <>
@@ -675,6 +754,7 @@ function AvailableRecord({
                         <CanonicalSupportSection
                             clientId={person.id}
                             view={activeView}
+                            support={supportFilter}
                         />
                     ) : location.tab === 'chart' ? (
                         <ChartSection
@@ -684,6 +764,7 @@ function AvailableRecord({
                             view={activeView}
                             date={date}
                             week={week}
+                            limitReachedOnly={limitOnly}
                             onChange={(nextDate, nextWeek) =>
                                 navigateQuery({
                                     date: nextDate,
@@ -701,6 +782,7 @@ function AvailableRecord({
                         <ClinicalSection
                             clientId={person.id}
                             view={activeView}
+                            range={clinicalRange}
                         />
                     ) : (
                         <HistorySection

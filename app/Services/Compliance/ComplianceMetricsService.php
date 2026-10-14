@@ -17,6 +17,8 @@ use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
+use App\Support\WorkerClock;
+use Carbon\CarbonInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -62,21 +64,54 @@ class ComplianceMetricsService
      */
     private function dailyCounts(Builder $query, string $dateColumn, int $days): array
     {
-        $from = Carbon::today()->subDays($days - 1);
-
-        $rows = (clone $query)
-            ->where($dateColumn, '>=', $from)
-            ->selectRaw("DATE($dateColumn) as d, COUNT(*) as total")
-            ->groupBy('d')
-            ->pluck('total', 'd');
+        // EA-081 (Lane C7): NZ days, like the MAR series beside it.
+        $rows = $this->nzDayCounts($query, $dateColumn, WorkerClock::lastDaysStartUtc($days));
+        $first = WorkerClock::today()->subDays(max(1, $days) - 1);
 
         $series = [];
         for ($i = 0; $i < $days; $i++) {
-            $d = $from->copy()->addDays($i)->toDateString();
-            $series[] = (int) ($rows[$d] ?? 0);
+            $series[] = (int) ($rows[$first->addDays($i)->toDateString()] ?? 0);
         }
 
         return $series;
+    }
+
+    /**
+     * Counts per NZ calendar day since $fromUtc. Grouped by UTC hour in SQL
+     * (NZ offsets are whole hours) and bucketed into NZ days here, so a
+     * 9:30 am event lands on its own NZ day, not the UTC one (EA-081).
+     *
+     * @return array<string, int> keyed by NZ day (Y-m-d)
+     */
+    private function nzDayCounts(Builder $query, string $dateColumn, CarbonInterface $fromUtc): array
+    {
+        $timezone = WorkerClock::timezone();
+
+        return (clone $query)
+            ->where($dateColumn, '>=', $fromUtc)
+            ->selectRaw("DATE_FORMAT($dateColumn, '%Y-%m-%d %H:00:00') as h, COUNT(*) as total")
+            ->groupBy('h')
+            ->toBase()
+            ->get()
+            ->reduce(function (array $days, object $row) use ($timezone): array {
+                $day = CarbonImmutable::parse((string) $row->h, 'UTC')->timezone($timezone)->toDateString();
+                $days[$day] = ($days[$day] ?? 0) + (int) $row->total;
+
+                return $days;
+            }, []);
+    }
+
+    /**
+     * A trend chart's points: only the NZ days with a count, oldest first.
+     *
+     * @return list<array{date: string, total: int}>
+     */
+    private function nzDayTrend(Builder $query, string $dateColumn, CarbonInterface $fromUtc): array
+    {
+        $counts = $this->nzDayCounts($query, $dateColumn, $fromUtc);
+        ksort($counts);
+
+        return collect($counts)->map(fn (int $total, string $day): array => ['date' => $day, 'total' => $total])->values()->all();
     }
 
     /**
@@ -85,7 +120,8 @@ class ComplianceMetricsService
     public function exceptionKpis(User $viewer, string $period): array
     {
         $days = $this->days($period);
-        $from = Carbon::now()->subDays($days);
+        // The period's NZ days (today included), as the sparklines count them.
+        $from = WorkerClock::lastDaysStartUtc($days);
         $medicationSiteIds = $this->medicationSiteIds($viewer);
         $canViewControlled = $viewer->canDo(
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
@@ -122,7 +158,7 @@ class ComplianceMetricsService
             ],
             [
                 'key' => 'mar', 'label' => 'MAR exceptions', 'value' => $marExceptions,
-                'caption' => 'Not given or not recorded today', 'href' => '/medications?tab=mar',
+                'caption' => 'Not given or not recorded today', 'href' => '/emar/mar?date='.WorkerClock::today()->toDateString(),
                 'tone' => $marExceptions > 0 ? 'warning' : 'success',
                 'spark' => $marExceptionSeries,
             ],
@@ -152,7 +188,7 @@ class ComplianceMetricsService
             $openCd = (clone $cd)->where('status', 'open')->count();
             array_splice($kpis, 1, 0, [[
                 'key' => 'cd', 'label' => 'CD discrepancies', 'value' => $openCd,
-                'caption' => 'Open controlled-drug', 'href' => '/medications?tab=controlled',
+                'caption' => 'Open controlled-drug', 'href' => '/emar/controlled?view=discrepancies',
                 'tone' => $openCd > 0 ? 'critical' : 'success',
                 'spark' => $this->dailyCounts(clone $cd, 'created_at', $days),
             ]]);
@@ -268,15 +304,7 @@ class ComplianceMetricsService
             self::CONTROL_ROOM_SITE_BYPASS_PERMISSIONS,
         );
         $this->alertAccess->applyControlledMedicationContentScope($alertTrendQuery, $viewer);
-        $alertTrend = $alertTrendQuery
-            ->where('triggered_at', '>=', Carbon::now()->subDays(14))
-            ->selectRaw('DATE(triggered_at) as d, COUNT(*) as total')
-            ->groupBy('d')
-            ->orderBy('d')
-            ->get()
-            ->map(fn ($r) => ['date' => (string) $r->d, 'total' => (int) $r->total])
-            ->values()
-            ->all();
+        $alertTrend = $this->nzDayTrend($alertTrendQuery, 'triggered_at', WorkerClock::lastDaysStartUtc(14));
 
         return [
             'open' => $actionableAlerts()->count(),
@@ -290,7 +318,7 @@ class ComplianceMetricsService
     public function trends(User $viewer, string $period): array
     {
         $days = $this->days($period);
-        $from = Carbon::now()->subDays($days);
+        $from = WorkerClock::lastDaysStartUtc($days);
         $medicationSiteIds = $this->medicationSiteIds($viewer);
 
         $incidents = ClientIncident::query();
@@ -320,15 +348,7 @@ class ComplianceMetricsService
 
         $cdTrend = [];
         if ($viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
-            $cdTrend = $this->controlledDiscrepancyQuery($viewer, $medicationSiteIds)
-                ->where('created_at', '>=', $from)
-                ->selectRaw('DATE(created_at) as d, COUNT(*) as total')
-                ->groupBy('d')
-                ->orderBy('d')
-                ->get()
-                ->map(fn ($r) => ['date' => (string) $r->d, 'total' => (int) $r->total])
-                ->values()
-                ->all();
+            $cdTrend = $this->nzDayTrend($this->controlledDiscrepancyQuery($viewer, $medicationSiteIds), 'created_at', $from);
         }
 
         return [

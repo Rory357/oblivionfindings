@@ -20,7 +20,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AssertsOverviewHasNoMedicationData;
 use Tests\TestCase;
 
 /**
@@ -36,6 +36,7 @@ use Tests\TestCase;
  */
 class DashboardDoseProjectionTest extends TestCase
 {
+    use AssertsOverviewHasNoMedicationData;
     use RefreshDatabase;
 
     private Site $kowhai;
@@ -166,13 +167,9 @@ class DashboardDoseProjectionTest extends TestCase
         // Kōwhai only: Saturday 4 of 4, Sunday 2 of 4, today 1 of 3.
         $this->assertSame([100.0, 50.0, 33.3], array_slice(array_column($payload['complianceTrend'], 'rate'), 4));
 
-        $this->actingAs($lead)
-            ->get('/dashboard')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('emarWidgets.dueNow', 2)
-                ->where('emarWidgets.overdue', 2)
-                ->where('emarWidgets.adminRate', 33.3));
+        // The home Overview carries no medication numbers (753a7f396); the
+        // eMAR Overview above is where the lead reads them.
+        $this->assertOverviewHasNoMedicationData($this->actingAs($lead)->get('/dashboard'));
 
         // A Kōwhai worker who may open only the person they support: Aroha.
         $worker = $this->reader($this->kowhai, ['medications.view'], [$this->aroha]);

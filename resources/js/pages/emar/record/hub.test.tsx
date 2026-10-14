@@ -132,4 +132,76 @@ describe('MAR chart discovery', () => {
             ]),
         );
     });
+
+    it('groups charts by house and shows each person’s allergy record (Lane C9g)', () => {
+        const person = props.page.data[0];
+        render(
+            <MedicationRecordHub
+                {...props}
+                house_counts={{ '3': 2, '4': 1 }}
+                page={{
+                    ...props.page,
+                    to: 3,
+                    total: 3,
+                    data: [
+                        {
+                            ...person,
+                            key: 'p20',
+                            client_id: 20,
+                            person: 'Zoe Allergic',
+                            house: 'Aaa House',
+                            house_id: 4,
+                            allergy: {
+                                status: 'recorded',
+                                count: 2,
+                                reviewed: false,
+                            },
+                        },
+                        {
+                            ...person,
+                            house_id: 3,
+                            allergy: {
+                                status: 'no_known',
+                                count: 0,
+                                reviewed: true,
+                            },
+                        },
+                        {
+                            ...person,
+                            key: 'p21',
+                            client_id: 21,
+                            person: 'Amy Plain',
+                            house_id: 3,
+                            allergy: {
+                                status: 'none',
+                                count: 0,
+                                reviewed: false,
+                            },
+                        },
+                    ],
+                }}
+            />,
+        );
+        const aaa = screen.getByRole('region', { name: 'Aaa House' });
+        const fictional = screen.getByRole('region', {
+            name: 'Fictional house',
+        });
+        expect(
+            within(aaa).getByText('1 of 1 person shown'),
+        ).toBeInTheDocument();
+        expect(within(aaa).getByText('Zoe Allergic')).toBeInTheDocument();
+        expect(within(aaa).getByText('2 recorded')).toBeInTheDocument();
+        expect(within(aaa).getByText('Not reviewed')).toBeInTheDocument();
+        expect(
+            within(fictional).getByText('2 of 2 people shown'),
+        ).toBeInTheDocument();
+        expect(
+            within(fictional).getByText('No known allergies'),
+        ).toBeInTheDocument();
+        expect(
+            within(fictional).getByText('None recorded'),
+        ).toBeInTheDocument();
+        expect(within(fictional).getAllByText('Not reviewed')).toHaveLength(1);
+        expect(screen.getByText(/by house, then name/)).toBeInTheDocument();
+    });
 });

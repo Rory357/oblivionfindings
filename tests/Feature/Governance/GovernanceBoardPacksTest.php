@@ -933,8 +933,9 @@ class GovernanceBoardPacksTest extends TestCase
         $this->assertSame(1, $reportsResponse->inertiaProps('kpis.auditEvents7d'));
         $auditModule = collect($reportsResponse->inertiaProps('modules'))->firstWhere('key', 'audit_logs');
         $this->assertSame(1, data_get($auditModule, 'summary.total_records'));
+        // EA-061 (Lane C7): stored instants are sent as ISO and read in NZ time on the page.
         $this->assertSame(
-            $controlAudit->created_at->toDateTimeString(),
+            $controlAudit->created_at->utc()->toIso8601String(),
             data_get($auditModule, 'summary.last_activity'),
         );
 

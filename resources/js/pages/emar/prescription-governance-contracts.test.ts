@@ -124,8 +124,20 @@ describe('prescriber order governance contracts', () => {
         expect(dialogs).toContain(
             'disabled={!form.data.reason.trim() || form.processing}',
         );
-        expect(controller).toContain("'reason' => 'required|string|max:500'");
-        expect(controller).toContain("'reason' => trim($validated['reason'])");
+        // Lane C10: the legacy revoke route hands over to Orders, whose
+        // revoke needs the trimmed reason.
+        expect(controller).toContain(
+            'app(MedicationLegacyOrderBridge::class)->revokeCovert($request, $authorisation)',
+        );
+        expect(legacyOrderBridge).toContain(
+            'app(MedicationOrdersController::class)->revokeCovert($request, $authorisation->id)',
+        );
+        expect(ordersController).toContain(
+            "$this->orders->reason((string) $request->input('reason', ''))",
+        );
+        expect(orderWorkflow).toContain(
+            "['reason' => trim($reason)], ['reason' => 'required|string|max:2000']",
+        );
     });
 
     it('posts a countersign declaration without collecting prescriber secrets', () => {
@@ -155,21 +167,14 @@ describe('prescriber order governance contracts', () => {
         expect(dialogs).toContain('onFinish: clearReadBackWitnessCredential');
         expect(dialogs).not.toMatch(/localStorage|sessionStorage|indexedDB/);
 
-        expect(controller).toContain("'read_back_witness_credential'");
-        // PIN-1: verified against the witness's PIN (attempt limit + audit),
-        // never their login password hash.
-        expect(controller).toContain('app(WitnessPinService::class)->verify(');
+        // EA-053 / Lane C10: the old register is read only, so no legacy
+        // writer takes or checks a read-back credential any more; the
+        // credential still never reaches the session flash.
+        expect(routes).toContain(
+            "Route::post('/prescriptions', [\\App\\Http\\Controllers\\Emar\\LegacyPrescriberOrderController::class, 'refuse'])",
+        );
+        expect(controller).not.toContain("'read_back_witness_credential'");
         expect(controller).not.toContain('Hash::check(');
-        expect(controller).toContain(
-            "unset($validated['read_back_witness_credential'])",
-        );
-        expect(controller).toContain(
-            "'read_back_witness_method' => $readBackVerificationMethod",
-        );
-        expect(controller).toContain(
-            'MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_WITNESS_PIN',
-        );
-        expect(controller).toContain("'read_back_witnessed_at'");
         expect(bootstrap).toContain("'read_back_witness_credential'");
     });
 
@@ -297,25 +302,8 @@ describe('prescriber order governance contracts', () => {
     });
 
     it('keeps classification and covert overlap checks server bound', () => {
-        expect(controller).toMatch(
-            /\$controlledSnapshot\s*&&\s*\(! \$user->canDo\(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY\)\s*\|\|\s*! \$user->canDo\(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY\)\)/,
-        );
-        expect(controller).not.toContain(
-            '($medication === null || $controlledSnapshot)',
-        );
-        expect(controller).toContain(
-            "'client_medication_id' => 'nullable|integer|min:1'",
-        );
-        expect(controller).toContain(
-            "$medication !== null && $validated['order_type'] === 'cease'",
-        );
-        expect(controller).toContain(
-            "$validated['medication_name'] = $medication->name;",
-        );
-        expect(controller).toContain('assertCeaseOrderEffective(');
-        expect(controller).toContain("'status' => 'prohibited'");
-        expect(controller).toContain("->where('status', 'active')");
-        expect(controller).toContain('->lockForUpdate()');
+        // Lane C10: the legacy order writer and its cease path are gone
+        // (EA-053 made them refuse); covert authority is bound in Orders.
         const covertSource = ordersController.slice(
             ordersController.indexOf('public function authoriseCovert('),
             ordersController.indexOf('private function readableOrder('),
@@ -353,18 +341,9 @@ describe('prescriber order governance contracts', () => {
     });
 
     it('makes every governed transition audit failure fatal', () => {
-        for (const action of [
-            'medications.prescriber_order.created',
-            'medications.prescriber_order.updated',
-            'medications.prescriber_order.linked',
-            'medications.prescriber_order.confirmed',
-            'medications.prescriber_order.countersigned',
-            'medications.prescriber_order.dispensed',
-            'medications.prescriber_order.cancelled',
-        ]) {
-            expect(controller).toContain(`'${action}'`);
-        }
-        expect(controller).toContain('AuditLogger::logOrFail(');
+        // Lane C10: the legacy prescriber-order transitions no longer write
+        // (EA-053), so their audit actions left with them.
+        expect(controller).not.toContain("'medications.prescriber_order.created'");
 
         // Covert transitions moved to Orders and use its transactional action
         // helper. Keep checking both actions and the fatal audit call they share.

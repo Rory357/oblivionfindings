@@ -19,7 +19,13 @@ import {
     Pill,
     User,
 } from 'lucide-react';
-import { PLAN_STATES, SUPPORT, type Medicine, type SupportPlan } from './types';
+import {
+    PLAN_STATES,
+    SUPPORT,
+    type Medicine,
+    type SupportMode,
+    type SupportPlan,
+} from './types';
 
 export function PlanBadge({ plan }: { plan: SupportPlan }) {
     const state = PLAN_STATES[plan.state];
@@ -29,18 +35,24 @@ export function PlanBadge({ plan }: { plan: SupportPlan }) {
 /** P02/care-plan integration: a fully read-only rendering when actions are omitted. */
 export function MedicationSupportPanel({
     plan,
+    mode = null,
     onAssess,
     onAgreement,
     onMedicine,
     onConsent,
 }: {
     plan: SupportPlan;
+    /** P02 "Support" filter (Lane C9f): only medicines with this support. */
+    mode?: SupportMode | null;
     onAssess?: () => void;
     onAgreement?: () => void;
     onMedicine?: (medicine: Medicine) => void;
     onConsent?: () => void;
 }) {
     const ctx = useEntityContextMenu<Medicine>();
+    const medicines = mode
+        ? plan.medicines.filter((m) => m.mode === mode)
+        : plan.medicines;
     const actions = (m: Medicine): MenuItem[] => [
         ...(onMedicine
             ? [
@@ -152,7 +164,9 @@ export function MedicationSupportPanel({
             <ListCaption
                 title="Support by medicine"
                 caption={
-                    plan.medicines.length +
+                    (mode
+                        ? `${medicines.length} of ${plan.medicines.length}`
+                        : plan.medicines.length) +
                     ' shown' +
                     (plan.concealed_count
                         ? ' · ' +
@@ -171,11 +185,11 @@ export function MedicationSupportPanel({
                     ) : undefined
                 }
             />
-            {plan.medicines.length ? (
+            {medicines.length ? (
                 <>
                     <div className="hidden md:block">
                         <EntityTable
-                            rows={plan.medicines}
+                            rows={medicines}
                             rowKey={(m) => m.id}
                             identityLabel="Medicine"
                             identityWidth="1.8fr"
@@ -229,7 +243,7 @@ export function MedicationSupportPanel({
                         />
                     </div>
                     <ul className="space-y-3 md:hidden">
-                        {plan.medicines.map((m) => (
+                        {medicines.map((m) => (
                             <li
                                 key={m.id}
                                 onContextMenu={(e) => ctx.open(e, m)}
@@ -273,6 +287,12 @@ export function MedicationSupportPanel({
                         ))}
                     </ul>
                 </>
+            ) : mode && plan.medicines.length ? (
+                <EmptyState
+                    icon={Pill}
+                    title={`No medicines with ${SUPPORT[mode].label} support`}
+                    description="Choose “All support” to see every medicine."
+                />
             ) : (
                 <EmptyState
                     icon={Pill}

@@ -17,6 +17,7 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -126,8 +127,9 @@ class CombinedReportController extends Controller
         }
 
         $now = now();
-        $from7 = $now->copy()->subDays(7)->startOfDay();
-        $from30 = $now->copy()->subDays(30)->startOfDay();
+        // EA-061/EA-220 (Lane C7): NZ calendar days; stored instants are UTC.
+        $from7 = WorkerClock::lastDaysStartUtc(7);
+        $from30 = WorkerClock::lastDaysStartUtc(30);
         $canReadMedication = ! $forExport && $this->canReadMedication($user);
         $medicationSiteIds = $canReadMedication ? $this->medicationReports->siteIds($user) : [];
         $canViewControlled = $canReadMedication && $user->canDo(
@@ -156,7 +158,7 @@ class CombinedReportController extends Controller
                 ['label' => 'Open incidents', 'value' => ClientIncident::query()->whereIn('status', ['submitted', 'reviewed'])->count()],
                 ['label' => 'High severity incidents (30d)', 'value' => ClientIncident::query()->where('occurred_at', '>=', $from30)->where('severity', 'high')->count()],
                 ['label' => 'Open safeguarding concerns', 'value' => SafeguardingConcern::query()->where('status', '!=', 'closed')->count()],
-                ['label' => 'Medication exceptions (7d)', 'value' => (clone $administrations)->where('administered_at', '>=', $from7)->whereIn('status', ['missed', 'withheld', 'refused'])->count()],
+                ['label' => 'Medication exceptions (7d)', 'value' => (clone $administrations)->whereRaw('COALESCE(client_medication_administrations.scheduled_for, client_medication_administrations.administered_at) >= ?', [$from7])->whereIn('status', ['missed', 'withheld', 'refused'])->count()],
                 ['label' => 'Completed shifts (7d)', 'value' => Shift::query()->where('starts_at', '>=', $from7)->where('status', 'completed')->count()],
             ];
             if ($canViewControlled) {
@@ -180,7 +182,7 @@ class CombinedReportController extends Controller
                             'id' => $i->id,
                             'cells' => [
                                 (string) $i->id,
-                                optional($i->occurred_at)->toDateTimeString() ?? '',
+                                ($i->occurred_at ? WorkerClock::display($i->occurred_at) : ''),
                                 (string) ($i->client_id ?? ''),
                                 (string) ($i->severity ?? ''),
                                 (string) ($i->status ?? ''),
@@ -204,7 +206,7 @@ class CombinedReportController extends Controller
                             'id' => $m->id,
                             'cells' => [
                                 (string) $m->id,
-                                optional($m->administered_at)->toDateTimeString() ?? '',
+                                ($m->administered_at ? WorkerClock::display($m->administered_at) : ''),
                                 (string) ($m->client_id ?? ''),
                                 (string) ($m->status ?? ''),
                                 (string) ($m->reason ?? ''),
@@ -227,7 +229,7 @@ class CombinedReportController extends Controller
                             'cells' => [
                                 (string) $s->id,
                                 (string) ($s->reference_number ?? ''),
-                                optional($s->reported_at)->toDateTimeString() ?? '',
+                                ($s->reported_at ? WorkerClock::display($s->reported_at) : ''),
                                 (string) ($s->severity ?? ''),
                                 (string) ($s->status ?? ''),
                                 (string) ($s->assigned_to_user_id ?? ''),
@@ -261,8 +263,8 @@ class CombinedReportController extends Controller
                             'id' => $s->id,
                             'cells' => [
                                 (string) $s->id,
-                                optional($s->starts_at)->toDateTimeString() ?? '',
-                                optional($s->ends_at)->toDateTimeString() ?? '',
+                                ($s->starts_at ? WorkerClock::display($s->starts_at) : ''),
+                                ($s->ends_at ? WorkerClock::display($s->ends_at) : ''),
                                 (string) ($s->client_id ?? ''),
                                 (string) ($s->user_id ?? ''),
                                 (string) ($s->status ?? ''),
@@ -312,7 +314,7 @@ class CombinedReportController extends Controller
                                 (string) ($u->name ?? ''),
                                 (string) ($u->email ?? ''),
                                 (string) ($u->role ?? ''),
-                                optional($u->created_at)->toDateTimeString() ?? '',
+                                ($u->created_at ? WorkerClock::display($u->created_at) : ''),
                             ],
                             'href' => '/staff/'.$u->id,
                         ])
@@ -348,7 +350,7 @@ class CombinedReportController extends Controller
                             'id' => $a->id,
                             'cells' => [
                                 (string) $a->id,
-                                optional($a->created_at)->toDateTimeString() ?? '',
+                                ($a->created_at ? WorkerClock::display($a->created_at) : ''),
                                 (string) ($a->action ?? ''),
                                 (string) ($a->user_id ?? ''),
                                 (string) ($a->client_id ?? ''),
@@ -428,7 +430,7 @@ class CombinedReportController extends Controller
 
         return [
             'report' => $definition,
-            'generated_at' => $now->toDateTimeString(),
+            'generated_at' => WorkerClock::display($now),
             'metrics' => $metrics,
             'sections' => $sections ?? [],
         ];

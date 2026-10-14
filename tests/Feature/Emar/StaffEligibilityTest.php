@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationCompetencyExemption;
@@ -9,6 +10,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\UserWitnessPin;
 use App\Services\Medication\CompetencyAcknowledgement;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -177,6 +179,90 @@ class StaffEligibilityTest extends TestCase
                 ->has('my_eligibility.areas', 12));
     }
 
+    /** EA-156 (Lane C9h): each row says whether they can witness controlled drugs, by the rule P07b enforces, and why not. */
+    public function test_each_row_says_whether_they_can_witness_and_why_not(): void
+    {
+        $witness = $this->worker('Priya Shah', witness: true);
+        $this->assessment($witness, ['can_witness_controlled' => true]);
+        $noArea = $this->worker('Mere Kahu', witness: true);
+        $this->assessment($noArea, ['can_witness_controlled' => true, 'controlled_drugs' => false]);
+        UserWitnessPin::query()->where('user_id', $noArea->id)->delete();
+        $ended = $this->worker('Aisha Rahman', witness: true);
+        $this->assessment($ended, ['assessment_date' => $this->day(-400), 'expiry_date' => $this->day(-5)]);
+        $restricted = $this->worker('Leilani Faleolo', witness: true);
+        $this->assessment($restricted, ['restricted' => true, 'can_witness_controlled' => true]);
+        UserWitnessPin::query()->where('user_id', $restricted->id)->update(['locked_until' => now()->addHour()]);
+        $none = $this->worker('Tomasi Vea', witness: true);
+        UserWitnessPin::query()->where('user_id', $none->id)->delete();
+        $noAccess = $this->worker('Jordan Tipene');
+        $this->assessment($noAccess, ['can_witness_controlled' => true]);
+        $noAccess->permissionOverrides()->syncWithoutDetaching(Permission::query()->where('key', 'medications.controlled.witness')->pluck('id')
+            ->mapWithKeys(fn (int $id) => [$id => ['allowed' => false]])->all());
+
+        $people = $this->people();
+        $witnessOf = fn (User $user): array => $people->firstWhere('id', $user->id)['witness'];
+        $this->assertSame(['can' => true, 'competency' => true, 'reasons' => []], $witnessOf($witness));
+        $this->assertNotNull($people->firstWhere('id', $witness->id)['pin_set_at']);
+        $this->assertSame(['can' => false, 'competency' => false, 'reasons' => ['controlled drugs area not passed', 'no witness PIN set']], $witnessOf($noArea));
+        $this->assertSame(['assessment ended', '“can witness controlled drugs” not on'], $witnessOf($ended)['reasons']);
+        $this->assertSame(['restricted — can’t witness while restricted', 'PIN locked'], $witnessOf($restricted)['reasons']);
+        $this->assertSame(['not assessed', 'no witness PIN set'], $witnessOf($none)['reasons']);
+        $this->assertNull($people->firstWhere('id', $none->id)['pin_set_at']);
+        $this->assertSame(['can' => false, 'competency' => false, 'reasons' => ['their role can’t witness controlled drugs']], $witnessOf($noAccess));
+    }
+
+    /** EA-156 (Lane C9h): the register mirrors the witness checks P07b enforces; if those change, this says so. */
+    public function test_the_witness_rule_mirrors_what_p07b_enforces(): void
+    {
+        $p07b = (string) file_get_contents(app_path('Services/Medication/ControlledMedicationTransportWitnessService.php'));
+        foreach ([
+            "! \$witness->canDo('medications.controlled.witness')",
+            "\$decision['state'] !== 'valid'",
+            '$assessment->restricted',
+            '! $assessment->controlled_drugs',
+            "in_array('controlled_drugs', \$assessment->not_seen_areas ?? [], true)",
+            '! $assessment->can_witness_controlled',
+        ] as $check) {
+            $this->assertStringContainsString($check, $p07b, 'P07b changed its witness rule; update StaffEligibilityRegister::witness() to match.');
+        }
+    }
+
+    /** EA-156 (Lane C9h): the witness view lists who is on shift now at each house and whether P07b accepts them as a witness now. */
+    public function test_the_witness_view_shows_who_can_witness_on_shift_now(): void
+    {
+        $rimu = Site::factory()->create(['is_active' => true, 'name' => 'Rimu House']);
+        $witness = $this->worker('Priya Shah', witness: true);
+        $this->assessment($witness, ['can_witness_controlled' => true]);
+        $noPin = $this->worker('Mere Kahu', witness: true);
+        $this->assessment($noPin, ['can_witness_controlled' => true]);
+        UserWitnessPin::query()->where('user_id', $noPin->id)->delete();
+        $offShift = $this->worker('Daniel Ahn', witness: true);
+        $this->assessment($offShift, ['can_witness_controlled' => true]);
+        $rimuWorker = $this->worker('Hemi Walker', $rimu, witness: true);
+        foreach ([$witness, $noPin] as $person) {
+            HrAttendanceSession::query()->create(['user_id' => $person->id, 'site_id' => $this->house->id, 'clock_in_at' => now()->subHours(2), 'clock_out_at' => null, 'status' => 'open']);
+        }
+        HrAttendanceSession::query()->create(['user_id' => $rimuWorker->id, 'site_id' => $rimu->id, 'clock_in_at' => now()->subHour(), 'clock_out_at' => null, 'status' => 'open']);
+
+        $this->actingAs($this->lead)->get('/emar/safety/eligibility')->assertOk()
+            ->assertInertia(function (Assert $page) use ($witness, $noPin, $offShift, $rimu, $rimuWorker) {
+                $houses = collect($page->toArray()['props']['on_shift'])->keyBy('id');
+                $here = collect($houses[$this->house->id]['people'])->keyBy('id');
+                $this->assertSame([$witness->id, $noPin->id], collect($houses[$this->house->id]['people'])->pluck('id')->sort()->values()->all());
+                $this->assertTrue($here[$witness->id]['can_now']);
+                $this->assertSame([], $here[$witness->id]['reasons']);
+                $this->assertNotNull($here[$witness->id]['since']);
+                $this->assertFalse($here[$noPin->id]['can_now']);
+                $this->assertSame(['no witness PIN set'], $here[$noPin->id]['reasons']);
+                $this->assertFalse($here->has($offShift->id), 'Off shift is not on shift now');
+                $this->assertSame(1, $houses[$this->house->id]['can_now']);
+                $this->assertSame([$rimuWorker->id], collect($houses[$rimu->id]['people'])->pluck('id')->all());
+                $this->assertSame(0, $houses[$rimu->id]['can_now']);
+
+                return $page->component('emar/StaffEligibility');
+            });
+    }
+
     private function day(int $offset): string
     {
         return now('Pacific/Auckland')->startOfDay()->addDays($offset)->toDateString();
@@ -228,9 +314,9 @@ class StaffEligibilityTest extends TestCase
         ));
     }
 
-    private function worker(string $name, ?Site $site = null): User
+    private function worker(string $name, ?Site $site = null, bool $witness = false): User
     {
-        return $this->staff('support_worker', ['medications.view', 'medications.administer.record'], $site, $name);
+        return $this->staff('support_worker', ['medications.view', 'medications.administer.record', ...($witness ? ['medications.controlled.witness'] : [])], $site, $name);
     }
 
     /** @param  list<string>  $permissions */

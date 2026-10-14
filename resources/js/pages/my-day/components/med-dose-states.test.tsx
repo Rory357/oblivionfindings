@@ -1,5 +1,4 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
     DOSE_STATUS_META,
@@ -10,7 +9,6 @@ import {
 import type { StreamItem } from '../lib/stream-grouping';
 import type { MyDayMedDue } from '../lib/types';
 import { workIsDone } from '../lib/work-priority';
-import { StreamItemRow } from './stream-item';
 
 function med(status: MyDayMedDue['status']): StreamItem {
     return {
@@ -38,22 +36,8 @@ function med(status: MyDayMedDue['status']): StreamItem {
 
 describe('My Day medication states (C6)', () => {
     it('shows a dose recorded as missed as "Missed (recorded)", done and never overdue', () => {
-        render(
-            <StreamItemRow
-                item={med('missed')}
-                isNow={false}
-                showResident={false}
-                onToggleTask={vi.fn()}
-                onGiveMed={vi.fn()}
-                onOpenContextMenu={vi.fn()}
-            />,
-        );
-
-        expect(screen.getAllByText('Missed (recorded)').length).toBeGreaterThan(
-            0,
-        );
-        expect(screen.queryByText('Overdue')).toBeNull();
-        expect(screen.queryByTitle('Mark as given')).toBeNull();
+        // The My Day row that rendered this was retired with its orphan
+        // quick actions (EA-125); the shared state logic stays covered.
         expect(workIsDone(med('missed'))).toBe(true);
         // The label Meds today uses for the same state.
         expect(DOSE_STATUS_META.missed.label).toBe('Missed (recorded)');
@@ -62,28 +46,16 @@ describe('My Day medication states (C6)', () => {
     it('shows a dose the person is away for as "Away · reason", with nothing to do and never overdue', () => {
         const item = med('away');
         if (item.kind === 'med') {
-            item.data.away_reason = 'Respite at another house (since Mon 15 Jun, 7:00 am)';
+            item.data.away_reason =
+                'Respite at another house (since Mon 15 Jun, 7:00 am)';
         }
-        render(
-            <StreamItemRow
-                item={item}
-                isNow={false}
-                showResident={false}
-                onToggleTask={vi.fn()}
-                onGiveMed={vi.fn()}
-                onOpenContextMenu={vi.fn()}
-            />,
-        );
-
-        expect(
-            screen.getAllByText('Away · Respite at another house (since Mon 15 Jun, 7:00 am)').length,
-        ).toBeGreaterThan(0);
-        expect(screen.queryByText('Overdue')).toBeNull();
-        expect(screen.queryByTitle('Mark as given')).toBeNull();
         expect(workIsDone(item)).toBe(true);
         // The label Meds today uses for the same state.
         expect(
-            doseStatusLabel('away', 'Respite at another house (since Mon 15 Jun, 7:00 am)'),
+            doseStatusLabel(
+                'away',
+                'Respite at another house (since Mon 15 Jun, 7:00 am)',
+            ),
         ).toBe('Away · Respite at another house (since Mon 15 Jun, 7:00 am)');
     });
 

@@ -69,7 +69,6 @@ use App\Http\Controllers\It\ItWorkTaskHistoryController;
 use App\Http\Controllers\LegacyRouteRedirectController;
 use App\Http\Controllers\MyCalendarController;
 use App\Http\Controllers\MyDayActionsController;
-use App\Http\Controllers\MyDayMedicationsController;
 use App\Http\Controllers\MyDayTaskController;
 use App\Http\Controllers\MyDayTaskDraftController;
 use App\Http\Controllers\MyTasksController;
@@ -450,13 +449,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/my-day/alerts/{alert}/ack', [MyDayActionsController::class, 'acknowledgeAlert'])->name('my-day.alert.ack');
     Route::post('/my-day/alerts/{alert}/snooze', [MyDayActionsController::class, 'snoozeAlert'])->name('my-day.alert.snooze');
 
-    // Site-first redesign — frontline medication quick actions. The same
-    // ClientMedicationAdministration writes flow through here as via the full
-    // eMAR, but UX-light: one click marks a dose given/refused; snooze hides
-    // the row from this worker's /my-day for 15m without touching the record.
-    Route::post('/my-day/medications/{medication}/administer', [MyDayMedicationsController::class, 'administer'])->name('my-day.medications.administer');
-    Route::post('/my-day/medications/{medication}/refuse', [MyDayMedicationsController::class, 'refuse'])->name('my-day.medications.refuse');
-    Route::post('/my-day/medications/{medication}/snooze', [MyDayMedicationsController::class, 'snooze'])->name('my-day.medications.snooze');
+    // EA-125 (Lane C10): the My Day medication quick actions (administer,
+    // refuse, snooze) are retired — approved P01 Q1. Doses are recorded through
+    // Meds today (/meds/today/record) with the full recording contract.
 });
 
 Route::get('/my-calendar', [MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');

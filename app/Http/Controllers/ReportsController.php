@@ -14,6 +14,8 @@ use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Support\ReportCatalog;
+use App\Support\WorkerClock;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -31,8 +33,9 @@ class ReportsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('reports.viewAny'), 403);
 
-        $from7 = now()->subDays(7)->startOfDay();
-        $today = now()->startOfDay();
+        // EA-220 (Lane C7): the last 7 NZ days (today and the six before), and today's NZ date.
+        $from7 = WorkerClock::lastDaysStartUtc(7);
+        $today = WorkerClock::today();
         $canReadMedication = $user->canDo('medications.reports.view')
             && ! $this->medicationReports->financeOnly($user);
         $medicationSiteIds = $canReadMedication ? $this->medicationReports->siteIds($user) : [];
@@ -70,8 +73,9 @@ class ReportsController extends Controller
                 ->count(),
         ];
         if ($canReadMedication) {
+            // Counted by when the dose was due (or given), not when it was entered.
             $kpis['missedMeds7d'] = $this->medicationAdministrationQuery($user, $medicationSiteIds)
-                ->where('created_at', '>=', $from7)
+                ->whereRaw('COALESCE(client_medication_administrations.scheduled_for, client_medication_administrations.administered_at) >= ?', [$from7])
                 ->whereIn('status', ['missed', 'withheld', 'refused'])
                 ->count();
         }
@@ -100,11 +104,9 @@ class ReportsController extends Controller
 
                 $lastActivity = null;
                 if ($hasDateField) {
-                    $last = (clone $query)->max($dateField);
-                    $lastActivity = $last ? (string) $last : null;
+                    $lastActivity = $this->activityStamp((clone $query)->max($dateField));
                 } elseif (Schema::hasColumn($table, 'created_at')) {
-                    $last = (clone $query)->max('created_at');
-                    $lastActivity = $last ? (string) $last : null;
+                    $lastActivity = $this->activityStamp((clone $query)->max('created_at'));
                 }
 
                 return array_merge($module, [
@@ -172,6 +174,20 @@ class ReportsController extends Controller
     }
 
     /** @param array<int, int> $siteIds */
+    /**
+     * EA-061 (Lane C7): a stored instant is UTC — sent as ISO so the page shows
+     * NZ time; a date-only value keeps its calendar date.
+     */
+    private function activityStamp(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $text = (string) $value;
+
+        return strlen($text) > 10 ? CarbonImmutable::parse($text, 'UTC')->toIso8601String() : $text;
+    }
+
     private function medicationAdministrationQuery(User $user, array $siteIds): Builder
     {
         $query = ClientMedicationAdministration::query()->effectiveClinicalEvidence();
