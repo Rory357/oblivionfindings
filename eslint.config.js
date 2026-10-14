@@ -155,6 +155,9 @@ export default [
                     'no-rem-tap-floor': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-accent-active-state': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -246,6 +249,26 @@ export default [
                         ':matches(Literal[value=/^(?![\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*bg-destructive(?:\\s|$))[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*text-destructive-foreground(?:\\x2f\\d+)?(?:\\s|$)/], TemplateElement[value.raw=/^(?![\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*bg-destructive(?:\\s|$))[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*text-destructive-foreground(?:\\x2f\\d+)?(?:\\s|$)/])',
                     message:
                         'text-destructive-foreground is text for a solid bg-destructive fill (white in light mode); without that fill in the same class string it disappears on cards. On a light surface use the critical status pair: bg-status-critical-bg + text-status-critical-foreground (icon text-status-critical). See DESIGN.md "Fill foregrounds off their fill".',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Accent as an active surface": the shared Toggle's
+        // bg-accent on state measured 4.03:1 (axe, role Overview), and
+        // bg-accent is purple in dark mode. Selected/pressed/active states
+        // use bg-primary-fill/10 + text-primary, as components/ui/toggle.tsx
+        // does. Open menu triggers (data-[state=open]) are not a selection.
+        files: ['resources/js/**/*.{ts,tsx}'],
+        ignores: ['**/*.test.tsx', '**/*.test.ts'],
+        rules: {
+            'design/no-accent-active-state': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/(?:^|\\s)(?:data-\\[state=(?:on|active|checked)\\]|aria-pressed|aria-selected|aria-checked):bg-accent(?:\\x2f\\d+)?(?:\\s|$)/], TemplateElement[value.raw=/(?:^|\\s)(?:data-\\[state=(?:on|active|checked)\\]|aria-pressed|aria-selected|aria-checked):bg-accent(?:\\x2f\\d+)?(?:\\s|$)/])',
+                    message:
+                        'bg-accent is under 4.5:1 as a selected/pressed/active surface (4.03:1 on the shared Toggle) and purple in dark mode. Mark the state with bg-primary-fill/10 + text-primary, as components/ui/toggle.tsx does. See DESIGN.md "Accent as an active surface".',
                 },
             ],
         },
