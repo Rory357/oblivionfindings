@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -247,5 +247,127 @@ describe('AddDeviceDialog', () => {
             screen.getByRole('textbox', { name: /Override reason/ }),
         ).toBeVisible();
         expect(screen.getByLabelText(/Override expires/)).toBeVisible();
+    });
+    it('keeps an edited registration until the user confirms discard', async () => {
+        const onClose = vi.fn();
+        render(<AddDeviceDialog open onClose={onClose} />);
+        await screen.findByText('What are we registering?');
+        fireEvent.change(screen.getByRole('textbox', { name: /Device name/ }), {
+            target: { value: 'Unsaved synthetic device' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByRole('alertdialog')).toBeVisible();
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep reviewing' }));
+        expect(
+            screen.getByRole('textbox', { name: /Device name/ }),
+        ).toHaveValue('Unsaved synthetic device');
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+    it('treats the loaded edit record as clean and guards later edits', async () => {
+        vi.mocked(fetch).mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                ...options,
+                device: {
+                    id: 42,
+                    name: 'Loaded synthetic camera',
+                    domain: 'security',
+                    category: 'cctv',
+                    status: 'active',
+                },
+            }),
+        } as Response);
+        const onClose = vi.fn();
+        const view = render(
+            <EditDeviceDialog open onClose={onClose} deviceId={42} />,
+        );
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: /Device name/ }),
+            ).toHaveValue('Loaded synthetic camera'),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        view.unmount();
+        onClose.mockClear();
+        render(<EditDeviceDialog open onClose={onClose} deviceId={42} />);
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: /Device name/ }),
+            ).toHaveValue('Loaded synthetic camera'),
+        );
+        fireEvent.change(screen.getByRole('textbox', { name: /Device name/ }), {
+            target: { value: 'Edited synthetic camera' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByRole('alertdialog')).toBeVisible();
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep reviewing' }));
+        expect(
+            screen.getByRole('textbox', { name: /Device name/ }),
+        ).toHaveValue('Edited synthetic camera');
+    });
+    it('clears the previous edit record when a different canonical device is opened', async () => {
+        let resolveNext: (value: Response) => void = () => {};
+        vi.mocked(fetch)
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    ...options,
+                    device: {
+                        id: 42,
+                        name: 'Previous synthetic camera',
+                        domain: 'security',
+                        category: 'cctv',
+                        status: 'active',
+                    },
+                }),
+            } as Response)
+            .mockImplementationOnce(
+                () =>
+                    new Promise<Response>((resolve) => {
+                        resolveNext = resolve;
+                    }),
+            );
+        const onClose = vi.fn();
+        const view = render(
+            <EditDeviceDialog open onClose={onClose} deviceId={42} />,
+        );
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: /Device name/ }),
+            ).toHaveValue('Previous synthetic camera'),
+        );
+        view.rerender(
+            <EditDeviceDialog open onClose={onClose} deviceId={43} />,
+        );
+        expect(
+            screen.queryByDisplayValue('Previous synthetic camera'),
+        ).not.toBeInTheDocument();
+        resolveNext({
+            ok: true,
+            json: async () => ({
+                ...options,
+                device: {
+                    id: 43,
+                    name: 'Current synthetic camera',
+                    domain: 'security',
+                    category: 'cctv',
+                    status: 'active',
+                },
+            }),
+        } as Response);
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: /Device name/ }),
+            ).toHaveValue('Current synthetic camera'),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
 });

@@ -1,47 +1,61 @@
+import type { DeliveryRecovery } from '@/components/monitoring/delivery-recovery-card';
+import { DeliveryRecoveryCard } from '@/components/monitoring/delivery-recovery-card';
 import {
-    DeliveryRecoveryCard,
-    type DeliveryRecovery,
-} from '@/components/monitoring/delivery-recovery-card';
-import { PageHero, PageTabs } from '@/components/page';
-import PageShell from '@/components/page-shell';
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderViewToggle,
+} from '@/components/page';
+import {
+    CapacityRecords,
+    CollectionRecords,
+    CoverageRecords,
+    DependencyRecords,
+    MonitorRecords,
+    MonitoringFields,
+    MonitoringState,
+    QueueRecords,
+    ReadinessRecords,
+    RetentionRecords,
+    RuntimeRecords,
+    TrendRecords,
+    monitoringLabel,
+    type MonitoringOwners,
+    type MonitoringView,
+} from '@/components/security-devices/monitoring-operational-records';
 import {
     NativeMonitorDeactivateDialog,
     NativeMonitorDialog,
     type NativeMonitorManagement,
     type NativeMonitorTarget,
 } from '@/components/security-devices/native-monitor-dialogs';
+import { NativeMonitorSavedRequests } from '@/components/security-devices/native-monitor-saved-requests';
 import {
     ControlRoomAlertAccessRequired,
-    ControlRoomDestination,
     type ControlRoomAlertAccess,
 } from '@/components/security-devices/permission-destinations';
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { ReviewCard } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
-    AlertTriangle,
-    Cable,
     Gauge,
+    LayoutGrid,
+    List,
     Network,
-    Pencil,
     Plus,
-    Radar,
+    RefreshCw,
     Search,
     ShieldCheck,
-    ShieldX,
 } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 
 type NamedLink = { id: number; name: string; href: string };
 
@@ -81,6 +95,8 @@ export type MonitorRow = {
         } | null;
     } | null;
     last_observation_at: string | null;
+    last_state_changed_at?: string | null;
+    finding_scope?: string;
     freshness_state: string;
     device: NamedLink & { domain: string | null; category: string | null };
     site: NamedLink | null;
@@ -94,6 +110,8 @@ export type MonitorRow = {
           }
         | { mode: 'direct'; label: string; state: string };
     actions?: {
+        actor_id?: number;
+        review_token?: string | null;
         can_manage: boolean;
         update_url: string | null;
         deactivate_url: string | null;
@@ -161,6 +179,7 @@ export type CentralSiteReadiness = {
 };
 
 export type MonitoringWorkspace = {
+    actor_id?: number;
     tabs: Array<{ key: string; label: string }>;
     active_tab: string;
     boundary: {
@@ -374,1077 +393,246 @@ export type MonitoringWorkspace = {
     };
 };
 
-function title(value: string): string {
-    return value
-        .replace(/[_-]/g, ' ')
-        .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function tone(value: string): StatusVariant {
-    if (
-        [
-            'healthy',
-            'fresh',
-            'available',
-            'direct',
-            'ready',
-            'verified',
-            'current',
-            'sent',
-        ].includes(value)
-    )
-        return 'success';
-    if (
-        [
-            'failed',
-            'critical',
-            'collection_unavailable',
-            'unavailable',
-            'revoked',
-        ].includes(value)
-    )
-        return 'critical';
-    if (
-        [
-            'degraded',
-            'stale',
-            'pending',
-            'paused',
-            'unknown',
-            'attention',
-            'runtime_unavailable',
-            'awaiting_evidence',
-            'evidence_incomplete',
-            'remote_only',
-            'suppressed',
-        ].includes(value)
-    )
-        return 'warning';
-    return 'neutral';
-}
-
-function when(value: string | null): string {
-    if (!value) return 'Not observed';
-    return new Date(value).toLocaleString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
-}
-
-function Metric({
-    label,
-    value,
-    note,
-}: {
-    label: string;
-    value: number;
-    note: string;
-}) {
-    return (
-        <Card className="shadow-xs">
-            <CardContent className="p-4">
-                <p className="text-2xl font-semibold tabular-nums">{value}</p>
-                <p className="text-sm font-medium">{label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-            </CardContent>
-        </Card>
-    );
-}
-
-function Boundary({ data }: { data: MonitoringWorkspace['boundary'] }) {
-    return (
-        <Card className="border-primary/20 bg-primary/5 shadow-xs">
-            <CardContent className="grid gap-4 p-4 lg:grid-cols-[1.2fr_1fr]">
-                <div>
-                    <div className="flex items-center gap-2 font-semibold">
-                        <ShieldCheck className="h-5 w-5 text-primary" />
-                        {data.title}
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {data.description}
-                    </p>
-                </div>
-                <div className="space-y-1 text-xs text-muted-foreground">
-                    <p>{data.privacy_note}</p>
-                    <p>{data.control_room_note}</p>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-export function CollectionPathCard({ path }: { path: CollectionPath }) {
-    return (
-        <div className="rounded-xl border p-4">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold">{path.collector_name}</p>
-                        <StatusBadge variant={tone(path.state)}>
-                            {title(path.state)}
-                        </StatusBadge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {path.site ? (
-                            <Link
-                                href={path.site.href}
-                                className="frontline-focus rounded-sm hover:text-primary hover:underline"
-                            >
-                                {path.site.name}
-                            </Link>
-                        ) : (
-                            'No site assigned'
-                        )}{' '}
-                        · {path.affected_devices} affected devices ·{' '}
-                        {path.affected_monitors} affected monitors
-                    </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                    Last heartbeat {when(path.last_seen_at)}
-                </p>
-            </div>
-        </div>
-    );
-}
-
-export function CentralSiteReadinessCard({
-    readiness,
-}: {
-    readiness: CentralSiteReadiness;
-}) {
-    return (
-        <div className="rounded-xl border p-4">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                            href={readiness.site.href}
-                            className="font-semibold hover:underline"
-                        >
-                            {readiness.site.name}
-                        </Link>
-                        <StatusBadge variant={tone(readiness.state)}>
-                            {readiness.label}
-                        </StatusBadge>
-                        <StatusBadge variant={tone(readiness.proof_state)}>
-                            {readiness.proof_state === 'verified'
-                                ? 'Central path verified'
-                                : 'Central path not verified'}
-                        </StatusBadge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {readiness.note}
-                    </p>
-                </div>
-                <p className="shrink-0 text-xs text-muted-foreground">
-                    Latest durable central evidence{' '}
-                    {when(readiness.evidence_at)}
-                </p>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                <div>
-                    <p className="font-semibold tabular-nums">
-                        {readiness.direct_monitors}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Direct checks
-                    </p>
-                </div>
-                <div>
-                    <p className="font-semibold tabular-nums">
-                        {readiness.direct_devices}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Direct devices
-                    </p>
-                </div>
-                <div>
-                    <p className="font-semibold tabular-nums">
-                        {readiness.fresh}/{readiness.direct_monitors}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Checks with fresh central evidence
-                    </p>
-                </div>
-                <div>
-                    <p className="font-semibold tabular-nums">
-                        {readiness.runtime.available}/
-                        {readiness.runtime.required}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Required workers
-                    </p>
-                </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-                <StatusBadge variant={tone(readiness.runtime.state)}>
-                    Runtime {title(readiness.runtime.state)}
-                </StatusBadge>
-                <StatusBadge variant={tone(readiness.topology.state)}>
-                    Topology {title(readiness.topology.state)}
-                </StatusBadge>
-                <StatusBadge variant={tone(readiness.discovery.state)}>
-                    Discovery {title(readiness.discovery.state)}
-                </StatusBadge>
-                {readiness.remote_monitors > 0 ? (
-                    <StatusBadge variant="neutral">
-                        {readiness.remote_monitors} collector-backed checks
-                    </StatusBadge>
-                ) : null}
-                {readiness.unmonitored_devices > 0 ? (
-                    <StatusBadge variant="warning">
-                        {readiness.unmonitored_devices}{' '}
-                        {readiness.unmonitored_devices === 1
-                            ? 'Device needs'
-                            : 'Devices need'}{' '}
-                        coverage
-                    </StatusBadge>
-                ) : null}
-            </div>
-        </div>
-    );
-}
-
-export function MonitorCard({
-    monitor,
-    onEdit,
-    onDeactivate,
-}: {
-    monitor: MonitorRow;
-    onEdit?: (monitor: MonitorRow) => void;
-    onDeactivate?: (monitor: MonitorRow) => void;
-}) {
-    const collectionLabel =
-        monitor.collection.mode === 'direct'
-            ? 'Direct from main application'
-            : monitor.collection.collector_name;
-
-    return (
-        <article
-            aria-label={`Monitor ${monitor.name}`}
-            className="rounded-xl border p-4"
-        >
-            <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
-                <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold">{monitor.name}</p>
-                        <StatusBadge variant={tone(monitor.effective_state)}>
-                            {title(monitor.effective_state)}
-                        </StatusBadge>
-                        {monitor.effective_state !== monitor.reported_state ? (
-                            <StatusBadge variant="neutral">
-                                Reported {title(monitor.reported_state)}
-                            </StatusBadge>
-                        ) : null}
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        <Link
-                            className="font-medium text-foreground hover:underline"
-                            href={monitor.device.href}
-                        >
-                            {monitor.device.name}
-                        </Link>
-                        {monitor.site ? (
-                            <>
-                                {' · '}
-                                <Link
-                                    className="hover:underline"
-                                    href={monitor.site.href}
-                                >
-                                    {monitor.site.name}
-                                </Link>
-                            </>
-                        ) : null}
-                    </p>
-                </div>
-                <div className="grid gap-1 text-xs text-muted-foreground lg:text-right">
-                    <span>
-                        {title(monitor.kind)} · {collectionLabel}
-                    </span>
-                    <span>
-                        Last observation {when(monitor.last_observation_at)}
-                    </span>
-                    {monitor.latest_observation ? (
-                        <span>
-                            Latest value{' '}
-                            {monitor.latest_observation.value ?? 'Not numeric'}
-                            {monitor.latest_observation.unit
-                                ? ` ${monitor.latest_observation.unit}`
-                                : ''}
-                        </span>
-                    ) : null}
-                </div>
-            </div>
-            {monitor.root_cause ? (
-                <p className="mt-3 rounded-lg bg-muted p-3 text-sm">
-                    Suppressed by root cause{' '}
-                    <Link
-                        href={monitor.root_cause.href}
-                        className="font-medium hover:underline"
-                    >
-                        {monitor.root_cause.monitor_name}
-                    </Link>
-                    {monitor.suppression_reason
-                        ? ` · ${title(monitor.suppression_reason)}`
-                        : null}
-                </p>
-            ) : null}
-            {monitor.correlation?.control_room ||
-            monitor.correlation?.it_incident ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-muted p-3 text-xs">
-                    <span className="font-medium">Operational correlation</span>
-                    {monitor.correlation.control_room?.href &&
-                    monitor.correlation.control_room.access.state ===
-                        'available' ? (
-                        <Link
-                            href={monitor.correlation.control_room.href}
-                            className="text-primary hover:underline"
-                        >
-                            Review Control Room correlation{' '}
-                            {monitor.correlation.control_room.reference ??
-                                `#${monitor.correlation.control_room.id}`}
-                        </Link>
-                    ) : monitor.correlation.control_room ? (
-                        <ControlRoomAlertAccessRequired
-                            label={
-                                monitor.correlation.control_room.access.label
-                            }
-                            className="min-h-0"
-                        />
-                    ) : null}
-                    {monitor.correlation.it_incident ? (
-                        <Link
-                            href={monitor.correlation.it_incident.href}
-                            className="text-primary hover:underline"
-                        >
-                            IT incident{' '}
-                            {monitor.correlation.it_incident.reference ??
-                                `#${monitor.correlation.it_incident.id}`}
-                            {monitor.correlation.it_incident
-                                .monitoring_recovered_at
-                                ? ' · monitoring recovered, technician closure pending'
-                                : ''}
-                        </Link>
-                    ) : null}
-                </div>
-            ) : null}
-            {monitor.actions?.can_manage ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                    {monitor.actions.update_url && onEdit ? (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onEdit(monitor)}
-                        >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Update monitor
-                        </Button>
-                    ) : null}
-                    {monitor.actions.deactivate_url && onDeactivate ? (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => onDeactivate(monitor)}
-                        >
-                            <ShieldX className="mr-2 h-4 w-4" />
-                            Deactivate
-                        </Button>
-                    ) : null}
-                </div>
-            ) : null}
-        </article>
-    );
-}
-
-function ExternalHistoryCard({
-    storage,
-}: {
-    storage: MonitoringWorkspace['storage'];
-}) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle role="heading" aria-level={2}>
-                    External history and retention
-                </CardTitle>
-                <CardDescription>
-                    {storage.retention.explanation}
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge variant={tone(storage.time_series.state)}>
-                        {title(storage.time_series.state)}
-                    </StatusBadge>
-                    <span className="text-sm text-muted-foreground">
-                        {storage.time_series.series} retained series
-                    </span>
-                </div>
-                {storage.time_series.series_truncated ? (
-                    <p className="text-sm text-muted-foreground">
-                        Showing the {storage.time_series.series_shown} most
-                        recently active series below. Availability totals cover
-                        all {storage.time_series.series} retained series.
-                    </p>
-                ) : null}
-                {storage.time_series.capacity_evidence.map((series) => (
-                    <article
-                        key={series.series_id}
-                        className="rounded-xl border p-3 text-sm"
-                    >
-                        <div className="flex flex-wrap justify-between gap-2">
-                            <Link
-                                href={series.device.href}
-                                className="font-medium hover:underline"
-                            >
-                                {series.device.name}
-                            </Link>
-                            <StatusBadge variant={tone(series.storage_state)}>
-                                {title(series.storage_state)}
-                            </StatusBadge>
-                        </div>
-                        <p className="mt-1 text-muted-foreground">
-                            {title(series.metric)} · latest{' '}
-                            {series.value ?? 'not available'} {series.unit} ·
-                            p95 {series.p95 ?? 'insufficient data'} ·{' '}
-                            {series.sample_count} samples
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Projection {title(series.projection.state)}
-                            {series.projection.threshold_at
-                                ? ` · threshold ${when(series.projection.threshold_at)}`
-                                : ''}
-                            {series.projection.sample_count > 0
-                                ? ` · ${series.projection.sample_count} history points · ${Math.round(series.projection.confidence * 100)}% confidence`
-                                : ''}
-                        </p>
-                        {series.projection.measured_from &&
-                        series.projection.measured_to ? (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                Measured history:{' '}
-                                {when(series.projection.measured_from)} to{' '}
-                                {when(series.projection.measured_to)}
-                            </p>
-                        ) : null}
-                    </article>
-                ))}
-                {storage.retention.policies.map((policy) => (
-                    <p
-                        key={policy.id}
-                        className="rounded-lg bg-muted p-3 text-xs text-muted-foreground"
-                    >
-                        {policy.name}: raw {policy.raw_days}d · hourly{' '}
-                        {policy.hourly_days}d · daily {policy.daily_days}d
-                        {policy.legal_hold ? ' · legal hold' : ''}
-                    </p>
-                ))}
-            </CardContent>
-        </Card>
-    );
-}
-
-function Filters({ workspace }: { workspace: MonitoringWorkspace }) {
-    const [search, setSearch] = useState(workspace.filters.search ?? '');
-    const apply = (changes: Record<string, string | number | null>) =>
-        router.get(
-            '/security-devices/monitoring',
-            { ...workspace.filters, tab: workspace.active_tab, ...changes },
-            { preserveState: true, preserveScroll: true },
-        );
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        apply({ search: search || null });
-    };
-
-    return (
-        <form
-            className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-2 xl:grid-cols-6"
-            onSubmit={submit}
-        >
-            <label className="xl:col-span-2">
-                <span className="sr-only">Search monitors</span>
-                <div className="relative">
-                    <Search className="absolute top-3.5 left-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        className="min-h-11 pl-9"
-                        placeholder="Search monitor, device, or site"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
-                </div>
-            </label>
-            <select
-                aria-label="Filter by state"
-                className="min-h-11 rounded-md border bg-background px-3 text-sm"
-                value={workspace.filters.state ?? ''}
-                onChange={(event) =>
-                    apply({ state: event.target.value || null })
-                }
-            >
-                <option value="">All states</option>
-                {workspace.filter_options.states.map((state) => (
-                    <option key={state} value={state}>
-                        {title(state)}
-                    </option>
-                ))}
-            </select>
-            <select
-                aria-label="Filter by site"
-                className="min-h-11 rounded-md border bg-background px-3 text-sm"
-                value={workspace.filters.site_id ?? ''}
-                onChange={(event) =>
-                    apply({ site_id: event.target.value || null })
-                }
-            >
-                <option value="">All sites</option>
-                {workspace.filter_options.sites.map((site) => (
-                    <option key={site.value} value={site.value}>
-                        {site.label}
-                    </option>
-                ))}
-            </select>
-            <select
-                aria-label="Filter by check type"
-                className="min-h-11 rounded-md border bg-background px-3 text-sm"
-                value={workspace.filters.kind ?? ''}
-                onChange={(event) =>
-                    apply({ kind: event.target.value || null })
-                }
-            >
-                <option value="">All check types</option>
-                {workspace.filter_options.kinds.map((kind) => (
-                    <option key={kind} value={kind}>
-                        {title(kind)}
-                    </option>
-                ))}
-            </select>
-            <Button className="min-h-11" type="submit">
-                Apply search
-            </Button>
-        </form>
-    );
-}
-
 export function MonitoringContent({
     workspace,
     onEditMonitor,
     onDeactivateMonitor,
+    view = 'cards',
+    owners = { profiles: true },
 }: {
     workspace: MonitoringWorkspace;
     onEditMonitor?: (monitor: MonitorRow) => void;
     onDeactivateMonitor?: (monitor: MonitorRow) => void;
+    view?: MonitoringView;
+    owners?: MonitoringOwners;
 }) {
-    if (workspace.active_tab === 'findings') {
+    const shared = { view, owners };
+    if (workspace.active_tab === 'findings')
         return (
-            <div className="space-y-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle role="heading" aria-level={2}>
-                            Collection-path findings
-                        </CardTitle>
-                        <CardDescription>
-                            {workspace.findings.note}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {workspace.findings.collection_paths.length ? (
-                            workspace.findings.collection_paths.map((path) => (
-                                <CollectionPathCard
-                                    key={
-                                        path.collector_id ?? path.collector_name
-                                    }
-                                    path={path}
-                                />
-                            ))
-                        ) : (
-                            <EmptyState
-                                variant="compact"
-                                icon={Cable}
-                                title="All collection paths are reporting"
-                            />
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle role="heading" aria-level={2}>
-                            Independent monitor findings
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {workspace.findings.monitors.length ? (
-                            workspace.findings.monitors.map((monitor) => (
-                                <MonitorCard
-                                    key={monitor.id}
-                                    monitor={monitor}
-                                />
-                            ))
-                        ) : (
-                            <EmptyState
-                                variant="compact"
-                                icon={ShieldCheck}
-                                title="No independent monitor findings"
-                            />
-                        )}
-                    </CardContent>
-                </Card>
+            <div className="space-y-5">
+                <CollectionRecords
+                    {...shared}
+                    rows={workspace.findings.collection_paths}
+                    title="Collection-path findings"
+                    description={workspace.findings.note}
+                />
+                <MonitorRecords
+                    {...shared}
+                    rows={workspace.findings.monitors}
+                    title="Independent monitor findings"
+                    empty="No independent monitor findings"
+                    description="Collection-path symptoms are grouped separately."
+                    onEdit={onEditMonitor}
+                    onDeactivate={onDeactivateMonitor}
+                />
             </div>
         );
-    }
-
-    if (workspace.active_tab === 'coverage') {
+    if (workspace.active_tab === 'coverage')
         return (
-            <div className="grid gap-4 lg:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <CardTitle role="heading" aria-level={2}>
-                            Monitoring coverage by site
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {workspace.coverage.by_site.map((row) => (
-                            <div
-                                key={row.site?.id ?? 'unassigned'}
-                                className="flex items-center justify-between rounded-lg border p-3"
-                            >
-                                <div>
-                                    <p className="font-medium">
-                                        {row.site ? (
-                                            <Link
-                                                href={`/security-devices/sites/${row.site.id}`}
-                                                className="frontline-focus rounded-sm text-primary hover:underline"
-                                            >
-                                                {row.site.name}
-                                            </Link>
-                                        ) : (
-                                            'No site assignment'
-                                        )}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {row.devices} devices
-                                    </p>
-                                </div>
-                                <div className="text-right text-sm">
-                                    <p>{row.monitored_devices} monitored</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {row.missing_devices} missing
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle role="heading" aria-level={2}>
-                            Known coverage limits
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                        <div className="flex items-center justify-between">
-                            <span>Paused checks</span>
-                            <strong>
-                                {workspace.coverage.paused_monitors}
-                            </strong>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span>Never observed</span>
-                            <strong>{workspace.coverage.never_observed}</strong>
-                        </div>
-                        <div className="rounded-lg border border-dashed p-3">
-                            <StatusBadge
-                                variant={tone(
-                                    workspace.coverage.unsupported_state,
-                                )}
-                            >
-                                {title(workspace.coverage.unsupported_state)}
-                            </StatusBadge>
-                            <p className="mt-2 text-muted-foreground">
-                                {workspace.coverage.unsupported_note}
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className="space-y-5">
+                <CoverageRecords
+                    {...shared}
+                    rows={workspace.coverage.by_site}
+                />
+                <ReviewCard icon={Gauge} title="Known coverage limits">
+                    <MonitoringFields
+                        items={[
+                            [
+                                'Permitted devices',
+                                workspace.coverage.total_devices,
+                            ],
+                            [
+                                'Monitored devices',
+                                workspace.coverage.monitored_devices,
+                            ],
+                            [
+                                'Devices missing coverage',
+                                workspace.coverage.missing_devices,
+                            ],
+                            [
+                                'Paused checks',
+                                workspace.coverage.paused_monitors,
+                            ],
+                            ['Fresh checks', workspace.coverage.fresh],
+                            ['Stale checks', workspace.coverage.stale],
+                            [
+                                'Never observed',
+                                workspace.coverage.never_observed,
+                            ],
+                            [
+                                'Unsupported equipment assessment',
+                                <MonitoringState
+                                    value={workspace.coverage.unsupported_state}
+                                />,
+                            ],
+                            [
+                                'Assessment explanation',
+                                workspace.coverage.unsupported_note,
+                            ],
+                            ...Object.entries(workspace.coverage.by_kind).map(
+                                ([kind, count]): [string, React.ReactNode] => [
+                                    `Check type: ${monitoringLabel(kind)}`,
+                                    count,
+                                ],
+                            ),
+                        ]}
+                    />
+                </ReviewCard>
             </div>
         );
-    }
-
-    if (workspace.active_tab === 'dependencies') {
+    if (workspace.active_tab === 'dependencies')
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle role="heading" aria-level={2}>
-                        Dependency evidence
-                    </CardTitle>
-                    <CardDescription>
-                        {workspace.dependencies.note}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    <StatusBadge variant="success">
-                        Canonical dependency model active
-                    </StatusBadge>
+            <div className="space-y-5">
+                <ReviewCard icon={Network} title="Dependency scope">
                     <p className="text-sm text-muted-foreground">
-                        {workspace.dependencies.suppressed_symptoms} suppressed
-                        symptoms remain inspectable.
+                        {workspace.dependencies.note}
                     </p>
-                    {workspace.dependencies.records.map((dependency) => (
-                        <article
-                            key={dependency.id}
-                            className="rounded-xl border p-4"
-                        >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <strong>
-                                    {dependency.upstream.name} →{' '}
-                                    {dependency.downstream.name}
-                                </strong>
-                                <div className="flex gap-2">
-                                    <StatusBadge variant="neutral">
-                                        {title(dependency.review_state)}
-                                    </StatusBadge>
-                                    <span className="text-sm tabular-nums">
-                                        {Math.round(
-                                            dependency.confidence * 100,
-                                        )}
-                                        % confidence
-                                    </span>
-                                </div>
-                            </div>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                {title(dependency.source)} evidence ·{' '}
-                                {title(dependency.policy)}
-                            </p>
-                        </article>
-                    ))}
-                    {workspace.dependencies.collection_paths.map((path) => (
-                        <CollectionPathCard
-                            key={path.collector_id ?? path.collector_name}
-                            path={path}
-                        />
-                    ))}
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (workspace.active_tab === 'trends') {
-        return (
-            <div className="space-y-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle role="heading" aria-level={2}>
-                            Retained trends
-                        </CardTitle>
-                        <CardDescription>
-                            Safe summaries from retained native observations;
-                            raw probe messages and metrics stay private.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {workspace.trends.length ? (
-                            workspace.trends.map((trend) => (
-                                <div
-                                    key={trend.monitor_id}
-                                    className="grid gap-2 rounded-xl border p-4 sm:grid-cols-[1fr_auto]"
-                                >
-                                    <div>
-                                        <p className="font-semibold">
-                                            {trend.monitor_name}
-                                        </p>
-                                        <Link
-                                            href={trend.device.href}
-                                            className="text-sm text-muted-foreground hover:underline"
-                                        >
-                                            {trend.device.name}
-                                        </Link>
-                                    </div>
-                                    <div className="text-sm sm:text-right">
-                                        <p>
-                                            {trend.latest_value ??
-                                                'No numeric value'}
-                                            {trend.unit ? ` ${trend.unit}` : ''}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {trend.samples} samples ·{' '}
-                                            {title(trend.direction)} ·{' '}
-                                            {trend.state_changes} state changes
-                                        </p>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <EmptyState
-                                variant="compact"
-                                icon={Gauge}
-                                title="No retained trend samples"
-                                description="Monitoring is configured, but no safe observation trend is available yet."
-                            />
-                        )}
-                    </CardContent>
-                </Card>
-                <ExternalHistoryCard storage={workspace.storage} />
-            </div>
-        );
-    }
-
-    if (workspace.active_tab === 'collection') {
-        return (
-            <div className="space-y-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle role="heading" aria-level={2}>
-                            Central Site readiness
-                        </CardTitle>
-                        <CardDescription>
-                            Site-by-Site proof that Oblivion Findings is
-                            scheduling checks, consuming runtime work, and
-                            retaining current direct observations, topology, and
-                            discovery evidence over the main Site connection. A
-                            collector is only needed where this direct path is
-                            unavailable.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-3 xl:grid-cols-2">
-                        {workspace.collection.direct_sites.length ? (
-                            workspace.collection.direct_sites.map(
-                                (readiness) => (
-                                    <CentralSiteReadinessCard
-                                        key={readiness.site.id}
-                                        readiness={readiness}
+                    <MonitoringFields
+                        items={[
+                            [
+                                'Dependency model',
+                                workspace.dependencies
+                                    .canonical_model_available ? (
+                                    <MonitoringState
+                                        value="available"
+                                        label="Canonical dependency model active"
+                                    />
+                                ) : (
+                                    <MonitoringState
+                                        value="not_assessed"
+                                        label="Dependency model unavailable"
                                     />
                                 ),
-                            )
-                        ) : (
-                            <div className="xl:col-span-2">
-                                <EmptyState
-                                    variant="compact"
-                                    icon={Network}
-                                    title="No accessible Sites"
-                                    description="No operational Site is available in your approved access scope."
-                                />
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-                <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle role="heading" aria-level={2}>
-                                Main application
-                            </CardTitle>
-                            <CardDescription>
-                                {workspace.collection.direct.label}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid grid-cols-2 gap-3">
-                            <Metric
-                                label="Direct checks"
-                                value={workspace.collection.direct.monitors}
-                                note="No collector required"
-                            />
-                            <Metric
-                                label="Devices"
-                                value={workspace.collection.direct.devices}
-                                note="Reached over site connectivity"
-                            />
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle role="heading" aria-level={2}>
-                                Remote collection paths
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {workspace.collection.remote_paths.length ? (
-                                workspace.collection.remote_paths.map(
-                                    (path) => (
-                                        <CollectionPathCard
-                                            key={
-                                                path.collector_id ??
-                                                path.collector_name
-                                            }
-                                            path={path}
-                                        />
-                                    ),
-                                )
-                            ) : (
-                                <EmptyState
-                                    variant="compact"
-                                    icon={Network}
-                                    title="No remote collectors required"
-                                />
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-                <DeliveryRecoveryCard delivery={workspace.delivery} />
+                            ],
+                            [
+                                'Suppressed symptoms',
+                                `${workspace.dependencies.suppressed_symptoms} suppressed symptoms remain inspectable.`,
+                            ],
+                        ]}
+                    />
+                </ReviewCard>
+                <DependencyRecords
+                    {...shared}
+                    rows={workspace.dependencies.records}
+                />
+                <CollectionRecords
+                    {...shared}
+                    rows={workspace.dependencies.collection_paths}
+                />
             </div>
         );
-    }
-
-    return (
-        <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <Metric
-                    label="Active findings"
-                    value={workspace.summary.active_findings}
-                    note="Independent findings plus failed paths"
-                />
-                <Metric
-                    label="Monitored devices"
-                    value={workspace.summary.monitored_devices}
-                    note={`${workspace.summary.unmonitored_devices} devices need coverage`}
-                />
-                <Metric
-                    label="Direct checks"
-                    value={workspace.summary.direct_monitors}
-                    note="Run by the main application"
-                />
-                <Metric
-                    label="Remote checks"
-                    value={workspace.summary.remote_monitors}
-                    note={`${workspace.summary.collection_paths_unavailable} unavailable paths`}
-                />
-            </div>
-            <Filters workspace={workspace} />
-            <Card>
-                <CardHeader>
-                    <CardTitle role="heading" aria-level={2}>
-                        Monitor states
-                    </CardTitle>
-                    <CardDescription>
-                        {workspace.inventory.total} matching checks. Collection
-                        failures are shown as uncertainty, not duplicated device
-                        failures.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    {workspace.monitors.length ? (
-                        workspace.monitors.map((monitor) => (
-                            <MonitorCard
-                                key={monitor.id}
-                                monitor={monitor}
-                                onEdit={onEditMonitor}
-                                onDeactivate={onDeactivateMonitor}
-                            />
-                        ))
-                    ) : (
-                        <EmptyState
-                            variant="compact"
-                            icon={Radar}
-                            title="No monitors match these filters"
-                        />
-                    )}
-                    {workspace.inventory.truncated ? (
-                        <p className="rounded-lg bg-status-warning-bg p-3 text-sm text-status-warning">
-                            Showing the first {workspace.inventory.shown} of{' '}
-                            {workspace.inventory.total} checks. Narrow the
-                            filters to reconcile the full set.
+    if (workspace.active_tab === 'trends')
+        return (
+            <div className="space-y-5">
+                <TrendRecords {...shared} rows={workspace.trends} />
+                <ReviewCard icon={Gauge} title="Retained history scope">
+                    <p className="text-sm text-muted-foreground">
+                        {workspace.storage.retention.explanation}
+                    </p>
+                    {workspace.storage.time_series.series_truncated ? (
+                        <p className="text-caption">
+                            Showing the{' '}
+                            {workspace.storage.time_series.series_shown} most
+                            recently active series below. Availability totals
+                            cover all {workspace.storage.time_series.series}{' '}
+                            retained series.
                         </p>
                     ) : null}
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle role="heading" aria-level={2}>
-                        Runtime health
-                    </CardTitle>
-                    <CardDescription>
-                        Bounded worker, queue, listener, storage, and collector
-                        evidence. Restricted users do not receive global queue
-                        counts.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
+                    <MonitoringFields
+                        items={[
+                            [
+                                'Series state',
+                                <MonitoringState
+                                    value={workspace.storage.time_series.state}
+                                />,
+                            ],
+                            [
+                                'Retained series',
+                                workspace.storage.time_series.series,
+                            ],
+                            [
+                                'Available',
+                                workspace.storage.time_series.available,
+                            ],
+                            ['Missing', workspace.storage.time_series.missing],
+                            [
+                                'Unavailable',
+                                workspace.storage.time_series.unavailable,
+                            ],
+                        ]}
+                    />
+                </ReviewCard>
+                <CapacityRecords
+                    {...shared}
+                    rows={workspace.storage.time_series.capacity_evidence}
+                    total={workspace.storage.time_series.series}
+                />
+                <RetentionRecords
+                    view={view}
+                    rows={workspace.storage.retention.policies}
+                />
+            </div>
+        );
+    if (workspace.active_tab === 'collection')
+        return (
+            <div className="space-y-5">
+                <ReadinessRecords
+                    {...shared}
+                    rows={workspace.collection.direct_sites}
+                />
+                <ReviewCard icon={Network} title="Main application">
                     <p className="text-sm text-muted-foreground">
-                        {workspace.runtime.workers.note}
+                        {workspace.collection.direct.label}
                     </p>
-                    <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-status-info/25 bg-status-info-bg p-3 text-sm">
-                        <div className="min-w-0">
-                            <strong>Independent outage watchdog</strong>
-                            <p className="mt-1 leading-5 text-muted-foreground">
-                                {workspace.runtime.external_heartbeat.note}
-                                {workspace.runtime.external_heartbeat
-                                    .last_sent_age_seconds === null
-                                    ? ''
-                                    : ` Last delivered ${workspace.runtime.external_heartbeat.last_sent_age_seconds}s ago.`}
-                            </p>
-                            {workspace.runtime.external_heartbeat
-                                .reason_code ? (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    Safe reason:{' '}
-                                    {title(
-                                        workspace.runtime.external_heartbeat
-                                            .reason_code,
-                                    )}
-                                </p>
-                            ) : null}
-                        </div>
-                        <StatusBadge
-                            variant={tone(
-                                workspace.runtime.external_heartbeat.state,
-                            )}
-                        >
-                            {workspace.runtime.external_heartbeat.state ===
-                            'sent' ? (
-                                <ShieldCheck
-                                    aria-hidden="true"
-                                    className="size-3"
-                                />
-                            ) : workspace.runtime.external_heartbeat.state ===
-                                  'failed' ||
-                              workspace.runtime.external_heartbeat.state ===
-                                  'suppressed' ||
-                              workspace.runtime.external_heartbeat.state ===
-                                  'stale' ? (
-                                <AlertTriangle
-                                    aria-hidden="true"
-                                    className="size-3"
-                                />
-                            ) : (
-                                <Activity
-                                    aria-hidden="true"
-                                    className="size-3"
-                                />
-                            )}
-                            {title(workspace.runtime.external_heartbeat.state)}
-                        </StatusBadge>
-                    </div>
-                    {Object.entries(workspace.runtime.queues).map(
-                        ([queue, state]) => (
-                            <div
-                                key={queue}
-                                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
-                            >
-                                <div>
-                                    <strong>{title(queue)}</strong>
-                                    <p className="text-muted-foreground">
-                                        Worker {title(state.worker_state)}
-                                        {state.heartbeat_age_seconds === null
-                                            ? ' · no heartbeat consumed'
-                                            : ` · heartbeat ${state.heartbeat_age_seconds}s ago`}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground">
-                                        {state.pending === null
-                                            ? 'Counts restricted'
-                                            : `${state.pending} pending · ${state.dead_letters ?? 0} dead letters`}
-                                    </span>
-                                    <StatusBadge variant={tone(state.state)}>
-                                        {title(state.state)}
-                                    </StatusBadge>
-                                </div>
-                            </div>
-                        ),
-                    )}
-                </CardContent>
-            </Card>
+                    <MonitoringFields
+                        items={[
+                            [
+                                'Direct checks',
+                                workspace.collection.direct.monitors,
+                            ],
+                            [
+                                'Direct devices',
+                                workspace.collection.direct.devices,
+                            ],
+                        ]}
+                    />
+                </ReviewCard>
+                <CollectionRecords
+                    {...shared}
+                    rows={workspace.collection.remote_paths}
+                />
+                <DeliveryRecoveryCard
+                    delivery={workspace.delivery}
+                    view={view}
+                />
+            </div>
+        );
+    return (
+        <div className="space-y-5">
+            <MonitorRecords
+                {...shared}
+                rows={workspace.monitors}
+                empty={
+                    Object.values(workspace.filters).some(Boolean)
+                        ? 'No monitors match these filters'
+                        : 'No monitoring checks in this permitted scope'
+                }
+                total={workspace.inventory.total}
+                onEdit={onEditMonitor}
+                onDeactivate={onDeactivateMonitor}
+            />
+            {workspace.inventory.truncated ? (
+                <p
+                    role="note"
+                    className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning"
+                >
+                    Showing {workspace.inventory.shown} of{' '}
+                    {workspace.inventory.total} matching checks. Refine the
+                    monitor filters to inspect the remaining records.
+                </p>
+            ) : null}
+            <RuntimeRecords runtime={workspace.runtime} view={view} />
+            <QueueRecords view={view} queues={workspace.runtime.queues} />
         </div>
     );
 }
@@ -1454,7 +642,85 @@ export default function Monitoring({
 }: {
     workspace: MonitoringWorkspace;
 }) {
-    const monitorManagement: NativeMonitorManagement =
+    const { auth } = usePage<{
+        auth: { user?: { id: number }; can?: Record<string, boolean> };
+    }>().props;
+    const [view, setView] = useState<MonitoringView>(() => {
+        try {
+            return localStorage.getItem('sd.monitoring.view') === 'table'
+                ? 'table'
+                : 'cards';
+        } catch {
+            return 'cards';
+        }
+    });
+    if (
+        workspace.actor_id !== auth?.user?.id ||
+        auth?.can?.['securityDevices.events.view'] !== true
+    )
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
+                    { title: 'Security & Devices', href: '/security-devices' },
+                    {
+                        title: 'Monitoring',
+                        href: '/security-devices/monitoring',
+                    },
+                ]}
+            >
+                <Head title="Monitoring - Security & Devices" />
+                <PageHeader
+                    icon={Activity}
+                    title="Monitoring"
+                    subline="Refresh to load evidence for your current approved access."
+                    actions={
+                        <PageHeaderGlassButton
+                            onClick={() =>
+                                router.reload({ only: ['workspace'] })
+                            }
+                        >
+                            Refresh monitoring
+                        </PageHeaderGlassButton>
+                    }
+                />
+                <p role="alert" className="text-sm text-muted-foreground">
+                    Monitoring is being refreshed for your current access.
+                </p>
+            </AppLayout>
+        );
+    const scope = JSON.stringify([auth?.user?.id, auth?.can, workspace]);
+    return (
+        <MonitoringScreen
+            key={scope}
+            workspace={workspace}
+            view={view}
+            setView={(next) => {
+                setView(next);
+                try {
+                    localStorage.setItem('sd.monitoring.view', next);
+                } catch {
+                    /* Layout preference is optional. */
+                }
+            }}
+            owners={{
+                profiles: auth?.can?.['securityDevices.devices.view'] === true,
+            }}
+        />
+    );
+}
+function MonitoringScreen({
+    workspace,
+    view,
+    setView,
+    owners,
+}: {
+    workspace: MonitoringWorkspace;
+    view: MonitoringView;
+    setView: (view: MonitoringView) => void;
+    owners: MonitoringOwners;
+}) {
+    const management: NativeMonitorManagement =
         workspace.monitor_management ?? {
             can_manage: false,
             create_url: null,
@@ -1462,109 +728,347 @@ export default function Monitoring({
             profiles: [],
             devices: [],
         };
-    const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
-    const [editingMonitor, setEditingMonitor] =
-        useState<NativeMonitorTarget | null>(null);
-    const [deactivatingMonitor, setDeactivatingMonitor] =
-        useState<NativeMonitorTarget | null>(null);
-    const lifecycleTarget = (monitor: MonitorRow): NativeMonitorTarget => ({
+    const [savedRequestsOpen, setSavedRequestsOpen] = useState(false),
+        [monitorDialogOpen, setMonitorDialogOpen] = useState(false),
+        [editingMonitor, setEditingMonitor] =
+            useState<NativeMonitorTarget | null>(null),
+        [deactivatingMonitor, setDeactivatingMonitor] =
+            useState<NativeMonitorTarget | null>(null),
+        [search, setSearch] = useState(workspace.filters.search ?? '');
+    const target = (monitor: MonitorRow): NativeMonitorTarget => ({
         id: monitor.id,
         name: monitor.name,
         kind: monitor.kind,
         enabled: monitor.enabled,
         affects_availability: monitor.affects_availability,
         profile: monitor.profile ?? null,
-        device: { id: monitor.device.id, name: monitor.device.name },
+        device: {
+            id: monitor.device.id,
+            name: monitor.device.name,
+            site: monitor.site
+                ? { id: monitor.site.id, name: monitor.site.name }
+                : undefined,
+        },
         actions: monitor.actions ?? {
             can_manage: false,
             update_url: null,
             deactivate_url: null,
         },
     });
-    const refreshWorkspace = () =>
+    const refresh = () =>
         router.reload({ only: ['workspace'], preserveScroll: true });
-    const changeTab = (tab: string) =>
+    const get = (changes: Record<string, string | number | null>) =>
         router.get(
             '/security-devices/monitoring',
-            { ...workspace.filters, tab },
+            { ...workspace.filters, tab: 'overview', ...changes },
             { preserveState: true, preserveScroll: true },
         );
-
+    const summary = (
+        label: string,
+        count: number,
+        filter: Record<string, string>,
+    ) => (
+        <PageHeaderMeterBlock
+            key={label}
+            onClick={() =>
+                router.get('/security-devices/monitoring', filter, {
+                    preserveState: true,
+                    preserveScroll: true,
+                })
+            }
+            ariaLabel={`View ${label.toLowerCase()}`}
+            label={label}
+        >
+            <PageHeaderMeterBig>{count}</PageHeaderMeterBig>
+            <PageHeaderMeterCaption>
+                Across all permitted monitoring
+            </PageHeaderMeterCaption>
+        </PageHeaderMeterBlock>
+    );
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
                 { title: 'Monitoring', href: '/security-devices/monitoring' },
             ]}
         >
             <Head title="Monitoring - Security & Devices" />
-            <PageShell>
-                <PageHero
-                    variant="compact"
+            <div className="space-y-5">
+                <PageHeader
                     icon={Activity}
                     title="Monitoring"
-                    description="Native estate-wide health, coverage, findings, dependencies, trends, and collection certainty."
-                    stats={[
-                        {
-                            label: 'Checks',
-                            value: workspace.summary.total_monitors,
-                        },
-                        { label: 'Healthy', value: workspace.summary.healthy },
-                        {
-                            label: 'Findings',
-                            value: workspace.summary.active_findings,
-                        },
-                        { label: 'Paused', value: workspace.summary.paused },
-                    ]}
+                    subline="Device checks, coverage and retained evidence across your permitted Sites."
+                    mobileSummary={`${workspace.summary.total_monitors} checks · ${workspace.summary.active_findings} findings`}
                     actions={
-                        <div className="flex flex-wrap gap-2">
-                            {monitorManagement.can_manage &&
-                            monitorManagement.create_url &&
-                            monitorManagement.devices.length &&
-                            monitorManagement.profiles.length ? (
-                                <Button
-                                    type="button"
+                        <>
+                            <PageHeaderSearch
+                                ariaLabel="Search monitors"
+                                placeholder="Search monitor, device or Site…"
+                                value={search}
+                                onChange={setSearch}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter')
+                                        get({ search: search || null });
+                                }}
+                            />
+                            <PageHeaderGlassButton
+                                onClick={() => get({ search: search || null })}
+                            >
+                                <Search className="size-4" />
+                                Search
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton onClick={refresh}>
+                                <RefreshCw className="size-4" />
+                                Refresh
+                            </PageHeaderGlassButton>
+                            {management.can_manage && management.actor_id ? (
+                                <PageHeaderGlassButton
+                                    onClick={() => setSavedRequestsOpen(true)}
+                                >
+                                    Saved monitor changes
+                                </PageHeaderGlassButton>
+                            ) : null}
+                            {management.can_manage &&
+                            management.create_url ===
+                                '/security-devices/monitoring/native-monitors' &&
+                            management.devices.length > 0 &&
+                            management.profiles.length > 0 ? (
+                                <PageHeaderPrimaryButton
                                     onClick={() => {
                                         setEditingMonitor(null);
                                         setMonitorDialogOpen(true);
                                     }}
                                 >
-                                    <Plus className="mr-2 h-4 w-4" />
+                                    <Plus className="size-4" />
                                     Create direct monitor
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             ) : null}
-                            <ControlRoomDestination
-                                canView={workspace.can.view_control_room}
+                            {workspace.can.view_control_room ? (
+                                <PageHeaderGlassButton asChild>
+                                    <Link href="/control-room">
+                                        Open Control Room
+                                    </Link>
+                                </PageHeaderGlassButton>
+                            ) : (
+                                <ControlRoomAlertAccessRequired
+                                    label="Control Room access required"
+                                    className="min-h-0 text-band-foreground/75"
+                                />
+                            )}
+                        </>
+                    }
+                    meters={[
+                        summary('Checks', workspace.summary.total_monitors, {
+                            tab: 'overview',
+                        }),
+                        summary('Healthy', workspace.summary.healthy, {
+                            tab: 'overview',
+                            state: 'healthy',
+                        }),
+                        summary('Findings', workspace.summary.active_findings, {
+                            tab: 'findings',
+                        }),
+                        summary('Paused', workspace.summary.paused, {
+                            tab: 'overview',
+                            state: 'paused',
+                        }),
+                    ]}
+                    filters={
+                        <>
+                            {workspace.active_tab === 'overview' ? (
+                                <>
+                                    {[
+                                        {
+                                            key: 'state' as const,
+                                            label: 'All states',
+                                            options:
+                                                workspace.filter_options.states.map(
+                                                    (value) => ({
+                                                        value,
+                                                        label: monitoringLabel(
+                                                            value,
+                                                        ),
+                                                    }),
+                                                ),
+                                        },
+                                        {
+                                            key: 'kind' as const,
+                                            label: 'All check types',
+                                            options:
+                                                workspace.filter_options.kinds.map(
+                                                    (value) => ({
+                                                        value,
+                                                        label: monitoringLabel(
+                                                            value,
+                                                        ),
+                                                    }),
+                                                ),
+                                        },
+                                        {
+                                            key: 'site_id' as const,
+                                            label: 'All Sites',
+                                            options:
+                                                workspace.filter_options.sites.map(
+                                                    (item) => ({
+                                                        value: String(
+                                                            item.value,
+                                                        ),
+                                                        label: item.label,
+                                                    }),
+                                                ),
+                                        },
+                                        {
+                                            key: 'device_id' as const,
+                                            label: 'All devices',
+                                            options:
+                                                workspace.filter_options.devices.map(
+                                                    (item) => ({
+                                                        value: String(
+                                                            item.value,
+                                                        ),
+                                                        label: item.label,
+                                                    }),
+                                                ),
+                                        },
+                                        {
+                                            key: 'collection_mode' as const,
+                                            label: 'All collection modes',
+                                            options: [
+                                                {
+                                                    value: 'direct',
+                                                    label: 'Main application',
+                                                },
+                                                {
+                                                    value: 'remote_collector',
+                                                    label: 'Remote collector',
+                                                },
+                                            ],
+                                        },
+                                    ].map((item) => (
+                                        <PageHeaderFilterSelect
+                                            key={item.key}
+                                            value={String(
+                                                workspace.filters[item.key] ??
+                                                    'all',
+                                            )}
+                                            label={item.label}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: item.label,
+                                                },
+                                                ...item.options,
+                                            ]}
+                                            onChange={(value) =>
+                                                get({
+                                                    [item.key]:
+                                                        value === 'all'
+                                                            ? null
+                                                            : value,
+                                                })
+                                            }
+                                        />
+                                    ))}
+                                    {Object.values(workspace.filters).some(
+                                        Boolean,
+                                    ) ? (
+                                        <PageHeaderFilterButton
+                                            onClick={() =>
+                                                router.get(
+                                                    '/security-devices/monitoring',
+                                                    { tab: 'overview' },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                    },
+                                                )
+                                            }
+                                        >
+                                            Clear monitor filters
+                                        </PageHeaderFilterButton>
+                                    ) : null}
+                                </>
+                            ) : (
+                                <span className="text-[11.5px] text-band-foreground/70">
+                                    These evidence views use the full permitted
+                                    scope. Monitor search opens Overview.
+                                </span>
+                            )}
+                            <PageHeaderViewToggle
+                                value={view}
+                                onChange={setView}
+                                options={[
+                                    {
+                                        value: 'cards',
+                                        label: 'Cards',
+                                        icon: LayoutGrid,
+                                    },
+                                    {
+                                        value: 'table',
+                                        label: 'Table',
+                                        icon: List,
+                                    },
+                                ]}
                             />
-                        </div>
+                        </>
+                    }
+                    rail={
+                        <PageHeaderRail
+                            ariaLabel="Monitoring views"
+                            items={workspace.tabs.map((tab) => ({
+                                key: tab.key,
+                                label: tab.label,
+                            }))}
+                            value={workspace.active_tab}
+                            onSelect={(tab) =>
+                                router.get(
+                                    '/security-devices/monitoring',
+                                    { ...workspace.filters, tab },
+                                    {
+                                        preserveState: true,
+                                        preserveScroll: true,
+                                    },
+                                )
+                            }
+                        />
                     }
                 />
-                <Boundary data={workspace.boundary} />
-                <PageTabs
-                    value={workspace.active_tab}
-                    onValueChange={changeTab}
-                    items={workspace.tabs.map((tab) => ({
-                        value: tab.key,
-                        label: tab.label,
-                    }))}
-                />
+                <ReviewCard icon={ShieldCheck} title={workspace.boundary.title}>
+                    <p className="text-sm text-muted-foreground">
+                        {workspace.boundary.description}
+                    </p>
+                    <p className="text-caption mt-2">
+                        {workspace.boundary.privacy_note}
+                    </p>
+                    <p className="text-caption mt-1">
+                        {workspace.boundary.control_room_note}
+                    </p>
+                </ReviewCard>
                 <MonitoringContent
                     workspace={workspace}
+                    view={view}
+                    owners={owners}
                     onEditMonitor={(monitor) => {
-                        setEditingMonitor(lifecycleTarget(monitor));
+                        setEditingMonitor(target(monitor));
                         setMonitorDialogOpen(true);
                     }}
                     onDeactivateMonitor={(monitor) =>
-                        setDeactivatingMonitor(lifecycleTarget(monitor))
+                        setDeactivatingMonitor(target(monitor))
                     }
                 />
-            </PageShell>
+            </div>
+            <NativeMonitorSavedRequests
+                open={savedRequestsOpen}
+                onOpenChange={setSavedRequestsOpen}
+                actorId={management.actor_id ?? 0}
+            />
             <NativeMonitorDialog
                 open={monitorDialogOpen}
                 onOpenChange={setMonitorDialogOpen}
-                management={monitorManagement}
+                management={management}
                 monitor={editingMonitor}
-                onSaved={refreshWorkspace}
+                onSaved={refresh}
             />
             <NativeMonitorDeactivateDialog
                 open={deactivatingMonitor !== null}
@@ -1572,7 +1076,7 @@ export default function Monitoring({
                     if (!open) setDeactivatingMonitor(null);
                 }}
                 monitor={deactivatingMonitor}
-                onDeactivated={refreshWorkspace}
+                onDeactivated={refresh}
             />
         </AppLayout>
     );

@@ -10,6 +10,7 @@ use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationEvent;
+use App\Models\MedicationExternalProposal;
 use App\Models\MedicationInteraction;
 use App\Models\MedicationOrderVersion;
 use App\Models\MedicationSelfAdminAssessment;
@@ -18,6 +19,7 @@ use App\Models\MedicationSyringeDriver;
 use App\Models\User;
 use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use App\Services\Medication\DoseSlots\DoseSlotCoverage;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationConcealment;
@@ -109,7 +111,32 @@ class PersonMedicationRecordController extends Controller
             ],
             'today' => Carbon::now($this->schedule->workerTimezone())->toDateString(),
             'as_at' => Carbon::now($this->schedule->workerTimezone())->toIso8601String(),
+            'prescriber_requests' => $this->prescriberRequests($actor, $client, $concealment),
         ]);
+    }
+
+    /**
+     * EA-025: outside prescriber requests waiting for a decision, so nobody
+     * works from the unchanged chart without knowing. Only while the
+     * prescriber portal runs; a controlled request counts only for
+     * controlled readers. Null when none wait.
+     *
+     * @return array{count: int, url: ?string, can_decide: bool}|null
+     */
+    private function prescriberRequests(User $actor, Client $client, MedicationConcealment $concealment): ?array
+    {
+        if (! app(ConnectedCareSettings::class)->enabled(ConnectedCareSettings::PORTAL)) {
+            return null;
+        }
+        $count = MedicationExternalProposal::query()->where('client_id', $client->id)->where('status', 'submitted')
+            ->when(! $concealment->canViewControlled(), fn ($q) => $q->where('controlled', false))->count();
+        if ($count === 0) {
+            return null;
+        }
+        $decides = $actor->canDo('medications.orders.manage');
+
+        return ['count' => $count, 'can_decide' => $decides,
+            'url' => $decides ? '/emar/connected-care?client_id='.$client->id.'#requests' : null];
     }
 
     /**

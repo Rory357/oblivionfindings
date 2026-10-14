@@ -366,7 +366,9 @@ export async function loginAs(
     await page.context().clearCookies();
     resetBrowserLoginThrottle(email);
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    // Staff sign-in is email first: Continue reveals the password step.
     await page.locator('#email').fill(email);
+    await page.getByTestId('login-continue').click();
     await page.locator('#password').fill(password);
     const loginButton = page.getByTestId('login-button');
     await expect(loginButton).toBeEnabled();

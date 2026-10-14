@@ -165,7 +165,7 @@ class SecurityWorkspaceTest extends TestCase
                 $this->assertSame('healthy', $device['observed']['stream_health']);
                 $this->assertSame('degraded', $device['observed']['recording_health']);
                 $this->assertSame('available', $device['media']['state']);
-                $this->assertSame('/security-devices/devices/preview/reception', $device['media']['href']);
+                $this->assertSame('/security-devices/devices/'.$camera->id.'/live', $device['media']['href']);
                 $this->assertSame(1, $device['maintenance']['open_count']);
                 $this->assertSame('Lens and recording inspection', $device['maintenance']['next']['description']);
             });
@@ -190,13 +190,15 @@ class SecurityWorkspaceTest extends TestCase
             });
     }
 
-    public function test_cctv_media_link_must_be_an_internal_path_even_for_an_authorised_viewer(): void
+    public function test_cctv_media_destination_is_app_owned_and_never_uses_observed_provider_urls(): void
     {
-        Device::factory()->create([
+        $camera = Device::factory()->create([
             'domain' => 'security',
             'category' => 'cctv',
             'config' => ['media_href' => 'https://camera-admin.example.test/live?token=secret'],
         ]);
+
+        $this->assignToSite($camera, Site::factory()->create());
 
         $this->actingAs($this->admin)
             ->get('/security-devices/security?tab=cctv')
@@ -204,8 +206,9 @@ class SecurityWorkspaceTest extends TestCase
             ->assertInertia(function ($page): void {
                 $media = $page->toArray()['props']['securityWorkspace']['activeTab']['devices'][0]['media'];
 
-                $this->assertSame('not_configured', $media['state']);
-                $this->assertArrayNotHasKey('href', $media);
+                $this->assertSame('available', $media['state']);
+                $this->assertMatchesRegularExpression('#^/security-devices/devices/[0-9]+/live$#', $media['href']);
+                $this->assertStringNotContainsString('camera-admin', $media['href']);
             });
     }
 

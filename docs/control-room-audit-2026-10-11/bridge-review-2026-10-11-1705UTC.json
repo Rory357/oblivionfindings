@@ -1,0 +1,43 @@
+{
+  "reviewedAtUtc": "2026-10-11T17:05:39Z",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "manifest": {
+    "path": "storage/logs/hs17-work-restriction-bridge-source-candidate.json",
+    "sha256": "6B4B23F94BB4B0B11AE8D045236F677BF1B7CDB441779CFCE3E343F143E849EE",
+    "selectedPins": 19,
+    "drift": [],
+    "unchangedAcrossRead": true
+  },
+  "handoff": {
+    "path": "docs/health-safety-audit-2026-10-07/HS17-WORK-RESTRICTION-SOURCE-BRIDGE.md",
+    "sha256": "01B2D4AA1DD824BDD3BE1D8DB216C2415F44929DA6B8377BB106B37AC9D94005"
+  },
+  "sharedTransition": {
+    "path": "app/Services/HealthSafety/InjuryAccessService.php",
+    "before": "20E89F4CA51D8252581054D9B3C5033665740F17AC05FD7EB2E7C6139C92DC1B",
+    "after": "8BB0AFA38268C275552C87D0AFD1D1873BDC88D925CD411F4BE4F3B0C0AE6742",
+    "comparison": "Current CR baseline matches before. Removing additive bridge span from H&S file reproduces exact old bytes.",
+    "existingAPIBodiesUnchanged": true
+  },
+  "inspected": [
+    "current/assertRecorded and supplied CurrentAuthorizationReads active connection",
+    "parent/typed source/retained version and attribution checks",
+    "restrictionDocument versus current canonical HR document and historical HR staff Site predicates",
+    "declared real domain, connection/lifetime, original-version recovery, document/Site/revoke/restore and rollback tests"
+  ],
+  "suite": {
+    "path": "tests/Feature/HealthSafety/InjuryWorkRestrictionSourceAdapterTest.php",
+    "sha256": "5F5F8EA236D3125F3A0105E1641FDFEC8CA4E7BBF56F251E2D7C63069E2E4239",
+    "declaredMethods": 25,
+    "ownerDeclaredStaticCases": 28,
+    "executed": false
+  },
+  "limits": [
+    "Selected source integrity and bounded review only",
+    "HR document policy currently duplicated narrowly: composed exact-current parity required; Workforce owns any canonical same-context API extraction",
+    "No approval policy/default grants or operational binding inferred",
+    "No complete runtime freeze, test execution, main application, browser or production acceptance"
+  ],
+  "decision": "Workforce assigned separately pinned combined bridge + three duty dependency transitions + full-set consumer source composition; H&S retains helper ownership. CR informed additive APIs preserve existing read baseline. No owner interruption.",
+  "runtimeAdmission": false
+}

@@ -8,10 +8,10 @@ use App\Models\Client;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Clients\ClientPortalMembershipService;
+use App\Services\Portal\PortalInvitationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +20,7 @@ class ClientPortalUserController extends Controller
 {
     public function __construct(
         private readonly ClientPortalMembershipService $portalMembership,
+        private readonly PortalInvitationService $portalInvitations,
     ) {}
 
     public function edit(Request $request, Client $client)
@@ -144,7 +145,8 @@ class ClientPortalUserController extends Controller
         }, 3);
 
         if ($action === 'create_user') {
-            Password::sendResetLink(['email' => $user->email]);
+            // A family portal invitation (7 days), not a generic password reset.
+            $this->portalInvitations->issue($user, $client, $actor);
         }
 
         return back()->with('status', 'Portal user linked.');

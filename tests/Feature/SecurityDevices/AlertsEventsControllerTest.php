@@ -680,6 +680,73 @@ class AlertsEventsControllerTest extends TestCase
         });
     }
 
+    public function test_event_ui_summary_window_excludes_old_and_future_observations(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $device = Device::factory()->create();
+        $recent = $this->deviceEvent(['device_id' => $device->id, 'event_type' => 'recent', 'severity' => 'critical', 'occurred_at' => now()->subHour()]);
+        $this->deviceEvent(['device_id' => $device->id, 'event_type' => 'old', 'severity' => 'warning', 'occurred_at' => now()->subDays(3)]);
+        $this->deviceEvent(['device_id' => $device->id, 'event_type' => 'future', 'severity' => 'critical', 'occurred_at' => now()->addHour()]);
+        $this->actingAs($this->admin)->get('/security-devices/alerts-events?window=24h&severity=critical')
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->where('stats.total24h', 1)->where('stats.critical24h', 1)->where('stats.warning24h', 0)
+            ->where('snapshotAt', now()->toISOString())->where('windowStart', now()->subHours(24)->toISOString())
+            ->where('events.meta.total', 1)->where('events.data.0.id', $recent->id)->where('filters.window', '24h'));
+    }
+
+    public function test_event_ui_history_does_not_expose_or_search_current_identity_after_transfer(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $viewer = $this->siteViewer($siteA, ['securityDevices.events.view', 'securityDevices.devices.view']);
+        $device = Device::factory()->create(['name' => 'PRIVATE-AFTER-TRANSFER', 'device_uid' => 'PRIVATE-CURRENT-IDENTIFIER', 'domain' => 'security', 'category' => 'camera']);
+        $transfer = now()->subHours(2)->startOfSecond();
+        $this->siteAssignment($device, $siteA, now()->subHours(6), $transfer);
+        $this->siteAssignment($device, $siteB, $transfer);
+        $event = $this->deviceEvent(['device_id' => $device->id, 'event_type' => 'permitted_historical_event', 'severity' => 'info', 'source' => 'permitted-source', 'occurred_at' => now()->subHours(4)]);
+        $this->actingAs($viewer)->get('/security-devices/alerts-events')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('events.data.0.id', $event->id)
+                ->where('events.data.0.device_name', null)->where('events.data.0.device_uid', null)
+                ->where('events.data.0.device_domain', null)->where('events.data.0.device_href', null)
+                ->where('events.data.0.device_access.metadata_state', 'restricted'))
+            ->assertDontSee('PRIVATE-AFTER-TRANSFER')->assertDontSee('PRIVATE-CURRENT-IDENTIFIER');
+        foreach (['search=PRIVATE-AFTER-TRANSFER', 'search=PRIVATE-CURRENT-IDENTIFIER', 'domain=security'] as $query) {
+            $this->actingAs($viewer)->get('/security-devices/alerts-events?'.$query)->assertOk()
+                ->assertInertia(fn ($page) => $page->where('events.meta.total', 0));
+        }
+        $this->actingAs($viewer)->get('/security-devices/alerts-events?device_id='.$device->id)->assertOk()
+            ->assertInertia(fn ($page) => $page->where('events.meta.total', 1)->where('events.data.0.device_href', null));
+        $this->actingAs($viewer)->get('/security-devices/devices/'.$device->id)->assertNotFound();
+    }
+
+    public function test_event_ui_current_context_does_not_grant_device_profile_or_control_room_permission(): void
+    {
+        $site = Site::factory()->create();
+        $viewer = $this->siteViewer($site, ['securityDevices.events.view']);
+        $device = Device::factory()->create(['name' => 'Permitted event device']);
+        $this->siteAssignment($device, $site, now()->subDay());
+        $this->deviceEvent(['device_id' => $device->id, 'event_type' => 'heartbeat', 'severity' => 'info', 'occurred_at' => now()->subHour()]);
+        $this->actingAs($viewer)->get('/security-devices/alerts-events')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('events.data.0.device_name', 'Permitted event device')
+                ->where('events.data.0.device_access.metadata_state', 'available')
+                ->where('events.data.0.device_access.state', 'restricted')->where('events.data.0.device_href', null)
+                ->where('controlRoom.href', null));
+        $this->actingAs($viewer)->get('/security-devices/devices/'.$device->id)->assertForbidden();
+    }
+
+    public function test_event_ui_destinations_follow_narrow_control_room_and_current_device_authority(): void
+    {
+        $site = Site::factory()->create();
+        $viewer = $this->siteViewer($site, ['securityDevices.events.view', 'securityDevices.devices.view', 'controlRoom.alerts.view']);
+        $device = Device::factory()->create();
+        $this->siteAssignment($device, $site, now()->subDay());
+        $this->deviceEvent(['device_id' => $device->id, 'event_type' => 'heartbeat', 'severity' => 'info', 'occurred_at' => now()->subHour()]);
+        $this->actingAs($viewer)->get('/security-devices/alerts-events')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('controlRoom.href', '/control-room/alerts')
+                ->where('events.data.0.device_access.state', 'available')
+                ->where('events.data.0.device_href', '/security-devices/devices/'.$device->id));
+    }
+
     /** @param list<string> $permissions */
     private function siteViewer(Site $site, array $permissions): User
     {

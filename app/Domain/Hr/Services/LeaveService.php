@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Domain\Hr\Notifications\LeaveBalanceAdjustedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
+use App\Models\AuditLog;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\StaffTimeOff;
@@ -305,7 +306,7 @@ class LeaveService
      */
     public function approveRequest(HrLeaveRequest $request, User $reviewer, ?string $reviewNotes = null): HrLeaveRequest
     {
-        return DB::transaction(function () use ($request, $reviewer, $reviewNotes) {
+        return DB::transaction(function () use ($request, $reviewer, $reviewNotes): HrLeaveRequest {
             $request = $this->access->reviewRequest($reviewer, $request, lockForUpdate: true);
             if ($request->status !== 'pending') {
                 throw new \LogicException("Cannot approve a '{$request->status}' leave request.");
@@ -313,64 +314,174 @@ class LeaveService
 
             $year = $this->balanceYear($request->starts_at);
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
-            $balance = $this->ensureBalanceRecord(
-                $requestUser,
-                $request->leave_type,
-                $year,
-                true,
-            );
+            $balance = $this->approvalBalance($requestUser, $request->leave_type, $year);
             $before = $this->snapshotBalance($balance);
-
-            $timeOff = StaffTimeOff::create([
-                'hr_leave_request_id' => $request->id,
-                'user_id' => $request->user_id,
-                'type' => $request->leave_type,
-                'starts_at' => $request->starts_at,
-                'ends_at' => $request->ends_at,
-                'period' => $request->period ?: 'full_day',
+            $hours = (float) $request->hours_requested;
+            $at = now()->startOfSecond();
+            [$timeOff, $timeOffValues] = $this->persistApprovalRow(new StaffTimeOff, [
+                'hr_leave_request_id' => $request->id, 'user_id' => $request->user_id, 'type' => $request->leave_type,
+                'starts_at' => $request->starts_at, 'ends_at' => $request->ends_at, 'period' => $request->period ?: 'full_day',
                 'label' => ucfirst(str_replace('_', ' ', (string) $request->leave_type)),
-                'notes' => $reviewNotes,
-                'created_by' => $reviewer->id,
+                'notes' => $reviewNotes, 'created_by' => $reviewer->id,
             ]);
-
-            $hoursRequested = (float) $request->hours_requested;
-            $balance->pending_hours = max((float) $balance->pending_hours - $hoursRequested, 0);
-            $balance->used_hours = round((float) $balance->used_hours + $hoursRequested, 2);
-            $balance->last_synced_at = now();
-            $balance->updated_by = $reviewer->id;
-            $balance->save();
-
-            $request->update([
-                'status' => 'approved',
-                'reviewed_by' => $reviewer->id,
-                'reviewed_at' => now(),
-                'review_notes' => $reviewNotes,
-                'time_off_id' => $timeOff->id,
-                'approval_due_at' => null,
+            [$balance, $balanceValues] = $this->persistApprovalRow($balance, [
+                'pending_hours' => max((float) $balance->pending_hours - $hours, 0),
+                'used_hours' => round((float) $balance->used_hours + $hours, 2),
+                'last_synced_at' => $at, 'updated_by' => $reviewer->id,
             ]);
+            [$request, $requestValues] = $this->persistApprovalRow($request, [
+                'status' => 'approved', 'reviewed_by' => $reviewer->id, 'reviewed_at' => $at,
+                'review_notes' => $reviewNotes, 'time_off_id' => $timeOff->getKey(), 'approval_due_at' => null,
+            ]);
+            [$ledger, $ledgerValues] = $this->persistApprovalRow(new HrLeaveBalanceLedger, [
+                'user_id' => $balance->user_id, 'leave_type' => $balance->leave_type, 'year' => $balance->year,
+                'entry_type' => 'approved', 'hours_delta' => round($hours, 2),
+                'balance_hours_before' => $before['balance_hours'], 'balance_hours_after' => (float) $balance->balance_hours,
+                'used_hours_before' => $before['used_hours'], 'used_hours_after' => (float) $balance->used_hours,
+                'pending_hours_before' => $before['pending_hours'], 'pending_hours_after' => (float) $balance->pending_hours,
+                'source_type' => $request->getMorphClass(), 'source_id' => $request->getKey(),
+                'notes' => $reviewNotes, 'created_by' => $reviewer->id,
+            ]);
+            $coverageWrites = [];
+            $this->coverage->syncApprovedLeave($request, $reviewer,
+                function (Model $row, array $attributes, bool $write = true) use (&$coverageWrites): Model {
+                    if ($write) {
+                        [$row, $values] = $this->persistApprovalRow($row, $attributes);
+                    } else {
+                        $values = $this->approvalRowValues($row, array_keys($row->getAttributes()));
+                        $row = $this->assertApprovalRow($row, $values);
+                    }
+                    $coverageWrites[$row->getMorphClass().':'.$row->getKey()] = [$row, $values];
 
-            $this->recordBalanceLedger(
-                balance: $balance,
-                before: $before,
-                entryType: 'approved',
-                hoursDelta: $hoursRequested,
-                source: $request,
-                createdBy: $reviewer->id,
-                notes: $reviewNotes,
+                    return $row;
+                },
             );
-
-            $this->coverage->syncApprovedLeave($request, $reviewer);
+            [$audit, $auditValues] = $this->persistApprovalRow(new AuditLog, [
+                'user_id' => $reviewer->id, 'client_id' => null, 'action' => 'hr.leave.approved',
+                'auditable_type' => $request->getMorphClass(), 'auditable_id' => $request->getKey(),
+                'meta' => ['balance_id' => (int) $balance->getKey(), 'ledger_id' => (int) $ledger->getKey(),
+                    'time_off_id' => (int) $timeOff->getKey(), 'approved_hours' => $hours,
+                    'balance_before' => $before, 'balance_after' => $this->snapshotBalance($balance)],
+                'ip_address' => null, 'user_agent' => null,
+            ]);
             $this->access->lockCurrentReviewActor($reviewer, $request);
+            $request = $this->assertApprovalRow($request, $requestValues);
+            foreach ([[$balance, $balanceValues], [$timeOff, $timeOffValues], [$ledger, $ledgerValues],
+                ...$coverageWrites, [$audit, $auditValues]] as [$row, $values]) {
+                $this->assertApprovalRow($row, $values);
+            }
+            $requestId = (int) $request->getKey();
+            DB::afterCommit(function () use ($requestId): void {
+                try {
+                    app(HrNotificationService::class)->notifyLeaveApproved(
+                        HrLeaveRequest::query()->with(['reviewer', 'user'])->findOrFail($requestId),
+                    );
+                } catch (\Throwable) {
+                    try {
+                        Log::warning('Failed to send committed leave approval notification', ['leave_request_id' => $requestId]);
+                    } catch (\Throwable) {
+                    }
+                }
+            });
 
-            $requestId = (int) $request->id;
-            DB::afterCommit(
-                fn () => app(HrNotificationService::class)->notifyLeaveApproved(
-                    HrLeaveRequest::query()->with(['reviewer', 'user'])->findOrFail($requestId),
-                ),
-            );
-
-            return $request->fresh();
+            return $request;
         });
+    }
+
+    /** Keep the installed opening/carry calculation, capturing new-row intent before observers. */
+    private function approvalBalance(User $user, string $leaveType, int $year): HrLeaveBalance
+    {
+        if (! $this->access->isCurrentStaff($user)) {
+            throw new \InvalidArgumentException('A leave balance requires current approved staff.');
+        }
+
+        $existing = HrLeaveBalance::query()->where('user_id', $user->id)
+            ->where('leave_type', $leaveType)->where('year', $year)->lockForUpdate()->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $defaultEntitlements = config('hr.leave.default_entitlements', [
+            'annual' => 152, 'sick' => 80, 'bereavement' => 24, 'parental' => 0,
+            'public_holiday' => 0, 'unpaid' => 0, 'toil' => 0, 'other' => 0,
+        ]);
+        $carryoverCaps = config('hr.leave.carryover_caps', ['annual' => 80, 'sick' => 40]);
+        $opening = (float) ($defaultEntitlements[$leaveType] ?? 0);
+        $carryOver = 0.0;
+        $previous = HrLeaveBalance::query()->where('user_id', $user->id)
+            ->where('leave_type', $leaveType)->where('year', $year - 1)->first();
+        if ($previous) {
+            $previousAvailable = $this->calculateAvailableHours(
+                (float) $previous->balance_hours, (float) $previous->used_hours, (float) $previous->pending_hours,
+            );
+            $cap = isset($carryoverCaps[$leaveType]) ? (float) $carryoverCaps[$leaveType] : $previousAvailable;
+            $carryOver = min($previousAvailable, $cap);
+        }
+        $startingHours = round($opening + max($carryOver, 0), 2);
+        [$balance] = $this->persistApprovalRow(new HrLeaveBalance, [
+            'user_id' => $user->id, 'leave_type' => $leaveType, 'year' => $year,
+            'balance_hours' => $startingHours, 'accrued_hours' => $startingHours,
+            'used_hours' => 0, 'pending_hours' => 0, 'source' => 'system',
+            'last_synced_at' => now()->startOfSecond(), 'updated_by' => $user->id,
+        ]);
+
+        return $balance;
+    }
+
+    /** @return array{Model, array<string, mixed>} */
+    private function persistApprovalRow(Model $row, array $attributes): array
+    {
+        $originalId = $row->getKey();
+        $row->fill($attributes);
+        $row->updateTimestamps();
+        $expected = $this->approvalRowValues($row, array_keys($row->getAttributes()));
+        if ($row->save() !== true || ! $row->exists || $row->getKey() === null
+            || ($originalId !== null && $row->getKey() !== $originalId)) {
+            throw new \LogicException('Leave approval could not be saved.');
+        }
+        $expected[$row->getKeyName()] = $row->getKey();
+
+        return [$this->assertApprovalRow($row, $expected), $expected];
+    }
+
+    private function assertApprovalRow(Model $row, array $expected): Model
+    {
+        $saved = $row->newQuery()->whereKey($expected[$row->getKeyName()])->lockForUpdate()->first();
+        if (! $saved || $this->approvalRowValues($saved, array_keys($expected)) !== $expected) {
+            throw new \LogicException('Leave approval could not be saved.');
+        }
+
+        return $saved;
+    }
+
+    /** Compare installed casts and SQL datetime precision, including unchanged source fields. */
+    private function approvalRowValues(Model $row, array $fields): array
+    {
+        $values = [];
+        foreach ($fields as $field) {
+            $value = $row->getAttribute($field);
+            if ($row instanceof AuditLog && $field === 'meta' && is_array($value)) {
+                $value = $this->canonicalApprovalAuditMeta($value);
+            }
+            $values[$field] = $value instanceof CarbonInterface ? $row->fromDateTime($value) : $value;
+        }
+
+        return $values;
+    }
+
+    /** Native JSON object order is immaterial; ordered lists and scalar values remain strict. */
+    private function canonicalApprovalAuditMeta(array $value): array
+    {
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $value[$key] = $this->canonicalApprovalAuditMeta($item);
+            }
+        }
+        if (! array_is_list($value)) {
+            ksort($value, SORT_STRING);
+        }
+
+        return $value;
     }
 
     /**
@@ -384,7 +495,7 @@ class LeaveService
      */
     public function declineRequest(HrLeaveRequest $request, User $reviewer, string $reason): HrLeaveRequest
     {
-        return DB::transaction(function () use ($request, $reviewer, $reason) {
+        return DB::transaction(function () use ($request, $reviewer, $reason): HrLeaveRequest {
             $request = $this->access->reviewRequest($reviewer, $request, lockForUpdate: true);
             if ($request->status !== 'pending') {
                 throw new \LogicException("Cannot decline a '{$request->status}' leave request.");
@@ -392,46 +503,162 @@ class LeaveService
 
             $year = $this->balanceYear($request->starts_at);
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
-            $balance = $this->ensureBalanceRecord(
-                $requestUser,
-                $request->leave_type,
-                $year,
-                true,
-            );
+            $balance = $this->declineBalance($requestUser, $request->leave_type, $year);
             $before = $this->snapshotBalance($balance);
+            $hoursRequested = (float) $request->hours_requested;
+            $at = now()->startOfSecond();
 
-            $request->update([
-                'status' => 'declined',
-                'reviewed_by' => $reviewer->id,
-                'reviewed_at' => now(),
-                'review_notes' => $reason,
-                'approval_due_at' => null,
+            [$request, $requestValues] = $this->persistDeclineRow($request, [
+                'status' => 'declined', 'reviewed_by' => $reviewer->id,
+                'reviewed_at' => $at, 'review_notes' => $reason, 'approval_due_at' => null,
+            ]);
+            [$balance, $balanceValues] = $this->persistDeclineRow($balance, [
+                'pending_hours' => max((float) $balance->pending_hours - $hoursRequested, 0),
+                'last_synced_at' => $at, 'updated_by' => $reviewer->id,
             ]);
 
-            $hoursRequested = (float) $request->hours_requested;
-            $balance->pending_hours = max((float) $balance->pending_hours - $hoursRequested, 0);
-            $balance->last_synced_at = now();
-            $balance->updated_by = $reviewer->id;
-            $balance->save();
+            // Preserve the existing release ledger semantics without changing the
+            // protected helper used by approval, cancellation and submission.
+            [$ledger, $ledgerValues] = $this->persistDeclineRow(new HrLeaveBalanceLedger, [
+                'user_id' => $balance->user_id, 'leave_type' => $balance->leave_type, 'year' => $balance->year,
+                'entry_type' => 'released', 'hours_delta' => round(-$hoursRequested, 2),
+                'balance_hours_before' => $before['balance_hours'], 'balance_hours_after' => (float) $balance->balance_hours,
+                'used_hours_before' => $before['used_hours'], 'used_hours_after' => (float) $balance->used_hours,
+                'pending_hours_before' => $before['pending_hours'], 'pending_hours_after' => (float) $balance->pending_hours,
+                'source_type' => $request->getMorphClass(), 'source_id' => $request->getKey(),
+                'notes' => $reason, 'created_by' => $reviewer->id,
+            ]);
+            // Existing observer audits remain active. This required command audit
+            // carries scalar balance effects, never the private decline reason.
+            [$audit, $auditValues] = $this->persistDeclineRow(new AuditLog, [
+                'user_id' => $reviewer->id, 'client_id' => null, 'action' => 'hr.leave.declined',
+                'auditable_type' => $request->getMorphClass(), 'auditable_id' => $request->getKey(),
+                'meta' => ['balance_id' => (int) $balance->getKey(), 'ledger_id' => (int) $ledger->getKey(),
+                    'released_hours' => $hoursRequested, 'balance_before' => $before,
+                    'balance_after' => $this->snapshotBalance($balance)],
+                'ip_address' => null, 'user_agent' => null,
+            ]);
 
-            $this->recordBalanceLedger(
-                balance: $balance,
-                before: $before,
-                entryType: 'released',
-                hoursDelta: -$hoursRequested,
-                source: $request,
-                createdBy: $reviewer->id,
-                notes: $reason,
-            );
-
-            // Real mail + database notification (includes the decline reason via
-            // the just-written review_notes) — mirrors the approve path's
-            // LeaveApprovedNotification instead of a database-only stub.
             $this->access->lockCurrentReviewActor($reviewer, $request);
-            app(HrNotificationService::class)->notifyLeaveDeclined($request->fresh(['reviewer', 'user']));
+            // Later observers may change an earlier write. Confirm the whole
+            // controlled suffix after the last write and final authority check.
+            $request = $this->assertDeclineRow($request, $requestValues);
+            $this->assertDeclineRow($balance, $balanceValues);
+            $this->assertDeclineRow($ledger, $ledgerValues);
+            $this->assertDeclineRow($audit, $auditValues);
+            $requestId = (int) $request->getKey();
+            DB::afterCommit(function () use ($requestId): void {
+                try {
+                    app(HrNotificationService::class)->notifyLeaveDeclined(
+                        HrLeaveRequest::query()->with(['reviewer', 'user'])->findOrFail($requestId),
+                    );
+                } catch (\Throwable) {
+                    // A transport/read failure after commit cannot undo decline.
+                    try {
+                        Log::warning('Failed to send committed leave decline notification', ['leave_request_id' => $requestId]);
+                    } catch (\Throwable) {
+                    }
+                }
+            });
 
-            return $request->fresh();
+            return $request;
         });
+    }
+
+    /** Keep the installed opening/carry calculation, capturing new-row intent before observers. */
+    private function declineBalance(User $user, string $leaveType, int $year): HrLeaveBalance
+    {
+        if (! $this->access->isCurrentStaff($user)) {
+            throw new \InvalidArgumentException('A leave balance requires current approved staff.');
+        }
+
+        $existing = HrLeaveBalance::query()->where('user_id', $user->id)
+            ->where('leave_type', $leaveType)->where('year', $year)->lockForUpdate()->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $defaultEntitlements = config('hr.leave.default_entitlements', [
+            'annual' => 152, 'sick' => 80, 'bereavement' => 24, 'parental' => 0,
+            'public_holiday' => 0, 'unpaid' => 0, 'toil' => 0, 'other' => 0,
+        ]);
+        $carryoverCaps = config('hr.leave.carryover_caps', ['annual' => 80, 'sick' => 40]);
+        $opening = (float) ($defaultEntitlements[$leaveType] ?? 0);
+        $carryOver = 0.0;
+        $previous = HrLeaveBalance::query()->where('user_id', $user->id)
+            ->where('leave_type', $leaveType)->where('year', $year - 1)->first();
+        if ($previous) {
+            $previousAvailable = $this->calculateAvailableHours(
+                (float) $previous->balance_hours, (float) $previous->used_hours, (float) $previous->pending_hours,
+            );
+            $cap = isset($carryoverCaps[$leaveType]) ? (float) $carryoverCaps[$leaveType] : $previousAvailable;
+            $carryOver = min($previousAvailable, $cap);
+        }
+        $startingHours = round($opening + max($carryOver, 0), 2);
+        [$balance] = $this->persistDeclineRow(new HrLeaveBalance, [
+            'user_id' => $user->id, 'leave_type' => $leaveType, 'year' => $year,
+            'balance_hours' => $startingHours, 'accrued_hours' => $startingHours,
+            'used_hours' => 0, 'pending_hours' => 0, 'source' => 'system',
+            'last_synced_at' => now()->startOfSecond(), 'updated_by' => $user->id,
+        ]);
+
+        return $balance;
+    }
+
+    /** @return array{Model, array<string, mixed>} */
+    private function persistDeclineRow(Model $row, array $attributes): array
+    {
+        $originalId = $row->getKey();
+        $row->fill($attributes);
+        $row->updateTimestamps();
+        $expected = $this->declineRowValues($row, array_keys($row->getAttributes()));
+        if ($row->save() !== true || ! $row->exists || $row->getKey() === null
+            || ($originalId !== null && $row->getKey() !== $originalId)) {
+            throw new \LogicException('Leave decline could not be saved.');
+        }
+        $expected[$row->getKeyName()] = $row->getKey();
+
+        return [$this->assertDeclineRow($row, $expected), $expected];
+    }
+
+    private function assertDeclineRow(Model $row, array $expected): Model
+    {
+        $saved = $row->newQuery()->whereKey($expected[$row->getKeyName()])->lockForUpdate()->first();
+        if (! $saved || $this->declineRowValues($saved, array_keys($expected)) !== $expected) {
+            throw new \LogicException('Leave decline could not be saved.');
+        }
+
+        return $saved;
+    }
+
+    /** Compare installed casts and SQL datetime precision, including unchanged source fields. */
+    private function declineRowValues(Model $row, array $fields): array
+    {
+        $values = [];
+        foreach ($fields as $field) {
+            $value = $row->getAttribute($field);
+            if ($row instanceof AuditLog && $field === 'meta' && is_array($value)) {
+                $value = $this->canonicalDeclineAuditMeta($value);
+            }
+            $values[$field] = $value instanceof CarbonInterface ? $row->fromDateTime($value) : $value;
+        }
+
+        return $values;
+    }
+
+    /** Native JSON object order is immaterial; ordered lists and scalar values remain strict. */
+    private function canonicalDeclineAuditMeta(array $value): array
+    {
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $value[$key] = $this->canonicalDeclineAuditMeta($item);
+            }
+        }
+        if (! array_is_list($value)) {
+            ksort($value, SORT_STRING);
+        }
+
+        return $value;
     }
 
     /**

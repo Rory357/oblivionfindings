@@ -1,5 +1,26 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import {
+    EmptyValue,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityTable,
+    ListCaption,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderViewToggle,
+} from '@/components/page';
 import {
     AddDeviceDialog,
     useAddDeviceDialogState,
@@ -9,60 +30,60 @@ import {
     type BulkManagementWorkspaceData,
 } from '@/components/security-devices/bulk-management-workspace';
 import {
-    type FacilitiesWorkspaceData,
     FacilitiesWorkspacePanels,
+    type FacilitiesWorkspaceData,
 } from '@/components/security-devices/facilities-workspace';
 import {
-    type HealthcareWorkspaceData,
     HealthcareWorkspacePanels,
+    type HealthcareWorkspaceData,
 } from '@/components/security-devices/healthcare-workspace';
 import {
-    type NetworkItWorkspaceData,
     NetworkItWorkspacePanels,
+    type NetworkItWorkspaceData,
 } from '@/components/security-devices/network-it-workspace';
 import {
-    type SecurityDevicesWorkspace,
     SecurityDevicesWorkspaceShell,
-    SecurityDevicesWorkspaceTabs,
-    WorkspaceDeviceList,
-    WorkspaceFilterBar,
+    type SecurityDevicesWorkspace,
 } from '@/components/security-devices/security-devices-workspace-shell';
 import {
-    type SecurityWorkspaceData,
     SecurityWorkspacePanels,
+    type SecurityWorkspaceData,
 } from '@/components/security-devices/security-workspace';
 import {
-    type TrackingWorkspaceData,
     TrackingWorkspacePanels,
+    type TrackingWorkspaceData,
 } from '@/components/security-devices/tracking-workspace';
 import { Button } from '@/components/ui/button';
 import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Building2,
     Cctv,
+    Cpu,
+    Eye,
     HeartPulse,
     Key,
-    type LucideIcon,
+    LayoutGrid,
+    List,
     Plus,
-    Search,
     Server,
     Siren,
     Smartphone,
+    type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
-
+import { useEffect, useState, type ReactNode } from 'react';
 import {
     DeviceCard,
+    deviceMonitoringVariant,
+    formatTimeSince,
     type DeviceListItem,
     type FilterOption,
-    FilterSelect,
     type Paginated,
 } from './devices/shared';
-
-// ── Types ─────────────────────────────────────────────────────────
 
 type CategoryStats = {
     total: number;
@@ -71,8 +92,7 @@ type CategoryStats = {
     attention: number;
     bySubcategory: Record<string, number>;
 };
-
-type PageConfig = {
+export type PageConfig = {
     slug: string;
     title: string;
     description: string;
@@ -82,8 +102,7 @@ type PageConfig = {
     domain: string;
     categories: string[] | null;
 };
-
-type Props = {
+export type CategoryPageProps = {
     devices: Paginated<DeviceListItem>;
     stats: CategoryStats;
     filters: Record<string, string>;
@@ -102,13 +121,8 @@ type Props = {
     healthcareWorkspace?: HealthcareWorkspaceData | null;
     trackingWorkspace?: TrackingWorkspaceData | null;
     bulkManagement?: BulkManagementWorkspaceData | null;
-    can: {
-        registerDevice: boolean;
-    };
+    can: { registerDevice: boolean };
 };
-
-// ── Icon map ──────────────────────────────────────────────────────
-
 const iconMap: Record<string, LucideIcon> = {
     'network-it': Server,
     security: Cctv,
@@ -123,70 +137,80 @@ const iconMap: Record<string, LucideIcon> = {
     'it-infrastructure': Server,
     facilities: Building2,
 };
-
-function singularizeTitle(title: string): string {
-    if (title.endsWith('ies')) {
-        return `${title.slice(0, -3)}y`;
-    }
-
-    if (title.endsWith('s')) {
-        return title.slice(0, -1);
-    }
-
-    return title;
+function singularizeTitle(title: string) {
+    if (title.endsWith('ies')) return `${title.slice(0, -3)}y`;
+    return title.endsWith('s') ? title.slice(0, -1) : title;
 }
-
-type CategorySearchInputProps = {
-    title: string;
-    value: string;
-    onChange: (value: string) => void;
-    onSubmit: () => void;
-};
 
 export function CategorySearchInput({
     title,
     value,
     onChange,
     onSubmit,
-}: CategorySearchInputProps) {
-    const accessibleName = `Search ${title.toLowerCase()}`;
-
+}: {
+    title: string;
+    value: string;
+    onChange: (value: string) => void;
+    onSubmit: () => void;
+}) {
+    const name = `Search ${title.toLowerCase()} device inventory`;
     return (
-        <Input
-            aria-label={accessibleName}
-            placeholder={`${accessibleName}...`}
+        <PageHeaderSearch
+            ariaLabel={name}
+            placeholder="Search device inventory…"
             value={value}
-            onChange={(event) => onChange(event.target.value)}
-            onKeyDown={(event) => event.key === 'Enter' && onSubmit()}
-            className="pl-9"
+            onChange={onChange}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter') onSubmit();
+            }}
         />
     );
 }
-
 export function CategoryRegisterAction({
     canRegister,
     label,
     onRegister,
+    onDark = true,
 }: {
+    onDark?: boolean;
     canRegister: boolean;
     label: string;
     onRegister: () => void;
 }) {
     if (!canRegister) return null;
-
+    if (!onDark)
+        return (
+            <Button type="button" size="sm" onClick={onRegister}>
+                <Plus className="size-4" aria-hidden="true" />
+                {label}
+            </Button>
+        );
     return (
-        <Button
-            type="button"
-            size="sm"
-            className="frontline-focus min-h-11"
-            onClick={onRegister}
-        >
-            <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+        <PageHeaderPrimaryButton onClick={onRegister}>
+            <Plus className="size-4" aria-hidden="true" />
             {label}
-        </Button>
+        </PageHeaderPrimaryButton>
     );
 }
-
+function domainInventoryHref(
+    domain: string,
+    query: Record<string, string> = {},
+) {
+    const params = new URLSearchParams({ domain, ...query });
+    return `/security-devices/devices?${params}`;
+}
+function workspaceTabHref(
+    workspace: SecurityDevicesWorkspace,
+    filters: Record<string, string | undefined>,
+    tab: string,
+) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+        if (value && !['page', 'tab'].includes(key)) params.set(key, value);
+    }
+    params.set('tab', tab);
+    return `${workspace.canonicalHref}?${params}`;
+}
 export function CategoryWorkspaceHero({
     pageConfig,
     workspace,
@@ -194,6 +218,8 @@ export function CategoryWorkspaceHero({
     canRegister,
     registerLabel,
     onRegister,
+    search,
+    filterControls,
 }: {
     pageConfig: PageConfig;
     workspace: SecurityDevicesWorkspace;
@@ -201,123 +227,233 @@ export function CategoryWorkspaceHero({
     canRegister: boolean;
     registerLabel: string;
     onRegister: () => void;
+    search?: ReactNode;
+    filterControls?: ReactNode;
 }) {
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
-
+    const freshness = workspace.freshness;
     return (
-        <PageHero
-            category="ops"
+        <PageHeader
             icon={PageIcon}
             title={pageConfig.title}
-            description={pageConfig.description}
-            stats={[
-                {
-                    label: 'Devices',
-                    value: workspace.summary.devices,
-                    hideOnMobile: false,
-                },
-                {
-                    label: 'Need attention',
-                    value: workspace.summary.attention,
-                    tone:
-                        workspace.summary.attention > 0 ? 'warning' : 'success',
-                    hideOnMobile: false,
-                },
-                {
-                    label: 'Monitored',
-                    value: workspace.summary.monitored,
-                    hideOnMobile: false,
-                },
-                {
-                    label: 'Unmonitored',
-                    value: workspace.summary.unmonitored,
-                    tone:
-                        workspace.summary.unmonitored > 0
-                            ? 'warning'
-                            : 'success',
-                    hideOnMobile: false,
-                },
-            ]}
+            subline={pageConfig.description}
+            mobileSummary={`${workspace.summary.devices} devices · ${workspace.summary.attention} need attention`}
             actions={
-                <CategoryRegisterAction
-                    canRegister={canRegister}
-                    label={registerLabel}
-                    onRegister={onRegister}
-                />
+                <>
+                    {search}
+                    <CategoryRegisterAction
+                        canRegister={canRegister}
+                        label={registerLabel}
+                        onRegister={onRegister}
+                    />
+                </>
             }
-            footer={
-                <SecurityDevicesWorkspaceTabs
-                    workspace={workspace}
-                    filters={filters}
-                    onDark
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Devices"
+                        href={domainInventoryHref(pageConfig.domain)}
+                    >
+                        <PageHeaderMeterBig>
+                            {workspace.summary.devices}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Equipment in this domain
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Need attention"
+                        tone={
+                            workspace.summary.attention > 0
+                                ? 'warning'
+                                : 'brand'
+                        }
+                        href={domainInventoryHref(pageConfig.domain, {
+                            view: 'needs_attention',
+                        })}
+                    >
+                        <PageHeaderMeterBig>
+                            {workspace.summary.attention}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Review current findings
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Without monitoring"
+                        tone={
+                            workspace.summary.unmonitored > 0
+                                ? 'warning'
+                                : 'brand'
+                        }
+                        href={domainInventoryHref(pageConfig.domain, {
+                            view: 'unmonitored',
+                        })}
+                    >
+                        <PageHeaderMeterBig>
+                            {workspace.summary.unmonitored}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {workspace.summary.monitored} devices have
+                            monitoring
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Latest report"
+                        tone={freshness.state === 'stale' ? 'warning' : 'brand'}
+                        href={domainInventoryHref(pageConfig.domain, {
+                            sort: 'last_seen_at',
+                            direction: 'desc',
+                        })}
+                    >
+                        <PageHeaderMeterBig>
+                            <span
+                                title={
+                                    freshness.observedAt
+                                        ? formatDateTime(freshness.observedAt)
+                                        : undefined
+                                }
+                            >
+                                {freshness.observedAt
+                                    ? formatRelative(freshness.observedAt)
+                                    : 'Not observed'}
+                            </span>
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {freshness.state === 'current'
+                                ? 'Latest report is current'
+                                : freshness.state === 'stale'
+                                  ? 'Latest report is stale'
+                                  : 'No recent report known'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={filterControls}
+            rail={
+                <PageHeaderRail
+                    items={workspace.tabs.map((tab) => ({
+                        key: tab.key,
+                        label: tab.label,
+                        icon:
+                            tab.key === 'overview'
+                                ? LayoutGrid
+                                : tab.key === 'devices'
+                                  ? Cpu
+                                  : undefined,
+                    }))}
+                    value={workspace.activeTab}
+                    onSelect={(tab) =>
+                        router.get(
+                            workspaceTabHref(workspace, filters, tab),
+                            {},
+                            { preserveState: true },
+                        )
+                    }
+                    ariaLabel={`${workspace.title} workspace views`}
+                    decorations={Object.fromEntries(
+                        workspace.tabs
+                            .filter((tab) => tab.state !== 'available')
+                            .map((tab) => [
+                                tab.key,
+                                <StatusBadge key={tab.key} variant="neutral">
+                                    {tab.stateLabel}
+                                </StatusBadge>,
+                            ]),
+                    )}
                 />
             }
         />
     );
 }
 
-// ── Component ─────────────────────────────────────────────────────
-
-export default function CategoryPage({
-    devices,
-    stats,
-    filters,
-    filterOptions,
-    pageConfig,
-    workspace,
-    facilitiesWorkspace,
-    networkItWorkspace,
-    securityWorkspace,
-    healthcareWorkspace,
-    trackingWorkspace,
-    bulkManagement,
-    can,
-}: Props) {
+export default function CategoryPage(props: CategoryPageProps) {
+    const actorId =
+        usePage<{ auth: { user: { id: number } | null } }>().props.auth.user
+            ?.id ?? 0;
+    const identity = JSON.stringify([
+        actorId,
+        props.pageConfig.slug,
+        props.can,
+        props.workspace.tabs.map((tab) => [tab.key, tab.state]),
+        props.bulkManagement?.canObserve,
+        props.bulkManagement?.canRequest,
+    ]);
+    return <CategoryWorkspace key={identity} {...props} />;
+}
+function CategoryWorkspace(props: CategoryPageProps) {
+    const {
+        devices,
+        stats,
+        filters,
+        filterOptions,
+        pageConfig,
+        workspace,
+        facilitiesWorkspace,
+        networkItWorkspace,
+        securityWorkspace,
+        healthcareWorkspace,
+        trackingWorkspace,
+        bulkManagement,
+        can,
+    } = props;
+    const [listView, setListView] = useState<'cards' | 'table'>('cards');
     const [search, setSearch] = useState(filters.search ?? '');
+    useEffect(() => setSearch(filters.search ?? ''), [filters.search]);
     const addDeviceDialog = useAddDeviceDialogState();
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
-    const pageUrl = workspace.canonicalHref;
     const registerLabel =
         pageConfig.slug.includes('-') ||
         ['security', 'healthcare', 'tracking'].includes(pageConfig.slug)
             ? 'Register device'
             : `Register ${singularizeTitle(pageConfig.title)}`;
-
-    const applyFilters = (newFilters: Record<string, string>) => {
+    const showInventory =
+        workspace.activeTabState === 'available' && !bulkManagement;
+    const applyFilters = (changes: Record<string, string>) =>
         router.get(
-            pageUrl,
-            { ...filters, ...newFilters, page: '1' },
+            workspace.canonicalHref,
+            { ...filters, ...changes, page: '1' },
             { preserveState: true },
         );
-    };
-
     const clearFilters = () => {
+        setSearch('');
         router.get(
-            pageUrl,
+            workspace.canonicalHref,
             {
                 tab: workspace.activeTab,
                 ...(filters.device_id ? { device_id: filters.device_id } : {}),
             },
             { preserveState: true },
         );
-        setSearch('');
     };
-
     const hasActiveFilters = Object.entries(filters).some(
         ([key, value]) =>
-            !['tab', 'device_id'].includes(key) && value && value !== 'all',
+            !['tab', 'device_id', 'page'].includes(key) &&
+            value &&
+            value !== 'all',
     );
-
+    const filter = (key: string, label: string, options: FilterOption[]) => (
+        <PageHeaderFilterSelect
+            key={key}
+            label={label}
+            value={filters[key] || 'all'}
+            onChange={(value) => applyFilters({ [key]: value })}
+            options={[
+                { value: 'all', label: `All ${label.toLowerCase()}` },
+                ...options.filter((option) => option.value !== 'all'),
+            ]}
+        />
+    );
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
-                { title: pageConfig.title, href: pageUrl },
+                { title: pageConfig.title, href: workspace.canonicalHref },
             ]}
         >
             <Head title={`${pageConfig.title} - Security & Devices`} />
-
-            <PageShell>
+            <div className="space-y-5">
                 <CategoryWorkspaceHero
                     pageConfig={pageConfig}
                     workspace={workspace}
@@ -325,13 +461,98 @@ export default function CategoryPage({
                     canRegister={can.registerDevice}
                     registerLabel={registerLabel}
                     onRegister={addDeviceDialog.openDialog}
+                    search={
+                        showInventory ? (
+                            <CategorySearchInput
+                                title={pageConfig.title}
+                                value={search}
+                                onChange={setSearch}
+                                onSubmit={() => applyFilters({ search })}
+                            />
+                        ) : undefined
+                    }
+                    filterControls={
+                        showInventory ? (
+                            <>
+                                {filterOptions.categories &&
+                                filterOptions.categories.length > 1
+                                    ? filter(
+                                          'category',
+                                          'Categories',
+                                          filterOptions.categories,
+                                      )
+                                    : null}
+                                {filterOptions.subcategories.length > 0
+                                    ? filter(
+                                          'subcategory',
+                                          'Device types',
+                                          filterOptions.subcategories.map(
+                                              (option) => ({
+                                                  ...option,
+                                                  label: `${option.label} (${stats.bySubcategory[option.value] ?? 0})`,
+                                              }),
+                                          ),
+                                      )
+                                    : null}
+                                {filter(
+                                    'status',
+                                    'Statuses',
+                                    filterOptions.statuses,
+                                )}
+                                {filter(
+                                    'health',
+                                    'Health states',
+                                    filterOptions.healthStatuses,
+                                )}
+                                {filterOptions.providers.length > 0
+                                    ? filter(
+                                          'provider',
+                                          'Providers',
+                                          filterOptions.providers.map(
+                                              (provider) => ({
+                                                  value: provider,
+                                                  label: provider,
+                                              }),
+                                          ),
+                                      )
+                                    : null}
+                                {filter('assigned', 'Assignments', [
+                                    { value: 'yes', label: 'Assigned' },
+                                    { value: 'no', label: 'Unassigned' },
+                                ])}
+                                {hasActiveFilters ? (
+                                    <PageHeaderFilterButton
+                                        onClick={clearFilters}
+                                    >
+                                        Clear inventory filters
+                                    </PageHeaderFilterButton>
+                                ) : null}
+                                <PageHeaderViewToggle
+                                    value={listView}
+                                    onChange={setListView}
+                                    options={[
+                                        {
+                                            value: 'cards',
+                                            label: 'Cards',
+                                            icon: LayoutGrid,
+                                        },
+                                        {
+                                            value: 'table',
+                                            label: 'Table',
+                                            icon: List,
+                                        },
+                                    ]}
+                                />
+                            </>
+                        ) : undefined
+                    }
                 />
-
                 <SecurityDevicesWorkspaceShell
                     workspace={workspace}
                     filters={filters}
                     showNavigation={false}
                     showSummary={false}
+                    showFreshness={false}
                 >
                     {bulkManagement ? (
                         <BulkManagementWorkspace data={bulkManagement} />
@@ -344,6 +565,7 @@ export default function CategoryPage({
                             ) : null}
                             {networkItWorkspace ? (
                                 <NetworkItWorkspacePanels
+                                    view={listView}
                                     data={networkItWorkspace}
                                 />
                             ) : null}
@@ -362,251 +584,34 @@ export default function CategoryPage({
                                     data={trackingWorkspace}
                                 />
                             ) : null}
-
-                            {/* Subcategory chips */}
-                            {filterOptions.subcategories.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="xs"
-                                        onClick={() =>
-                                            applyFilters({ subcategory: 'all' })
-                                        }
-                                        className={`h-auto rounded-full px-3 py-1 ${
-                                            !filters.subcategory ||
-                                            filters.subcategory === 'all'
-                                                ? 'border-primary bg-primary/10 text-primary'
-                                                : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                        }`}
-                                    >
-                                        All
-                                        <span className="ml-1 text-muted-foreground">
-                                            ({stats.total})
-                                        </span>
-                                    </Button>
-                                    {filterOptions.subcategories.map((sub) => {
-                                        const count =
-                                            stats.bySubcategory[sub.value] ?? 0;
-                                        const isActive =
-                                            filters.subcategory === sub.value;
-                                        return (
-                                            <Button
-                                                key={sub.value}
-                                                type="button"
-                                                variant="outline"
-                                                size="xs"
-                                                onClick={() =>
-                                                    applyFilters({
-                                                        subcategory: sub.value,
-                                                    })
-                                                }
-                                                className={`h-auto rounded-full px-3 py-1 ${
-                                                    isActive
-                                                        ? 'border-primary bg-primary/10 text-primary'
-                                                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                                }`}
-                                            >
-                                                {sub.label}
-                                                {count > 0 && (
-                                                    <span className="ml-1 text-muted-foreground/70">
-                                                        ({count})
-                                                    </span>
-                                                )}
-                                            </Button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {/* Category filter (for multi-category or whole-domain pages) */}
-                            {filterOptions.categories &&
-                                filterOptions.categories.length > 1 && (
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="xs"
-                                            onClick={() =>
-                                                applyFilters({
-                                                    category: 'all',
-                                                })
-                                            }
-                                            className={`h-auto rounded-full px-3 py-1 ${
-                                                !filters.category ||
-                                                filters.category === 'all'
-                                                    ? 'border-primary bg-primary/10 text-primary'
-                                                    : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                            }`}
-                                        >
-                                            All categories
-                                        </Button>
-                                        {filterOptions.categories.map((cat) => (
-                                            <Button
-                                                key={cat.value}
-                                                type="button"
-                                                variant="outline"
-                                                size="xs"
-                                                onClick={() =>
-                                                    applyFilters({
-                                                        category: cat.value,
-                                                    })
-                                                }
-                                                className={`h-auto rounded-full px-3 py-1 ${
-                                                    filters.category ===
-                                                    cat.value
-                                                        ? 'border-primary bg-primary/10 text-primary'
-                                                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                                }`}
-                                            >
-                                                {cat.label}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
-
-                            {/* Filter bar */}
-                            <WorkspaceFilterBar>
-                                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                                    <div className="relative flex-1 sm:max-w-xs">
-                                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                        <CategorySearchInput
-                                            title={pageConfig.title}
-                                            value={search}
-                                            onChange={setSearch}
-                                            onSubmit={() =>
-                                                applyFilters({ search })
-                                            }
-                                        />
-                                    </div>
-
-                                    <FilterSelect
-                                        value={filters.status}
-                                        onChange={(v) =>
-                                            applyFilters({ status: v })
-                                        }
-                                        placeholder="Status"
-                                        options={filterOptions.statuses}
+                            <CategoryInventory
+                                key={JSON.stringify([
+                                    filters,
+                                    devices.data.map((device) => [
+                                        device.id,
+                                        device.name,
+                                        device.assigned_to,
+                                    ]),
+                                ])}
+                                devices={devices}
+                                listView={listView}
+                                onClear={clearFilters}
+                                hasActiveFilters={Boolean(hasActiveFilters)}
+                                search={filters.search}
+                                config={pageConfig}
+                                icon={PageIcon}
+                                register={
+                                    <CategoryRegisterAction
+                                        onDark={false}
+                                        canRegister={can.registerDevice}
+                                        label={registerLabel}
+                                        onRegister={addDeviceDialog.openDialog}
                                     />
-                                    <FilterSelect
-                                        value={filters.health}
-                                        onChange={(v) =>
-                                            applyFilters({ health: v })
-                                        }
-                                        placeholder="Health"
-                                        options={filterOptions.healthStatuses}
-                                    />
-                                    {filterOptions.providers.length > 0 && (
-                                        <FilterSelect
-                                            value={filters.provider}
-                                            onChange={(v) =>
-                                                applyFilters({ provider: v })
-                                            }
-                                            placeholder="Provider"
-                                            options={filterOptions.providers.map(
-                                                (p: string) => ({
-                                                    value: p,
-                                                    label: p,
-                                                }),
-                                            )}
-                                        />
-                                    )}
-                                    <FilterSelect
-                                        value={filters.assigned}
-                                        onChange={(v) =>
-                                            applyFilters({ assigned: v })
-                                        }
-                                        placeholder="Assignment"
-                                        options={[
-                                            { value: 'yes', label: 'Assigned' },
-                                            {
-                                                value: 'no',
-                                                label: 'Unassigned',
-                                            },
-                                        ]}
-                                    />
-
-                                    {hasActiveFilters && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={clearFilters}
-                                        >
-                                            Clear filters
-                                        </Button>
-                                    )}
-                                </div>
-                            </WorkspaceFilterBar>
-
-                            {/* Results */}
-                            <WorkspaceDeviceList>
-                                {devices.data.length > 0 ? (
-                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                        {devices.data.map((device) => (
-                                            <DeviceCard
-                                                key={device.id}
-                                                device={device}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : hasActiveFilters ? (
-                                    <EmptySearch
-                                        onClear={clearFilters}
-                                        searchTerm={filters.search}
-                                        title={`No matching ${pageConfig.title.toLowerCase()} found`}
-                                    />
-                                ) : (
-                                    <EmptyState
-                                        icon={PageIcon}
-                                        title={pageConfig.emptyTitle}
-                                        description={
-                                            pageConfig.emptyDescription
-                                        }
-                                        action={
-                                            <CategoryRegisterAction
-                                                canRegister={can.registerDevice}
-                                                label={registerLabel}
-                                                onRegister={
-                                                    addDeviceDialog.openDialog
-                                                }
-                                            />
-                                        }
-                                    />
-                                )}
-
-                                {/* Pagination */}
-                                {(devices.meta.last_page ?? 1) > 1 && (
-                                    <div className="flex items-center justify-center gap-1">
-                                        {devices.links.map((link, i) => (
-                                            <Button
-                                                key={i}
-                                                variant={
-                                                    link.active
-                                                        ? 'default'
-                                                        : 'outline'
-                                                }
-                                                size="sm"
-                                                disabled={!link.url}
-                                                onClick={() =>
-                                                    link.url &&
-                                                    router.get(
-                                                        link.url,
-                                                        {},
-                                                        { preserveState: true },
-                                                    )
-                                                }
-                                                dangerouslySetInnerHTML={{
-                                                    __html: link.label,
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                )}
-                            </WorkspaceDeviceList>
+                                }
+                            />
                         </>
                     )}
                 </SecurityDevicesWorkspaceShell>
-
                 {can.registerDevice ? (
                     <AddDeviceDialog
                         open={addDeviceDialog.open}
@@ -614,7 +619,168 @@ export default function CategoryPage({
                         prefillDomain={pageConfig.domain}
                     />
                 ) : null}
-            </PageShell>
+            </div>
         </AppLayout>
+    );
+}
+function CategoryInventory({
+    devices,
+    listView,
+    onClear,
+    hasActiveFilters,
+    search,
+    config,
+    icon: Icon,
+    register,
+}: {
+    devices: Paginated<DeviceListItem>;
+    listView: 'cards' | 'table';
+    onClear: () => void;
+    hasActiveFilters: boolean;
+    search?: string;
+    config: PageConfig;
+    icon: LucideIcon;
+    register: ReactNode;
+}) {
+    const contextMenu = useEntityContextMenu<DeviceListItem>();
+    const actionsFor = (device: DeviceListItem): MenuItem[] => [
+        {
+            label: 'Open device',
+            icon: Eye,
+            onClick: () =>
+                router.visit(`/security-devices/devices/${device.id}`),
+        },
+    ];
+    const columns: EntityTableColumn<DeviceListItem>[] = [
+        {
+            key: 'status',
+            label: 'Status',
+            width: '110px',
+            cell: (device) => <StatusBadge status={device.status} />,
+        },
+        {
+            key: 'health',
+            label: 'Health',
+            width: '110px',
+            cell: (device) => <StatusBadge status={device.health_status} />,
+        },
+        {
+            key: 'type',
+            label: 'Equipment',
+            width: '1fr',
+            cell: (device) => (
+                <EntityChip>{device.category.replaceAll('_', ' ')}</EntityChip>
+            ),
+        },
+        {
+            key: 'monitoring',
+            label: 'Monitoring',
+            width: '140px',
+            cell: (device) =>
+                device.monitoring_state ? (
+                    <StatusBadge
+                        variant={deviceMonitoringVariant(
+                            device.monitoring_state,
+                        )}
+                        status={device.monitoring_state}
+                    />
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'assignment',
+            label: 'Assigned to',
+            width: '1fr',
+            cell: (device) => device.assigned_to || <EmptyValue />,
+        },
+        {
+            key: 'seen',
+            label: 'Last seen',
+            width: '130px',
+            cell: (device) => (
+                <span
+                    title={
+                        device.last_seen_at
+                            ? formatDateTime(device.last_seen_at)
+                            : undefined
+                    }
+                >
+                    {formatTimeSince(device.last_seen_at)}
+                </span>
+            ),
+        },
+    ];
+    return (
+        <section
+            aria-label={`${config.title} device inventory`}
+            className="space-y-5"
+        >
+            <ListCaption
+                title="Device inventory"
+                caption={`${devices.data.length} of ${devices.meta.total} shown`}
+            />
+            <p className="text-caption">
+                Search and inventory filters apply to this device list.
+            </p>
+            {devices.data.length > 0 ? (
+                listView === 'cards' ? (
+                    <EntityCardGrid>
+                        {devices.data.map((device) => (
+                            <DeviceCard key={device.id} device={device} />
+                        ))}
+                    </EntityCardGrid>
+                ) : (
+                    <EntityTable
+                        rows={devices.data}
+                        rowKey={(device) => device.id}
+                        identityLabel="Device"
+                        identity={(device) => ({
+                            icon: Icon,
+                            name: device.name,
+                            subline: device.device_uid,
+                        })}
+                        columns={columns}
+                        actionsFor={actionsFor}
+                        hrefFor={(device) =>
+                            `/security-devices/devices/${device.id}`
+                        }
+                        onOpen={(device) =>
+                            router.visit(
+                                `/security-devices/devices/${device.id}`,
+                            )
+                        }
+                        onRowContextMenu={contextMenu.open}
+                    />
+                )
+            ) : hasActiveFilters ? (
+                <EmptySearch
+                    onClear={onClear}
+                    searchTerm={search}
+                    title={`No matching ${config.title.toLowerCase()} found`}
+                />
+            ) : (
+                <EmptyState
+                    icon={Icon}
+                    title={config.emptyTitle}
+                    description={config.emptyDescription}
+                    action={register}
+                />
+            )}
+            <LaravelPagination
+                links={devices.links}
+                lastPage={devices.meta.last_page}
+            />
+            {contextMenu.ctx ? (
+                <EntityContextMenu
+                    x={contextMenu.ctx.x}
+                    y={contextMenu.ctx.y}
+                    title={contextMenu.ctx.record.name}
+                    icon={Icon}
+                    items={actionsFor(contextMenu.ctx.record)}
+                    onClose={contextMenu.close}
+                />
+            ) : null}
+        </section>
     );
 }

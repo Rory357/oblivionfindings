@@ -74,6 +74,7 @@ enum CommandStatus: string
             self::Ready => [self::Queued, self::Dispatching, self::Expired, self::Cancelled, self::Blocked],
             self::Queued => [self::Dispatching, self::Expired, self::Cancelled, self::Blocked],
             self::Dispatching => [
+                self::Cancelled,
                 self::Accepted,
                 self::Running,
                 self::Succeeded,
@@ -83,6 +84,7 @@ enum CommandStatus: string
                 self::Expired,
             ],
             self::Accepted => [
+                self::Cancelled,
                 self::Running,
                 self::Succeeded,
                 self::Failed,

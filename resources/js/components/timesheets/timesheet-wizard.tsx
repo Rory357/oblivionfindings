@@ -437,7 +437,7 @@ function TimesheetWizardBody(props: TimesheetWizardProps & {
             actorId !== currentActorId;
         return () => { props.protectedForm.current = () => true; };
     }, [dirty, command.pending, command.outcome, discard, submitConfirm,
-        actorId, currentActorId, props.protectedForm]);
+        actorId, currentActorId, props.protectedForm, command.busy, command.held]);
     const confirmed =
         command.outcome?.status === 'confirmed'
             ? command.outcome.receipt

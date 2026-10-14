@@ -30,6 +30,7 @@ use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\Medication\Recording\OfflineReplayReview;
+use App\Services\Medication\Recording\PackPhotoSettings;
 use App\Services\Medication\Recording\PrnEffectCheckQueue;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Reporting\MedicationReportAccess;
@@ -670,6 +671,8 @@ class WorkerMedsController extends Controller
             ...$this->medicationOfflineSubmissionRules($request),
             // Review item 3: a "given" always says which order it showed (EA-008).
             'order_fingerprint' => ['required_if:status,given', 'nullable', 'string', 'max:128'],
+            // A11: the dialog's "I've checked the label" tick.
+            PackPhotoSettings::LABEL_TICK_FIELD => ['nullable', 'boolean'],
         ], self::ORDER_FINGERPRINT_MESSAGES);
 
         $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
@@ -706,7 +709,11 @@ class WorkerMedsController extends Controller
                     $notes = $notes === '' ? $balanceLine : $notes."\n".$balanceLine;
                 }
 
-                $result = $this->marService->recordAdministration(
+                // A11 (Main, 13 Oct): the tick the organisation asks for when
+                // there's no photo of the pack is checked here, not only in
+                // the dialog. A dose without it is refused and nothing is saved.
+                $labelTickRequired = app(PackPhotoSettings::class)->labelTickRequired($user, $medication, $data);
+                $result = $labelTickRequired && ! PackPhotoSettings::labelTicked($data) ? PackPhotoSettings::labelTickMissing() : $this->marService->recordAdministration(
                     $scope->client,
                     $medication,
                     [
@@ -741,6 +748,9 @@ class WorkerMedsController extends Controller
                     prelockedPresenceShifts: $scope->lockedPresenceShifts,
                     prelockedPresenceEffectiveAt: $scope->lockedPresenceEffectiveAt,
                 );
+                if ($labelTickRequired) {
+                    PackPhotoSettings::keepLabelTick($user, $result);
+                }
 
                 if (! ($result['success'] ?? false)) {
                     $field = $result['error_field'] ?? 'status';
@@ -919,6 +929,7 @@ class WorkerMedsController extends Controller
             ...$this->medicationOfflineSubmissionRules($request),
             // Review item 3: an as-needed dose is always "given".
             'order_fingerprint' => ['required', 'string', 'max:128'],
+            PackPhotoSettings::LABEL_TICK_FIELD => ['nullable', 'boolean'],
         ], self::ORDER_FINGERPRINT_MESSAGES);
 
         $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
@@ -947,7 +958,9 @@ class WorkerMedsController extends Controller
                 }
                 $scan = $this->validatedRecordingScan($scope, $data);
 
-                $result = $this->marService->recordAdministration(
+                // A11: as for a scheduled dose; an as-needed dose is always given.
+                $labelTickRequired = app(PackPhotoSettings::class)->labelTickRequired($user, $medication, [...$data, 'status' => 'given']);
+                $result = $labelTickRequired && ! PackPhotoSettings::labelTicked($data) ? PackPhotoSettings::labelTickMissing() : $this->marService->recordAdministration(
                     $scope->client,
                     $medication,
                     [
@@ -982,6 +995,9 @@ class WorkerMedsController extends Controller
                     prelockedPresenceShifts: $scope->lockedPresenceShifts,
                     prelockedPresenceEffectiveAt: $scope->lockedPresenceEffectiveAt,
                 );
+                if ($labelTickRequired) {
+                    PackPhotoSettings::keepLabelTick($user, $result);
+                }
 
                 if (! ($result['success'] ?? false)) {
                     $field = $result['error_field'] ?? 'reason';

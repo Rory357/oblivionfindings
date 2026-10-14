@@ -11,6 +11,8 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -83,10 +85,12 @@ final class MonitoringReplayService
         }, 3);
 
         if (is_string($claim['token'])) {
-            ReplayMonitoringDeadLetter::dispatch($claim['id'], $claim['token'])
-                ->afterCommit()
-                ->onConnection((string) config('monitoring.delivery.queue_connection', 'redis'))
-                ->onQueue((string) config('monitoring.queues.orchestration', 'monitoring'));
+            DB::afterCommit(function () use ($claim): void {
+                ReplayMonitoringDeadLetter::dispatch($claim['id'], $claim['token'])
+                    ->afterCommit()
+                    ->onConnection((string) config('monitoring.delivery.queue_connection', 'redis'))
+                    ->onQueue((string) config('monitoring.queues.orchestration', 'monitoring'));
+            });
         }
     }
 
@@ -230,7 +234,7 @@ final class MonitoringReplayService
             'can_discard' => ! $pending,
             'pending_replay' => $pending,
             'operator_note' => match (true) {
-                $pending => 'Replay is queued. Evidence remains locked until processing completes.',
+                $pending => 'Replay is requested. Evidence remains locked until processing completes.',
                 ! $envelope instanceof RuntimeEnvelope => 'Authentication or envelope validation failed. Preserve the evidence or discard it with a reason.',
                 ! $supported => 'This signed contract is not supported by the deployed runtime.',
                 ! $replayableReason => 'This failure is not safe to replay. Preserve or discard it after investigation.',
@@ -272,51 +276,70 @@ final class MonitoringReplayService
         MonitoringDeadLetter $letter,
         bool $requiresValidEnvelope,
     ): ?RuntimeEnvelope {
-        if (! $actor->canDo('securityDevices.integrations.manage')) {
-            throw new AuthorizationException('You cannot operate monitoring dead letters.');
-        }
-
-        $accessibleSiteIds = $this->access->accessibleSiteIds($actor);
-
-        if ($letter->site_id !== null
-            && ! in_array($letter->site_id, $accessibleSiteIds, true)) {
-            throw new AuthorizationException('The monitoring site is outside your access scope.');
-        }
-
-        try {
-            $envelope = $this->codec->decode($letter->envelope_bytes);
-        } catch (UnexpectedValueException $exception) {
-            if ($requiresValidEnvelope) {
-                throw $exception;
+        return DB::transaction(fn () => CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($actor, $letter, $requiresValidEnvelope): ?RuntimeEnvelope {
+            $letter = MonitoringDeadLetter::query()->useWritePdo()->whereKey($letter->getKey())->lockForUpdate()->firstOrFail();
+            $actor = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting((int) $actor->id, ['*']);
+            if (! $actor->approved_at || ! $actor->email_verified_at || $actor->external_clinical_account) {
+                throw new AuthorizationException('Current approved internal operator access is required.');
+            }
+            foreach (['client', 'next_of_kin', 'external_clinician'] as $role) {
+                if ($actor->role === $role || $actor->hasRole($role)) {
+                    throw new AuthorizationException('Current approved internal operator access is required.');
+                }
+            }
+            $deviceId = null;
+            try {
+                $candidate = $this->codec->decode($letter->envelope_bytes);
+                $deviceId = $candidate->payload['device_id'] ?? null;
+            } catch (UnexpectedValueException) {
+            }
+            if (! $actor->canDo('securityDevices.integrations.manage')) {
+                throw new AuthorizationException('You cannot operate monitoring dead letters.');
             }
 
-            return null;
-        }
+            $scope = $this->access->forCurrentEvidence($reads, (int) ($deviceId ?? 0));
+            $accessibleSiteIds = $scope->accessibleSiteIds($actor);
 
-        $payloadSiteId = $envelope->payload['site_id'] ?? null;
-
-        if ($payloadSiteId !== null
-            && (! is_int($payloadSiteId) || ! in_array($payloadSiteId, $accessibleSiteIds, true))) {
-            throw new AuthorizationException('A referenced monitoring site is outside your access scope.');
-        }
-
-        $deviceId = $envelope->payload['device_id'] ?? null;
-
-        if ($deviceId !== null) {
-            if (! is_int($deviceId) || $deviceId < 1) {
-                throw new AuthorizationException('The protected monitoring target is invalid.');
+            if ($letter->site_id !== null
+                && ! in_array($letter->site_id, $accessibleSiteIds, true)) {
+                throw new AuthorizationException('The monitoring site is outside your access scope.');
             }
 
-            $device = Device::query()->find($deviceId);
+            try {
+                $envelope = $this->codec->decode($letter->envelope_bytes);
+            } catch (UnexpectedValueException $exception) {
+                if ($requiresValidEnvelope) {
+                    throw $exception;
+                }
 
-            if ($device === null) {
-                throw new AuthorizationException('The protected monitoring target is unavailable.');
+                return null;
             }
 
-            $this->access->assertCanViewDevice($actor, $device);
-        }
+            $payloadSiteId = $envelope->payload['site_id'] ?? null;
 
-        return $envelope;
+            if ($payloadSiteId !== null
+                && (! is_int($payloadSiteId) || ! in_array($payloadSiteId, $accessibleSiteIds, true))) {
+                throw new AuthorizationException('A referenced monitoring site is outside your access scope.');
+            }
+
+            $deviceId = $envelope->payload['device_id'] ?? null;
+
+            if ($deviceId !== null) {
+                if (! is_int($deviceId) || $deviceId < 1) {
+                    throw new AuthorizationException('The protected monitoring target is invalid.');
+                }
+
+                $device = $reads->query(Device::query()->useWritePdo())->whereKey($deviceId)->first();
+
+                if ($device === null) {
+                    throw new AuthorizationException('The protected monitoring target is unavailable.');
+                }
+
+                $scope->assertCanViewDevice($actor, $device);
+            }
+
+            return $envelope;
+        }), 3);
     }
 
     private function validReason(string $reason): string

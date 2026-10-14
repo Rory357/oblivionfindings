@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Portal\PortalInvitationController;
 use App\Models\Identity;
+use App\Models\PortalInvitation;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -99,7 +101,12 @@ class PortalOAuthController extends Controller
 
     private function handlePortalLogin(string $email, ?string $name, string $provider, array $authentication): RedirectResponse
     {
-        [$user, $created, $loggedIn] = DB::transaction(function () use ($email, $name, $provider, $authentication): array {
+        // Set by "Use Google/Microsoft" on the family invitation page. The
+        // invitation link proves mailbox control, so it may attach the first
+        // provider identity to the invited (already approved) account.
+        $pendingInvitation = request()->session()->pull(PortalInvitationController::SSO_SESSION_KEY);
+
+        [$user, $created, $loggedIn] = DB::transaction(function () use ($email, $name, $provider, $authentication, $pendingInvitation): array {
             app(SsoGroupMappingLockService::class)->lockMappingSet();
             app(SsoAuthenticationService::class)->assertCurrent($provider, 'portal', $authentication['configuration_fingerprint']);
             $provisioning = app(SsoConfigurationService::class)->provisioning();
@@ -122,7 +129,23 @@ class PortalOAuthController extends Controller
                 abort_unless(strtolower(trim((string) $user->email)) === $email, 409, 'The account email changed. Please retry sign-in.');
                 $identity = Identity::query()->where('provider', $provider)->where('provider_user_id', $subject)->lockForUpdate()->first();
                 abort_if($identity && (int) $identity->user_id !== (int) $user->id, 403);
-                abort_if(! $identity && $user->approved_at, 403, 'Sign in using an existing method, then connect this provider from your profile. Staff can help recover your existing sign-in.');
+                $invitation = ! $identity && $user->approved_at
+                    ? $this->lockedActiveInvitation($pendingInvitation, $user)
+                    : null;
+                abort_if(! $identity && $user->approved_at && ! $invitation, 403, 'Sign in using an existing method, then connect this provider from your profile. Staff can help recover your existing sign-in.');
+                if ($invitation instanceof PortalInvitation) {
+                    abort_unless($user->isPortalAccount(), 403, 'This account does not have portal access.');
+                    $identity = $user->identities()->create(['provider' => $provider, 'provider_user_id' => $subject, 'email' => $email]);
+                    $invitation->forceFill(['accepted_at' => now()])->save();
+                    AuditLogger::logOrFail('portal.invitation.accepted', null, [
+                        'actor_id' => (int) $user->id,
+                        'invitation_id' => (int) $invitation->id,
+                        'identity_id' => (int) $identity->id,
+                        'method' => $provider,
+                    ]);
+
+                    return [$user, false, true];
+                }
                 $lockedPortalRole = Role::query()->whereKey($portalRoleId)->lockForUpdate()->first();
                 abort_unless(
                     $lockedPortalRole instanceof Role && (string) $lockedPortalRole->name === 'next_of_kin',
@@ -199,5 +222,25 @@ class PortalOAuthController extends Controller
         request()->session()->regenerate();
 
         return redirect()->intended('/portal');
+    }
+
+    /** The invitation that started this provider sign-in, locked, if it still belongs to $user and works. */
+    private function lockedActiveInvitation(mixed $pending, User $user): ?PortalInvitation
+    {
+        if (! is_array($pending)
+            || ! is_int($pending['id'] ?? null)
+            || (int) ($pending['user_id'] ?? 0) !== (int) $user->id
+            || ! is_int($pending['started_at'] ?? null)
+            || $pending['started_at'] < now()->subMinutes(10)->timestamp) {
+            return null;
+        }
+
+        $invitation = PortalInvitation::query()->whereKey($pending['id'])->lockForUpdate()->first();
+
+        return $invitation instanceof PortalInvitation
+            && (int) $invitation->user_id === (int) $user->id
+            && $invitation->isActive()
+            ? $invitation
+            : null;
     }
 }

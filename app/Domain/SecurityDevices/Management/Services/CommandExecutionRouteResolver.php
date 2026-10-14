@@ -4,6 +4,9 @@ namespace App\Domain\SecurityDevices\Management\Services;
 
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionRoute;
 use App\Domain\SecurityDevices\Models\Device;
 use Throwable;
@@ -17,6 +20,16 @@ final class CommandExecutionRouteResolver
 
     public function resolve(Device $device, int $siteId, string $capability): CommandExecutionRoute
     {
+        if ($capability === 'endpoint.software.install') {
+            return app(EndpointSoftwareAuthority::class)->supports($device) ? CommandExecutionRoute::endpoint() : CommandExecutionRoute::unavailable('Approved machine MSI installation is unavailable.');
+        }
+        if ($capability === 'endpoint.computer.restart') {
+            return app(EndpointRestartAuthority::class)->supports($device) ? CommandExecutionRoute::endpoint() : CommandExecutionRoute::unavailable('The governed Windows restart release or installed agent is unavailable.');
+        }
+        if ($capability === 'endpoint.service.manage') {
+            return app(EndpointServiceAuthority::class)->supports($device)
+                ? CommandExecutionRoute::endpoint() : CommandExecutionRoute::unavailable('The governed native service-action release or installed agent is unavailable.');
+        }
         try {
             if ($this->centralAdapters->supports($device, $capability)) {
                 return CommandExecutionRoute::central($this->centralAdapters->for($device, $capability));
@@ -74,7 +87,7 @@ final class CommandExecutionRouteResolver
         }
 
         return $collectorId === null
-            ? $route->mode === 'central'
+            ? in_array($route->mode, ['central', 'endpoint'], true)
             : $route->mode === 'collector' && (int) $route->collector?->id === $collectorId;
     }
 }

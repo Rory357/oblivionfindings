@@ -1,0 +1,61 @@
+{
+  "reviewedAtUtc": "2026-10-12T14:37:42Z",
+  "state": "SOURCE_REVIEWED_WITH_OPEN_FINDING; UNAPPLIED; NO_RUNTIME_ACCEPTANCE",
+  "owner": "Control Room — Sol 6.1 implementation",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "packet": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41",
+  "manifestSha256": "0BABF79888F40932CFE713FD78C23289637D828232B4936F0C9C45A94D4068D7",
+  "patchSha256": "4243AA2169175439AA9434F0C78FCE2A2709AF320314AB9D0CEC17EE0D1FB380",
+  "independentEvidence": {
+    "ownedPinsMatched": 5,
+    "dependencyPinsMatched": 24,
+    "preserveOnlyPinsMatched": 12,
+    "evidencePinsMatched": 12,
+    "drift": 0,
+    "read": "Three proposed CR services, export/import delta, whole new native test class, relevant canonical source-copy callback and current authorization/operator/CR access implementations.",
+    "controllerOutsideExportAndImportsNormalizedByteExact": true,
+    "productControllerEqualsBeforeImage": true,
+    "controllerBeforeAndCurrentSha256": "2560DC53883E644A0C0334C236666FA7444C284C7E7D8D02E4A77CF9FD5767ED",
+    "patchApplicationCheck": "Owner reports exit 0; parent matched saved patch hash but did not execute apply/check.",
+    "newNativeDeclarations": 18,
+    "newNativeExecution": "UNRUN",
+    "canonicalSavedCopyNativeDeclarations": 47,
+    "existingReportsNativeDeclarations": 29,
+    "allNativeChecksUnrun": true
+  },
+  "ownedSourceHashes": {
+    "ControlRoomReportController.php": "36AB1747F02A2608458DC3E6B559438AE490386F37E8D2B289DA92990ABF73A6",
+    "ControlRoomCopiedAlertNoteService.php": "C56732F3A4E969612F4A2718AA29C94A5CD953D2CEF75134692DC3AE92D40CF2",
+    "ControlRoomIncidentNoteCopyWriter.php": "CBA4D2F1A6AD34E0F09EA62EF07CEEE303B1553D8BEE4277838E94C0D85CD2D8",
+    "ControlRoomNoteReadEvidence.php": "669762D70EFD6E97696F6FE634C9671273E6700F788A758F15974E4B065C9DF7",
+    "ControlRoomCopiedAlertExportTest.php": "302C1A27CFD872FA301145AFB52162613FF849DCDE683C81D3F6E5D926565B3A"
+  },
+  "findings": [
+    {
+      "id": "CR-COPY-ORIGIN-01",
+      "state": "OPEN; OWNER_NOTIFIED",
+      "file": "source/app/Services/ControlRoom/ControlRoomCopiedAlertNoteService.php",
+      "discoveryLine": 51,
+      "actualSelectLine": 98,
+      "finalCheckLine": 100,
+      "finding": "Conflicting operator/source origin is refused only from discovery metadata. The copied-note branch query at lines 87-100 does not require root_note_origin to remain absent. A same-connection mutation after discovery can add that conflicting marker while the actual Notes SELECT and final exists continue to accept the original source copy.",
+      "impact": "Bounded inconsistency with the declared conflicting-origin refusal. This is a source finding, not an executed exploit or a claim that cross-connection writes bypass held locks.",
+      "action": "Bind root_note_origin absence into the copied-branch query used for actual hydration and final existence check. Keep source policy unchanged and producer unwired.",
+      "acceptance": "Native before-Notes conflict case must hydrate zero Notes bodies and retain the operational row with blank Notes; a post-hydration conflict case must also return blank Notes with the row retained. Run only under the owner's existing isolated admission rules."
+    }
+  ],
+  "savedParserEvidence": {
+    "r41ResultSha256": "1C94DF6353D56789AFAC33DA3EB54B066333BE31A156205675C6548361C2A6F5",
+    "r42ResultSha256": "7C6EA0EAF74194DCB37F20F11447EBBD9124962C6A4B11A62AE4ACC2E002609E",
+    "r41AndR42": "HELD before child; zero compiler children/files; after-read/own-child exit/streams complete. No grammar or runtime pass.",
+    "r43InputSha256": "2E96D419B174B63EF44B827D3B708AC57F9EB513ADB654C0430666D9FF2A4288",
+    "r43": "Prepared input image only; not executed."
+  },
+  "preservedBoundaries": [
+    "Canonical H&S v2 exact-field proof and original source identity; source availability does not grant CR destination access.",
+    "CR independent operational/report scope and separately persisted operator text; no mandatory incident/H&S detour for every urgent row.",
+    "User/Role/RoleUser/HR/Site/AuditLogger and global UI ownership remain unchanged.",
+    "All root-note workspace/worklist/search/history consumers must compose before activating the prospective writer."
+  ],
+  "remainingGates": "Open finding, source/dependency composition, MySQL scalar JSON bindings and rollback, lifecycle/provider/pivot/current-read interleavings and query ceilings, all-reader integration, deployed Stats diagnosis, six destinations, full workflows and actual Rory/browser acceptance. No product application, DB/test/build/resource/browser run or live operation by coordinator."
+}

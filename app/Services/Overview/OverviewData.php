@@ -73,7 +73,12 @@ final class OverviewData
 
     public function __construct(private readonly OverviewAccess $access, private readonly UserSiteAccessService $siteAccess) {}
 
-    public function build(User $user, string $role, string $range, string $site): array
+    /**
+     * @param  list<string>|null  $only  Optional library blocks to work out; null works out all of
+     *                                   them. The core summaries are always built. Blocks left out
+     *                                   come back as 'deferred' and load when the editor opens.
+     */
+    public function build(User $user, string $role, string $range, string $site, ?array $only = null): array
     {
         $this->access->authorize($user, $role);
         $this->user = $user;
@@ -140,11 +145,18 @@ final class OverviewData
             'governance' => ['governance-declarations' => 'declarations'],
         };
         foreach ($optional as $id => $method) {
+            if ($only !== null && ! in_array($id, $only, true)) {
+                $this->deferred($id);
+
+                continue;
+            }
             $this->source('Block '.$id, fn () => $this->blocks[$id] = app(OverviewOptionalBlocks::class)->$method($user, $this->siteIds));
         }
         $connected = app(OverviewConnectedBlocks::class);
         foreach (OverviewConnectedBlocks::BLOCKS as $id) {
-            if (isset($this->blocks[$id])) {
+            if ($only !== null && isset($this->blocks[$id]) && ! in_array($id, $only, true)) {
+                $this->deferred($id);
+            } elseif (isset($this->blocks[$id])) {
                 $this->source('Block '.$id, fn () => $this->blocks[$id] = $connected->read($id, $user, $this->siteIds, $this->start, $this->end));
             }
         }
@@ -181,6 +193,13 @@ final class OverviewData
             'governance' => [['Board workspace', '/governance/dashboard'], ['My board work', '/governance/my-work']],
         };
         $this->blocks['shortcuts'] = $this->ready('Open your everyday workspaces', null, array_map(fn ($link) => ['label' => $link[0], 'href' => $link[1], 'detail' => 'Open workspace'], $links), count($links));
+        // A block that was asked for but is still unfilled was skipped by its
+        // permission check: say so, rather than calling it planned.
+        foreach ($this->blocks as $id => $block) {
+            if (($block['state'] ?? null) === 'proposed') {
+                $this->restricted($id);
+            }
+        }
         foreach ($this->blocks as $id => &$block) {
             $block['scopeMode'] ??= $id === 'governance-declarations' ? 'personal' : ($role === 'governance' ? 'organisation' : (($id === 'shortcuts' || ($role === 'worker' && in_array($id, ['sites', 'worker-learning', 'worker-leave', 'worker-requests', 'worker-policy-reading', 'worker-contacts'], true))) ? 'personal' : 'site'));
         }
@@ -197,7 +216,7 @@ final class OverviewData
 
         return ['primary' => $primary, 'blocks' => $this->blocks, 'metrics' => $this->metrics, 'partial' => $this->partial,
             'urgent' => array_values(array_filter($this->attention, fn ($row) => in_array($row['tone'] ?? '', ['critical', 'warning'], true))),
-            'scope' => $role === 'governance' ? 'Organisation-wide board records · permitted audience' : ($site === 'all' ? 'All permitted sites' : collect($this->sites)->firstWhere('id', (int) $site)['name']),
+            'scope' => $role === 'governance' ? 'Organisation-wide board records' : ($site === 'all' ? 'All your sites' : collect($this->sites)->firstWhere('id', (int) $site)['name']),
             'period' => ['start' => $this->start->toDateString(), 'end' => $this->end->subDay()->toDateString()], 'updatedAt' => now()->toIso8601String()];
     }
 
@@ -237,9 +256,20 @@ final class OverviewData
         }
     }
 
+    /** The worker's local date: date-only columns are compared with it, not UTC today(). */
+    private function localToday(): CarbonImmutable
+    {
+        return CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
+    }
+
     private function ready(string $subtitle, ?string $href, array $rows = [], ?int $total = null, array $series = []): array
     {
         return ['state' => 'ready', 'subtitle' => $subtitle, 'href' => $href, 'rows' => $rows, 'series' => $series, 'total' => $total ?? count($rows)];
+    }
+
+    private function deferred(string $id): void
+    {
+        $this->blocks[$id] = ['state' => 'deferred', 'subtitle' => 'Loads when you add it', 'rows' => [], 'series' => [], 'total' => null];
     }
 
     private function restricted(string $id): void
@@ -283,7 +313,7 @@ final class OverviewData
                 '/governance/my-work' => 'Review actions',
                 default => str_starts_with($href, '/it') ? 'Open support queue' : 'Review work',
             };
-            $this->attention[] = ['label' => $label, 'value' => $count, 'href' => $href, 'detail' => $detail === 'Open the workspace to review and act' ? $count.' '.($count === 1 ? 'item' : 'items').' in your permitted view' : $detail, 'tone' => $tone, 'actionLabel' => $action, 'status' => $tone === 'critical' ? 'Urgent' : ($tone === 'warning' ? 'Needs review' : 'To review')];
+            $this->attention[] = ['label' => $label, 'value' => $count, 'href' => $href, 'detail' => $detail === 'Open the workspace to review and act' ? $count.' '.($count === 1 ? 'item' : 'items').' you can see' : $detail, 'tone' => $tone, 'actionLabel' => $action, 'status' => $tone === 'critical' ? 'Urgent' : ($tone === 'warning' ? 'Needs review' : 'To review')];
         }
     }
 
@@ -353,7 +383,10 @@ final class OverviewData
         $this->blocks['focus'] = $this->ready($worker ? 'Continue your care work in My Day' : 'Upcoming rostered work', $worker ? '/my-day' : $href, array_slice($rows, 0, 1));
         $this->blocks['focus']['title'] = $worker ? 'Your next shift' : 'The next shift';
         $this->blocks['focus']['actionLabel'] = $worker ? 'Open My Day' : 'Open team roster';
-        $this->blocks['focus']['empty'] = 'No upcoming shift is recorded in this view.';
+        $this->blocks['focus']['empty'] = $worker ? 'Nothing is rostered for you in the next 14 days. New shifts appear here once they are published.' : 'No shifts are rostered in the next 14 days.';
+        if (! $rows) {
+            $this->blocks['focus']['headline'] = 'No shift scheduled';
+        }
         $this->metrics[] = ['label' => $worker ? 'Your shifts' : 'Scheduled shifts', 'value' => $count, 'caption' => 'Selected reporting period', 'href' => $href, 'series' => array_column($this->blocks['trend']['series'], 'value')];
         $completed = (clone $selected)->where('status', 'completed')->count();
         $this->metrics[] = ['label' => 'Completed shifts', 'value' => $completed, 'total' => $count, 'caption' => 'Of shifts in this period', 'href' => $href];
@@ -369,18 +402,22 @@ final class OverviewData
             $this->restricted('agenda');
         }
         if ($worker || $this->user->canDo('timesheets.manageAny')) {
-            $timesheets = $worker ? $this->siteAccess->applyTimesheetScope(Timesheet::query(), $this->user)->where('user_id', $this->user->id) : $scope->timesheets($this->user);
+            // Reviewers count what the approvals page shows: the dashboard's optional
+            // all-sites bypass does not widen a review queue (as in managerReviews).
+            $timesheets = $worker ? $this->siteAccess->applyTimesheetScope(Timesheet::query(), $this->user)->where('user_id', $this->user->id)
+                : $this->siteAccess->applyTimesheetScope($scope->timesheets($this->user), $this->user, [])->whereNull('archived_at');
             $timesheets->whereIn('site_id', $this->siteIds);
             $pending = (clone $timesheets)->whereIn('status', $worker ? ['draft', 'returned'] : ['submitted'])->count();
             $sheetHref = $worker ? '/hr/my/time' : '/operations/timesheets';
             $this->addAttention($worker ? 'Timesheets to finish' : 'Timesheets ready for review', $pending, $sheetHref);
             $this->blocks['lead-approvals'] = $this->ready('Current timesheet queue', $sheetHref, [['label' => 'Timesheets', 'value' => $pending]], $pending);
             if ($worker) {
-                $this->metrics[] = ['label' => 'Timesheet', 'value' => $pending, 'caption' => 'Drafts and returns ready for your review', 'href' => $sheetHref];
+                $this->metrics[] = ['label' => 'Timesheet', 'value' => $pending, 'caption' => 'Drafts and returns to review', 'href' => $sheetHref];
             }
         }
         if (! $worker && ($this->user->canDo('incidents.viewAny') || $this->user->canDo('incidents.viewAssigned'))) {
-            $incidents = $scope->incidents($this->user)->whereHas('client', fn ($q) => $q->whereIn('site_id', $this->siteIds));
+            $incidents = $this->siteAccess->applyClientIncidentScope($scope->incidents($this->user), $this->user, ['sites.viewAll', 'incidents.manage'])
+                ->whereHas('client', fn ($q) => $q->whereIn('site_id', $this->siteIds));
             if (! $this->user->canDo('incidents.viewAny')) {
                 $incidents->whereIn('client_id', $this->user->assignedClients()->select('clients.id'));
             }
@@ -405,7 +442,7 @@ final class OverviewData
                 $this->blocks['distribution']['footnote'] = 'Live incident actions · due in selected period';
                 $this->metrics[2] = ['label' => 'Follow-ups closed', 'value' => $done, 'total' => $all, 'caption' => ($all - $done).' still open in this period', 'instrument' => 'donut', 'instrumentCaption' => 'Recorded complete', 'href' => '/incidents'];
                 $due = (clone $followups)->whereNull('completed_at')->whereNotNull('due_at')->where('due_at', '<', now()->addDays(14))->orderBy('due_at')->limit(6)->get(['id', 'due_at']);
-                $this->blocks['agenda'] = $this->ready('Incident follow-ups · overdue and next 14 days', '/incidents', $due->map(fn ($row) => ['label' => 'Incident follow-up review', 'date' => $row->due_at->toIso8601String(), 'detail' => 'Open the permitted incident for its owner and context', 'status' => $row->due_at->isPast() ? 'Overdue' : 'Upcoming', 'tone' => $row->due_at->isPast() ? 'warning' : 'neutral', 'href' => '/incidents'])->all());
+                $this->blocks['agenda'] = $this->ready('Incident follow-ups · overdue and next 14 days', '/incidents', $due->map(fn ($row) => ['label' => 'Incident follow-up review', 'date' => $row->due_at->toIso8601String(), 'detail' => 'Open the incident for its owner and context', 'status' => $row->due_at->isPast() ? 'Overdue' : 'Upcoming', 'tone' => $row->due_at->isPast() ? 'warning' : 'neutral', 'href' => '/incidents'])->all());
                 $this->blocks['agenda']['title'] = 'Decisions and reviews';
                 $this->blocks['agenda']['footnote'] = 'Next review dates · includes overdue work';
             }
@@ -440,7 +477,7 @@ final class OverviewData
             ->get(['starts_at', 'ends_at']);
         $hours = round($week->sum(fn ($shift) => max(0, $shift->starts_at->diffInMinutes($shift->ends_at)) / 60), 1);
         $this->metrics = [
-            ['label' => 'Shift tasks', 'value' => $done, 'display' => $done.' of '.$total, 'instrument' => 'bar', 'percent' => $total ? round($done / $total * 100) : null, 'caption' => $total ? ($total - $done).' still to do today' : 'No tasks recorded on your shifts today', 'href' => '/my-day'],
+            ['label' => 'Shift tasks', 'value' => $done, 'display' => $done.' of '.$total, 'instrument' => 'bar', 'percent' => $total ? round($done / $total * 100) : null, 'caption' => $total ? ($total - $done).' still to do today' : 'No tasks on your shifts today', 'href' => '/my-day'],
             ['label' => 'This week', 'value' => $hours, 'display' => $hours.'h', 'caption' => $week->count().' scheduled shifts · before breaks', 'href' => '/my-calendar'],
         ];
         $first = $this->blocks['focus']['rows'][0] ?? null;
@@ -486,7 +523,7 @@ final class OverviewData
         $this->blocks['sites'] += ['title' => 'Site performance', 'presentation' => 'delivery', 'footnote' => 'Ended shifts only · cancelled shifts excluded'];
         $this->metrics = [
             ['label' => 'Service delivery', 'value' => $percent, 'display' => $percent === null ? '—' : $percent.'%', 'instrument' => 'bar', 'percent' => $percent, 'caption' => $planned ? $completed.' of '.$planned.' ended shifts completed' : 'No ended shifts in this period', 'href' => $href],
-            ['label' => 'Sites in view', 'value' => count($this->siteIds), 'caption' => 'Your permitted sites', 'href' => $href],
+            ['label' => 'Sites in view', 'value' => count($this->siteIds), 'caption' => 'Sites you can see', 'href' => $href],
             ['label' => 'Follow-ups closed', 'value' => null, 'caption' => 'Incident review permission required', 'target' => 'attention'],
         ];
     }
@@ -543,14 +580,14 @@ final class OverviewData
             $this->addAttention('Other incident reviews', (clone $query)->whereNotIn('severity', ['high', 'critical'])->count(), '/incidents?tab=review', 'neutral');
             $sources++;
             $rows = $rows->concat($query->orderByRaw("CASE WHEN severity IN ('high', 'critical') THEN 0 ELSE 1 END")->orderBy('submitted_at')->orderBy('id')->limit(6)->get(['id', 'severity', 'submitted_at'])
-                ->map(fn ($incident) => ['label' => 'Incident #'.$incident->id.' review', 'detail' => 'Submitted for review · open the permitted record for context', 'status' => Str::headline($incident->severity).' severity', 'tone' => in_array($incident->severity, ['high', 'critical'], true) ? 'critical' : 'neutral', 'href' => '/incidents/'.$incident->id, 'sort' => $incident->submitted_at?->toIso8601String() ?? '', 'priority' => in_array($incident->severity, ['high', 'critical'], true) ? 0 : 2]));
+                ->map(fn ($incident) => ['label' => 'Incident #'.$incident->id.' review', 'detail' => 'Submitted for review · open the record for context', 'status' => Str::headline($incident->severity).' severity', 'tone' => in_array($incident->severity, ['high', 'critical'], true) ? 'critical' : 'neutral', 'href' => '/incidents/'.$incident->id, 'sort' => $incident->submitted_at?->toIso8601String() ?? '', 'priority' => in_array($incident->severity, ['high', 'critical'], true) ? 0 : 2]));
         }
         $reviews = $rows->sortBy([['priority', 'asc'], ['sort', 'asc']])->take(6)->map(fn ($row) => array_diff_key($row, ['priority' => true, 'sort' => true]))->values()->all();
         $this->blocks['attention']['reviews'] = $reviews;
         $this->blocks['attention']['reviewTotal'] = $total;
         $this->blocks['attention']['reviewQueues'] = array_values(array_filter($queues, fn ($queue) => $queue['value'] > 0));
         $this->blocks['focus'] = $this->ready('Specific requests you can open and review', '/dashboard', array_slice($reviews, 0, 1), $total);
-        $this->blocks['focus'] += ['title' => 'Your decision queue', 'actionLabel' => 'Review decision queue', 'actionTarget' => 'attention', 'headline' => $total.' '.($total === 1 ? 'review' : 'reviews'), 'focusTag' => 'Ready for review', 'focusMeta' => [$sources.' permitted review '.Str::plural('queue', $sources), count($this->siteIds).' '.Str::plural('site', count($this->siteIds)).' in view'], 'empty' => $sources ? 'No submitted decisions are waiting in your permitted queues.' : 'Review permissions are required to see decision requests.'];
+        $this->blocks['focus'] += ['title' => 'Your decision queue', 'actionLabel' => 'Review decision queue', 'actionTarget' => 'attention', 'headline' => $total ? $total.' '.($total === 1 ? 'review' : 'reviews') : 'Nothing to review', 'focusTag' => 'Ready for review', 'focusMeta' => [$sources.' review '.Str::plural('queue', $sources), count($this->siteIds).' '.Str::plural('site', count($this->siteIds)).' in view'], 'empty' => $sources ? 'No submitted decisions are waiting for your review.' : 'Review permissions are required to see decision requests.'];
         if (! $sources) {
             $this->blocks['focus']['state'] = 'restricted';
             $this->blocks['focus']['message'] = $this->blocks['focus']['empty'];
@@ -582,22 +619,24 @@ final class OverviewData
         $this->blocks['distribution'] = $this->ready('Assigned positions against recorded staffing requirements', $href, [['label' => 'Assigned', 'value' => $assigned ?? 0], ['label' => 'Unfilled', 'value' => max(0, ($need ?? 0) - ($assigned ?? 0))]], $need ?? 0);
         $this->blocks['distribution'] += ['title' => 'Today’s shift coverage', 'footnote' => 'Role gaps are highlighted on the coverage board'];
         if ($coverage['unassessed']) {
-            $this->blocks['distribution'] = ['state' => 'unavailable', 'subtitle' => 'Coverage needs review', 'message' => 'Some contributing roster records could not be assessed in your permitted view.', 'rows' => [], 'series' => [], 'total' => null];
+            $this->blocks['distribution'] = ['state' => 'unavailable', 'subtitle' => 'Coverage needs review', 'message' => 'Some contributing roster records could not be assessed with your access.', 'rows' => [], 'series' => [], 'total' => null];
         }
         $scope = app(OperationsDashboardScopeService::class);
         $dutyShifts = $scope->shifts($this->user)->whereIn('site_id', $this->siteIds)
             ->where('status', 'in_progress')->where('actual_starts_at', '<=', now())->whereNull('actual_ends_at');
         $onDuty = (clone $dutyShifts)->distinct()->count('user_id');
         $dutyBySite = (clone $dutyShifts)->select('site_id')->selectRaw('COUNT(DISTINCT user_id) AS aggregate')->groupBy('site_id')->pluck('aggregate', 'site_id');
-        $initials = $scope->staff($this->user)->whereIn('users.id', (clone $dutyShifts)->select('user_id'))->orderBy('name')->limit(3)->pluck('name')
+        $onDutyStaff = $scope->staff($this->user)->whereIn('users.id', (clone $dutyShifts)->select('user_id'))->orderBy('name')->limit(3)->get(['users.id', 'users.name']);
+        $initials = $onDutyStaff->pluck('name')
             ->map(fn ($name) => collect(preg_split('/\s+/u', trim($name)))->filter()->take(2)->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))->implode(''))->all();
+        $people = $onDutyStaff->map(fn ($staff) => ['id' => $staff->id, 'name' => $staff->name, 'detail' => 'On shift now'])->all();
         $this->metrics = [
             ['label' => 'Shift coverage', 'value' => $known ? $assigned : null, 'display' => $known ? $assigned.' / '.$need : '—', 'instrument' => 'bar', 'percent' => $known ? round($assigned / $need * 100) : null, 'caption' => ! $known ? ($coverage['unassessed'] ? 'Some coverage cannot be assessed' : 'No staffing requirements recorded') : ($coverage['gaps'] ? $coverage['gaps'].' windows need staffing review' : 'Assigned positions / recorded requirements'), 'href' => $href],
-            ['label' => 'On duty', 'value' => $onDuty, 'caption' => 'Started shifts · not yet ended', 'avatars' => $initials, 'href' => $href],
+            ['label' => 'On duty', 'value' => $onDuty, 'caption' => 'Started shifts · not yet ended', 'avatars' => $initials, 'people' => $people, 'href' => $href],
         ];
         $this->addAttention('Staffing windows need cover', $coverage['gaps'], $href, 'critical', 'Review the gaps and role cover shown on your coverage board.');
         if ($coverage['unassessed']) {
-            $this->addAttention('Coverage needs assessment', $coverage['unassessed'], $href, 'warning', 'Some roster records are outside the permitted assessment boundary.');
+            $this->addAttention('Coverage needs assessment', $coverage['unassessed'], $href, 'warning', 'Some roster records are outside what you can assess.');
         }
         $this->blocks['sites'] = $this->ready('Current staffing, upcoming handovers and open incident actions', $href, collect($coverage['rows'])->map(function ($site) use ($dutyBySite) {
             $windows = collect($site['cells'])->flatten(1);
@@ -642,7 +681,10 @@ final class OverviewData
         $href = '/operations/handovers';
         $this->blocks['lead-handover'] = $this->ready('Recorded handovers · next 14 days', $href, $rows, $handovers->count());
         $this->blocks['focus'] = $this->ready('Next recorded handover across your teams', $href, array_slice($rows, 0, 1));
-        $this->blocks['focus'] += ['title' => 'The next handover', 'focusTag' => 'Handover', 'actionLabel' => 'Review handover', 'empty' => 'No upcoming handover is recorded in your permitted view.'];
+        $this->blocks['focus'] += ['title' => 'The next handover', 'focusTag' => 'Handover', 'actionLabel' => 'Review handover', 'emptyActionLabel' => 'Open handovers', 'empty' => 'No handover is recorded for your teams in the next 14 days.'];
+        if (! $rows) {
+            $this->blocks['focus']['headline'] = 'No handover due';
+        }
         $this->blocks['agenda'] = $this->ready('Upcoming recorded handovers and rostered shifts', $href, collect([...$rows, ...($this->blocks['agenda']['rows'] ?? [])])->sortBy('date')->take(6)->values()->all());
     }
 
@@ -652,7 +694,7 @@ final class OverviewData
         $count = (clone $query)->count();
         $href = $this->user->canDo('hr.employees.viewAny') ? '/hr/employees' : '/hr/analytics';
         $this->metrics = [
-            ['label' => 'Active workforce', 'value' => $count, 'caption' => 'Current approved staff · primary site', 'href' => $href],
+            ['label' => 'Active workforce', 'value' => $count, 'caption' => 'Approved staff · primary site', 'href' => $href],
             ['label' => 'Training current', 'value' => null, 'caption' => 'Compliance permission required', 'href' => $href],
             ['label' => 'Open vacancies', 'value' => null, 'caption' => 'Recruitment permission required', 'href' => $href],
         ];
@@ -669,9 +711,9 @@ final class OverviewData
         }
         $this->blocks['trend'] = $this->ready('Recorded employment dates · selected period', $href, [], $count, $series);
         $this->blocks['trend'] += ['title' => 'Workforce movement', 'seriesLabel' => 'Headcount', 'footnote' => 'Retained employment dates · future dates not measured'];
-        $probation = (clone $query)->whereNotNull('probation_end_date')->whereBetween('probation_end_date', [today(), today()->addDays(30)]);
+        $probation = (clone $query)->whereNotNull('probation_end_date')->whereBetween('probation_end_date', [$this->localToday()->toDateString(), $this->localToday()->addDays(30)->toDateString()]);
         $n = (clone $probation)->count();
-        $rows = $probation->orderBy('probation_end_date')->limit(6)->get(['id', 'probation_end_date'])->map(fn ($p) => ['label' => 'Probation review', 'date' => $p->probation_end_date->toDateString(), 'detail' => 'Open the permitted employee record for detail', 'href' => $href])->all();
+        $rows = $probation->orderBy('probation_end_date')->limit(6)->get(['id', 'probation_end_date'])->map(fn ($p) => ['label' => 'Probation review', 'date' => $p->probation_end_date->toDateString(), 'detail' => 'Open the employee record for detail', 'href' => $href])->all();
         $this->blocks['hr-probation'] = $this->ready('Reviews due in the next 30 days', $href, $rows, $n);
         $this->blocks['agenda'] = $this->blocks['hr-probation'];
         $this->blocks['agenda']['title'] = 'People deadlines';
@@ -681,7 +723,7 @@ final class OverviewData
     private function mergePeopleDeadlines(array $rows): void
     {
         $all = collect([...($this->blocks['agenda']['rows'] ?? []), ...$rows])->filter(fn ($row) => ! empty($row['date']))->sortBy('date')->values();
-        $this->blocks['agenda'] = $this->ready('Next recorded people deadlines · your permitted records', null, $all->take(6)->all(), $all->count());
+        $this->blocks['agenda'] = $this->ready('Next recorded people deadlines · your records', null, $all->take(6)->all(), $all->count());
         $this->blocks['agenda']['title'] = 'People deadlines';
     }
 
@@ -701,7 +743,7 @@ final class OverviewData
         $stages = ['New' => ['new'], 'Screening' => ['screening'], 'Interview' => ['interview_scheduled', 'interview_completed'], 'References' => ['reference_check'], 'Offer' => ['offer_pending', 'offer_sent'], 'Joining' => ['offer_accepted', 'onboarding']];
         $href = '/hr/recruitment?tab=board';
         $rows = collect($stages)->map(fn ($keys, $label) => ['label' => $label, 'value' => collect($keys)->sum(fn ($key) => (int) ($counts[$key] ?? 0)), 'href' => $href])->values()->all();
-        $this->blocks['sites'] = $this->ready('Active candidates · your permitted sites', $href, $rows, array_sum(array_column($rows, 'value')));
+        $this->blocks['sites'] = $this->ready('Active candidates · your sites', $href, $rows, array_sum(array_column($rows, 'value')));
         $this->blocks['sites'] += ['title' => 'Recruitment pipeline', 'presentation' => 'pipeline', 'footnote' => 'Current stage · each candidate counted once'];
         $this->blocks['hr-recruitment-sources'] = $this->ready('Active candidates by recorded source', '/hr/recruitment?tab=analytics', $this->groups($candidates, 'source'), (clone $candidates)->count());
         $vacancies = $access->visibleRequisitions($this->user)->whereIn('site_id', $this->siteIds)->where('status', 'published');
@@ -735,7 +777,7 @@ final class OverviewData
         $count = $profiles->count();
         $href = '/hr/onboarding';
         $this->blocks['focus'] = $this->ready('Starting over the next 14 days', $href, $count ? [['label' => 'Starting over the next 14 days', 'detail' => 'Open onboarding for the people, owners and remaining steps.', 'href' => $href]] : [], $count);
-        $this->blocks['focus'] += ['title' => 'Joining the team', 'headline' => $count.' new '.($count === 1 ? 'starter' : 'starters'), 'focusTag' => 'Onboarding', 'focusMeta' => [$complete.' '.Str::plural('checklist', $complete).' complete', ($count - $complete).' '.($count - $complete === 1 ? 'needs' : 'need').' preparation'], 'actionLabel' => 'Review onboarding', 'empty' => 'No new starters are recorded in the next 14 days.'];
+        $this->blocks['focus'] += ['title' => 'Joining the team', 'headline' => $count ? $count.' new '.($count === 1 ? 'starter' : 'starters') : 'No new starters', 'emptyActionLabel' => 'Open onboarding', 'focusTag' => 'Onboarding', 'focusMeta' => [$complete.' '.Str::plural('checklist', $complete).' complete', ($count - $complete).' '.($count - $complete === 1 ? 'needs' : 'need').' preparation'], 'actionLabel' => 'Review onboarding', 'empty' => 'No new starters are recorded in the next 14 days.'];
         $this->addAttention('New starters need onboarding', $count - $complete, $href, 'warning');
         $this->mergePeopleDeadlines($profiles->sortBy('start_date')->take(6)->map(fn ($profile) => ['label' => 'New starter begins', 'date' => $profile->start_date->toDateString(), 'status' => 'Start date', 'href' => $href])->all());
     }
@@ -756,7 +798,7 @@ final class OverviewData
             $this->addAttention('Leave requests awaiting review', $pending, $href);
             if ($this->role === 'lead') {
                 $approvalRows = $this->blocks['lead-approvals']['state'] === 'ready' ? $this->blocks['lead-approvals']['rows'] : [];
-                $this->blocks['lead-approvals'] = $this->ready('Current permitted approval queues', null, [...$approvalRows, ['label' => 'Leave requests', 'value' => $pending, 'href' => $href]], array_sum(array_column($approvalRows, 'value')) + $pending);
+                $this->blocks['lead-approvals'] = $this->ready('Current approval queues', null, [...$approvalRows, ['label' => 'Leave requests', 'value' => $pending, 'href' => $href]], array_sum(array_column($approvalRows, 'value')) + $pending);
             }
         }
         $rows = (clone $query)->where('ends_at', '>=', now())->orderBy('starts_at')->limit(6)->get(['id', 'starts_at', 'ends_at', 'status'])
@@ -815,7 +857,7 @@ final class OverviewData
         $rows = collect($counts)->map(fn ($value, $label) => ['label' => $label, 'value' => $value])->values()->all();
         $this->blocks['distribution'] = $this->ready('Staff with all applicable training requirements current', '/hr/compliance', $rows, $total);
         $this->blocks['distribution'] += ['title' => 'Mandatory training', 'footnote' => 'Each staff member counted once', 'measurementKnown' => $configured > 0];
-        $this->metrics[1] = ['label' => 'Training current', 'value' => $configured ? $counts['Current'] : null, 'total' => $configured ? $total : 0, 'display' => $configured ? round($counts['Current'] / $total * 100).'%' : '—', 'instrumentCaption' => $configured ? $counts['Current'].' of '.$total.' staff' : 'Not assessed', 'caption' => $counts['Not configured'] ? $counts['Not configured'].' '.($counts['Not configured'] === 1 ? 'staff member has' : 'staff have').' no training requirements set' : 'All applicable training requirements', 'href' => '/hr/compliance'];
+        $this->metrics[1] = ['label' => 'Training current', 'value' => $configured ? $counts['Current'] : null, 'total' => $configured ? $total : 0, 'display' => $configured ? round($counts['Current'] / $total * 100).'%' : '—', 'instrumentCaption' => $configured ? $counts['Current'].' of '.$total.' staff' : 'Not assessed', 'caption' => $counts['Not configured'] ? $counts['Not configured'].' '.($counts['Not configured'] === 1 ? 'staff member has' : 'staff have').' no requirements set' : 'All applicable training requirements', 'href' => '/hr/compliance'];
         $this->addAttention('Staff training needs follow-up', $counts['Needs follow-up'], '/hr/compliance', 'warning');
         $this->blocks['hr-documents'] = $this->ready('Upcoming compliance requirement renewals', '/hr/compliance', collect($renewals)->sortBy('date')->take(6)->values()->all(), count($renewals));
         $this->mergePeopleDeadlines($renewals);
@@ -837,7 +879,7 @@ final class OverviewData
             $this->blocks['agenda']['subtitle'] = 'Your shifts and learning deadlines · includes overdue learning';
             $this->blocks['agenda']['footnote'] = 'Next 14 days · personal learning is across sites';
         }
-        $this->blocks['worker-contacts'] = $this->ready('Your permitted support workspaces', null, [
+        $this->blocks['worker-contacts'] = $this->ready('Your support workspaces', null, [
             ['label' => 'Team directory', 'detail' => 'Find current colleagues in your approved sites', 'href' => '/hr/my/directory'],
             ...($this->user->canDo('it.request') ? [['label' => 'IT service desk', 'detail' => 'Ask for device, login or connection help', 'href' => '/it']] : []),
         ]);
@@ -872,8 +914,10 @@ final class OverviewData
         $urgent = (clone $open)->where('priority', 'urgent')->count();
         $unassigned = (clone $open)->whereNull('assigned_to_user_id')->count();
         $this->addAttention('Urgent support work', $urgent, $href.'&ticket_priority=urgent', 'critical');
-        $this->addAttention('Tickets needing an owner', $unassigned, '/it?tab=tickets&view=unassigned', 'warning');
-        $this->metrics[] = ['label' => 'Open tickets', 'value' => $n, 'caption' => 'Current permitted service work', 'href' => $href];
+        // Urgent tickets are already counted above; each ticket counts once.
+        $needsOwner = (clone $open)->whereNull('assigned_to_user_id')->where(fn ($q) => $q->whereNull('priority')->orWhere('priority', '!=', 'urgent'))->count();
+        $this->addAttention('Tickets needing an owner', $needsOwner, '/it?tab=tickets&view=unassigned', 'warning');
+        $this->metrics[] = ['label' => 'Open tickets', 'value' => $n, 'caption' => 'Open service work you can see', 'href' => $href];
         $this->metrics[] = ['label' => 'Devices reporting', 'value' => null, 'instrument' => 'bar', 'display' => '—', 'caption' => 'Device monitoring permission required'];
         $sla = app(ItSlaReadService::class);
         $due = $this->period(clone $query, 'first_response_due_at')->where('first_response_due_at', '<=', $sla->evaluatedAt());
@@ -882,7 +926,7 @@ final class OverviewData
         $measured = $met + ($outcomes['breached'] ?? 0);
         $this->metrics[] = ['label' => 'Response target', 'value' => $measured ? $met : null, 'total' => $measured,
             'display' => $measured ? round($met / $measured * 100).'%' : '—', 'instrumentCaption' => $measured ? $met.' of '.$measured.' on time' : 'No measured deadlines',
-            'caption' => 'First responses due so far · selected period', 'href' => '/it'];
+            'caption' => 'First responses due so far', 'href' => '/it'];
         $waiting = (clone $open)->whereNotNull('assigned_to_user_id')->where('status', 'waiting')->count();
         $this->blocks['distribution'] = $this->ready('Current open work · each ticket counted once', $href, [
             ['label' => 'In progress', 'value' => $n - $waiting - $unassigned], ['label' => 'Waiting', 'value' => $waiting], ['label' => 'Unassigned', 'value' => $unassigned],
@@ -904,8 +948,11 @@ final class OverviewData
         $deadline = $confirmedResponse && ! $next->first_responded_at && ($clock['state'] ?? 'unmeasured') !== 'unmeasured' ? $clock['due_at'] : null;
         $rows = $next ? [['label' => $next->reference ?: 'Support request', 'date' => $deadline, 'status' => Str::headline($next->priority),
             'detail' => $deadline ? 'First response deadline · '.Str::headline($clock['state']) : ($confirmedResponse ? 'Awaiting IT · no measured next-response deadline' : 'Check who needs to respond next · responsibility not recorded'), 'href' => '/it/tickets/'.$next->id]] : [];
-        $this->blocks['focus'] = $this->ready('Awaiting IT · measured first-response deadlines first', $href, $rows);
-        $this->blocks['focus'] += ['title' => 'Your next response', 'actionLabel' => 'Review support request', 'focusTag' => $next ? Str::headline($next->priority) : 'Response queue'];
+        $this->blocks['focus'] = $this->ready('Awaiting IT · soonest response deadline first', $href, $rows);
+        $this->blocks['focus'] += ['title' => 'Your next response', 'actionLabel' => 'Review support request', 'emptyActionLabel' => 'Open service desk', 'focusTag' => $next ? Str::headline($next->priority) : 'Response queue', 'empty' => 'No support requests are waiting for an IT response.'];
+        if (! $next) {
+            $this->blocks['focus']['headline'] = 'No responses due';
+        }
         if ($next && ! $deadline) {
             $this->blocks['focus']['headline'] = $confirmedResponse ? 'Response needed' : 'Review needed';
         }
@@ -914,6 +961,14 @@ final class OverviewData
         $planned = (clone $changes)->with('ticket:id,reference')->orderBy('maintenance_starts_at')->limit(6)->get()->map(fn ($change) => [
             'label' => ($change->ticket->reference ?: 'IT change').' · planned change', 'date' => $change->maintenance_starts_at->toIso8601String(), 'end' => $change->maintenance_ends_at?->toIso8601String(),
             'status' => Str::headline($change->change_type), 'href' => '/it/changes/'.$change->id,
+            // Restricted changes keep their risk out of the overview.
+            'actionLabel' => 'Open change', 'facts' => array_values(array_filter([
+                ['label' => 'Request', 'value' => $change->ticket->reference ?: 'Not recorded'],
+                ['label' => 'Change type', 'value' => Str::headline($change->change_type)],
+                ! $change->is_restricted && $change->risk_level ? ['label' => 'Risk', 'value' => Str::headline($change->risk_level)] : null,
+                ['label' => 'Starts', 'dateTime' => $change->maintenance_starts_at->toIso8601String()],
+                ['label' => 'Ends', 'dateTime' => $change->maintenance_ends_at?->toIso8601String(), 'value' => $change->maintenance_ends_at ? null : 'Not recorded'],
+            ])),
         ])->all();
         $this->blocks['agenda'] = $this->ready('Scheduled changes · next 30 days', '/it/changes', $planned, (clone $changes)->count());
         $this->blocks['agenda']['title'] = 'Planned IT work';
@@ -949,7 +1004,7 @@ final class OverviewData
         $total = $devices->count();
         $known = $canMonitor && $total > 0;
         $this->metrics[1] = ['label' => 'Devices reporting', 'value' => $known ? $reporting : null, 'instrument' => 'bar', 'display' => $known ? round($reporting / $total * 100).'%' : '—',
-            'percent' => $known ? round($reporting / $total * 100) : null, 'caption' => $canMonitor ? $reporting.' of '.$total.' deployed devices have fresh observations' : 'Monitoring permission required', 'href' => '/security-devices'];
+            'percent' => $known ? round($reporting / $total * 100) : null, 'caption' => $canMonitor ? $reporting.' of '.$total.' devices reporting recently' : 'Monitoring permission required', 'href' => '/security-devices'];
         $rows = collect($this->sites)->whereIn('id', $this->siteIds)->map(function ($site) use ($devicesBySite, $freshness, $canMonitor, $history) {
             $items = $devicesBySite[$site['id']];
             $fresh = $items->filter(fn ($device) => ($freshness[$device->id] ?? null) === 'fresh')->count();
@@ -959,11 +1014,16 @@ final class OverviewData
 
             return ['label' => $site['name'], 'value' => $items->count(), 'status' => $unknown ? 'Not assessed' : ($attention || $fresh < $items->count() ? 'Needs attention' : 'Reporting'),
                 'tone' => $critical ? 'critical' : (! $unknown && ($attention || $fresh < $items->count()) ? 'warning' : 'neutral'),
-                'detail' => $canMonitor ? $fresh.' reporting · '.$items->count().' deployed '.Str::plural('device', $items->count()) : 'Device monitoring permission required', 'history' => $history[$site['id']] ?? null, 'href' => '/security-devices/sites/'.$site['id']];
+                'detail' => $canMonitor ? $fresh.' reporting · '.$items->count().' deployed '.Str::plural('device', $items->count()) : 'Device monitoring permission required', 'history' => $history[$site['id']] ?? null, 'href' => '/security-devices/sites/'.$site['id'],
+                'actionLabel' => 'Open site devices', 'facts' => $canMonitor ? [
+                    ['label' => 'Deployed devices', 'value' => (string) $items->count()],
+                    ['label' => 'Reporting recently', 'value' => (string) $fresh],
+                    ['label' => 'Needing attention', 'value' => (string) $items->filter(fn ($device) => in_array($device->health_status?->value, ['critical', 'warning', 'unknown'], true) || $device->status?->value !== 'active')->count()],
+                ] : null];
         })->values()->all();
-        $this->blocks['sites'] = $this->ready('Current device observations · permitted sites', '/security-devices', $rows, $total);
+        $this->blocks['sites'] = $this->ready('Current device observations · your sites', '/security-devices', $rows, $total);
         $this->blocks['sites'] += ['title' => 'Service health', 'presentation' => 'service-health', 'footnote' => 'Recorded connectivity checks · 24 hourly windows · current hour partial'];
-        $this->blocks['it-assets'] = $this->ready('Deployed devices · permitted site assignments', '/security-devices/devices', $devices->groupBy(fn ($device) => $device->status->value)->map(fn ($items, $status) => ['label' => Str::headline($status), 'value' => $items->count()])->values()->all(), $total);
+        $this->blocks['it-assets'] = $this->ready('Deployed devices · site assignments', '/security-devices/devices', $devices->groupBy(fn ($device) => $device->status->value)->map(fn ($items, $status) => ['label' => Str::headline($status), 'value' => $items->count()])->values()->all(), $total);
         $this->blocks['it-inventory'] = $this->ready('Deployed devices by category', '/security-devices/devices', $devices->groupBy('category')->map(fn ($items, $category) => ['label' => Str::headline($category ?: 'Not recorded'), 'value' => $items->count()])->values()->all(), $total);
         if ($canMonitor) {
             $this->addAttention('Devices need a fresh observation', $total - $reporting, '/security-devices', 'warning');
@@ -1022,6 +1082,14 @@ final class OverviewData
                 'label' => $risk->title, 'detail' => $risk->riskOwner?->name ?: 'Owner not assigned', 'date' => $risk->next_review_date?->toDateString(),
                 'status' => $risk->isCritical() ? 'Critical' : ($risk->isHigh() ? 'High' : ($risk->isMedium() ? 'Medium' : 'Low')),
                 'tone' => $risk->isCritical() ? 'critical' : ($risk->isHigh() ? 'warning' : 'neutral'), 'href' => '/governance/risks/'.$risk->id,
+                'actionLabel' => 'Open risk', 'facts' => array_values(array_filter([
+                    $risk->risk_reference ? ['label' => 'Reference', 'value' => $risk->risk_reference] : null,
+                    $risk->category ? ['label' => 'Category', 'value' => Str::headline($risk->category)] : null,
+                    ['label' => 'Owner', 'value' => $risk->riskOwner?->name ?: 'Not assigned'],
+                    $risk->residual_score !== null ? ['label' => 'Residual score', 'value' => $risk->residual_score.($risk->within_appetite === null ? '' : ($risk->within_appetite ? ' · within appetite' : ' · above appetite'))] : null,
+                    $risk->risk_committee ? ['label' => 'Committee', 'value' => Str::headline($risk->risk_committee)] : null,
+                    ['label' => 'Next review', 'date' => $risk->next_review_date?->toDateString(), 'value' => $risk->next_review_date ? null : 'Not scheduled'],
+                ])),
             ])->all();
             $riskSection = ['title' => 'Risks to watch', 'caption' => 'Current residual rating', 'state' => 'ready', 'rows' => $riskRows];
             $reviewRows = (clone $risks)->whereNotNull('next_review_date')->orderBy('next_review_date')->limit(6)->get()->map(fn ($risk) => ['label' => $risk->title, 'date' => $risk->next_review_date->toDateString(), 'status' => 'Risk review', 'href' => '/governance/risks/'.$risk->id])->all();
@@ -1033,7 +1101,7 @@ final class OverviewData
             $total = (clone $obligations)->count();
             $onTime = (clone $obligations)->onTime($today)->count();
             $this->metrics[1] = ['label' => 'Obligations on time', 'value' => $total ? $onTime : null, 'display' => $total ? round($onTime / $total * 100).'%' : '—', 'instrument' => 'bar', 'percent' => $total ? round($onTime / $total * 100) : null,
-                'caption' => $onTime.' of '.$total.' complete or not overdue · selected period', 'href' => '/governance/compliance'];
+                'caption' => $onTime.' of '.$total.' on time this period', 'href' => '/governance/compliance'];
             $this->addAttention('Compliance obligations overdue', ComplianceObligation::query()->overdue($today)->count(), '/governance/compliance', 'warning');
             $exceptions = ComplianceObligation::query()->counted()->whereDate('due_date', '<=', ComplianceObligation::dueSoonUntil($today))
                 ->where(fn ($q) => $q->where(fn ($q) => $q->where('evidence_required', true)->where('evidence_provided', false))
@@ -1042,6 +1110,12 @@ final class OverviewData
                 'label' => $item->obligation_title, 'detail' => $item->owner?->name ?: 'Owner not assigned', 'date' => $item->due_date->toDateString(),
                 'status' => $item->evidence_required && ! $item->evidence_provided ? 'Awaiting evidence' : 'Awaiting sign-off',
                 'tone' => $item->due_date->toDateString() < $today ? 'critical' : 'warning', 'href' => '/governance/compliance/'.$item->id,
+                'actionLabel' => 'Open obligation', 'facts' => [
+                    ['label' => 'Owner', 'value' => $item->owner?->name ?: 'Not assigned'],
+                    ['label' => 'Due', 'date' => $item->due_date->toDateString()],
+                    ['label' => 'Evidence', 'value' => ! $item->evidence_required ? 'Not required' : ($item->evidence_provided ? 'Provided' : 'Still needed')],
+                    ['label' => 'Sign-off', 'value' => ! $item->sign_off_required ? 'Not required' : ($item->signed_off_at ? 'Signed off' : 'Still needed')],
+                ],
             ])->all();
             $evidenceSection = ['title' => 'Assurance evidence', 'caption' => 'Due within 30 days, including overdue', 'state' => 'ready', 'rows' => $evidenceRows];
             $this->blocks['governance-assurance'] = $this->ready('Required evidence and sign-off still outstanding', '/governance/compliance', $evidenceRows, (clone $exceptions)->count());
@@ -1062,6 +1136,12 @@ final class OverviewData
                 'label' => $goal->title, 'value' => $goal->progress_pct === null ? null : (float) $goal->progress_pct, 'target' => 100,
                 'status' => Str::headline($goal->status), 'tone' => $goal->status === 'at_risk' ? 'warning' : 'neutral',
                 'detail' => $goal->leadExecutive?->name ?: 'Owner not assigned', 'href' => '/governance/strategy/'.$goal->strategic_plan_id,
+                'actionLabel' => 'Open strategic plan', 'facts' => array_values(array_filter([
+                    ['label' => 'Lead', 'value' => $goal->leadExecutive?->name ?: 'Not assigned'],
+                    $goal->pillar ? ['label' => 'Pillar', 'value' => Str::headline($goal->pillar)] : null,
+                    $goal->timeframe ? ['label' => 'Timeframe', 'value' => Str::headline($goal->timeframe)] : null,
+                    ['label' => 'Recorded progress', 'value' => $goal->progress_pct === null ? 'Not recorded' : round((float) $goal->progress_pct).'%'],
+                ])),
             ])->all();
             $this->blocks['sites'] = $this->ready('Current approved plans · recorded progress', '/governance/strategy', $rows, (clone $goals)->count());
             $this->blocks['sites'] += ['title' => 'Strategic priorities', 'presentation' => 'priorities'];
@@ -1075,15 +1155,18 @@ final class OverviewData
         if ($this->user->canDo('governance.meetings.view')) {
             $meetingQuery = $access->scopeMeetings(GovernanceMeeting::query(), $this->user)->whereNotIn('status', ['cancelled', 'completed'])->where('scheduled_at', '>=', now());
             $meetings = (clone $meetingQuery)->orderBy('scheduled_at')->limit(6)->get();
-            $this->blocks['governance-committees'] = $this->ready('Upcoming permitted meetings · organisation-wide', '/governance/meetings', $meetings->map(fn ($m) => ['label' => $m->title, 'date' => $m->scheduled_at?->toIso8601String(), 'detail' => 'Open the meeting for papers and reports', 'href' => '/governance/meetings/'.$m->id])->all());
+            $this->blocks['governance-committees'] = $this->ready('Upcoming meetings · organisation-wide', '/governance/meetings', $meetings->map(fn ($m) => ['label' => $m->title, 'date' => $m->scheduled_at?->toIso8601String(), 'detail' => 'Open the meeting for papers and reports', 'href' => '/governance/meetings/'.$m->id])->all());
             $this->blocks['governance-committees']['title'] = 'Upcoming committee meetings';
             $next = (clone $meetingQuery)->where('meeting_type', 'board')->orderBy('scheduled_at')->first();
             $packs = $next ? $access->scopeBoardPacks(BoardPack::query(), $this->user)->where('governance_meeting_id', $next->id)->where('is_current', true)->count() : 0;
-            $this->blocks['focus'] = $this->ready('Next permitted board meeting', '/governance/meetings', $next ? [[
+            $this->blocks['focus'] = $this->ready('Next board meeting', '/governance/meetings', $next ? [[
                 'label' => $next->title, 'date' => $next->scheduled_at->toIso8601String(), 'end' => $next->duration_minutes ? $next->scheduled_at->copy()->addMinutes($next->duration_minutes)->toIso8601String() : null,
                 'detail' => $packs ? $packs.' board pack available in your view' : 'No board papers available in your view', 'href' => '/governance/meetings/'.$next->id,
             ]] : []);
-            $this->blocks['focus'] += ['title' => 'Next board meeting', 'focusTag' => 'Board preparation', 'actionLabel' => 'Open meeting', 'empty' => 'No upcoming board meeting is available in your permitted view.'];
+            $this->blocks['focus'] += ['title' => 'Next board meeting', 'focusTag' => 'Board preparation', 'actionLabel' => 'Open meeting', 'emptyActionLabel' => 'Open meetings', 'empty' => 'No board meeting is scheduled in your view yet.'];
+            if (! $next) {
+                $this->blocks['focus']['headline'] = 'No meeting scheduled';
+            }
             if ($next) {
                 $localMeeting = $next->scheduled_at->copy()->setTimezone($this->start->timezone);
                 $this->blocks['focus']['headline'] = $localMeeting->format('j F');
@@ -1094,7 +1177,7 @@ final class OverviewData
             }
             $calendar = [...$calendar, ...$meetings->map(fn ($meeting) => ['label' => $meeting->title, 'date' => $meeting->scheduled_at->toIso8601String(), 'status' => 'Meeting', 'href' => '/governance/meetings/'.$meeting->id])->all()];
         }
-        $this->blocks['agenda'] = $this->ready('Next permitted meetings, actions and obligations', '/governance/my-work', collect($calendar)->sortBy('date')->take(6)->values()->all());
+        $this->blocks['agenda'] = $this->ready('Next meetings, actions and obligations', '/governance/my-work', collect($calendar)->sortBy('date')->take(6)->values()->all());
         $this->blocks['agenda']['title'] = 'Governance calendar';
     }
 }

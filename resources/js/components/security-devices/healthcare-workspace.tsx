@@ -7,6 +7,7 @@ import {
 } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { ReviewRow } from '@/components/wizard/shell';
 import { formatDate, formatDateTime } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
@@ -171,11 +172,12 @@ function plural(value: number, singular: string, pluralLabel?: string): string {
 }
 
 function Metric({ children }: { children: ReactNode }) {
-    return (
-        <div className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm font-semibold">
-            {children}
-        </div>
-    );
+    const fact =
+        typeof children === 'string' ? children.match(/^(\d+)\s+(.+)$/) : null;
+    const label = fact
+        ? fact[2].replace(/^./, (character) => character.toUpperCase())
+        : 'Equipment';
+    return <ReviewRow label={label} value={fact ? fact[1] : children} />;
 }
 
 function Boundary({ data }: { data: HealthcareWorkspaceData['boundary'] }) {
@@ -239,7 +241,7 @@ function HealthcareOverview({ data }: { data: HealthcareWorkspaceData }) {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-0">
                         <Metric>{plural(inventory.total, 'device')}</Metric>
                         <Metric>
                             {plural(

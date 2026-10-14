@@ -290,8 +290,8 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->weeklyOn(1, '08:00');
 
-// HR calendar event reminders: every minute, fire any reminder whose lead time
-// lands in the last minute (de-duped via last_sent_at).
+// HR calendar reminders: stage durable per-recipient work, recover missed runs
+// and retry delivery while each event is still current.
 app(Schedule::class)
     ->command('hr:dispatch-calendar-reminders')
     ->everyMinute()
@@ -997,6 +997,22 @@ app(Schedule::class)->command('emar:expire-second-person-confirmations')->everyM
 app(Schedule::class)->call(fn () => app(PharmacyDispatchService::class)->recover())
     ->name('emar-pharmacy-dispatch-recovery')->everyMinute()->withoutOverlapping()->onOneServer();
 app(Schedule::class)->command('medications:chart-backups')->everyMinute()->withoutOverlapping()->onOneServer();
+
+// Native helper sign-in material has a bounded lifetime, including when Obli is disabled.
+app(Schedule::class)->command('obli:prune-sessions')->daily()->withoutOverlapping();
+
+Illuminate\Support\Facades\Schedule::command('endpoints:expire-remote-sessions')->everyMinute()->withoutOverlapping();
+
+// Sealed replies remain recoverable through token expiry, including lost replies.
+app(Schedule::class)->command('monitoring:prune-enrolment-recovery')
+    ->everyFiveMinutes()->withoutOverlapping()->name('monitoring.enrolment-recovery.prune');
+
+// Native attempt expiry is bookkeeping only; it never retries a computer action.
+app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
+
+// Media watchdogs enforce 15-second authority; this erases expired central signalling.
+Illuminate\Support\Facades\Schedule::command('cctv:expire-live-sessions')->everyMinute()->withoutOverlapping();
+
 // EA-188: 14-day reminders before prescriber access, identities and catalogue reviews end.
 app(Schedule::class)->command('medications:connected-expiry-reminders')->dailyAt('07:00')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 
@@ -1005,3 +1021,10 @@ Artisan::command('workforce:recover-eligibility-refresh', function () {
     $this->info((string) app(WorkforceEligibilityRefresh::class)->recover());
 })->purpose('Recover pending or interrupted workforce eligibility checks');
 app(Schedule::class)->command('workforce:recover-eligibility-refresh')->everyMinute()->withoutOverlapping();
+
+app(Schedule::class)->command('company-hub:deliver-notices')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+
+Artisan::command('company-hub:prune-search-insights', function () {
+    $this->info((string) app(\App\Domain\CompanyHub\Services\HubSearchInsights::class)->prune());
+})->purpose('Remove Company Hub search topic totals older than 90 calendar days');
+app(Schedule::class)->command('company-hub:prune-search-insights')->dailyAt('02:10')->timezone('Pacific/Auckland')->withoutOverlapping();

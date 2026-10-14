@@ -10,6 +10,7 @@ import { BlockContent } from './block-content';
 import {
     catalog,
     defaultBlocks,
+    fillRows,
     moveBlock,
     tidyBlocks,
     type OverviewProps,
@@ -69,7 +70,7 @@ const props = (): OverviewProps => ({
         metrics: [],
         urgent: [],
         partial: false,
-        scope: 'All permitted sites',
+        scope: 'All your sites',
         period: { start: '2026-10-12', end: '2026-10-12' },
         updatedAt: '2026-10-12T00:00:00Z',
     },
@@ -93,6 +94,11 @@ beforeEach(() => {
     );
 });
 afterEach(() => vi.unstubAllGlobals());
+/** Layout saves only (the editor also loads the block library with a GET). */
+const layoutWrites = () =>
+    vi
+        .mocked(fetch)
+        .mock.calls.filter(([url]) => String(url).startsWith('/dashboard/layout'));
 
 describe('overview arrangements', () => {
     it('shows independent progress measures without adding overlapping counts into a donut', () => {
@@ -224,7 +230,7 @@ describe('overview arrangements', () => {
         );
         expect(screen.queryByRole('link')).not.toBeInTheDocument();
     });
-    it('inspects measured zero and future unknown on count charts near the latest measured day', () => {
+    it('keeps measured zero apart from future unknown in the chart figures, with one row of dates', () => {
         const series = Array.from({ length: 31 }, (_, index) => ({
             label: `2026-10-${String(index + 1).padStart(2, '0')}`,
             value: index < 12 ? 0 : null,
@@ -244,15 +250,38 @@ describe('overview arrangements', () => {
                 }}
             />,
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Mon 12' }));
-        expect(screen.getByText(/Opened: 0 · Resolved: 0/)).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Tue 13' }));
+        // The chart itself is the date picker; no second row of date buttons.
         expect(
-            screen.getByText(/Opened: Not measured · Resolved: Not measured/),
-        ).toBeInTheDocument();
-        expect(
-            screen.queryByRole('button', { name: 'Sat 31' }),
+            screen.queryByRole('button', { name: /Mon 12/ }),
         ).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Select a date on the chart to see its figures.'),
+        ).toBeInTheDocument();
+        // The figures are a real table: a header row, then one row per date.
+        const table = screen.getByRole('table', {
+            name: /figures by date/,
+        });
+        expect(
+            within(table)
+                .getAllByRole('columnheader')
+                .map((th) => th.textContent),
+        ).toEqual(['Date', 'Opened', 'Resolved']);
+        const measured = within(table).getByRole('row', { name: /Mon 12 Oct/ });
+        expect(
+            within(measured)
+                .getAllByRole('cell')
+                .map((td) => td.textContent),
+        ).toEqual(['0', '0']);
+        const future = within(table).getByRole('row', { name: /Tue 13 Oct/ });
+        expect(
+            within(future)
+                .getAllByRole('cell')
+                .map((td) => td.textContent),
+        ).toEqual(['No data yet', 'No data yet']);
+        // No hidden keyboard stop inside the chart image.
+        expect(
+            document.querySelector('.ov-area [tabindex="0"]'),
+        ).toBeNull();
     });
     it('keeps team work destinations separate and library previews non-interactive', () => {
         const data = {
@@ -879,7 +908,8 @@ describe('overview arrangements', () => {
             screen.getByRole('region', { name: 'Needs attention' }),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-        expect(fetch).not.toHaveBeenCalled();
+        // Opening the editor loads the block library; nothing is written.
+        expect(layoutWrites()).toHaveLength(0);
         expect(
             screen.getByRole('button', { name: 'Edit layout' }),
         ).toBeInTheDocument();
@@ -908,7 +938,7 @@ describe('overview arrangements', () => {
                 screen.getByRole('button', { name: 'Edit layout' }),
             ).toBeInTheDocument(),
         );
-        const call = vi.mocked(fetch).mock.calls[0];
+        const call = layoutWrites()[0];
         expect(call[0]).toBe('/dashboard/layout/worker');
         const saved = JSON.parse(call[1]!.body as string);
         expect(saved.value.blocks).toHaveLength(7);
@@ -959,5 +989,269 @@ describe('overview arrangements', () => {
             screen.getByRole('button', { name: 'Save layout' }),
         ).toBeEnabled();
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+    });
+});
+
+describe('overview completion pass (13 Oct 2026)', () => {
+    const attention = (rows: OverviewProps['overview']['urgent']) => ({
+        state: 'ready' as const,
+        subtitle: 'Current priorities',
+        total: rows.length,
+        series: [],
+        rows,
+    });
+
+    it('calls only critical work urgent and leaves warnings in Needs attention', () => {
+        const p = props();
+        const warning = {
+            label: 'Timesheets to finish',
+            tone: 'warning' as const,
+            href: '/timesheets',
+        };
+        p.overview.urgent = [warning];
+        p.overview.blocks.attention = attention([warning]);
+        const { unmount } = render(<OverviewWorkspace {...p} />);
+        expect(screen.queryByText(/urgent item/)).not.toBeInTheDocument();
+        unmount();
+        const critical = {
+            label: 'Staffing gap needs escalation',
+            tone: 'critical' as const,
+            href: '/rostering',
+        };
+        p.overview.urgent = [critical, warning];
+        p.overview.blocks.attention = attention([critical, warning]);
+        render(<OverviewWorkspace {...p} />);
+        expect(screen.getByText('1 urgent item')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Review now/ }));
+        expect(screen.getByText('Also on your list')).toBeInTheDocument();
+    });
+
+    it('shows the next step and upcoming dates beside the full list in Needs attention', () => {
+        const { container } = render(<OverviewWorkspace {...props()} />);
+        fireEvent.click(screen.getByRole('tab', { name: /Needs attention/ }));
+        expect(
+            [...container.querySelectorAll('[data-block]')].map((el) =>
+                el.getAttribute('data-block'),
+            ),
+        ).toEqual(['attention', 'focus', 'agenda']);
+    });
+
+    it('widens the last block in each row so a filtered view has no holes', () => {
+        const blocks = [
+            { id: 'trend', span: 8, height: 120, site: 'page' },
+            { id: 'distribution', span: 4, height: 0, site: 'page' },
+            { id: 'sites', span: 8, height: 0, site: 'page' },
+            { id: 'a', span: 6, height: 0, site: 'page' },
+            { id: 'b', span: 4, height: 0, site: 'page' },
+        ];
+        expect(fillRows(blocks).map((b) => b.span)).toEqual([8, 4, 12, 6, 6]);
+        expect(fillRows(blocks).every((b) => b.height === 0)).toBe(true);
+        // Display only: the saved layout is untouched.
+        expect(blocks[2].span).toBe(8);
+    });
+
+    it('gives an empty focus card plain copy and a quiet route instead of a call to action', () => {
+        render(
+            <BlockContent
+                meta={catalog.lead.blocks.find((b) => b.id === 'focus')!}
+                data={{
+                    state: 'ready',
+                    subtitle: 'Next recorded handover',
+                    href: '/operations/handovers',
+                    headline: 'No handover due',
+                    empty: 'No handover is recorded for your teams in the next 14 days.',
+                    actionLabel: 'Review handover',
+                    emptyActionLabel: 'Open handovers',
+                    rows: [],
+                    series: [],
+                    total: 0,
+                }}
+            />,
+        );
+        expect(screen.getByText('No handover due')).toBeInTheDocument();
+        const link = screen.getByRole('link', { name: /Open handovers/ });
+        expect(link).toHaveAttribute('href', '/operations/handovers');
+        // The outline (secondary) Button, not the primary call to action.
+        expect(link.className).toContain('btn-soft-secondary');
+        expect(
+            screen.queryByRole('link', { name: /Review handover/ }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('opens read-only details for a row with facts and links on to its module', () => {
+        const p = props();
+        p.role = 'governance';
+        p.roles = ['governance'];
+        p.overview.blocks = Object.fromEntries(
+            catalog.governance.blocks.map((b) => [
+                b.id,
+                {
+                    state: 'ready',
+                    subtitle: 'Live',
+                    rows: [],
+                    series: [],
+                    total: 0,
+                },
+            ]),
+        );
+        p.overview.blocks.trend = {
+            state: 'ready',
+            subtitle: 'Risk and assurance',
+            presentation: 'assurance',
+            total: 1,
+            rows: [],
+            series: [],
+            sections: [
+                {
+                    title: 'Risks to watch',
+                    caption: 'Current residual rating',
+                    state: 'ready',
+                    rows: [
+                        {
+                            label: 'Service continuity',
+                            detail: 'Operations lead',
+                            status: 'High',
+                            tone: 'warning',
+                            href: '/governance/risks/7',
+                            actionLabel: 'Open risk',
+                            facts: [
+                                { label: 'Owner', value: 'Operations lead' },
+                                { label: 'Next review', date: '2026-10-20' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+        render(<OverviewWorkspace {...p} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: /Service continuity/ }),
+        );
+        const dialog = screen.getByRole('dialog', {
+            name: 'Service continuity',
+        });
+        expect(within(dialog).getByText('Owner')).toBeInTheDocument();
+        expect(within(dialog).getByText(/20 Oct/)).toBeInTheDocument();
+        expect(
+            within(dialog).getByRole('link', { name: /Open risk/ }),
+        ).toHaveAttribute('href', '/governance/risks/7');
+    });
+
+    it('sketches a block shape in the library instead of a bare zero', () => {
+        render(<OverviewWorkspace {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+        fireEvent.click(screen.getByRole('button', { name: /Add blocks/ }));
+        const dialog = screen.getByRole('dialog', {
+            name: 'Choose your blocks',
+        });
+        expect(dialog.querySelector('.ov-sketch')).not.toBeNull();
+        expect(
+            within(dialog).queryByText(/^0$/, { selector: 'strong' }),
+        ).not.toBeInTheDocument();
+    });
+});
+
+describe('overview audit fixes (14 Oct 2026)', () => {
+    const blockIds = (container: HTMLElement) =>
+        [...container.querySelectorAll('[data-block]')].map((el) =>
+            el.getAttribute('data-block'),
+        );
+
+    it('keeps Ctrl+Z working after removing a block moves focus off the board', () => {
+        const { container } = render(<OverviewWorkspace {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+        const before = blockIds(container);
+        const first = catalog.worker.blocks.find((b) => b.id === before[0])!;
+        fireEvent.click(
+            screen.getByRole('button', { name: `Remove ${first.title}` }),
+        );
+        expect(blockIds(container)).not.toContain(before[0]);
+        // The shortcut is heard from the page itself, not only inside the board.
+        fireEvent.keyDown(document.body, { key: 'z', ctrlKey: true });
+        expect(blockIds(container)).toEqual(before);
+    });
+
+    it('asks before Cancel throws away layout changes', () => {
+        const { container } = render(<OverviewWorkspace {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+        const before = blockIds(container);
+        const first = catalog.worker.blocks.find((b) => b.id === before[0])!;
+        fireEvent.click(
+            screen.getByRole('button', { name: `Remove ${first.title}` }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        const confirm = screen.getByRole('alertdialog', {
+            name: 'Discard your layout changes?',
+        });
+        fireEvent.click(
+            within(confirm).getByRole('button', { name: 'Keep editing' }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Save layout' }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard changes' }),
+        );
+        expect(
+            screen.queryByRole('button', { name: 'Save layout' }),
+        ).not.toBeInTheDocument();
+        expect(blockIds(container)).toEqual(before);
+    });
+
+    it('recovers from a save clash with another tab without a reload', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: false,
+            status: 409,
+            json: async () => ({
+                message:
+                    'This layout was changed in another tab. Your changes are still here.',
+                revision: 'newer-revision',
+                value: {
+                    blocks: [
+                        { id: 'attention', span: 12, height: 0, site: 'page' },
+                    ],
+                    copies: [],
+                    favorites: [],
+                    density: 'balanced',
+                    range: 'today',
+                },
+            }),
+        }));
+        vi.stubGlobal('fetch', fetchMock);
+        const { container } = render(<OverviewWorkspace {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save layout' }));
+        await waitFor(() =>
+            expect(screen.getByRole('alert')).toHaveTextContent(
+                'changed in another tab',
+            ),
+        );
+        // Keeping the draft sends the newer revision on the next save.
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Keep my changes' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save layout' }));
+        await waitFor(() => expect(layoutWrites()).toHaveLength(2));
+        const body = JSON.parse(
+            (layoutWrites()[1] as unknown as [string, RequestInit])[1]
+                .body as string,
+        );
+        expect(body.revision).toBe('newer-revision');
+        // Or adopt the other tab's layout outright.
+        await waitFor(() =>
+            expect(
+                screen.getByRole('button', {
+                    name: 'Use the other tab’s layout',
+                }),
+            ).toBeInTheDocument(),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Use the other tab’s layout' }),
+        );
+        expect(blockIds(container)).toEqual(['attention']);
+        expect(
+            screen.queryByRole('button', { name: 'Save layout' }),
+        ).not.toBeInTheDocument();
     });
 });

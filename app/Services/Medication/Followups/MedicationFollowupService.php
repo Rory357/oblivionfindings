@@ -55,11 +55,12 @@ final class MedicationFollowupService
         'covert_review' => 'Review covert authorisation',
         // eMAR audit Lane A3: a dose saved on a device that didn't reach the chart.
         'offline_review' => 'Dose saved on a device, not recorded',
+        'duplicate_supply' => 'Check for a duplicate supply',
     ];
 
     public const LEAD_TYPES = ['unconfirmed', 'partial', 'disputed', 'override', 'countersign', 'handover', 'reconciliation',
         'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review',
-        'offline_review'];
+        'offline_review', 'duplicate_supply'];
 
     public const SOURCE_OWNED_TYPES = ['confirm', 'override', 'countersign', 'reconciliation',
         'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review'];
@@ -69,7 +70,7 @@ final class MedicationFollowupService
         'phone-written-confirmation' => 'written_confirmation', 'second-check' => 'second_check',
         'reconciliation-query' => 'reconciliation_query', 'review-watch' => 'review_watch',
         'stock-discrepancy' => 'stock_discrepancy', 'confirm' => 'confirm', 'witness-override' => 'override',
-        'covert-review' => 'covert_review',
+        'covert-review' => 'covert_review', 'duplicate-supply' => 'duplicate_supply',
     ];
 
     public function __construct(

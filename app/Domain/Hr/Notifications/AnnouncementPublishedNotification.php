@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Notifications;
 
 use App\Domain\Hr\Models\HrAnnouncement;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -28,7 +29,9 @@ class AnnouncementPublishedNotification extends Notification implements ShouldQu
             'title' => $this->announcement->title,
             'priority' => $this->announcement->priority,
             'requires_acknowledgement' => (bool) $this->announcement->requires_acknowledgement,
-            'action_url' => "/hr/announcements/{$this->announcement->id}",
+            'action_url' => $notifiable instanceof User && ! $notifiable->canDo('hr.announcements.view') && $notifiable->canDo('company_hub.view')
+                ? "/company-hub?view=updates&announcement={$this->announcement->id}"
+                : "/hr/announcements/{$this->announcement->id}",
         ];
     }
 }

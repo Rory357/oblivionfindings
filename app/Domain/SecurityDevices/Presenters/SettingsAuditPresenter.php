@@ -235,6 +235,7 @@ class SettingsAuditPresenter
         if (! $canManage) {
             return [
                 'visible' => false,
+                'actor_id' => (int) $viewer->id,
                 'can_manage' => false,
                 'can_manage_application' => false,
                 'retention_confirmation' => '',
@@ -303,6 +304,7 @@ class SettingsAuditPresenter
 
         return [
             'visible' => $canManage,
+            'actor_id' => (int) $viewer->id,
             'can_manage' => $canManage,
             'can_manage_application' => $canManage && $canViewAllSites,
             'retention_confirmation' => MonitoringPolicyRules::RETENTION_CONFIRMATION,
@@ -403,7 +405,7 @@ class SettingsAuditPresenter
                 ->map(fn (MonitoringMaintenanceWindow $row): array => [
                     ...$row->only([
                         'id', 'site_id', 'monitor_id', 'device_id', 'name', 'recurrence',
-                        'timezone', 'policy', 'status', 'reason', 'version',
+                        'timezone', 'dst_overlap', 'dst_gap', 'policy', 'status', 'reason', 'version',
                     ]),
                     'site_name' => $row->site?->name ?? 'Site unavailable',
                     'monitor_name' => $row->monitor_id === null ? null : $monitorNames->get((int) $row->monitor_id, 'Monitor unavailable'),

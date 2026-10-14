@@ -12,7 +12,7 @@ use App\Models\User;
 use App\Services\ShiftCoverageService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -147,7 +147,6 @@ class HrCalendarAggregator
             ? collect()
             : HrCalendarEvent::query()
                 ->whereIn('recurrence_parent_id', $recurringIds->all())
-                ->active()
                 ->where('is_exception', true)
                 ->with([
                     'creator:id,name',
@@ -184,7 +183,7 @@ class HrCalendarAggregator
 
             // Render override children that land in range as their own events.
             foreach ($children as $child) {
-                if ($child->starts_at && $child->ends_at
+                if (! $child->archived_at && $viewer && $this->access->canViewEvent($viewer, $child) && $child->starts_at && $child->ends_at
                     && $child->starts_at->lte($end) && $child->ends_at->gte($start)) {
                     $out->push($this->eventRow($child, $child->starts_at, $child->ends_at, null, true));
                 }
@@ -199,6 +198,8 @@ class HrCalendarAggregator
     {
         $recurring = (bool) $e->rrule || $isException || $occurrenceDate !== null;
         $presentationEvent = $isException && $e->recurrenceParent ? $e->recurrenceParent : $e;
+        $reminderEvent = $isException && $e->reminders_override ? $e : $presentationEvent;
+        $attachments = $presentationEvent->attachments->concat($isException ? $e->attachments : collect())->unique('id');
         $audience = $this->attendeeSummary($presentationEvent);
 
         return [
@@ -212,6 +213,8 @@ class HrCalendarAggregator
             'editable' => $this->viewer !== null && $this->access->canManageEvent($this->viewer, $e),
             'extendedProps' => [
                 'eventId' => $e->id,
+                'hubContent' => $this->viewer && $end ? app(HrCalendarHubContent::class)->read($this->viewer, $e, $end, $attachments) : null,
+                'editVersion' => (int) $presentationEvent->edit_version,
                 'category' => $e->event_type,
                 'site' => $e->site?->name,
                 'siteId' => $e->site_id,
@@ -223,12 +226,17 @@ class HrCalendarAggregator
                 'startRaw' => optional($start)->toIso8601String(),
                 'endRaw' => optional($end)->toIso8601String(),
                 'createdBy' => $e->creator?->name,
+                'createdAt' => $e->created_at?->toIso8601String(),
+                'updatedAt' => $e->updated_at?->toIso8601String(),
                 'recurring' => $recurring,
                 'rrule' => $e->rrule,
-                'recurrenceUntil' => optional($e->recurrence_until)->toDateString(),
+                'recurrenceUntil' => $e->recurrence_until?->copy()->setTimezone(app(HrCalendarRecurrence::class)->timezone($e))->toDateString(),
+                'recurrenceTimezone' => $presentationEvent->recurrence_timezone ?? 'UTC',
                 'occurrenceDate' => $occurrenceDate,
                 'isException' => $isException,
                 'recurrenceParentId' => $e->recurrence_parent_id,
+                'seriesStart' => $presentationEvent->starts_at?->toIso8601String(),
+                'seriesEnd' => $presentationEvent->ends_at?->toIso8601String(),
                 'attendeeCount' => $audience['count'],
                 'audienceType' => $audience['type'],
                 'audienceRef' => $audience['ref'],
@@ -236,15 +244,20 @@ class HrCalendarAggregator
                 'attendeeUserIds' => $audience['userIds'],
                 'rsvp' => $audience['rsvp'],
                 'myRsvp' => $audience['myRsvp'],
-                'reminders' => $presentationEvent->relationLoaded('reminders')
-                    ? $presentationEvent->reminders->map(fn ($r) => [
+                'registration' => $this->viewer && $start ? app(HrEventRegistrationService::class)->summary(
+                    $this->viewer, $e, $e->exception_date?->toDateString() ?? $occurrenceDate ?? $start->toDateString(),
+                ) : null,
+                'reminders' => $reminderEvent->relationLoaded('reminders')
+                    ? $reminderEvent->reminders->map(fn ($r) => [
                         'offset_minutes' => (int) $r->offset_minutes,
                         'channel' => $r->channel,
                     ])->values()->all()
                     : [],
                 'attachments' => $presentationEvent->relationLoaded('attachments')
-                    ? $presentationEvent->attachments->map(fn ($a) => [
+                    ? $attachments->map(fn ($a) => [
                         'id' => $a->id,
+                        'eventId' => $a->event_id,
+                        'inherited' => (int) $a->event_id !== (int) $e->id,
                         'name' => $a->original_name,
                         'mime' => $a->mime,
                         'size' => (int) $a->size,
@@ -312,71 +325,9 @@ class HrCalendarAggregator
      *
      * @return list<array{date: string, start: Carbon, end: Carbon}>
      */
-    private function occurrences(HrCalendarEvent $e, Carbon $rangeStart, Carbon $rangeEnd): array
+    public function occurrences(HrCalendarEvent $e, Carbon $rangeStart, Carbon $rangeEnd): array
     {
-        $rule = $this->parseRrule($e->rrule, $e->id);
-        if (! $rule || ! $e->starts_at) {
-            return [];
-        }
-
-        $durationSec = $e->ends_at ? max(0, $e->ends_at->getTimestamp() - $e->starts_at->getTimestamp()) : 0;
-        $hardEnd = $e->recurrence_until ? $rangeEnd->copy()->min($e->recurrence_until) : $rangeEnd->copy();
-
-        $cursor = $e->starts_at->copy();
-        $out = [];
-        $index = 0;
-        while ($cursor->lte($hardEnd) && $index < 400) {
-            $index++;
-            if ($rule['count'] !== null && $index > $rule['count']) {
-                break;
-            }
-            if ($cursor->gte($rangeStart)) {
-                $occStart = $cursor->copy();
-                $out[] = [
-                    'date' => $occStart->toDateString(),
-                    'start' => $occStart,
-                    'end' => $occStart->copy()->addSeconds($durationSec),
-                ];
-            }
-            match ($rule['freq']) {
-                'DAILY' => $cursor->addDays($rule['interval']),
-                'WEEKLY' => $cursor->addWeeks($rule['interval']),
-                'MONTHLY' => $cursor->addMonthsNoOverflow($rule['interval']),
-                default => $cursor->addYears(1000),
-            };
-        }
-
-        return $out;
-    }
-
-    /** @return array{freq: string, interval: int, count: int|null}|null */
-    private function parseRrule(?string $rrule, ?int $eventId = null): ?array
-    {
-        if (! $rrule) {
-            return null;
-        }
-        $parts = [];
-        foreach (explode(';', $rrule) as $kv) {
-            [$k, $v] = array_pad(explode('=', $kv, 2), 2, null);
-            $parts[strtoupper(trim((string) $k))] = trim((string) $v);
-        }
-        $freq = $parts['FREQ'] ?? null;
-        if (! in_array($freq, ['DAILY', 'WEEKLY', 'MONTHLY'], true)) {
-            // A non-empty RRULE we can't expand means the event silently loses
-            // all its occurrences — leave a trace instead of failing mute.
-            Log::info('HR calendar RRULE failed to parse; recurring event will not expand.', [
-                'event_id' => $eventId,
-                'rrule' => $rrule,
-            ]);
-
-            return null;
-        }
-
-        return [
-            'freq' => $freq,
-            'interval' => max(1, (int) ($parts['INTERVAL'] ?? 1)),
-            'count' => isset($parts['COUNT']) ? max(1, (int) $parts['COUNT']) : null,
-        ];
+        return app(HrCalendarRecurrence::class)->between($e, $rangeStart, $rangeEnd);
     }
 
     /* ── Leave + holidays (read-only; reuse the hub feed + redaction) ─────── */
@@ -653,16 +604,18 @@ class HrCalendarAggregator
             ? $this->access->visibleCurrentProfilesQuery($viewer)
             : HrEmployeeProfile::query()->whereRaw('1 = 0');
 
+        $birthdayUserIds = DB::table('hub_celebration_settings')->where('birthday_enabled', true)->pluck('user_id')->all();
+
         $profiles
             ->when(! empty($filters['site_id']), fn ($q) => $q->where('primary_site_id', $filters['site_id']))
             ->when(! empty($filters['department_id']), fn ($q) => $q->where('department_id', $filters['department_id']))
             ->with('user:id,name')
             ->get()
-            ->each(function (HrEmployeeProfile $p) use ($out, $start, $end) {
+            ->each(function (HrEmployeeProfile $p) use ($out, $start, $end, $birthdayUserIds) {
                 $name = $p->user?->name ?? 'Employee';
 
                 // Birthday — recurring; no year exposed.
-                if ($dob = $this->safeDate($p->date_of_birth)) {
+                if (in_array($p->user_id, $birthdayUserIds) && ($dob = $this->safeDate($p->date_of_birth))) {
                     if ($day = $this->anniversaryInRange($dob, $start, $end)) {
                         $out->push($this->milestoneRow('birthday-'.$p->id, $name.' · Birthday', $day, [
                             'person' => $name, 'kind' => 'birthday',

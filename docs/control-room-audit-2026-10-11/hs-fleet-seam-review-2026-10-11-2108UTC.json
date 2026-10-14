@@ -1,0 +1,98 @@
+{
+  "reviewed_at_utc": "2026-10-11T21:08:00Z",
+  "scope": "Bounded H&S dashboard correction and Fleet seam ownership decision",
+  "candidate_root": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "observation": {
+    "path": "storage/logs/hs18-root-public-chemical-source-delta-2026-10-12.json",
+    "sha256": "0866E2BDA3F273ECD25A458B8975DE90443EF304C3F5EE3F945DEA9B32029841",
+    "is_freeze": false
+  },
+  "selected_source_pins": [
+    {
+      "path": "resources/js/pages/health-safety/components/command-centre-hero.tsx",
+      "sha256": "1411936AAFD1907B8923E64E389A10AB755A48F5582D3557A1B4CD0956487EE7"
+    },
+    {
+      "path": "resources/js/pages/health-safety/components/command-centre-hero.test.tsx",
+      "sha256": "8C0643371BB60014B11DD0CF7552561D0339DC68FF7499150C1634B96CD895F4"
+    },
+    {
+      "path": "resources/js/pages/health-safety/components/worklists.tsx",
+      "sha256": "CC19D0813F2DCE1B896179CA11C77FEBC70ABA12AE53D5D473D0967A207B4D1F"
+    },
+    {
+      "path": "resources/js/pages/health-safety/components/worklists.test.tsx",
+      "sha256": "E19C46B5007F88D169E38CA945F5864B1DD221B78ADD068F8CDE168325A49516"
+    },
+    {
+      "path": "app/Http/Controllers/HealthSafety/HealthSafetyDashboardController.php",
+      "sha256": "41739BD02D407AC1F9C7E6BCE9CE427C9BA440D435FD31367D62024F504D714C"
+    },
+    {
+      "path": "app/Http/Controllers/IncidentController.php",
+      "sha256": "C2F6D5AD4285472E46039D6B43F973C51D4ABD2844AF9AAE12D8677D576F97B3"
+    },
+    {
+      "path": "app/Services/HealthSafety/HsKpiService.php",
+      "sha256": "E193BB678779E45B14B66A4707A56D0EEA23919C617276E04FD04D30F2E3FB77"
+    },
+    {
+      "path": "app/Services/HealthSafety/HsAnalyticsService.php",
+      "sha256": "16AD63BA671CA09B4B8344395C19D64366C782C068E9B6A0A25A91B5E8AD0A09"
+    }
+  ],
+  "accepted_source_corrections": [
+    "Worklist section/subtitle now use text-section-title/text-subtle.",
+    "Incident link preserves selected Site/date and incidents-only kind through actual validated IncidentController filters.",
+    "Analytics receives supported Site/custom range/lens; current HsAnalyticsService scorecard and KPI builders use the same HsKpiService functions, including fixed rate basis.",
+    "Header test now asserts nondefault Site/custom date links. Tests were inspected, not run."
+  ],
+  "open_findings": [
+    "Fleet dashboard count uses H&S accessible Sites and asset.site_id OR home_site_id, while canonical Fleet reads require fleet.viewAny OR assets.viewAny, asset.site_id and fleet.manage-only Site bypass.",
+    "Rolling Fleet count uses instant comparison but destination date_from/date_to use civil whereDate. The earlier selected-Site mismatch inference is withdrawn: resolveSiteContext returns a singleton for an explicit Site.",
+    "Safeguarding count/privacy parity remains open independently of selected-Site narrowing; the dashboard raw query requires composition with the canonical safeguarding current read policy.",
+    "Full-register caption honestly discloses Fleet mismatch but is interim, not matching meter acceptance."
+  ],
+  "fleet_observed_source": {
+    "controller": "app/Http/Controllers/FleetAssets/IncidentController.php",
+    "main_and_hs_sha256": "74B96EC877CD172B35123A378A5790454942AB156A14C1002D22B3BBECEE9E07",
+    "main_routes_sha256": "2EFBBC3015614E969220BD9C5BD9A1C3D57722FFD92AAAF988150C36C791DC59",
+    "read_gate_line": 618,
+    "read_scope_lines": [
+      512,
+      522
+    ],
+    "civil_filter_lines": [
+      618,
+      622
+    ]
+  },
+  "ownership_evidence": [
+    {
+      "thread": "01a0b8c5-186f-7681-83fc-40229d94ef87",
+      "title": "Follow Revision 10 approval gates",
+      "observation": "notLoaded; historical delivered Fleet followup, latest failed turn concerned public network/certificate/browser verification"
+    },
+    {
+      "thread": "01a0ea93-a73d-7811-b36a-cdb1d4f75769",
+      "title": "OF | Fleet Follow-up Fixes & Verification…",
+      "observation": "notLoaded; historical completed Fleet followup and app troubleshooting"
+    },
+    {
+      "thread": "01a0e754-5280-7832-8987-132001e84c76",
+      "title": "OF | Fleet Integration & Reports Fixes…",
+      "observation": "notLoaded; historical completed merge report"
+    }
+  ],
+  "decision": "H&S owns H&S dashboard adapter and an UNAPPLIED minimal shared Fleet canonical read predicate / rolling-instant proposal. Fleet retains domain authority. No current Fleet incident handoff/freeze found in inspected recent summaries; notLoaded does not certify ownership release. Current-source/owner review required before future integration. No Fleet chats messaged.",
+  "acceptance": [
+    "Intersect H&S selected scope with canonical current Fleet read permission/Sites before counts.",
+    "Restricted/unconfirmed must not become zero or a usable drilldown.",
+    "Exact common instant boundaries and pagination/return; preserve legacy civil filters.",
+    "H&S bypass without Fleet grant, manager versus incidents.manage, asset/home-Site mismatch, current withdrawal and zero/denied distinctions.",
+    "Preserve independent H&S obligations and Fleet action authority."
+  ],
+  "owner_notified": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+  "correction_2026_10_11_2108UTC": "H&S owner correctly challenged the selected-Site claim. Parent read unchanged dashboard41739BD0 resolveSiteContext at lines511-539: explicit Site returns [requestedSiteId,[requestedSiteId],bypass]; nonbypass default returns one effective Site; bypass default returns its canonical accessible set. Earlier assumption that $siteIds always meant all accessible Sites was wrong and is withdrawn. No resolver change required. Fleet domain permission/asset-home-Site and safeguarding canonical-read concerns remain. Parent acknowledged once; Fleet proposal remains unmounted with fleet.manage as Site bypass only, not a standalone read grant.",
+  "limits": "Partial source review only; private exposure/public chemical full workflows not reviewed here. No app-source edits, tests, browser, DB, migrations, processes, provider calls or MAIN adoption. Runtime HOLD unchanged."
+}

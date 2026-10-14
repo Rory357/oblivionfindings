@@ -155,6 +155,7 @@ const navSections: NavSection[] = [
     {
         label: 'Integrations',
         items: [
+            { icon: KeyRound, title: 'Obli', href: '/settings/obli', permission: 'integrations.manageObli' },
             {
                 icon: CalendarSync,
                 title: 'Calendar Sync',

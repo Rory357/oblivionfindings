@@ -1,0 +1,57 @@
+{
+  "reviewedAtUtc": "2026-10-11T17:54:44Z",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "sourceOnly": true,
+  "ppeRead": {
+    "manifest": "storage/logs/hs18a-ppe-read-source-candidate.json",
+    "sha256": "EA11DA347650F08D6E898C701DA5ED585769407AA421C690FC7BAD2BEBDE7D88",
+    "ownedPins": 10,
+    "wholeSuitePins": 4,
+    "observedDependencyPins": 35,
+    "drift": [],
+    "declaredMethods": 65,
+    "executed": false
+  },
+  "relocation": {
+    "handoff": "docs/health-safety-audit-2026-10-07/HS18A-PPE-RELOCATION-SOURCE-HANDOFF-2026-10-12.md",
+    "sha256": "4CDB5BE7A4FD7727702EB593485C12942C71EF0DA37318259C9A3DD41B2EF360",
+    "verifiedPins": 27,
+    "drift": [],
+    "ownerDeclaredWholeSuites": 9,
+    "ownerDeclaredMethods": 110,
+    "executed": false,
+    "limits": "Source pins and handoff reviewed; no full lifecycle/native/filesystem behavior clearance"
+  },
+  "calendar": {
+    "patchSha256": "90329E53DEC18C45A9E46DAD2FFF4DACD9ACA934745E103A84810F42BB2FAD6E",
+    "sourceSha256": "89EABF1FE8A3987DFEB15C78165A87F07B9309330A10FA88B2EFC3CFD72D6485",
+    "testSha256": "105A1BEBBC0A858836F053939FFC457DCA84C7C8071EB1EC127029B75896EF8A",
+    "helperSha256": "F7A51849EB7EAC53699ADA7492269126473D24690DD9BE8DFDD59D739C1A93C9",
+    "helperTestSha256": "EF1CE9C1D411ECA3613DDDB24C1B8EF4F7B18A05BCFE125405D1B95EB146E3B3",
+    "applied": false
+  },
+  "finding": {
+    "path": "app/Services/HealthSafety/PpeSiteReadService.php",
+    "lines": [
+      75,
+      76,
+      92,
+      116
+    ],
+    "issue": "Requested day bounds, today and event midnight hard-code Pacific/Auckland, conflicting with configured calendar/roster zone.",
+    "owner": "H&S",
+    "action": "Use established server zone contract; coordinate inclusive legacy versus exclusive civil range adaptation with Workforce; preserve undated repair markers."
+  },
+  "allocation": {
+    "workforce": "Shared provider dispatch/aggregator/Calendar repair notice composition against current OWNER R5; partition before both legacy and civil decoration/count/date/export, bind notices to current independent lane lifecycle and privacy.",
+    "healthSafety": "Canonical PPE source/provider semantics and timezone repair; adopt only reviewed compatible shared composition.",
+    "controlRoom": "Pending chemical exposure canonical source-family privacy contract; do not duplicate permission predicate or lose independent urgent work."
+  },
+  "verifiedHumanChemicalPolicy": {
+    "thread": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+    "message": "01a12bfc-6c75-7742-aede-63fd0303f7d4",
+    "answer": "Require wellbeing access for identifiable exposure records (Recommended); general safety users see that access is restricted.",
+    "scope": "Generic chemical reference/SDS/storage separate; legacy unknown Incident Client provenance not inferred known-null."
+  },
+  "runtimeAdmission": false
+}

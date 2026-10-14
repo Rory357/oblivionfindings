@@ -118,3 +118,47 @@ function collectorNow(): DateTimeImmutable
 {
     return new DateTimeImmutable('2026-07-23T12:00:00+00:00');
 }
+
+/** @return array{certificate: string, private_key: string} */
+function collectorCertificatePair(string $commonName): array
+{
+    $configPath = tempnam(sys_get_temp_dir(), 'oblivion-collector-openssl-');
+    if ($configPath === false || file_put_contents($configPath, <<<'CONFIG'
+[req]
+distinguished_name = subject
+prompt = no
+
+[subject]
+CN = oblivion-collector-test
+CONFIG
+    ) === false) {
+        throw new RuntimeException('Collector test OpenSSL configuration failed.');
+    }
+
+    try {
+        $options = [
+            'config' => $configPath,
+            'digest_alg' => 'sha256',
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ];
+        $privateKey = openssl_pkey_new($options);
+        $request = $privateKey === false ? false : openssl_csr_new(
+            ['commonName' => $commonName],
+            $privateKey,
+            $options,
+        );
+        $certificate = $request === false || $privateKey === false
+            ? false
+            : openssl_csr_sign($request, null, $privateKey, 1, $options);
+        if ($privateKey === false || $certificate === false
+            || ! openssl_x509_export($certificate, $certificatePem)
+            || ! openssl_pkey_export($privateKey, $privateKeyPem, null, $options)) {
+            throw new RuntimeException('Collector test certificate generation failed.');
+        }
+
+        return ['certificate' => $certificatePem, 'private_key' => $privateKeyPem];
+    } finally {
+        @unlink($configPath);
+    }
+}

@@ -1,0 +1,37 @@
+{
+  "kind": "coordinator_read_only_checkpoint_not_runtime_acceptance",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "packet": "docs/health-safety-audit-2026-10-07/participation-mobile-focus-client-options-source-r2-2026-10-13.json",
+  "packet_sha256": "1B26017F1267470190ECE172D8E1D85C238A906C4D9710BD9219B772DBF2ECB0",
+  "pin_check": {"total": 30, "matched": 24, "changed": 6},
+  "changed_paths": [
+    "resources/js/pages/health-safety/worker-participation/index.tsx",
+    "resources/js/pages/health-safety/worker-participation/participation-cards.tsx",
+    "resources/js/pages/health-safety/worker-participation/participation-cards.test.tsx",
+    "resources/js/components/worker-participation/shared.tsx",
+    "app/Http/Controllers/HealthSafety/WorkerParticipationController.php",
+    "storage/logs/hs-overview-recovery-vitest-runner.ps1"
+  ],
+  "interpretation": "Owner actively changing participation access and stale-account display; completed receipt cannot certify those current successor files. No competing coordinator audit or source edits.",
+  "stable_header": {
+    "sha256": "4F57163B03803E8BCB1D465F18C0727C86CC17B7F3508833ADB229DC60C7A432",
+    "review": "Read revised meter/filter construction. All meetings now uses meetingCount/all periods with committee/quarter facts retained in caption; unfinished-action meter counts meetings with a separate action-sum caption; minutes/training/action links supply named focus filters. Correct intent present, not full backend/row/runtime proof.",
+    "finding": "HS-PARTICIPATION-DRILLDOWN-01 remains pending current complete backend and workflow verification; no repeated guidance to active owner."
+  },
+  "source_check_receipt": {
+    "path": "storage/logs/participation-mobile-focus-source-check.json",
+    "sha256": "950F5359F97B08DD4E568D19097209C98E64A7FF49B86FC676141E2EB57A34E4",
+    "observed": "Six source files syntax_errors empty and formatting true; this is transpilation/formatting only. Index/cards/test pins subsequently changed."
+  },
+  "other_source_review_limit": "Shared EntityCard/EntityMenu inspected only in part; no complete component, keyboard, accessibility, browser or cross-consumer sign-off. Dashboard Client-options service/test pins matched but complete source behavior not independently re-audited.",
+  "runtime": "Owner packet records no R9/R10 runtime admission. Current native, semantic types, components and browser unrun. 106 pure helper checks are not application tests; 136 component forecast is not execution. Earlier R4 84/84 remains historical only.",
+  "human_decision": {
+    "thread": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+    "user_message": "01a1318f-4b60-7273-add4-04ae4aa82667",
+    "question_scope": "Committees without Site recorded, including retained records whose previous Site was deleted",
+    "answer": "Organisation-wide H&S access only; flag missing ownership (Recommended)",
+    "boundary": "Participation context only; existing current permissions and other privacy checks remain; specific Site excludes unowned records; not universal Site-less source admission. Owner acknowledged and implementing."
+  },
+  "holds": "Both exact human holds remain. HsSourceCommandContext, HasHealthSafetyCommandSourceGuard and ClientProfileSourceReadLifetime confirmed absent. Middleware and ClientController pins match previous packet.",
+  "coordination": "CR/WF same idle completed acknowledgements, no new question/package. H&S active. No restart, duplicate tests/builds/process probes, provider calls, application source edits or owner messages this checkpoint. All approved scopes incomplete."
+}

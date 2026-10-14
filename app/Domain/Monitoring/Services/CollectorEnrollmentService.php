@@ -102,6 +102,9 @@ final readonly class CollectorEnrollmentService
                 || $enrollment->expires_at->lte(CarbonImmutable::now('UTC'))) {
                 throw new DomainException('Collector enrolment token is unavailable.');
             }
+            if ($enrollment->expected_collector_uuid !== null && ! hash_equals($enrollment->expected_collector_uuid, $collectorUuid)) {
+                throw new DomainException('Collector installation identity does not match its grant.');
+            }
             $site = Site::query()
                 ->whereKey($enrollment->site_id)
                 ->where('is_active', true)

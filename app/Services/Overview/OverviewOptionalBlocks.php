@@ -64,12 +64,15 @@ final class OverviewOptionalBlocks
             ->where(fn ($notes) => $notes->whereNull('shift_id')->orWhereHas('shift', fn ($shift) => $this->sites->applyShiftScope($shift, $user, [])
                 ->whereColumn('shifts.client_id', 'client_notes.client_id')));
         $total = (clone $query)->count();
-        $rows = $query->orderByDesc('updated_at')->limit(6)->get(['id', 'client_id', 'updated_at'])->map(fn ($note) => [
-            'label' => 'Daily note draft #'.$note->id, 'date' => $note->updated_at?->toIso8601String(), 'status' => 'Draft',
+        // The worker is already assigned to (or may view) each person, so their
+        // preferred name tells them whose note it is; note contents stay out.
+        $rows = $query->with('client:id,first_name,preferred_name')->orderByDesc('updated_at')->limit(6)->get(['id', 'client_id', 'updated_at'])->map(fn ($note) => [
+            'label' => ($name = $note->client?->preferred_name ?: $note->client?->first_name) ? 'Daily note for '.$name : 'Daily note draft #'.$note->id,
+            'date' => $note->updated_at?->toIso8601String(), 'status' => 'Draft',
             'detail' => 'Last saved · open Daily Notes to continue', 'href' => '/operations/clients/'.$note->client_id.'?tab=progress_notes',
         ])->all();
 
-        return $this->ready('Your saved daily notes · selected permitted sites', '/operations/clients', $rows, $total, 'Own drafts only · note contents stay in the client workspace');
+        return $this->ready('Your saved daily notes · selected sites', '/operations/clients', $rows, $total, 'Own drafts only · note contents stay in the client workspace');
     }
 
     public function supervision(User $user, array $siteIds): array
@@ -120,7 +123,7 @@ final class OverviewOptionalBlocks
                 'href' => '/hr/offboarding/'.$checklist->id,
             ])->all();
 
-        return $this->ready('Open offboarding checklists · permitted staff', '/hr/offboarding', $rows, $total, 'Practical handover tasks · departure reasons stay in HR');
+        return $this->ready('Open offboarding checklists · your staff', '/hr/offboarding', $rows, $total, 'Practical handover tasks · departure reasons stay in HR');
     }
 
     public function maintenance(User $user, array $siteIds): array

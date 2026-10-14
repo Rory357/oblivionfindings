@@ -1,9 +1,22 @@
 <?php
 
 use App\Domain\SecurityDevices\AccessControl\Http\Controllers\AccessControlController;
+use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvLiveController;
+use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvRecordingReferenceController;
+use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvSourceController;
+use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionDiscoveryController;
+use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionSourceController;
 use App\Domain\SecurityDevices\Credentials\Http\Controllers\CredentialReferenceController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointDownloadsController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointLifecycleController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointRestartCommandController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointRestartPolicyController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointSoftwareCatalogueController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointSoftwarePolicyController;
+use App\Domain\SecurityDevices\Endpoints\Http\Middleware\EndpointTransport;
 use App\Domain\SecurityDevices\Http\Controllers\AlertsEventsController;
 use App\Domain\SecurityDevices\Http\Controllers\CategoryPageController;
+use App\Domain\SecurityDevices\Http\Controllers\CollectorInstallationController;
 use App\Domain\SecurityDevices\Http\Controllers\ConfigurationSnapshotController;
 use App\Domain\SecurityDevices\Http\Controllers\DashboardController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceAssignmentController;
@@ -51,6 +64,62 @@ Route::middleware([
     Route::get('/', DashboardController::class)
         ->name('security-devices.index');
 
+    Route::middleware([EndpointTransport::class, 'permission:securityDevices.commands.admin', 'throttle:10,1'])->group(function (): void {
+        Route::post('/devices/{device}/endpoint/enrolments', [EndpointLifecycleController::class, 'issue'])->name('security-devices.devices.endpoint.enrolments');
+        Route::get('/devices/{device}/endpoint/bootstrap-options', [EndpointLifecycleController::class, 'options'])->name('security-devices.devices.endpoint.bootstrap-options');
+        Route::post('/devices/{device}/endpoint/bootstrap', [EndpointLifecycleController::class, 'bootstrap'])->name('security-devices.devices.endpoint.bootstrap');
+        Route::post('/devices/{device}/endpoint/revoke', [EndpointLifecycleController::class, 'revoke'])->name('security-devices.devices.endpoint.revoke');
+    });
+
+    $software = EndpointSoftwareCatalogueController::class;
+    Route::get('/software/confirm-identity', [$software, 'confirmIdentity'])->name('security-devices.software.confirm-identity');
+    Route::get('/software', [$software, 'index'])->name('security-devices.software.index');
+    Route::post('/software', [$software, 'upload'])->middleware('throttle:10,1')->name('security-devices.software.upload');
+    Route::get('/software/uploads/{request_key}', [$software, 'recovery'])->whereUuid('request_key')->name('security-devices.software.recovery');
+    Route::get('/software/{package}', [$software, 'show'])->whereUuid('package')->name('security-devices.software.show');
+    foreach (['submit', 'review', 'withdraw'] as $action) {
+        Route::post('/software/{package}/'.$action, [$software, $action])->whereUuid('package')->name('security-devices.software.'.$action);
+    }
+    $softwarePolicy = EndpointSoftwarePolicyController::class;
+    Route::get('/devices/{device}/endpoint/software-policy', [$softwarePolicy, 'show'])->middleware(EndpointTransport::class)->name('security-devices.devices.endpoint.software-policy');
+    Route::put('/devices/{device}/endpoint/software-policy', [$softwarePolicy, 'update'])->middleware(EndpointTransport::class)->name('security-devices.devices.endpoint.software-policy.update');
+    Route::get('/agent-downloads', [EndpointDownloadsController::class, 'index'])
+        ->middleware('permission:securityDevices.commands.admin|securityDevices.integrations.manage')
+        ->name('security-devices.agent-downloads.index');
+    Route::get('/agent-downloads/{artifact}/{digest}', [EndpointDownloadsController::class, 'download'])
+        ->where('artifact', '[a-z0-9][a-z0-9-]{1,63}')->where('digest', '[a-f0-9]{64}')
+        ->middleware(['permission:securityDevices.commands.admin|securityDevices.integrations.manage', 'throttle:10,1'])
+        ->name('security-devices.agent-downloads.download');
+
+    $hikvisionDiscovery = HikvisionDiscoveryController::class;
+    Route::post('/devices/{device}/hikvision-discoveries', [$hikvisionDiscovery, 'store'])->whereNumber('device')->middleware('throttle:10,1')->name('security-devices.cctv.hikvision.discovery.store');
+    Route::get('/cctv/hikvision-discoveries/requests/{key}', [$hikvisionDiscovery, 'recover'])->whereUuid('key')->name('security-devices.cctv.hikvision.discovery.recover');
+    Route::get('/cctv/hikvision-discoveries/{uuid}', [$hikvisionDiscovery, 'show'])->whereUuid('uuid')->name('security-devices.cctv.hikvision.discovery.show');
+    $hikvisionSource = HikvisionSourceController::class;
+    Route::get('/devices/{device}/live/hikvision/setup', [$hikvisionSource, 'setup'])->whereNumber('device')->name('security-devices.cctv.hikvision.setup');
+    Route::post('/devices/{device}/live/hikvision/source/enable', [$hikvisionSource, 'enable'])->whereNumber('device')->middleware('throttle:12,1')->name('security-devices.cctv.hikvision.source.enable');
+    Route::post('/devices/{device}/live/hikvision/source/disable', [$hikvisionSource, 'disable'])->whereNumber('device')->middleware('throttle:12,1')->name('security-devices.cctv.hikvision.source.disable');
+    Route::get('/devices/{device}/live/hikvision/source', [$hikvisionSource, 'show'])->whereNumber('device')->name('security-devices.cctv.hikvision.source.show');
+    Route::post('/devices/{device}/live/hikvision/source', [$hikvisionSource, 'store'])->whereNumber('device')->middleware('throttle:12,1')->name('security-devices.cctv.hikvision.source.store');
+    Route::get('/devices/{device}/live/hikvision/source/discoveries/{uuid}', [$hikvisionSource, 'review'])->whereNumber('device')->whereUuid('uuid')->name('security-devices.cctv.hikvision.source.review');
+    Route::get('/devices/{device}/live/hikvision/source/requests/{key}', [$hikvisionSource, 'recover'])->whereNumber('device')->whereUuid('key')->name('security-devices.cctv.hikvision.source.recover');
+    $recordingReferences = CctvRecordingReferenceController::class;
+    Route::get('/devices/{device}/recording-references', [$recordingReferences, 'index'])->whereNumber('device')->name('security-devices.cctv.references.index');
+    Route::post('/devices/{device}/recording-references', [$recordingReferences, 'store'])->whereNumber('device')->middleware('throttle:12,1')->name('security-devices.cctv.references.store');
+    Route::get('/cctv/recording-references/requests/{key}', [$recordingReferences, 'recover'])->whereUuid('key')->name('security-devices.cctv.references.recover');
+    Route::get('/cctv/recording-references/{uuid}', [$recordingReferences, 'show'])->whereUuid('uuid')->name('security-devices.cctv.references.show');
+    $live = CctvLiveController::class;
+    $source = CctvSourceController::class;
+    Route::get('/devices/{device}/live', [$live, 'show'])->whereNumber('device')->name('security-devices.cctv.live');
+    Route::post('/devices/{device}/live-sessions', [$live, 'start'])->whereNumber('device')->middleware('throttle:12,1')->name('security-devices.cctv.start');
+    Route::get('/cctv/live-sessions/{uuid}', [$live, 'status'])->whereUuid('uuid')->name('security-devices.cctv.status');
+    foreach (['offer', 'renew', 'stop'] as $action) {
+        Route::post('/cctv/live-sessions/{uuid}/'.$action, [$live, $action])->whereUuid('uuid')->middleware('throttle:60,1')->name('security-devices.cctv.'.$action);
+    }
+    Route::get('/devices/{device}/live/source', [$source, 'show'])->whereNumber('device')->name('security-devices.cctv.source');
+    Route::post('/devices/{device}/live/source', [$source, 'save'])->whereNumber('device')->middleware('throttle:10,1')->name('security-devices.cctv.source.save');
+    Route::post('/devices/{device}/live/source/enable-stream', [$source, 'enable'])->whereNumber('device')->middleware('throttle:10,1')->name('security-devices.cctv.source.enable');
+    Route::post('/devices/{device}/live/source/disable', [$source, 'disable'])->whereNumber('device')->middleware('throttle:10,1')->name('security-devices.cctv.source.disable');
     // ── Device CRUD ───────────────────────────────────────────────
 
     Route::get('/devices', [DeviceController::class, 'index'])
@@ -97,6 +166,11 @@ Route::middleware([
             'permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin',
         ])
         ->name('security-devices.devices.commands.store');
+
+    $restartPolicy = EndpointRestartPolicyController::class;
+    Route::get('/devices/{device}/endpoint/restart-policy', [$restartPolicy, 'show'])->name('security-devices.devices.endpoint.restart-policy.show');
+    Route::put('/devices/{device}/endpoint/restart-policy', [$restartPolicy, 'update'])->name('security-devices.devices.endpoint.restart-policy.update');
+    Route::post('/devices/{device}/commands/{command}/cancel', [EndpointRestartCommandController::class, 'cancel'])->name('security-devices.devices.commands.cancel');
 
     Route::post('/commands/{command}/decision', [DeviceCommandApprovalController::class, 'store'])
         ->middleware('permission:securityDevices.commands.approve')
@@ -339,6 +413,10 @@ Route::middleware([
             'throttle:30,1',
         ])
         ->group(function () {
+            Route::get('/requests', [NativeMonitorLifecycleController::class, 'requests'])->name('security-devices.monitoring.native-monitors.requests');
+            Route::post('/requests/{requestUuid}/recover', [NativeMonitorLifecycleController::class, 'recover'])
+                ->whereUuid('requestUuid')
+                ->name('security-devices.monitoring.native-monitors.recover');
             Route::post('/', [NativeMonitorLifecycleController::class, 'store'])
                 ->name('security-devices.monitoring.native-monitors.store');
             Route::patch('/{monitor}', [NativeMonitorLifecycleController::class, 'update'])
@@ -356,6 +434,8 @@ Route::middleware([
     Route::prefix('/monitoring/dead-letters')
         ->middleware('permission:securityDevices.integrations.manage')
         ->group(function () {
+            Route::get('/requests', [MonitoringDeadLetterController::class, 'requests'])->name('security-devices.monitoring.dead-letters.requests');
+            Route::post('/requests/{requestUuid}/recover', [MonitoringDeadLetterController::class, 'recover'])->whereUuid('requestUuid')->name('security-devices.monitoring.dead-letters.recover');
             Route::post('/{deadLetter}/replay', [MonitoringDeadLetterController::class, 'replay'])
                 ->name('security-devices.monitoring.dead-letters.replay');
             Route::post('/{deadLetter}/discard', [MonitoringDeadLetterController::class, 'discard'])
@@ -415,6 +495,8 @@ Route::middleware([
             'throttle:6,1,security-device-collectors:',
         ])
         ->group(function () {
+            Route::get('/installation-options', [CollectorInstallationController::class, 'options'])->name('security-devices.collectors.installation.options');
+            Route::post('/installation-profile', [CollectorInstallationController::class, 'issue'])->name('security-devices.collectors.installation.issue');
             Route::post('/enrolments', [MonitoringCollectorLifecycleController::class, 'issue'])
                 ->name('security-devices.collectors.enrolments.issue');
             Route::post('/{collector}/re-enrolment', [MonitoringCollectorLifecycleController::class, 'reEnroll'])
@@ -464,6 +546,11 @@ Route::middleware([
                 ->whereNumber('dependency')
                 ->name('security-devices.settings.monitoring.dependencies.deactivate');
 
+            Route::get('/maintenance/requests/{requestUuid}', [MonitoringMaintenanceSettingsController::class, 'recover'])
+                ->whereUuid('requestUuid')
+                ->name('security-devices.settings.monitoring.maintenance.recover');
+            Route::post('/maintenance/preview', [MonitoringMaintenanceSettingsController::class, 'preview'])
+                ->name('security-devices.settings.monitoring.maintenance.preview');
             Route::post('/maintenance', [MonitoringMaintenanceSettingsController::class, 'store'])
                 ->name('security-devices.settings.monitoring.maintenance.store');
             Route::patch('/maintenance/{window}', [MonitoringMaintenanceSettingsController::class, 'update'])

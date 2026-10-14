@@ -6,8 +6,11 @@ import {
     formatDateOnly,
     formatDateTimeInZone,
     formatMonthYear,
+    timeOffsetInZone,
+    timeOffsetsInZone,
     toDateInput,
     toDatetimeLocal,
+    workerTimeOffsets,
 } from './datetime';
 
 describe('age on the NZ calendar day', () => {
@@ -90,5 +93,40 @@ describe('explicit pattern timezones', () => {
             '12 Oct 2026, 9:00 am',
         );
         expect(formatDateTimeInZone(null, 'UTC')).toBe('—');
+    });
+});
+
+describe('selected-zone maintenance clocks', () => {
+    it('keeps the NZ default and supports UTC and the Chatham quarter-hour offset', () => {
+        expect(toDatetimeLocal('2026-09-26T21:00:00Z')).toBe(
+            '2026-09-27T10:00',
+        );
+        expect(toDatetimeLocal('2026-09-26T21:00:00Z', 'UTC')).toBe(
+            '2026-09-26T21:00',
+        );
+        expect(
+            timeOffsetInZone('2026-09-26T21:00:00Z', 'Pacific/Chatham'),
+        ).toBe('+13:45');
+        expect(
+            timeOffsetsInZone('2026-09-27T10:45', 'Pacific/Chatham'),
+        ).toEqual(['+13:45']);
+        expect(timeOffsetsInZone('2026-09-27T10:45', 'UTC')).toEqual([
+            '+00:00',
+        ]);
+    });
+    it('offers both NZ repeated instants and no fabricated missing clock', () => {
+        expect(timeOffsetsInZone('2026-04-05T02:15')).toEqual([
+            '+13:00',
+            '+12:00',
+        ]);
+        expect(workerTimeOffsets('2026-04-05T02:15')).toEqual([
+            '+13:00',
+            '+12:00',
+        ]);
+        expect(timeOffsetsInZone('2026-09-27T02:15')).toEqual([]);
+        expect(timeOffsetsInZone('2026-02-30T09:00')).toEqual([]);
+        expect(timeOffsetsInZone('2026-09-27T09:00', 'Invalid/Zone')).toEqual(
+            [],
+        );
     });
 });

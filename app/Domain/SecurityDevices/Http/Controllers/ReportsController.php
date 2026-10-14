@@ -40,6 +40,7 @@ class ReportsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('securityDevices.reports.view'), 403);
 
+        $asOf = now();
         $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
         $visibleEvents = $this->access->applyTemporalEventCustodyScope(
             DeviceEvent::query(),
@@ -49,7 +50,7 @@ class ReportsController extends Controller
         $stats = [
             'devices' => (clone $visibleDeviceIds)->count(),
             'events_90d' => $visibleEvents
-                ->where('occurred_at', '>=', now()->subDays(self::EVENTS_WINDOW_DAYS))
+                ->whereBetween('occurred_at', [$asOf->copy()->subDays(self::EVENTS_WINDOW_DAYS), $asOf])
                 ->count(),
             'maintenance' => DeviceMaintenanceRecord::query()
                 ->whereIn('device_id', clone $visibleDeviceIds)
@@ -57,6 +58,8 @@ class ReportsController extends Controller
         ];
 
         return Inertia::render('security-devices/reports', [
+            'actor_id' => $user->id,
+            'as_of' => $asOf->toISOString(),
             'stats' => $stats,
             'windowDays' => self::EVENTS_WINDOW_DAYS,
         ]);
@@ -127,7 +130,8 @@ class ReportsController extends Controller
             'event_type' => ['nullable', 'string', 'max:100'],
             'source' => ['nullable', 'string', 'max:100'],
         ]);
-        $since = now()->subDays(self::EVENTS_WINDOW_DAYS);
+        $asOf = now();
+        $since = $asOf->copy()->subDays(self::EVENTS_WINDOW_DAYS);
         $filename = 'security-devices-events-'.self::EVENTS_WINDOW_DAYS.'d-'.now()->format('Y-m-d').'.csv';
 
         $columns = [
@@ -141,22 +145,26 @@ class ReportsController extends Controller
             'processed_at',
         ];
 
+        $visibleDeviceNames = $this->access->visibleDevices($user)->select('devices.id', 'devices.name');
+        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
         $query = $this->access->applyTemporalEventCustodyScope(DeviceEvent::query(), $user)
+            ->leftJoinSub($visibleDeviceNames, 'permitted_export_device', fn ($join) => $join
+                ->on('permitted_export_device.id', '=', 'device_events.device_id'))
+            ->select('device_events.*', 'permitted_export_device.name as permitted_device_name')
             ->when($filters['domain'] ?? null, fn ($query, string $domain) => $query
-                ->whereHas('device', fn ($device) => $device->where('domain', $domain)))
+                ->whereHas('device', fn ($device) => $device->where('domain', $domain)->whereIn('devices.id', clone $visibleDeviceIds)))
             ->when($filters['device_id'] ?? null, fn ($query, int $deviceId) => $query->where('device_id', $deviceId))
-            ->where('occurred_at', '>=', $since)
+            ->whereBetween('occurred_at', [$since, $asOf])
             ->when($filters['severity'] ?? null, fn ($query, string $severity) => $query->where('severity', $severity))
             ->when($filters['event_type'] ?? null, fn ($query, string $eventType) => $query->where('event_type', $eventType))
             ->when($filters['source'] ?? null, fn ($query, string $source) => $query->where('source', $source))
-            ->with(['device:id,name'])
             ->orderBy('occurred_at', 'desc');
 
         return $this->streamCsv($filename, $columns, $query->cursor(), function (DeviceEvent $e) {
             return [
                 $e->id,
                 $e->device_id,
-                $e->device?->name,
+                $e->permitted_device_name,
                 $e->event_type,
                 $e->severity,
                 $e->source,

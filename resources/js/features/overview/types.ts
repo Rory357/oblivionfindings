@@ -63,6 +63,15 @@ export interface Row {
     sparkline?: (number | null)[];
     handover?: Row;
     followups?: Row;
+    /** Read-only facts for the detail panel; a row with facts opens it. */
+    facts?:
+        | {
+              label: string;
+              value?: string | null;
+              date?: string | null;
+              dateTime?: string | null;
+          }[]
+        | null;
     history?:
         | {
               at: string;
@@ -73,12 +82,15 @@ export interface Row {
 }
 export interface BlockData {
     scopeMode?: 'site' | 'personal' | 'organisation';
-    state: 'ready' | 'proposed' | 'restricted' | 'unavailable';
+    /** deferred: a library block not on the layout, loaded when the editor opens. */
+    state: 'ready' | 'proposed' | 'restricted' | 'unavailable' | 'deferred';
     title?: string;
     subtitle: string;
     message?: string;
     empty?: string;
     actionLabel?: string;
+    /** Focus card: the quiet route shown when nothing is scheduled. */
+    emptyActionLabel?: string;
     headline?: string;
     seriesLabel?: string;
     comparisonLabel?: string;
@@ -166,6 +178,7 @@ export interface OverviewData {
         percent?: number | null;
         instrumentCaption?: string;
         avatars?: string[];
+        people?: { id: number; name: string; detail?: string }[];
     }[];
     urgent: Row[];
     partial: boolean;
@@ -176,6 +189,8 @@ export interface OverviewData {
 export interface OverviewProps {
     role: Role;
     roles: Role[];
+    /** The overview that opens first on sign-in. */
+    defaultRole?: Role;
     sites: { id: number; name: string }[];
     filters: { site: string; range: Range };
     overview: OverviewData;
@@ -219,6 +234,24 @@ export function tidyBlocks(blocks: BlockLayout[]): BlockLayout[] {
     return result;
 }
 
+/**
+ * Display only (never saved): widen the last block of each row so a filtered
+ * view such as Insights has no holes where the hidden blocks were.
+ */
+export function fillRows(blocks: BlockLayout[]): BlockLayout[] {
+    const result = blocks.map((b) => ({ ...b, height: 0 }));
+    let used = 0;
+    result.forEach((block, index) => {
+        if (used > 0 && used + block.span > 12) {
+            result[index - 1].span += 12 - used;
+            used = 0;
+        }
+        used = (used + block.span) % 12;
+    });
+    if (used > 0) result[result.length - 1].span += 12 - used;
+    return result;
+}
+
 export function moveBlock(
     blocks: BlockLayout[],
     id: string,
@@ -251,9 +284,12 @@ export async function writeOverview(url: string, body: unknown) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok)
-        throw new Error(
-            result.message ??
-                'Could not save. Your changes are still here; please try again.',
+        throw Object.assign(
+            new Error(
+                result.message ??
+                    'Could not save. Your changes are still here; please try again.',
+            ),
+            { status: response.status, data: result },
         );
     return result;
 }

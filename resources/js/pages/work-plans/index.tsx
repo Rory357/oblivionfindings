@@ -1,22 +1,42 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { VehicleSearchSelect as SearchSelect } from '@/components/fleet-assets/vehicle-workspace/search-select';
+import InputError from '@/components/input-error';
+import {
+    EntityCard,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    ListCaption,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
+    PageHeaderSearch,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
+import { PageLayout } from '@/components/page/page-layout';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -24,7 +44,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge } from '@/components/ui/status-badge';
+import type { StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
 import AppLayout from '@/layouts/app-layout';
@@ -32,17 +52,17 @@ import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     ArrowLeft,
-    ArrowUpRight,
+    Building2,
     CalendarDays,
-    CheckCheck,
     ClipboardList,
     Clock3,
+    Eye,
+    ListFilter,
+    Pencil,
     Plus,
-    Search,
     UserRound,
 } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
-import './plans.css';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 type Status = 'planned' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
 const statuses: Record<Status, string> = {
@@ -52,6 +72,25 @@ const statuses: Record<Status, string> = {
     completed: 'Completed',
     cancelled: 'Cancelled',
 };
+const statusTone: Record<Status, StatusVariant> = {
+    planned: 'neutral',
+    in_progress: 'info',
+    blocked: 'warning',
+    completed: 'success',
+    cancelled: 'neutral',
+};
+/** The list views the controller accepts as `status` (default: open). */
+const statusFilters = [
+    { value: 'open', label: 'Open plans' },
+    { value: 'attention', label: 'Needs attention' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'planned', label: 'Planned' },
+    { value: 'in_progress', label: 'In progress' },
+    { value: 'blocked', label: 'Blocked' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'all', label: 'All plans' },
+];
 type Definition = {
     kind: string;
     title: string;
@@ -96,14 +135,18 @@ type Props = {
         data: Plan[];
         current_page: number;
         last_page: number;
-        prev_page_url: string | null;
-        next_page_url: string | null;
         total: number;
+        links: { url: string | null; label: string; active: boolean }[];
     };
     selected: Plan | null;
     history: History;
     counts: Partial<Record<Status | 'overdue', number>>;
-    filters: { site?: string; status?: string; search?: string };
+    filters: {
+        site?: string;
+        status?: string;
+        search?: string;
+        record?: string;
+    };
 };
 type FormValues = {
     title: string;
@@ -132,6 +175,7 @@ export function PlanEditor({
 > & { plan: Plan | null; onClose: () => void }) {
     const [discard, setDiscard] = useState(false);
     const [confirmReload, setConfirmReload] = useState(false);
+    const [dueDateMissing, setDueDateMissing] = useState(false);
     const form = useForm<FormValues>({
         title: plan?.title ?? '',
         due_date: plan?.due_date.slice(0, 10) ?? '',
@@ -157,32 +201,88 @@ export function PlanEditor({
         'Your unsaved plan changes will be lost. Cancel to keep editing.',
     );
     const errors = form.errors as Record<string, string | undefined>;
+    const dueDateError = dueDateMissing
+        ? 'Choose a due date.'
+        : errors.due_date;
     function close() {
         if (form.isDirty) setDiscard(true);
         else onClose();
     }
     function save(event: FormEvent) {
         event.preventDefault();
+        if (!form.data.due_date) {
+            setDueDateMissing(true);
+            document.getElementById('plan-date')?.focus();
+            return;
+        }
         const options = { preserveScroll: true, onSuccess: onClose };
         if (plan)
             form.put(`/work-plans/${definition.kind}/${plan.id}`, options);
         else form.post(`/work-plans/${definition.kind}`, options);
     }
+    const siteMissing = definition.scope === 'site' && !form.data.site_id;
     const eligibleOwners = owners.filter(
         (owner) =>
             definition.scope !== 'site' ||
             owner.site_ids.includes(form.data.site_id ?? 0),
     );
+    const ownerOptions = [
+        ...eligibleOwners.map((owner) => ({
+            value: String(owner.id),
+            label: owner.name,
+        })),
+        ...(plan && !eligibleOwners.some((owner) => owner.id === plan.owner_id)
+            ? [
+                  {
+                      value: String(plan.owner_id),
+                      label: plan.owner.name,
+                      description: 'Current owner',
+                  },
+              ]
+            : []),
+    ];
     return (
         <>
             {leave.confirmation}
+            <ConfirmDialog
+                open={discard}
+                onClose={() => setDiscard(false)}
+                onConfirm={onClose}
+                title="Discard unsaved plan changes?"
+                description="Your changes to this plan have not been saved and will be lost."
+                confirmText="Discard changes"
+                cancelText="Keep editing"
+            />
+            <ConfirmDialog
+                open={confirmReload}
+                onClose={() => setConfirmReload(false)}
+                onConfirm={() =>
+                    leave.discardAndRun(() =>
+                        router.get(
+                            `/work-plans/${definition.kind}`,
+                            { record: plan?.id },
+                            { preserveState: false, preserveScroll: true },
+                        ),
+                    )
+                }
+                title="Reload the saved version?"
+                description="Reloading replaces your unsaved changes with the latest saved version of this plan."
+                confirmText="Discard draft and reload"
+                cancelText="Keep my draft"
+            />
             <Dialog
                 open
                 onOpenChange={(open) => {
                     if (!open) close();
                 }}
             >
-                <DialogContent className="wp-editor sm:max-w-2xl">
+                <DialogContent
+                    className="max-h-[90vh] overflow-y-auto"
+                    style={{
+                        width: 'min(92vw, 720px)',
+                        maxWidth: 'min(92vw, 720px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>
                             {plan
@@ -195,72 +295,46 @@ export function PlanEditor({
                             {definition.title} ·{' '}
                             {definition.scope === 'personal'
                                 ? 'Only you can see this plan'
-                                : 'Visible within this workspace’s permitted audience'}
+                                : 'Visible to people with access to this workspace'}
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={save} className="wp-form">
-                        <p className="wp-guide">{definition.guide}</p>
+                    <form onSubmit={save} className="grid gap-4">
+                        <p className="text-subtle rounded-lg border border-border bg-muted/40 px-3.5 py-3">
+                            {definition.guide}
+                        </p>
                         {Object.keys(errors).length > 0 && (
-                            <div className="wp-error" role="alert">
-                                <strong>
+                            <div
+                                className="grid gap-2 rounded-lg border border-status-critical/40 bg-status-critical-bg p-3.5 text-sm text-foreground"
+                                role="alert"
+                            >
+                                <p className="font-semibold text-status-critical">
                                     Check the following before saving. Your
                                     changes are still here.
-                                </strong>
-                                <ul>
+                                </p>
+                                <ul className="list-disc pl-5">
                                     {Object.entries(errors).map(
                                         ([key, value]) => (
                                             <li key={key}>{value}</li>
                                         ),
                                     )}
                                 </ul>
-                                {errors.version && !confirmReload && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setConfirmReload(true)}
-                                    >
-                                        Reload saved version
-                                    </Button>
-                                )}
-                                {errors.version && confirmReload && (
-                                    <div className="wp-discard">
-                                        <span>
-                                            Reloading replaces your unsaved
-                                            changes with the latest saved
-                                            version.
-                                        </span>
+                                {errors.version && (
+                                    <div>
                                         <Button
                                             type="button"
                                             variant="outline"
+                                            size="sm"
                                             onClick={() =>
-                                                setConfirmReload(false)
+                                                setConfirmReload(true)
                                             }
                                         >
-                                            Keep my draft
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="destructive"
-                                            onClick={() =>
-                                                leave.discardAndRun(() =>
-                                                    router.get(
-                                                        `/work-plans/${definition.kind}`,
-                                                        { record: plan?.id },
-                                                        {
-                                                            preserveState: false,
-                                                            preserveScroll: true,
-                                                        },
-                                                    ),
-                                                )
-                                            }
-                                        >
-                                            Discard draft and reload
+                                            Reload saved version
                                         </Button>
                                     </div>
                                 )}
                             </div>
                         )}
-                        <div className="wp-field">
+                        <div className="grid gap-2">
                             <Label htmlFor="plan-title">Plan title</Label>
                             <Input
                                 id="plan-title"
@@ -275,22 +349,31 @@ export function PlanEditor({
                                 aria-invalid={!!errors.title}
                             />
                         </div>
-                        <div className="wp-two">
-                            <div className="wp-field">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid content-start gap-2">
                                 <Label htmlFor="plan-date">Due date</Label>
-                                <Input
+                                <DatePicker
                                     id="plan-date"
-                                    type="date"
-                                    required
-                                    disabled={!canWrite}
+                                    label="Due date"
                                     value={form.data.due_date}
-                                    onChange={(e) =>
-                                        form.setData('due_date', e.target.value)
+                                    onChange={(value) => {
+                                        form.setData('due_date', value);
+                                        setDueDateMissing(false);
+                                    }}
+                                    disabled={!canWrite}
+                                    invalid={!!dueDateError}
+                                    describedBy={
+                                        dueDateError
+                                            ? 'plan-date-error'
+                                            : undefined
                                     }
-                                    aria-invalid={!!errors.due_date}
+                                />
+                                <InputError
+                                    id="plan-date-error"
+                                    message={dueDateError}
                                 />
                             </div>
-                            <div className="wp-field">
+                            <div className="grid content-start gap-2">
                                 <Label htmlFor="plan-status">Status</Label>
                                 <Select
                                     disabled={!canWrite}
@@ -328,9 +411,9 @@ export function PlanEditor({
                                 </Select>
                             </div>
                         </div>
-                        <div className="wp-two">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             {definition.scope === 'site' && (
-                                <div className="wp-field">
+                                <div className="grid content-start gap-2">
                                     <Label htmlFor="plan-site">Site</Label>
                                     <Select
                                         disabled={!canWrite || !!plan}
@@ -362,7 +445,7 @@ export function PlanEditor({
                                     </Select>
                                 </div>
                             )}
-                            <div className="wp-field">
+                            <div className="grid content-start gap-2">
                                 <Label htmlFor="plan-owner">Owner</Label>
                                 {!canWrite ||
                                 definition.scope === 'personal' ? (
@@ -379,48 +462,44 @@ export function PlanEditor({
                                         }
                                     />
                                 ) : (
-                                    <Select
-                                        value={String(form.data.owner_id)}
-                                        onValueChange={(value) =>
-                                            form.setData(
-                                                'owner_id',
-                                                Number(value),
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger id="plan-owner">
-                                            <SelectValue placeholder="Choose an owner" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {eligibleOwners.map((owner) => (
-                                                <SelectItem
-                                                    key={owner.id}
-                                                    value={String(owner.id)}
-                                                >
-                                                    {owner.name}
-                                                </SelectItem>
-                                            ))}
-                                            {plan &&
-                                                !eligibleOwners.some(
-                                                    (owner) =>
-                                                        owner.id ===
-                                                        plan.owner_id,
-                                                ) && (
-                                                    <SelectItem
-                                                        value={String(
-                                                            plan.owner_id,
-                                                        )}
-                                                    >
-                                                        {plan.owner.name} ·
-                                                        current owner
-                                                    </SelectItem>
-                                                )}
-                                        </SelectContent>
-                                    </Select>
+                                    <>
+                                        <SearchSelect
+                                            id="plan-owner"
+                                            label="Owner"
+                                            value={
+                                                siteMissing
+                                                    ? ''
+                                                    : String(form.data.owner_id)
+                                            }
+                                            options={ownerOptions}
+                                            onChange={(value) =>
+                                                form.setData(
+                                                    'owner_id',
+                                                    Number(value),
+                                                )
+                                            }
+                                            disabled={siteMissing}
+                                            invalid={!!errors.owner_id}
+                                            describedBy={
+                                                siteMissing
+                                                    ? 'plan-owner-hint'
+                                                    : undefined
+                                            }
+                                        />
+                                        {siteMissing && (
+                                            <p
+                                                id="plan-owner-hint"
+                                                className="text-caption"
+                                            >
+                                                Choose a site to see who can own
+                                                this plan.
+                                            </p>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
-                        <div className="wp-field">
+                        <div className="grid gap-2">
                             <Label htmlFor="plan-progress">
                                 Progress ·{' '}
                                 {form.data.status === 'completed'
@@ -457,7 +536,7 @@ export function PlanEditor({
                         </div>
                         {Object.entries(definition.fields).map(
                             ([key, label]) => (
-                                <div key={key} className="wp-field">
+                                <div key={key} className="grid gap-2">
                                     <Label htmlFor={`detail-${key}`}>
                                         {label}
                                     </Label>
@@ -497,7 +576,7 @@ export function PlanEditor({
                                 </div>
                             ),
                         )}
-                        <div className="wp-field">
+                        <div className="grid gap-2">
                             <Label htmlFor="plan-completion">
                                 Completion or closure notes
                                 {form.data.status === 'completed'
@@ -521,8 +600,10 @@ export function PlanEditor({
                             />
                         </div>
                         {plan && (
-                            <div className="wp-history">
-                                <strong>Record history</strong>
+                            <div className="text-caption grid gap-1 border-t border-border pt-3">
+                                <p className="font-semibold text-foreground">
+                                    Record history
+                                </p>
                                 <p>
                                     Last saved {formatDateTime(plan.updated_at)}{' '}
                                     · version {plan.version}
@@ -543,26 +624,7 @@ export function PlanEditor({
                                 ))}
                             </div>
                         )}
-                        {discard && (
-                            <div className="wp-discard" role="alert">
-                                <span>You have unsaved changes.</span>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setDiscard(false)}
-                                >
-                                    Keep editing
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="destructive"
-                                    onClick={onClose}
-                                >
-                                    Discard changes
-                                </Button>
-                            </div>
-                        )}
-                        <div className="wp-form-actions">
+                        <DialogFooter className="sticky -bottom-6 z-10 border-t border-border bg-background py-3">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -582,7 +644,7 @@ export function PlanEditor({
                                           : 'Add plan'}
                                 </Button>
                             )}
-                        </div>
+                        </DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>
@@ -594,6 +656,10 @@ export default function WorkPlans(props: Props) {
     const { definition, records, filters, counts, canWrite, sites } = props;
     const [editing, setEditing] = useState<Plan | 'new' | null>(props.selected);
     const [search, setSearch] = useState(filters.search ?? '');
+    const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+        undefined,
+    );
+    const ctxMenu = useEntityContextMenu<Plan>();
     useEffect(() => {
         // Validation redirects contain fresh server records. Keep the mounted
         // editor (and its draft/version) until the user chooses to reload.
@@ -604,6 +670,15 @@ export default function WorkPlans(props: Props) {
                 : props.selected,
         );
     }, [props.selected, props.errors]);
+    // Keep the header search in step when the server echoes another query,
+    // unless the user has typed a newer search that is still waiting to run.
+    useEffect(() => {
+        if (searchTimer.current === undefined) setSearch(filters.search ?? '');
+    }, [filters.search]);
+    useEffect(() => {
+        const timer = searchTimer;
+        return () => clearTimeout(timer.current);
+    }, []);
     const base = `/work-plans/${definition.kind}`;
     function statusLink(status: string) {
         const query = new URLSearchParams({ status });
@@ -611,340 +686,307 @@ export default function WorkPlans(props: Props) {
         if (filters.search) query.set('search', filters.search);
         return `${base}?${query}`;
     }
-    function filter(values: Partial<Props['filters']>) {
+    function filter(values: Partial<Props['filters']>, replace = false) {
         router.get(
             base,
             { ...filters, ...values, record: undefined },
-            { preserveScroll: true },
+            { preserveScroll: true, preserveState: true, replace },
         );
     }
+    function submitSearch(value: string) {
+        clearTimeout(searchTimer.current);
+        searchTimer.current = undefined;
+        const next = value.trim();
+        if (next === (filters.search ?? '')) return;
+        filter({ search: next || undefined }, true);
+    }
+    function changeSearch(value: string) {
+        setSearch(value);
+        clearTimeout(searchTimer.current);
+        searchTimer.current = setTimeout(() => submitSearch(value), 350);
+    }
+    function openPlan(plan: Plan) {
+        router.get(
+            base,
+            { ...filters, record: plan.id },
+            { preserveScroll: true, preserveState: true },
+        );
+    }
+    // One action list feeds both the kebab and the right-click menu. Status
+    // changes, completion and reopening all happen in the plan editor.
+    const actionsFor = (plan: Plan): MenuItem[] => [
+        {
+            label: canWrite ? 'Open plan' : 'View details',
+            icon: canWrite ? Pencil : Eye,
+            onClick: () => openPlan(plan),
+        },
+    ];
     const open =
         (counts.planned ?? 0) +
         (counts.in_progress ?? 0) +
         (counts.blocked ?? 0);
     const canCreate =
         canWrite && (definition.scope !== 'site' || sites.length > 0);
+    const statusView = filters.status ?? 'open';
+    const statusLabel =
+        statusFilters.find((option) => option.value === statusView)?.label ??
+        'Open plans';
+    const header = (
+        <PageHeader
+            icon={ClipboardList}
+            title={definition.title}
+            frontline={definition.role === 'worker'}
+            subline={
+                definition.scope === 'personal'
+                    ? 'Your private plans · owned by you'
+                    : 'Clear owners, next steps and recorded outcomes'
+            }
+            titleChip={
+                <PageHeaderStatusChip variant="neutral">
+                    {definition.scope === 'personal'
+                        ? 'Private to you'
+                        : 'Recorded by your team'}
+                </PageHeaderStatusChip>
+            }
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={changeSearch}
+                        onKeyDown={(event) => {
+                            if (event.key !== 'Enter') return;
+                            event.preventDefault();
+                            submitSearch(search);
+                        }}
+                        placeholder="Search plan titles…"
+                        ariaLabel="Search plans"
+                    />
+                    <PageHeaderGlassButton asChild>
+                        <Link href={`/dashboard?role=${definition.role}`}>
+                            <ArrowLeft size={16} />
+                            Overview
+                        </Link>
+                    </PageHeaderGlassButton>
+                    {canCreate && (
+                        <PageHeaderPrimaryButton
+                            onClick={() => setEditing('new')}
+                        >
+                            <Plus size={16} />
+                            Add plan
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        href={statusLink('open')}
+                        label="Open plans"
+                    >
+                        <PageHeaderMeterBig>{open}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Work still to finish
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        href={statusLink('overdue')}
+                        label="Overdue"
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.overdue ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Due date has passed
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        href={statusLink('blocked')}
+                        label="Blocked"
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.blocked ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Needs a next step
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        href={statusLink('completed')}
+                        label="Completed"
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.completed ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Recorded outcomes
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    {definition.scope === 'site' && (
+                        <PageHeaderFilterSelect
+                            icon={Building2}
+                            label="All your sites"
+                            value={String(filters.site ?? 'all')}
+                            options={[
+                                { value: 'all', label: 'All your sites' },
+                                ...sites.map((site) => ({
+                                    value: String(site.id),
+                                    label: site.name,
+                                })),
+                            ]}
+                            onChange={(site) =>
+                                filter({
+                                    site: site === 'all' ? undefined : site,
+                                })
+                            }
+                        />
+                    )}
+                    <PageHeaderFilterSelect
+                        icon={ListFilter}
+                        label="Open plans"
+                        value={statusView}
+                        allValue="open"
+                        options={statusFilters}
+                        onChange={(status) => filter({ status })}
+                    />
+                </>
+            }
+        />
+    );
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 {
                     title: 'Overview',
                     href: `/dashboard?role=${definition.role}`,
                 },
-                { title: definition.title, href: base },
+                { title: definition.title },
             ]}
         >
             <Head title={definition.title} />
-            <div className="wp-workspace">
-                <PageHeader
-                    icon={ClipboardList}
-                    title={definition.title}
-                    frontline={definition.role === 'worker'}
-                    subline={
-                        definition.scope === 'personal'
-                            ? 'Your private plans · owned by you'
-                            : 'Clear owners, next steps and recorded outcomes'
-                    }
-                    titleChip={
-                        <PageHeaderStatusChip variant="neutral">
-                            Recorded by your team
-                        </PageHeaderStatusChip>
-                    }
-                    actions={
-                        <>
-                            <PageHeaderGlassButton asChild>
-                                <Link
-                                    href={`/dashboard?role=${definition.role}`}
-                                >
-                                    <ArrowLeft size={16} />
-                                    Overview
-                                </Link>
-                            </PageHeaderGlassButton>
-                            {canCreate && (
-                                <PageHeaderPrimaryButton
-                                    onClick={() => setEditing('new')}
-                                >
-                                    <Plus size={16} />
-                                    Add plan
-                                </PageHeaderPrimaryButton>
-                            )}
-                        </>
-                    }
-                    meters={
-                        <>
-                            <PageHeaderMeterBlock
-                                href={statusLink('open')}
-                                label="Open plans"
-                            >
-                                <PageHeaderMeterBig>{open}</PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Work still to finish
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                href={statusLink('overdue')}
-                                label="Overdue"
-                            >
-                                <PageHeaderMeterBig>
-                                    {counts.overdue ?? 0}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Due date has passed
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                href={statusLink('blocked')}
-                                label="Blocked"
-                            >
-                                <PageHeaderMeterBig>
-                                    {counts.blocked ?? 0}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Needs a next step
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                href={statusLink('completed')}
-                                label="Completed"
-                            >
-                                <PageHeaderMeterBig>
-                                    {counts.completed ?? 0}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Recorded outcomes
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                        </>
-                    }
-                />
-                <div className="wp-body">
-                    <p className="wp-guide">
-                        <ClipboardList size={18} />
-                        {definition.guide}
-                    </p>
-                    <div className="wp-toolbar">
-                        <form
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                filter({ search });
-                            }}
-                            className="wp-search"
-                        >
-                            <Search size={17} />
-                            <Input
-                                aria-label="Search plans"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                                placeholder="Find a plan…"
-                            />
-                            <Button type="submit" variant="outline">
-                                Search
-                            </Button>
-                        </form>
-                        {definition.scope === 'site' && (
-                            <Select
-                                value={String(filters.site ?? 'all')}
-                                onValueChange={(site) =>
-                                    filter({
-                                        site: site === 'all' ? undefined : site,
-                                    })
-                                }
-                            >
-                                <SelectTrigger
-                                    className="wp-filter"
-                                    aria-label="Filter by site"
-                                >
-                                    <SelectValue placeholder="All permitted sites" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All permitted sites
-                                    </SelectItem>
-                                    {sites.map((site) => (
-                                        <SelectItem
-                                            key={site.id}
-                                            value={String(site.id)}
-                                        >
-                                            {site.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                        <Select
-                            value={filters.status ?? 'open'}
-                            onValueChange={(status) => filter({ status })}
-                        >
-                            <SelectTrigger
-                                className="wp-filter"
-                                aria-label="Filter by status"
-                            >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="open">Open plans</SelectItem>
-                                <SelectItem value="attention">
-                                    Needs attention
-                                </SelectItem>
-                                <SelectItem value="overdue">Overdue</SelectItem>
-                                <SelectItem value="planned">Planned</SelectItem>
-                                <SelectItem value="in_progress">
-                                    In progress
-                                </SelectItem>
-                                <SelectItem value="blocked">Blocked</SelectItem>
-                                <SelectItem value="completed">
-                                    Completed
-                                </SelectItem>
-                                <SelectItem value="cancelled">
-                                    Cancelled
-                                </SelectItem>
-                                <SelectItem value="all">All records</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="wp-result-heading">
-                        <h2>
-                            {filters.status === 'completed'
-                                ? 'Completed work'
-                                : filters.status === 'cancelled'
-                                  ? 'Cancelled plans'
-                                  : 'Your work plans'}
-                        </h2>
-                        <span>
-                            {records.total}{' '}
-                            {records.total === 1 ? 'record' : 'records'}
-                        </span>
-                    </div>
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title={statusLabel}
+                        caption={`${records.data.length} of ${records.total} shown`}
+                    />
                     {records.data.length ? (
-                        <div className="wp-grid">
+                        <EntityCardGrid>
                             {records.data.map((plan) => (
-                                <article className="wp-card" key={plan.id}>
-                                    <div className="wp-card-top">
-                                        <StatusBadge
-                                            variant={
-                                                plan.status === 'blocked' ||
-                                                plan.overdue
-                                                    ? 'warning'
-                                                    : 'neutral'
-                                            }
-                                        >
-                                            {plan.overdue
-                                                ? `Overdue · ${statuses[plan.status]}`
-                                                : statuses[plan.status]}
-                                        </StatusBadge>
-                                        <span>#{plan.id}</span>
-                                    </div>
-                                    <h3>
-                                        <Link
-                                            href={`${base}?record=${plan.id}`}
-                                            preserveScroll
-                                        >
-                                            {plan.title}
-                                            <ArrowUpRight size={17} />
-                                        </Link>
-                                    </h3>
-                                    <p className="wp-card-meta">
-                                        <CalendarDays size={15} />
-                                        Due{' '}
-                                        {formatDateOnly(
-                                            plan.due_date.slice(0, 10),
-                                        )}
-                                    </p>
-                                    <p className="wp-card-meta">
-                                        <UserRound size={15} />
-                                        {plan.owner.name}
-                                        {plan.site
-                                            ? ` · ${plan.site.name}`
-                                            : ''}
-                                    </p>
-                                    <div className="wp-progress-heading">
-                                        <span>
-                                            {plan.status === 'completed'
-                                                ? 'Completed'
-                                                : 'Progress'}
-                                        </span>
-                                        <strong>{plan.progress}%</strong>
-                                    </div>
-                                    <progress
-                                        aria-label={`${plan.title} progress`}
-                                        max={100}
-                                        value={plan.progress}
-                                    />
-                                    <div className="wp-card-footer">
-                                        <span>
-                                            {plan.status === 'completed' ? (
-                                                <CheckCheck size={15} />
-                                            ) : (
-                                                <Clock3 size={15} />
-                                            )}
-                                            Version {plan.version}
-                                        </span>
-                                        <Button asChild variant="ghost">
-                                            <Link
-                                                href={`${base}?record=${plan.id}`}
-                                                preserveScroll
+                                <EntityCard
+                                    key={plan.id}
+                                    meridian={
+                                        plan.overdue ||
+                                        plan.status === 'blocked'
+                                            ? 'warning'
+                                            : 'success'
+                                    }
+                                    icon={ClipboardList}
+                                    name={plan.title}
+                                    subline={`Due ${formatDateOnly(
+                                        plan.due_date.slice(0, 10),
+                                    )}`}
+                                    sublineIcon={CalendarDays}
+                                    actions={actionsFor(plan)}
+                                    onOpen={() => openPlan(plan)}
+                                    onContextMenu={(event) =>
+                                        ctxMenu.open(event, plan)
+                                    }
+                                    muted={plan.status === 'cancelled'}
+                                    chips={
+                                        <>
+                                            <EntityStatusChip
+                                                variant={
+                                                    statusTone[plan.status]
+                                                }
                                             >
-                                                {canWrite
-                                                    ? 'Open plan'
-                                                    : 'View details'}
-                                                <ArrowUpRight size={15} />
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                </article>
+                                                {statuses[plan.status]}
+                                            </EntityStatusChip>
+                                            {plan.site ? (
+                                                <EntityChip icon={Building2}>
+                                                    {plan.site.name}
+                                                </EntityChip>
+                                            ) : null}
+                                        </>
+                                    }
+                                    metric={{
+                                        label:
+                                            plan.status === 'completed'
+                                                ? 'Completed'
+                                                : 'Progress',
+                                        value: `${plan.progress}%`,
+                                        percent: plan.progress,
+                                        tone:
+                                            plan.status === 'completed'
+                                                ? 'success'
+                                                : 'brand',
+                                    }}
+                                    alerts={
+                                        plan.overdue ? (
+                                            <EntityStatusChip
+                                                variant="warning"
+                                                icon={Clock3}
+                                            >
+                                                Overdue
+                                            </EntityStatusChip>
+                                        ) : undefined
+                                    }
+                                    footer={{
+                                        personName: plan.owner.name,
+                                        personIcon: UserRound,
+                                        primary: plan.owner.name,
+                                        secondary: 'Plan owner',
+                                    }}
+                                    openLabel={
+                                        canWrite ? 'Open plan' : 'View details'
+                                    }
+                                />
                             ))}
-                        </div>
+                        </EntityCardGrid>
                     ) : (
-                        <div className="wp-empty">
-                            <ClipboardList size={34} />
-                            <h3>No plans in this view</h3>
-                            <p>
-                                {filters.search
+                        <EmptyState
+                            icon={ClipboardList}
+                            title="No plans in this view"
+                            description={
+                                filters.search
                                     ? 'Try a different search or change the filters.'
                                     : canCreate
                                       ? 'Give the next piece of work an owner and a due date.'
-                                      : 'Plans appear here when someone with access records them.'}
-                            </p>
-                            {canCreate && (
-                                <Button onClick={() => setEditing('new')}>
-                                    <Plus size={16} />
-                                    Add your first plan
-                                </Button>
-                            )}
-                        </div>
+                                      : 'Plans appear here when someone with access records them.'
+                            }
+                            action={
+                                canCreate ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setEditing('new')}
+                                    >
+                                        <Plus className="size-4" />
+                                        Add a plan
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
                     )}
-                    {records.last_page > 1 && (
-                        <nav aria-label="Plan pages" className="wp-pagination">
-                            <Button
-                                variant="outline"
-                                disabled={!records.prev_page_url}
-                                onClick={() =>
-                                    records.prev_page_url &&
-                                    router.get(records.prev_page_url)
-                                }
-                            >
-                                Previous
-                            </Button>
-                            <span>
-                                Page {records.current_page} of{' '}
-                                {records.last_page}
-                            </span>
-                            <Button
-                                variant="outline"
-                                disabled={!records.next_page_url}
-                                onClick={() =>
-                                    records.next_page_url &&
-                                    router.get(records.next_page_url)
-                                }
-                            >
-                                Next
-                            </Button>
-                        </nav>
-                    )}
+                    <LaravelPagination
+                        links={records.links}
+                        lastPage={records.last_page}
+                    />
                 </div>
-            </div>
+            </PageLayout>
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={ClipboardList}
+                    title={ctxMenu.ctx.record.title}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
             {editing && (
                 <PlanEditor
                     key={
@@ -955,7 +997,22 @@ export default function WorkPlans(props: Props) {
                     {...props}
                     plan={editing === 'new' ? null : editing}
                     history={editing === 'new' ? [] : props.history}
-                    onClose={() => setEditing(null)}
+                    onClose={() => {
+                        setEditing(null);
+                        // Drop the closed plan from the URL (and from the page
+                        // links built from it), so paging or a refresh doesn't
+                        // reopen it.
+                        if (filters.record)
+                            router.get(
+                                base,
+                                { ...filters, record: undefined },
+                                {
+                                    preserveScroll: true,
+                                    preserveState: true,
+                                    replace: true,
+                                },
+                            );
+                    }}
                 />
             )}
         </AppLayout>

@@ -608,6 +608,7 @@ export default function NotificationPreferences({
                                                             {/* In-App checkbox */}
                                                             <div className="flex w-16 justify-center">
                                                                 <Checkbox
+                                                                    aria-label={`${friendlyNotificationName(key)}: in-app`}
                                                                     checked={
                                                                         pref.inapp
                                                                     }
@@ -630,6 +631,7 @@ export default function NotificationPreferences({
                                                             {/* Email checkbox */}
                                                             <div className="flex w-16 justify-center">
                                                                 <Checkbox
+                                                                    aria-label={`${friendlyNotificationName(key)}: email`}
                                                                     checked={
                                                                         pref.email
                                                                     }
@@ -652,11 +654,16 @@ export default function NotificationPreferences({
                                                             {/* Push checkbox (slightly muted) */}
                                                             <div className="flex w-16 justify-center opacity-60">
                                                                 <Checkbox
+                                                                    aria-label={`${friendlyNotificationName(key)}: push`}
                                                                     checked={
+                                                                        key !==
+                                                                            'hr.calendar.reminder' &&
                                                                         pref.push
                                                                     }
                                                                     disabled={
-                                                                        !masterEnabled
+                                                                        !masterEnabled ||
+                                                                        key ===
+                                                                            'hr.calendar.reminder'
                                                                     }
                                                                     onCheckedChange={(
                                                                         v,
@@ -674,6 +681,7 @@ export default function NotificationPreferences({
                                                             {/* Master toggle */}
                                                             <div className="flex w-14 justify-center">
                                                                 <Switch
+                                                                    aria-label={`Enable ${friendlyNotificationName(key)}`}
                                                                     checked={
                                                                         masterEnabled
                                                                     }

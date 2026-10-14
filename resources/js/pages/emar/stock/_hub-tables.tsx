@@ -112,19 +112,34 @@ export const pharmacyColumns: EntityTableColumn<PharmacyOrderRow>[] = [
     {
         key: 'status',
         label: 'Status',
-        width: '125px',
+        width: '150px',
         cell: (row) => (
-            <EntityStatusChip
-                variant={
-                    row.status === 'delivered'
-                        ? 'success'
-                        : row.status === 'cancelled'
-                          ? 'neutral'
-                          : 'info'
-                }
-            >
-                {pharmacyStatus(row.status)}
-            </EntityStatusChip>
+            <div className="grid justify-items-start gap-1">
+                <EntityStatusChip
+                    variant={
+                        row.status === 'delivered'
+                            ? 'success'
+                            : row.status === 'cancelled'
+                              ? 'neutral'
+                              : 'info'
+                    }
+                >
+                    {pharmacyStatus(row.status)}
+                </EntityStatusChip>
+                {row.dispatch ? (
+                    <span
+                        title={row.dispatch.note ?? row.dispatch.label}
+                        data-testid="pharmacy-dispatch-state"
+                    >
+                        <EntityStatusChip variant={row.dispatch.tone}>
+                            {row.dispatch.short_label}
+                        </EntityStatusChip>
+                        <span className="sr-only">
+                            {` ${row.dispatch.label}. ${row.dispatch.note ?? ''}`}
+                        </span>
+                    </span>
+                ) : null}
+            </div>
         ),
     },
 ];

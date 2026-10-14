@@ -1,11 +1,11 @@
 import { ListCaption } from '@/components/lists';
 import {
-    PageHeader,
     PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
     PageHeaderStatusChip,
@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
@@ -178,8 +179,22 @@ export default function QualificationsIndex({
         })),
     ];
 
+    const headerSearch = (
+        <PageHeaderSearch
+            value={q}
+            onChange={setQ}
+            placeholder={`Search qualifications and ${clientPlural.toLowerCase()}…`}
+        />
+    );
+    const headerPrimaryAction = can.create ? (
+        <PageHeaderPrimaryButton onClick={() => setEditor(null)}>
+            <Plus className="mr-2 size-4" />
+            Add requirement
+        </PageHeaderPrimaryButton>
+    ) : null;
+
     const header = (
-        <PageHeader
+        <WorkforcePageHeader
             icon={Award}
             title="Qualifications"
             titleChip={
@@ -192,22 +207,13 @@ export default function QualificationsIndex({
             subline={`Worker qualification requirements by ${clientSingular.toLowerCase()} · ${s.total} ${s.total === 1 ? 'requirement' : 'requirements'}`}
             actions={
                 <>
-                    <PageHeaderSearch
-                        value={q}
-                        onChange={setQ}
-                        placeholder={`Search qualifications and ${clientPlural.toLowerCase()}…`}
-                    />
-                    {can.create ? (
-                        <Button
-                            onClick={() => setEditor(null)}
-                            className="min-h-11"
-                        >
-                            <Plus className="mr-2 size-4" />
-                            Add requirement
-                        </Button>
-                    ) : null}
+                    {headerSearch}
+                    {headerPrimaryAction}
                 </>
             }
+            mobileSummary="Requirements"
+            mobilePrimaryAction={headerPrimaryAction}
+            mobileSecondaryActions={headerSearch}
             meters={
                 <>
                     <PageHeaderMeterBlock
@@ -277,7 +283,7 @@ export default function QualificationsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: '/operations/rostering' },
                 {
                     title: 'Qualifications',
                     href: '/operations/qualifications',

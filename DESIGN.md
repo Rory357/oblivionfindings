@@ -74,7 +74,7 @@ New status key? Add it to `status-colors.ts` once; it's used on 50+ pages.
 |---|---|
 | Admin/back-office pages | `layouts/app-layout.tsx` (sidebar) + `components/page-shell.tsx` for the title/description/actions header |
 | Frontline/staff mobile pages | `layouts/staff-page-shell.tsx` (+ `staff-bottom-nav`, `.staff-shell-content`, `.frontline-sticky-footer`, `.frontline-header-inset` safe-area helpers from `app.css`) |
-| Auth screens | `layouts/auth/*` |
+| Auth screens | `layouts/auth/auth-journey-layout.tsx` (the Journey half-and-half; see Recurring patterns) |
 | Settings pages | `layouts/settings/layout.tsx` |
 | Marketing pages | `layouts/marketing-layout.tsx` |
 
@@ -149,6 +149,23 @@ meter row).
 ---
 
 ## Recurring patterns — where the canonical version lives
+
+- **Sign-in and account screens: the Journey half-and-half (approved
+  2026-10-13).** Every sign-in, password, verification, invitation and
+  signed-out screen uses `layouts/auth/auth-journey-layout.tsx`. It has a brand
+  half (staff: ink; family: lilac, ink in dark mode) with the NZ islands
+  `JourneyMark`, a two-line headline and the identity from `BrandLockup`, and a
+  plain form half. Styles live in `resources/css/journey-auth.css`; colours
+  are the `--journey-*` tokens, derived from `--primary` so
+  Settings › Branding recolours them. Identity follows branding: no custom
+  branding shows the Journey mark and "oblivion care"; an uploaded logo shows
+  that logo (its "logo for dark backgrounds" version on ink); a custom name
+  alone shows the name without our mark, with "Powered by oblivion care". The
+  islands artwork stays for every client. Staff sign-in asks for the email
+  first and sends organisation domains to their provider. Family sign-in
+  offers the emailed sign-in link first. The journey animation plays once,
+  only while a sign-in is sent. Mockups: the "Sign-in redesign" canvas
+  (claude.ai/artifact/TKAEX7134Dgt5zp7ehDuHn), boards marked "chosen".
 
 - **Calendars — always the Site Calendar style** (approved 2026-09-13).
   `resources/js/pages/sites/calendar/SiteCalendar.tsx` and `_parts.tsx`
@@ -317,6 +334,18 @@ meter row).
   `size-3.5` in dense chrome; default stroke. Icon-only controls always
   carry an `aria-label`.
 - **Stat/KPI cards** — `components/ops-stat-card.tsx` / `fleet-stat-card.tsx`.
+- **Role overview pilot (approved by Stephan 2026-10-13).** The six-role
+  Overview (`features/overview/`) is the reference for editable dashboards:
+  block cards (title + subtitle, ⋯ menu, footer note + "View details ↗"),
+  the drag/resize block grid, the block library and read-only detail
+  panels (a row with facts opens a 480px panel whose one action links to
+  the module). Light mode uses the app tokens. Two overview-only choices
+  are piloted there and are candidates for the whole app — Stephan
+  decides: the **graphite dark palette** and the **calm categorical chart
+  palette** (both as oklch tokens at the top of `workspace.css`), and the
+  **comfortable 38px header dropdowns** (`PageHeaderFilterSelect
+  size="comfortable"`, PAGE_HEADER_STYLE_GUIDE.md §6). Status colours
+  there always use the app's verified pairs.
 - **Multi-step flows** — `WizardShell` (see entity add/edit above).
   `components/wizard-stepper.tsx` is **legacy** — do not use it in new work.
 - **Forms** — shadcn `<Input>`/`<Select>`/`<Textarea>`; dense native-element
@@ -336,6 +365,12 @@ meter row).
 These are recurring mistakes. Recognise and avoid them; each has burned us
 before.
 
+- **Generic sign-in screens** (corrected 2026-10-13: "this does not look
+  unique to us") — sign-in or account pages built from stock auth layouts, a
+  photo background, plain token cards or the shell's ring wordmark. Brand-facing
+  screens use the Oblivion Care Journey identity through
+  `auth-journey-layout.tsx` (Recurring patterns). Don't add a giant stacked
+  wordmark (rejected as Option D) or looping decorative motion.
 - **Raw palette classes / inline hex** — bypasses rebranding; ESLint blocks it.
 - **Hardcoded hues inside CSS utilities** — ESLint only sees classNames, so
   hex hiding in `app.css` rules or `style={{}}` props escapes it. Known
@@ -396,6 +431,15 @@ before.
   `design/band-text-token`); both bands also redefine
   `primary-foreground` inside themselves, so page content in their slots
   reads white too. Brands are never blocked for this.
+- **Fill foregrounds off their fill** (fixed 2026-10-13) — `*-foreground`
+  tokens are for text on their solid fill, not on cards: the destructive
+  `<Alert>` used `text-destructive-foreground` (white in light mode) on a
+  card and rendered white on white. Error text on a light surface uses the
+  critical status pair (`bg-status-critical-bg` +
+  `text-status-critical-foreground`, icon `text-status-critical`), as the
+  `Alert` destructive variant now does. ESLint
+  (`design/no-destructive-foreground-off-fill`) requires `bg-destructive`
+  in the same class string.
 - **Ad-hoc `text-2xl`/`text-xl` headings** — use the typography helpers.
 - **`dark:` colour pairs on token-styled elements** — redundant and drifts.
 - **Pinning a fixed hue to a module** (e.g. `bg-purple-500` for HR) — use
@@ -610,6 +654,22 @@ before.
   `gap-[15px]`/`space-y-6`. Spacing INSIDE a card (its own
   padding and micro-layout) is unaffected. Existing pages migrate via
   conformance sweep probe 17.
+- **Page-scoped token forks** (corrected 2026-10-13, role Overview) — a
+  feature stylesheet that redefines `--background`, `--card`,
+  `--foreground`, `--border`, the `--status-*` pairs or the font with hex
+  values inside its own scope (the Overview shipped 50 of them). The page
+  silently stops following theme, dark-mode and contrast fixes, and its
+  status badges lose the verified pairs. A feature may add its own
+  derived tokens (`--ov-soft: color-mix(… var(--primary) …)`), but core
+  and status tokens come from `app.css`; a deliberate palette pilot is
+  written as oklch tokens, documented here, and approved by Stephan.
+  ESLint cannot see CSS, so check `*.css` files for `#` colours by hand.
+- **Pixel font sizes in feature CSS** (corrected 2026-10-13, role
+  Overview) — `font-size: 11px` ignores the user's text-size setting
+  (`--base-font-size`, 13/14/16px), and 8–10px text was unreadable on the
+  Overview. Use the typography helpers, or `calc(Nrem / 14)` in a
+  stylesheet (N px at the default size), never below the `.text-caption`
+  size (10.5px at default).
 - **Non-existent colour tokens** — utilities like `bg-warning/20` or
   `text-warning-foreground` reference a `warning` token that isn't in the
   `@theme` registry, so they silently render as nothing. The real tokens

@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Management\Services;
 
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCatalogue;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Management\Data\CommandCapabilityDefinition;
 use App\Domain\SecurityDevices\Management\Enums\CommandConfirmationMode;
@@ -33,6 +34,11 @@ final class CommandCapabilityRegistry
     /** @param array<string, mixed> $definition */
     private function make(string $key, array $definition): CommandCapabilityDefinition
     {
+        if ($key === 'endpoint.service.manage') {
+            $catalogue = app(EndpointServiceCatalogue::class)->all();
+            $definition['parameters']['service_name']['enum'] = array_column($catalogue, 'name');
+            $definition['parameters']['service_name']['option_labels'] = array_column($catalogue, 'label', 'name');
+        }
         $required = [
             'label', 'domain', 'level', 'risk', 'requires_step_up', 'requires_approval',
             'requires_change', 'allows_break_glass', 'expires_after_seconds', 'reconciliation',
@@ -47,7 +53,7 @@ final class CommandCapabilityRegistry
         }
 
         $capability = CommandCapabilityDefinition::fromArray($key, $definition);
-        if ($capability->expiresAfterSeconds < 30 || $capability->expiresAfterSeconds > 3600) {
+        if ($capability->expiresAfterSeconds < 30 || $capability->expiresAfterSeconds > ($key === 'endpoint.computer.restart' ? 86405 : 3600)) {
             throw new DomainException("Device capability {$key} has an unsafe expiry.");
         }
         if ($capability->isHighRisk()

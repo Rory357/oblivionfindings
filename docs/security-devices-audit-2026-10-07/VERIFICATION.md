@@ -1,0 +1,15 @@
+# Audit verification record
+
+7 October 2026 · Source baseline `12d5665c47b0367a60ee9df5dcc46917c94b390f`
+
+- Collector: executed the existing standalone Pest suite using installed PHP 8.4 on Windows. Result: 37 passing tests, 335 assertions, 8.43 seconds. Output is retained in `collector-tests.txt`.
+- Main app: attempted the selected protocol unit-test invocation. It could not start because the root dependency tree/test runner is absent. Output retained in `protocol-unit-tests.txt`. No application-test success is claimed.
+- Browser: the hosted Security & Devices URL redirected to login. The user subsequently confirmed that Oblivion is development-only, with nothing in production. No authenticated review or hardware verification occurred.
+- Source findings: traced provider classification → normalized event → signal → alert/correlation → incident inference. SD-01 explicitly retains critical severity; the defect is classification/context/evidence and correlation scope. SD-02 follows the unconditional maintenance branch and its predicate.
+- Report: checked local links across the audit package, including the target scope, market catalogue, pilot and Rory conformance mapping. Source hashes are retained in `source-evidence.json`; hashes identify referenced local files at final verification rather than certifying a hosted installation. Concurrent Health & Safety planning documents can subsequently change.
+- Interactive report: saved one self-contained canvas file under the managed workspace directory, using documented SDK exports and embedded data. Reviewed its source for valid component props, hierarchy, nonempty content, theme-token styling and the required absence of network calls. The app accepted an open request as queued. No host compilation/render diagnostic was returned, so visual rendering is not independently verified; the Markdown audit is the complete fallback.
+- No app code, schema, production setting or device state was changed. Audit/specification documents are the only repository deliverables from this chat. Other active chats have their own untracked audit files.
+- Scope reconciliation: the report and canvas incorporate all eight clarification answers and Rory's rules. The Health & Safety audit chat confirmed its shared contract now uses one complete final release gate, configurable evidence/access rules and HR-owned attendance. The market catalogue contains 24 equipment families; the base pilot contains 21 logical records across two synthetic sites. Neither is a claim of implemented integration or seeded data.
+- Subsequent provider decision: the user selected NinjaOne and Microsoft Intune. Updated the scope, audit, market catalogue, decision checklist, pilot and canvas to reflect the selection. This was documentation-only; no integration connection, subscription purchase or additional application test run occurred.
+
+The report distinguishes source presence, locally executed tests, deployment configuration and witnessed hardware acceptance. No aggregate percentage of completion is asserted.

@@ -1,8 +1,9 @@
-/* eslint-disable no-restricted-syntax -- The approved puzzle controls and library cards use custom button geometry; form actions use the shared Button. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     PageHeader,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
+    PageHeaderMeterAvatars,
     PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -11,13 +12,16 @@ import {
     PageHeaderMeterSpark,
     PageHeaderPrimaryButton,
     PageHeaderRail,
+    PageHeaderSearchTrigger,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
@@ -29,7 +33,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -37,8 +43,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Toggle } from '@/components/ui/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatTime } from '@/lib/datetime';
+import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
 import {
     DndContext,
     KeyboardSensor,
@@ -85,6 +94,7 @@ import {
     Sparkles,
     Star,
     Trash2,
+    TriangleAlert,
     Undo2,
     UsersRound,
     X,
@@ -101,10 +111,16 @@ import {
     type ReactNode,
 } from 'react';
 import { toast } from 'sonner';
-import { BlockContent } from './block-content';
+import {
+    BlockContent,
+    BlockSketch,
+    ConnectionHistoryStrip,
+    OverviewDetailContext,
+} from './block-content';
 import {
     catalog,
     defaultBlocks,
+    fillRows,
     moveBlock,
     tidyBlocks,
     writeOverview,
@@ -116,6 +132,7 @@ import {
     type OverviewProps,
     type Range,
     type Role,
+    type Row,
 } from './types';
 import './workspace.css';
 
@@ -126,6 +143,8 @@ const rangeLabels = {
     quarter: 'This quarter',
 };
 type Tab = 'overview' | 'attention' | 'insights';
+/** The view-mode card footer (status line + View details). */
+const FOOTER_HEIGHT = 43;
 type DialogView = 'library' | 'starters' | 'saved' | 'find' | null;
 
 function ScopeSelect({
@@ -146,7 +165,7 @@ function ScopeSelect({
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="page">Follow page filter</SelectItem>
-                <SelectItem value="all">All permitted sites</SelectItem>
+                <SelectItem value="all">All your sites</SelectItem>
                 {sites.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>
                         {s.name}
@@ -194,7 +213,21 @@ function PuzzleBlock({
         transition,
     } = useSortable({ id: layout.id, disabled: !editing });
     const content = useRef<HTMLDivElement>(null);
+    const tools = useRef<HTMLDivElement>(null);
+    const bottom = useRef<HTMLDivElement>(null);
     const [naturalHeight, setNaturalHeight] = useState(300);
+    // Saved heights are view-mode heights. The editor adds a tools bar and a
+    // scope bar and drops the footer, so it converts with this difference.
+    const [chrome, setChrome] = useState(0);
+    useLayoutEffect(() => {
+        setChrome(
+            editing
+                ? (tools.current?.offsetHeight ?? 0) +
+                      (bottom.current?.offsetHeight ?? 0) -
+                      (meta.kind === 'focus' ? 0 : FOOTER_HEIGHT)
+                : 0,
+        );
+    }, [editing, meta.kind]);
     const [resize, setResize] = useState<{
         span: number;
         height: number;
@@ -216,10 +249,11 @@ function PuzzleBlock({
         return () => observer.disconnect();
     }, []);
     const span = resize?.span ?? layout.span;
-    const footerHeight = meta.kind === 'focus' || editing ? 0 : 43;
+    const footerHeight = meta.kind === 'focus' || editing ? 0 : FOOTER_HEIGHT;
+    const savedHeight = resize?.height ?? layout.height;
     const height = Math.max(
         naturalHeight + footerHeight,
-        resize?.height ?? layout.height,
+        savedHeight ? savedHeight + chrome : 0,
     );
     const title = data?.title ?? meta.title;
     const style = {
@@ -242,7 +276,7 @@ function PuzzleBlock({
             x: e.clientX,
             y: e.clientY,
             span: layout.span,
-            height: block.getBoundingClientRect().height,
+            height: block.getBoundingClientRect().height - chrome,
             width: block.getBoundingClientRect().width,
         };
     }
@@ -278,13 +312,14 @@ function PuzzleBlock({
             style={style}
             className={`ov-card ${editing ? 'ov-card-edit' : ''} ${isDragging ? 'ov-dragging' : ''}`}
             aria-label={title}
+            tabIndex={-1}
             data-block={layout.id}
             data-span={layout.span}
             data-kind={meta.kind}
         >
             <div ref={content} className="ov-card-inner">
                 {editing && (
-                    <div className="ov-block-tools">
+                    <div className="ov-block-tools" ref={tools}>
                         <button
                             type="button"
                             className="ov-icon-button ov-drag-handle"
@@ -304,12 +339,14 @@ function PuzzleBlock({
                         </span>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button
-                                    className="ov-icon-button"
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="ov-tool-button"
                                     aria-label={`Size and position of ${title}`}
                                 >
-                                    <MoreHorizontal size={18} />
-                                </button>
+                                    <MoreHorizontal />
+                                </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>
@@ -346,13 +383,15 @@ function PuzzleBlock({
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <button
-                            className="ov-icon-button"
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ov-tool-button"
                             aria-label={`Remove ${title}`}
                             onClick={onRemove}
                         >
-                            <X size={16} />
-                        </button>
+                            <X />
+                        </Button>
                     </div>
                 )}
                 <header className="ov-card-head">
@@ -361,17 +400,19 @@ function PuzzleBlock({
                         <p>{data?.subtitle ?? meta.description}</p>
                     </div>
                     {data?.state === 'proposed' ? (
-                        <span className="ov-proposal">Proposed</span>
+                        <StatusBadge variant="neutral">Proposed</StatusBadge>
                     ) : (
                         !editing && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button
-                                        className="ov-icon-button"
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="ov-tool-button"
                                         aria-label={`Options for ${title}`}
                                     >
-                                        <MoreHorizontal size={17} />
-                                    </button>
+                                        <MoreHorizontal />
+                                    </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     {data?.href && (
@@ -397,10 +438,10 @@ function PuzzleBlock({
                             <ShieldCheck size={12} />
                             Fixed to{' '}
                             {layout.site === 'all'
-                                ? 'all permitted sites'
+                                ? 'all your sites'
                                 : (sites.find(
                                       (s) => String(s.id) === layout.site,
-                                  )?.name ?? 'unavailable site')}
+                                  )?.name ?? 'a site you can no longer see')}
                         </div>
                     )}
                 <div
@@ -415,12 +456,12 @@ function PuzzleBlock({
                     />
                 </div>
                 {editing && (
-                    <div className="ov-block-bottom">
+                    <div className="ov-block-bottom" ref={bottom}>
                         {data?.scopeMode && data.scopeMode !== 'site' ? (
                             <span>
                                 {data.scopeMode === 'personal'
                                     ? 'Personal · across sites'
-                                    : 'Organisation-wide · permitted audience'}
+                                    : 'Organisation-wide'}
                             </span>
                         ) : (
                             <ScopeSelect
@@ -451,7 +492,7 @@ function PuzzleBlock({
                                         ? 'No outstanding priorities in this view'
                                         : 'Current work · ordered by urgency'
                                   : (data?.footnote ??
-                                    'Live records · your permitted view')}
+                                    'Live records · what you can see')}
                     </span>
                     {meta.id === 'attention' &&
                     !expanded &&
@@ -460,7 +501,8 @@ function PuzzleBlock({
                         (data.total ?? 0) > 0 ||
                         data.rows.length > 0 ||
                         (data.reviewTotal ?? 0) > 0) ? (
-                        <button onClick={onExpand}>
+                        // eslint-disable-next-line no-restricted-syntax -- styled as the footer's text link, like its sibling <Link>s
+                        <button type="button" onClick={onExpand}>
                             View all {data?.total ?? 0}{' '}
                             {data?.total === 1 ? 'item' : 'items'}{' '}
                             <ArrowRight size={14} />
@@ -503,7 +545,8 @@ function PuzzleBlock({
                                     0,
                                     Math.min(
                                         720,
-                                        (layout.height || naturalHeight) +
+                                        (layout.height ||
+                                            naturalHeight - chrome) +
                                             (e.key === 'ArrowDown' ? 36 : -36),
                                     ),
                                 ),
@@ -554,6 +597,7 @@ export default function OverviewWorkspace(props: OverviewProps) {
 function Workspace({
     role,
     roles,
+    defaultRole,
     sites,
     filters,
     overview,
@@ -595,7 +639,16 @@ function Workspace({
     const [error, setError] = useState('');
     const [dialog, setDialog] = useState<DialogView>(null);
     const [previewId, setPreviewId] = useState<string | null>(null);
-    const [tab, setTab] = useState<Tab>('overview');
+    // The tab lives in the URL too, so changing site or period keeps it.
+    const [tab, setTab] = useState<Tab>(() => {
+        const value =
+            typeof window === 'undefined'
+                ? null
+                : new URLSearchParams(window.location.search).get('tab');
+        return value === 'attention' || value === 'insights'
+            ? value
+            : 'overview';
+    });
     const [query, setQuery] = useState('');
     const [category, setCategory] = useState('All');
     const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -605,7 +658,17 @@ function Workspace({
     const [announcement, setAnnouncement] = useState('');
     const [scopes, setScopes] = useState<Record<string, OverviewData>>({});
     const [refreshing, setRefreshing] = useState(false);
+    const [isDefault, setIsDefault] = useState(defaultRole === role);
+    const [detailRow, setDetailRow] = useState<Row | null>(null);
+    const [confirmCancel, setConfirmCancel] = useState(false);
+    const [conflict, setConflict] = useState<{
+        revision: string | null;
+        value: OverviewProps['preference']['value'];
+    } | null>(null);
+    const [savingDefault, setSavingDefault] = useState(false);
     const board = useRef<HTMLDivElement>(null);
+    /** Where focus goes when the dialog closes (a Find result's block). */
+    const returnFocus = useRef<string | null>(null);
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
         useSensor(KeyboardSensor, {
@@ -613,20 +676,26 @@ function Workspace({
         }),
     );
     const editing = draft !== null;
-    const scopeKey = [
-        ...new Set(
-            current.blocks
-                .map((b) => (b.site === 'page' ? filters.site : b.site))
-                .filter((s) => s !== filters.site),
-        ),
-    ]
+    // Warnings stay in Needs attention; only critical work is called urgent.
+    const urgentNow = overview.urgent.filter((row) => row.tone === 'critical');
+    // Blocks pinned to another site, grouped by site: "3:trend+sites,7:agenda".
+    // Each site fetch works out only its own pinned blocks.
+    const scopeKey = Object.entries(
+        current.blocks.reduce<Record<string, string[]>>((sites, b) => {
+            const site = b.site === 'page' ? filters.site : b.site;
+            if (site !== filters.site) (sites[site] ??= []).push(b.id);
+            return sites;
+        }, {}),
+    )
+        .map(([site, ids]) => `${site}:${[...ids].sort().join('+')}`)
         .sort()
         .join(',');
     useEffect(() => {
         const controller = new AbortController();
-        for (const site of scopeKey.split(',').filter(Boolean)) {
+        for (const entry of scopeKey.split(',').filter(Boolean)) {
+            const [site, ids] = entry.split(':');
             fetch(
-                `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site })}`,
+                `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site, blocks: ids.split('+').join(',') })}`,
                 {
                     signal: controller.signal,
                     headers: { Accept: 'application/json' },
@@ -667,6 +736,76 @@ function Workspace({
         }
         return () => controller.abort();
     }, [scopeKey, role, filters.range, overview, roleMeta]);
+    // The page load works out only the layout's blocks. The editor needs the
+    // whole library (previews, newly added blocks), so it loads it once here.
+    // Tied to the page data it was loaded with, so a refresh or new filters
+    // never show last time's previews.
+    const [libraryLoad, setLibraryLoad] = useState<{
+        source: OverviewData;
+        blocks: Record<string, BlockData>;
+    } | null>(null);
+    const libraryData =
+        libraryLoad?.source === overview ? libraryLoad.blocks : null;
+    useEffect(() => {
+        if (!editing || libraryData) return;
+        const setLibraryData = (blocks: Record<string, BlockData>) =>
+            setLibraryLoad({ source: overview, blocks });
+        const controller = new AbortController();
+        fetch(
+            `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site: filters.site, blocks: 'all' })}`,
+            {
+                signal: controller.signal,
+                headers: { Accept: 'application/json' },
+            },
+        )
+            .then(async (response) => {
+                if (!response.ok) throw new Error('Library unavailable');
+                return (await response.json()) as OverviewData;
+            })
+            .then((data) => setLibraryData(data.blocks))
+            .catch((e) => {
+                if (e.name === 'AbortError') return;
+                setLibraryData(
+                    Object.fromEntries(
+                        roleMeta.blocks.map((b) => [
+                            b.id,
+                            {
+                                state: 'unavailable',
+                                subtitle: 'Information unavailable',
+                                message:
+                                    'This summary could not be loaded. Refresh to try again.',
+                                rows: [],
+                                series: [],
+                                total: null,
+                            } satisfies BlockData,
+                        ]),
+                    ),
+                );
+            });
+        return () => controller.abort();
+    }, [
+        editing,
+        libraryData,
+        overview,
+        role,
+        filters.range,
+        filters.site,
+        roleMeta,
+    ]);
+    const pageBlocks = useMemo(
+        () =>
+            libraryData
+                ? Object.fromEntries(
+                      Object.entries(overview.blocks).map(([id, block]) => [
+                          id,
+                          block.state === 'deferred'
+                              ? (libraryData[id] ?? block)
+                              : block,
+                      ]),
+                  )
+                : overview.blocks,
+        [overview.blocks, libraryData],
+    );
     useEffect(() => {
         if (!editing) return;
         const beforeUnload = (e: BeforeUnloadEvent) => {
@@ -681,6 +820,33 @@ function Workspace({
             window.removeEventListener('beforeunload', beforeUnload);
             cancelVisit();
         };
+    }, [editing]);
+    // Editor shortcuts listen on the window: removing a block unmounts the
+    // focused control, and Ctrl+Z must still work from the page body.
+    const shortcuts = useRef<(e: KeyboardEvent) => void>(() => {});
+    shortcuts.current = (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement;
+        if (
+            dialog ||
+            ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+            target.isContentEditable
+        )
+            return;
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            void save();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) redo();
+            else undo();
+        }
+    };
+    useEffect(() => {
+        if (!editing) return;
+        const onKey = (e: KeyboardEvent) => shortcuts.current(e);
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
     }, [editing]);
     const change = useCallback(
         (next: Layout, message = 'Layout updated') => {
@@ -728,12 +894,47 @@ function Workspace({
             setAnnouncement('Your overview layout has been saved.');
             toast.success('Overview layout saved');
         } catch (e) {
+            const failure = e as Error & {
+                status?: number;
+                data?: { revision?: string | null; value?: unknown };
+            };
+            if (failure.status === 409 && failure.data)
+                setConflict({
+                    revision: failure.data.revision ?? null,
+                    value: failure.data
+                        .value as OverviewProps['preference']['value'],
+                });
             setError(
                 e instanceof Error ? e.message : 'Could not save this layout.',
             );
         } finally {
             setSaving(false);
         }
+    }
+    /** After a clash with another tab: keep the draft and save over it. */
+    function keepDraft() {
+        if (!conflict) return;
+        setRevision(conflict.revision);
+        setConflict(null);
+        setError('');
+        setAnnouncement(
+            'Your changes will replace the other tab’s layout when you save.',
+        );
+    }
+    /** After a clash with another tab: adopt the newer saved layout. */
+    function adoptLatest() {
+        if (!conflict) return;
+        const latest = {
+            ...conflict.value,
+            range: filters.range,
+            blocks: conflict.value.blocks ?? defaultBlocks(role),
+        };
+        setSaved(latest);
+        setRevision(conflict.revision);
+        setConflict(null);
+        setDraft(null);
+        setError('');
+        setAnnouncement('The layout from the other tab is now showing.');
     }
     function updateBlock(id: string, value: Partial<BlockLayout>) {
         change({
@@ -770,9 +971,9 @@ function Workspace({
     }
     function dataFor(block: BlockLayout): BlockData | undefined {
         const site = block.site === 'page' ? filters.site : block.site;
-        return (site === filters.site ? overview : scopes[site])?.blocks[
-            block.id
-        ];
+        return site === filters.site
+            ? pageBlocks[block.id]
+            : scopes[site]?.blocks[block.id];
     }
     function navigate(next: { role?: Role; site?: string; range?: Range }) {
         if (editing) return;
@@ -783,6 +984,7 @@ function Workspace({
                 ...filters,
                 ...next,
                 ...(next.role ? { site: 'all', range: undefined } : {}),
+                tab: tab === 'overview' ? undefined : tab,
             },
             { preserveScroll: true, replace: true },
         );
@@ -791,21 +993,25 @@ function Workspace({
         const blocks = tidyBlocks(current.blocks);
         let row: BlockLayout[] = [],
             width = 0;
+        // Measure each card as it will look outside the editor: its content
+        // without the tools and scope bars, plus the footer.
+        const viewHeight = (b: BlockLayout) => {
+            const card = board.current?.querySelector(`[data-block="${b.id}"]`);
+            const measure = (selector: string) =>
+                card?.querySelector(selector)?.getBoundingClientRect().height ??
+                0;
+            const kind = roleMeta.blocks.find((m) => m.id === b.id)?.kind;
+            return (
+                measure('.ov-card-inner') -
+                measure('.ov-block-tools') -
+                measure('.ov-block-bottom') +
+                (kind === 'focus' ? 0 : FOOTER_HEIGHT)
+            );
+        };
         const align = () => {
             const height = Math.min(
                 720,
-                Math.ceil(
-                    Math.max(
-                        ...row.map(
-                            (b) =>
-                                board.current
-                                    ?.querySelector(
-                                        `[data-block="${b.id}"] .ov-card-inner`,
-                                    )
-                                    ?.getBoundingClientRect().height ?? 0,
-                        ),
-                    ),
-                ),
+                Math.ceil(Math.max(...row.map(viewHeight))),
             );
             row.forEach((b) => {
                 b.height = height;
@@ -905,13 +1111,25 @@ function Workspace({
                 ),
         [roleMeta, query, category, favoritesOnly, availableOnly, current],
     );
+    // Needs attention follows the approved mockup: the full priority list,
+    // the next step beside it, then the upcoming dates.
+    const attentionView: BlockLayout[] = [
+        { id: 'attention', span: 8, height: 0, site: 'page' },
+        { id: 'focus', span: 4, height: 0, site: 'page' },
+        { id: 'agenda', span: 12, height: 0, site: 'page' },
+    ];
     const shown =
         tab === 'attention'
-            ? [{ id: 'attention', span: 12, height: 0, site: 'page' }]
+            ? attentionView.filter((b) =>
+                  roleMeta.blocks.some((m) => m.id === b.id),
+              )
             : tab === 'insights'
-              ? current.blocks.filter((b) =>
-                    ['trend', 'donut', 'bars', 'progress'].includes(
-                        roleMeta.blocks.find((m) => m.id === b.id)?.kind ?? '',
+              ? fillRows(
+                    current.blocks.filter((b) =>
+                        ['trend', 'donut', 'bars', 'progress'].includes(
+                            roleMeta.blocks.find((m) => m.id === b.id)?.kind ??
+                                '',
+                        ),
                     ),
                 )
               : current.blocks;
@@ -932,31 +1150,29 @@ function Workspace({
         governance: 'Board workspace',
     }[role];
     const previewMeta = roleMeta.blocks.find((b) => b.id === previewId);
+    const titleOf = (id: string | number) =>
+        roleMeta.blocks.find((b) => b.id === id)?.title ?? 'block';
+    const needle = query.trim().toLowerCase();
+    const foundSteps =
+        dialog === 'find'
+            ? overview.urgent.filter((r) =>
+                  r.label.toLowerCase().includes(needle),
+              )
+            : [];
+    const foundBlocks =
+        dialog === 'find'
+            ? roleMeta.blocks.filter(
+                  (b) =>
+                      current.blocks.some((c) => c.id === b.id) &&
+                      b.title.toLowerCase().includes(needle),
+              )
+            : [];
     return (
         <div
             className="ov-workspace"
             data-editing={editing}
             data-density={current.density}
             data-role={role}
-            onKeyDown={(e) => {
-                if (
-                    !editing ||
-                    dialog ||
-                    ['INPUT', 'TEXTAREA'].includes(
-                        (e.target as HTMLElement).tagName,
-                    )
-                )
-                    return;
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                    e.preventDefault();
-                    void save();
-                }
-                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-                    e.preventDefault();
-                    if (e.shiftKey) redo();
-                    else undo();
-                }
-            }}
         >
             <PageHeader
                 icon={
@@ -971,10 +1187,7 @@ function Workspace({
                 }
                 title="Overview"
                 titleChip={
-                    <PageHeaderStatusChip
-                        variant="neutral"
-                        className="ov-role-chip"
-                    >
+                    <PageHeaderStatusChip variant="neutral">
                         {roleMeta.name}
                     </PageHeaderStatusChip>
                 }
@@ -982,12 +1195,11 @@ function Workspace({
                 actions={
                     !editing && (
                         <>
-                            <PageHeaderGlassButton
-                                onClick={() => startDialog('find')}
-                                aria-label="Find in overview"
-                            >
-                                <Search size={16} />
-                            </PageHeaderGlassButton>
+                            <PageHeaderSearchTrigger
+                                className="ov-hero-find"
+                                placeholder="Find in overview…"
+                                onOpen={() => startDialog('find')}
+                            />
                             <PageHeaderGlassButton onClick={edit}>
                                 <LayoutDashboard size={16} />
                                 Edit layout
@@ -1033,9 +1245,14 @@ function Workspace({
                             {...(m.href
                                 ? { href: m.href }
                                 : { onClick: () => setTab('attention') })}
+                            // OverviewData always places Needs attention second.
                             tone={
-                                i === 1 && overview.urgent.length
-                                    ? 'warning'
+                                i === 1
+                                    ? urgentNow.length
+                                        ? 'critical'
+                                        : overview.urgent.length
+                                          ? 'warning'
+                                          : 'brand'
                                     : 'brand'
                             }
                         >
@@ -1053,19 +1270,18 @@ function Workspace({
                                     <span>—</span>
                                     {m.instrumentCaption ?? 'No records yet'}
                                 </span>
-                            ) : m.avatars?.length ? (
+                            ) : m.people?.length ? (
                                 <div className="ov-duty-meter">
                                     <PageHeaderMeterBig>
                                         {m.value ?? '—'}
                                     </PageHeaderMeterBig>
-                                    <span
-                                        className="ov-duty-avatars"
-                                        aria-label="On-duty team initials"
-                                    >
-                                        {m.avatars.map((initials, index) => (
-                                            <span key={index}>{initials}</span>
-                                        ))}
-                                    </span>
+                                    <PageHeaderMeterAvatars
+                                        people={m.people}
+                                        overflow={Math.max(
+                                            0,
+                                            (m.value ?? 0) - m.people.length,
+                                        )}
+                                    />
                                 </div>
                             ) : (
                                 <PageHeaderMeterBig>
@@ -1092,6 +1308,7 @@ function Workspace({
                             </span>
                             {roles.length > 1 && (
                                 <PageHeaderFilterSelect
+                                    size="comfortable"
                                     icon={UsersRound}
                                     label={roleMeta.name}
                                     value={role}
@@ -1108,13 +1325,14 @@ function Workspace({
                             )}
                             {role !== 'governance' && (
                                 <PageHeaderFilterSelect
+                                    size="comfortable"
                                     icon={Building2}
-                                    label="All permitted sites"
+                                    label="All your sites"
                                     value={filters.site}
                                     options={[
                                         {
                                             value: 'all',
-                                            label: 'All permitted sites',
+                                            label: 'All your sites',
                                         },
                                         ...sites.map((s) => ({
                                             value: String(s.id),
@@ -1125,6 +1343,7 @@ function Workspace({
                                 />
                             )}
                             <PageHeaderFilterSelect
+                                size="comfortable"
                                 icon={CalendarDays}
                                 label={rangeLabels[filters.range]}
                                 value={filters.range}
@@ -1153,7 +1372,7 @@ function Workspace({
                                     key: 'attention',
                                     label: 'Needs attention',
                                     count: overview.blocks.attention.total ?? 0,
-                                    alert: overview.urgent.length > 0,
+                                    alert: urgentNow.length > 0,
                                 },
                                 {
                                     key: 'insights',
@@ -1171,23 +1390,26 @@ function Workspace({
                     )
                 }
             />
-            {overview.urgent.length > 0 && (
-                <div className="ov-urgent">
-                    <ShieldCheck size={18} />
+            {urgentNow.length > 0 && (
+                <div className="ov-urgent" role="status">
+                    <TriangleAlert size={18} aria-hidden="true" />
                     <strong>
-                        {overview.urgent.length === 1
-                            ? '1 priority needs attention'
-                            : `${overview.urgent.length} priorities need attention`}
+                        {urgentNow.length === 1
+                            ? '1 urgent item'
+                            : `${urgentNow.length} urgent items`}
                     </strong>
-                    <span>{overview.urgent[0].label}</span>
-                    <button
+                    <span>{urgentNow[0].label}</span>
+                    <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                             if (editing) startDialog('find');
                             else setTab('attention');
                         }}
                     >
-                        Review now <ArrowUpRight size={15} />
-                    </button>
+                        Review now
+                        <ArrowUpRight />
+                    </Button>
                 </div>
             )}
             {overview.partial && (
@@ -1209,26 +1431,39 @@ function Workspace({
             )}
             {!editing && (
                 <div className="ov-context">
-                    <button
-                        className="ov-context-priorities"
-                        onClick={() => setTab('attention')}
-                    >
-                        <Check size={14} />
-                        {overview.partial
-                            ? 'Some summaries need a refresh'
-                            : overview.blocks.attention.total
-                              ? `${overview.blocks.attention.total} ${overview.blocks.attention.total === 1 ? 'item needs' : 'items need'} your review`
-                              : 'No outstanding priorities in this view'}
-                        <ArrowRight size={13} />
-                    </button>
+                    {overview.partial || overview.blocks.attention.total ? (
+                        // eslint-disable-next-line no-restricted-syntax -- a quiet text link in the status line, not a button
+                        <button
+                            type="button"
+                            className="ov-context-priorities"
+                            onClick={() => setTab('attention')}
+                        >
+                            {overview.partial
+                                ? 'Some summaries need a refresh'
+                                : `${overview.blocks.attention.total} ${overview.blocks.attention.total === 1 ? 'item needs' : 'items need'} your review`}
+                            <ArrowRight size={13} />
+                        </button>
+                    ) : (
+                        <span className="ov-context-priorities">
+                            <Check size={14} />
+                            You’re up to date
+                        </span>
+                    )}
                     <span>
                         {formatDate(overview.period.start)} –{' '}
                         {formatDate(overview.period.end)}
                     </span>
-                    <button onClick={refresh} disabled={refreshing}>
+                    {/* eslint-disable-next-line no-restricted-syntax -- the "Updated" timestamp doubles as a quiet refresh link */}
+                    <button
+                        type="button"
+                        className="ov-context-refresh"
+                        onClick={refresh}
+                        disabled={refreshing}
+                        aria-label={`Refresh · updated ${formatTime(overview.updatedAt)}`}
+                    >
                         <RefreshCw
                             size={13}
-                            className={refreshing ? 'ov-loading' : ''}
+                            className={refreshing ? 'animate-spin' : undefined}
                         />
                         Updated {formatTime(overview.updatedAt)}
                     </button>
@@ -1238,7 +1473,7 @@ function Workspace({
                 <div className="ov-editor-toolbar">
                     <div className="ov-editor-top">
                         <div>
-                            <span className="ov-eyebrow">MAKE IT YOURS</span>
+                            <span className="ov-eyebrow">Your layout</span>
                             <h2>Edit your overview</h2>
                             <p>
                                 {roleMeta.name} · {current.blocks.length} blocks
@@ -1258,6 +1493,10 @@ function Workspace({
                                 variant="ghost"
                                 disabled={saving}
                                 onClick={() => {
+                                    if (history.length) {
+                                        setConfirmCancel(true);
+                                        return;
+                                    }
                                     setDraft(null);
                                     setError('');
                                 }}
@@ -1274,51 +1513,60 @@ function Workspace({
                     </div>
                     <div className="ov-editor-secondary" inert={saving}>
                         <span>Drag to arrange · Resize a corner</span>
-                        <div
+                        <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
                             className="ov-density"
                             aria-label="Information density"
+                            value={current.density}
+                            onValueChange={(d) => {
+                                if (d === 'balanced' || d === 'compact')
+                                    change({ ...current, density: d });
+                            }}
                         >
-                            {(['balanced', 'compact'] as const).map((d) => (
-                                <button
-                                    key={d}
-                                    aria-pressed={current.density === d}
-                                    onClick={() =>
-                                        change({ ...current, density: d })
-                                    }
-                                >
-                                    {d === 'balanced' ? 'Balanced' : 'Compact'}
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            className="ov-icon-button"
+                            <ToggleGroupItem value="balanced">
+                                Balanced
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="compact">
+                                Compact
+                            </ToggleGroupItem>
+                        </ToggleGroup>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ov-tool-button"
                             aria-label="Undo layout change"
                             disabled={!history.length}
                             onClick={undo}
                         >
-                            <Undo2 size={17} />
-                        </button>
-                        <button
-                            className="ov-icon-button"
+                            <Undo2 />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ov-tool-button"
                             aria-label="Redo layout change"
                             disabled={!future.length}
                             onClick={redo}
                         >
-                            <Redo2 size={17} />
-                        </button>
-                        <button className="ov-text-button" onClick={tidy}>
-                            <Sparkles size={15} />
+                            <Redo2 />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={tidy}>
+                            <Sparkles />
                             Tidy layout
-                        </button>
-                        <button
-                            className="ov-text-button"
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => startDialog('saved')}
                         >
-                            <BookOpen size={15} />
+                            <BookOpen />
                             Saved layouts
-                        </button>
-                        <button
-                            className="ov-text-button"
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() =>
                                 change(
                                     {
@@ -1330,14 +1578,28 @@ function Workspace({
                                 )
                             }
                         >
-                            <RotateCcw size={15} />
+                            <RotateCcw />
                             Restore defaults
-                        </button>
+                        </Button>
                     </div>
                     {error && (
-                        <p role="alert" className="ov-save-error">
-                            {error}
-                        </p>
+                        <div role="alert" className="ov-save-error">
+                            <p>{error}</p>
+                            {conflict && (
+                                <div className="ov-save-error-actions">
+                                    <Button size="sm" onClick={keepDraft}>
+                                        Keep my changes
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={adoptLatest}
+                                    >
+                                        Use the other tab’s layout
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             )}
@@ -1348,84 +1610,130 @@ function Workspace({
                 role={editing ? 'region' : undefined}
                 aria-label={editing ? 'Scrollable dashboard layout' : undefined}
             >
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={dragEnd}
+                <OverviewDetailContext.Provider
+                    value={editing ? null : setDetailRow}
                 >
-                    <SortableContext
-                        items={shown.map((b) => b.id)}
-                        strategy={rectSortingStrategy}
+                    <DndContext
+                        accessibility={{
+                            announcements: {
+                                onDragStart: ({ active }) =>
+                                    `Picked up ${titleOf(active.id)}.`,
+                                onDragOver: ({ active, over }) =>
+                                    over
+                                        ? `${titleOf(active.id)} is over ${titleOf(over.id)}.`
+                                        : `${titleOf(active.id)} is not over a block.`,
+                                onDragEnd: ({ active, over }) =>
+                                    over
+                                        ? `${titleOf(active.id)} moved to where ${titleOf(over.id)} was.`
+                                        : `${titleOf(active.id)} dropped.`,
+                                onDragCancel: ({ active }) =>
+                                    `Moving ${titleOf(active.id)} was cancelled.`,
+                            },
+                            screenReaderInstructions: {
+                                draggable:
+                                    'To move a block, press Space or Enter, use the arrow keys, then press Space or Enter to drop it. Press Escape to cancel.',
+                            },
+                        }}
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={dragEnd}
                     >
-                        <div
-                            className="ov-board"
-                            ref={board}
-                            data-natural={
-                                !editing &&
-                                shown.every((block) => !block.height)
-                            }
+                        <SortableContext
+                            items={shown.map((b) => b.id)}
+                            strategy={rectSortingStrategy}
                         >
-                            {shown.map((block) => {
-                                const meta = roleMeta.blocks.find(
-                                    (b) => b.id === block.id,
-                                );
-                                if (!meta) return null;
-                                return (
-                                    <PuzzleBlock
-                                        key={block.id}
-                                        layout={block}
-                                        meta={meta}
-                                        data={dataFor(block)}
-                                        editing={editing}
-                                        expanded={tab === 'attention'}
-                                        onExpand={() => setTab('attention')}
-                                        onEdit={edit}
-                                        sites={sites}
-                                        onChange={(value) =>
-                                            updateBlock(block.id, value)
-                                        }
-                                        onRemove={() =>
-                                            change(
-                                                {
-                                                    ...current,
-                                                    blocks: current.blocks.filter(
+                            <div
+                                className="ov-board"
+                                ref={board}
+                                data-natural={
+                                    !editing &&
+                                    shown.every((block) => !block.height)
+                                }
+                            >
+                                {shown.map((block) => {
+                                    const meta = roleMeta.blocks.find(
+                                        (b) => b.id === block.id,
+                                    );
+                                    if (!meta) return null;
+                                    return (
+                                        <PuzzleBlock
+                                            key={block.id}
+                                            layout={block}
+                                            meta={meta}
+                                            data={dataFor(block)}
+                                            editing={editing}
+                                            expanded={tab === 'attention'}
+                                            onExpand={() => setTab('attention')}
+                                            onEdit={edit}
+                                            sites={sites}
+                                            onChange={(value) =>
+                                                updateBlock(block.id, value)
+                                            }
+                                            onRemove={() => {
+                                                const index =
+                                                    current.blocks.findIndex(
                                                         (b) =>
-                                                            b.id !== block.id,
+                                                            b.id === block.id,
+                                                    );
+                                                const next =
+                                                    current.blocks[index + 1] ??
+                                                    current.blocks[index - 1];
+                                                change(
+                                                    {
+                                                        ...current,
+                                                        blocks: current.blocks.filter(
+                                                            (b) =>
+                                                                b.id !==
+                                                                block.id,
+                                                        ),
+                                                    },
+                                                    `${meta.title} removed`,
+                                                );
+                                                // The focused ✕ unmounts; keep the
+                                                // keyboard user on the board.
+                                                requestAnimationFrame(() =>
+                                                    (
+                                                        board.current?.querySelector(
+                                                            next
+                                                                ? `[data-block="${next.id}"] .ov-drag-handle`
+                                                                : '.ov-add-tile',
+                                                        ) as HTMLElement | null
+                                                    )?.focus(),
+                                                );
+                                            }}
+                                            onMove={(delta) =>
+                                                change({
+                                                    ...current,
+                                                    blocks: moveBlock(
+                                                        current.blocks,
+                                                        block.id,
+                                                        delta,
                                                     ),
-                                                },
-                                                `${meta.title} removed`,
-                                            )
-                                        }
-                                        onMove={(delta) =>
-                                            change({
-                                                ...current,
-                                                blocks: moveBlock(
-                                                    current.blocks,
-                                                    block.id,
-                                                    delta,
-                                                ),
-                                            })
-                                        }
-                                    />
-                                );
-                            })}
-                            {editing && (
-                                <button
-                                    className="ov-add-tile"
-                                    onClick={() => startDialog('library')}
-                                >
-                                    <Plus size={22} />
-                                    <strong>Add another block</strong>
-                                    <span>
-                                        {roleMeta.blocks.length -
-                                            current.blocks.length}{' '}
-                                        more to choose from
-                                    </span>
-                                </button>
-                            )}
-                        </div>
-                    </SortableContext>
-                </DndContext>
+                                                })
+                                            }
+                                        />
+                                    );
+                                })}
+                                {editing && (
+                                    // eslint-disable-next-line no-restricted-syntax -- an empty grid slot that opens the block library
+                                    <button
+                                        type="button"
+                                        className="ov-add-tile"
+                                        onClick={() => startDialog('library')}
+                                    >
+                                        <Plus size={22} />
+                                        <strong>Add another block</strong>
+                                        <span>
+                                            {roleMeta.blocks.length -
+                                                current.blocks.length}{' '}
+                                            more to choose from
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                </OverviewDetailContext.Provider>
                 {!shown.length && !editing && (
                     <div className="ov-board-empty">
                         <LayoutDashboard />
@@ -1448,28 +1756,45 @@ function Workspace({
                 ) : (
                     <span>Live records · {overview.scope}</span>
                 )}
-                {!editing && (
-                    <button
-                        onClick={async () => {
-                            try {
-                                await writeOverview('/dashboard/default-role', {
-                                    role,
-                                });
-                                toast.success(
-                                    `${roleMeta.name} is your default overview`,
-                                );
-                            } catch (e) {
-                                toast.error(
-                                    e instanceof Error
-                                        ? e.message
-                                        : 'Could not save default',
-                                );
-                            }
-                        }}
-                    >
-                        Make this my default view
-                    </button>
-                )}
+                {!editing &&
+                    roles.length > 1 &&
+                    (isDefault ? (
+                        <span className="ov-default-note">
+                            <Check size={13} />
+                            {roleMeta.name} opens first when you sign in
+                        </span>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={savingDefault}
+                            onClick={async () => {
+                                if (savingDefault) return;
+                                setSavingDefault(true);
+                                try {
+                                    await writeOverview(
+                                        '/dashboard/default-role',
+                                        { role },
+                                    );
+                                    setIsDefault(true);
+                                    toast.success(
+                                        `${roleMeta.name} is now your default overview`,
+                                    );
+                                } catch (e) {
+                                    toast.error(
+                                        e instanceof Error
+                                            ? e.message
+                                            : 'Could not save default',
+                                    );
+                                } finally {
+                                    setSavingDefault(false);
+                                }
+                            }}
+                        >
+                            <Star />
+                            Open {roleMeta.name} first
+                        </Button>
+                    ))}
             </footer>
             <div className="sr-only" role="status" aria-live="polite">
                 {announcement}
@@ -1485,15 +1810,40 @@ function Workspace({
             >
                 <DialogContent
                     className={`ov-dialog ${dialog === 'library' && !previewId ? 'ov-library-dialog' : ''}`}
+                    onCloseAutoFocus={(e) => {
+                        const target = returnFocus.current
+                            ? (board.current?.querySelector(
+                                  returnFocus.current,
+                              ) as HTMLElement | null)
+                            : null;
+                        returnFocus.current = null;
+                        if (target) {
+                            e.preventDefault();
+                            target.focus({ preventScroll: true });
+                        }
+                    }}
+                    // POPUP_STYLE_GUIDE width tokens: long form for the
+                    // library grid, standard form for everything else.
+                    style={
+                        dialog === 'library' && !previewId
+                            ? {
+                                  maxWidth: 'min(92vw, 900px)',
+                                  width: 'min(92vw, 900px)',
+                              }
+                            : {
+                                  maxWidth: 'min(92vw, 720px)',
+                                  width: 'min(92vw, 720px)',
+                              }
+                    }
                 >
                     <DialogHeader>
                         <DialogTitle>
                             {previewMeta
                                 ? previewMeta.title
                                 : dialog === 'library'
-                                  ? 'Make room for what matters'
+                                  ? 'Choose your blocks'
                                   : dialog === 'starters'
-                                    ? 'A useful place to start'
+                                    ? 'Starter layouts'
                                     : dialog === 'saved'
                                       ? 'Your saved arrangements'
                                       : 'Find in your overview'}
@@ -1501,7 +1851,7 @@ function Workspace({
                         <DialogDescription>
                             {previewMeta
                                 ? 'Block preview'
-                                : `${roleMeta.name} · ${dialog === 'library' ? '20 useful blocks. Choose what belongs in your day.' : dialog === 'starters' ? 'Three focused arrangements' : dialog === 'saved' ? 'Keep up to three arrangements for this role' : 'Jump to a summary or review urgent work'}`}
+                                : `${roleMeta.name} · ${dialog === 'library' ? `${roleMeta.blocks.length} choices · ${roleMeta.blocks.length - current.blocks.length} available to add` : dialog === 'starters' ? `${roleMeta.starters.length} focused arrangements` : dialog === 'saved' ? 'Keep up to three arrangements for this role' : 'Jump to a summary or review urgent work'}`}
                         </DialogDescription>
                     </DialogHeader>
                     {dialog === 'library' && !previewMeta && (
@@ -1527,53 +1877,61 @@ function Workspace({
                                 </Button>
                             </div>
                             <div className="ov-library-filters">
-                                {[
-                                    'All',
-                                    ...new Set(
-                                        roleMeta.blocks.map((b) => b.category),
-                                    ),
-                                ].map((c) => (
-                                    <button
-                                        key={c}
-                                        aria-pressed={category === c}
-                                        onClick={() => setCategory(c)}
-                                    >
-                                        {c}{' '}
-                                        <span>
-                                            {c === 'All'
-                                                ? roleMeta.blocks.length
-                                                : roleMeta.blocks.filter(
-                                                      (b) => b.category === c,
-                                                  ).length}
-                                        </span>
-                                    </button>
-                                ))}
-                                <button
-                                    aria-pressed={favoritesOnly}
-                                    onClick={() =>
-                                        setFavoritesOnly(!favoritesOnly)
-                                    }
+                                <ToggleGroup
+                                    type="single"
+                                    size="sm"
+                                    aria-label="Block category"
+                                    value={category}
+                                    onValueChange={(c) => c && setCategory(c)}
                                 >
-                                    <Star size={14} />
+                                    {[
+                                        'All',
+                                        ...new Set(
+                                            roleMeta.blocks.map(
+                                                (b) => b.category,
+                                            ),
+                                        ),
+                                    ].map((c) => (
+                                        <ToggleGroupItem key={c} value={c}>
+                                            {c}
+                                            <span className="ov-filter-count">
+                                                {c === 'All'
+                                                    ? roleMeta.blocks.length
+                                                    : roleMeta.blocks.filter(
+                                                          (b) =>
+                                                              b.category === c,
+                                                      ).length}
+                                            </span>
+                                        </ToggleGroupItem>
+                                    ))}
+                                </ToggleGroup>
+                                <Toggle
+                                    size="sm"
+                                    pressed={favoritesOnly}
+                                    onPressedChange={setFavoritesOnly}
+                                >
+                                    <Star />
                                     Favourites
-                                </button>
-                                <label>
-                                    <input
-                                        type="checkbox"
+                                </Toggle>
+                                <div className="ov-available-only">
+                                    <Checkbox
+                                        id="overview-available-only"
                                         checked={availableOnly}
-                                        onChange={(e) =>
-                                            setAvailableOnly(e.target.checked)
+                                        onCheckedChange={(checked) =>
+                                            setAvailableOnly(checked === true)
                                         }
                                     />
-                                    Not on my overview
-                                </label>
+                                    <Label htmlFor="overview-available-only">
+                                        Not on my overview
+                                    </Label>
+                                </div>
                             </div>
                             <div className="ov-library-grid">
                                 {library.map((meta) => {
                                     const on = current.blocks.some(
                                         (b) => b.id === meta.id,
                                     );
-                                    const data = overview.blocks[meta.id];
+                                    const data = pageBlocks[meta.id];
                                     return (
                                         <article
                                             key={meta.id}
@@ -1583,8 +1941,10 @@ function Workspace({
                                                 <span className="ov-eyebrow">
                                                     {meta.category}
                                                 </span>
-                                                <button
-                                                    className="ov-icon-button"
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="ov-tool-button"
                                                     aria-label={`${current.favorites.includes(meta.id) ? 'Unfavourite' : 'Favourite'} ${meta.title}`}
                                                     aria-pressed={current.favorites.includes(
                                                         meta.id,
@@ -1594,7 +1954,6 @@ function Workspace({
                                                     }
                                                 >
                                                     <Star
-                                                        size={17}
                                                         fill={
                                                             current.favorites.includes(
                                                                 meta.id,
@@ -1603,17 +1962,20 @@ function Workspace({
                                                                 : 'none'
                                                         }
                                                     />
-                                                </button>
+                                                </Button>
                                             </div>
+                                            {/* eslint-disable-next-line no-restricted-syntax -- a thumbnail tile that opens the full preview */}
                                             <button
+                                                type="button"
                                                 className="ov-preview-thumb"
+                                                data-preview-id={meta.id}
                                                 aria-label={`Preview ${meta.title}`}
                                                 onClick={() =>
                                                     setPreviewId(meta.id)
                                                 }
                                             >
                                                 {data?.state === 'ready' &&
-                                                data.total !== null ? (
+                                                data.total ? (
                                                     <>
                                                         <strong>
                                                             {data.total}
@@ -1640,8 +2002,8 @@ function Workspace({
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <LayoutDashboard
-                                                            size={29}
+                                                        <BlockSketch
+                                                            kind={meta.kind}
                                                         />
                                                         <span>
                                                             {data?.state ===
@@ -1652,8 +2014,11 @@ function Workspace({
                                                                   ? 'Temporarily unavailable'
                                                                   : data?.state ===
                                                                       'ready'
-                                                                    ? 'No measurement available'
-                                                                    : 'Proposed summary'}
+                                                                    ? 'Nothing recorded yet'
+                                                                    : data?.state ===
+                                                                        'deferred'
+                                                                      ? 'Loading preview…'
+                                                                      : 'Proposed summary'}
                                                         </span>
                                                     </>
                                                 )}
@@ -1661,14 +2026,15 @@ function Workspace({
                                             <h3>{meta.title}</h3>
                                             <p>{meta.description}</p>
                                             <div className="ov-library-card-footer">
-                                                <button
-                                                    className="ov-text-button"
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     onClick={() =>
                                                         setPreviewId(meta.id)
                                                     }
                                                 >
                                                     Preview
-                                                </button>
+                                                </Button>
                                                 <Button
                                                     size="sm"
                                                     variant={
@@ -1725,7 +2091,7 @@ function Workspace({
                             <div className="ov-full-preview">
                                 <BlockContent
                                     meta={previewMeta}
-                                    data={overview.blocks[previewMeta.id]}
+                                    data={pageBlocks[previewMeta.id]}
                                     preview
                                 />
                             </div>
@@ -1738,7 +2104,17 @@ function Workspace({
                             <div className="ov-between">
                                 <Button
                                     variant="outline"
-                                    onClick={() => setPreviewId(null)}
+                                    onClick={() => {
+                                        const id = previewId;
+                                        setPreviewId(null);
+                                        requestAnimationFrame(() =>
+                                            (
+                                                document.querySelector(
+                                                    `[data-preview-id="${id}"]`,
+                                                ) as HTMLElement | null
+                                            )?.focus(),
+                                        );
+                                    }}
                                 >
                                     Back to blocks
                                 </Button>
@@ -1765,7 +2141,8 @@ function Workspace({
                                         <LayoutTemplate className="ov-starter-icon" />
                                         <div>
                                             <span className="ov-eyebrow">
-                                                6 BLOCKS · SUGGESTED
+                                                {starter.ids.length} blocks ·
+                                                Suggested
                                             </span>
                                             <h3>{starter.name}</h3>
                                             <p>{starter.description}</p>
@@ -1848,8 +2225,10 @@ function Workspace({
                                         >
                                             Use layout
                                         </Button>
-                                        <button
-                                            className="ov-icon-button"
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="ov-tool-button"
                                             aria-label={`Remove saved layout ${copy.name}`}
                                             onClick={() =>
                                                 change(
@@ -1864,8 +2243,8 @@ function Workspace({
                                                 )
                                             }
                                         >
-                                            <Trash2 size={16} />
-                                        </button>
+                                            <Trash2 />
+                                        </Button>
                                     </article>
                                 ))}
                             </div>
@@ -1913,64 +2292,176 @@ function Workspace({
                                 onChange={(e) => setQuery(e.target.value)}
                             />
                             <div className="ov-find-results">
-                                {overview.urgent
-                                    .filter((r) =>
-                                        r.label
-                                            .toLowerCase()
-                                            .includes(query.toLowerCase()),
-                                    )
-                                    .map((row) => (
-                                        <div
-                                            key={row.label}
-                                            className="ov-find-urgent"
+                                {foundSteps.map((row) => (
+                                    <div
+                                        key={row.label}
+                                        className="ov-find-urgent"
+                                        data-tone={row.tone}
+                                    >
+                                        <TriangleAlert size={18} />
+                                        <strong>{row.label}</strong>
+                                        <StatusBadge
+                                            variant={
+                                                row.tone === 'critical'
+                                                    ? 'critical'
+                                                    : 'warning'
+                                            }
                                         >
-                                            <ShieldCheck size={18} />
-                                            <strong>{row.label}</strong>
-                                            {row.href && (
-                                                <a href={row.href}>
-                                                    Open workspace{' '}
-                                                    <ArrowUpRight size={14} />
-                                                </a>
-                                            )}
-                                        </div>
-                                    ))}
-                                {roleMeta.blocks
-                                    .filter(
-                                        (b) =>
-                                            current.blocks.some(
-                                                (c) => c.id === b.id,
-                                            ) &&
-                                            b.title
-                                                .toLowerCase()
-                                                .includes(query.toLowerCase()),
-                                    )
-                                    .map((meta) => (
-                                        <button
-                                            key={meta.id}
-                                            onClick={() => {
-                                                setTab('overview');
-                                                setDialog(null);
-                                                requestAnimationFrame(() =>
-                                                    board.current
-                                                        ?.querySelector(
-                                                            `[data-block="${meta.id}"]`,
-                                                        )
-                                                        ?.scrollIntoView({
-                                                            block: 'center',
-                                                            behavior: 'auto',
-                                                        }),
-                                                );
-                                            }}
-                                        >
-                                            <LayoutDashboard size={16} />
-                                            <span>{meta.title}</span>
-                                            <ArrowDown size={15} />
-                                        </button>
-                                    ))}
+                                            {row.tone === 'critical'
+                                                ? 'Urgent'
+                                                : 'Due soon'}
+                                        </StatusBadge>
+                                        {row.href && (
+                                            <Link
+                                                href={row.href}
+                                                onClick={() => setDialog(null)}
+                                            >
+                                                {row.actionLabel ??
+                                                    'Open workspace'}
+                                                <ArrowUpRight size={14} />
+                                            </Link>
+                                        )}
+                                    </div>
+                                ))}
+                                {!foundSteps.length && !foundBlocks.length && (
+                                    <EmptyState
+                                        variant="compact"
+                                        icon={Search}
+                                        heading="Nothing matches"
+                                        description="Try another word, or open Edit layout to add a block."
+                                    />
+                                )}
+                                {foundBlocks.map((meta) => (
+                                    // eslint-disable-next-line no-restricted-syntax -- a result row that scrolls to its block
+                                    <button
+                                        type="button"
+                                        key={meta.id}
+                                        onClick={() => {
+                                            setTab('overview');
+                                            setDialog(null);
+                                            requestAnimationFrame(() =>
+                                                board.current
+                                                    ?.querySelector(
+                                                        `[data-block="${meta.id}"]`,
+                                                    )
+                                                    ?.scrollIntoView({
+                                                        block: 'center',
+                                                        behavior: 'auto',
+                                                    }),
+                                            );
+                                            // Land keyboard focus on the
+                                            // block, not back on Find.
+                                            returnFocus.current = `[data-block="${meta.id}"]`;
+                                        }}
+                                    >
+                                        <LayoutDashboard size={16} />
+                                        <span>{meta.title}</span>
+                                        <ArrowDown size={15} />
+                                    </button>
+                                ))}
                             </div>
                         </>
                     )}
                 </DialogContent>
+            </Dialog>
+            <ConfirmDialog
+                open={confirmCancel}
+                onClose={() => setConfirmCancel(false)}
+                onConfirm={() => {
+                    setConfirmCancel(false);
+                    setDraft(null);
+                    setConflict(null);
+                    setError('');
+                    setAnnouncement('Layout changes discarded');
+                }}
+                title="Discard your layout changes?"
+                description="Your saved overview stays as it was. The changes you made in this editing session will be lost."
+                confirmText="Discard changes"
+                cancelText="Keep editing"
+                variant="destructive"
+            />
+            <Dialog
+                open={detailRow !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDetailRow(null);
+                }}
+            >
+                {detailRow && (
+                    <DialogContent
+                        className="ov-dialog ov-detail"
+                        // POPUP_STYLE_GUIDE width token: read-only detail.
+                        style={{
+                            maxWidth: 'min(92vw, 480px)',
+                            width: 'min(92vw, 480px)',
+                        }}
+                    >
+                        <DialogHeader>
+                            <DialogTitle>{detailRow.label}</DialogTitle>
+                            {detailRow.detail && (
+                                <DialogDescription>
+                                    {detailRow.detail}
+                                </DialogDescription>
+                            )}
+                        </DialogHeader>
+                        {detailRow.status && (
+                            <StatusBadge
+                                className="w-fit"
+                                variant={
+                                    detailRow.tone === 'critical'
+                                        ? 'critical'
+                                        : detailRow.tone === 'warning'
+                                          ? 'warning'
+                                          : 'neutral'
+                                }
+                            >
+                                {detailRow.status}
+                            </StatusBadge>
+                        )}
+                        {!!detailRow.facts?.length && (
+                            <dl className="ov-detail-facts">
+                                {detailRow.facts.map((fact) => (
+                                    <div key={fact.label}>
+                                        <dt>{fact.label}</dt>
+                                        <dd>
+                                            {fact.date
+                                                ? formatDate(fact.date)
+                                                : fact.dateTime
+                                                  ? formatDateTime(
+                                                        fact.dateTime,
+                                                    )
+                                                  : (fact.value ??
+                                                    'Not recorded')}
+                                        </dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        )}
+                        {!!detailRow.history?.length && (
+                            <div className="ov-detail-history">
+                                <strong>
+                                    Connection checks · last 24 hours
+                                </strong>
+                                <ConnectionHistoryStrip row={detailRow} />
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => setDetailRow(null)}
+                            >
+                                Close
+                            </Button>
+                            {detailRow.href && (
+                                <Button asChild>
+                                    <Link href={detailRow.href}>
+                                        {detailRow.actionLabel ?? 'Open record'}
+                                        <ArrowUpRight />
+                                    </Link>
+                                </Button>
+                            )}
+                        </DialogFooter>
+                    </DialogContent>
+                )}
             </Dialog>
         </div>
     );

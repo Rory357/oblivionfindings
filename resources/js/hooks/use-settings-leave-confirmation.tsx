@@ -1,4 +1,8 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    draftHistoryNavigation,
+    registerDraftHistoryGuard,
+} from '@/lib/draft-history';
 import { router } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -9,7 +13,10 @@ export function useSettingsLeaveConfirmation(
     description = 'Your unsaved entries will be discarded. A save already sent may still finish; review the saved settings before retrying it. Cancel to keep editing.',
     onDiscard?: () => void,
 ) {
-    const [pending, setPending] = useState<{ run: () => void } | null>(null);
+    const [pending, setPending] = useState<{
+        run: () => void;
+        cancel?: () => void;
+    } | null>(null);
     const approved = useRef(false);
     const discardAndRun = (run: () => void) => {
         approved.current = true;
@@ -38,6 +45,9 @@ export function useSettingsLeaveConfirmation(
             event.returnValue = '';
         };
         window.addEventListener('beforeunload', unload);
+        const removeHistory = registerDraftHistoryGuard((run, cancel) =>
+            setPending({ run, cancel }),
+        );
         const remove = router.on('before', (event) => {
             const visit = event.detail.visit;
             if (approved.current || visit.method !== 'get') return;
@@ -46,17 +56,22 @@ export function useSettingsLeaveConfirmation(
         });
         return () => {
             window.removeEventListener('beforeunload', unload);
+            removeHistory();
             remove();
         };
     }, [dirty]);
 
     return {
         request,
+        historyProtectionAvailable: draftHistoryNavigation() !== null,
         discardAndRun,
         confirmation: (
             <ConfirmDialog
                 open={dirty && pending !== null}
-                onClose={() => setPending(null)}
+                onClose={() => {
+                    pending?.cancel?.();
+                    setPending(null);
+                }}
                 onConfirm={() => {
                     if (!dirty || !pending) return;
                     discardAndRun(pending.run);

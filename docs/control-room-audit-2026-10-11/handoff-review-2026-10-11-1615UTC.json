@@ -1,0 +1,93 @@
+{
+  "reviewedAtUtc": "2026-10-11T16:15:35Z",
+  "scope": "Filesystem source and handoff review only; no application/runtime execution",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "backend": {
+    "path": "storage/logs/hs17-injury-source-projection-source-candidate.json",
+    "sha256": "9FF3D6AEFB72A96FDDE6F3174FAF106ABFD443ECC29FD0C967FB7A91AA636513",
+    "selectedSourcePins": 74,
+    "sourceDrift": [],
+    "queuedCompleteSuitePins": 55,
+    "suiteDrift": [],
+    "manifestUnchangedAcrossRead": true,
+    "testsExecuted": false
+  },
+  "frontend": {
+    "path": "storage/logs/hs17-injury-frontend-source-candidate.json",
+    "sha256": "2C7B2027AE4CDE76AFBE851CBF4F7048541C9753139144ED82FB24302968FA7B",
+    "selectedSourcePins": 58,
+    "manifestUnchangedAcrossRead": true,
+    "currentDrift": [
+      {
+        "path": "resources/js/components/health-safety/injury-command-form.test.tsx",
+        "expected": "1BB54EAC16F8719DBDEDBA0E5CBA8A67EED231748D7D1F2413E4414CE4A5668A",
+        "actual": "82F00669BFDEF8931AC08862CEF0D4852CF37D2374679BBD2BC6870F13155318"
+      },
+      {
+        "path": "resources/js/components/health-safety/injury-command-form.tsx",
+        "expected": "D78937F6F0864F80D02A9D2096E168C3560A17100E3128A340B9A6914391D3C9",
+        "actual": "9893A80F725124B4F5F0AA7B24EE7AC54CD2D15BB2FF0D808F351D25E8008D75"
+      }
+    ],
+    "disposition": "Active H&S failed-access recovery repair; frontend excluded from stable backend transfer. Owner asked to refresh completed inventory.",
+    "testsExecuted": false
+  },
+  "handoffs": [
+    {
+      "path": "docs/health-safety-audit-2026-10-07/CONTROL-ROOM-INTEGRATION-HANDOFF.md",
+      "sha256": "AC27617CDF7A6E3D8B4DC407084D1A95F3BCF046E00F812E33031FDE400FF93B",
+      "read": "Latest section; historical paragraphs superseded"
+    },
+    {
+      "path": "docs/health-safety-audit-2026-10-07/GROUP-B-CANDIDATE-READ-HANDOFF-2026-10-12.md",
+      "sha256": "5828CA2E0C41E7C973930B4535D8E34551CFB6941079A4FCA7318B295D7B8014",
+      "verifiedListedPins": 20,
+      "drift": []
+    },
+    {
+      "path": "docs/health-safety-audit-2026-10-07/HS-SOURCE-CONNECTION-CONTEXT-CLOSURE.md",
+      "sha256": "C6595A93C395B6A848C8CEE8823BAE14717D55315B858BB7FE7999803388271F",
+      "verifiedListedPins": 7,
+      "drift": []
+    },
+    {
+      "path": "docs/health-safety-audit-2026-10-07/HSE-STANDALONE-CALLER-RECONCILIATION.md",
+      "sha256": "502B532CA1E5E8C032FE2EF517AC4F075EC660319B205347F463805F5796D08D",
+      "read": true,
+      "ownerReportedOriginalSites": 17,
+      "ownerReportedHSSourceAddressed": 14,
+      "CRConsumerSites": 3
+    }
+  ],
+  "reviewedSource": [
+    "InjurySourceProjectionService forAlert/forInjury/within and factual projection",
+    "CR GovernanceRead raw-model return and snapshot materialisation",
+    "CR INJURY-CONSUMER-HANDOFF actual final consuming boundaries"
+  ],
+  "limits": [
+    "Selected snapshots only, not complete dependency closure/frozen runtime inventory",
+    "No whole behavioral clearance; declaration counts not executed results",
+    "No main integration, native/Node/build/browser/provider/database/operational changes"
+  ],
+  "actions": {
+    "controlRoom": "Dispatched minimal dependency-complete semantic backend transfer and own final consumer composition; source only in isolated CR candidate",
+    "healthSafety": "Retains canonical shared source and active frontend ownership; informed of two stale frontend pins",
+    "workforce": "Baseline supplied for existing adapter/source reconciliation; unresolved HR policy unchanged"
+  },
+  "frontendSuccessorReview": {
+    "manifestSha256": "D77E8C905FC36EE48E75154F681DDC23174566894BA77AA63435217FABB507C2",
+    "selectedSourcePins": 58,
+    "drift": [],
+    "manifestUnchangedAcrossRead": true,
+    "formSha256": "3E6FC8989589392BF35FB0158CDECAFAE40E8EB4A9F64B62BBB876B71DC6CBF6",
+    "testSha256": "82F00669BFDEF8931AC08862CEF0D4852CF37D2374679BBD2BC6870F13155318",
+    "declaredWholeFiles": 10,
+    "declaredTestCalls": 53,
+    "declaredStaticCases": 59,
+    "sampledSource": "Latest checked medical access and allowed/!checkFailed govern commandRecord, serializer/review, private-command body and Save. Retained internal draft is distinct from visible fields.",
+    "testsExecuted": false,
+    "behavioralAcceptance": false,
+    "frontendOwnership": "H&S unchanged; CR assignment remains backend/read integration"
+  },
+  "runtimeAdmission": false
+}

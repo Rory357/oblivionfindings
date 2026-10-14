@@ -1,479 +1,227 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
 import {
-    AlertTriangle,
-    CheckCircle2,
-    Database,
-    MapPin,
-    Plug,
-    RefreshCw,
-} from 'lucide-react';
-import type { HTMLAttributes } from 'react';
-
-import { StatCard, formatTimeSince } from './devices/shared';
-
-export type ProviderException = {
-    type: string;
-    summary: string;
-    action: string;
-    href: string | null;
-    count: number;
-};
-export type Provider = {
-    slug: string;
-    name: string;
-    vendor: string;
-    summary: string;
-    device_scope: string[];
-    docs_href: string | null;
-    connection_status:
-        | 'connected'
-        | 'disconnected'
-        | 'error'
-        | 'untested'
-        | 'disabled'
-        | 'unavailable'
-        | 'not_configured';
-    connected: boolean;
-    last_tested_at: string | null;
-    last_synced_at: string | null;
-    device_count: number;
-    events_24h: number;
-    credential?: {
-        configured: boolean;
-        reference: string | null;
-        reference_label: string | null;
-        display_state:
-            | 'provider_connection_configured'
-            | 'site_credentials_configured'
-            | 'not_configured';
-        rotation_state: string;
-        rotation_cadence_days: number;
-        rotated_at: string | null;
-        created_at: string | null;
-        last_tested_at: string | null;
-        site_credentials: {
-            total: number;
-            enabled: number;
-            needs_attention: number;
-            capabilities: string[];
-        };
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderViewToggle,
+} from '@/components/page';
+import {
+    integrationForViewer,
+    IntegrationRecords,
+    integrationViews,
+    type IntegrationPermissions,
+    type IntegrationView,
+} from '@/components/security-devices/integration-records';
+import type { IntegrationsProps } from '@/components/security-devices/integration-types';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateTimeLong } from '@/lib/datetime';
+import { Head, router, usePage } from '@inertiajs/react';
+import { LayoutGrid, List, Plug, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+export type {
+    Provider,
+    ProviderException,
+} from '@/components/security-devices/integration-types';
+export default function IntegrationsHub(data: IntegrationsProps) {
+    const { auth } = usePage<{
+        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+    }>().props;
+    const [layout, setLayout] = useState<'cards' | 'table'>('cards');
+    const visible = Boolean(
+        auth?.user?.id &&
+        data.actor_id === auth.user.id &&
+        auth.can?.['securityDevices.integrations.view'] === true,
+    );
+    const permission: IntegrationPermissions = {
+        manage:
+            visible &&
+            data.can.manage &&
+            auth?.can?.['securityDevices.integrations.manage'] === true,
+        devices:
+            visible && auth?.can?.['securityDevices.devices.view'] === true,
     };
-    site_mapping: {
-        total: number;
-        mapped: number;
-        unmapped: number;
-        sites: Array<{ id: number; name: string | null; state: string }>;
-    };
-    sync: {
-        status: string;
-        freshness: string;
-        last_synced_at: string | null;
-        items_processed: number;
-        items_errored: number;
-        stale_site_count: number;
-        affected_site_count: number;
-        summary: string | null;
-    };
-    reconciliation: {
-        imported_devices: number;
-        unassigned_devices: number;
-        duplicate_candidates: number;
-        unsupported_checks: number;
-    };
-    monitoring_support: {
-        state: 'supported' | 'capability_absent';
-        scope: 'provider';
-        note: string;
-    };
-    health: {
-        state:
-            | 'unsupported'
-            | 'not_run'
-            | 'collecting'
-            | 'current'
-            | 'stale'
-            | 'partial'
-            | 'failed';
-        freshness: 'unsupported' | 'never' | 'current' | 'stale';
-        last_attempted_at: string | null;
-        last_collected_at: string | null;
-        summary: string;
-        action: string;
-        href: string | null;
-    };
-    runtime: {
-        version: string;
-        contract_state:
-            | 'native_runtime_only'
-            | 'connection_health_only'
-            | 'inventory_sync'
-            | 'topology_collection';
-        contract_label: string;
-        contract_note: string;
-        capabilities: string[];
-        page_limit: number;
-        minimum_interval_seconds: number;
-        backfill_limit: number;
-        cursor_scopes: number;
-        partial_scopes: number;
-        exception_count: number;
-        latest_completed_at: string | null;
-        latest_exception_at: string | null;
-        exception_codes: string[];
-        disconnect_ready: boolean;
-        revoke_ready: boolean;
-    };
-    exceptions: ProviderException[];
-    exception_count: number;
-};
-
-function ConnectionBadge({ provider }: { provider: Provider }) {
-    if (provider.connection_status === 'connected')
-        return (
-            <Badge className="gap-1 bg-status-success text-white">
-                <CheckCircle2 className="h-3 w-3" />
-                Connected
-            </Badge>
-        );
-    if (provider.connection_status === 'error')
-        return (
-            <Badge variant="destructive" className="gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                Error
-            </Badge>
-        );
-    if (provider.connection_status === 'untested')
-        return (
-            <Badge variant="secondary" className="gap-1">
-                <Plug className="h-3 w-3" />
-                Not tested
-            </Badge>
-        );
-    if (provider.connection_status === 'disabled')
-        return (
-            <Badge variant="secondary" className="gap-1">
-                <Plug className="h-3 w-3" />
-                Disabled
-            </Badge>
-        );
-    if (provider.connection_status === 'unavailable')
-        return (
-            <Badge variant="outline" className="gap-1">
-                <Plug className="h-3 w-3" />
-                Cloud API unavailable
-            </Badge>
-        );
     return (
-        <Badge variant="secondary" className="gap-1">
-            <Plug className="h-3 w-3" />
-            {provider.connection_status === 'not_configured'
-                ? 'Not configured'
-                : 'Disconnected'}
-        </Badge>
+        <IntegrationsBody
+            key={JSON.stringify([auth, data])}
+            data={data}
+            actor={auth?.user?.id ?? 0}
+            visible={visible}
+            permission={permission}
+            layout={layout}
+            setLayout={setLayout}
+        />
     );
 }
-
-function HealthStateBadge({ provider }: { provider: Provider }) {
-    const labels: Record<Provider['health']['state'], string> = {
-        unsupported: 'Unsupported',
-        not_run: 'Not run',
-        collecting: 'Collecting',
-        current: 'Current',
-        stale: 'Stale',
-        partial: 'Partial',
-        failed: 'Failed',
-    };
-
-    return (
-        <Badge
-            variant={
-                provider.health.state === 'failed'
-                    ? 'destructive'
-                    : provider.health.state === 'current'
-                      ? 'outline'
-                      : 'secondary'
-            }
-        >
-            {labels[provider.health.state]}
-        </Badge>
-    );
-}
-
-export function CredentialRotationStatus({
-    state,
-    cadenceDays,
-    ...props
+function IntegrationsBody({
+    data,
+    actor,
+    visible: receivedVisible,
+    permission,
+    layout,
+    setLayout,
 }: {
-    state: string;
-    cadenceDays: number;
-} & HTMLAttributes<HTMLParagraphElement>) {
-    const presentation =
-        state === 'rotation_due'
-            ? {
-                  label: `Rotation due (${cadenceDays}-day cadence)`,
-                  variant: 'warning',
-                  className: 'text-status-warning',
-              }
-            : state === 'current'
-              ? {
-                    label: 'Rotation current',
-                    variant: 'default',
-                    className: 'text-muted-foreground',
-                }
-              : state === 'not_configured'
-                ? {
-                      label: 'Credential not configured',
-                      variant: 'secondary',
-                      className: 'text-muted-foreground',
-                  }
-                : {
-                      label: 'Rotation status unknown',
-                      variant: 'secondary',
-                      className: 'text-muted-foreground',
-                  };
-
-    return (
-        <p
-            {...props}
-            className={`${presentation.className} ${props.className ?? ''}`.trim()}
-            data-variant={presentation.variant}
-        >
-            {presentation.label}
-        </p>
-    );
-}
-
-export function ProviderCard({
-    provider,
-    canManage,
-}: {
-    provider: Provider;
-    canManage: boolean;
+    data: IntegrationsProps;
+    actor: number;
+    visible: boolean;
+    permission: IntegrationPermissions;
+    layout: 'cards' | 'table';
+    setLayout: (v: 'cards' | 'table') => void;
 }) {
-    return (
-        <Card className="min-w-0">
-            <CardHeader className="space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <CardTitle>{provider.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground">
-                            {provider.vendor}
-                        </p>
-                    </div>
-                    <div className="flex max-w-full min-w-0 flex-wrap justify-end gap-2">
-                        <Badge
-                            variant="outline"
-                            className="h-auto max-w-full text-center leading-tight whitespace-normal"
-                        >
-                            {provider.runtime.contract_label}
-                        </Badge>
-                        <ConnectionBadge provider={provider} />
-                    </div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    {provider.summary}
-                </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="rounded-lg border p-3">
-                        <p className="text-muted-foreground">Imported</p>
-                        <p className="text-xl font-semibold">
-                            {provider.reconciliation.imported_devices}
-                        </p>
-                    </div>
-                    <div className="rounded-lg border p-3">
-                        <p className="text-muted-foreground">Site mapping</p>
-                        <p className="font-semibold">
-                            {provider.site_mapping.mapped} of{' '}
-                            {provider.site_mapping.total}
-                        </p>
-                    </div>
-                    <div className="rounded-lg border p-3">
-                        <p className="text-muted-foreground">Last sync</p>
-                        <p className="font-medium capitalize">
-                            {provider.sync.freshness === 'never'
-                                ? 'Not run'
-                                : formatTimeSince(provider.sync.last_synced_at)}
-                        </p>
-                    </div>
-                    <div className="rounded-lg border p-3">
-                        <p className="text-muted-foreground">Exceptions</p>
-                        <p className="text-xl font-semibold">
-                            {provider.exception_count}
-                        </p>
-                    </div>
-                </div>
-
-                {provider.credential ? (
-                    <div className="rounded-lg bg-muted/40 p-3 text-sm">
-                        <p className="font-medium">
-                            {provider.credential.reference_label ??
-                                (provider.credential.display_state ===
-                                'site_credentials_configured'
-                                    ? 'Site credentials configured'
-                                    : 'Credential not configured')}
-                        </p>
-                        <CredentialRotationStatus
-                            state={provider.credential.rotation_state}
-                            cadenceDays={
-                                provider.credential.rotation_cadence_days
-                            }
-                        />
-                    </div>
-                ) : null}
-
-                <section
-                    aria-label={`${provider.name} health feed`}
-                    className="rounded-lg border p-3 text-sm"
-                >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-semibold">Health feed</h3>
-                        <HealthStateBadge provider={provider} />
-                    </div>
-                    <p className="mt-2 text-muted-foreground">
-                        {provider.health.summary}
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                        Freshness:{' '}
-                        {provider.health.freshness.replaceAll('_', ' ')}
-                        {' · '}
-                        {provider.health.last_collected_at
-                            ? `Last evidence ${formatTimeSince(provider.health.last_collected_at)}`
-                            : 'No completed collection'}
-                    </p>
-                    {provider.health.href ? (
-                        <Link
-                            className="frontline-focus mt-2 inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline"
-                            href={provider.health.href}
-                        >
-                            {provider.health.action}
-                        </Link>
-                    ) : null}
-                </section>
-
-                <section
-                    aria-label={`${provider.name} runtime capabilities`}
-                    className="rounded-lg border p-3 text-sm"
-                >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-semibold">
-                            Runtime contract v{provider.runtime.version}
-                        </h3>
-                        <Badge
-                            variant={
-                                provider.monitoring_support.state ===
-                                'supported'
-                                    ? 'outline'
-                                    : 'secondary'
-                            }
-                        >
-                            {provider.monitoring_support.state === 'supported'
-                                ? 'Monitoring capable'
-                                : 'Monitoring capability absent'}
-                        </Badge>
-                    </div>
-                    <p className="mt-2 text-muted-foreground">
-                        {provider.runtime.capabilities.length
-                            ? provider.runtime.capabilities
-                                  .map((value) => value.replaceAll('_', ' '))
-                                  .join(', ')
-                            : 'No runtime capabilities declared'}
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                        Page limit {provider.runtime.page_limit} · minimum
-                        interval {provider.runtime.minimum_interval_seconds}s ·
-                        backfill limit {provider.runtime.backfill_limit} ·{' '}
-                        {provider.runtime.cursor_scopes} cursor scopes ·{' '}
-                        {provider.runtime.exception_count} runtime exceptions
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                        {provider.runtime.contract_note}
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                        {provider.monitoring_support.note}
-                    </p>
-                </section>
-
-                <section
-                    aria-label={`${provider.name} exceptions`}
-                    className="space-y-2"
-                >
-                    <h3 className="text-sm font-semibold">Required action</h3>
-                    {provider.exceptions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            No current reconciliation exceptions.
-                        </p>
-                    ) : (
-                        provider.exceptions.map((exception) => (
-                            <div
-                                key={exception.type}
-                                className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm"
-                            >
-                                <p>{exception.summary}</p>
-                                {exception.href ? (
-                                    <Link
-                                        className="frontline-focus mt-2 inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline"
-                                        href={exception.href}
-                                    >
-                                        {exception.action}
-                                    </Link>
-                                ) : (
-                                    <p className="mt-2 text-muted-foreground">
-                                        Ask an integration manager to{' '}
-                                        {exception.action.toLowerCase()}.
-                                    </p>
-                                )}
-                            </div>
-                        ))
-                    )}
-                </section>
-
-                {provider.docs_href && canManage ? (
-                    <Button asChild className="min-h-11 w-full sm:w-auto">
-                        <Link href={provider.docs_href}>
-                            Open {provider.name} diagnostics
-                        </Link>
-                    </Button>
-                ) : null}
-            </CardContent>
-        </Card>
+    const [scope, setScope] = useState<IntegrationView>('providers'),
+        [search, setSearch] = useState(''),
+        [denied, setDenied] = useState(false),
+        [notice, setNotice] = useState('');
+    const live = useRef(true),
+        refreshing = useRef(false);
+    const visible = receivedVisible && !denied;
+    useEffect(() => {
+        live.current = true;
+        return () => {
+            live.current = false;
+        };
+    }, []);
+    useEffect(
+        () =>
+            router.on('invalid', (event) => {
+                if (!live.current || !refreshing.current) return;
+                const response = event.detail.response;
+                if (
+                    response.config.method?.toLowerCase() !== 'get' ||
+                    typeof response.config.url !== 'string'
+                )
+                    return;
+                let target: URL;
+                try {
+                    target = new URL(
+                        response.config.url,
+                        window.location.origin,
+                    );
+                } catch {
+                    return;
+                }
+                if (
+                    target.origin !== window.location.origin ||
+                    target.pathname !== '/security-devices/integrations'
+                )
+                    return;
+                event.preventDefault();
+                refreshing.current = false;
+                if ([401, 403, 404].includes(response.status)) {
+                    setDenied(true);
+                    setSearch('');
+                } else
+                    setNotice(
+                        'The catalogue could not be refreshed. Previous provider readings are still shown with their read time. Try Refresh again.',
+                    );
+            }),
+        [],
     );
-}
-
-type Props = {
-    providers: Provider[];
-    stats: {
-        providers_total: number;
-        providers_connected: number;
-        providers_errored: number;
-        imported_devices: number;
-        events_24h: number;
-        exceptions: number;
+    const refresh = () => {
+        if (refreshing.current) return;
+        refreshing.current = true;
+        setNotice('');
+        router.reload({
+            only: [
+                'actor_id',
+                'as_of',
+                'providers',
+                'stats',
+                'can',
+                'boundaries',
+                'auth',
+            ],
+            onSuccess: (page) => {
+                if (!live.current) return;
+                const props = page.props as {
+                    actor_id?: number;
+                    auth?: {
+                        user?: { id?: number };
+                        can?: Record<string, unknown>;
+                    };
+                };
+                if (
+                    page.component === 'security-devices/integrations' &&
+                    props.actor_id === actor &&
+                    props.auth?.user?.id === actor &&
+                    props.auth.can?.['securityDevices.integrations.view'] ===
+                        true
+                )
+                    setDenied(false);
+                else {
+                    setDenied(true);
+                    setSearch('');
+                }
+            },
+            onFinish: () => {
+                if (live.current) refreshing.current = false;
+            },
+        });
     };
-    can: { manage: boolean };
-    boundaries: {
-        sync_stale_after_hours: number;
-        credential_rotation_cadence_days: number;
-        alert_owner: string;
+    const select = (view: IntegrationView) => {
+        if (visible) {
+            setScope(view);
+            setSearch('');
+        }
     };
-};
-
-export default function IntegrationsHub({
-    providers,
-    stats,
-    can,
-    boundaries,
-}: Props) {
+    const providers = visible
+        ? data.providers.map((p) => integrationForViewer(p, permission))
+        : [];
+    const rows = providers.filter((p) =>
+        JSON.stringify(p)
+            .toLocaleLowerCase()
+            .includes(search.trim().toLocaleLowerCase()),
+    );
+    const meters: Array<{
+        label: string;
+        value: number;
+        caption: string;
+        scope: IntegrationView;
+    }> = [
+        {
+            label: 'Providers',
+            value: data.stats.providers_total,
+            caption: 'Declared catalogue entries',
+            scope: 'providers',
+        },
+        {
+            label: 'Connected',
+            value: data.stats.providers_connected,
+            caption: 'Connection state; health is separate',
+            scope: 'connection',
+        },
+        {
+            label: 'Connection errors',
+            value: data.stats.providers_errored,
+            caption: 'Recorded connection errors',
+            scope: 'connection',
+        },
+        {
+            label: 'Imported devices',
+            value: data.stats.imported_devices,
+            caption: 'Current permitted device records',
+            scope: 'sites',
+        },
+        {
+            label: 'Events in 24 hours',
+            value: data.stats.events_24h,
+            caption: 'Permitted events in the past window',
+            scope: 'health',
+        },
+        {
+            label: 'Required action',
+            value: data.stats.exceptions,
+            caption: 'Recorded reconciliation exceptions',
+            scope: 'actions',
+        },
+    ];
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
                 {
                     title: 'Integrations',
@@ -482,77 +230,139 @@ export default function IntegrationsHub({
             ]}
         >
             <Head title="Integrations - Security & Devices" />
-            <PageShell>
-                <PageHero
+            <div className="space-y-5">
+                <PageHeader
                     icon={Plug}
-                    title="Integrations"
-                    description="Connection health, site mapping, sync, and imported-device reconciliation. Provider setup and diagnostics stay in each provider workspace."
-                    stats={[
-                        {
-                            label: 'Connected',
-                            value: stats.providers_connected,
-                        },
-                        {
-                            label: 'Imported devices',
-                            value: stats.imported_devices,
-                        },
-                        { label: 'Exceptions', value: stats.exceptions },
-                        {
-                            label: 'Connection errors',
-                            value: stats.providers_errored,
-                        },
-                    ]}
-                />
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatCard
-                        label="Connected providers"
-                        value={stats.providers_connected}
-                        icon={Plug}
-                    />
-                    <StatCard
-                        label="Imported devices"
-                        value={stats.imported_devices}
-                        icon={Database}
-                    />
-                    <StatCard
-                        label="Reconciliation exceptions"
-                        value={stats.exceptions}
-                        icon={AlertTriangle}
-                        variant="warning"
-                    />
-                    <StatCard
-                        label="Mapped provider sites"
-                        value={providers.reduce(
-                            (sum, provider) =>
-                                sum + provider.site_mapping.mapped,
-                            0,
-                        )}
-                        icon={MapPin}
-                    />
-                </div>
-                <div className="grid min-w-0 gap-4 xl:grid-cols-3">
-                    {providers.map((provider) => (
-                        <ProviderCard
-                            key={provider.slug}
-                            provider={provider}
-                            canManage={can.manage}
-                        />
+                    title="Provider integrations"
+                    subline="Connection, Site mapping, collected health and supported capabilities."
+                    actions={
+                        <>
+                            <PageHeaderSearch
+                                value={visible ? search : ''}
+                                onChange={(value) =>
+                                    visible && setSearch(value)
+                                }
+                                ariaLabel="Search provider records"
+                                placeholder="Search permitted provider records…"
+                            />
+                            <PageHeaderGlassButton onClick={refresh}>
+                                <RefreshCw className="size-4" />
+                                Refresh
+                            </PageHeaderGlassButton>
+                        </>
+                    }
+                    meters={meters.map((meter) => (
+                        <PageHeaderMeterBlock
+                            key={meter.label}
+                            label={meter.label}
+                            onClick={() => select(meter.scope)}
+                            ariaLabel={
+                                'Open ' +
+                                integrationViews.find(
+                                    (v) => v.key === meter.scope,
+                                )?.label +
+                                ' view'
+                            }
+                        >
+                            <PageHeaderMeterBig>
+                                {visible ? meter.value : 'Restricted'}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {meter.caption}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
                     ))}
-                </div>
-                <Card>
-                    <CardContent className="flex flex-wrap items-start gap-3 p-5 text-sm text-muted-foreground">
-                        <RefreshCw className="mt-0.5 h-4 w-4" />
-                        <p>
-                            Sync is marked stale after{' '}
-                            {boundaries.sync_stale_after_hours} hours.
-                            Credential rotation uses a declared{' '}
-                            {boundaries.credential_rotation_cadence_days}-day
-                            review cadence. Correlated operational alerts remain
-                            owned by {boundaries.alert_owner}.
+                    mobileSummary={
+                        visible
+                            ? `${data.stats.providers_total} providers · ${data.stats.exceptions} exceptions`
+                            : 'Provider records restricted'
+                    }
+                    filters={
+                        <>
+                            <PageHeaderFilterButton
+                                onClick={() => {
+                                    if (visible) {
+                                        setSearch('');
+                                        setScope('providers');
+                                    }
+                                }}
+                            >
+                                All providers
+                            </PageHeaderFilterButton>
+                            <PageHeaderViewToggle
+                                value={layout}
+                                onChange={setLayout}
+                                options={[
+                                    {
+                                        value: 'cards',
+                                        label: 'Cards',
+                                        icon: LayoutGrid,
+                                    },
+                                    {
+                                        value: 'table',
+                                        label: 'Table',
+                                        icon: List,
+                                    },
+                                ]}
+                            />
+                        </>
+                    }
+                    rail={
+                        <PageHeaderRail
+                            items={integrationViews}
+                            value={scope}
+                            onSelect={select}
+                            ariaLabel="Provider views"
+                        />
+                    }
+                />
+                {!visible ? (
+                    <p
+                        role="status"
+                        className="rounded-xl border bg-card p-5 text-sm"
+                    >
+                        Provider records are restricted. Ask an administrator to
+                        restore access, then Refresh.
+                    </p>
+                ) : (
+                    <>
+                        <p className="text-sm text-muted-foreground">
+                            Read started{' '}
+                            {formatDateTimeLong(
+                                data.as_of,
+                                'at a time not recorded',
+                            )}
+                            . Stored readings can change between refreshes.
                         </p>
-                    </CardContent>
-                </Card>
-            </PageShell>
+                        {notice ? (
+                            <p
+                                role="status"
+                                className="text-sm text-muted-foreground"
+                            >
+                                {notice}
+                            </p>
+                        ) : null}
+                        <IntegrationRecords
+                            rows={rows}
+                            data={{ ...data, providers }}
+                            permission={permission}
+                            scope={scope}
+                            layout={layout}
+                            searching={Boolean(search.trim())}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                            Sync is marked old after{' '}
+                            {data.boundaries.sync_stale_after_hours} hours.
+                            Credential review cadence is{' '}
+                            {data.boundaries.credential_rotation_cadence_days}{' '}
+                            days. Correlated operational alerts remain owned by{' '}
+                            {data.boundaries.alert_owner}.
+                        </p>
+                    </>
+                )}
+            </div>
         </AppLayout>
     );
 }
+
+export { CredentialRotationStatus } from '@/components/security-devices/integration-records';

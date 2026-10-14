@@ -404,6 +404,13 @@ class User extends Authenticatable implements MustVerifyEmail
             ->exists();
     }
 
+    /** Family portal accounts: the person supported (client) and their family (next_of_kin). */
+    public function isPortalAccount(): bool
+    {
+        return in_array($this->role, ['client', 'next_of_kin'], true)
+            || $this->hasRole('client', 'next_of_kin');
+    }
+
     /** Revoked accounts keep their dedicated external identity. */
     public function isExternalClinicianAccount(): bool
     {

@@ -951,7 +951,13 @@ export function PageHeaderFilterButton({
     );
 }
 
-/** Glass dropdown filter chip (label + chevron; ✕ clears when active). */
+/**
+ * Glass dropdown filter chip (label + chevron; ✕ clears when active).
+ *
+ * `size="comfortable"` is the taller 38px dropdown approved for the role
+ * Overview (Stephan, 13 Oct 2026; DESIGN.md "Role overview pilot"). It is
+ * opt-in while it is piloted there; the default stays the 23px chip.
+ */
 export function PageHeaderFilterSelect({
     testId,
     icon: Icon,
@@ -960,6 +966,7 @@ export function PageHeaderFilterSelect({
     allValue = 'all',
     options,
     onChange,
+    size = 'default',
 }: {
     testId?: string;
     icon?: IconType;
@@ -968,11 +975,13 @@ export function PageHeaderFilterSelect({
     allValue?: string;
     options: { value: string; label: string }[];
     onChange: (value: string) => void;
+    size?: 'default' | 'comfortable';
 }) {
     const [open, setOpen] = useState(false);
     const tap = useFrontlineTap();
     const current = options.find((o) => o.value === value);
     const active = value !== allValue;
+    const comfortable = size === 'comfortable';
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -982,10 +991,14 @@ export function PageHeaderFilterSelect({
                 className={cn(
                     'inline-flex items-center',
                     FILTER_FIELD,
+                    comfortable &&
+                        'h-[38px] rounded-[10px] text-[0.857rem] font-medium shadow-xs',
                     tap && 'h-auto max-w-full',
                     active
                         ? 'border-band-foreground bg-band-foreground text-primary-strong'
-                        : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
+                        : comfortable
+                          ? 'border-band-foreground/15 bg-band-foreground/5 text-band-foreground hover:bg-band-foreground/15'
+                          : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
                 )}
             >
                 <PopoverTrigger asChild>
@@ -994,18 +1007,34 @@ export function PageHeaderFilterSelect({
                         data-test={testId}
                         className={cn(
                             'inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none',
-                            active ? 'pr-1' : 'pr-2',
+                            comfortable && 'gap-2 rounded-[10px] pl-3',
+                            active ? 'pr-1' : comfortable ? 'pr-3' : 'pr-2',
                             tap,
                         )}
                     >
                         {Icon ? (
-                            <Icon className="size-2.5 shrink-0 opacity-70" />
+                            <Icon
+                                className={cn(
+                                    'shrink-0 opacity-70',
+                                    comfortable ? 'size-3.5' : 'size-2.5',
+                                )}
+                            />
                         ) : null}
-                        <span className="max-w-[130px] truncate">
+                        <span
+                            className={cn(
+                                'truncate',
+                                comfortable ? 'max-w-[180px]' : 'max-w-[130px]',
+                            )}
+                        >
                             {active ? (current?.label ?? label) : label}
                         </span>
                         {!active ? (
-                            <ChevronDown className="size-3 opacity-70" />
+                            <ChevronDown
+                                className={cn(
+                                    'opacity-70',
+                                    comfortable ? 'size-3.5' : 'size-3',
+                                )}
+                            />
                         ) : null}
                     </button>
                 </PopoverTrigger>

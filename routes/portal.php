@@ -17,12 +17,14 @@ use App\Http\Controllers\Portal\PortalCalendarController;
 use App\Http\Controllers\Portal\PortalDocumentController;
 use App\Http\Controllers\Portal\PortalFamilyNoteController;
 use App\Http\Controllers\Portal\PortalHealthController;
+use App\Http\Controllers\Portal\PortalInvitationController;
 use App\Http\Controllers\Portal\PortalLocationController;
 use App\Http\Controllers\Portal\PortalMessageController;
 use App\Http\Controllers\Portal\PortalNotificationController;
 use App\Http\Controllers\Portal\PortalPhotoController;
 use App\Http\Controllers\Portal\PortalPreferenceController;
 use App\Http\Controllers\Portal\PortalScheduleController;
+use App\Http\Controllers\Portal\PortalSignInLinkController;
 use App\Http\Controllers\Portal\PortalTimelineController;
 use App\Http\Controllers\Portal\PortalTimelineInteractionController;
 use App\Http\Controllers\PortalClientController;
@@ -48,9 +50,39 @@ use Inertia\Inertia;
  */
 
 // Portal SSO routes (outside auth middleware - these are for login)
-Route::get('portal/login', fn () => Inertia::render('portal/login', [
+Route::get('portal/login', fn (Request $request) => Inertia::render('portal/login', [
     'ssoProviders' => app(SsoConfigurationService::class)->availability('portal'),
+    'status' => $request->session()->get('status'),
+    'linkSentTo' => $request->session()->get('portalLinkSentTo'),
+    'notice' => $request->session()->get('portalNotice'),
+    'passwordChanged' => (bool) $request->session()->get('passwordChanged', false),
+    'retryAfter' => $request->session()->get('loginRetryAfter'),
 ]))->name('portal.login')->middleware('guest');
+
+// Family sign-in without a password: "Email me a sign-in link".
+Route::middleware('guest')->group(function () {
+    Route::post('portal/login/link', [PortalSignInLinkController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('portal.sign-in-link.store');
+    Route::get('portal/login/link/{token}', [PortalSignInLinkController::class, 'consume'])
+        ->middleware('throttle:20,1')
+        ->name('portal.sign-in-link.consume');
+
+    // Family invitations: choose a password or link Google/Microsoft.
+    Route::get('portal/invite/{token}', [PortalInvitationController::class, 'show'])
+        ->middleware('throttle:30,1')
+        ->name('portal.invitations.show');
+    Route::post('portal/invite/{token}', [PortalInvitationController::class, 'accept'])
+        ->middleware('throttle:10,1')
+        ->name('portal.invitations.accept');
+    Route::post('portal/invite/{token}/resend', [PortalInvitationController::class, 'resend'])
+        ->middleware('throttle:3,10')
+        ->name('portal.invitations.resend');
+    Route::get('portal/invite/{token}/sso/{provider}', [PortalInvitationController::class, 'sso'])
+        ->whereIn('provider', ['microsoft', 'google'])
+        ->middleware('throttle:10,1')
+        ->name('portal.invitations.sso');
+});
 Route::get('portal/auth/microsoft/redirect', [PortalOAuthController::class, 'redirectMicrosoft'])->name('portal.auth.microsoft');
 Route::get('portal/auth/microsoft/callback', [PortalOAuthController::class, 'callbackMicrosoft']);
 Route::get('portal/auth/google/redirect', [PortalOAuthController::class, 'redirectGoogle'])->name('portal.auth.google');

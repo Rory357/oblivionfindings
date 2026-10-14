@@ -1,44 +1,77 @@
-// Components
-import TextLink from '@/components/text-link';
+import { AuthStatusPanel } from '@/components/auth/auth-status-panel';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
-import AuthLayout from '@/layouts/auth-layout';
+import AuthJourneyLayout, {
+    type AuthAudience,
+} from '@/layouts/auth/auth-journey-layout';
 import { logout } from '@/routes';
 import { send } from '@/routes/verification';
-import { Form, Head } from '@inertiajs/react';
+import { Form, Link } from '@inertiajs/react';
+import { Check, Mail } from 'lucide-react';
 
-export default function VerifyEmail({ status }: { status?: string }) {
+/** "Confirm your email address" before first use. */
+export default function VerifyEmail({
+    status,
+    email,
+    audience = 'staff',
+}: {
+    status?: string | null;
+    email?: string | null;
+    audience?: AuthAudience;
+}) {
     return (
-        <AuthLayout
-            title="Verify email"
-            description="Please verify your email address by clicking on the link we just emailed to you."
+        <AuthJourneyLayout
+            audience={audience}
+            title="Confirm your email address"
         >
-            <Head title="Email verification" />
-
             {status === 'verification-link-sent' && (
-                <div className="mb-4 text-center text-sm font-medium text-status-success">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
-                </div>
+                <Alert variant="success">
+                    <Check />
+                    <AlertDescription>
+                        We've sent a new link. Check your email.
+                    </AlertDescription>
+                </Alert>
             )}
-
-            <Form action={send()} className="space-y-6 text-center">
-                {({ processing }) => (
-                    <>
-                        <Button disabled={processing} variant="secondary">
-                            {processing && <Spinner />}
-                            Resend verification email
-                        </Button>
-
-                        <TextLink
-                            href={logout()}
-                            className="mx-auto block text-sm"
-                        >
-                            Log out
-                        </TextLink>
-                    </>
-                )}
-            </Form>
-        </AuthLayout>
+            <AuthStatusPanel
+                icon={Mail}
+                title="Confirm your email address"
+                actions={
+                    <Form action={send()} className="flex flex-col gap-3">
+                        {({ processing }) => (
+                            <>
+                                <Button
+                                    type="submit"
+                                    variant="outline"
+                                    className="journey-control w-full"
+                                    disabled={processing}
+                                >
+                                    Send the link again
+                                </Button>
+                                <Link
+                                    href={logout()}
+                                    method="post"
+                                    as="button"
+                                    className="self-center text-[14px] font-semibold text-primary hover:underline"
+                                >
+                                    Sign out
+                                </Link>
+                            </>
+                        )}
+                    </Form>
+                }
+            >
+                <p>
+                    Open the link we sent to{' '}
+                    {email ? (
+                        <span className="font-semibold text-foreground">
+                            {email}
+                        </span>
+                    ) : (
+                        'your email'
+                    )}{' '}
+                    to finish setting up your account.
+                </p>
+            </AuthStatusPanel>
+        </AuthJourneyLayout>
     );
 }

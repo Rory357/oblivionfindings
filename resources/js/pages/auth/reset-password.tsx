@@ -1,116 +1,127 @@
-import { update } from '@/routes/password';
-import { Form, Head } from '@inertiajs/react';
-
+import { PasswordField } from '@/components/auth/password-field';
+import {
+    PasswordRules,
+    type PasswordRequirements,
+} from '@/components/auth/password-rules';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
-import AuthLayout from '@/layouts/auth-layout';
+import AuthJourneyLayout, {
+    type AuthAudience,
+} from '@/layouts/auth/auth-journey-layout';
 import { useI18n } from '@/lib/i18n';
+import { update } from '@/routes/password';
+import { useForm } from '@inertiajs/react';
+import { type FormEvent } from 'react';
 
 interface ResetPasswordProps {
     token: string;
     email: string;
+    audience?: AuthAudience;
+    passwordRules?: PasswordRequirements;
 }
 
-export default function ResetPassword({ token, email }: ResetPasswordProps) {
+const DEFAULT_RULES: PasswordRequirements = {
+    minLength: 12,
+    mixedCase: true,
+    numbers: true,
+    symbols: true,
+};
+
+/** Step 3 of the reset flow: choose a new password (live rule checklist). */
+export default function ResetPassword({
+    token,
+    email,
+    audience = 'staff',
+    passwordRules = DEFAULT_RULES,
+}: ResetPasswordProps) {
     const { t } = useI18n();
+    const form = useForm({ email, password: '', password_confirmation: '' });
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        form.transform((data) => ({ ...data, token }));
+        form.post(update().url, {
+            onFinish: () => form.reset('password', 'password_confirmation'),
+        });
+    };
 
     return (
-        <AuthLayout
-            title={t('app.auth.reset.title', 'Reset password')}
-            description={t(
-                'app.auth.reset.description',
-                'Please enter your new password below',
-            )}
+        <AuthJourneyLayout
+            audience={audience}
+            title={t('app.auth.reset.title', 'Choose a new password')}
+            signing={form.processing}
         >
-            <Head title={t('app.auth.reset.title', 'Reset password')} />
-
-            <Form
-                action={update()}
-                transform={(data) => ({ ...data, token, email })}
-                resetOnSuccess={['password', 'password_confirmation']}
-            >
-                {({ processing, errors }) => (
-                    <div className="grid gap-6">
-                        <div className="grid gap-2">
-                            <Label htmlFor="email" className="text-foreground">
-                                {t('app.auth.email', 'Email')}
-                            </Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                name="email"
-                                autoComplete="email"
-                                value={email}
-                                className="bg-background/80"
-                                readOnly
-                            />
-                            <InputError
-                                message={errors.email}
-                                className="mt-2"
-                            />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label
-                                htmlFor="password"
-                                className="text-foreground"
-                            >
-                                {t('app.auth.password', 'Password')}
-                            </Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                name="password"
-                                autoComplete="new-password"
-                                className="bg-background/80"
-                                autoFocus
-                                placeholder={t('app.auth.password', 'Password')}
-                            />
-                            <InputError message={errors.password} />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label
-                                htmlFor="password_confirmation"
-                                className="text-foreground"
-                            >
-                                {t(
-                                    'app.auth.confirm_password',
-                                    'Confirm password',
-                                )}
-                            </Label>
-                            <Input
-                                id="password_confirmation"
-                                type="password"
-                                name="password_confirmation"
-                                autoComplete="new-password"
-                                className="bg-background/80"
-                                placeholder={t(
-                                    'app.auth.confirm_password',
-                                    'Confirm password',
-                                )}
-                            />
-                            <InputError
-                                message={errors.password_confirmation}
-                                className="mt-2"
-                            />
-                        </div>
-
-                        <Button
-                            type="submit"
-                            className="mt-4 w-full"
-                            disabled={processing}
-                            data-test="reset-password-button"
-                        >
-                            {processing && <Spinner />}
-                            {t('app.auth.reset.submit', 'Reset password')}
-                        </Button>
-                    </div>
-                )}
-            </Form>
-        </AuthLayout>
+            <div className="flex flex-col gap-1.5">
+                <h1 className="journey-title">
+                    {t('app.auth.reset.title', 'Choose a new password')}
+                </h1>
+                <p className="journey-subtitle">
+                    For{' '}
+                    <span className="font-semibold text-foreground">
+                        {email}
+                    </span>
+                </p>
+            </div>
+            <form onSubmit={submit} className="flex flex-col gap-4">
+                <InputError message={form.errors.email} />
+                <div className="flex flex-col gap-2">
+                    <Label htmlFor="password" className="journey-label">
+                        New password
+                    </Label>
+                    <PasswordField
+                        id="password"
+                        name="password"
+                        autoComplete="new-password"
+                        autoFocus
+                        required
+                        value={form.data.password}
+                        onChange={(event) =>
+                            form.setData('password', event.target.value)
+                        }
+                        aria-describedby="password-rules"
+                        aria-invalid={
+                            Boolean(form.errors.password) || undefined
+                        }
+                    />
+                    <PasswordRules
+                        id="password-rules"
+                        rules={passwordRules}
+                        value={form.data.password}
+                    />
+                    <InputError message={form.errors.password} />
+                </div>
+                <div className="flex flex-col gap-2">
+                    <Label
+                        htmlFor="password_confirmation"
+                        className="journey-label"
+                    >
+                        Type it again
+                    </Label>
+                    <PasswordField
+                        id="password_confirmation"
+                        name="password_confirmation"
+                        autoComplete="new-password"
+                        required
+                        value={form.data.password_confirmation}
+                        onChange={(event) =>
+                            form.setData(
+                                'password_confirmation',
+                                event.target.value,
+                            )
+                        }
+                    />
+                    <InputError message={form.errors.password_confirmation} />
+                </div>
+                <Button
+                    type="submit"
+                    className="journey-control w-full"
+                    disabled={form.processing}
+                    data-test="reset-password-button"
+                >
+                    {t('app.auth.reset.submit', 'Save new password')}
+                </Button>
+            </form>
+        </AuthJourneyLayout>
     );
 }

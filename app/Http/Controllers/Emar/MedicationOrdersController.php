@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationCovertAuthorisation;
+use App\Models\MedicationExternalProposal;
 use App\Models\MedicationOrderAction;
 use App\Models\MedicationOrderFile;
 use App\Models\MedicationOrderRevision;
@@ -14,6 +15,7 @@ use App\Models\MedicationReconciliation;
 use App\Models\MedicationReviewItem;
 use App\Models\RespiteStay;
 use App\Models\User;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderLifecycleService;
@@ -101,7 +103,8 @@ final class MedicationOrdersController extends Controller
         $page = $query->with('client:id,first_name,last_name,site_id')->orderBy('name')->paginate(40)->withQueryString();
         $revisions = $this->scope->scopeCanonicalClientMedicationRows(MedicationOrderRevision::query()->canonicalVersion(), $sites, false)->whereIn('client_medication_id', $page->pluck('id'))
             ->with(['version', 'enterer:id,name', 'checker:id,name', 'witness:id,name'])->orderBy('id')->get()->groupBy('client_medication_id');
-        $page->through(fn ($medication) => $this->summary($medication, $revisions->get($medication->id, collect()), $actor, $writableIds));
+        $requests = $this->prescriberRequests($actor, $page->getCollection());
+        $page->through(fn ($medication) => $this->summary($medication, $revisions->get($medication->id, collect()), $actor, $writableIds, $requests));
         $reconciliations = MedicationReconciliation::query()->whereIn('client_id', $scopedIds)->with(['client:id,first_name,last_name', 'items'])->orderByDesc('id')->limit(100)->get()
             ->map(fn ($record) => $this->reconciliationPayload($record, $actor, $writableIds));
         $covert = $this->scope->scopeCanonicalClientMedicationRows(MedicationCovertAuthorisation::query(), $sites, false)->whereIn('client_id', $scopedIds)
@@ -168,7 +171,8 @@ final class MedicationOrdersController extends Controller
             ->orderByDesc('administered_at')->orderByDesc('id')->with('administeredBy:id,name')->first();
 
         return response()->json([
-            'summary' => $this->summary($order, $revisions->reverse()->values(), $request->user(), $this->work->clientIdsWithCurrentAuthority($request->user(), [$order->client_id], now())),
+            'summary' => $this->summary($order, $revisions->reverse()->values(), $request->user(), $this->work->clientIdsWithCurrentAuthority($request->user(), [$order->client_id], now()),
+                $this->prescriberRequests($request->user(), collect([$order]))),
             'order' => $order, 'revisions' => $revisions, 'actions' => $actions,
             'allergies' => $this->allergies->inspect($order->client, ($revisions->firstWhere('status', 'pending')?->version->name) ?? $order->name),
             'last_dose' => $last !== null ? ['id' => $last->id, 'given_at' => $last->administered_at?->toIso8601String(), 'dose_given' => $last->dose_given, 'by' => $last->administeredBy?->name, 'source' => 'emar'] : null,
@@ -200,8 +204,9 @@ final class MedicationOrdersController extends Controller
         $orders = $query->with('client:id,first_name,last_name,site_id')->orderBy('name')->get();
         $revisions = MedicationOrderRevision::query()->canonicalVersion()->where('client_id', $person->id)->whereIn('client_medication_id', $orders->pluck('id'))->with('version')->orderBy('id')->get()->groupBy('client_medication_id');
         $workIds = $this->work->clientIdsWithCurrentAuthority($request->user(), [$person->id], now());
+        $requests = $this->prescriberRequests($request->user(), $orders);
 
-        return response()->json(['orders' => $orders->map(fn ($order) => $this->summary($order, $revisions->get($order->id, collect()), $request->user(), $workIds))])->header('Cache-Control', 'private, no-store');
+        return response()->json(['orders' => $orders->map(fn ($order) => $this->summary($order, $revisions->get($order->id, collect()), $request->user(), $workIds, $requests))])->header('Cache-Control', 'private, no-store');
     }
 
     public function enter(Request $request)
@@ -473,7 +478,7 @@ final class MedicationOrdersController extends Controller
         return $order;
     }
 
-    private function summary(ClientMedication $order, $revisions, User $actor, array $workIds): array
+    private function summary(ClientMedication $order, $revisions, User $actor, array $workIds, array $requests = []): array
     {
         $pending = $revisions->last(fn ($revision) => in_array($revision->status, ['pending', 'sent_back'], true) && ((int) $revision->version->version_number > (int) $order->version || $order->approval_status !== 'verified'));
         $current = $revisions->last(fn ($revision) => in_array($revision->status, ['checked', 'checked_alone'], true) && (int) $revision->version->version_number === (int) $order->version);
@@ -490,7 +495,35 @@ final class MedicationOrdersController extends Controller
             'can_manage' => $mutable && $actor->canDo('medications.orders.manage'),
             'can_verify' => $mutable && $actor->canDo('medications.orders.verify'),
             'blocked_reason' => $mutable ? null : 'A covering, clocked-in shift or emergency access is required for this person.',
+            // EA-025: an outside prescriber's request about this order is waiting.
+            'prescriber_request' => $requests[$order->client_id.':'.$order->id] ?? null,
         ];
+    }
+
+    /**
+     * EA-025: the oldest waiting outside-prescriber request about each order,
+     * keyed "client:order", only while the prescriber portal runs. A
+     * controlled request shows only to controlled readers; the link only to
+     * people who decide requests.
+     *
+     * @return array<string, array{id: int, kind: string, submitted_at: ?string, url: ?string}>
+     */
+    private function prescriberRequests(User $actor, $orders): array
+    {
+        if ($orders->isEmpty() || ! app(ConnectedCareSettings::class)->enabled(ConnectedCareSettings::PORTAL)) {
+            return [];
+        }
+        $decides = $actor->canDo('medications.orders.manage');
+
+        return MedicationExternalProposal::query()->where('status', 'submitted')
+            ->whereIn('medication_id', $orders->pluck('id'))->whereIn('client_id', $orders->pluck('client_id')->unique()->values())
+            ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled', false))
+            ->orderBy('submitted_at')->orderBy('id')->get(['id', 'client_id', 'medication_id', 'kind', 'submitted_at'])
+            ->unique(fn ($proposal) => $proposal->client_id.':'.$proposal->medication_id)
+            ->mapWithKeys(fn ($proposal) => [$proposal->client_id.':'.$proposal->medication_id => [
+                'id' => (int) $proposal->id, 'kind' => $proposal->kind, 'submitted_at' => $proposal->submitted_at?->toIso8601String(),
+                'url' => $decides ? '/emar/connected-care?client_id='.$proposal->client_id.'#requests' : null,
+            ]])->all();
     }
 
     private function actionableRevisionIds(bool $checksOnly = false)

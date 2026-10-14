@@ -1,0 +1,41 @@
+{
+  "reviewed_at_utc": "2026-10-12T10:34:32Z",
+  "status": "WF-IMPACT-POSTCOMMIT-01_ADDRESSED_IN_CANDIDATE_SOURCE_ONLY",
+  "packet": "test-results/workforce-work-restriction-decision-integration-proposal-r5-20261012",
+  "manifest_sha256": "2498D6AE8F5FBA3C3FAD094FF6B0814B88CC7D87743223A35120333CFC73C14D",
+  "independent_review_sha256": "7C38A084BD08B7E0DF60F47718D5C49AF1AF0D2515BE376199E7E547723706A9",
+  "independent_proof_sha256": "B82A2FA06721132789D7235901146ACEFCFCBFB5051A6331343C1D3AC2483E76",
+  "parent_verification": {
+    "packet_files": 21,
+    "hash_drift": [],
+    "read": "Complete R4-to-R5 two-file delta and independent finite review/proof, against prior coordinator finding and installed commit-order evidence.",
+    "impact_sha256": "E773A240309D98830867DF78A233EBACA872E3090DC5F02E3091CB18469EA216",
+    "test_sha256": "DC0699E9BA9A3436DCDF112080F3179D9CDE591D0A5F93E5E2F79CAD8E07A629",
+    "independent_preservation": "Removing exactly one added confirm gate and its new private helper reproduces the whole R4 Impact service byte-for-byte.",
+    "gate_matches": 1,
+    "helper_matches": 1,
+    "whole_other_service_byte_equal": true,
+    "not_repeated": "Full 205-pin review and all inverse/test-body proofs; no PHP/SQL/PDO/framework/native/browser/resource execution."
+  },
+  "finding_resolution": {
+    "id": "WF-IMPACT-POSTCOMMIT-01",
+    "source_only": true,
+    "detail": "Final current target and named-audience admission runs after targetTransaction has returned from all ordinary confirmation afterCommit and TransactionCommitted callbacks, before private ID/hash is exposed.",
+    "mechanics": "Compiled SELECTs execute directly with bound values on the original PDO at level zero; no new framework transaction/commit or normal hydration/query events follow. Preliminary audience/profile/publication observations are bound in the final target query; current approval, Shift read, ordinary approved Sites and existing own/publication semantics retained.",
+    "denial": "Existing not_confirmed response only; original saved impact retained, no rollback or replay authority claimed.",
+    "authored_controls": "Six reached Shift-read/Site/named-membership withdrawal cases across both confirmation callback paths plus one unchanged authorised positive; 78 prior plus 7 = 85 prospective cases, all UNRUN.",
+    "additional_findings": []
+  },
+  "unchanged_acceptance_gates": [
+    "Actual PHP/Laravel/SQL/PDO/driver/event-order/native verification",
+    "Full source/evaluation/immutable AFTER/durable-witness/generation/ABA evidence",
+    "Schema/current dependency admission",
+    "API/recovery and actual owning-page/browser/Rory workflow integration"
+  ],
+  "application_or_runtime_action_by_coordinator": false,
+  "source_schema_routes_grants_adopted": false,
+  "original_r4_and_prior_hold_retained": true,
+  "owner_notified_once": true,
+  "workflow_complete": false,
+  "heartbeat": "ACTIVE"
+}

@@ -41,13 +41,16 @@ final class OverviewPlans
         if ($definition['scope'] !== 'site') {
             return [];
         }
+        return Site::query()->whereIn('id', $this->siteIdsFor($user, $definition))->active()->notArchived()->whereNull('archived_at')
+            ->orderBy('name')->get(['id', 'name'])->toArray();
+    }
+
+    private function siteIdsFor(User $user, array $definition): array
+    {
         // Ticket visibility can be personal; it must never grant access to a site's IT plans.
-        $ids = $definition['role'] === 'it'
+        return $definition['role'] === 'it'
             ? app(ItWorkAccessService::class)->approvedSiteIds($user)
             : $this->overview->siteIds($user, $definition['role']);
-
-        return Site::query()->whereIn('id', $ids)->active()->notArchived()->whereNull('archived_at')
-            ->orderBy('name')->get(['id', 'name'])->toArray();
     }
 
     public function query(User $user, string $kind): Builder
@@ -78,9 +81,13 @@ final class OverviewPlans
         $people = $query->with(['roles.permissions', 'permissionOverrides'])->orderBy('name')->get(['id', 'name', 'role'])->push($user)->unique('id');
         $visibleSiteIds = array_column($this->sites($user, $definition), 'id');
 
+        // $visibleSiteIds is already limited to active, unarchived sites, so each
+        // person only needs their raw site ids (no Site query per person).
         return $people->filter(fn ($person) => $this->canRead($person, $definition))->map(fn ($person) => [
             'id' => $person->id, 'name' => $person->name,
-            'site_ids' => array_values(array_intersect($visibleSiteIds, array_column($this->sites($person, $definition), 'id'))),
+            'site_ids' => $definition['scope'] === 'site'
+                ? array_values(array_intersect($visibleSiteIds, array_map('intval', $this->siteIdsFor($person, $definition))))
+                : [],
         ])->values()->all();
     }
 
@@ -121,7 +128,9 @@ final class OverviewPlans
         }
         $query = $this->query($user, $kind)->when($definition['scope'] === 'site', fn ($q) => $q->whereIn('site_id', $siteIds));
         $open = (clone $query)->whereNotIn('status', ['completed', 'cancelled']);
-        $href = '/work-plans/'.$kind.($definition['scope'] === 'site' && count($siteIds) === 1 ? '?site='.$siteIds[0] : '');
+        // Only link a site the planning page accepts (IT overview sites can come from tickets alone).
+        $linkSite = $definition['scope'] === 'site' && count($siteIds) === 1 && in_array((int) $siteIds[0], array_map('intval', $this->siteIdsFor($user, $definition)), true);
+        $href = '/work-plans/'.$kind.($linkSite ? '?site='.$siteIds[0] : '');
         $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
         $rows = (clone $open)->orderBy('due_date')->limit(6)->get()->map(fn ($plan) => [
             'label' => $plan->title,

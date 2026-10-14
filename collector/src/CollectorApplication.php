@@ -5,8 +5,11 @@ namespace Oblivion\Collector;
 use DateTimeImmutable;
 use JsonException;
 use Oblivion\Collector\Config\SignedConfigLoader;
+use Oblivion\Collector\Enrollment\InstallationProfile;
+use Oblivion\Collector\Enrollment\RecoverableEnrollment;
 use Oblivion\Collector\Exceptions\CentralApiFailure;
 use Oblivion\Collector\Http\HttpsCentralApi;
+use Oblivion\Collector\Media\MediaLane;
 use Oblivion\Collector\Runtime\CollectorCommandExecutor;
 use Oblivion\Collector\Runtime\CommandJournal;
 use Oblivion\Collector\Runtime\HeartbeatReporter;
@@ -34,6 +37,7 @@ final class CollectorApplication
         private readonly ?\Closure $enrolmentTransport = null,
         private readonly ?\Closure $transportEvidenceTransport = null,
         private readonly ?\Closure $output = null,
+        private readonly ?\Closure $recoverableEnrollmentTransport = null,
     ) {}
 
     /** @param list<string> $arguments */
@@ -47,6 +51,10 @@ final class CollectorApplication
                 'version' => $this->version(),
                 'doctor' => $this->doctor($options),
                 'enrol' => $this->enrol($options),
+                'enrol-recoverable' => $this->enrolRecoverable($options),
+                'enrol-profile' => $this->enrolProfile($options),
+                'runtime-check' => $this->runtimeCheck($options),
+                'media-run' => $this->mediaRun($options),
                 'run' => $this->collect($options),
                 'verify-transport' => $this->verifyTransport($options),
                 default => $this->usage(),
@@ -56,6 +64,23 @@ final class CollectorApplication
 
             return 1;
         }
+    }
+
+    /** Local-only startup check; does not contact central or run network probes. */
+    private function runtimeCheck(array $options): int
+    {
+        if (array_keys($options) !== ['identity'] || PHP_VERSION_ID < 80400 || PHP_VERSION_ID >= 90000) {
+            throw new RuntimeException('Collector runtime options or PHP version are unsupported.');
+        }
+        foreach (['curl', 'json', 'openssl', 'sodium', 'sockets'] as $extension) {
+            if (! extension_loaded($extension)) {
+                throw new RuntimeException('Collector runtime extensions are incomplete.');
+            }
+        }
+        (new RecoverableEnrollment)->verifyInstalled($this->requiredPath($options, 'identity'));
+        $this->write("runtime: locally ready; central monitoring health is not confirmed\n");
+
+        return 0;
     }
 
     private function version(): int
@@ -136,7 +161,7 @@ final class CollectorApplication
         $certificate = openssl_x509_read($clientCertificate);
         $privateKey = openssl_pkey_get_private($clientPrivateKey);
         $actualFingerprint = $certificate === false ? false : openssl_x509_fingerprint($certificate, 'sha256');
-        $parsedCertificate = $certificate === false ? false : openssl_x509_parse($certificate, false);
+        $parsedCertificate = $certificate === false ? false : openssl_x509_parse($certificate, true);
         $now = time();
         if ($certificate === false || $privateKey === false || ! is_string($actualFingerprint)
             || ! is_array($parsedCertificate)
@@ -176,6 +201,92 @@ final class CollectorApplication
     }
 
     /** @param array<string, string|bool> $options */
+    private function enrolProfile(array $options): int
+    {
+        if (array_diff(array_keys($options), ['profile', 'state-directory', 'confirm-server', 'confirm-collector-server']) !== []) {
+            throw new RuntimeException('Profile enrolment contains an unknown option.');
+        }
+        $platform = match (PHP_OS_FAMILY) {
+            'Windows' => 'windows', 'Linux' => 'linux',
+            default => throw new RuntimeException('Site collector platform is unsupported.'),
+        };
+        $profile = InstallationProfile::read($this->requiredPath($options, 'profile'), $platform);
+        try {
+            if ($this->requiredString($options, 'confirm-server') !== $profile['deployment_url']
+                || ($profile['server_url'] !== $profile['deployment_url']
+                    && ($options['confirm-collector-server'] ?? null) !== $profile['server_url'])
+                || (isset($options['confirm-collector-server']) && $options['confirm-collector-server'] !== $profile['server_url'])) {
+                throw new RuntimeException('Confirm the exact deployment and collector server from the intended organisation.');
+            }
+            $root = $this->requiredString($options, 'state-directory');
+            (new RecoverableEnrollment($this->recoverableEnrollmentTransport))->enrol(
+                $root.DIRECTORY_SEPARATOR.'collector.identity.json', $profile['collector_uuid'], $profile['site_id'],
+                $profile['server_url'], $profile['tls_public_key_pin'], $root, $profile['enrolment_token'],
+                true, $profile['server_public_key'],
+            );
+        } finally {
+            sodium_memzero($profile['enrolment_token']);
+        }
+        $this->write("enrolment: identity saved; runtime connectivity still requires verification\n");
+
+        return 0;
+    }
+
+    /** @param array<string, string|bool> $options */
+    private function enrolRecoverable(array $options): int
+    {
+        $allowed = ['identity', 'collector-id', 'site-id', 'central-url', 'tls-public-key-pin', 'state-directory', 'token-fd', 'confirm-current', 'expected-server-key'];
+        if (array_diff(array_keys($options), $allowed) !== []) {
+            throw new RuntimeException('Recoverable enrolment contains an unknown option.');
+        }
+        if (isset($options['confirm-current']) && $options['confirm-current'] !== true) {
+            throw new RuntimeException('Use --confirm-current without a value.');
+        }
+        $site = $this->requiredString($options, 'site-id');
+        if (! ctype_digit($site) || strlen($site) > 15 || (int) $site < 1) {
+            throw new RuntimeException('Collector --site-id must identify the approved Site.');
+        }
+        $token = $this->enrolmentToken($options);
+        try {
+            (new RecoverableEnrollment($this->recoverableEnrollmentTransport))->enrol(
+                $this->requiredString($options, 'identity'),
+                $this->requiredString($options, 'collector-id'),
+                (int) $site,
+                $this->requiredString($options, 'central-url'),
+                $this->requiredString($options, 'tls-public-key-pin'),
+                $this->requiredString($options, 'state-directory'),
+                $token,
+                ($options['confirm-current'] ?? false) === true,
+                isset($options['expected-server-key']) ? $this->requiredString($options, 'expected-server-key') : null,
+            );
+        } finally {
+            sodium_memzero($token);
+        }
+        $this->write("enrolment: identity saved; runtime connectivity still requires verification\n");
+
+        return 0;
+    }
+
+    /** @param array<string, string|bool> $options */
+    private function mediaRun(array $options): int
+    {
+        if (array_keys($options) !== ['identity']) {
+            throw new RuntimeException('Media identity unavailable.');
+        }
+        $identity = $this->identity($this->requiredPath($options, 'identity'), requireRuntime: true);
+        $secret = base64_decode($identity['request_signing_secret_key'], true);
+        if (! is_string($secret) || strlen($secret) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
+            throw new RuntimeException('Media identity unavailable.');
+        }
+        try {
+            $central = new HttpsCentralApi($identity['central_url'], $identity['tls_public_key_pin'], $secret, $identity['client_certificate_file'], $identity['client_private_key_file']);
+
+            return (new MediaLane($central, new CredentialLeaseDecryptor($secret), new EnvelopeVerifier($identity['central_signing_public_key'])))->run($identity, STDIN, STDOUT);
+        } finally {
+            sodium_memzero($secret);
+        }
+    }
+
     private function collect(array $options): int
     {
         $configPath = $this->requiredString($options, 'config');
@@ -520,7 +631,15 @@ final class CollectorApplication
     {
         $descriptor = $options['token-fd'] ?? null;
         if (is_string($descriptor) && ctype_digit($descriptor)) {
-            $token = file_get_contents('php://fd/'.(int) $descriptor);
+            $stream = fopen('php://fd/'.(int) $descriptor, 'rb');
+            if (! is_resource($stream)) {
+                throw new RuntimeException('One-time enrolment token is unavailable.');
+            }
+            try {
+                $token = stream_get_contents($stream, 4097);
+            } finally {
+                fclose($stream);
+            }
         } else {
             $token = getenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN');
         }
@@ -546,7 +665,7 @@ final class CollectorApplication
 
     private function usage(): int
     {
-        $this->write("Usage: oblivion-collector enrol|run|doctor|verify-transport|version [--name=value]\n", STDERR);
+        $this->write("Usage: oblivion-collector enrol|enrol-profile|enrol-recoverable|runtime-check|run|doctor|verify-transport|version [--name=value]\n", STDERR);
 
         return 64;
     }

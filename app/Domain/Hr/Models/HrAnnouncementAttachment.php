@@ -11,6 +11,14 @@ class HrAnnouncementAttachment extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        $revise = fn (self $attachment) => HrAnnouncement::whereKey($attachment->announcement_id)->increment('read_version');
+        static::created($revise);
+        static::updated($revise);
+        static::deleted($revise);
+    }
+
     protected $fillable = [
         'announcement_id',
         'disk',

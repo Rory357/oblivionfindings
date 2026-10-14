@@ -132,6 +132,25 @@ beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState({}, '', '/operations/handovers');
 });
+it('retains every handover status in the header filter after workspace navigation is separated', () => {
+    render(<HandoversIndex {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Handover status' }));
+    expect(
+        screen.getByRole('button', { name: 'All handovers · 301' }),
+    ).toBeVisible();
+    expect(
+        screen.getByRole('button', { name: 'Awaiting acknowledgement · 1' }),
+    ).toBeVisible();
+    expect(
+        screen.getByRole('button', { name: 'Acknowledged · 0' }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Drafts · 300' }));
+    expect(get.mock.calls[0][1]).toEqual({
+        ...props.filters,
+        status: 'draft',
+        page: 1,
+    });
+});
 it('uses full scoped counts and the shared header with a working status meter and dated Home-rooted trail', () => {
     const { container } = render(<HandoversIndex {...props} />);
     expect(container.querySelector('.eh-header')).toBeInTheDocument();

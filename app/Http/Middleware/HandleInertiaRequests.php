@@ -6,7 +6,11 @@ use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Domain\Finance\Services\FinanceHubCountsService;
 use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Services\BoardPackAccessService;
+use App\Domain\Hr\Services\LeaveReviewReceipt;
 use App\Domain\It\ItModuleNavigation;
+use App\Domain\It\Services\ItRemoteSupportAccess;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
+use App\Http\Controllers\Auth\LocaleController;
 use App\Models\Announcement;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
@@ -109,7 +113,8 @@ class HandleInertiaRequests extends Middleware
         $availableLocales = (array) config('locales.available', [
             'en' => ['label' => 'English (NZ)', 'native' => 'English (NZ)'],
         ]);
-        $locale = (string) ($user?->locale ?? config('app.locale', 'en'));
+        // Signed-out visitors choose a language on the sign-in pages (cookie).
+        $locale = (string) ($user?->locale ?? $request->cookie(LocaleController::COOKIE) ?? config('app.locale', 'en'));
 
         if (! array_key_exists($locale, $availableLocales)) {
             $locale = (string) config('app.fallback_locale', 'en');
@@ -164,6 +169,7 @@ class HandleInertiaRequests extends Middleware
                             'theme.dark',
                             'branding.name',
                             'branding.logo_path',
+                            'branding.logo_dark_path',
                         ]);
                 })
                 ->get(['key', 'value'])
@@ -182,6 +188,9 @@ class HandleInertiaRequests extends Middleware
         $brandingName = $settings->get('branding.name')?->value;
         $logoPath = $settings->get('branding.logo_path')?->value;
         $logoUrl = $logoPath ? Storage::disk('public')->url($logoPath) : null;
+        // The organisation's logo for dark backgrounds (sign-in brand half, dark mode).
+        $logoDarkPath = $settings->get('branding.logo_dark_path')?->value;
+        $logoDarkUrl = $logoDarkPath ? Storage::disk('public')->url($logoDarkPath) : null;
 
         $hasOpsMessagingTables = SchemaCache::hasTable('ops_messages')
             && SchemaCache::hasTable('ops_conversation_participants');
@@ -281,6 +290,7 @@ class HandleInertiaRequests extends Middleware
             'branding' => [
                 'name' => is_string($brandingName) && trim($brandingName) !== '' ? $brandingName : config('app.name'),
                 'logoUrl' => $logoUrl,
+                'logoDarkUrl' => $logoDarkUrl,
             ],
             // Per-user appearance preferences so the React app can hydrate
             // from server state instead of only trusting localStorage. Null
@@ -310,6 +320,7 @@ class HandleInertiaRequests extends Middleware
             // Flash messages for global toasts
             'flash' => [
                 'attendance_result' => fn () => $request->session()->get('attendance_result'),
+                'leave_review_result' => fn () => LeaveReviewReceipt::forRequester($request),
                 'staff_availability_result' => fn () => $request->session()->get('staff_availability_result'),
                 'workforce_settings_result' => function () use ($request) {
                     $outcome = $request->session()->get('workforce_settings_result');
@@ -598,6 +609,9 @@ class HandleInertiaRequests extends Middleware
     protected function buildUserPermissions($user): array
     {
         return [
+            'companyHub' => [
+                'view' => app(\App\Domain\CompanyHub\Services\HubAccess::class)->canEnter($user),
+            ],
             'sites' => [
                 'viewAny' => $user->canDo('sites.viewAny'),
                 'viewAll' => $user->canDo('sites.viewAll'),
@@ -869,6 +883,7 @@ class HandleInertiaRequests extends Middleware
             'integrations' => [
                 'view' => $user->canDo('integrations.view'),
                 'manageSecrets' => $user->canDo('integrations.manage_secrets'),
+                'manageObli' => $user->canDo('settings.access.manage') && $user->canDo('integrations.manage_secrets'),
                 'manageSiteSecrets' => $user->canDo('integrations.manage_site_secrets'),
             ],
 
@@ -1081,6 +1096,8 @@ class HandleInertiaRequests extends Middleware
             'it' => [
                 'view' => $user->canDo('it.view'),
                 'manage' => $user->canDo('it.manage'),
+                'remote_support' => app(ItRemoteSupportAccess::class)->canOpen($user),
+                'approved_software' => EndpointSoftwarePackages::canOpen($user),
                 'request' => $user->canDo('it.request'),
                 'knowledge_author' => $user->canDo('it.knowledge.author'),
                 'knowledge_review' => $user->canDo('it.knowledge.review'),

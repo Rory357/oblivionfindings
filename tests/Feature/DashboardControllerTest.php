@@ -102,9 +102,9 @@ class DashboardControllerTest extends TestCase
     {
         $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
         $user = $this->grant($this->actor('support_worker', $site), ['progress_notes.viewAny', 'progress_notes.create']);
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'first_name' => 'Merewhiua', 'preferred_name' => 'Mere']);
         $client->supportWorkers()->attach($user->id);
-        $hidden = Client::factory()->create(['site_id' => $site->id]);
+        $hidden = Client::factory()->create(['site_id' => $site->id, 'first_name' => 'Hiddenperson', 'preferred_name' => null]);
         $foreign = Client::factory()->create();
         $base = ['client_id' => $client->id, 'user_id' => $user->id, 'type' => 'daily_note', 'body' => 'Private care narrative', 'subject' => 'Private care subject', 'is_draft' => true];
         $draft = ClientNote::query()->create($base);
@@ -117,9 +117,10 @@ class DashboardControllerTest extends TestCase
         ClientNote::query()->create([...$base, 'shift_id' => $incoherent->id]);
         $this->actingAs($user)->getJson('/dashboard/data?role=worker')->assertOk()->assertJsonPath('partial', false)
             ->assertJsonPath('blocks.worker-notes.state', 'ready')->assertJsonPath('blocks.worker-notes.total', 1)
-            ->assertJsonPath('blocks.worker-notes.rows.0.label', 'Daily note draft #'.$draft->id)
+            // The preferred name says whose note it is; the contents stay private.
+            ->assertJsonPath('blocks.worker-notes.rows.0.label', 'Daily note for Mere')
             ->assertJsonPath('blocks.worker-notes.rows.0.href', '/operations/clients/'.$client->id.'?tab=progress_notes')
-            ->assertDontSee('Private care narrative')->assertDontSee('Private care subject');
+            ->assertDontSee('Private care narrative')->assertDontSee('Private care subject')->assertDontSee('Hiddenperson');
         $user->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'progress_notes.viewAny')->sole()->id => ['allowed' => false]]);
         $this->actingAs($user->fresh())->getJson('/dashboard/data?role=worker')->assertOk()->assertJsonPath('blocks.worker-notes.state', 'restricted');
     }
@@ -321,9 +322,14 @@ class DashboardControllerTest extends TestCase
             ->assertJsonPath('blocks.trend.series.0.value', 4)->assertJsonPath('blocks.trend.series.0.comparison', 1)
             ->assertJsonPath('blocks.trend.series.1.value', null)->assertJsonPath('blocks.trend.series.1.comparison', null)
             ->assertJsonPath('blocks.distribution.rows.0.value', 1)->assertJsonPath('blocks.distribution.rows.1.value', 1)->assertJsonPath('blocks.distribution.rows.2.value', 1)
-            ->assertJsonPath('blocks.agenda.rows.0.href', '/it/changes/'.$change->id)->assertJsonPath('blocks.sites.state', 'restricted');
+            ->assertJsonPath('blocks.agenda.rows.0.href', '/it/changes/'.$change->id)->assertJsonPath('blocks.sites.state', 'restricted')
+            ->assertJsonPath('blocks.agenda.rows.0.facts.2.label', 'Risk')->assertJsonPath('blocks.agenda.rows.0.facts.2.value', 'Low');
         $this->assertStringNotContainsString('Hidden site request', $response->getContent());
         $this->assertStringNotContainsString('Restricted request', $response->getContent());
+        // A restricted change keeps its risk out of the overview's detail panel.
+        $change->update(['is_restricted' => true]);
+        $facts = $this->getJson('/dashboard/data?role=it&range=week')->assertOk()->json('blocks.agenda.rows.0.facts');
+        $this->assertNotContains('Risk', array_column($facts, 'label'));
     }
 
     public function test_it_device_reporting_respects_device_sites_and_monitoring_permission(): void
@@ -338,11 +344,13 @@ class DashboardControllerTest extends TestCase
         }
         $this->actingAs($user)->getJson('/dashboard/data?role=it')->assertOk()->assertJsonPath('partial', false)
             ->assertJsonPath('metrics.2.display', '50%')->assertJsonPath('blocks.sites.total', 2)->assertJsonCount(1, 'blocks.sites.rows')
-            ->assertJsonPath('blocks.sites.rows.0.status', 'Needs attention')->assertJsonPath('blocks.it-assets.total', 2);
+            ->assertJsonPath('blocks.sites.rows.0.status', 'Needs attention')->assertJsonPath('blocks.it-assets.total', 2)
+            ->assertJsonPath('blocks.sites.rows.0.facts.0.value', '2')->assertJsonPath('blocks.sites.rows.0.facts.1.value', '1');
         $permission = Permission::where('key', 'securityDevices.events.view')->sole();
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
         $this->actingAs($user->fresh())->getJson('/dashboard/data?role=it')->assertOk()->assertJsonPath('partial', false)
-            ->assertJsonPath('metrics.2.value', null)->assertJsonPath('blocks.sites.rows.0.status', 'Not assessed');
+            ->assertJsonPath('metrics.2.value', null)->assertJsonPath('blocks.sites.rows.0.status', 'Not assessed')
+            ->assertJsonPath('blocks.sites.rows.0.facts', null);
     }
 
     public function test_governance_uses_permitted_meetings_and_current_risk_assurance_and_strategy(): void
@@ -371,7 +379,10 @@ class DashboardControllerTest extends TestCase
             ->assertJsonPath('blocks.focus.rows.0.detail', 'No board papers available in your view')
             ->assertJsonPath('blocks.trend.sections.0.rows.0.href', '/governance/risks/'.$risk->id)
             ->assertJsonPath('blocks.trend.sections.0.rows.0.status', 'Critical')->assertJsonPath('blocks.trend.sections.1.rows.0.label', 'Due evidence')
-            ->assertJsonPath('blocks.sites.rows.0.value', 42)->assertJsonPath('blocks.sites.presentation', 'priorities');
+            ->assertJsonPath('blocks.sites.rows.0.value', 42)->assertJsonPath('blocks.sites.presentation', 'priorities')
+            ->assertJsonPath('blocks.trend.sections.0.rows.0.facts.0.value', 'OV-RISK-1')->assertJsonPath('blocks.trend.sections.0.rows.0.facts.1.value', 'Operational')
+            ->assertJsonPath('blocks.trend.sections.1.rows.0.facts.2.value', 'Still needed')
+            ->assertJsonPath('blocks.sites.rows.0.facts.3.value', '42%');
         foreach (['Hidden executive meeting', 'Hidden decision paper', 'Cancelled board meeting', 'Voided risk', 'Cancelled obligation'] as $hidden) {
             $this->assertStringNotContainsString($hidden, $response->getContent());
         }
@@ -400,7 +411,8 @@ class DashboardControllerTest extends TestCase
         Shift::factory()->published()->assignedToday($user)->create(['site_id' => $site->id, 'client_id' => $client->id, 'status' => 'cancelled']);
         $this->actingAs($user)->getJson('/dashboard/data?role=lead')->assertOk()->assertJsonPath('partial', false)
             ->assertJsonPath('metrics.0.display', '1 / 2')->assertJsonPath('metrics.2.label', 'On duty')->assertJsonPath('metrics.2.value', 1)
-            ->assertJsonPath('metrics.2.avatars.0', 'TW')
+            ->assertJsonPath('metrics.2.avatars.0', 'TW')->assertJsonCount(1, 'metrics.2.people')
+            ->assertJsonPath('metrics.2.people.0.name', 'Team Worker')
             ->assertJsonPath('blocks.trend.coverage.gaps', 1)->assertJsonPath('blocks.trend.coverage.rows.0.cells.0.0.assigned', 1)
             ->assertJsonPath('blocks.trend.coverage.rows.0.cells.0.0.required', 2)->assertJsonPath('blocks.sites.rows.0.status', 'Cover needed');
 
@@ -410,6 +422,39 @@ class DashboardControllerTest extends TestCase
         $this->getJson('/dashboard/data?role=lead')->assertOk()->assertJsonPath('partial', false)
             ->assertJsonPath('metrics.0.value', null)->assertJsonPath('blocks.trend.coverage.unassessed', 1)
             ->assertJsonPath('blocks.trend.coverage.rows.0.cells.0.0.assigned', null)->assertJsonPath('blocks.distribution.state', 'unavailable');
+    }
+
+    public function test_lead_coverage_before_seven_keeps_the_night_on_the_floor_in_view(): void
+    {
+        // Tuesday 02:00: the operational day is still Monday 07:00 → Tuesday 07:00.
+        $this->travelTo(CarbonImmutable::parse('2026-10-13 02:00', 'Pacific/Auckland')->utc());
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $user = $this->grant($this->actor('team_lead', $site), ['shifts.manageAny', 'operations.dashboard.view', 'rostering.viewAny']);
+        SiteCoverageRequirement::create(['site_id' => $site->id, 'name' => 'Overnight cover', 'coverage_type' => 'custom',
+            'day_of_week' => 'tue', 'starts_time' => '01:00', 'ends_time' => '05:00', 'minimum_staff' => 1,
+            'role_requirements' => [], 'allow_overstaffing' => true, 'is_active' => true]);
+        $this->actingAs($user)->getJson('/dashboard/data?role=lead')->assertOk()
+            ->assertJsonPath('blocks.trend.coverage.date', '2026-10-12')->assertJsonPath('blocks.trend.coverage.windows', 1)
+            ->assertJsonPath('blocks.trend.coverage.gaps', 1);
+    }
+
+    public function test_lead_timesheet_count_matches_the_approvals_page_not_the_all_sites_bypass(): void
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $other = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $user = $this->grant($this->actor('team_lead', $site), ['shifts.manageAny', 'operations.dashboard.view', 'operations.dashboard.viewAllSites', 'timesheets.manageAny', 'timesheets.viewAny']);
+        foreach ([[$site, 1], [$other, 2]] as [$target, $count]) {
+            $worker = $this->actor('support_worker', $target);
+            $client = Client::factory()->create(['site_id' => $target->id]);
+            foreach (range(1, $count) as $index) {
+                $shift = Shift::factory()->published()->assignedToday($worker)->create(['site_id' => $target->id, 'client_id' => $client->id]);
+                Timesheet::factory()->submitted()->create(['shift_id' => $shift->id, 'site_id' => $target->id]);
+            }
+        }
+        // The bypass widens the lead's view of sites, but a review queue only
+        // counts the timesheets the approvals page would show (approved site).
+        $this->actingAs($user)->getJson('/dashboard/data?role=lead')->assertOk()
+            ->assertJsonPath('blocks.lead-approvals.total', 1);
     }
 
     public function test_lead_no_requirements_and_owner_only_handovers_remain_honest(): void
@@ -627,7 +672,9 @@ class DashboardControllerTest extends TestCase
         $value = $this->layout();
         $saved = $this->actingAs($user)->putJson('/dashboard/layout/worker', ['revision' => null, 'value' => $value])->assertOk();
         $revision = $saved->json('revision');
-        $this->putJson('/dashboard/layout/worker', ['revision' => null, 'value' => $value])->assertConflict();
+        // A clash returns the newer layout and revision so the editor can recover without a reload.
+        $this->putJson('/dashboard/layout/worker', ['revision' => null, 'value' => $value])->assertConflict()
+            ->assertJsonPath('revision', $revision)->assertJsonPath('value.blocks.0.id', 'attention');
         $value['blocks'][0]['span'] = 12;
         $this->putJson('/dashboard/layout/worker', ['revision' => $revision, 'value' => $value])->assertOk();
         $this->actingAs($other)->get('/dashboard')->assertInertia(fn ($page) => $page->where('preference.value.blocks', null));
@@ -737,8 +784,42 @@ class DashboardControllerTest extends TestCase
     public function test_default_role_is_permitted_and_remembered(): void
     {
         $this->actingAs($this->actor('admin'))->putJson('/dashboard/default-role', ['role' => 'hr'])->assertOk();
-        $this->get('/dashboard')->assertInertia(fn ($page) => $page->where('role', 'hr'));
+        $this->get('/dashboard')->assertInertia(fn ($page) => $page->where('role', 'hr')->where('defaultRole', 'hr'));
         $this->actingAs($this->actor())->putJson('/dashboard/default-role', ['role' => 'hr'])->assertUnprocessable();
+    }
+
+    public function test_hr_staff_open_the_hr_overview_without_the_analytics_permission(): void
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $hr = $this->actor('hr', $site);
+        $analytics = Permission::where('key', 'hr.analytics.view')->first();
+        if ($analytics) {
+            $hr->permissionOverrides()->syncWithoutDetaching([$analytics->id => ['allowed' => false]]);
+            $hr = $hr->fresh();
+        }
+        $this->assertFalse($hr->canDo('hr.analytics.view'));
+        $this->actingAs($hr)->get('/dashboard')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('role', 'hr')->where('defaultRole', 'hr'));
+        // A support worker still can't ask for it.
+        $this->actingAs($this->actor('support_worker', $site))->getJson('/dashboard/data?role=hr')->assertForbidden();
+    }
+
+    public function test_page_load_works_out_only_the_layout_blocks_and_the_editor_loads_the_rest(): void
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $user = $this->actor('support_worker', $site);
+        $user->uiPreferences()->create(['key' => 'overview.workspace.worker', 'value' => $this->layout('worker-learning')]);
+        $this->actingAs($user)->get('/dashboard?role=worker')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('overview.blocks.worker-learning.state', 'ready')
+            ->where('overview.blocks.worker-shift-offers.state', 'deferred')
+            ->where('overview.blocks.attention.state', 'ready'));
+        $named = $this->getJson('/dashboard/data?role=worker&blocks=worker-shift-offers')->assertOk()
+            ->assertJsonPath('blocks.worker-notes.state', 'deferred');
+        $this->assertNotSame('deferred', $named->json('blocks.worker-shift-offers.state'));
+        // The editor asks for the whole library at once; nothing is left deferred or "planned".
+        $all = $this->getJson('/dashboard/data?role=worker&blocks=all')->assertOk()->json('blocks');
+        $this->assertSame([], array_keys(array_filter($all, fn ($block) => in_array($block['state'], ['deferred', 'proposed'], true))));
+        $this->getJson('/dashboard/data?role=worker&blocks=../etc')->assertUnprocessable();
     }
 
     public function test_malformed_filters_do_not_run_summary_queries(): void

@@ -303,6 +303,10 @@ class DeviceController extends Controller
         $accessibleAssetIds = $this->access->accessibleAssetIds($user);
 
         return Inertia::render('security-devices/devices/show', [
+            'endpoint_setup' => config('endpoint_management.enabled') && $canUpdate
+                && $user->canDo('securityDevices.commands.admin')
+                && $device->domain === 'it_infrastructure' && in_array($device->category, ['endpoint', 'server'], true)
+                    ? ['actor_id' => (int) $user->id] : null,
             'device' => [
                 'id' => $device->id,
                 'name' => $device->name,

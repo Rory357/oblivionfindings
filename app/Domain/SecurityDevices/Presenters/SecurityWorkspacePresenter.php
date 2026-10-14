@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -122,6 +123,7 @@ class SecurityWorkspacePresenter
                 'devices' => $restricted
                     ? []
                     : $activeDevices->map(fn (Device $device) => $this->mapDevice(
+                        $viewer,
                         $device,
                         $assignmentContext,
                         $canViewMaintenance,
@@ -435,6 +437,7 @@ class SecurityWorkspacePresenter
     }
 
     private function mapDevice(
+        User $viewer,
         Device $device,
         array $siteContext,
         bool $canViewMaintenance,
@@ -481,7 +484,9 @@ class SecurityWorkspacePresenter
         ];
 
         if ($device->category === 'cctv') {
-            $mapped['media'] = $this->mediaAccess($device, $canViewMedia);
+            $navigation = app(CctvNavigation::class)->forDevice($viewer, $device);
+            $mapped += $navigation;
+            $mapped['media'] = $this->mediaAccess($device, $canViewMedia && $navigation['live_href'] !== null);
         }
 
         return $mapped;
@@ -573,20 +578,16 @@ class SecurityWorkspacePresenter
 
     private function mediaAccess(Device $device, bool $canViewMedia): array
     {
-        $href = $this->observedValue($device, 'media_href');
-        $validInternalHref = is_string($href)
-            && Str::startsWith($href, '/')
-            && ! Str::startsWith($href, '//');
-
-        if (! $validInternalHref) {
+        if ($device->subcategory === 'nvr') {
             return ['state' => 'not_configured'];
         }
-
         if (! $canViewMedia) {
             return ['state' => 'restricted'];
         }
 
-        return ['state' => 'available', 'href' => $href];
+        // This opens governed setup/viewing. It makes no claim that video is flowing.
+        // Observed media URLs never supply an application destination or provider locator.
+        return ['state' => 'available', 'href' => '/security-devices/devices/'.$device->id.'/live'];
     }
 
     private function mapEvent(DeviceEvent $event): array

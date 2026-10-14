@@ -37,3 +37,15 @@ yarn-error.log
 /.claude
 /.design-drops
 *.zip
+
+/.endpoint-tools/
+
+/endpoint-agent/tray/**/bin/
+/endpoint-agent/tray/**/obj/
+
+/collector/vendor/
+
+/collector/.phpunit.cache/
+
+/endpoint-agent/installer/**/bin/
+/endpoint-agent/installer/**/obj/

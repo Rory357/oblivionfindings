@@ -1,3 +1,4 @@
+import { CctvNavigationActions } from '@/components/security-devices/cctv-navigation-actions';
 import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
 import {
     ControlRoomAlertAccessRequired,
@@ -5,6 +6,7 @@ import {
 } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { ReviewRow } from '@/components/wizard/shell';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
@@ -14,7 +16,6 @@ import {
     Camera,
     ChevronRight,
     CircleHelp,
-    ExternalLink,
     KeyRound,
     MapPin,
     RadioTower,
@@ -63,6 +64,10 @@ type SecurityDevice = {
             scheduledFor: string | null;
         } | null;
     } | null;
+    live_href?: string | null;
+    setup_href?: string | null;
+    setup_kind?: 'recorder';
+    reference_href?: string | null;
     media?: {
         state: 'available' | 'restricted' | 'not_configured';
         href?: string;
@@ -203,11 +208,12 @@ function SectionHeading({
 }
 
 function Metric({ children }: { children: ReactNode }) {
-    return (
-        <div className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm font-semibold">
-            {children}
-        </div>
-    );
+    const fact =
+        typeof children === 'string' ? children.match(/^(\d+)\s+(.+)$/) : null;
+    const label = fact
+        ? fact[2].replace(/^./, (character) => character.toUpperCase())
+        : 'Equipment';
+    return <ReviewRow label={label} value={fact ? fact[1] : children} />;
 }
 
 function SecurityOverview({ data }: { data: SecurityWorkspaceData }) {
@@ -224,7 +230,7 @@ function SecurityOverview({ data }: { data: SecurityWorkspaceData }) {
                     />
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-0">
                         <Metric>
                             {plural(inventory.cctv, 'CCTV', 'CCTV')}
                         </Metric>
@@ -438,28 +444,38 @@ function DeviceEvidence({ device }: { device: SecurityDevice }) {
                 </div>
             ) : null}
 
-            {device.media ? (
-                <div className="mt-4 border-t border-border pt-3 text-sm">
-                    {device.media.state === 'available' && device.media.href ? (
-                        <Link
-                            href={device.media.href}
-                            className="frontline-focus inline-flex min-h-11 items-center gap-2 font-semibold text-primary hover:underline"
-                        >
-                            <Camera className="h-4 w-4" />
-                            Open authorised media
-                            <ExternalLink className="h-3.5 w-3.5" />
-                        </Link>
-                    ) : device.media.state === 'restricted' ? (
-                        <span className="inline-flex items-center gap-2 text-muted-foreground">
-                            <KeyRound className="h-4 w-4" /> Media access
-                            restricted
-                        </span>
-                    ) : (
-                        <span className="inline-flex items-center gap-2 text-muted-foreground">
-                            <CircleHelp className="h-4 w-4" /> Media link not
-                            configured
-                        </span>
-                    )}
+            {device.media ||
+            device.live_href ||
+            device.setup_href ||
+            device.reference_href ? (
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-sm">
+                    <CctvNavigationActions
+                        cameraId={device.id}
+                        navigation={{
+                            live_href: device.live_href ?? null,
+                            setup_href: device.setup_href ?? null,
+                            setup_kind: device.setup_kind,
+                            reference_href: device.reference_href ?? null,
+                        }}
+                    />
+                    {!device.live_href &&
+                        (device.media?.state === 'restricted' ? (
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                                <KeyRound
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                />
+                                Media access restricted
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                                <CircleHelp
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                />
+                                Live view unavailable
+                            </span>
+                        ))}
                 </div>
             ) : null}
         </article>

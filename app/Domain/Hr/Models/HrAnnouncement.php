@@ -18,6 +18,17 @@ class HrAnnouncement extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
+    protected $attributes = ['read_version' => 1, 'push_to_bell' => false];
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $announcement) {
+            if ($announcement->isDirty(['title', 'content', 'priority', 'requires_acknowledgement'])) {
+                $announcement->read_version = ((int) static::whereKey($announcement->id)->value('read_version')) + 1;
+            }
+        });
+    }
+
     protected static function newFactory()
     {
         return HrAnnouncementFactory::new();
@@ -40,6 +51,7 @@ class HrAnnouncement extends Model
         'inbox_announcement_id',
         'is_pinned',
         'requires_acknowledgement',
+        'push_to_bell',
         'created_by',
     ];
 
@@ -48,8 +60,12 @@ class HrAnnouncement extends Model
         'expires_at' => 'datetime',
         'ack_deadline' => 'datetime',
         'recurrence_ends_at' => 'datetime',
+        'recurrence_anchor_at' => 'datetime',
+        'recurrence_cancelled_at' => 'datetime',
         'is_pinned' => 'boolean',
         'requires_acknowledgement' => 'boolean',
+        'push_to_bell' => 'boolean',
+        'read_version' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -62,6 +78,11 @@ class HrAnnouncement extends Model
     }
 
     public function acknowledgements(): HasMany
+    {
+        return $this->acknowledgementHistory()->current();
+    }
+
+    public function acknowledgementHistory(): HasMany
     {
         return $this->hasMany(HrAnnouncementAcknowledgement::class, 'announcement_id');
     }

@@ -55,6 +55,7 @@ import {
     PageHeaderStatusChip,
     PageHeaderViewToggle,
 } from '@/components/page/page-header';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -116,12 +117,53 @@ function UnavailableRecord({
     );
 }
 
+/**
+ * EA-025: an outside prescriber's request is waiting, so nobody works from
+ * the unchanged chart without knowing. People who decide requests get the
+ * way to Connected care; everyone else is told the chart still applies.
+ */
+function PrescriberRequestsNotice({
+    requests,
+}: {
+    requests: NonNullable<
+        Extract<RecordPageProps, { person: unknown }>['prescriber_requests']
+    >;
+}) {
+    return (
+        <Alert
+            role="status"
+            className="border-status-warning/30 bg-status-warning-bg text-status-warning-foreground"
+            data-testid="prescriber-requests-notice"
+        >
+            <AlertTriangle />
+            <AlertTitle>
+                {requests.count === 1
+                    ? 'A prescriber request is waiting'
+                    : `${requests.count} prescriber requests are waiting`}
+            </AlertTitle>
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-3 text-status-warning-foreground">
+                <span>
+                    An outside prescriber asked to start, change or stop a
+                    medicine. The chart stays as it is until the request is
+                    decided.
+                </span>
+                {requests.url ? (
+                    <Button asChild variant="outline" size="sm">
+                        <Link href={requests.url}>Open in Connected care</Link>
+                    </Button>
+                ) : null}
+            </AlertDescription>
+        </Alert>
+    );
+}
+
 function AvailableRecord({
     person,
     meters,
     as_at,
     can,
     today,
+    prescriber_requests,
 }: Extract<RecordPageProps, { person: unknown }>) {
     const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
     const query = new URLSearchParams(page.url.split('?')[1]);
@@ -659,6 +701,9 @@ function AvailableRecord({
                         />
                     }
                 />
+                {prescriber_requests ? (
+                    <PrescriberRequestsNotice requests={prescriber_requests} />
+                ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <TierTwoTabs
                         tabs={section.views}

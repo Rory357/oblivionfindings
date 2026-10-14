@@ -121,6 +121,26 @@ beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState({}, '', '/operations/shift-notes');
 });
+it('retains all note status filters and counts independently of the workspace tabs', () => {
+    render(<ShiftNotesIndex {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Note status' }));
+    expect(
+        screen.getByRole('button', { name: 'All notes · 401' }),
+    ).toBeVisible();
+    expect(
+        screen.getByRole('button', { name: 'Awaiting review · 301' }),
+    ).toBeVisible();
+    expect(
+        screen.getByRole('button', { name: 'Reviewed · 100' }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Flagged · 2' }));
+    expect(get.mock.calls[0][1]).toEqual({
+        ...props.filters,
+        flagged: 0,
+        status: 'flagged',
+        page: 1,
+    });
+});
 it('shows authoritative counts across pages and never claims every shift is documented', () => {
     const { container } = render(<ShiftNotesIndex {...props} />);
     expect(

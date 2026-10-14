@@ -61,6 +61,7 @@ type Props = {
         tagline: string | null;
         report_subtitle: string | null;
         logoUrl: string | null;
+        logoDarkUrl: string | null;
         faviconUrl: string | null;
         email_header_colour: string | null;
         email_footer_text: string | null;
@@ -423,8 +424,10 @@ export default function BrandingPage(props: Props) {
         document.documentElement.classList.contains('dark'),
     );
     const [dragOver, setDragOver] = useState(false);
+    const [darkDragOver, setDarkDragOver] = useState(false);
     const [faviconDragOver, setFaviconDragOver] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const darkFileInputRef = useRef<HTMLInputElement>(null);
     const faviconInputRef = useRef<HTMLInputElement>(null);
 
     const initialTheme = useMemo(
@@ -450,6 +453,8 @@ export default function BrandingPage(props: Props) {
         theme: { light: Record<string, string>; dark: Record<string, string> };
         logo: File | null;
         remove_logo: boolean;
+        logo_dark: File | null;
+        remove_logo_dark: boolean;
         favicon: File | null;
         remove_favicon: boolean;
     }>({
@@ -476,6 +481,8 @@ export default function BrandingPage(props: Props) {
         },
         logo: null,
         remove_logo: false,
+        logo_dark: null,
+        remove_logo_dark: false,
         favicon: null,
         remove_favicon: false,
     });
@@ -502,6 +509,14 @@ export default function BrandingPage(props: Props) {
         (file: File | null) => {
             if (file && file.size > 2 * 1024 * 1024) return;
             form.setData('logo', file);
+        },
+        [form],
+    );
+
+    const handleDarkFile = useCallback(
+        (file: File | null) => {
+            if (file && file.size > 2 * 1024 * 1024) return;
+            form.setData('logo_dark', file);
         },
         [form],
     );
@@ -847,6 +862,108 @@ export default function BrandingPage(props: Props) {
                                                         className="text-sm text-muted-foreground"
                                                     >
                                                         Remove current logo
+                                                    </Label>
+                                                </div>
+                                            )}
+
+                                            {/* Second logo: shown on dark backgrounds (sign-in brand half, dark mode). */}
+                                            <Label>
+                                                Logo for dark backgrounds
+                                            </Label>
+                                            <div
+                                                className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed bg-journey-ink px-6 py-8 text-journey-paper transition-colors ${
+                                                    darkDragOver
+                                                        ? 'border-journey-lavender'
+                                                        : 'border-journey-ink-muted/40 hover:border-journey-lavender'
+                                                }`}
+                                                onClick={() =>
+                                                    darkFileInputRef.current?.click()
+                                                }
+                                                onDragOver={(e) => {
+                                                    e.preventDefault();
+                                                    setDarkDragOver(true);
+                                                }}
+                                                onDragLeave={() =>
+                                                    setDarkDragOver(false)
+                                                }
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    setDarkDragOver(false);
+                                                    handleDarkFile(
+                                                        e.dataTransfer
+                                                            .files?.[0] ?? null,
+                                                    );
+                                                }}
+                                            >
+                                                {props.branding?.logoDarkUrl &&
+                                                !form.data.remove_logo_dark ? (
+                                                    <img
+                                                        src={
+                                                            props.branding
+                                                                .logoDarkUrl
+                                                        }
+                                                        alt="Current logo for dark backgrounds"
+                                                        className="mb-3 h-14 w-auto object-contain"
+                                                    />
+                                                ) : (
+                                                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-journey-paper/10">
+                                                        <Upload className="h-6 w-6 text-journey-ink-muted" />
+                                                    </div>
+                                                )}
+                                                <p className="text-sm font-medium">
+                                                    Click to upload or drag and
+                                                    drop
+                                                </p>
+                                                <p className="mt-1 text-xs text-journey-ink-muted">
+                                                    A light version of your logo
+                                                    for the dark half of the
+                                                    sign-in page and dark mode.
+                                                    PNG, JPG up to 2MB.
+                                                </p>
+                                                {form.data.logo_dark && (
+                                                    <p className="mt-2 text-xs font-medium text-journey-lavender">
+                                                        Selected:{' '}
+                                                        {
+                                                            form.data.logo_dark
+                                                                .name
+                                                        }
+                                                    </p>
+                                                )}
+                                                <input
+                                                    ref={darkFileInputRef}
+                                                    type="file"
+                                                    accept="image/png,image/jpeg,image/jpg"
+                                                    className="hidden"
+                                                    onChange={(e) =>
+                                                        handleDarkFile(
+                                                            e.target
+                                                                .files?.[0] ??
+                                                                null,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            {props.branding?.logoDarkUrl && (
+                                                <div className="flex items-center gap-2">
+                                                    <Checkbox
+                                                        id="remove_logo_dark"
+                                                        checked={
+                                                            form.data
+                                                                .remove_logo_dark
+                                                        }
+                                                        onCheckedChange={(v) =>
+                                                            form.setData(
+                                                                'remove_logo_dark',
+                                                                Boolean(v),
+                                                            )
+                                                        }
+                                                    />
+                                                    <Label
+                                                        htmlFor="remove_logo_dark"
+                                                        className="text-sm text-muted-foreground"
+                                                    >
+                                                        Remove logo for dark
+                                                        backgrounds
                                                     </Label>
                                                 </div>
                                             )}
@@ -1822,6 +1939,8 @@ export default function BrandingPage(props: Props) {
                                     });
                                     form.setData('logo', null);
                                     form.setData('remove_logo', false);
+                                    form.setData('logo_dark', null);
+                                    form.setData('remove_logo_dark', false);
                                     form.setData('favicon', null);
                                     form.setData('remove_favicon', false);
                                     props.allowedVars.forEach((v) =>

@@ -1,0 +1,149 @@
+{
+  "reviewed_at_utc": "2026-10-12T23:41:05Z",
+  "scope": "Coordinator read-only checkpoint; candidate/source review, not integration or runtime acceptance",
+  "threads": {
+    "control_room": {
+      "cursor": "699e5753-10ee-477a-ba33-75cffb0f6882:1",
+      "status": "idle",
+      "changed": false
+    },
+    "workforce": {
+      "cursor": "fc731a53-9d22-42fd-89a3-7d6a97f17fb0:2",
+      "status": "notLoaded",
+      "changed": false
+    },
+    "health_safety": {
+      "cursor": "770687bb-c28f-488c-be83-3c35d4a60100:6",
+      "status": "active",
+      "turn": "01a13273-f93a-7251-8e55-c170d22c05c1"
+    }
+  },
+  "direct_human_decisions": [
+    {
+      "message": "01a13250-ef85-76c2-ae0c-c1157acfdd9e",
+      "question": "call_NncLDZQR6qfAFjZnzOnxPiwi",
+      "answer": "Approve scoped invitation access",
+      "scope": "Current approved named invitee at authorised Site; read-only committee/Site, time, location, status and own response/attendance. Full register and private content remain separate."
+    },
+    {
+      "message": "01a13267-31b4-7f13-88d4-181a6efaeb41",
+      "question": "call_3c08fef363f348baadd259e7e7768299",
+      "answer": "Approve scoped meeting recipient selection",
+      "scope": "Server-only existing meeting notification recipient selection using current approved staff and current Site assignments; named attendees separately and each recipient rechecked. No new page access."
+    }
+  ],
+  "source_review": {
+    "handoff_sha256": "55CAE5677CD97285B2D21D93D7CAEC3B0E3028D78A5D607C8F2A3FAB26148042",
+    "reviewed": "Full new invitation page and bounded portal page, full invitation controller/DTO reader, actual route, canonical datetime zone, saved handoff and source-check receipts.",
+    "observations": [
+      "PageLayout hero with shared PageHeader, Home breadcrumb, connected rail, linked summary meters and no extra page shell gutter present.",
+      "Invitation masks on actor/route/prop changes and refresh; admits exact own DTO; 15-second abort and unavailable retry state present.",
+      "Portal consumes next_page_url, preserves selected filter, supplies local Open update link, and separates read marking from work completion.",
+      "Native DTO is minimal; GET is auth-protected and ID-bounded, no-store/no-referrer. JSON encodes in source callback; Inertia transport remains outside that lifetime.",
+      "Recipient source service and its test changed under active owner after handoff; excluded from complete source acceptance."
+    ],
+    "limitations": [
+      "47 forecast native cases and 16 invitation/7 portal component cases remain UNRUN.",
+      "Saved syntax/formatting checks are not semantic types, browser/accessibility/mobile or real workflow proof.",
+      "Did not execute tests, browser, database, provider, process/resource checks or integrations.",
+      "No complete source-service, current notification delivery/recovery, shared inbox or query-budget sign-off."
+    ]
+  },
+  "checks": {
+    "sourcePins": [
+      {
+        "path": "app/Services/HealthSafety/WorkerParticipationRecipientSourceService.php",
+        "expected": "22840BD3BB689135619A57E49066FF7282198BA7C64604D5040210A4DE342FC3",
+        "actual": "94BB30AEF18DD481FDD4ECE59BFCCFC75C4CBFF910ED96E90C9B442B598F34E5",
+        "matched": false
+      },
+      {
+        "path": "app/Services/HealthSafety/WorkerParticipationRecipientSourceOrigin.php",
+        "expected": "88737B370787E6B61FB80BA7BF9AC01C31BC5B94256D9ED46E5850D6FBBB4FDD",
+        "actual": "88737B370787E6B61FB80BA7BF9AC01C31BC5B94256D9ED46E5850D6FBBB4FDD",
+        "matched": true
+      },
+      {
+        "path": "app/Services/HealthSafety/WorkerParticipationInvitationReadService.php",
+        "expected": "7C4C23D213E6A49A506161703EC8B9F1D971133CAB6F10387A7A904B2CD3A08D",
+        "actual": "7C4C23D213E6A49A506161703EC8B9F1D971133CAB6F10387A7A904B2CD3A08D",
+        "matched": true
+      },
+      {
+        "path": "app/Http/Controllers/MyDayMeetingInvitationController.php",
+        "expected": "360DA0D90ADF9B1CC20E4C849F6DA9E2441D9E83F10074992BEAE61AF74AC770",
+        "actual": "360DA0D90ADF9B1CC20E4C849F6DA9E2441D9E83F10074992BEAE61AF74AC770",
+        "matched": true
+      },
+      {
+        "path": "routes/web.php",
+        "expected": "64415FE0A270003BBA8950B2BD6D008F5D34433B0C685F3000555B96ECAABAA4",
+        "actual": "64415FE0A270003BBA8950B2BD6D008F5D34433B0C685F3000555B96ECAABAA4",
+        "matched": true
+      },
+      {
+        "path": "tests/Feature/HealthSafety/WorkerParticipationInvitationReadTest.php",
+        "expected": "D61C69FDB1F977E3B0E6D3E88DBE5C621D26346FC862467F2876074492D2FE72",
+        "actual": "D61C69FDB1F977E3B0E6D3E88DBE5C621D26346FC862467F2876074492D2FE72",
+        "matched": true
+      },
+      {
+        "path": "tests/Feature/HealthSafety/WorkerParticipationRecipientSourceReadTest.php",
+        "expected": "0264699EF60AB05D7C7D4761329156EBB24CCD378C87235A602B2B5D8F560709",
+        "actual": "8DCA33D14ECC9FCF0279116CC26A978F5B87535043875576EDDD1F886862991D",
+        "matched": false
+      }
+    ],
+    "uiPins": [
+      {
+        "path": "resources/js/pages/my-day/meeting-invitation.tsx",
+        "expected": "BEEA8F64BD1AAC8D95E4225399729D96FE2CD2BE0D9DC72318B903C53838B6FA",
+        "actual": "BEEA8F64BD1AAC8D95E4225399729D96FE2CD2BE0D9DC72318B903C53838B6FA",
+        "matched": true
+      },
+      {
+        "path": "resources/js/pages/my-day/meeting-invitation.test.tsx",
+        "expected": "D565CB58163A8E45809F81A334C1554BAFA728A8FF2B41D73DA2051756B9D394",
+        "actual": "D565CB58163A8E45809F81A334C1554BAFA728A8FF2B41D73DA2051756B9D394",
+        "matched": true
+      },
+      {
+        "path": "resources/js/pages/portal/notifications.tsx",
+        "expected": "9835F874C989B2A9CD122FEC131A370F39946D2AA2E68A3D0EEA06E5506D4D61",
+        "actual": "9835F874C989B2A9CD122FEC131A370F39946D2AA2E68A3D0EEA06E5506D4D61",
+        "matched": true
+      },
+      {
+        "path": "resources/js/pages/portal/notifications.test.tsx",
+        "expected": "25EC617D8CC3E9C3EF714C35E36419EBAC0A7FE386CBB5423FC71C5367DD3070",
+        "actual": "25EC617D8CC3E9C3EF714C35E36419EBAC0A7FE386CBB5423FC71C5367DD3070",
+        "matched": true
+      }
+    ],
+    "held": [
+      {
+        "path": "app/Services/HealthSafety/HsSourceCommandContext.php",
+        "exists": false
+      },
+      {
+        "path": "app/Models/Concerns/HasHealthSafetyCommandSourceGuard.php",
+        "exists": false
+      },
+      {
+        "path": "app/Services/HealthSafety/ClientProfileSourceReadLifetime.php",
+        "exists": false
+      }
+    ]
+  },
+  "shared_inbox": {
+    "receipt_sha256": "C2CA5676FFFDABFB528ADA39EADC07A809A0E8B6EFE38F3EB691C6D64D92678B",
+    "status": "Automatic review rejected shared BoardPack mount; owner preparing exact proposal and regression coverage. No new human decision observed. Do not retry or indirectly mount."
+  },
+  "held_files_verified": {
+    "middleware_sha256": "D5D911233C5798B66C2A199B39F1BE2FB276EAACC8749B86E0BF14B3D4863949",
+    "client_controller_sha256": "49D4DDF2B2513ACE358616B8408B862134281D3CB7D4AF8C8DA35519B8F299EF",
+    "human_holds": "Incident source writes and Client wrapper unchanged."
+  },
+  "coordinator_actions": "Record latest approvals and source checkpoint; no duplicate questions, owner messages, restarts or application edits.",
+  "next_gate": "Owner completes delivery/recovery and exact shared integration proposal, then admitted whole-suite/current-source and browser evidence. All three scopes remain incomplete."
+}

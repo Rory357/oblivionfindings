@@ -8,8 +8,7 @@ use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
-use App\Domain\Monitoring\Topology\Models\TopologyEdge;
-use App\Domain\Monitoring\Topology\Models\TopologySnapshot;
+use App\Domain\SecurityDevices\Data\NetworkMapFilters;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -20,6 +19,8 @@ use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -30,12 +31,13 @@ class NetworkItWorkspacePresenter
 {
     private const DEVICE_LIMIT = 100;
 
-    public function __construct(private readonly CanonicalDeviceSiteResolver $siteResolver) {}
+    public function __construct(private readonly CanonicalDeviceSiteResolver $siteResolver, private readonly TopologyWorkspacePresenter $topologyPresenter) {}
 
     /** @return array<string, mixed> */
-    public function present(User $viewer, Builder $networkScope, array $activeTab): array
+    public function present(User $viewer, Builder $networkScope, array $activeTab, ?Cursor $topologyCursor = null, ?NetworkMapFilters $mapFilters = null, ?Collection $mapSites = null): array
     {
-        $candidates = (clone $networkScope)
+        $includeHistory = $activeTab['key'] === 'map';
+        $loadedScope = (clone $networkScope)
             ->with([
                 'assignments' => fn ($query) => $query
                     ->active()
@@ -49,12 +51,22 @@ class NetworkItWorkspacePresenter
                     ->latest('captured_at')
                     ->latest('id')
                     ->limit(12),
-            ])
-            ->orderBy('name')
-            ->limit(self::DEVICE_LIMIT + 1)
-            ->get();
-        $inventoryTruncated = $candidates->count() > self::DEVICE_LIMIT;
-        $devices = $candidates->take(self::DEVICE_LIMIT)->values();
+            ]);
+        $mapInventory = null;
+        $exploration = null;
+        if ($includeHistory && $mapFilters?->anchorId !== null) {
+            $exploration = (new NetworkMapExplorationQuery($this->siteResolver, $this->topologyPresenter))->page(clone $networkScope, $mapFilters, $mapSites ?? collect());
+            $mapFilters = $exploration->filters;
+            $devices = $loadedScope->whereKey($exploration->deviceIds)->reorder('devices.id')->get();
+            $inventoryTruncated = true;
+        } elseif ($includeHistory) {
+            [$devices, $mapInventory, $mapFilters] = (new NetworkMapInventoryQuery)->page($loadedScope, $mapFilters ?? new NetworkMapFilters, $mapSites ?? collect());
+            $inventoryTruncated = $mapInventory['isPartial'];
+        } else {
+            $candidates = $loadedScope->orderBy('name')->limit(self::DEVICE_LIMIT + 1)->get();
+            $inventoryTruncated = $candidates->count() > self::DEVICE_LIMIT;
+            $devices = $candidates->take(self::DEVICE_LIMIT)->values();
+        }
         $deviceIds = $devices->pluck('id');
         $canonicalSiteIds = $devices->mapWithKeys(function (Device $device): array {
             try {
@@ -63,14 +75,51 @@ class NetworkItWorkspacePresenter
                 return [$device->id => null];
             }
         });
+        if ($exploration !== null) {
+            $siteId = $exploration->metadata['siteId'];
+            if ($canonicalSiteIds->get($exploration->metadata['anchorId']) !== $siteId) {
+                throw (new ModelNotFoundException)->setModel(Device::class);
+            }
+            $devices = $devices->filter(fn (Device $device): bool => $canonicalSiteIds->get($device->id) === $siteId)->values();
+            $deviceIds = $devices->pluck('id');
+            $canonicalSiteIds = $canonicalSiteIds->intersectByKeys($deviceIds->flip());
+        }
         $monitorIds = $devices->flatMap->monitors->pluck('id');
         $latestObservations = $this->latestObservations($viewer, $monitorIds);
         $siteContext = $this->siteContext($devices);
         $mappedDevices = $devices
             ->map(fn (Device $device): array => $this->mapDevice($device, $siteContext))
             ->values();
-        $relationships = $this->relationships($deviceIds);
-        $topology = $this->topology($mappedDevices, $relationships, $this->latestTopologySnapshots($mappedDevices));
+        $relationships = $exploration !== null ? ($exploration->runtime ? collect() : DeviceRelationship::query()->active()->whereKey($exploration->edgeIds)->whereIn('parent_device_id', $deviceIds)->whereIn('child_device_id', $deviceIds)->orderBy('id')->get()) : $this->relationships($deviceIds);
+        $topologySiteIds = $canonicalSiteIds;
+        $siteMismatch = false;
+        if ($includeHistory && $mapFilters?->siteId !== null) {
+            $siteMismatch = $canonicalSiteIds->contains(fn ($siteId): bool => $siteId !== $mapFilters->siteId);
+            $topologySiteIds = $canonicalSiteIds->map(fn ($siteId) => $siteId === $mapFilters->siteId ? $siteId : null);
+            $relationshipIds = $topologySiteIds->filter()->keys();
+            $relationships = $relationships->filter(fn ($relationship): bool => $relationshipIds->contains($relationship->parent_device_id) && $relationshipIds->contains($relationship->child_device_id))->values();
+        }
+        $topology = $this->topologyPresenter->present($mappedDevices, $topologySiteIds, $includeHistory && $exploration === null, $includeHistory ? $topologyCursor : null, $mapFilters, $exploration)
+            ?? $this->topology($mappedDevices, $relationships, $includeHistory && $topologyCursor !== null, $mapFilters);
+        $topology['nodes'] = collect($topology['nodes'])->map(function (array $node) use ($canonicalSiteIds): array {
+            $siteId = $canonicalSiteIds->get($node['id']);
+            $node['exploreHref'] = $siteId === null ? null : NetworkMapFilters::exploreHref($node['id'], $siteId);
+
+            return $node;
+        })->values();
+        if ($exploration !== null) {
+            $topology['exploration'] = [...$exploration->metadata, 'neighborsShown' => max(0, $devices->count() - 1)];
+            $topology['state'] = 'partial';
+            $topology['label'] = 'Showing immediate connections from retained evidence';
+        }
+        if ($mapInventory !== null) {
+            $mapInventory['isPartial'] = $mapInventory['isPartial'] || $siteMismatch;
+            $topology['inventory'] = $mapInventory;
+            if ($mapInventory['isPartial']) {
+                $topology['state'] = 'partial';
+                $topology['label'] = 'Showing topology evidence for a limited device view';
+            }
+        }
         $interfaces = $this->interfaces($devices, $latestObservations);
         $services = $this->services($devices, $relationships);
         $traffic = $interfaces
@@ -132,6 +181,7 @@ class NetworkItWorkspacePresenter
             ? $configuration
             : collect();
         $inventoryTotal = match ($activeTab['key']) {
+            'map' => $exploration !== null ? $devices->count() : $mapInventory['total'],
             'interfaces' => $interfaces->count(),
             'services' => $services->count(),
             'traffic-capacity' => $traffic->count(),
@@ -154,6 +204,7 @@ class NetworkItWorkspacePresenter
                 'description' => $activeTab['description'],
                 'inventoryTotal' => $inventoryTotal,
                 'inventoryShown' => match ($activeTab['key']) {
+                    'map' => $devices->count(),
                     'interfaces' => $activeInterfaces->count(),
                     'services' => $activeServices->count(),
                     'traffic-capacity' => $activeTraffic->count(),
@@ -299,42 +350,9 @@ class NetworkItWorkspacePresenter
             ->get();
     }
 
-    /** @param Collection<int, array<string, mixed>> $devices @return Collection<int, TopologySnapshot> */
-    private function latestTopologySnapshots(Collection $devices): Collection
-    {
-        $siteIds = $devices->pluck('site.id')->filter()->unique()->values();
-        if ($siteIds->isEmpty()) {
-            return collect();
-        }
-
-        return TopologySnapshot::query()
-            ->whereIn('site_id', $siteIds)
-            ->where('status', 'completed')
-            ->with([
-                'site:id,name',
-                'nodes.canonicalDevice:id,name,category,subcategory,health_status',
-                'edges.fromNode.canonicalDevice:id,name',
-                'edges.toNode.canonicalDevice:id,name',
-                'changes:id,current_snapshot_id,change_type,edge_hash,created_at',
-            ])
-            ->orderByDesc('captured_at')
-            ->orderByDesc('id')
-            ->get()
-            ->reject(fn (TopologySnapshot $snapshot): bool => preg_match(
-                '/^native:snmp:(?:lldp|cdp|arp|forwarding_table|route):device:\d+$/',
-                $snapshot->source,
-            ) === 1)
-            ->unique(fn (TopologySnapshot $snapshot): string => $snapshot->site_id.':'.$snapshot->source)
-            ->values();
-    }
-
     /** @return array<string, mixed> */
-    private function topology(Collection $devices, Collection $relationships, Collection $snapshots): array
+    private function topology(Collection $devices, Collection $relationships, bool $positionReset = false, ?NetworkMapFilters $mapFilters = null): array
     {
-        if ($snapshots->isNotEmpty()) {
-            return $this->runtimeTopology($devices, $snapshots);
-        }
-
         $names = $devices->keyBy('id');
         $linkedIds = $relationships
             ->flatMap(fn (DeviceRelationship $relationship): array => [
@@ -363,6 +381,9 @@ class NetworkItWorkspacePresenter
                 'category' => $device['category'],
                 'subcategory' => $device['subcategory'],
                 'health' => $device['health'],
+                'healthBasis' => 'current_device_state',
+                'currentState' => true,
+                'siteId' => $device['site']['id'] ?? null,
                 'site' => $device['site']['name'] ?? null,
                 'href' => $device['href'],
             ])->values(),
@@ -386,104 +407,9 @@ class NetworkItWorkspacePresenter
                 ];
             })->values(),
             'snapshots' => [],
+            'visibleDeviceCount' => $devices->count(),
+            'history' => TopologyWorkspacePresenter::emptyHistory($positionReset, $mapFilters),
             'changes' => ['added' => 0, 'removed' => 0, 'changed' => 0],
-        ];
-    }
-
-    /** @param Collection<int, array<string, mixed>> $devices @param Collection<int, TopologySnapshot> $snapshots @return array<string, mixed> */
-    private function runtimeTopology(Collection $devices, Collection $snapshots): array
-    {
-        $visible = $devices->keyBy('id');
-        $nodes = $snapshots->flatMap->nodes
-            ->filter(fn ($node): bool => $node->canonical_device_id !== null && $visible->has((int) $node->canonical_device_id))
-            ->unique('canonical_device_id')
-            ->map(function ($node) use ($visible): array {
-                $device = $visible->get((int) $node->canonical_device_id);
-
-                return [
-                    'id' => (int) $node->canonical_device_id,
-                    'name' => $device['name'],
-                    'category' => $device['category'],
-                    'subcategory' => $device['subcategory'],
-                    'health' => $device['health'],
-                    'site' => $device['site']['name'] ?? null,
-                    'href' => $device['href'],
-                ];
-            })
-            ->values();
-        $visibleIds = $nodes->pluck('id');
-        $edges = $snapshots->flatMap->edges
-            ->filter(function (TopologyEdge $edge) use ($visibleIds): bool {
-                $from = $edge->fromNode?->canonical_device_id;
-                $to = $edge->toNode?->canonical_device_id;
-
-                return $from !== null && $to !== null
-                    && $visibleIds->contains((int) $from)
-                    && $visibleIds->contains((int) $to);
-            })
-            ->map(function (TopologyEdge $edge): array {
-                $from = $edge->fromNode?->canonicalDevice;
-                $to = $edge->toNode?->canonicalDevice;
-                $confidence = (float) $edge->confidence;
-                $provider = is_array($edge->evidence) && is_string($edge->evidence['provider'] ?? null)
-                    ? $edge->evidence['provider']
-                    : null;
-                $providerLabel = $provider === 'unifi' ? 'UniFi' : Str::headline((string) $provider);
-                $evidenceSource = $edge->source === 'provider' && $provider !== null
-                    ? $providerLabel.' provider'
-                    : Str::headline($edge->source);
-
-                return [
-                    'id' => 'runtime-'.$edge->id,
-                    'parentId' => $from?->id,
-                    'parentName' => $from?->name ?? 'Unknown source Device',
-                    'childId' => $to?->id,
-                    'childName' => $to?->name ?? 'Unknown destination Device',
-                    'type' => $edge->kind,
-                    'label' => Str::headline($edge->kind),
-                    'port' => collect([$edge->local_port, $edge->remote_port])->filter()->implode(' → ') ?: null,
-                    'source' => $edge->source,
-                    'confidence' => $confidence,
-                    'reviewState' => in_array($edge->source, ['manual', 'reviewed'], true) ? 'reviewed' : 'inferred',
-                    'evidenceLabel' => $evidenceSource.' '.Str::headline($edge->kind).' evidence',
-                    'firstSeenAt' => $edge->first_seen_at?->toIso8601String(),
-                    'lastSeenAt' => $edge->last_seen_at?->toIso8601String(),
-                ];
-            })
-            ->values();
-        $linkedIds = $edges->flatMap(fn (array $edge): array => [(int) $edge['parentId'], (int) $edge['childId']])->unique();
-        $unlinked = $nodes->pluck('id')->diff($linkedIds)->count();
-        $changes = $snapshots->flatMap->changes->countBy('change_type');
-
-        return [
-            'source' => 'runtime_topology',
-            'state' => $edges->isEmpty() ? 'partial' : ($unlinked === 0 ? 'known' : 'partial'),
-            'label' => $edges->isEmpty()
-                ? 'Latest topology snapshots have no visible relationships'
-                : ($unlinked === 0 ? 'Topology evidence covers every visible Device' : 'Topology evidence is incomplete'),
-            'nodeCount' => $nodes->count(),
-            'edgeCount' => $edges->count(),
-            'unlinkedCount' => $unlinked,
-            'nodes' => $nodes,
-            'edges' => $edges,
-            'snapshots' => $snapshots->map(fn (TopologySnapshot $snapshot): array => [
-                'id' => $snapshot->id,
-                'site' => $snapshot->site ? [
-                    'id' => $snapshot->site->id,
-                    'name' => $snapshot->site->name,
-                    'href' => "/security-devices/sites/{$snapshot->site->id}",
-                ] : null,
-                'source' => $snapshot->source,
-                'capturedAt' => $snapshot->captured_at?->toIso8601String(),
-                'nodeCount' => $snapshot->node_count,
-                'edgeCount' => $snapshot->edge_count,
-                'changeCount' => $snapshot->change_count,
-            ])->values(),
-            'changes' => [
-                'added' => (int) ($changes['added'] ?? 0),
-                'removed' => (int) ($changes['removed'] ?? 0),
-                'changed' => (int) ($changes['changed'] ?? 0),
-            ],
         ];
     }
 

@@ -86,6 +86,17 @@ export type Order = {
     can_manage: boolean;
     can_verify: boolean;
     blocked_reason: string | null;
+    /**
+     * EA-025: an outside prescriber's request about this order is waiting
+     * for a decision (only while the prescriber portal runs). `url` is the
+     * request in Connected care, for people who decide requests.
+     */
+    prescriber_request?: {
+        id: number;
+        kind: 'start' | 'change' | 'stop' | string;
+        submitted_at: string | null;
+        url: string | null;
+    } | null;
 };
 export type AllergyInspection = {
     recorded: {

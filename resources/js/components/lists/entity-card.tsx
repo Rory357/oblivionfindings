@@ -316,7 +316,7 @@ export function EntityCardGrid({
     return (
         <div
             className={cn(
-                'grid [grid-template-columns:repeat(auto-fill,minmax(330px,1fr))] gap-5 [&>*]:h-full',
+                'grid [grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))] gap-5 [&>*]:h-full',
                 className,
             )}
         >

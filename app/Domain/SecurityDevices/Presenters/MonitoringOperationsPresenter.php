@@ -19,8 +19,10 @@ use App\Domain\Monitoring\Services\CapacityProjectionService;
 use App\Domain\Monitoring\Services\CentralSiteMonitoringReadinessService;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
+use App\Domain\Monitoring\Services\MonitoringRecoveryRequestService;
 use App\Domain\Monitoring\Services\MonitoringReplayService;
 use App\Domain\Monitoring\Services\MonitoringRuntimeHealthService;
+use App\Domain\Monitoring\Services\NativeMonitorCommandService;
 use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
@@ -99,6 +101,7 @@ class MonitoringOperationsPresenter
             $observations->get($monitor->id, collect()),
             $correlations->get($monitor->id),
             $canManageNativeMonitors,
+            (int) $viewer->id,
         ));
         $collectionPaths = $this->collectionPaths($allMonitors, $sitesByDevice);
         $monitorFindings = $mapped
@@ -126,6 +129,7 @@ class MonitoringOperationsPresenter
         );
 
         return [
+            'actor_id' => (int) $viewer->id,
             'tabs' => [
                 ['key' => 'overview', 'label' => 'Overview'],
                 ['key' => 'findings', 'label' => 'Findings'],
@@ -169,6 +173,7 @@ class MonitoringOperationsPresenter
             ],
             'monitors' => $shown,
             'monitor_management' => [
+                'actor_id' => (int) $viewer->id,
                 'can_manage' => $canManageNativeMonitors,
                 'create_url' => $canManageNativeMonitors
                     ? '/security-devices/monitoring/native-monitors'
@@ -281,6 +286,7 @@ class MonitoringOperationsPresenter
 
         if (! $canOperate) {
             return [
+                'actor_id' => (int) $viewer->id,
                 'contracts' => [
                     'envelope_current' => (int) config('monitoring.contracts.current', 1),
                     'envelope_accepted' => array_values(array_map('intval', (array) config('monitoring.contracts.accepted', [1]))),
@@ -324,6 +330,7 @@ class MonitoringOperationsPresenter
 
             return [
                 'id' => (int) $letter->id,
+                'review_token' => app(MonitoringRecoveryRequestService::class)->reviewToken($letter),
                 'reason_code' => $letter->reason_code,
                 'reason_message' => $letter->reason_message,
                 'consumer' => $letter->consumer,
@@ -342,6 +349,7 @@ class MonitoringOperationsPresenter
         $shown = $rows->take(self::ROW_LIMIT)->values();
 
         return [
+            'actor_id' => (int) $viewer->id,
             'contracts' => [
                 'envelope_current' => (int) config('monitoring.contracts.current', 1),
                 'envelope_accepted' => array_values(array_map('intval', (array) config('monitoring.contracts.accepted', [1]))),
@@ -384,6 +392,7 @@ class MonitoringOperationsPresenter
         Collection $observations,
         ?array $correlation,
         bool $canManage,
+        int $actorId,
     ): array {
         $nativeDirect = $monitor->collector_id === null
             && in_array(
@@ -460,7 +469,11 @@ class MonitoringOperationsPresenter
                 'state' => 'available',
             ],
             'actions' => [
+                'actor_id' => $actorId,
                 'can_manage' => $canManage && $nativeDirect,
+                'review_token' => $canManage && $nativeDirect && $site
+                    ? app(NativeMonitorCommandService::class)->reviewToken($monitor, (int) $site->id)
+                    : null,
                 'update_url' => $canManage && $nativeDirect
                     ? "/security-devices/monitoring/native-monitors/{$monitor->id}"
                     : null,

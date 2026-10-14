@@ -159,8 +159,25 @@ export function OrderStatus({ order }: { order: Order }) {
                     {state.line}
                 </p>
             )}
+            {order.prescriber_request && (
+                <>
+                    <StatusBadge variant="warning">
+                        Prescriber request waiting
+                    </StatusBadge>
+                    <p className="text-caption max-w-72 text-muted-foreground">
+                        {prescriberRequestLine(order.prescriber_request.kind)}{' '}
+                        The order stays as it is until the request is decided.
+                    </p>
+                </>
+            )}
         </div>
     );
+}
+/** EA-025: what the waiting prescriber request asks for. */
+export function prescriberRequestLine(kind: string): string {
+    if (kind === 'stop') return 'An outside prescriber asked to stop it.';
+    if (kind === 'change') return 'An outside prescriber asked to change it.';
+    return 'An outside prescriber sent a request about it.';
 }
 export function useDraftClose(
     dirty: boolean,

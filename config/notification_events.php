@@ -43,6 +43,9 @@ return [
         ],
 
         // --- HR Module ---
+        'Company events' => [
+            'hr.calendar.reminder',
+        ],
         'Leave' => [
             'hr.leave.requested',
             'hr.leave.approved',
