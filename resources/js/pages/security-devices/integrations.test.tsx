@@ -8,7 +8,7 @@ import {
     within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { integrationsFixture } from '../../../../.endpoint-tools/sd-ui-integrations-20261013/fixtures';
+import { integrationsFixture } from './integrations-test-fixtures';
 import IntegrationsHub from './integrations';
 const mocks = vi.hoisted(() => ({
     actor: 7,

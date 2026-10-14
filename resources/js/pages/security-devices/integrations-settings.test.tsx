@@ -4,7 +4,7 @@ import {
 } from '@/components/security-devices/integration-records';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { integrationsFixture } from '../../../../.endpoint-tools/sd-ui-integrations-20261013/fixtures';
+import { integrationsFixture } from './integrations-test-fixtures';
 
 import { CredentialReferenceManagement } from '@/components/security-devices/credential-reference-management';
 import { CredentialRotationStatus, type Provider } from './integrations';

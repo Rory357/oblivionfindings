@@ -9,7 +9,7 @@ import {
     within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { estateFixture } from '../../../../.endpoint-tools/sd-ui-estate-20261013/fixtures';
+import { estateFixture } from './estate-test-fixtures';
 import Dashboard from './dashboard';
 const mocks = vi.hoisted(() => ({
     actor: 7,
