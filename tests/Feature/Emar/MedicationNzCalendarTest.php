@@ -299,20 +299,12 @@ it('starts a new medication order on today\'s New Zealand date', function (strin
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect();
-    $this->actingAs($manager)
-        ->post(route('emar.medications.import'), [
-            'csv_file' => UploadedFile::fake()->createWithContent(
-                'medications.csv',
-                "client_name,medication_name,dose,frequency,route\n"
-                ."Mere Wilson,Imported medicine,5 mg,Once daily,oral\n",
-            ),
-        ])
-        ->assertSessionHasNoErrors()
-        ->assertRedirect();
+    // The CSV import was the other way in; it is refused since Lane C3c
+    // (EA-023 — orders are entered in Orders, covered by the C3 refusal tests).
 
     $orders = ClientMedication::query()->where('client_id', $client->id)->orderBy('name')->get();
 
     expect($orders->map(fn (ClientMedication $order) => [$order->name, $order->start_date?->toDateString()])->all())
-        ->toBe([['Added medicine', '2026-06-08'], ['Imported medicine', '2026-06-08']])
+        ->toBe([['Added medicine', '2026-06-08']])
         ->and($orders->pluck('approval_status')->unique()->all())->toBe(['pending_verification']);
 })->with('new zealand clock on 8 june');
