@@ -42,6 +42,7 @@ use App\Services\Medication\Stock\TransitStockContext;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -853,12 +854,8 @@ class EnhancedMarService
             return $overrideValidation;
         }
 
-        if (! $medication->isAdministrable()) {
-            return [
-                'success' => false,
-                'error' => 'Medication order is awaiting verification before it can be administered.',
-                'error_field' => 'approval_status',
-            ];
+        if (! $medication->isAdministrable() && ! $this->owedBeforeStop($medication, $data)) {
+            return $this->notAdministrable($medication);
         }
 
         $notGivenValidation = $this->validateNotGivenReason($data);
@@ -1030,12 +1027,9 @@ class EnhancedMarService
                     }
                 }
 
-                if (! $medication->isAdministrable()) {
-                    return [
-                        'success' => false,
-                        'error' => 'Medication order is awaiting verification before it can be administered.',
-                        'error_field' => 'approval_status',
-                    ];
+                // EA-041: revalidated under the lock, a dose given before the stop's effective time (administered_at, never when the request began) is still recorded — it really was given.
+                if (! $medication->isAdministrable() && ! $this->owedBeforeStop($medication, $data)) {
+                    return $this->notAdministrable($medication);
                 }
 
                 $currentAdminRules = $this->ruleService->requirementsFor($medication, true);
@@ -1423,7 +1417,7 @@ class EnhancedMarService
                         } elseif ($existing->status === 'refused') {
                             return [
                                 'success' => false,
-                                'error' => 'This refusal can’t be re-offered any more: its follow-up is closed, or it was on another day.',
+                                'error' => 'This refusal can’t be re-offered any more: its follow-up is closed, or the next dose is already due.',
                                 'error_field' => 'reoffer_of_id',
                             ];
                         }
@@ -2395,6 +2389,56 @@ class EnhancedMarService
             'block_reason' => $safetyCheck['block_reason'] ?? null,
             'failed_checks' => $failedChecks,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * EA-041: a dose due before its order was stopped or paused is still
+     * owed, so what happened can be recorded — not given at any time, given
+     * only at a time before the stop. Doses due after the stop are not owed.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function owedBeforeStop(ClientMedication $medication, array $data): bool
+    {
+        $stoppedAt = ScheduledDoseStates::stoppedAt($medication);
+        if ($stoppedAt === null || $medication->is_prn || $medication->superseded_by !== null
+            || $medication->deleted_at !== null || ! $medication->isVerifiedForAdministration()
+            || blank($data['scheduled_for'] ?? null)) {
+            return false;
+        }
+        $dueAt = CarbonImmutable::instance($this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']))->utc();
+        if ($dueAt->gte($stoppedAt)) {
+            return false;
+        }
+        if (($data['status'] ?? null) !== 'given') {
+            return true;
+        }
+        $givenAt = filled($data['administered_at'] ?? null)
+            ? CarbonImmutable::instance($this->scheduleService->parseWorkerDateTime((string) $data['administered_at']))->utc()
+            : CarbonImmutable::now('UTC');
+
+        return $givenAt->lt($stoppedAt);
+    }
+
+    /** @return array{success: false, error: string, error_field: string} */
+    private function notAdministrable(ClientMedication $medication): array
+    {
+        $stoppedAt = ScheduledDoseStates::stoppedAt($medication);
+        if ($stoppedAt !== null) {
+            return [
+                'success' => false,
+                'error' => 'This order was '.($medication->state === 'paused' ? 'paused' : 'stopped').' at '
+                    .$stoppedAt->setTimezone($this->scheduleService->workerTimezone())->format('g:i a j M')
+                    .'. Only a dose due before then can be recorded, and “given” only at a time before then.',
+                'error_field' => 'client_medication_id',
+            ];
+        }
+
+        return [
+            'success' => false,
+            'error' => 'Medication order is awaiting verification before it can be administered.',
+            'error_field' => 'approval_status',
+        ];
     }
 
     private function validateNotGivenReason(array $data): ?array

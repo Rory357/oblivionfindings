@@ -13,6 +13,7 @@ use App\Services\Medication\MedicationSafetyPolicySettings;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class MedicationSafetyService
 {
@@ -661,7 +662,10 @@ class MedicationSafetyService
 
             return [
                 'blocked' => true,
-                'message' => "⛔ INTERVAL NOT ELAPSED: Minimum {$minHours} hours between doses required. Last dose was {$lastAdmin->administered_at->format('H:i')}. Please wait {$remainingMinutes} more minutes.",
+                // EA-119: the last dose time in NZ time, never the UTC hour.
+                'message' => "⛔ INTERVAL NOT ELAPSED: Minimum {$minHours} hours between doses required. Last dose was "
+                    .Carbon::instance($lastAdmin->administered_at)->copy()->timezone((string) config('app.worker_timezone', 'Pacific/Auckland'))->format('g:i a')
+                    .". Please wait {$remainingMinutes} more minutes.",
                 'details' => [
                     'min_hours_between_doses' => $minHours,
                     'hours_since_last' => round($hoursSinceLast, 2),
@@ -704,12 +708,18 @@ class MedicationSafetyService
 
     private function prnGivenHistory(ClientMedication $medication): Builder
     {
-        return ClientMedicationAdministration::query()
+        $history = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
             ->where('client_id', $medication->client_id)
             ->where('client_medication_id', $medication->id)
             ->where('status', 'given')
             ->whereNotNull('administered_at');
+
+        // EA-056: inside a recording transaction this is a current (locking)
+        // read. A plain read would use the InnoDB snapshot taken before the
+        // person's lock, so two as-needed doses recorded at once would each
+        // miss the other and both pass the interval and the daily limit.
+        return DB::transactionLevel() > 0 ? $history->sharedLock() : $history;
     }
 
     /**

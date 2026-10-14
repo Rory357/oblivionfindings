@@ -538,11 +538,19 @@ export function DoseStateCell({
     } else if (row.status === 'overdue') {
         lines.push(
             <Line key="la">
-                Due {nzTime(row.scheduled_for)} · outside today’s window (
-                {opens}–{ends})
+                Due {nzTime(row.scheduled_for)}
+                {row.from_yesterday ? ' yesterday' : ''} · outside{' '}
+                {row.from_yesterday ? 'its' : 'today’s'} window ({opens}–{ends})
             </Line>,
         );
     }
+    // EA-043: an evening dose still owed after midnight stays on the board.
+    if (row.from_yesterday)
+        lines.unshift(
+            <Line key="yesterday" tone="warning">
+                From yesterday · nothing recorded yet
+            </Line>,
+        );
     const block = blockOf(row);
     if ((open || row.status === 'pending_check') && block) {
         const b = blockLine(block, person);

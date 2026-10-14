@@ -31,6 +31,7 @@ import type {
 } from './types';
 
 const getMock = vi.fn();
+const postMock = vi.fn(async () => ({ data: { read: true } }));
 const submitMock = vi.fn();
 
 vi.mock('axios', async (importOriginal) => {
@@ -40,6 +41,7 @@ vi.mock('axios', async (importOriginal) => {
         default: {
             ...actual.default,
             get: (...args: unknown[]) => getMock(...args),
+            post: (...args: unknown[]) => postMock(...(args as [])),
             isAxiosError: actual.default.isAxiosError,
         },
     };
@@ -1773,6 +1775,88 @@ describe('RecordDoseDialog (P01)', () => {
                 outcome: 'Given',
             },
         });
+    });
+
+    it('shows “Prompt staff” chart alerts before recording and records the reading (EA-005)', async () => {
+        postMock.mockClear();
+        open(
+            requirements({
+                chart_alerts: [
+                    {
+                        id: 3,
+                        type: 'warfarin',
+                        title: 'Hold if INR > 3.5',
+                        detail: 'Check today’s INR before giving.',
+                        read_at: null,
+                    },
+                    {
+                        id: 4,
+                        type: 'chart_warning',
+                        title: 'Crush tablets',
+                        detail: null,
+                        read_at: new Date().toISOString(),
+                    },
+                ],
+            }),
+        );
+        await screen.findByText('Losartan 50mg');
+        expect(
+            screen.getByText('Chart alert: Hold if INR > 3.5'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Check today’s INR before giving.'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /continue/i }),
+        ).toBeDisabled();
+        expect(
+            screen.getByText('Read the chart alerts first'),
+        ).toBeInTheDocument();
+        // Read earlier today: already ticked.
+        const boxes = screen.getAllByRole('checkbox', {
+            name: 'I’ve read this alert',
+        });
+        expect(boxes[1]).toBeChecked();
+        fireEvent.click(boxes[0]);
+        expect(postMock).toHaveBeenCalledWith(
+            '/meds/today/chart-alerts/3/read',
+            {},
+            expect.any(Object),
+        );
+        expect(screen.getByRole('button', { name: /continue/i })).toBeEnabled();
+    });
+
+    it('sends the dose time as one NZ instant in the repeated DST hour (EA-042)', async () => {
+        // 02:52 NZST on 4 April 2027, the second time round (14:52 UTC on the 3rd).
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2027-04-03T14:52:00Z'));
+        try {
+            submitMock.mockResolvedValueOnce({
+                status: 'processed',
+                data: { administration: { id: 19 } },
+            });
+            open(requirements());
+            await screen.findByText('Losartan 50mg');
+            fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+            fireEvent.click(
+                await screen.findByRole('button', { name: /^Given/ }),
+            );
+            expect(
+                screen.getByText('Which occurrence of this time?'),
+            ).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+            fireEvent.click(
+                await screen.findByRole('button', {
+                    name: /^Record outcome$/i,
+                }),
+            );
+            await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+            expect(submitMock.mock.calls[0][1].administered_at).toBe(
+                '2027-04-04T02:52:00+12:00',
+            );
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('doesn’t offer less than ordered on a controlled medicine counted in other units', async () => {

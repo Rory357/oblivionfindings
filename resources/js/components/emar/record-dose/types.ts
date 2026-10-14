@@ -115,6 +115,15 @@ export interface PackPhotoPolicy {
     receipt_prompt?: boolean;
 }
 
+/** A chart alert set to "Prompt staff", read once per NZ day (EA-005). */
+export interface ChartAlert {
+    id: number;
+    type: 'warfarin' | 'paper_prescription' | 'chart_warning' | string;
+    title: string;
+    detail: string | null;
+    read_at: string | null;
+}
+
 export interface DoseRequirements {
     /**
      * A11: absent until the server sends photos (the card stays hidden);
@@ -125,6 +134,7 @@ export interface DoseRequirements {
     /** Review P1: hours after which a dose saved on this device is not sent. */
     offline_max_hours?: number;
     stock_tracking?: { lots_started: boolean; offline_given_allowed: boolean };
+    chart_alerts?: ChartAlert[];
     live_recording_context?: string | null;
     /** The order this dialog shows; a save is refused if it changed (EA-008). */
     order_fingerprint?: string | null;

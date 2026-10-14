@@ -9,6 +9,7 @@ use App\Services\Medication\Controlled\ControlledSettingsFragment;
 use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationErrorWorkflow;
 use App\Services\Medication\MedicationSafetyPolicySettings;
+use App\Services\Medication\Recording\ChartAlertPromptSettings;
 use App\Services\Medication\Recording\OfflineReplayReview;
 use App\Services\Medication\Recording\PackPhotoSettings;
 use App\Services\Medication\Reviews\MedicationReviewCadence;
@@ -140,6 +141,7 @@ class MedicationSettingsRegistry
         return [
             $this->safetyChecks(),
             $this->packPhotoAtRecording(),
+            $this->chartAlertPrompts(),
             $this->doseTiming(),
             $this->offlineReplay(),
             $this->competencyPolicy(),
@@ -630,6 +632,39 @@ class MedicationSettingsRegistry
                     numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_LOOSER, 'off' => null, 'off_is_loosest' => false],
                     range: $pins::CONFIRM_MINUTES_RANGE,
                     unit: 'minutes',
+                ),
+            ],
+        );
+    }
+
+    /**
+     * Lane A5 settings (EA-005): how often a worker confirms a person's
+     * "Prompt staff" chart alerts in the recording dialog. Every dose is
+     * stricter; going back to once a day loosens.
+     */
+    private function chartAlertPrompts(): MedicationSettingGroup
+    {
+        $prompts = ChartAlertPromptSettings::class;
+
+        return new MedicationSettingGroup(
+            key: 'chartAlerts',
+            view: self::VIEW_RULES,
+            effect: 'From the next dose recorded, at every house',
+            auditEvent: 'medications.chart_alert_prompts.updated',
+            definitions: [
+                new MedicationSettingDefinition(
+                    group: 'chartAlerts',
+                    key: 'reconfirm',
+                    storageKey: $prompts::RECONFIRM,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'safety',
+                    label: 'Staff confirm “Prompt staff” chart alerts',
+                    options: [
+                        $prompts::ONCE_A_DAY => 'Once a day — each worker confirms once per person per day',
+                        $prompts::EVERY_DOSE => 'Every dose — confirmed each time a dose is recorded',
+                    ],
+                    default: $prompts::DEFAULT,
+                    rank: [$prompts::ONCE_A_DAY, $prompts::EVERY_DOSE],
                 ),
             ],
         );

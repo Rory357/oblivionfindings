@@ -133,6 +133,10 @@ export function SafetyChecks({
     clear: () => void;
 }) {
     const { s, value, edit, state, disabled, shown } = useRow('safety');
+    const alerts = useRow('chartAlerts');
+    const alertsLabel = 'Confirm “Prompt staff” alerts';
+    const alertsHint =
+        'The person’s chart alerts are always shown before a dose is recorded.';
     const label = (key: string) => s.definitions.safety?.[key]?.label ?? key;
     const onOff = (key: string, hint: string): ReactNode => {
         const sw = SAFETY_SWITCH[key];
@@ -229,6 +233,41 @@ export function SafetyChecks({
                         'Controlled drugs and covert plans. Insulin isn’t checked yet.',
                     )}
                 </SettingGroup>
+                {s.definitions.chartAlerts?.reconfirm ? (
+                    <SettingGroup
+                        id="chart-alerts"
+                        icon={Bell}
+                        title="Chart alerts"
+                        caption="Alerts set to “Prompt staff” on the person’s chart"
+                    >
+                        <GroupRow
+                            id="sf-chart-alerts"
+                            label={alertsLabel}
+                            hint={alertsHint}
+                            state={alerts.state('reconfirm')}
+                            hidden={
+                                !alerts.shown(
+                                    show,
+                                    q,
+                                    'reconfirm',
+                                    alertsLabel,
+                                    alertsHint,
+                                    s.definitions.chartAlerts.reconfirm.label,
+                                )
+                            }
+                        >
+                            <Choice
+                                value={alerts.value('reconfirm')}
+                                disabled={alerts.disabled}
+                                onChange={(v) => alerts.edit('reconfirm', v)}
+                                options={[
+                                    ['day', 'Once a day'],
+                                    ['dose', 'Every dose'],
+                                ]}
+                            />
+                        </GroupRow>
+                    </SettingGroup>
+                ) : null}
             </GroupGrid>
         </Section>
     );

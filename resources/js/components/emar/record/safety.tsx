@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Notice } from '@/components/emar/record-dose/parts';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateTime } from '@/lib/datetime';
@@ -142,14 +143,23 @@ export function SafetySection({
                         )
                     }
                 >
-                    <p className="text-sm">
-                        Administration alerts are{' '}
-                        {data.suppression.suppressed ? 'suppressed' : 'on'}
-                        {data.suppression.reason
-                            ? ` · ${data.suppression.reason}`
-                            : ''}
-                        .
-                    </p>
+                    {data.suppression.suppressed ? (
+                        // EA-055: a paused safety alert is visible, not a plain sentence.
+                        <Notice
+                            tone="warning"
+                            title="Due and late dose alerts are paused"
+                        >
+                            Staff and leads aren’t reminded about this person’s
+                            doses until the alerts are turned back on.
+                            {data.suppression.reason
+                                ? ` Reason: ${data.suppression.reason}`
+                                : ''}
+                        </Notice>
+                    ) : (
+                        <p className="text-sm">
+                            Due and late dose alerts are on.
+                        </p>
+                    )}
                     {resolvedHidden ? (
                         <p className="text-caption text-muted-foreground">
                             {resolvedHidden} resolved{' '}

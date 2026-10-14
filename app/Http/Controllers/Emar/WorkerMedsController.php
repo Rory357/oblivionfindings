@@ -41,6 +41,7 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -141,6 +142,12 @@ class WorkerMedsController extends Controller
         // those are overdue), naming none, so it reconciles with the badge
         // (which counts them, P09 Q6).
         $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot, $includeControlled, $hiddenControlled);
+        // EA-043: at midnight an evening dose still in its window, or late
+        // with nothing recorded, stays on today's board ("From yesterday")
+        // until someone records it, instead of vanishing with the NZ day.
+        if ($isToday && $assignedClientIds !== []) {
+            $schedule = [...$this->openFromYesterday($assignedClientIds, $date, $now, $includeControlled), ...$schedule];
+        }
         // The MAR link: only charts this worker may open (a lead's fallback
         // board can include people outside the frontline person rule).
         $marLinks = app(MarLinkService::class);
@@ -282,6 +289,32 @@ class WorkerMedsController extends Controller
                 ? $marLinks->openableClientIds($user, $assignedClientIds)
                 : [],
         ]);
+    }
+
+    /**
+     * EA-043: yesterday's doses for these people that are still due (inside
+     * their window past midnight) or late with nothing recorded.
+     *
+     * @param  array<int, int>  $clientIds
+     * @return list<array<string, mixed>>
+     */
+    private function openFromYesterday(array $clientIds, Carbon $today, Carbon $now, bool $includeControlled): array
+    {
+        $yesterday = $today->copy()->subDay();
+        // Only a day the projection holds, as the overdue job reads it: a
+        // day before it began isn't guessed at from the order as it is now
+        // (that would owe doses due before the order existed).
+        if (! app(\App\Services\Medication\DoseSlots\ScheduledDoseStates::class)->holdsDay($yesterday->toDateString(), CarbonImmutable::instance($now))) {
+            return [];
+        }
+        $administrations = $this->boardPayload->administrationsForDay($clientIds, $yesterday, $includeControlled);
+        $rows = $this->boardPayload->scheduleForDate($clientIds, $yesterday, $now, $this->boardPayload->slotIndex($administrations), $includeControlled);
+
+        return array_values(array_map(
+            fn (array $row): array => [...$row, 'from_yesterday' => true],
+            array_filter($rows, fn (array $row): bool => $row['recorded'] === null
+                && in_array($row['status'], ['due', 'overdue'], true)),
+        ));
     }
 
     /**
@@ -656,7 +689,7 @@ class WorkerMedsController extends Controller
             'status' => ['required', 'in:given,refused,withheld'],
             'reason_code' => ['nullable', 'string', 'max:60', 'required_unless:status,given'],
             'reason' => ['nullable', 'string', 'max:500'],
-            'administered_at' => ['nullable', 'date'],
+            'administered_at' => ['nullable', 'date', $this->unambiguousWorkerTime()],
             'witnessed_by' => ['nullable', 'integer', 'min:1'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
             'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
@@ -852,6 +885,38 @@ class WorkerMedsController extends Controller
     }
 
     /**
+     * EA-042: a dose time sent without an offset must name one NZ instant.
+     * On the April DST night 02:00–02:59 happens twice and is never guessed;
+     * on the September night 02:00–02:59 doesn't happen. The dialog sends an
+     * offset; other callers must too for those times.
+     */
+    private function unambiguousWorkerTime(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (! is_string($value) || preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/', trim($value)) === 1
+                || preg_match('/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/', trim($value), $parts) !== 1) {
+                return;
+            }
+            $wall = $parts[1].'T'.$parts[2];
+            try {
+                $utcWall = CarbonImmutable::parse($wall, 'UTC');
+            } catch (\Throwable) {
+                return;
+            }
+            $timezone = $this->scheduleService->workerTimezone();
+            $matches = collect([11, 12, 13, 14])
+                ->map(fn (int $hours) => $utcWall->subHours($hours))
+                ->filter(fn (CarbonImmutable $candidate): bool => $candidate->setTimezone($timezone)->format('Y-m-d\TH:i') === $wall)
+                ->count();
+            if ($matches > 1) {
+                $fail('This NZ time happened twice when the clocks went back. Choose which one it was.');
+            } elseif ($matches === 0) {
+                $fail('This NZ time didn’t happen — the clocks went forward. Choose a real time.');
+            }
+        };
+    }
+
+    /**
      * Record a PRN (as-needed) dose from the frontline quick-entry flow.
      *
      * Delegates to the same EnhancedMarService the rest of the medication
@@ -916,7 +981,7 @@ class WorkerMedsController extends Controller
             // P01 Q-C2a: a controlled as-needed dose states the balance left,
             // checked against the register as a scheduled dose's is.
             'cd_balance' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', 'max:100000'],
-            'administered_at' => ['nullable', 'date'],
+            'administered_at' => ['nullable', 'date', $this->unambiguousWorkerTime()],
             'witnessed_by' => ['nullable', 'integer', 'min:1'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
             'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],

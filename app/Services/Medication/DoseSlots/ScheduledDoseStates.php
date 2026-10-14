@@ -9,6 +9,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\DoseTimingSettings;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -57,12 +58,51 @@ final class ScheduledDoseStates
     {
         return ClientMedication::query()
             ->whereIn('client_id', $clientIds)
-            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
+            ->where(fn ($orders) => $orders->active()
+                ->orWhere(fn ($waiting) => $waiting->awaitingVerification())
+                ->orWhere(fn ($stopped) => self::stoppedRecently($stopped)))
             ->where('is_prn', false)
             ->where(function ($query) {
                 $query->whereNotNull('dose_times')
                     ->orWhereNotNull('frequency');
             });
+    }
+
+    /**
+     * EA-041: checked orders stopped or paused since the start of yesterday
+     * (NZ). A dose due before the stop is still owed until something is
+     * recorded for it; the projection owes nothing due after the stop.
+     *
+     * @param  Builder<ClientMedication>  $query
+     * @return Builder<ClientMedication>
+     */
+    public static function stoppedRecently(Builder $query, ?CarbonInterface $now = null): Builder
+    {
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $since = CarbonImmutable::instance($now ?? CarbonImmutable::now())->setTimezone($timezone)->subDay()->startOfDay()->utc();
+
+        return $query
+            ->whereNull('superseded_by')
+            ->whereNull('deleted_at')
+            ->where(fn ($checked) => $checked->where('approval_status', 'verified')->orWhereNull('approval_status'))
+            ->where(fn ($stopped) => $stopped
+                ->where(fn ($ceased) => $ceased->where('state', 'ceased')->where('ceased_at', '>=', $since))
+                ->orWhere(fn ($paused) => $paused->where('state', 'paused')->where('paused_at', '>=', $since)));
+    }
+
+    /**
+     * EA-041: the instant a stopped or paused order stopped owing doses, or
+     * null while it is in effect.
+     */
+    public static function stoppedAt(ClientMedication $order): ?CarbonImmutable
+    {
+        $raw = match ($order->state) {
+            'ceased' => $order->getRawOriginal('ceased_at'),
+            'paused' => $order->getRawOriginal('paused_at'),
+            default => null,
+        };
+
+        return DoseOrderTimelineFactory::rawInstant($raw);
     }
 
     /**

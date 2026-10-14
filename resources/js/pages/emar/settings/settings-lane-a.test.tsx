@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SettingsCtx, type SettingsContext } from './_context';
 import type { Draft, SettingDefinition, SettingsPayload } from './_model';
 import { MedicinePhotos } from './_photos';
-import { WitnessPins } from './_sections';
+import { SafetyChecks, WitnessPins } from './_sections';
 import { DoseTiming } from './_timing';
 
 vi.mock('@inertiajs/react', () => ({
@@ -128,8 +128,32 @@ const packPhoto = {
     }),
 };
 
+const chartAlerts = {
+    reconfirm: def(
+        'chartAlerts',
+        'reconfirm',
+        'safety',
+        'Staff confirm “Prompt staff” chart alerts',
+        {
+            default: 'day',
+            rank: ['day', 'dose'],
+            options: [
+                { value: 'day', label: 'Once a day' },
+                { value: 'dose', label: 'Every dose' },
+            ],
+        },
+    ),
+};
+
 const payload = (): SettingsPayload => ({
     groups: {
+        chartAlerts: {
+            key: 'chartAlerts',
+            view: 'rules',
+            effect: 'From the next dose recorded, at every house',
+            audit_event: 'medications.chart_alert_prompts.updated',
+            keys: Object.keys(chartAlerts),
+        },
         packPhoto: {
             key: 'packPhoto',
             view: 'rules',
@@ -159,7 +183,7 @@ const payload = (): SettingsPayload => ({
             keys: Object.keys(offline),
         },
     },
-    definitions: { pin, forgotten, offline, packPhoto },
+    definitions: { pin, forgotten, offline, packPhoto, chartAlerts },
     values: {
         pin: {
             max_attempts: '5',
@@ -169,6 +193,7 @@ const payload = (): SettingsPayload => ({
         forgotten: { forgotten_fallback: 'yes', confirm_minutes: '30' },
         offline: { max_hours: '12' },
         packPhoto: { show: 'yes', no_photo: 'warn' },
+        chartAlerts: { reconfirm: 'day' },
     },
     reviewed: {
         pin: {
@@ -179,6 +204,7 @@ const payload = (): SettingsPayload => ({
         forgotten: { forgotten_fallback: null, confirm_minutes: null },
         offline: { max_hours: null },
         packPhoto: { show: null, no_photo: null },
+        chartAlerts: { reconfirm: null },
     },
     site_values: {},
     site_reviewed: {},
@@ -283,5 +309,16 @@ describe('Medicine photos › At recording (Lane A11 settings)', () => {
         expect(draft()).toEqual({
             packPhoto: { no_photo: 'tick', show: 'no' },
         });
+    });
+});
+
+describe('Safety checks › Chart alerts (Lane A5 settings)', () => {
+    it('asks for a confirmation every dose instead of once a day', () => {
+        const { draft } = renderWith(
+            <SafetyChecks q="" show="all" clear={vi.fn()} />,
+        );
+        expect(screen.getByText('Chart alerts')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Every dose' }));
+        expect(draft()).toEqual({ chartAlerts: { reconfirm: 'dose' } });
     });
 });

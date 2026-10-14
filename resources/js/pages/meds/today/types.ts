@@ -122,6 +122,8 @@ export interface ScheduleRow {
     req?: BoardRequirements | null;
     /** A refused dose's open follow-up (from refusal_follow_ups). */
     follow_up?: { owner: string | null; due_time: string | null } | null;
+    /** EA-043: yesterday's dose, still due or late with nothing recorded. */
+    from_yesterday?: boolean;
 }
 
 /** An open refusal follow-up (P01: owned by whoever recorded the refusal). */

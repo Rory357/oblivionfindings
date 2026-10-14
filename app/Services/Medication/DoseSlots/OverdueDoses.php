@@ -93,8 +93,9 @@ final class OverdueDoses
     /**
      * Of these doses (keys), the ones with positive evidence that they are
      * no longer overdue, whatever their day: a record (given, refused,
-     * withheld or missed), the order no longer owed (ceased, paused,
-     * superseded, alerts suppressed for the person), or the dose's own state
+     * withheld or missed), the order no longer owed (superseded, alerts
+     * suppressed for the person, or stopped/paused before yesterday — a dose
+     * due before a recent stop is still owed, EA-041), or the dose's own state
      * no longer overdue (away, self-managed, waiting for the order check).
      * A dose that has only aged out of the lookback, or that can no longer
      * be found, is not settled.
@@ -171,7 +172,10 @@ final class OverdueDoses
     private function owedOrders(): Builder
     {
         return ClientMedication::query()
-            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
+            ->where(fn ($orders) => $orders->active()
+                ->orWhere(fn ($waiting) => $waiting->awaitingVerification())
+                // EA-041: a stop or pause doesn't settle a dose already owed.
+                ->orWhere(fn ($stopped) => ScheduledDoseStates::stoppedRecently($stopped)))
             ->where('is_prn', false)
             ->where(function ($query) {
                 $query->whereNotNull('dose_times')

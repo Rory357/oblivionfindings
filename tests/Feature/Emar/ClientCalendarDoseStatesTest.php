@@ -242,12 +242,13 @@ class ClientCalendarDoseStatesTest extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
+    /** Today's rows on the board (yesterday's still-owed doses, EA-043, are left out). */
     private function medsToday(string $date): array
     {
-        return array_values($this->actingAs($this->reader->fresh())
+        return array_values(array_filter($this->actingAs($this->reader->fresh())
             ->get('/meds/today?date='.$date)
             ->assertOk()
-            ->inertiaProps('schedule'));
+            ->inertiaProps('schedule'), fn (array $row): bool => ! ($row['from_yesterday'] ?? false)));
     }
 
     private function record(ClientMedication $order, string $dueNz, string $status): ClientMedicationAdministration

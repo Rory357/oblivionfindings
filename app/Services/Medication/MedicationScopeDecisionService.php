@@ -190,14 +190,24 @@ class MedicationScopeDecisionService
                 historical: $historicalPaper !== null,
             );
 
+            // EA-041 (Lane A9): a dose due before its order was stopped or
+            // paused is still owed, so what happened can be recorded for it —
+            // even when the stop committed while this request waited for the
+            // lock. "Given" must be before the stop's effective time
+            // (administered_at, checked in EnhancedMarService).
+            $owedBeforeStop = $roundSnapshot === null && $this->owedBeforeStop($medication, $scheduledFor);
             if ($roundSnapshot === null) {
                 if ($medication->is_prn) {
                     $this->notFoundUnless($scheduledFor === null);
+                } elseif ($owedBeforeStop) {
+                    $this->assertScheduledCellBeforeStop($medication, $scheduledFor);
                 } else {
                     $this->assertScheduledCell($medication, $scheduledFor);
                 }
             }
-            $this->assertMedicationIsActiveFor($medication, $scheduledFor ?? $actionAt);
+            if (! $owedBeforeStop) {
+                $this->assertMedicationIsActiveFor($medication, $scheduledFor ?? $actionAt);
+            }
 
             [$shift, $breakGlass] = $reviewedPaper === null ? $this->resolveClientAuthority(
                 $performer, $client, $actionAt, $submittedShiftId,
@@ -869,6 +879,34 @@ class MedicationScopeDecisionService
             fn (array $dose): Carbon => $dose['due_at'],
             $states->dosesOn([$medication], $date, now())[(int) $medication->id] ?? [],
         );
+    }
+
+    /**
+     * EA-041 (Lane A9): a checked, scheduled order that was stopped or
+     * paused after this dose was due still owes it. (EnhancedMarService
+     * also allows "given" only at a time before the stop.)
+     */
+    private function owedBeforeStop(ClientMedication $medication, ?Carbon $scheduledFor): bool
+    {
+        if ($scheduledFor === null || $medication->is_prn || $medication->superseded_by !== null
+            || $medication->deleted_at !== null || ! $medication->isVerifiedForAdministration()) {
+            return false;
+        }
+        $stoppedAt = ScheduledDoseStates::stoppedAt($medication);
+
+        return $stoppedAt !== null && CarbonImmutable::instance($scheduledFor)->utc()->lt($stoppedAt);
+    }
+
+    /** The dose is one of the order's own times that day, as it was before the stop. */
+    private function assertScheduledCellBeforeStop(ClientMedication $medication, Carbon $scheduledFor): void
+    {
+        $date = $this->schedule->dateFromInput(
+            $scheduledFor->copy()->timezone($this->schedule->workerTimezone())->toDateString(),
+        );
+        $asBefore = (clone $medication)->forceFill(['active' => true]);
+        $matches = collect($this->schedule->scheduledTimesForDate($asBefore, $date))
+            ->contains(fn (Carbon $slot): bool => abs($slot->copy()->utc()->diffInSeconds($scheduledFor->copy()->utc(), false)) < 60);
+        $this->notFoundUnless($matches);
     }
 
     private function assertMedicationIsActiveFor(ClientMedication $medication, Carbon $at): void
