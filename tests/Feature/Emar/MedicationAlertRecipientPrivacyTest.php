@@ -81,6 +81,28 @@ test('a person alert is not told to rostered staff who cannot open that person',
     expect($result['not_told_person'] ?? null)->toContain($relief->id)->not->toContain($lead->id);
 });
 
+test('a worker rostered on the person’s shift but not assigned to them is told once clocked in, not before', function () {
+    // EA-015 with B2 Q10: "Everyone rostered" counts the rostered window and
+    // the person gate is the record's own. A relief worker on Aroha's shift
+    // opens her record once clocked in (the shift names her), so is told from
+    // then; a worker assigned to her is told for the whole window (above).
+    $aroha = Client::factory()->create(['site_id' => $this->house->id, 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'status' => 'active']);
+    $relief = ($this->staffAt)($this->house, 'support_worker');
+    $shift = ($this->rosteredOn)($relief, $aroha);
+    $subject = new MedicationAlertSubject(
+        key: 'overdue:relief', siteId: $this->house->id, title: 'Overdue dose',
+        message: 'Aroha N. — Metformin, 8:00 pm dose — has no outcome.', shortMessage: 'A dose at Kowhai House has no outcome.',
+        clientId: $aroha->id,
+    );
+    $told = fn () => collect(app(MedicationAlertRecipients::class)->resolve(MedicationAlertCatalogue::OVERDUE, $subject, now())['told'])
+        ->map(fn ($c) => (int) $c['user']->id);
+
+    expect($told())->not->toContain($relief->id);
+
+    $shift->update(['status' => 'in_progress', 'actual_starts_at' => now()->subMinutes(30)]);
+    expect($told())->toContain($relief->id);
+});
+
 test('a stock alert link is the medicine’s stock page for stock staff and the person’s chart otherwise', function () {
     $aroha = Client::factory()->create(['site_id' => $this->house->id, 'status' => 'active']);
     $order = ClientMedication::factory()->create([
