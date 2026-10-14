@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\Medication\SafetyOverrideReason;
 use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
@@ -47,6 +48,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -1233,7 +1235,15 @@ class MedicationsApiController extends Controller
     }
 
     /**
-     * Correct an administration
+     * Correct an administration.
+     *
+     * EA-106: the person record's correction path. The person rule first
+     * (ClientPolicy::correctMedications: the record's own rule, with the
+     * correction right in place of read access), then the canonical
+     * correction writer with its P09 event and its notice to approvers. A
+     * person the actor can't reach answers exactly like a missing or forged
+     * dose. This API keeps its contract: the correction reason is required, a
+     * second pending correction is a conflict, and the JSON is unchanged.
      */
     public function correctAdministration(
         Request $request,
@@ -1247,274 +1257,54 @@ class MedicationsApiController extends Controller
             403,
             'You do not have permission to correct medication administrations.'
         );
+        abort_unless(
+            (int) $administration->client_id === (int) $client->getKey()
+            && Gate::forUser($user)->allows('correctMedications', $client),
+            404,
+        );
+        $request->validate([
+            'status' => ['required', 'in:given,refused,missed,withheld'],
+            'reason' => ['nullable', 'string', 'max:255'],
+            'dose_given' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'administered_at' => ['nullable', 'date'],
+            'correction_reason' => ['required', 'string', 'max:255'],
+        ]);
 
-        return DB::transaction(function () use ($request, $client, $administration, $user) {
-            // Read only the submitted child identity first, then lock the
-            // canonical aggregate in parent-first order. A forged nested owner,
-            // cross-client medication, foreign Site, and a missing row all
-            // collapse to the same concealed response before validation/writes.
-            $snapshot = ClientMedicationAdministration::query()
-                ->whereKey($administration->getKey())
-                ->first([
-                    'id',
-                    'client_id',
-                    'client_medication_id',
-                    'is_correction',
-                    'corrected_of_id',
-                ]);
-            abort_unless(
-                $snapshot !== null
-                && (int) $snapshot->client_id === (int) $client->getKey()
-                && is_numeric($snapshot->client_medication_id)
-                && (int) $snapshot->client_medication_id > 0,
-                404,
-            );
-
-            $canonicalClient = Client::query()
-                ->whereKey($snapshot->client_id)
-                ->lockForUpdate()
-                ->first();
-            abort_unless(
-                $canonicalClient !== null
-                && is_numeric($canonicalClient->site_id)
-                && (int) $canonicalClient->site_id > 0
-                && in_array(
-                    (int) $canonicalClient->site_id,
-                    $this->siteAccess->accessibleSiteIds(
-                        $user,
-                        MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
-                    ),
-                    true,
-                ),
-                404,
-            );
-
-            $canonicalMedication = ClientMedication::withTrashed()
-                ->whereKey($snapshot->client_medication_id)
-                ->where('client_id', $canonicalClient->id)
-                ->lockForUpdate()
-                ->first();
-            abort_unless($canonicalMedication !== null, 404);
-            abort_unless(
-                ! (bool) $canonicalMedication->controlled_drug
-                || $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY),
-                404,
-            );
-
-            $rootId = $snapshot->is_correction
-                ? (int) $snapshot->corrected_of_id
-                : (int) $snapshot->id;
-            abort_unless($rootId > 0, 404);
-
-            $rootAdministration = ClientMedicationAdministration::query()
-                ->whereKey($rootId)
-                ->where('client_id', $canonicalClient->id)
-                ->where('client_medication_id', $canonicalMedication->id)
-                ->where(function ($query): void {
-                    $query->where('is_correction', false)
-                        ->orWhereNull('is_correction');
-                })
-                ->lockForUpdate()
-                ->first();
-            abort_unless($rootAdministration !== null, 404);
-
-            $corrections = ClientMedicationAdministration::query()
-                ->where('corrected_of_id', $rootAdministration->id)
-                ->where('client_id', $canonicalClient->id)
-                ->where('client_medication_id', $canonicalMedication->id)
-                ->where('is_correction', true)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-
-            $submittedAdministration = $snapshot->is($rootAdministration)
-                ? $rootAdministration
-                : $corrections->first(
-                    fn (ClientMedicationAdministration $candidate): bool => $candidate->is($snapshot),
-                );
-            abort_unless($submittedAdministration instanceof ClientMedicationAdministration, 404);
-
-            $approvedWinner = $corrections
-                ->filter(
-                    fn (ClientMedicationAdministration $candidate): bool => $candidate->correction_status === 'approved',
-                )
-                ->sort(function (
-                    ClientMedicationAdministration $left,
-                    ClientMedicationAdministration $right,
-                ): int {
-                    $leftApprovedAt = $left->correction_approved_at?->getTimestamp() ?? PHP_INT_MIN;
-                    $rightApprovedAt = $right->correction_approved_at?->getTimestamp() ?? PHP_INT_MIN;
-
-                    return $leftApprovedAt === $rightApprovedAt
-                        ? (int) $right->id <=> (int) $left->id
-                        : $rightApprovedAt <=> $leftApprovedAt;
-                })
-                ->first();
-            $effectiveAdministration = $approvedWinner ?? $rootAdministration;
-
-            abort_unless(
-                $submittedAdministration->is($rootAdministration)
-                || $submittedAdministration->is($effectiveAdministration),
-                404,
-            );
-
-            $pendingSibling = $corrections->first(
-                fn (ClientMedicationAdministration $candidate): bool => $candidate->correction_status === 'pending',
-            );
-            if ($pendingSibling !== null) {
+        try {
+            app(MedicationAdministrationCorrectionController::class)->store($request, $client, $administration);
+        } catch (ValidationException $exception) {
+            if (array_key_exists('correction', $exception->errors())) {
                 return response()->json([
                     'success' => false,
                     'error' => 'A correction for this administration is already awaiting approval.',
                 ], 409);
             }
 
-            $data = $request->validate([
-                'status' => ['required', 'in:given,refused,missed,withheld'],
-                'reason' => ['nullable', 'string', 'max:500'],
-                'dose_given' => ['nullable', 'string', 'max:255'],
-                'notes' => ['nullable', 'string', 'max:2000'],
-                'administered_at' => ['nullable', 'date'],
-                'correction_reason' => ['required', 'string', 'max:500'],
-            ]);
-
-            if (
-                (bool) $canonicalMedication->controlled_drug
-                && (($effectiveAdministration->status === 'given') !== ($data['status'] === 'given'))
-            ) {
-                throw ValidationException::withMessages([
-                    'status' => 'A controlled medication correction cannot change whether stock was administered without a separate witnessed register reconciliation.',
-                ]);
-            }
-            $this->assertCorrectionClinicalIntegrity($canonicalMedication, $effectiveAdministration, $data);
-            if (
-                (bool) $canonicalMedication->controlled_drug
-                && $effectiveAdministration->witnessed_by !== null
-                && (int) $effectiveAdministration->administered_by === (int) $effectiveAdministration->witnessed_by
-            ) {
-                throw ValidationException::withMessages([
-                    'administration' => 'Controlled medication evidence must retain an administering worker distinct from its witness.',
-                ]);
-            }
-
-            // Check correction time window
-            $windowAnchor = $rootAdministration->administered_at
-                ?? $rootAdministration->updated_at
-                ?? $rootAdministration->created_at;
-            $minutesSince = $windowAnchor?->diffInMinutes(now()) ?? 999999;
-            if ($minutesSince > 30 && empty($data['correction_reason'])) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Correction reason is required when correcting after 30 minutes.',
-                ], 422);
-            }
-
-            // Create correction record
-            $correction = $effectiveAdministration->replicate([
-                'id',
-                'client_request_uuid',
-                'correction_requested_by',
-                'correction_status',
-                'correction_approved_by',
-                'correction_approved_at',
-                'correction_rejection_reason',
-                'deleted_at',
-                'created_at',
-                'updated_at',
-            ]);
-            $correction->is_correction = true;
-            $correction->corrected_of_id = $rootAdministration->id;
-            $correction->correction_reason = $data['correction_reason'];
-            $correction->status = $data['status'];
-            $correction->reason = $data['reason'] ?? $effectiveAdministration->reason;
-            $correction->dose_given = $data['dose_given'] ?? $effectiveAdministration->dose_given;
-            $correction->notes = $data['notes'] ?? $effectiveAdministration->notes;
-            $correction->administered_at = $data['administered_at'] ?? $effectiveAdministration->administered_at;
-            if ($correction->status !== 'given') {
-                foreach (ClientMedicationAdministration::ADMINISTRATION_ONLY_EVIDENCE_FIELDS as $field) {
-                    $correction->{$field} = null;
-                }
-            }
-            $correction->correction_requested_by = $user->id;
-            $correction->correction_status = 'pending';
-            $correction->save();
-
-            // Timeline event
-            app(TimelineEmitter::class)->record([
-                'source_type' => ClientMedicationAdministration::class,
-                'source_id' => $correction->id,
-                'occurred_at' => now(),
-                'type' => 'medication_correction',
-                'actor_user_id' => $user->id,
-                'client_id' => $canonicalClient->id,
-                'shift_id' => $effectiveAdministration->shift_id,
-                'site_id' => $canonicalClient->site_id,
-                'subject' => 'Medication corrected: '.$canonicalMedication->name,
-                'body' => $data['correction_reason'],
-                'meta' => array_filter([
-                    'corrected_from' => $effectiveAdministration->status,
-                    'corrected_to' => $data['status'],
-                    'original_administration_id' => $rootAdministration->id,
-                ]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $user->id,
-            ]);
-
-            // Handle incident for significant corrections
-            if ($minutesSince > 240) { // 4 hours
-                $this->incidentService->handleUnsafeCorrection($rootAdministration, $data, $user->id, $correction);
-            }
-
-            return response()->json([
-                'success' => true,
-                'correction' => [
-                    'id' => $correction->id,
-                    'status' => $correction->status,
-                    'is_correction' => true,
-                    'correction_status' => $correction->correction_status,
-                ],
-            ]);
-        }, 3);
-    }
-
-    /** @param array<string, mixed> $data */
-    private function assertCorrectionClinicalIntegrity(
-        ClientMedication $medication,
-        ClientMedicationAdministration $effectiveAdministration,
-        array $data,
-    ): void {
-        $currentStatus = (string) $effectiveAdministration->status;
-        $correctedStatus = (string) $data['status'];
-
-        if ($currentStatus !== 'given' && $correctedStatus === 'given') {
-            throw ValidationException::withMessages([
-                'status' => 'A correction cannot create a given administration without the governed administration workflow and its required clinical evidence.',
-            ]);
-        }
-        if (! $medication->controlled_drug || $currentStatus !== 'given' || $correctedStatus !== 'given') {
-            return;
+            throw $exception;
         }
 
-        if (array_key_exists('dose_given', $data)) {
-            $submittedDose = $data['dose_given'] === null ? null : trim((string) $data['dose_given']);
-            $recordedDose = $effectiveAdministration->dose_given === null
-                ? null
-                : trim((string) $effectiveAdministration->dose_given);
-            if ($submittedDose !== $recordedDose) {
-                throw ValidationException::withMessages([
-                    'dose_given' => 'A controlled medication correction cannot change the recorded dose without witnessed register reconciliation.',
-                ]);
-            }
-        }
+        $rootId = $administration->is_correction
+            ? (int) $administration->corrected_of_id
+            : (int) $administration->id;
+        $correction = ClientMedicationAdministration::query()
+            ->where('client_id', $client->getKey())
+            ->where('corrected_of_id', $rootId)
+            ->where('is_correction', true)
+            ->where('correction_status', 'pending')
+            ->where('correction_requested_by', $user->id)
+            ->latest('id')
+            ->firstOrFail();
 
-        if (array_key_exists('administered_at', $data) && $data['administered_at'] !== null) {
-            $recordedAt = $effectiveAdministration->administered_at;
-            if ($recordedAt === null || ! Carbon::parse($data['administered_at'])->utc()->equalTo($recordedAt->copy()->utc())) {
-                throw ValidationException::withMessages([
-                    'administered_at' => 'A controlled medication correction cannot change the administration time without witnessed register reconciliation.',
-                ]);
-            }
-        }
+        return response()->json([
+            'success' => true,
+            'correction' => [
+                'id' => $correction->id,
+                'status' => $correction->status,
+                'is_correction' => true,
+                'correction_status' => $correction->correction_status,
+            ],
+        ]);
     }
 
     /**

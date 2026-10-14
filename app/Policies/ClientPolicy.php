@@ -68,10 +68,31 @@ class ClientPolicy
             return $user->canDo('medications.view');
         }
 
-        if (! $user->canDo('medications.view')) {
-            return false;
-        }
+        return $user->canDo('medications.view') && $this->reachesMedicationRecord($user, $client);
+    }
 
+    /**
+     * EA-106: correcting a dose follows the same person rule as reading the
+     * record, with the correction right in place of read access, so someone
+     * who holds only medications.administer.correct corrects wherever that
+     * rule lets them reach the person. Never through the client portal.
+     * Controlled medicines keep their own check in the correction writer.
+     */
+    public function correctMedications(User $user, Client $client): bool
+    {
+        return ! $user->canAccessClientPortal($client)
+            && $user->canDo('medications.administer.correct')
+            && $this->reachesMedicationRecord($user, $client);
+    }
+
+    /**
+     * Whether someone reaches a person's medication record, once their
+     * capability is settled: medication operations or client-wide roles at
+     * the person's house, assigned to the person there, clocked in on a shift
+     * covering them, or break-glass at their house.
+     */
+    private function reachesMedicationRecord(User $user, Client $client): bool
+    {
         $hasMedicationOperationsAccess = collect([
             'medications.stock.update',
             'medications.audit.view',
