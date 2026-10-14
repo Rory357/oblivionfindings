@@ -31,15 +31,14 @@ final class DashboardController extends Controller
         $preference = $this->access->preference($user, $role);
         // Only the blocks on this person's layout are worked out on page load;
         // the editor fetches the rest of the library when it opens.
-        $layout = $preference['value']['blocks'] !== null
-            ? array_column($preference['value']['blocks'], 'id')
-            : array_column(array_slice($this->access->catalog($role)['blocks'], 0, 6), 'id');
+        $defaultLayout = $this->access->defaultBlockIds($user, $role);
+        $layout = $preference['value']['blocks'] !== null ? array_column($preference['value']['blocks'], 'id') : $defaultLayout;
 
         return inertia('dashboard', [
             'overview' => app(OverviewData::class)->build($user, $role, $range, $site, $layout),
             'role' => $role, 'roles' => $this->access->roles($user), 'defaultRole' => $this->access->defaultRole($user),
             'sites' => $this->access->sites($user, $role), 'filters' => ['range' => $range, 'site' => $site],
-            'preference' => $preference,
+            'preference' => $preference, 'defaultLayout' => $defaultLayout,
         ]);
     }
 

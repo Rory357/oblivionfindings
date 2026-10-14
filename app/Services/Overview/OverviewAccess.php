@@ -10,7 +10,7 @@ use App\Services\UserSiteAccessService;
 
 final class OverviewAccess
 {
-    public const ROLES = ['worker', 'lead', 'manager', 'hr', 'it', 'governance'];
+    public const ROLES = ['worker', 'lead', 'manager', 'hr', 'it', 'governance', 'office'];
 
     public function roles(User $user): array
     {
@@ -38,6 +38,13 @@ final class OverviewAccess
         if ($user->canDo('governance.view')) {
             $roles[] = 'governance';
         }
+        // Business support: back-office roles, and anyone who reads finance,
+        // compliance, audit or risk records. A frontline fleet or hazard
+        // permission alone (support workers, team leads) does not add it.
+        if ($user->hasRole(...OverviewOfficeBlocks::ROLES) || $user->canDo('finance.dashboard') || $user->canDo('compliance.view')
+            || $user->canDo('audit.viewAny') || $user->canDo('governance.risks.view')) {
+            $roles[] = 'office';
+        }
 
         return $roles;
     }
@@ -55,6 +62,7 @@ final class OverviewAccess
             $user->hasRole('it_manager') => 'it',
             $user->hasRole('board_chair', 'board_member', 'board_secretary', 'board_observer', 'board_trustee') => 'governance',
             $user->hasRole('team_lead', 'coordinator', 'clinical_lead') => 'lead',
+            $user->hasRole(...OverviewOfficeBlocks::ROLES) => 'office',
             default => 'worker',
         };
 
@@ -71,8 +79,24 @@ final class OverviewAccess
         return match ($role) {
             'lead', 'manager' => ['operations.dashboard.viewAllSites'],
             'hr' => UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+            // Each Business support block also applies its own module's Site rule.
+            'office' => ['sites.viewAll', 'healthSafety.viewAllSites'],
             default => [],
         };
+    }
+
+    /**
+     * The blocks a role opens with before the person saves a layout. Business
+     * support picks from the areas the person can see; the others use the
+     * first six blocks of their catalog.
+     *
+     * @return list<string>
+     */
+    public function defaultBlockIds(User $user, string $role): array
+    {
+        return $role === 'office'
+            ? app(OverviewOfficeBlocks::class)->defaultBlockIds($user)
+            : array_column(array_slice($this->catalog($role)['blocks'], 0, 6), 'id');
     }
 
     public function siteIds(User $user, string $role): array

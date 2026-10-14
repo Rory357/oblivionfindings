@@ -1504,5 +1504,232 @@
                 ]
             }
         ]
+    },
+    "office": {
+        "name": "Business support",
+        "icon": "briefcase-business",
+        "description": "Money, compliance, safety and assets: the deadlines that keep services running.",
+        "range": "month",
+        "primary": "Open my areas",
+        "blocks": [
+            {
+                "id": "attention",
+                "title": "Needs attention",
+                "description": "Deadlines and approvals across your areas.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 8,
+                "icon": "list-checks"
+            },
+            {
+                "id": "focus",
+                "title": "Your next deadline",
+                "description": "The nearest due date in the areas you look after.",
+                "category": "Actions",
+                "kind": "focus",
+                "span": 4,
+                "icon": "calendar-clock"
+            },
+            {
+                "id": "trend",
+                "title": "Money in and out",
+                "description": "Recorded income against spending by month.",
+                "category": "Insights",
+                "kind": "trend",
+                "span": 8,
+                "icon": "chart-no-axes-combined"
+            },
+            {
+                "id": "distribution",
+                "title": "Money owed to us",
+                "description": "Unpaid invoices by how long they have been outstanding.",
+                "category": "Insights",
+                "kind": "donut",
+                "span": 4,
+                "icon": "hand-coins"
+            },
+            {
+                "id": "sites",
+                "title": "Budget by site",
+                "description": "Spending against budget for each site this period.",
+                "category": "Insights",
+                "kind": "bars",
+                "span": 8,
+                "icon": "building-2"
+            },
+            {
+                "id": "agenda",
+                "title": "Upcoming deadlines",
+                "description": "Filing, renewal and review dates coming up.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "calendar-days"
+            },
+            {
+                "id": "updates",
+                "title": "Latest updates",
+                "description": "Recent changes in your work.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "bell-ring"
+            },
+            {
+                "id": "shortcuts",
+                "title": "Quick links",
+                "description": "Your useful everyday destinations.",
+                "category": "Actions",
+                "kind": "links",
+                "span": 4,
+                "icon": "arrow-left-right"
+            },
+            {
+                "id": "office-payroll",
+                "title": "Payroll and payday filing",
+                "description": "Pay runs waiting for approval and filings still owed to Inland Revenue.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 6,
+                "icon": "banknote"
+            },
+            {
+                "id": "office-bills",
+                "title": "Bills due",
+                "description": "Supplier bills due in the next 7 days or already overdue.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 6,
+                "icon": "receipt-text"
+            },
+            {
+                "id": "office-funding",
+                "title": "Funding claims",
+                "description": "Claims to funders by stage, so nothing sits unclaimed.",
+                "category": "Insights",
+                "kind": "progress",
+                "span": 6,
+                "icon": "landmark"
+            },
+            {
+                "id": "office-cash",
+                "title": "Cash runway",
+                "description": "Cash on hand and how many days it covers at current spending.",
+                "category": "Insights",
+                "kind": "list",
+                "span": 6,
+                "icon": "wallet"
+            },
+            {
+                "id": "office-vehicle-reviews",
+                "title": "Vehicle costs to review",
+                "description": "Vehicle reviews waiting for a finance decision.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 6,
+                "icon": "car-front"
+            },
+            {
+                "id": "office-compliance",
+                "title": "Compliance due",
+                "description": "Compliance items overdue or due in the next 30 days.",
+                "category": "Assurance",
+                "kind": "list",
+                "span": 6,
+                "icon": "shield-check"
+            },
+            {
+                "id": "office-safety",
+                "title": "Safety actions",
+                "description": "Corrective actions overdue or due soon, with days since a lost-time injury.",
+                "category": "Assurance",
+                "kind": "list",
+                "span": 6,
+                "icon": "hard-hat"
+            },
+            {
+                "id": "office-fleet",
+                "title": "Vehicle compliance",
+                "description": "WOF, registration, COF, road user charges and insurance due or expired.",
+                "category": "Assurance",
+                "kind": "bars",
+                "span": 6,
+                "icon": "bus"
+            },
+            {
+                "id": "office-maintenance",
+                "title": "Maintenance work",
+                "description": "Open, urgent and overdue work orders across your sites.",
+                "category": "Actions",
+                "kind": "bars",
+                "span": 6,
+                "icon": "wrench"
+            },
+            {
+                "id": "office-risks",
+                "title": "Risk reviews due",
+                "description": "Risks whose next review date has passed or is close.",
+                "category": "Assurance",
+                "kind": "list",
+                "span": 6,
+                "icon": "flag"
+            },
+            {
+                "id": "office-audit",
+                "title": "Record changes",
+                "description": "Changes recorded in the audit trail this period, by area.",
+                "category": "Assurance",
+                "kind": "bars",
+                "span": 6,
+                "icon": "file-search"
+            },
+            {
+                "id": "office-tax",
+                "title": "GST and tax returns",
+                "description": "GST and other returns due, with their filing status.",
+                "category": "Assurance",
+                "kind": "list",
+                "span": 6,
+                "icon": "stamp"
+            }
+        ],
+        "starters": [
+            {
+                "name": "Month-end finance",
+                "description": "Pay, bills and what we are owed.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "office-payroll",
+                    "office-bills",
+                    "distribution",
+                    "office-tax"
+                ]
+            },
+            {
+                "name": "Compliance and safety",
+                "description": "Due dates that keep services safe and certified.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "office-compliance",
+                    "office-safety",
+                    "office-fleet",
+                    "office-risks"
+                ]
+            },
+            {
+                "name": "Money and funding",
+                "description": "Income, budgets, claims and cash.",
+                "ids": [
+                    "attention",
+                    "trend",
+                    "sites",
+                    "office-funding",
+                    "office-cash",
+                    "office-vehicle-reviews"
+                ]
+            }
+        ]
     }
 }

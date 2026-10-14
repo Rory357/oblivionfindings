@@ -71,6 +71,11 @@ final class OverviewData
 
     private string $site;
 
+    /** Business support areas this person can see, and each area's blocks (for failures). */
+    private array $officeAreas = [];
+
+    private array $officeSources = [];
+
     public function __construct(private readonly OverviewAccess $access, private readonly UserSiteAccessService $siteAccess) {}
 
     /**
@@ -100,6 +105,8 @@ final class OverviewData
         $this->metrics = [];
         $this->teamFollowups = null;
         $this->partial = false;
+        $this->officeAreas = [];
+        $this->officeSources = [];
         foreach ($this->access->catalog($role)['blocks'] as $meta) {
             $this->blocks[$meta['id']] = ['state' => 'proposed', 'rows' => [], 'series' => [], 'total' => null,
                 'subtitle' => 'Proposed summary', 'message' => 'This block is planned. Its summary is not connected yet.'];
@@ -136,6 +143,9 @@ final class OverviewData
         if ($role === 'manager') {
             $this->source('Decision queue', fn () => $this->managerReviews());
         }
+        if ($role === 'office') {
+            $this->office($only);
+        }
         $optional = match ($role) {
             'worker' => ['worker-notes' => 'drafts'],
             'lead' => ['lead-supervision' => 'supervision'],
@@ -143,6 +153,7 @@ final class OverviewData
             'hr' => ['hr-supervision' => 'supervision', 'hr-exits' => 'leavers'],
             'it' => ['it-knowledge' => 'knowledge'],
             'governance' => ['governance-declarations' => 'declarations'],
+            'office' => [],
         };
         foreach ($optional as $id => $method) {
             if ($only !== null && ! in_array($id, $only, true)) {
@@ -191,6 +202,7 @@ final class OverviewData
             'hr' => [['HR analytics', '/hr/analytics'], ['My HR', '/hr/my']],
             'it' => [['Service desk', '/it']],
             'governance' => [['Board workspace', '/governance/dashboard'], ['My board work', '/governance/my-work']],
+            'office' => array_map(fn ($area) => array_slice(OverviewOfficeBlocks::WORKSPACES[$area], 0, 2), array_slice($this->officeAreas, 0, 6)),
         };
         $this->blocks['shortcuts'] = $this->ready('Open your everyday workspaces', null, array_map(fn ($link) => ['label' => $link[0], 'href' => $link[1], 'detail' => 'Open workspace'], $links), count($links));
         // A block that was asked for but is still unfilled was skipped by its
@@ -201,7 +213,7 @@ final class OverviewData
             }
         }
         foreach ($this->blocks as $id => &$block) {
-            $block['scopeMode'] ??= $id === 'governance-declarations' ? 'personal' : ($role === 'governance' ? 'organisation' : (($id === 'shortcuts' || ($role === 'worker' && in_array($id, ['sites', 'worker-learning', 'worker-leave', 'worker-requests', 'worker-policy-reading', 'worker-contacts'], true))) ? 'personal' : 'site'));
+            $block['scopeMode'] ??= $role === 'office' ? ($id === 'shortcuts' ? 'personal' : (in_array($id, ['attention', 'focus', 'agenda', 'updates', 'office-safety', 'office-fleet', 'office-maintenance'], true) ? 'site' : 'organisation')) : ($id === 'governance-declarations' ? 'personal' : ($role === 'governance' ? 'organisation' : (($id === 'shortcuts' || ($role === 'worker' && in_array($id, ['sites', 'worker-learning', 'worker-leave', 'worker-requests', 'worker-policy-reading', 'worker-contacts'], true))) ? 'personal' : 'site')));
         }
         unset($block);
         $this->blocks = array_intersect_key($this->blocks, array_flip(array_column($this->access->catalog($role)['blocks'], 'id')));
@@ -211,6 +223,9 @@ final class OverviewData
             'hr' => ['label' => 'Review HR work', 'href' => '/hr/analytics'],
             'it' => ['label' => 'Open service desk', 'href' => '/it'],
             'governance' => ['label' => 'Board workspace', 'href' => '/governance/dashboard'],
+            'office' => isset($this->officeAreas[0])
+                ? ['label' => OverviewOfficeBlocks::WORKSPACES[$this->officeAreas[0]][2], 'href' => OverviewOfficeBlocks::WORKSPACES[$this->officeAreas[0]][1]]
+                : ['label' => 'Open All Tasks', 'href' => '/tasks'],
             default => ['label' => 'Open My Day', 'href' => '/my-day'],
         };
 
@@ -234,7 +249,7 @@ final class OverviewData
                     ['label' => 'On duty', 'value' => null, 'caption' => 'Roster information unavailable'],
                 ];
             }
-            $sourceIds = match ($name) {
+            $sourceIds = $this->officeSources[$name] ?? match ($name) {
                 'Roster', 'Workforce', 'Service desk', 'Governance' => ['focus', 'trend', 'distribution', 'sites', 'agenda'],
                 'Leave' => ['worker-leave', 'lead-availability', 'hr-leave'],
                 'Compliance' => ['worker-learning', 'lead-learning', 'hr-documents', ...($this->role === 'hr' ? ['distribution'] : [])],
@@ -1036,6 +1051,67 @@ final class OverviewData
             $this->blocks['agenda']['total'] += $maintenanceQuery->count();
             $this->blocks['agenda']['subtitle'] = 'Scheduled changes and device maintenance · next 30 days';
         }
+    }
+
+    /**
+     * Business support: each area the person can see (finance, compliance,
+     * safety, fleet, risks, audit) through its own module's service, plus the
+     * shared next deadline and upcoming dates drawn from all of them.
+     */
+    private function office(?array $only): void
+    {
+        $office = app(OverviewOfficeBlocks::class);
+        $this->officeAreas = $office->areas($this->user);
+        $metrics = [];
+        $deadlines = [];
+        foreach ($this->officeAreas as $area) {
+            $name = OverviewOfficeBlocks::WORKSPACES[$area][0];
+            $this->officeSources[$name] = OverviewOfficeBlocks::AREAS[$area];
+            $this->source($name, function () use ($office, $area, $only, &$metrics, &$deadlines) {
+                $result = $office->read($area, $this->user, $this->siteIds, $this->site !== 'all', $only, $this->start, $this->end);
+                $this->blocks = array_replace($this->blocks, $result['blocks']);
+                array_push($this->attention, ...$result['attention']);
+                $metrics[] = $result['metrics'];
+                array_push($deadlines, ...$result['deadlines']);
+            });
+            // A visible area's blocks that are not on the layout load when the editor opens.
+            foreach (OverviewOfficeBlocks::AREAS[$area] as $id) {
+                if ($only !== null && ! in_array($id, $only, true) && ($this->blocks[$id]['state'] ?? null) === 'proposed') {
+                    $this->deferred($id);
+                }
+            }
+        }
+        // Hero figures: the first from each area in turn, then the next.
+        for ($i = 0; $i < 3; $i++) {
+            foreach ($metrics as $list) {
+                if (isset($list[$i]) && count($this->metrics) < 3) {
+                    $this->metrics[] = $list[$i];
+                }
+            }
+        }
+        $today = $this->localToday();
+        usort($deadlines, fn ($a, $b) => strcmp($a['date'], $b['date']));
+        $describe = function (array $deadline) use ($today): array {
+            $days = (int) round($today->diffInDays(CarbonImmutable::parse($deadline['date'], $today->timezone)->startOfDay(), false));
+            [$status, $tone, $when] = match (true) {
+                $days < 0 => ['Overdue', 'warning', abs($days).' '.(abs($days) === 1 ? 'day' : 'days').' overdue'],
+                $days === 0 => ['Due today', 'warning', 'due today'],
+                default => ['Due soon', 'neutral', 'in '.$days.' '.($days === 1 ? 'day' : 'days')],
+            };
+
+            return ['label' => $deadline['label'], 'date' => $deadline['date'], 'detail' => $deadline['area'].' · '.$when,
+                'status' => $status, 'tone' => $tone, 'href' => $deadline['href']];
+        };
+        // Overdue dates sort first, so the next deadline is the most pressing one.
+        $next = $deadlines[0] ?? null;
+        $primary = isset($this->officeAreas[0]) ? OverviewOfficeBlocks::WORKSPACES[$this->officeAreas[0]] : ['', '/tasks', 'Open All Tasks'];
+        $this->blocks['focus'] = $this->ready('The nearest due date in the areas you look after', $next['href'] ?? $primary[1], $next ? [$describe($next)] : [], count($deadlines))
+            + ['title' => 'Your next deadline', 'focusTag' => $next ? $describe($next)['status'] : null,
+                'actionLabel' => $next ? 'Open '.mb_strtolower($next['area']) : null, 'emptyActionLabel' => $primary[2],
+                'empty' => 'Nothing is due in your areas in the next 30 days.'];
+        $upcoming = array_values(array_filter($deadlines, fn ($deadline) => $deadline['date'] >= $today->toDateString() && $deadline['date'] <= $today->addDays(30)->toDateString()));
+        $this->blocks['agenda'] = $this->ready('Filing, renewal and review dates in the next 30 days', null, array_map($describe, array_slice($upcoming, 0, 6)), count($upcoming))
+            + ['empty' => 'Nothing is due in your areas in the next 30 days.'];
     }
 
     private function governance(): void

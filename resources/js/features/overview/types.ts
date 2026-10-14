@@ -53,6 +53,8 @@ export interface Row {
     label: string;
     detail?: string;
     value?: number | null;
+    /** Shown in place of the value, e.g. "$1,960" or "104%". */
+    display?: string;
     target?: number;
     href?: string;
     date?: string | null;
@@ -94,7 +96,10 @@ export interface BlockData {
     headline?: string;
     seriesLabel?: string;
     comparisonLabel?: string;
-    unit?: '%';
+    /** '%' for shares; 'NZD' for money (whole dollars). */
+    unit?: '%' | 'NZD';
+    /** Trend points are days unless the series is monthly. */
+    interval?: 'day' | 'month';
     presentation?:
         | 'progress-rows'
         | 'links'
@@ -198,9 +203,19 @@ export interface OverviewProps {
         value: Omit<Layout, 'blocks'> & { blocks: BlockLayout[] | null };
         revision: string | null;
     };
+    /** Block ids the role opens with, when the server picks them (Business support). */
+    defaultLayout?: string[];
 }
 
-export function defaultBlocks(role: Role): BlockLayout[] {
+export function defaultBlocks(role: Role, ids?: string[]): BlockLayout[] {
+    // Business support opens with blocks chosen from the person's areas.
+    if (role === 'office' && ids?.length)
+        return ids.flatMap((id) => {
+            const meta = catalog[role].blocks.find((b) => b.id === id);
+            return meta
+                ? [{ id, span: meta.span, height: 0, site: 'page' }]
+                : [];
+        });
     const defaults = catalog[role].blocks.slice(0, 6);
     if (role === 'hr') [defaults[2], defaults[4]] = [defaults[4], defaults[2]];
     return defaults.map((b, i) => ({

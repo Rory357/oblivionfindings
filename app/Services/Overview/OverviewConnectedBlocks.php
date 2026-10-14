@@ -2,7 +2,10 @@
 
 namespace App\Services\Overview;
 
+use App\Domain\Finance\Models\FinBill;
 use App\Domain\Governance\Models\ActionItem;
+use App\Domain\Governance\Models\ComplianceObligation;
+use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Domain\Governance\Services\GovernanceRecordAccessService;
 use App\Domain\Hr\Models\HrCompetencyAssessment;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
@@ -145,6 +148,19 @@ final class OverviewConnectedBlocks
             $tickets = app(ItWorkAccessService::class)->applyViewScope(ItTicket::query(), $user)
                 ->whereIn('site_id', $siteIds)->whereNull('merged_into_ticket_id');
             $this->changes($tickets, 'Service request', '/it');
+        }
+        if ($role === 'office') {
+            // Business support: changes to the organisation-wide records its summaries count.
+            if ($user->canDo('finance.dashboard')) {
+                $bills = FinBill::query()->when($user->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id));
+                $this->changes($bills, 'Bill', $user->canDo('finance.ap.view') ? '/finance/bills' : '/finance');
+            }
+            if ($user->canDo('compliance.view')) {
+                $this->changes(ComplianceObligation::query(), 'Compliance obligation', '/compliance');
+            }
+            if ($user->canDo('governance.risks.view')) {
+                $this->changes(RiskRegisterEntry::query(), 'Risk', '/governance/risks');
+            }
         }
         $plans = app(OverviewPlans::class);
         foreach (OverviewPlanDefinitions::all() as $kind => $definition) {

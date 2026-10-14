@@ -98,7 +98,9 @@ afterEach(() => vi.unstubAllGlobals());
 const layoutWrites = () =>
     vi
         .mocked(fetch)
-        .mock.calls.filter(([url]) => String(url).startsWith('/dashboard/layout'));
+        .mock.calls.filter(([url]) =>
+            String(url).startsWith('/dashboard/layout'),
+        );
 
 describe('overview arrangements', () => {
     it('shows independent progress measures without adding overlapping counts into a donut', () => {
@@ -279,9 +281,7 @@ describe('overview arrangements', () => {
                 .map((td) => td.textContent),
         ).toEqual(['No data yet', 'No data yet']);
         // No hidden keyboard stop inside the chart image.
-        expect(
-            document.querySelector('.ov-area [tabindex="0"]'),
-        ).toBeNull();
+        expect(document.querySelector('.ov-area [tabindex="0"]')).toBeNull();
     });
     it('keeps team work destinations separate and library previews non-interactive', () => {
         const data = {
@@ -1253,5 +1253,120 @@ describe('overview audit fixes (14 Oct 2026)', () => {
         expect(
             screen.queryByRole('button', { name: 'Save layout' }),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('business support overview (14 Oct 2026)', () => {
+    const meta = (id: string) =>
+        catalog.office.blocks.find((block) => block.id === id)!;
+
+    it('opens with the blocks the server picks from the person’s areas', () => {
+        expect(
+            defaultBlocks('office', [
+                'attention',
+                'focus',
+                'office-payroll',
+                'office-bills',
+                'not-a-block',
+            ]),
+        ).toEqual([
+            { id: 'attention', span: 8, height: 0, site: 'page' },
+            { id: 'focus', span: 4, height: 0, site: 'page' },
+            { id: 'office-payroll', span: 6, height: 0, site: 'page' },
+            { id: 'office-bills', span: 6, height: 0, site: 'page' },
+        ]);
+        // Other roles keep their catalog defaults.
+        expect(defaultBlocks('it', ['office-bills'])[0].id).toBe('attention');
+    });
+
+    it('shows money in and out by month in NZ dollars, in the chart figures too', () => {
+        render(
+            <BlockContent
+                meta={meta('trend')}
+                data={{
+                    state: 'ready',
+                    subtitle: 'Posted income and spending',
+                    title: 'Money in and out',
+                    seriesLabel: 'Money in',
+                    comparisonLabel: 'Money out',
+                    unit: 'NZD',
+                    interval: 'month',
+                    rows: [],
+                    total: null,
+                    series: [
+                        {
+                            label: '2026-08-01',
+                            value: 425800,
+                            comparison: 409900,
+                        },
+                        {
+                            label: '2026-09-01',
+                            value: 428100,
+                            comparison: 414300,
+                        },
+                    ],
+                }}
+            />,
+        );
+        expect(screen.getByText('NZ dollars')).toBeInTheDocument();
+        const table = screen.getByRole('table');
+        expect(within(table).getByText('Month')).toBeInTheDocument();
+        expect(within(table).getByText('September 2026')).toBeInTheDocument();
+        expect(within(table).getByText('$428,100')).toBeInTheDocument();
+        expect(within(table).getByText('$414,300')).toBeInTheDocument();
+    });
+
+    it('labels money in breakdowns and rows with their dollar amounts', () => {
+        const { rerender } = render(
+            <BlockContent
+                meta={meta('distribution')}
+                data={{
+                    state: 'ready',
+                    subtitle: 'Unpaid invoices',
+                    unit: 'NZD',
+                    total: 86440,
+                    series: [],
+                    rows: [
+                        { label: 'Current', value: 48200, display: '$48,200' },
+                        {
+                            label: 'Over 90 days',
+                            value: 38240,
+                            display: '$38,240',
+                        },
+                    ],
+                }}
+            />,
+        );
+        expect(screen.getByText('$48,200')).toBeInTheDocument();
+        expect(screen.getByText('$86,440 in total')).toBeInTheDocument();
+        expect(screen.getByRole('img')).toHaveAccessibleName(
+            'Current: $48,200, Over 90 days: $38,240',
+        );
+        rerender(
+            <BlockContent
+                meta={meta('office-cash')}
+                data={{
+                    state: 'ready',
+                    subtitle: 'Cash in active bank accounts',
+                    total: 2,
+                    series: [],
+                    rows: [
+                        {
+                            label: 'Cash on hand',
+                            value: 612400,
+                            display: '$612,400',
+                        },
+                        {
+                            label: 'Days it covers',
+                            value: 46,
+                            display: '46 days',
+                        },
+                    ],
+                }}
+            />,
+        );
+        expect(screen.getByText('$612,400')).toBeInTheDocument();
+        expect(screen.getByText('46 days')).toBeInTheDocument();
+        expect(screen.queryByText('612400')).not.toBeInTheDocument();
     });
 });

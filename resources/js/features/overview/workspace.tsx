@@ -72,6 +72,7 @@ import {
     ArrowUp,
     ArrowUpRight,
     BookOpen,
+    BriefcaseBusiness,
     Building2,
     CalendarDays,
     Check,
@@ -116,6 +117,7 @@ import {
     BlockSketch,
     ConnectionHistoryStrip,
     OverviewDetailContext,
+    formatAmount,
 } from './block-content';
 import {
     catalog,
@@ -602,6 +604,7 @@ function Workspace({
     filters,
     overview,
     preference,
+    defaultLayout,
 }: OverviewProps) {
     const roleMeta = useMemo(
         () => ({
@@ -627,7 +630,7 @@ function Workspace({
     const initial = {
         ...preference.value,
         range: filters.range,
-        blocks: preference.value.blocks ?? defaultBlocks(role),
+        blocks: preference.value.blocks ?? defaultBlocks(role, defaultLayout),
     };
     const [saved, setSaved] = useState<Layout>(initial);
     const [draft, setDraft] = useState<Layout | null>(null);
@@ -927,7 +930,7 @@ function Workspace({
         const latest = {
             ...conflict.value,
             range: filters.range,
-            blocks: conflict.value.blocks ?? defaultBlocks(role),
+            blocks: conflict.value.blocks ?? defaultBlocks(role, defaultLayout),
         };
         setSaved(latest);
         setRevision(conflict.revision);
@@ -1140,6 +1143,7 @@ function Workspace({
         hr: '/hr/analytics',
         it: '/it',
         governance: '/governance/dashboard',
+        office: '/tasks',
     }[role];
     const primaryLabel = {
         worker: 'Open My Day',
@@ -1148,6 +1152,7 @@ function Workspace({
         hr: 'Review HR work',
         it: 'Open service desk',
         governance: 'Board workspace',
+        office: 'Open my areas',
     }[role];
     const previewMeta = roleMeta.blocks.find((b) => b.id === previewId);
     const titleOf = (id: string | number) =>
@@ -1183,6 +1188,7 @@ function Workspace({
                         hr: ContactRound,
                         it: MonitorCog,
                         governance: Landmark,
+                        office: BriefcaseBusiness,
                     }[role]
                 }
                 title="Overview"
@@ -1571,7 +1577,10 @@ function Workspace({
                                 change(
                                     {
                                         ...current,
-                                        blocks: defaultBlocks(role),
+                                        blocks: defaultBlocks(
+                                            role,
+                                            defaultLayout,
+                                        ),
                                         density: 'balanced',
                                     },
                                     'Role defaults restored to your draft',
@@ -1978,7 +1987,13 @@ function Workspace({
                                                 data.total ? (
                                                     <>
                                                         <strong>
-                                                            {data.total}
+                                                            {data.unit === 'NZD'
+                                                                ? formatAmount(
+                                                                      data.total,
+                                                                      'NZD',
+                                                                      true,
+                                                                  )
+                                                                : data.total}
                                                         </strong>
                                                         <span>
                                                             {data.rows
@@ -1993,7 +2008,8 @@ function Workspace({
                                                                             r.label
                                                                         }{' '}
                                                                         <b>
-                                                                            {r.value ??
+                                                                            {r.display ??
+                                                                                r.value ??
                                                                                 '→'}
                                                                         </b>
                                                                     </i>
@@ -2014,7 +2030,14 @@ function Workspace({
                                                                   ? 'Temporarily unavailable'
                                                                   : data?.state ===
                                                                       'ready'
-                                                                    ? 'Nothing recorded yet'
+                                                                    ? data.series.some(
+                                                                          (p) =>
+                                                                              (p.value ??
+                                                                                  0) >
+                                                                              0,
+                                                                      )
+                                                                        ? 'Open the preview to see the chart'
+                                                                        : 'Nothing recorded yet'
                                                                     : data?.state ===
                                                                         'deferred'
                                                                       ? 'Loading preview…'

@@ -73,8 +73,10 @@ function RowContent({ row }: { row: Row }) {
                         row.target !== undefined ? row.detail : undefined
                     }
                 >
-                    {row.value}
-                    {row.target !== undefined ? ` / ${row.target}` : ''}
+                    {row.display ?? row.value}
+                    {row.target !== undefined && row.display === undefined
+                        ? ` / ${row.target}`
+                        : ''}
                 </b>
             )}
             {row.status && (
@@ -290,6 +292,36 @@ export function ConnectionHistoryStrip({ row }: { row: Row }) {
             </span>
         </>
     );
+}
+
+/** A chart figure with its unit: 48% or $48,200 ($48.2K on an axis). */
+export function formatAmount(
+    value: number,
+    unit?: BlockData['unit'],
+    compact = false,
+): string {
+    if (unit !== 'NZD') return `${value}${unit ?? ''}`;
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+        currencyDisplay: 'narrowSymbol',
+        notation: compact ? 'compact' : 'standard',
+        maximumFractionDigits: compact ? 1 : 0,
+    }).format(value);
+}
+
+/** A chart point's label: a day, or a month for monthly series. */
+function pointLabel(
+    label: string,
+    interval?: BlockData['interval'],
+    short = false,
+): string {
+    if (interval === 'month')
+        return new Intl.DateTimeFormat('en-NZ', {
+            month: short ? 'short' : 'long',
+            ...(short ? {} : { year: 'numeric' as const }),
+        }).format(new Date(`${label.slice(0, 10)}T12:00:00`));
+    return short ? formatDate(label).split(' ')[0] : formatDate(label);
 }
 
 export function BlockContent({
@@ -1240,7 +1272,11 @@ export function BlockContent({
                             {data.comparisonLabel}
                         </span>
                     )}
-                    {data.unit && <small>Share ({data.unit})</small>}
+                    {data.unit && (
+                        <small>
+                            {data.unit === 'NZD' ? 'NZ dollars' : 'Share (%)'}
+                        </small>
+                    )}
                 </div>
                 <div
                     className="ov-area"
@@ -1259,7 +1295,8 @@ export function BlockContent({
                             margin={{
                                 top: 10,
                                 right: 12,
-                                left: -20,
+                                // Dollar labels ($450K) need the axis room.
+                                left: data.unit === 'NZD' ? 0 : -20,
                                 bottom: 0,
                             }}
                         >
@@ -1291,9 +1328,11 @@ export function BlockContent({
                             <XAxis
                                 dataKey="label"
                                 tickFormatter={(v) =>
-                                    data.series.length <= 7
-                                        ? formatDate(v).split(' ')[0]
-                                        : formatDate(v)
+                                    pointLabel(
+                                        v,
+                                        data.interval,
+                                        data.series.length <= 7,
+                                    )
                                 }
                                 axisLine={false}
                                 tickLine={false}
@@ -1308,7 +1347,7 @@ export function BlockContent({
                                     data.unit === '%' ? [0, 100] : undefined
                                 }
                                 tickFormatter={(value) =>
-                                    `${value}${data.unit ?? ''}`
+                                    formatAmount(value, data.unit, true)
                                 }
                                 allowDecimals={false}
                                 axisLine={false}
@@ -1319,11 +1358,16 @@ export function BlockContent({
                                 }}
                             />
                             <Tooltip
-                                labelFormatter={(v) => formatDate(String(v))}
+                                labelFormatter={(v) =>
+                                    pointLabel(String(v), data.interval)
+                                }
                                 formatter={(value, name) => [
                                     value == null
                                         ? 'No data'
-                                        : `${value}${data.unit ?? ''}`,
+                                        : formatAmount(
+                                              Number(value),
+                                              data.unit,
+                                          ),
                                     name,
                                 ]}
                                 contentStyle={{
@@ -1374,13 +1418,15 @@ export function BlockContent({
                                     (p) => p.label === selectedDate,
                                 );
                                 if (!point)
-                                    return 'Select a date on the chart to see its figures.';
+                                    return data.interval === 'month'
+                                        ? 'Select a month on the chart to see its figures.'
+                                        : 'Select a date on the chart to see its figures.';
                                 if (
                                     data.unit === '%' &&
                                     point.planned !== undefined
                                 )
                                     return `${formatDate(point.label)} · ${point.value === null ? 'No ended shifts yet' : `${point.value}% delivered · ${point.completed} of ${point.planned} planned shifts`}`;
-                                return `${formatDate(point.label)} · ${data.seriesLabel ?? 'Recorded'}: ${point.value === null ? 'No data yet' : `${point.value}${data.unit ?? ''}`}${data.comparisonLabel ? ` · ${data.comparisonLabel}: ${point.comparison == null ? 'No data yet' : `${point.comparison}${data.unit ?? ''}`}` : ''}`;
+                                return `${pointLabel(point.label, data.interval)} · ${data.seriesLabel ?? 'Recorded'}: ${point.value === null ? 'No data yet' : formatAmount(point.value, data.unit)}${data.comparisonLabel ? ` · ${data.comparisonLabel}: ${point.comparison == null ? 'No data yet' : formatAmount(point.comparison, data.unit)}` : ''}`;
                             })()}
                         </p>
                     </div>
@@ -1394,7 +1440,11 @@ export function BlockContent({
                             </caption>
                             <thead>
                                 <tr>
-                                    <th scope="col">Date</th>
+                                    <th scope="col">
+                                        {data.interval === 'month'
+                                            ? 'Month'
+                                            : 'Date'}
+                                    </th>
                                     <th scope="col">
                                         {data.seriesLabel ?? 'Recorded'}
                                     </th>
@@ -1414,18 +1464,24 @@ export function BlockContent({
                                 {data.series.map((p) => (
                                     <tr key={p.label}>
                                         <th scope="row">
-                                            {formatDate(p.label)}
+                                            {pointLabel(p.label, data.interval)}
                                         </th>
                                         <td>
                                             {p.value === null
                                                 ? 'No data yet'
-                                                : `${p.value}${data.unit ?? ''}`}
+                                                : formatAmount(
+                                                      p.value,
+                                                      data.unit,
+                                                  )}
                                         </td>
                                         {data.comparisonLabel && (
                                             <td>
                                                 {p.comparison == null
                                                     ? 'No data yet'
-                                                    : `${p.comparison}${data.unit ?? ''}`}
+                                                    : formatAmount(
+                                                          p.comparison,
+                                                          data.unit,
+                                                      )}
                                             </td>
                                         )}
                                         {data.series.some(
@@ -1462,7 +1518,10 @@ export function BlockContent({
                         aria-label={
                             total
                                 ? values
-                                      .map((r) => `${r.label}: ${r.value}`)
+                                      .map(
+                                          (r) =>
+                                              `${r.label}: ${r.display ?? r.value}`,
+                                      )
                                       .join(', ')
                                 : 'No records in this breakdown'
                         }
@@ -1528,13 +1587,17 @@ export function BlockContent({
                                     }}
                                 />
                                 <span>{r.label}</span>
-                                <b>{r.value}</b>
+                                <b>{r.display ?? r.value}</b>
                             </div>
                         ))}
                     </div>
                 </div>
                 <div className="ov-breakdown-total">
-                    <span>{total} in this breakdown</span>
+                    <span>
+                        {data.unit === 'NZD'
+                            ? `${formatAmount(total, 'NZD')} in total`
+                            : `${total} in this breakdown`}
+                    </span>
                     {!preview && data.href && (
                         <Link href={data.href}>
                             Explore <ArrowUpRight size={13} />
@@ -1689,11 +1752,12 @@ export function BlockContent({
                             <div className="ov-between">
                                 <strong>{r.label}</strong>
                                 <b>
-                                    {r.target !== undefined
-                                        ? r.target
-                                            ? `${Math.round(((r.value ?? 0) / r.target) * 100)}%`
-                                            : '—'
-                                        : r.value}
+                                    {r.display ??
+                                        (r.target !== undefined
+                                            ? r.target
+                                                ? `${Math.round(((r.value ?? 0) / r.target) * 100)}%`
+                                                : '—'
+                                            : r.value)}
                                 </b>
                             </div>
                             <div className="ov-track">
