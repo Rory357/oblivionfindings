@@ -511,3 +511,15 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Gates: 168 + 193 passed, vitest 113, eslint 0. tsc only shows main's known errors, since fixed.
   - **Lane B next:** EA-106 correction delegation.
 - **Lane C's last batch:** every group is green apart from the stale emarWidgets tests, which fail on main too (proved). Lane C is also fixing MedicationNzCalendarTest, which still posts to the import route C3c retired.
+- **15 Oct: Lane C's last batch LIVE: merge `1c77a0115`.**
+  - C7: NZ-day reports, and every dose reaches the P09 chain.
+  - C10: the orphan dose writers are retired and about 20k lines of unrouted legacy medication code are removed.
+  - C9f–h: MAR by house with allergies, the person-record filters and the witness view.
+  - Test-only: the emarWidgets tests now assert the Overview shows no medication data, and the NZ calendar test no longer uses the retired import.
+  - Gates: all green (Pest 133/60/55/171/91/45/55, vitest 137/230, tsc 0, eslint 0).
+  - **Next for Lane C:** the 1440 screenshot walk against the mockups.
+- **Lane A A5–A9:** 2 reds.
+  - A real leak: a stopped order's pre-stop dose answers 403 instead of 404 to an unreachable worker.
+  - A race-timing test.
+  - Lane A is fixing both and rebasing onto 1c77a0115 because of the C10 overlap.
+- **Lane B EA-106:** 1 red, the 404 body not identical. Lane B is fixing it and merging main because of the C10 overlap in MedicationsApiController.
