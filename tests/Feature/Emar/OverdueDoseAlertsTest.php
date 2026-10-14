@@ -401,7 +401,9 @@ class OverdueDoseAlertsTest extends TestCase
     {
         // P11 B2: who is told comes from Medication Settings — for overdue
         // doses, everyone rostered on a covering shift and the house lead
-        // (Stephan's decision, locked on).
+        // (Stephan's decision, locked on). EA-015: only people who can open
+        // Aroha's record are told, so the rostered worker is on shift for her
+        // as a real one is — clocked in on the shift that names her.
         $worker = $this->staff();
         Shift::factory()->create([
             'client_id' => $this->aroha->id,
@@ -409,6 +411,7 @@ class OverdueDoseAlertsTest extends TestCase
             'user_id' => $worker->id,
             'starts_at' => $this->nz('2026-06-15 07:00'),
             'ends_at' => $this->nz('2026-06-15 15:00'),
+            'actual_starts_at' => $this->nz('2026-06-15 07:00'),
             'status' => 'in_progress',
         ]);
 
