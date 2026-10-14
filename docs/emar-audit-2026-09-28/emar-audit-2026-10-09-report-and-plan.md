@@ -505,3 +505,9 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
     - 5 eMAR tests that read emarWidgets are red on main. Lane C is updating them to assert the Overview carries no medication data.
     - **For Stephan:** the home Overview no longer shows medication "due now" or alert counts.
   - **Memory:** free RAM fell to about 1 GB at 06:45. ChatGPT and Codex use about 6 GB, plus about 4 GB of Codex node helpers. Main archived the finished destructive-alerts session.
+- **Lane B UI markers LIVE: merge `55820fb7e`.**
+  - EA-025: "Prescriber request waiting" on Orders rows and on the person's MAR. People who decide requests get a link to Connected care.
+  - EA-138: a send-state chip on Pharmacy orders rows.
+  - Gates: 168 + 193 passed, vitest 113, eslint 0. tsc only shows main's known errors, since fixed.
+  - **Lane B next:** EA-106 correction delegation.
+- **Lane C's last batch:** every group is green apart from the stale emarWidgets tests, which fail on main too (proved). Lane C is also fixing MedicationNzCalendarTest, which still posts to the import route C3c retired.
