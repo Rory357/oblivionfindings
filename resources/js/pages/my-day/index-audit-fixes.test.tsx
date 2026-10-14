@@ -94,10 +94,6 @@ vi.mock('./components/tomorrow-panel', () => ({
     TomorrowPanel: () => <section data-testid="tomorrow" />,
 }));
 
-vi.mock('./components/stream-context-menu', () => ({
-    StreamContextMenu: () => null,
-}));
-
 vi.mock('./components/date-popover', () => ({
     DatePopover: () => null,
 }));

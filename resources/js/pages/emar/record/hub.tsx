@@ -5,6 +5,7 @@ import { DosePicker } from '@/components/emar/record/record-dose-launch';
 import { RecordTable } from '@/components/emar/record/record-table';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { EmptyValue, ProgressValue } from '@/components/lists/entity-cells';
+import { ListCaption } from '@/components/lists/list-caption';
 import {
     PageHeader,
     PageHeaderFilterButton,
@@ -51,6 +52,14 @@ type Row = SecondPersonEvidence & {
     client_id: number;
     person: string;
     house: string | null;
+    /** MAR charts: the person's house, for the per-house groups. */
+    house_id?: number | null;
+    /** MAR charts: the person's allergy record (EA-111, approved P02). */
+    allergy?: {
+        status: 'recorded' | 'no_known' | 'none' | 'unavailable';
+        count: number;
+        reviewed: boolean;
+    };
     href: string;
     name?: string;
     dosage?: string | null;
@@ -117,6 +126,8 @@ type Props = {
     controlled_left_out: boolean;
     can_report: boolean;
     coverage: { complete: boolean; notice: string | null };
+    /** MAR charts: people per house across every page. */
+    house_counts?: Record<string, number>;
 };
 const PATHS = {
     charts: '/emar/mar',
@@ -227,6 +238,269 @@ export default function MedicationRecordHub(props: Props) {
     const personFilterName =
         rows.find((row) => row.client_id === props.filters.client_id)?.person ??
         'One person';
+    // Rows arrive sorted by house, then name; keep each house together.
+    const houseGroups = rows.reduce<
+        { key: string; name: string; total?: number; rows: Row[] }[]
+    >((groups, row) => {
+        const key = String(row.house_id ?? 'none');
+        const last = groups[groups.length - 1];
+        if (last?.key === key) last.rows.push(row);
+        else
+            groups.push({
+                key,
+                name: row.house ?? 'No house recorded',
+                total: props.house_counts?.[key],
+                rows: [row],
+            });
+        return groups;
+    }, []);
+    // EA-111 (Lane C9g): one table per house on MAR charts (approved P02).
+    const table = (tableRows: Row[]) => (
+        <RecordTable
+            rows={tableRows}
+            rowKey={(row) => row.key}
+            identityLabel={props.view === 'charts' ? 'Person' : 'Medicine'}
+            minWidth={props.view === 'charts' ? 850 : 1000}
+            rowHeight="content"
+            wrapIdentity
+            identity={(row) => ({
+                icon: props.view === 'charts' ? Users : Pill,
+                name:
+                    props.view === 'charts'
+                        ? row.person
+                        : (row.name ?? 'Recorded medicine'),
+                subline:
+                    props.view === 'charts'
+                        ? (row.house ?? 'No house recorded')
+                        : `${row.person} · ${row.house ?? 'No house recorded'}`,
+                extra:
+                    row.state === 'awaiting' ? (
+                        <StatusBadge variant="info">
+                            Waiting for order check
+                        </StatusBadge>
+                    ) : undefined,
+            })}
+            hrefFor={(row) => row.href}
+            onOpen={(row) => router.visit(row.href)}
+            columns={
+                props.view === 'charts'
+                    ? [
+                          {
+                              key: 'due',
+                              label: 'Due now',
+                              width: '0.7fr',
+                              cell: (row) =>
+                                  row.due ? (
+                                      <StatusBadge variant="neutral">
+                                          {row.due}
+                                      </StatusBadge>
+                                  ) : (
+                                      <EmptyValue />
+                                  ),
+                          },
+                          {
+                              key: 'late',
+                              label: 'Late',
+                              width: '0.6fr',
+                              cell: (row) =>
+                                  row.overdue ? (
+                                      <StatusBadge variant="warning">
+                                          {row.overdue}
+                                      </StatusBadge>
+                                  ) : (
+                                      <EmptyValue />
+                                  ),
+                          },
+                          {
+                              key: 'help',
+                              label: 'Needs help',
+                              width: '1.7fr',
+                              cell: (row) =>
+                                  row.help ? (
+                                      <span className="flex items-center gap-2">
+                                          <StatusBadge variant="critical">
+                                              {row.help}
+                                          </StatusBadge>
+                                          <span className="text-caption whitespace-normal">
+                                              {row.help_reason}
+                                          </span>
+                                      </span>
+                                  ) : (
+                                      <EmptyValue />
+                                  ),
+                          },
+                          {
+                              key: 'recorded',
+                              label:
+                                  props.filters.date === props.today
+                                      ? 'Recorded today'
+                                      : 'Recorded',
+                              width: '1.1fr',
+                              cell: (row) =>
+                                  row.so_far ? (
+                                      <ProgressValue
+                                          percent={
+                                              (100 * (row.recorded ?? 0)) /
+                                              row.so_far
+                                          }
+                                          tone={
+                                              row.recorded === row.so_far
+                                                  ? 'success'
+                                                  : 'brand'
+                                          }
+                                      >
+                                          {row.recorded ?? 0} of {row.so_far}
+                                      </ProgressValue>
+                                  ) : (
+                                      <span className="text-caption text-muted-foreground">
+                                          n/a — none due yet
+                                      </span>
+                                  ),
+                          },
+                          {
+                              key: 'next',
+                              label: 'Next due',
+                              width: '1.1fr',
+                              cell: (row) => row.next ?? <EmptyValue />,
+                          },
+                          {
+                              key: 'allergies',
+                              label: 'Allergies',
+                              width: '1fr',
+                              cell: (row) => (
+                                  <AllergyCell allergy={row.allergy} />
+                              ),
+                          },
+                      ]
+                    : props.view === 'medicines'
+                      ? [
+                            {
+                                key: 'dose',
+                                label: 'Dose',
+                                width: '1fr',
+                                cell: (row) =>
+                                    `${row.dosage ?? 'Not recorded'} · ${row.route ?? 'route not recorded'}`,
+                            },
+                            {
+                                key: 'when',
+                                label: 'When',
+                                width: '1.5fr',
+                                cell: (row) => row.when ?? 'As needed',
+                            },
+                            {
+                                key: 'support',
+                                label: 'Staff support',
+                                width: '1fr',
+                                cell: (row) => row.support ?? 'Administer',
+                            },
+                            {
+                                key: 'state',
+                                label: 'Order',
+                                width: '1fr',
+                                cell: (row) => (
+                                    <StatusBadge
+                                        variant={
+                                            row.state === 'awaiting'
+                                                ? 'info'
+                                                : 'neutral'
+                                        }
+                                    >
+                                        {row.state === 'awaiting'
+                                            ? 'Waiting for order check'
+                                            : (row.state ?? 'Recorded')}
+                                    </StatusBadge>
+                                ),
+                            },
+                        ]
+                      : [
+                            {
+                                key: 'at',
+                                label: 'Given at',
+                                width: '1.5fr',
+                                cell: (row) => formatDateTime(row.at),
+                            },
+                            {
+                                key: 'dose',
+                                label: 'Dose / reason',
+                                width: '2fr',
+                                cell: (row) =>
+                                    `${row.dose ?? 'Not recorded'} · ${row.reason ?? 'reason not recorded'}`,
+                            },
+                            {
+                                key: 'by',
+                                label: 'Recorded by',
+                                width: '1fr',
+                                cell: (row) => row.by ?? 'Not recorded',
+                            },
+                            {
+                                key: 'second-person',
+                                label: 'Second-person check',
+                                width: '1.5fr',
+                                cell: (row) => {
+                                    const check = secondPersonDisplay(row);
+                                    return check ? (
+                                        <span>
+                                            <StatusBadge variant={check.tone}>
+                                                {check.label}
+                                            </StatusBadge>
+                                            <span className="text-caption mt-1 block">
+                                                {check.detail}
+                                            </span>
+                                        </span>
+                                    ) : (
+                                        '—'
+                                    );
+                                },
+                            },
+                            {
+                                key: 'effect',
+                                label: 'Effect check',
+                                width: '2fr',
+                                cell: (row) => (
+                                    <>
+                                        <StatusBadge
+                                            variant={
+                                                row.effect_status === 'recorded'
+                                                    ? 'success'
+                                                    : 'warning'
+                                            }
+                                        >
+                                            {row.effect_status === 'recorded'
+                                                ? 'Recorded'
+                                                : 'No effect check recorded'}
+                                        </StatusBadge>
+                                        {row.effect && (
+                                            <p className="text-caption mt-1">
+                                                {row.effect}
+                                            </p>
+                                        )}
+                                    </>
+                                ),
+                            },
+                        ]
+            }
+            actionsFor={(row) =>
+                props.view === 'charts'
+                    ? chartActions(row)
+                    : [
+                          {
+                              label: 'Open medication record',
+                              icon: ClipboardList,
+                              onClick: () => router.visit(row.href),
+                          },
+                          ...(props.view === 'asneeded' && row.can_record
+                              ? [
+                                    {
+                                        label: 'Record effect check',
+                                        icon: History,
+                                        onClick: () => setEffectDose(row.id),
+                                    },
+                                ]
+                              : []),
+                      ]
+            }
+        />
+    );
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${title} · MAR & medicines`} />
@@ -512,275 +786,31 @@ export default function MedicationRecordHub(props: Props) {
                             {props.page.total} ·{' '}
                             {props.view === 'asneeded'
                                 ? 'newest first'
-                                : 'alphabetical'}
+                                : props.view === 'charts'
+                                  ? 'by house, then name'
+                                  : 'alphabetical'}
                         </p>
                     </div>
                     {rows.length ? (
-                        <RecordTable
-                            rows={rows}
-                            rowKey={(row) => row.key}
-                            identityLabel={
-                                props.view === 'charts' ? 'Person' : 'Medicine'
-                            }
-                            minWidth={props.view === 'charts' ? 850 : 1000}
-                            rowHeight="content"
-                            wrapIdentity
-                            identity={(row) => ({
-                                icon: props.view === 'charts' ? Users : Pill,
-                                name:
-                                    props.view === 'charts'
-                                        ? row.person
-                                        : (row.name ?? 'Recorded medicine'),
-                                subline:
-                                    props.view === 'charts'
-                                        ? (row.house ?? 'No house recorded')
-                                        : `${row.person} · ${row.house ?? 'No house recorded'}`,
-                                extra:
-                                    row.state === 'awaiting' ? (
-                                        <StatusBadge variant="info">
-                                            Waiting for order check
-                                        </StatusBadge>
-                                    ) : undefined,
-                            })}
-                            hrefFor={(row) => row.href}
-                            onOpen={(row) => router.visit(row.href)}
-                            columns={
-                                props.view === 'charts'
-                                    ? [
-                                          {
-                                              key: 'due',
-                                              label: 'Due now',
-                                              width: '0.7fr',
-                                              cell: (row) =>
-                                                  row.due ? (
-                                                      <StatusBadge variant="neutral">
-                                                          {row.due}
-                                                      </StatusBadge>
-                                                  ) : (
-                                                      <EmptyValue />
-                                                  ),
-                                          },
-                                          {
-                                              key: 'late',
-                                              label: 'Late',
-                                              width: '0.6fr',
-                                              cell: (row) =>
-                                                  row.overdue ? (
-                                                      <StatusBadge variant="warning">
-                                                          {row.overdue}
-                                                      </StatusBadge>
-                                                  ) : (
-                                                      <EmptyValue />
-                                                  ),
-                                          },
-                                          {
-                                              key: 'help',
-                                              label: 'Needs help',
-                                              width: '1.7fr',
-                                              cell: (row) =>
-                                                  row.help ? (
-                                                      <span className="flex items-center gap-2">
-                                                          <StatusBadge variant="critical">
-                                                              {row.help}
-                                                          </StatusBadge>
-                                                          <span className="text-caption whitespace-normal">
-                                                              {row.help_reason}
-                                                          </span>
-                                                      </span>
-                                                  ) : (
-                                                      <EmptyValue />
-                                                  ),
-                                          },
-                                          {
-                                              key: 'recorded',
-                                              label:
-                                                  props.filters.date ===
-                                                  props.today
-                                                      ? 'Recorded today'
-                                                      : 'Recorded',
-                                              width: '1.1fr',
-                                              cell: (row) =>
-                                                  row.so_far ? (
-                                                      <ProgressValue
-                                                          percent={
-                                                              (100 *
-                                                                  (row.recorded ??
-                                                                      0)) /
-                                                              row.so_far
-                                                          }
-                                                          tone={
-                                                              row.recorded ===
-                                                              row.so_far
-                                                                  ? 'success'
-                                                                  : 'brand'
-                                                          }
-                                                      >
-                                                          {row.recorded ?? 0} of{' '}
-                                                          {row.so_far}
-                                                      </ProgressValue>
-                                                  ) : (
-                                                      <span className="text-caption text-muted-foreground">
-                                                          n/a — none due yet
-                                                      </span>
-                                                  ),
-                                          },
-                                          {
-                                              key: 'next',
-                                              label: 'Next due',
-                                              width: '1.1fr',
-                                              cell: (row) =>
-                                                  row.next ?? <EmptyValue />,
-                                          },
-                                      ]
-                                    : props.view === 'medicines'
-                                      ? [
-                                            {
-                                                key: 'dose',
-                                                label: 'Dose',
-                                                width: '1fr',
-                                                cell: (row) =>
-                                                    `${row.dosage ?? 'Not recorded'} · ${row.route ?? 'route not recorded'}`,
-                                            },
-                                            {
-                                                key: 'when',
-                                                label: 'When',
-                                                width: '1.5fr',
-                                                cell: (row) =>
-                                                    row.when ?? 'As needed',
-                                            },
-                                            {
-                                                key: 'support',
-                                                label: 'Staff support',
-                                                width: '1fr',
-                                                cell: (row) =>
-                                                    row.support ?? 'Administer',
-                                            },
-                                            {
-                                                key: 'state',
-                                                label: 'Order',
-                                                width: '1fr',
-                                                cell: (row) => (
-                                                    <StatusBadge
-                                                        variant={
-                                                            row.state ===
-                                                            'awaiting'
-                                                                ? 'info'
-                                                                : 'neutral'
-                                                        }
-                                                    >
-                                                        {row.state ===
-                                                        'awaiting'
-                                                            ? 'Waiting for order check'
-                                                            : (row.state ??
-                                                              'Recorded')}
-                                                    </StatusBadge>
-                                                ),
-                                            },
-                                        ]
-                                      : [
-                                            {
-                                                key: 'at',
-                                                label: 'Given at',
-                                                width: '1.5fr',
-                                                cell: (row) =>
-                                                    formatDateTime(row.at),
-                                            },
-                                            {
-                                                key: 'dose',
-                                                label: 'Dose / reason',
-                                                width: '2fr',
-                                                cell: (row) =>
-                                                    `${row.dose ?? 'Not recorded'} · ${row.reason ?? 'reason not recorded'}`,
-                                            },
-                                            {
-                                                key: 'by',
-                                                label: 'Recorded by',
-                                                width: '1fr',
-                                                cell: (row) =>
-                                                    row.by ?? 'Not recorded',
-                                            },
-                                            {
-                                                key: 'second-person',
-                                                label: 'Second-person check',
-                                                width: '1.5fr',
-                                                cell: (row) => {
-                                                    const check =
-                                                        secondPersonDisplay(
-                                                            row,
-                                                        );
-                                                    return check ? (
-                                                        <span>
-                                                            <StatusBadge
-                                                                variant={
-                                                                    check.tone
-                                                                }
-                                                            >
-                                                                {check.label}
-                                                            </StatusBadge>
-                                                            <span className="text-caption mt-1 block">
-                                                                {check.detail}
-                                                            </span>
-                                                        </span>
-                                                    ) : (
-                                                        '—'
-                                                    );
-                                                },
-                                            },
-                                            {
-                                                key: 'effect',
-                                                label: 'Effect check',
-                                                width: '2fr',
-                                                cell: (row) => (
-                                                    <>
-                                                        <StatusBadge
-                                                            variant={
-                                                                row.effect_status ===
-                                                                'recorded'
-                                                                    ? 'success'
-                                                                    : 'warning'
-                                                            }
-                                                        >
-                                                            {row.effect_status ===
-                                                            'recorded'
-                                                                ? 'Recorded'
-                                                                : 'No effect check recorded'}
-                                                        </StatusBadge>
-                                                        {row.effect && (
-                                                            <p className="text-caption mt-1">
-                                                                {row.effect}
-                                                            </p>
-                                                        )}
-                                                    </>
-                                                ),
-                                            },
-                                        ]
-                            }
-                            actionsFor={(row) =>
-                                props.view === 'charts'
-                                    ? chartActions(row)
-                                    : [
-                                          {
-                                              label: 'Open medication record',
-                                              icon: ClipboardList,
-                                              onClick: () =>
-                                                  router.visit(row.href),
-                                          },
-                                          ...(props.view === 'asneeded' &&
-                                          row.can_record
-                                              ? [
-                                                    {
-                                                        label: 'Record effect check',
-                                                        icon: History,
-                                                        onClick: () =>
-                                                            setEffectDose(
-                                                                row.id,
-                                                            ),
-                                                    },
-                                                ]
-                                              : []),
-                                      ]
-                            }
-                        />
+                        props.view === 'charts' ? (
+                            <div className="flex flex-col gap-5">
+                                {houseGroups.map((group) => (
+                                    <section
+                                        key={group.key}
+                                        aria-label={group.name}
+                                        className="flex flex-col gap-2.5"
+                                    >
+                                        <ListCaption
+                                            title={group.name}
+                                            caption={`${group.rows.length} of ${group.total ?? group.rows.length} ${(group.total ?? group.rows.length) === 1 ? 'person' : 'people'} shown`}
+                                        />
+                                        {table(group.rows)}
+                                    </section>
+                                ))}
+                            </div>
+                        ) : (
+                            table(rows)
+                        )
                     ) : (
                         <EmptyState
                             icon={Pill}
@@ -825,5 +855,34 @@ export default function MedicationRecordHub(props: Props) {
                 />
             )}
         </AppLayout>
+    );
+}
+
+const ALLERGY_TONE = {
+    recorded: 'critical',
+    no_known: 'neutral',
+    none: 'warning',
+    unavailable: 'warning',
+} as const;
+
+function AllergyCell({ allergy }: { allergy: Row['allergy'] }) {
+    if (!allergy) return <EmptyValue />;
+    return (
+        <span className="flex flex-col items-start gap-0.5">
+            <StatusBadge variant={ALLERGY_TONE[allergy.status]}>
+                {allergy.status === 'recorded'
+                    ? `${allergy.count} recorded`
+                    : allergy.status === 'no_known'
+                      ? 'No known allergies'
+                      : allergy.status === 'none'
+                        ? 'None recorded'
+                        : 'Couldn’t load'}
+            </StatusBadge>
+            {allergy.status !== 'unavailable' && !allergy.reviewed ? (
+                <span className="text-caption text-status-warning">
+                    Not reviewed
+                </span>
+            ) : null}
+        </span>
     );
 }

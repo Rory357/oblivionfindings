@@ -181,7 +181,9 @@ final class MedicationGovernanceScopeService
         }
 
         if ($requestedClientId !== null) {
+            // EA-062 (Lane C7): audit readers can still report on an archived person.
             $client = Client::query()
+                ->when($actor->canDo('medications.audit.view'), fn ($query) => $query->withTrashed())
                 ->whereKey($requestedClientId)
                 ->whereIn('site_id', $siteIds)
                 ->first(['id', 'site_id']);

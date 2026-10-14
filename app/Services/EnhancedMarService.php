@@ -907,8 +907,8 @@ class EnhancedMarService
             if (! $windowCheck['valid']
                 && ($data['status'] ?? null) === 'given'
                 && empty($data['reason'])
-                && empty($data['late_reason'])
-                && ! ($data['override_window'] ?? false)) {
+                // EA-106/EA-151 (Lane C10): no caller can skip this any more.
+                && empty($data['late_reason'])) {
                 return [
                     'success' => false,
                     'error' => 'Outside time window: '.$windowCheck['message'].'. Please provide a reason.',
@@ -1768,6 +1768,22 @@ class EnhancedMarService
                 if ($secondPersonNomination !== null) {
                     $this->forgottenPins->appendEvent($secondPersonNomination, $admin, $userId);
                 }
+                // EA-063 (Lane C7): every dose writer (Meds today, fleet, paper,
+                // guided rounds, the profile MAR) reaches the P09 chain here,
+                // once — an exact replay returned above. A recorder failure
+                // rolls the dose back.
+                app(\App\Services\Medication\Audit\MedicationEventRecorder::class)->append(new \App\Services\Medication\Audit\MedicationEventData(
+                    siteId: (int) $client->site_id,
+                    kind: 'dose.recorded',
+                    subjectType: 'medication_administration',
+                    subjectId: (string) $admin->id,
+                    actorId: (int) $userId,
+                    occurredAt: \Carbon\CarbonImmutable::now('UTC'),
+                    summary: 'Medication dose outcome recorded.',
+                    facts: ['outcome' => $admin->status, 'round_id' => $admin->medication_round_id],
+                    clientId: (int) $client->id,
+                    controlled: (bool) $medication->controlled_drug,
+                ));
 
                 return [
                     'success' => true,

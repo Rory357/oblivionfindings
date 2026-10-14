@@ -80,6 +80,12 @@ const person = (over: Partial<EligPerson> = {}): EligPerson => ({
     days: 160,
     prev_valid: null,
     pin: 'set',
+    pin_set_at: '2026-09-09',
+    witness: {
+        can: false,
+        competency: false,
+        reasons: ['controlled drugs area not passed'],
+    },
     exemption: null,
     assessment: {
         id: 70,
@@ -178,6 +184,12 @@ const pageProps = {
             days: null,
             assessment: null,
             pin: 'not_set',
+            pin_set_at: null,
+            witness: {
+                can: false,
+                competency: false,
+                reasons: ['not assessed', 'no witness PIN set'],
+            },
             can: { assess: true, exempt: true, reset_pin: false },
         }),
         person({
@@ -186,7 +198,37 @@ const pageProps = {
             status: 'due',
             days: 9,
             until: '2026-10-11',
+            witness: { can: true, competency: true, reasons: [] },
         }),
+    ],
+    on_shift: [
+        {
+            id: 3,
+            name: 'Kōwhai House',
+            can_now: 1,
+            people: [
+                {
+                    id: 9,
+                    name: 'Aroha Ngata',
+                    role: 'Support worker',
+                    since: '2026-10-02T07:02:00+13:00',
+                    until: '2026-10-02T15:00:00+13:00',
+                    clocked_in: true,
+                    can_now: true,
+                    reasons: [],
+                },
+                {
+                    id: 7,
+                    name: 'Priya Shah',
+                    role: 'Support worker',
+                    since: '2026-10-02T06:58:00+13:00',
+                    until: null,
+                    clocked_in: true,
+                    can_now: false,
+                    reasons: ['controlled drugs area not passed'],
+                },
+            ],
+        },
     ],
     exemptions: [],
     houses: [{ id: 3, name: 'Kōwhai House' }],
@@ -199,7 +241,7 @@ const pageProps = {
 };
 
 describe('Safety & oversight › Staff eligibility', () => {
-    it('shows the meters, the sub-views as header chips, and no witness view', () => {
+    it('shows the meters, the sub-views as header chips, and the witness view (EA-156)', () => {
         render(<StaffEligibility {...pageProps} />);
         expect(screen.getByText('Safety & oversight')).toBeInTheDocument();
         // The Safety & oversight hub rail, this page as the active tab.
@@ -213,8 +255,30 @@ describe('Safety & oversight › Staff eligibility', () => {
         expect(
             screen.getByText('First: Aroha, 11 Oct 2026'),
         ).toBeInTheDocument();
-        expect(screen.queryByText(/Can witness/)).toBeNull();
-        expect(screen.queryByText(/Witness & PINs/)).toBeNull();
+        // EA-156 (Lane C9h): the Can witness meter and the register's Witness column.
+        expect(screen.getByText('1 of 3')).toBeInTheDocument();
+        expect(
+            screen.getByText('Someone on shift can witness at each house'),
+        ).toBeInTheDocument();
+        expect(screen.getAllByText('Not a witness')).toHaveLength(2);
+        expect(
+            screen.getByText('not assessed · no witness PIN set'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: /^Witnesses & PINs/ }),
+        );
+        expect(
+            screen.getByText('Kōwhai House · on shift now'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('1 can witness')).toBeInTheDocument();
+        expect(
+            screen.getByText('Witness competency and PIN'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('No — controlled drugs area not passed'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('No — not assessed')).toBeInTheDocument();
+        expect(screen.getByText('Not on shift now')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /^Renewals/ }));
         expect(
             screen.getByRole('heading', { name: 'Given competency not met' }),

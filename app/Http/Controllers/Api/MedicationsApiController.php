@@ -951,7 +951,8 @@ class MedicationsApiController extends Controller
         $this->preflightMedicationRecordingTarget($request, $user, $client, $medication);
 
         $data = $request->validate([
-            'status' => ['required', 'in:given,refused,missed,withheld'],
+            // EA-106 (Lane C10): the retired "missed" outcome is no longer accepted here.
+            'status' => ['required', 'in:given,refused,withheld'],
             'reason' => ['nullable', 'string', 'max:500'],
             'reason_code' => ['nullable', 'string', 'max:60'],
             'dose_given' => ['nullable', 'string', 'max:255'],
@@ -974,9 +975,10 @@ class MedicationsApiController extends Controller
             'safety_override' => ['sometimes', 'array:reason_code,reason', 'required_array_keys:reason_code,reason'],
             'safety_override.reason_code' => ['required_with:safety_override', new Enum(SafetyOverrideReason::class)],
             'safety_override.reason' => ['required_with:safety_override', 'string', 'min:10', 'max:1000'],
-            'override_window' => ['nullable', 'boolean'],
-            // P01: the same recording contract as the web dialog. "missed"
-            // above stays a legacy value for API callers only.
+            // EA-106 (Lane C10): a late dose needs its reason, as on Meds today;
+            // a client can't switch the window check off.
+            'override_window' => ['prohibited'],
+            // P01: the same recording contract as the web dialog.
             ...RecordingContract::rules(),
             ...$this->medicationOfflineSubmissionRules($request),
             'scan_code' => ['nullable', 'string', 'max:255'],

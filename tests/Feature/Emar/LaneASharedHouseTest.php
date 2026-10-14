@@ -180,16 +180,22 @@ class LaneASharedHouseTest extends TestCase
             'total_medications' => 3,
         ]);
 
+        // Lane C10 (EA-151): the guided round item writer is retired — it
+        // refuses with nothing written — so the round's doses are recorded
+        // in Meds today, and the round counts them wherever they were made.
+        $this->actingAs($this->worker)
+            ->postJson("/emar/rounds/{$round->id}/guided/items/{$this->orders['A']->id}", [
+                'status' => 'given',
+                'scheduled_for' => '2026-07-01T22:00:00+12:00',
+                'client_request_uuid' => (string) Str::uuid(),
+                'queued_offline' => false,
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('success', false);
+        $this->assertSame(0, ClientMedicationAdministration::query()->count());
+
         foreach (['A', 'B', 'C'] as $key) {
-            $this->actingAs($this->worker)
-                ->postJson("/emar/rounds/{$round->id}/guided/items/{$this->orders[$key]->id}", [
-                    'status' => 'given',
-                    'scheduled_for' => '2026-07-01T22:00:00+12:00',
-                    'client_request_uuid' => (string) Str::uuid(),
-                    'queued_offline' => false,
-                ])
-                ->assertOk()
-                ->assertJsonPath('success', true);
+            $this->record($key)->assertOk();
         }
 
         $this->actingAs($this->worker)
@@ -197,7 +203,8 @@ class LaneASharedHouseTest extends TestCase
             ->assertSessionHasNoErrors()
             ->assertRedirect();
         $this->assertSame('completed', $round->fresh()->status);
-        $this->assertSame(3, ClientMedicationAdministration::query()->where('medication_round_id', $round->id)->count());
+        $this->assertSame(3, ClientMedicationAdministration::query()
+            ->whereIn('client_id', [$this->people['A']->id, $this->people['B']->id, $this->people['C']->id])->count());
     }
 
     private function requirements(string $key)

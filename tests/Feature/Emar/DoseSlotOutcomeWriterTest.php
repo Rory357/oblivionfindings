@@ -150,22 +150,21 @@ class DoseSlotOutcomeWriterTest extends TestCase
         $this->actingAs($this->worker, 'sanctum')->postJson($url, $payload)->assertOk();
 
         $this->assertOneOutcome($order, 'given', ClientMedicationAdministration::query()->sole());
+        // EA-063 (Lane C7): the API dose reaches the P09 chain once, not on the replay.
+        $this->assertSame(1, \App\Models\MedicationEvent::query()->where('kind', 'dose.recorded')->count());
     }
 
-    public function test_my_day_writes_given_and_refused_outcomes(): void
+    /** EA-125 (Lane C10): the retired My Day quick actions write nothing. */
+    public function test_the_retired_my_day_medication_actions_are_gone(): void
     {
-        $given = $this->scheduledOrder(['name' => 'Morning tablets']);
-        $refused = $this->scheduledOrder(['name' => 'Iron']);
-
-        $this->actingAs($this->worker)
-            ->post("/my-day/medications/{$given->id}/administer", ['scheduled_for' => $this->slotTime->toIso8601String()])
-            ->assertSessionHasNoErrors();
-        $this->actingAs($this->worker)
-            ->post("/my-day/medications/{$refused->id}/refuse", ['scheduled_for' => $this->slotTime->toIso8601String(), 'reason_code' => 'refused'])
-            ->assertSessionHasNoErrors();
-
-        $this->assertOneOutcome($given, 'given', ClientMedicationAdministration::query()->where('client_medication_id', $given->id)->sole());
-        $this->assertOneOutcome($refused, 'refused', ClientMedicationAdministration::query()->where('client_medication_id', $refused->id)->sole());
+        $order = $this->scheduledOrder(['name' => 'Morning tablets']);
+        foreach (['administer', 'refuse', 'snooze'] as $action) {
+            $status = $this->actingAs($this->worker)
+                ->postJson("/my-day/medications/{$order->id}/{$action}", ['scheduled_for' => $this->slotTime->toIso8601String()])
+                ->status();
+            $this->assertContains($status, [404, 405], "/my-day/medications/{id}/{$action} must no longer exist.");
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 
     public function test_the_shared_service_used_by_rounds_transport_and_the_profile_writes_one_outcome_and_reads_away(): void
@@ -187,6 +186,11 @@ class DoseSlotOutcomeWriterTest extends TestCase
         $this->assertTrue($result['success'] ?? false, (string) ($result['error'] ?? ''));
 
         $this->assertOneOutcome($order, 'away', ClientMedicationAdministration::query()->sole());
+        // EA-063 (Lane C7): the shared writer (rounds, transport, the profile,
+        // paper) appends the dose event itself.
+        $event = \App\Models\MedicationEvent::query()->where('kind', 'dose.recorded')->sole();
+        $this->assertSame((string) ClientMedicationAdministration::query()->sole()->id, $event->subject_id);
+        $this->assertSame((int) $this->client->id, (int) $event->client_id);
     }
 
     public function test_as_needed_doses_never_write_a_slot_outcome(): void

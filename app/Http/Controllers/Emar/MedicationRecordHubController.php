@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\DoseSlots\DoseSlotCoverage;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -81,7 +82,7 @@ final class MedicationRecordHubController extends Controller
                 $staff = $doses->reject(fn ($row) => in_array($row['state'] ?? '', ['self_managed', 'away', 'pending_check', 'not_due', 'upcoming'], true));
                 $next = $doses->filter(fn ($row) => in_array($row['state'] ?? '', ['not_due', 'upcoming'], true))->sortBy('scheduled_for')->first();
 
-                return $this->identity($person) + ['key' => 'person'.$person->id, 'id' => $person->id, 'href' => $this->recordHref($person, $date, $returnTo),
+                return $this->identity($person) + ['key' => 'person'.$person->id, 'id' => $person->id, 'house_id' => $person->site_id, 'href' => $this->recordHref($person, $date, $returnTo),
                     'due' => $doses->filter(fn ($row) => ($row['state'] ?? '') === 'due' && $row['recorded'] === null)->count(), 'overdue' => $doses->where('status', 'overdue')->count(),
                     'recorded' => $staff->filter(fn ($row) => $row['recorded'] !== null)->count(), 'so_far' => $staff->count(), 'waiting' => $doses->where('status', 'pending_check')->count(),
                     // EA-111 (Lane C9): Needs help — doses that can't be recorded yet because the order is waiting to be checked.
@@ -89,7 +90,10 @@ final class MedicationRecordHubController extends Controller
                     'next' => $next ? $next['time'].' · '.$next['medication_name'] : null,
                     'can_record' => $date === $now->toDateString() && in_array((int) $person->id, $authority, true)];
             })->filter(fn ($row) => ! $query || str_contains(mb_strtolower($row['person']), $query))
-                ->filter(fn ($row) => $work === 'all' || $row[$work] > 0)->sortBy('person')->values();
+                ->filter(fn ($row) => $work === 'all' || $row[$work] > 0)
+                // EA-111 (Lane C9g): grouped by house (approved P02), then by name.
+                ->sortBy(fn ($row) => sprintf('%d|%s|%010d|%s', $row['house'] === null ? 1 : 0, mb_strtolower($row['house'] ?? ''), (int) $row['house_id'], mb_strtolower($row['person'])))->values();
+            $houseCounts = $rows->countBy(fn ($row) => (string) ($row['house_id'] ?? 'none'))->all();
         } elseif ($view === 'medicines') {
             $policy = app(MedicationSupport::class);
             $words = ['self_managed' => 'Self-managed', 'prompted' => 'Prompt', 'assisted' => 'Assist', 'staff_given' => 'Administer'];
@@ -126,11 +130,39 @@ final class MedicationRecordHubController extends Controller
         }
         $pageNumber = $data['page'] ?? 1;
         $page = $rows instanceof LengthAwarePaginator ? $rows : new LengthAwarePaginator($rows->forPage($pageNumber, 25)->values(), $rows->count(), 25, $pageNumber, ['path' => $request->url(), 'query' => $request->query()]);
+        if ($view === 'charts') {
+            $page->setCollection($this->withAllergies($page->getCollection()));
+        }
 
         return Inertia::render('emar/record/hub', ['view' => $view, 'filters' => ['site_id' => $siteId, 'client_id' => $clientId, 'date' => $date, 'q' => $data['q'] ?? '', 'status' => $data['status'] ?? 'current', 'range' => $data['range'] ?? 30, 'work' => $work, 'return_to' => MedicationJourney::returnTo($data['return_to'] ?? null)],
             'page' => $page, 'sites' => $scope->sitePicker($sites)->map->only(['id', 'name'])->values(), 'today' => $now->toDateString(), 'as_at' => $now->toIso8601String(), 'controlled_left_out' => ! $controlled,
             'can_report' => $actor->canDo('medications.reports.view') && $actor->canDo('medications.reports.export'),
-            'coverage' => app(DoseSlotCoverage::class)->forPeriod($date, CarbonImmutable::now()), 'meters' => $this->meters($actor, $current, $todayRows, $ids, $sites, $siteId, $controlled, $now)]);
+            'coverage' => app(DoseSlotCoverage::class)->forPeriod($date, CarbonImmutable::now()), 'meters' => $this->meters($actor, $current, $todayRows, $ids, $sites, $siteId, $controlled, $now),
+            'house_counts' => $houseCounts ?? (object) []]);
+    }
+
+    /**
+     * EA-111 (Lane C9g): the approved P02 Allergies column — the person's
+     * allergy record as the record header reads it (recorded / none known /
+     * not recorded), and whether it has been reviewed. Unavailable, never a
+     * guess, when the record can't be read.
+     */
+    private function withAllergies($rows)
+    {
+        try {
+            $summaries = app(ClientAllergyRecordService::class)->summariesForClients($rows->pluck('client_id')->map(fn ($id) => (int) $id)->all());
+        } catch (\Throwable $e) {
+            report($e);
+            $summaries = null;
+        }
+
+        return $rows->map(function (array $row) use ($summaries) {
+            $summary = $summaries[(int) $row['client_id']] ?? null;
+
+            return $row + ['allergy' => $summary === null
+                ? ['status' => 'unavailable', 'count' => 0, 'reviewed' => false]
+                : ['status' => $summary['status'], 'count' => count($summary['entries']), 'reviewed' => $summary['reviewed'] !== null]];
+        });
     }
 
     private function recordHref(Client $person, string $date, ?string $returnTo, array $params = []): string

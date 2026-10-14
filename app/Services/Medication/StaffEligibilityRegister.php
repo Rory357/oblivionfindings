@@ -2,12 +2,15 @@
 
 namespace App\Services\Medication;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationCompetencyExemption;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\UserWitnessPin;
 use App\Services\Medication\Settings\MedicationSettingsStore;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -20,8 +23,14 @@ use Illuminate\Support\Collection;
  * The status comes from MedicationAdministratorCompetencyPolicy — the same
  * decision recording a dose uses — plus the facts the page shows: the
  * assessment on file and its 12 area results, a newer assessment waiting for
- * acknowledgement, an active exemption, and the witness PIN status. Who can
- * witness is not worked out here: that rule is enforced with P07b.
+ * acknowledgement, an active exemption, and the witness PIN status.
+ *
+ * EA-156 (Lane C9h): each row also says whether the person can witness
+ * controlled drugs, and why not, by the rule P07b enforces
+ * (ControlledMedicationTransportWitnessService::qualification and
+ * isValidWitnessAssessment, plus a usable witness PIN). Being on shift at the
+ * house is checked when they witness; onShiftNow() shows who is, and asks
+ * that service who it accepts right now.
  */
 class StaffEligibilityRegister
 {
@@ -206,6 +215,7 @@ class StaffEligibilityRegister
     {
         $ids = $users->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $pins = $this->witnessPins->statuses($ids);
+        $pinSetAt = UserWitnessPin::query()->whereIn('user_id', $ids)->get(['user_id', 'set_at'])->keyBy('user_id');
         $houseIds = $users->map(fn (User $u): ?int => $u->hrEmployeeProfile?->primary_site_id ? (int) $u->hrEmployeeProfile->primary_site_id : null)->filter()->unique()->values()->all();
         $houses = Site::query()->whereIn('id', $houseIds)->pluck('name', 'id');
         $roles = Role::query()->pluck('label', 'name');
@@ -222,7 +232,7 @@ class StaffEligibilityRegister
             ->get()
             ->groupBy('user_id');
 
-        return $users->map(function (User $user) use ($pins, $houses, $roles, $now, $today, $renewalDays, $activeExemptions): array {
+        return $users->map(function (User $user) use ($pins, $pinSetAt, $houses, $roles, $now, $today, $renewalDays, $activeExemptions): array {
             $houseId = $user->hrEmployeeProfile?->primary_site_id ? (int) $user->hrEmployeeProfile->primary_site_id : null;
             $decision = $this->policy->evaluate($user, $houseId, $now);
             $established = $decision['assessment_id'] !== null
@@ -285,6 +295,14 @@ class StaffEligibilityRegister
                 'days' => $days,
                 'prev_valid' => $prevValid,
                 'pin' => $pins[(int) $user->id] ?? WitnessPinService::STATUS_NOT_SET,
+                'pin_set_at' => $pinSetAt->get($user->id)?->set_at?->copy()->timezone($this->timezone())->toDateString(),
+                'witness' => $this->witness(
+                    $user,
+                    $decision,
+                    $st,
+                    $established ?? $shown,
+                    $pins[(int) $user->id] ?? WitnessPinService::STATUS_NOT_SET,
+                ),
                 'exemption' => $exemption ? [
                     'id' => (int) $exemption->id,
                     'house' => $exemption->site?->name,
@@ -311,6 +329,131 @@ class StaffEligibilityRegister
                     ->all(),
             ];
         });
+    }
+
+    /**
+     * EA-156 (Lane C9h): can this person witness controlled drugs, and why
+     * not — the P07b rule without the moment's presence on shift. Mirrors
+     * ControlledMedicationTransportWitnessService::qualification (the
+     * controlled witness permission and a current competency decision) and
+     * isValidWitnessAssessment (passed, not restricted, controlled drugs area
+     * passed and seen, "can witness controlled drugs" on), plus a usable PIN.
+     * An exemption never covers witnessing.
+     *
+     * @param  array<string, mixed>  $decision
+     * @return array{can: bool, competency: bool, reasons: list<string>}
+     */
+    private function witness(User $user, array $decision, string $st, ?MedicationCompetencyAssessment $assessment, string $pin): array
+    {
+        $reasons = [];
+        if (! $user->canDo('medications.controlled.witness')) {
+            $reasons[] = 'their role can’t witness controlled drugs';
+        }
+        if ($decision['state'] !== 'valid' || $decision['assessment_id'] === null) {
+            $reasons[] = match (true) {
+                $decision['state'] === 'exempt' => 'an exemption doesn’t cover witnessing',
+                $st === 'ack' => 'assessment waiting for their acknowledgement',
+                $st === 'failed' || $decision['state'] === 'failed' => 'not passed',
+                in_array($decision['state'], ['expired', 'missing_expiry'], true) => 'assessment ended',
+                default => 'not assessed',
+            };
+        }
+        if ($assessment !== null) {
+            if ($assessment->restricted) {
+                $reasons[] = 'restricted — can’t witness while restricted';
+            }
+            if (in_array('controlled_drugs', $assessment->not_seen_areas ?? [], true)) {
+                $reasons[] = 'controlled drugs area not assessed';
+            } elseif (! $assessment->controlled_drugs) {
+                $reasons[] = 'controlled drugs area not passed';
+            }
+            if (! $assessment->can_witness_controlled) {
+                $reasons[] = '“can witness controlled drugs” not on';
+            }
+        }
+        $competency = $reasons === [];
+        $reasons = [...$reasons, ...match ($pin) {
+            WitnessPinService::STATUS_SET => [],
+            WitnessPinService::STATUS_LOCKED => ['PIN locked'],
+            WitnessPinService::STATUS_RESET => ['PIN reset — must set a new one'],
+            WitnessPinService::STATUS_EXPIRED => ['PIN renewal due — must set a new one'],
+            default => ['no witness PIN set'],
+        }];
+
+        return ['can' => $reasons === [], 'competency' => $competency, 'reasons' => $reasons];
+    }
+
+    /**
+     * EA-156 (Lane C9h): the witness view's "on shift now" for each house —
+     * who from the register is clocked in, or on a shift in progress, at the
+     * house now (read only), and whether P07b accepts them as a controlled-drug
+     * witness there now (ControlledMedicationTransportWitnessService, the rule
+     * recording enforces) with a usable witness PIN.
+     *
+     * @param  list<int>  $siteIds
+     * @param  Collection<int, array<string, mixed>>  $rows  register rows
+     * @return list<array{id: int, name: string, can_now: int, people: list<array<string, mixed>>}>
+     */
+    public function onShiftNow(array $siteIds, Collection $rows): array
+    {
+        if ($siteIds === []) {
+            return [];
+        }
+        $byId = $rows->keyBy('id');
+        $ids = $byId->keys()->map(fn ($id): int => (int) $id)->all();
+        $now = now();
+        $storage = $now->copy()->utc();
+        $present = [];
+        foreach (HrAttendanceSession::query()->whereIn('site_id', $siteIds)->whereIn('user_id', $ids)
+            ->where('clock_in_at', '<=', $storage)->where('status', 'open')->whereNull('clock_out_at')
+            ->orderBy('clock_in_at')->get(['user_id', 'site_id', 'clock_in_at']) as $session) {
+            $present[(int) $session->site_id][(int) $session->user_id] ??= ['since' => $session->clock_in_at, 'until' => null, 'clocked' => true];
+        }
+        foreach (Shift::query()->with('client:id,site_id')->whereIn('user_id', $ids)
+            ->where('starts_at', '<=', $storage)->where('ends_at', '>=', $storage)
+            ->whereIn('status', ['in_progress', 'active', 'clocked_in', 'started'])
+            ->where(fn ($at) => $at->whereIn('site_id', $siteIds)
+                ->orWhere(fn ($derived) => $derived->whereNull('site_id')->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))))
+            ->get(['id', 'user_id', 'site_id', 'client_id', 'starts_at', 'ends_at', 'actual_starts_at']) as $shift) {
+            $siteId = (int) ($shift->site_id ?? $shift->client?->site_id);
+            $seen = $present[$siteId][(int) $shift->user_id] ?? ['since' => null, 'until' => null, 'clocked' => false];
+            $present[$siteId][(int) $shift->user_id] = [
+                'since' => $seen['since'] ?? $shift->actual_starts_at ?? $shift->starts_at,
+                'until' => $shift->ends_at,
+                'clocked' => $seen['clocked'],
+            ];
+        }
+        $witnesses = app(ControlledMedicationTransportWitnessService::class);
+        $timezone = $this->timezone();
+
+        return Site::query()->whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name'])
+            ->map(function (Site $site) use ($present, $byId, $witnesses, $now, $timezone): array {
+                $here = $present[(int) $site->id] ?? [];
+                $accepted = $here === [] ? collect() : $witnesses->eligibleWitnessesForSite((int) $site->id, $now)->pluck('id')->map(fn ($id): int => (int) $id);
+                $people = collect($here)->map(function (array $at, int $userId) use ($byId, $accepted, $timezone): array {
+                    $row = $byId->get($userId);
+                    $canNow = $accepted->contains($userId) && $row['pin'] === WitnessPinService::STATUS_SET;
+                    $reasons = $canNow ? [] : ($row['witness']['reasons'] ?: ['can’t witness at this house now']);
+
+                    return [
+                        'id' => $userId,
+                        'name' => (string) $row['name'],
+                        'role' => $row['role'],
+                        'since' => $at['since']?->copy()->timezone($timezone)->toIso8601String(),
+                        'until' => $at['until']?->copy()->timezone($timezone)->toIso8601String(),
+                        'clocked_in' => (bool) $at['clocked'],
+                        'can_now' => $canNow,
+                        'reasons' => $reasons,
+                    ];
+                })->sortBy('name')->values();
+
+                return [
+                    'id' => (int) $site->id,
+                    'name' => (string) $site->name,
+                    'can_now' => $people->where('can_now', true)->count(),
+                    'people' => $people->all(),
+                ];
+            })->values()->all();
     }
 
     /** The assessment the register shows, with each area's result. */

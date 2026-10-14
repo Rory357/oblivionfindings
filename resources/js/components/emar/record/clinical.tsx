@@ -102,16 +102,34 @@ type Command =
     | 'check-driver'
     | 'finish-driver';
 
+/** EA-109 (Lane C9f): the approved Clinical "Range" filter. */
+export type ClinicalRange = '3m' | '12m' | 'all';
+
+const RANGE_WORDS: Record<ClinicalRange, string | null> = {
+    '3m': 'in the last 3 months',
+    '12m': 'in the last 12 months',
+    all: null,
+};
+
 export function ClinicalSection({
     clientId,
     view,
+    range = 'all',
 }: {
     clientId: number;
     view: string;
+    range?: ClinicalRange;
 }) {
     const { data, load, reload } = useRecordJson<ClinicalData>(
-        `/emar/clients/${clientId}/record/clinical`,
+        `/emar/clients/${clientId}/record/clinical?range=${range}`,
     );
+    const inRange = RANGE_WORDS[range];
+    const olderHint =
+        range === '3m'
+            ? ' Choose “Last 12 months” or “All dates” in Range to see older records.'
+            : range === '12m'
+              ? ' Choose “All dates” in Range to see older records.'
+              : '';
     const [command, setCommand] = useState<{
         key: Command;
         recordId?: number;
@@ -164,7 +182,9 @@ export function ClinicalSection({
                     >
                         {!data.drivers.length && (
                             <p className="text-sm">
-                                No syringe driver recorded.
+                                {inRange
+                                    ? `No syringe driver ${inRange}.${olderHint}`
+                                    : 'No syringe driver recorded.'}
                             </p>
                         )}
                         {data.drivers.map((driver) =>
@@ -327,6 +347,11 @@ export function ClinicalSection({
                 <ObservationList
                     clientId={clientId}
                     rows={data.observations.rows}
+                    empty={
+                        inRange
+                            ? `No readings taken with doses ${inRange}.${olderHint}`
+                            : undefined
+                    }
                 />
             ) : (
                 <>
@@ -388,8 +413,9 @@ export function ClinicalSection({
                             </>
                         ) : (
                             <p className="text-sm">
-                                No visible INR result recorded. Results without
-                                a linked medicine are still shown.
+                                {inRange
+                                    ? `No visible INR result ${inRange}.${olderHint}`
+                                    : 'No visible INR result recorded. Results without a linked medicine are still shown.'}
                             </p>
                         )}
                     </SectionCard>
@@ -539,9 +565,11 @@ export function DoseObservations({ clientId }: { clientId: number }) {
 function ObservationList({
     clientId,
     rows,
+    empty = 'No readings taken with doses in the displayed record.',
 }: {
     clientId: number;
     rows: MaybeConcealed<Observation>[];
+    empty?: string;
 }) {
     return (
         <SectionCard
@@ -620,9 +648,7 @@ function ObservationList({
                     actionsFor={() => []}
                 />
             ) : (
-                <p className="text-caption text-muted-foreground">
-                    No readings taken with doses in the displayed record.
-                </p>
+                <p className="text-caption text-muted-foreground">{empty}</p>
             )}
             <p className="text-caption text-muted-foreground">
                 Most recent 100 dose records with readings are shown. Historical

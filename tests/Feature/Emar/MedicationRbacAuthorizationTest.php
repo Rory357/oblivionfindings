@@ -36,10 +36,12 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
+use Tests\Support\AssertsOverviewHasNoMedicationData;
 use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationRbacAuthorizationTest extends TestCase
 {
+    use AssertsOverviewHasNoMedicationData;
     use RefreshDatabase;
     use RecordsDosesLikeTheDialog;
 
@@ -311,10 +313,8 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('safety_alerts.total_alerts', 0)
             ->assertJsonMissing(['message' => 'Controlled medication alert with an ordinary type']);
-        $dashboard = $this->actingAs($actor)
-            ->get(route('dashboard'))
-            ->assertOk();
-        $this->assertSame(0, $dashboard->inertiaProps('emarWidgets.activeAlerts'));
+        // The home Overview carries no medication data (no alert counts).
+        $this->assertOverviewHasNoMedicationData($this->actingAs($actor)->get(route('dashboard')));
         $this->assertSame('active', $alert->fresh()->status);
 
         $controlledView = Permission::query()

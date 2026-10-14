@@ -614,7 +614,7 @@ class DashboardControllerTest extends TestCase
     public function test_worker_cannot_request_privileged_views_or_layouts(): void
     {
         $this->actingAs($this->actor());
-        foreach (['manager', 'hr', 'it', 'governance'] as $role) {
+        foreach (['manager', 'hr', 'it', 'governance', 'office'] as $role) {
             $this->getJson('/dashboard/data?role='.$role)->assertForbidden();
             $this->putJson('/dashboard/layout/'.$role, ['revision' => null, 'value' => $this->layout()])->assertForbidden();
         }

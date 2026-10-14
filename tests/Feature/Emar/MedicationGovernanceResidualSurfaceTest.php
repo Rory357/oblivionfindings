@@ -27,11 +27,13 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\AssertsOverviewHasNoMedicationData;
 use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 class MedicationGovernanceResidualSurfaceTest extends TestCase
 {
+    use AssertsOverviewHasNoMedicationData;
     use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
 
@@ -310,10 +312,10 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
 
     public function test_audit_and_dashboard_fail_closed_without_sites_and_both_global_site_permissions_broaden_only_scope(): void
     {
-        // The /dashboard eMAR widget counts the 09:00 dose slots on the
-        // worker (NZ) day from the dose-slot projection (NF-25, C6a): pin the
-        // clock after the 09:00 window has ended (10:00) and put the recorded
-        // doses on that slot through the model, so the slot outcome is written.
+        // Doses on today's 09:00 slot (local and foreign Site, ordinary and
+        // controlled) give the home Overview something it could leak; it
+        // carries no medication data for any reader (the eMAR widget is gone
+        // since the role workspaces, 753a7f396).
         Carbon::setTestNow(Carbon::parse('2026-05-21 10:30:00', 'Pacific/Auckland')->utc());
         $context = $this->context();
         $slotUtc = Carbon::parse('2026-05-21 09:00:00', 'Pacific/Auckland')->utc();
@@ -337,28 +339,22 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         $this->actingAs($empty)->getJson(route('medications.audit.export', ['purpose' => 'audit']))->assertUnprocessable();
         $this->actingAs($empty)->getJson(route('emar.audit.export', ['purpose' => 'audit']))->assertUnprocessable();
         $this->assertDatabaseCount('medication_events', 0);
-        // No readable Site: no scheduled doses, so the admin rate is n/a.
-        $this->assertDashboardWidgets($empty, null, 0, 0, 0, 0);
+        $this->assertDashboardHasNoMedicationData($empty);
 
-        // Dose numbers count the people the reader may open (the person
-        // rule) and controlled doses for every reader (P09 Q6): the local
-        // 09:00 dose given and the local controlled 09:00 dose unrecorded,
-        // now overdue → 1 of 2 due doses given, 1 due now.
         $ordinary = $this->userWithPermissions([
             'medications.view',
             'clients.viewAny',
             'shifts.manageAny',
         ], $context['local_site']);
-        $this->assertDashboardWidgets($ordinary, 50.0, 1, 1, 1, 1);
+        $this->assertDashboardHasNoMedicationData($ordinary);
 
-        // The same dose numbers; the controlled alert and stock are its own.
         $controlledReader = $this->userWithPermissions([
             'medications.view',
             'clients.viewAny',
             'medications.controlled.view',
             'shifts.manageAny',
         ], $context['local_site']);
-        $this->assertDashboardWidgets($controlledReader, 50.0, 1, 2, 1, 2);
+        $this->assertDashboardHasNoMedicationData($controlledReader);
 
         foreach (MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS as $bypassPermission) {
             $global = $this->userWithPermissions([
@@ -391,9 +387,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                 ->getContent();
             $this->assertStringContainsString('Local Resident', $globalCsv);
             $this->assertStringContainsString('Foreign Resident', $globalCsv);
-            // Both Sites: local given, foreign recorded missed, and both
-            // controlled 09:00 doses unrecorded (overdue) → 1 of 4 given.
-            $this->assertDashboardWidgets($global, 25.0, 2, 2, 2, 2);
+            $this->assertDashboardHasNoMedicationData($global);
         }
     }
 
@@ -873,21 +867,10 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         ]);
     }
 
-    private function assertDashboardWidgets(
-        User $user,
-        ?float $adminRate,
-        int $dueNow,
-        int $activeAlerts,
-        int $overdueReviews,
-        int $lowStock,
-    ): void {
-        $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
-        $actualRate = $response->inertiaProps('emarWidgets.adminRate');
-        $this->assertSame($adminRate, $actualRate === null ? null : (float) $actualRate);
-        $this->assertSame($dueNow, $response->inertiaProps('emarWidgets.dueNow'));
-        $this->assertSame($activeAlerts, $response->inertiaProps('emarWidgets.activeAlerts'));
-        $this->assertSame($overdueReviews, $response->inertiaProps('emarWidgets.overdueReviews'));
-        $this->assertSame($lowStock, $response->inertiaProps('emarWidgets.lowStock'));
+    /** The home Overview carries no medication data for this reader. */
+    private function assertDashboardHasNoMedicationData(User $user): void
+    {
+        $this->assertOverviewHasNoMedicationData($this->actingAs($user)->get(route('dashboard')));
     }
 
     private function assertMinimalIntegrityResponse(TestResponse $response): void

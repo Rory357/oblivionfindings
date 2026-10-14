@@ -346,7 +346,13 @@ meter row).
   palette** (both as oklch tokens at the top of `workspace.css`), and the
   **comfortable 38px header dropdowns** (`PageHeaderFilterSelect
   size="comfortable"`, PAGE_HEADER_STYLE_GUIDE.md §6). Status colours
-  there always use the app's verified pairs.
+  there always use the app's verified pairs. The seventh role, **Business
+  support** (finance, compliance, safety, fleet, risk and audit staff),
+  builds each block from its module's own service and permission, and
+  opens with blocks chosen from the areas the person can see. Money on
+  the overview is whole NZ dollars: charts set `unit: 'NZD'` (monthly
+  series add `interval: 'month'`), and rows, breakdowns and bars carry a
+  formatted `display` value such as "$1,960" instead of a raw number.
 - **Multi-step flows** — `WizardShell` (see entity add/edit above).
   `components/wizard-stepper.tsx` is **legacy** — do not use it in new work.
 - **Forms** — shadcn `<Input>`/`<Select>`/`<Textarea>`; dense native-element

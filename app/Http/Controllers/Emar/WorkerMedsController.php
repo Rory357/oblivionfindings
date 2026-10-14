@@ -21,8 +21,6 @@ use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\OnCallResolver;
-use App\Services\Medication\Audit\MedicationEventData;
-use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
 use App\Services\Medication\ForgottenWitnessPinService;
@@ -43,7 +41,6 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -832,8 +829,6 @@ class WorkerMedsController extends Controller
                     Carbon::now($this->scheduleService->workerTimezone())->toDateString(),
                 ));
 
-                $this->appendDoseEvent($scope, $result['administration']);
-
                 $outcome = match ($data['status']) {
                     'refused' => 'recorded as refused',
                     'withheld' => 'recorded as withheld',
@@ -1057,8 +1052,6 @@ class WorkerMedsController extends Controller
 
                 $savedMessage = 'Saved — '.$medication->name.' recorded for '.trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? ''));
 
-                $this->appendDoseEvent($scope, $result['administration']);
-
                 if ($request->expectsJson()) {
                     return response()->json($this->withMedicationSync(
                         $this->prnAdministrationPayload($result),
@@ -1199,23 +1192,6 @@ class WorkerMedsController extends Controller
         ], $data, 'conflict', false, $message), 409);
     }
 
-    private function appendDoseEvent(MedicationScopeDecision $scope, ClientMedicationAdministration $administration): void
-    {
-        // Last domain write in the authorized source transaction. A recorder
-        // failure rolls the dose back; exact replays return before this call.
-        app(MedicationEventRecorder::class)->append(new MedicationEventData(
-            siteId: (int) $scope->client->site_id,
-            kind: 'dose.recorded',
-            subjectType: 'medication_administration',
-            subjectId: (string) $administration->id,
-            actorId: (int) $scope->performer->id,
-            occurredAt: CarbonImmutable::now('UTC'),
-            summary: 'Medication dose outcome recorded.',
-            facts: ['outcome' => $administration->status, 'round_id' => $administration->medication_round_id],
-            clientId: (int) $scope->client->id,
-            controlled: (bool) $scope->medication->controlled_drug,
-        ));
-    }
 
     private function doseAdministrationPayload(array $result): array
     {

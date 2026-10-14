@@ -889,10 +889,11 @@ class MedicationOverviewService
                     'client' => $this->clientName($driver->client),
                     'site' => $driver->site?->name,
                     'contents' => $contents ?: 'Infusion',
-                    'commenced_at' => optional($driver->commenced_at)->format('j M H:i'),
-                    'next_check_due' => optional($nextCheckDue)->format('H:i'),
+                    // EA-158 (Lane C7): times in NZ, as the record's clinical tab shows them.
+                    'commenced_at' => $driver->commenced_at?->copy()->timezone($this->schedule->workerTimezone())->format('j M H:i'),
+                    'next_check_due' => $nextCheckDue?->copy()->timezone($this->schedule->workerTimezone())->format('H:i'),
                     'overdue' => $overdue,
-                    'status_label' => $overdue ? 'Check due '.optional($nextCheckDue)->format('H:i') : 'On schedule',
+                    'status_label' => $overdue ? 'Check due '.$nextCheckDue->copy()->timezone($this->schedule->workerTimezone())->format('H:i') : 'On schedule',
                 ];
             })
             ->all();

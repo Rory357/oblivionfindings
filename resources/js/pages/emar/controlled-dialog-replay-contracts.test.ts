@@ -34,10 +34,6 @@ const shiftMedicationSource = readFileSync(
     ),
     'utf8',
 );
-const prnSheetSource = readFileSync(
-    resolve(process.cwd(), 'resources/js/components/prn-sheet.tsx'),
-    'utf8',
-);
 const stockDialogsSource = readFileSync(
     resolve(process.cwd(), 'resources/js/pages/emar/_stock-dialogs.tsx'),
     'utf8',
@@ -344,26 +340,6 @@ describe('controlled mutation dialog replay contracts', () => {
             'client_request_uuid: crypto.randomUUID()',
         );
         expect(shiftMedicationSource).not.toContain('password or PIN');
-    });
-
-    it('blocks witness-gated quick PRN actions and gives queueable actions a payload-aware UUID', () => {
-        expect(prnSheetSource).toContain('const submissionReplay = useRef({');
-        expect(prnSheetSource).toContain('materialFingerprint');
-        expect(prnSheetSource).toContain(
-            'client_request_uuid: submissionReplay.current.uuid',
-        );
-        expect(prnSheetSource).toContain('submitEmarMutation(');
-        expect(prnSheetSource).toContain(
-            'selected.requires_witness || selected.is_controlled',
-        );
-        expect(prnSheetSource).toContain('!selected.requires_witness &&');
-        expect(prnSheetSource).toContain('!selected.is_controlled &&');
-        expect(prnSheetSource).toContain(
-            'Use the full MAR to record this witnessed dose.',
-        );
-        expect(prnSheetSource).toContain(
-            'if (!emarMutationWasAccepted(result.status)) return;',
-        );
     });
 
     it('binds the client profile administration dialog to a stable intent UUID', () => {

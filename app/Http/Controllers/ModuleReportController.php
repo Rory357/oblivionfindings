@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Support\ReportCatalog;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -44,10 +45,11 @@ class ModuleReportController extends Controller
         $query = $this->buildQuery($definition, $filters, $user);
         $columns = $this->availableColumns($definition);
 
+        $instants = $this->instantColumns($definition, $columns);
         $rows = $query
             ->paginate(50)
             ->withQueryString()
-            ->through(fn (Model $row): array => $this->serializeRow($row, $columns));
+            ->through(fn (Model $row): array => $this->serializeRow($row, $columns, $instants));
 
         return inertia('reports/module', [
             'module' => [
@@ -105,13 +107,15 @@ class ModuleReportController extends Controller
             now()->format('Ymd_His')
         );
 
-        return response()->streamDownload(function () use ($query, $columns, $labels) {
+        $instants = $this->instantColumns($definition, $columns);
+
+        return response()->streamDownload(function () use ($query, $columns, $labels, $instants) {
             $out = fopen('php://output', 'w');
             $this->putCsv($out, $labels);
 
-            $query->chunk(500, function ($records) use ($out, $columns) {
+            $query->chunk(500, function ($records) use ($out, $columns, $instants) {
                 foreach ($records as $record) {
-                    $row = $this->serializeRow($record, $columns);
+                    $row = $this->serializeRow($record, $columns, $instants);
                     $this->putCsv($out, array_values($row));
                 }
             });
@@ -160,12 +164,19 @@ class ModuleReportController extends Controller
             });
         }
 
+        // EA-061 (Lane C7): stored instants are UTC; the filter's dates are
+        // NZ calendar days. Date-only columns keep their calendar date.
+        $instant = Schema::hasColumn($table, $dateField) && $this->isInstantColumn($table, $dateField);
         if (! empty($filters['date_from']) && Schema::hasColumn($table, $dateField)) {
-            $query->whereDate($dateField, '>=', (string) $filters['date_from']);
+            $instant
+                ? $query->where($dateField, '>=', WorkerClock::dayStartUtc((string) $filters['date_from']))
+                : $query->whereDate($dateField, '>=', (string) $filters['date_from']);
         }
 
         if (! empty($filters['date_to']) && Schema::hasColumn($table, $dateField)) {
-            $query->whereDate($dateField, '<=', (string) $filters['date_to']);
+            $instant
+                ? $query->where($dateField, '<=', WorkerClock::dayEndUtc((string) $filters['date_to']))
+                : $query->whereDate($dateField, '<=', (string) $filters['date_to']);
         }
 
         if (! empty($filters['status']) && Schema::hasColumn($table, 'status')) {
@@ -207,14 +218,20 @@ class ModuleReportController extends Controller
      * @param  array<string, string>  $columns
      * @return array<string, string>
      */
-    private function serializeRow(Model $model, array $columns): array
+    private function serializeRow(Model $model, array $columns, array $instants = []): array
     {
         $row = [];
 
         foreach (array_keys($columns) as $column) {
             $value = $model->getAttribute($column);
+            // EA-061 (Lane C7): stored UTC instants read in NZ time, with the zone.
+            if (isset($instants[$column]) && $value !== null && $value !== '') {
+                $row[$column] = WorkerClock::display($value instanceof \DateTimeInterface ? $value : \Carbon\CarbonImmutable::parse((string) $value, 'UTC'));
+
+                continue;
+            }
             if ($value instanceof \DateTimeInterface) {
-                $row[$column] = $value->format('Y-m-d H:i:s');
+                $row[$column] = $value->format('Y-m-d');
 
                 continue;
             }
@@ -232,6 +249,30 @@ class ModuleReportController extends Controller
         }
 
         return $row;
+    }
+
+    /**
+     * The columns that hold a stored instant (datetime/timestamp), as a set.
+     *
+     * @param  array<string, mixed>  $definition
+     * @param  array<string, string>  $columns
+     * @return array<string, true>
+     */
+    private function instantColumns(array $definition, array $columns): array
+    {
+        /** @var class-string<Model> $modelClass */
+        $modelClass = $definition['model'];
+        $table = (new $modelClass)->getTable();
+
+        return collect(array_keys($columns))
+            ->filter(fn (string $column): bool => $this->isInstantColumn($table, $column))
+            ->mapWithKeys(fn (string $column): array => [$column => true])
+            ->all();
+    }
+
+    private function isInstantColumn(string $table, string $column): bool
+    {
+        return in_array(strtolower(Schema::getColumnType($table, $column)), ['datetime', 'timestamp'], true);
     }
 
     /**

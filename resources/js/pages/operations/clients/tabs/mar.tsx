@@ -72,6 +72,8 @@ export type MarTabProps = {
     /** The record provides the heading and dose launcher; Report stays on the chart. */
     embedded?: boolean;
     view?: 'scheduled' | 'asneeded';
+    /** P02 as-needed "Show limit reached only" (Lane C9f). */
+    limitReachedOnly?: boolean;
     initialDate?: string | null;
     onDateChange?: (date: string | null) => void;
 };
@@ -207,6 +209,7 @@ export function MarTab({
     canViewControlled,
     embedded = false,
     view,
+    limitReachedOnly = false,
     initialDate = null,
     onDateChange,
 }: MarTabProps) {
@@ -686,6 +689,7 @@ export function MarTab({
                             hidden={day.prn.hidden}
                             recordBlocked={prnBlocked}
                             canRecordControlled={day.can.record_controlled}
+                            limitReachedOnly={limitReachedOnly}
                             onRecord={(id) => recorder.recordAsNeeded(id)}
                         />
                         {day.prn.rows.length === 0 && day.prn.hidden === 0 ? (

@@ -84,6 +84,14 @@ export type EligPerson = {
     /** A new assessment waits for acknowledgement; the previous one counts until then. */
     prev_valid: string | null;
     pin: 'set' | 'not_set' | 'locked' | 'reset' | 'expired';
+    /** When the witness PIN was set (NZ date), or null. */
+    pin_set_at?: string | null;
+    /**
+     * EA-156 (Lane C9h): can they witness controlled drugs, by the rule P07b
+     * enforces (everything but being on shift), and why not. `competency` is
+     * the assessment side only; the PIN reason, if any, is the last reason.
+     */
+    witness?: { can: boolean; competency: boolean; reasons: string[] };
     exemption: PersonExemption | null;
     assessment: EligAssessment | null;
     /** Their other assessments, newest first. */
