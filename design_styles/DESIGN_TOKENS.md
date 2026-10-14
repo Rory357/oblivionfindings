@@ -199,6 +199,26 @@ sources stay distinguishable. The module sets:
 A source colour never signals urgency: an entry whose `status` is
 `overdue` renders critical regardless of its source.
 
+## Journey tokens (sign-in pages, added 2026-10-13)
+
+The Oblivion Care "Journey" palette for the sign-in and account screens
+(`layouts/auth/auth-journey-layout.tsx`, `resources/css/journey-auth.css`).
+Every value derives from `--primary`, so Settings › Branding recolours them.
+With `--primary` `#7040D6` they reproduce the brand sheet exactly.
+
+| Token | Utility | Use |
+|---|---|---|
+| `--journey-ink` | `bg-journey-ink` | Staff brand half (≈ `#141019`) |
+| `--journey-ink-muted` | `text-journey-ink-muted` | Secondary text on ink (≥ 7:1) |
+| `--journey-paper` | `text-journey-paper` | Text and light marks on ink (≈ `#FCFAFF`) |
+| `--journey-lavender` | `fill-journey-lavender` | The islands mark and accents on ink (≈ `#D6B9FF`) |
+| `--journey-lilac` | `bg-journey-lilac` | Family brand half (light mode) |
+| `--journey-surface` / `--journey-field` | `bg-journey-surface`, `bg-journey-field` | The form half and its inputs (dark variants in `.dark`) |
+
+Brand text on these surfaces uses `text-primary` (`--primary-text`), never
+the raw brand. Status notices use the `Alert` tone variants (`critical`,
+`warning`, `info`, `success`) on the status token pairs.
+
 ## Adding a new token
 
 Edit [`resources/css/app.css`](../resources/css/app.css):

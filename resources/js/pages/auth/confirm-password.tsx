@@ -1,61 +1,86 @@
+import { PasswordField } from '@/components/auth/password-field';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
-import AuthLayout from '@/layouts/auth-layout';
+import AuthJourneyLayout, {
+    type AuthAudience,
+} from '@/layouts/auth/auth-journey-layout';
 import { useI18n } from '@/lib/i18n';
+import { request } from '@/routes/password';
 import { store } from '@/routes/password/confirm';
-import { Form, Head } from '@inertiajs/react';
+import { Form, Link } from '@inertiajs/react';
+import { ShieldCheck } from 'lucide-react';
 
-export default function ConfirmPassword() {
+/** "Confirm it's you" before sensitive settings (Fortify password confirmation). */
+export default function ConfirmPassword({
+    audience = 'staff',
+}: {
+    audience?: AuthAudience;
+}) {
     const { t } = useI18n();
 
     return (
-        <AuthLayout
-            title={t('app.auth.confirm.title', 'Confirm your password')}
-            description={t(
-                'app.auth.confirm.description',
-                'This is a secure area of the application. Please confirm your password before continuing.',
-            )}
+        <AuthJourneyLayout
+            audience={audience}
+            title={t('app.auth.confirm.head', "Confirm it's you")}
         >
-            <Head title={t('app.auth.confirm.head', 'Confirm password')} />
-
-            <Form action={store()} resetOnSuccess={['password']}>
+            <div className="flex flex-col gap-4">
+                <span className="journey-badge" aria-hidden="true">
+                    <ShieldCheck className="size-5" />
+                </span>
+                <h1 className="journey-title">
+                    {t('app.auth.confirm.title', "Confirm it's you")}
+                </h1>
+                <p className="journey-subtitle">
+                    {t(
+                        'app.auth.confirm.description',
+                        'Enter your password again before you change your security settings.',
+                    )}
+                </p>
+            </div>
+            <Form
+                action={store()}
+                resetOnSuccess={['password']}
+                className="flex flex-col gap-4"
+            >
                 {({ processing, errors }) => (
-                    <div className="space-y-6">
-                        <div className="grid gap-2">
-                            <Label htmlFor="password">
+                    <>
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="password" className="journey-label">
                                 {t('app.auth.password', 'Password')}
                             </Label>
-                            <Input
+                            <PasswordField
                                 id="password"
-                                type="password"
                                 name="password"
-                                placeholder={t('app.auth.password', 'Password')}
                                 autoComplete="current-password"
                                 autoFocus
+                                required
+                                aria-invalid={
+                                    Boolean(errors.password) || undefined
+                                }
                             />
-
                             <InputError message={errors.password} />
                         </div>
-
-                        <div className="flex items-center">
-                            <Button
-                                className="w-full"
-                                disabled={processing}
-                                data-test="confirm-password-button"
-                            >
-                                {processing && <Spinner />}
-                                {t(
-                                    'app.auth.confirm.submit',
-                                    'Confirm password',
-                                )}
-                            </Button>
-                        </div>
-                    </div>
+                        <Button
+                            type="submit"
+                            className="journey-control w-full"
+                            disabled={processing}
+                            data-test="confirm-password-button"
+                        >
+                            {t('app.auth.confirm.submit', 'Confirm')}
+                        </Button>
+                        <Link
+                            href={request()}
+                            className="self-center text-[14px] font-semibold text-primary hover:underline"
+                        >
+                            {t(
+                                'app.auth.forgot_password_link',
+                                'Forgot password?',
+                            )}
+                        </Link>
+                    </>
                 )}
             </Form>
-        </AuthLayout>
+        </AuthJourneyLayout>
     );
 }

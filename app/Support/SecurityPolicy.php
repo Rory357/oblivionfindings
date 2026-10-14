@@ -40,6 +40,22 @@ class SecurityPolicy
         return $rule;
     }
 
+    /**
+     * The password rules as plain values, so set-password screens can show a
+     * live checklist that matches passwordRule() exactly.
+     *
+     * @return array{minLength: int, mixedCase: bool, numbers: bool, symbols: bool}
+     */
+    public static function passwordRequirements(): array
+    {
+        return [
+            'minLength' => self::integer('password_min_length'),
+            'mixedCase' => self::boolean('password_require_uppercase'),
+            'numbers' => self::boolean('password_require_numbers'),
+            'symbols' => self::boolean('password_require_symbols'),
+        ];
+    }
+
     public static function forceTwoFactor(): bool
     {
         return self::boolean('force_2fa');

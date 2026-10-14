@@ -30,6 +30,28 @@ class SsoConfigurationService
         return $available;
     }
 
+    /**
+     * Email-first staff sign-in: which organisation domain goes to which
+     * provider. Only providers that are switched on for staff and correctly
+     * configured; Microsoft first when both share a domain. The domain is the
+     * staff email domain, already implied by any staff address, never a secret.
+     *
+     * @return list<array{domain: string, provider: string}>
+     */
+    public function staffRouting(): array
+    {
+        $routes = [];
+        foreach (self::PROVIDERS as $provider) {
+            $config = $this->provider($provider);
+            if ($config['staff_enabled'] && $config['domain'] !== '' && $this->configurationChecks($provider, $config) === []
+                && ! in_array($config['domain'], array_column($routes, 'domain'), true)) {
+                $routes[] = ['domain' => $config['domain'], 'provider' => $provider];
+            }
+        }
+
+        return $routes;
+    }
+
     public function provider(string $provider): array
     {
         abort_unless(in_array($provider, self::PROVIDERS, true), 404);
