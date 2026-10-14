@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     PageHeader,
     PageHeaderFilterSelect,
@@ -16,11 +17,6 @@ import {
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Label } from '@/components/ui/label';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Toggle } from '@/components/ui/toggle';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
     Dialog,
     DialogContent,
@@ -37,7 +33,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -45,6 +43,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Toggle } from '@/components/ui/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
 import {
@@ -142,6 +143,8 @@ const rangeLabels = {
     quarter: 'This quarter',
 };
 type Tab = 'overview' | 'attention' | 'insights';
+/** The view-mode card footer (status line + View details). */
+const FOOTER_HEIGHT = 43;
 type DialogView = 'library' | 'starters' | 'saved' | 'find' | null;
 
 function ScopeSelect({
@@ -162,7 +165,7 @@ function ScopeSelect({
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="page">Follow page filter</SelectItem>
-                <SelectItem value="all">All permitted sites</SelectItem>
+                <SelectItem value="all">All your sites</SelectItem>
                 {sites.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>
                         {s.name}
@@ -210,7 +213,21 @@ function PuzzleBlock({
         transition,
     } = useSortable({ id: layout.id, disabled: !editing });
     const content = useRef<HTMLDivElement>(null);
+    const tools = useRef<HTMLDivElement>(null);
+    const bottom = useRef<HTMLDivElement>(null);
     const [naturalHeight, setNaturalHeight] = useState(300);
+    // Saved heights are view-mode heights. The editor adds a tools bar and a
+    // scope bar and drops the footer, so it converts with this difference.
+    const [chrome, setChrome] = useState(0);
+    useLayoutEffect(() => {
+        setChrome(
+            editing
+                ? (tools.current?.offsetHeight ?? 0) +
+                      (bottom.current?.offsetHeight ?? 0) -
+                      (meta.kind === 'focus' ? 0 : FOOTER_HEIGHT)
+                : 0,
+        );
+    }, [editing, meta.kind]);
     const [resize, setResize] = useState<{
         span: number;
         height: number;
@@ -232,10 +249,11 @@ function PuzzleBlock({
         return () => observer.disconnect();
     }, []);
     const span = resize?.span ?? layout.span;
-    const footerHeight = meta.kind === 'focus' || editing ? 0 : 43;
+    const footerHeight = meta.kind === 'focus' || editing ? 0 : FOOTER_HEIGHT;
+    const savedHeight = resize?.height ?? layout.height;
     const height = Math.max(
         naturalHeight + footerHeight,
-        resize?.height ?? layout.height,
+        savedHeight ? savedHeight + chrome : 0,
     );
     const title = data?.title ?? meta.title;
     const style = {
@@ -258,7 +276,7 @@ function PuzzleBlock({
             x: e.clientX,
             y: e.clientY,
             span: layout.span,
-            height: block.getBoundingClientRect().height,
+            height: block.getBoundingClientRect().height - chrome,
             width: block.getBoundingClientRect().width,
         };
     }
@@ -294,13 +312,14 @@ function PuzzleBlock({
             style={style}
             className={`ov-card ${editing ? 'ov-card-edit' : ''} ${isDragging ? 'ov-dragging' : ''}`}
             aria-label={title}
+            tabIndex={-1}
             data-block={layout.id}
             data-span={layout.span}
             data-kind={meta.kind}
         >
             <div ref={content} className="ov-card-inner">
                 {editing && (
-                    <div className="ov-block-tools">
+                    <div className="ov-block-tools" ref={tools}>
                         <button
                             type="button"
                             className="ov-icon-button ov-drag-handle"
@@ -419,10 +438,10 @@ function PuzzleBlock({
                             <ShieldCheck size={12} />
                             Fixed to{' '}
                             {layout.site === 'all'
-                                ? 'all permitted sites'
+                                ? 'all your sites'
                                 : (sites.find(
                                       (s) => String(s.id) === layout.site,
-                                  )?.name ?? 'unavailable site')}
+                                  )?.name ?? 'a site you can no longer see')}
                         </div>
                     )}
                 <div
@@ -437,12 +456,12 @@ function PuzzleBlock({
                     />
                 </div>
                 {editing && (
-                    <div className="ov-block-bottom">
+                    <div className="ov-block-bottom" ref={bottom}>
                         {data?.scopeMode && data.scopeMode !== 'site' ? (
                             <span>
                                 {data.scopeMode === 'personal'
                                     ? 'Personal · across sites'
-                                    : 'Organisation-wide · permitted audience'}
+                                    : 'Organisation-wide'}
                             </span>
                         ) : (
                             <ScopeSelect
@@ -473,7 +492,7 @@ function PuzzleBlock({
                                         ? 'No outstanding priorities in this view'
                                         : 'Current work · ordered by urgency'
                                   : (data?.footnote ??
-                                    'Live records · your permitted view')}
+                                    'Live records · what you can see')}
                     </span>
                     {meta.id === 'attention' &&
                     !expanded &&
@@ -526,7 +545,8 @@ function PuzzleBlock({
                                     0,
                                     Math.min(
                                         720,
-                                        (layout.height || naturalHeight) +
+                                        (layout.height ||
+                                            naturalHeight - chrome) +
                                             (e.key === 'ArrowDown' ? 36 : -36),
                                     ),
                                 ),
@@ -619,7 +639,16 @@ function Workspace({
     const [error, setError] = useState('');
     const [dialog, setDialog] = useState<DialogView>(null);
     const [previewId, setPreviewId] = useState<string | null>(null);
-    const [tab, setTab] = useState<Tab>('overview');
+    // The tab lives in the URL too, so changing site or period keeps it.
+    const [tab, setTab] = useState<Tab>(() => {
+        const value =
+            typeof window === 'undefined'
+                ? null
+                : new URLSearchParams(window.location.search).get('tab');
+        return value === 'attention' || value === 'insights'
+            ? value
+            : 'overview';
+    });
     const [query, setQuery] = useState('');
     const [category, setCategory] = useState('All');
     const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -631,7 +660,15 @@ function Workspace({
     const [refreshing, setRefreshing] = useState(false);
     const [isDefault, setIsDefault] = useState(defaultRole === role);
     const [detailRow, setDetailRow] = useState<Row | null>(null);
+    const [confirmCancel, setConfirmCancel] = useState(false);
+    const [conflict, setConflict] = useState<{
+        revision: string | null;
+        value: OverviewProps['preference']['value'];
+    } | null>(null);
+    const [savingDefault, setSavingDefault] = useState(false);
     const board = useRef<HTMLDivElement>(null);
+    /** Where focus goes when the dialog closes (a Find result's block). */
+    const returnFocus = useRef<string | null>(null);
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
         useSensor(KeyboardSensor, {
@@ -641,20 +678,24 @@ function Workspace({
     const editing = draft !== null;
     // Warnings stay in Needs attention; only critical work is called urgent.
     const urgentNow = overview.urgent.filter((row) => row.tone === 'critical');
-    const scopeKey = [
-        ...new Set(
-            current.blocks
-                .map((b) => (b.site === 'page' ? filters.site : b.site))
-                .filter((s) => s !== filters.site),
-        ),
-    ]
+    // Blocks pinned to another site, grouped by site: "3:trend+sites,7:agenda".
+    // Each site fetch works out only its own pinned blocks.
+    const scopeKey = Object.entries(
+        current.blocks.reduce<Record<string, string[]>>((sites, b) => {
+            const site = b.site === 'page' ? filters.site : b.site;
+            if (site !== filters.site) (sites[site] ??= []).push(b.id);
+            return sites;
+        }, {}),
+    )
+        .map(([site, ids]) => `${site}:${[...ids].sort().join('+')}`)
         .sort()
         .join(',');
     useEffect(() => {
         const controller = new AbortController();
-        for (const site of scopeKey.split(',').filter(Boolean)) {
+        for (const entry of scopeKey.split(',').filter(Boolean)) {
+            const [site, ids] = entry.split(':');
             fetch(
-                `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site })}`,
+                `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site, blocks: ids.split('+').join(',') })}`,
                 {
                     signal: controller.signal,
                     headers: { Accept: 'application/json' },
@@ -695,6 +736,76 @@ function Workspace({
         }
         return () => controller.abort();
     }, [scopeKey, role, filters.range, overview, roleMeta]);
+    // The page load works out only the layout's blocks. The editor needs the
+    // whole library (previews, newly added blocks), so it loads it once here.
+    // Tied to the page data it was loaded with, so a refresh or new filters
+    // never show last time's previews.
+    const [libraryLoad, setLibraryLoad] = useState<{
+        source: OverviewData;
+        blocks: Record<string, BlockData>;
+    } | null>(null);
+    const libraryData =
+        libraryLoad?.source === overview ? libraryLoad.blocks : null;
+    useEffect(() => {
+        if (!editing || libraryData) return;
+        const setLibraryData = (blocks: Record<string, BlockData>) =>
+            setLibraryLoad({ source: overview, blocks });
+        const controller = new AbortController();
+        fetch(
+            `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site: filters.site, blocks: 'all' })}`,
+            {
+                signal: controller.signal,
+                headers: { Accept: 'application/json' },
+            },
+        )
+            .then(async (response) => {
+                if (!response.ok) throw new Error('Library unavailable');
+                return (await response.json()) as OverviewData;
+            })
+            .then((data) => setLibraryData(data.blocks))
+            .catch((e) => {
+                if (e.name === 'AbortError') return;
+                setLibraryData(
+                    Object.fromEntries(
+                        roleMeta.blocks.map((b) => [
+                            b.id,
+                            {
+                                state: 'unavailable',
+                                subtitle: 'Information unavailable',
+                                message:
+                                    'This summary could not be loaded. Refresh to try again.',
+                                rows: [],
+                                series: [],
+                                total: null,
+                            } satisfies BlockData,
+                        ]),
+                    ),
+                );
+            });
+        return () => controller.abort();
+    }, [
+        editing,
+        libraryData,
+        overview,
+        role,
+        filters.range,
+        filters.site,
+        roleMeta,
+    ]);
+    const pageBlocks = useMemo(
+        () =>
+            libraryData
+                ? Object.fromEntries(
+                      Object.entries(overview.blocks).map(([id, block]) => [
+                          id,
+                          block.state === 'deferred'
+                              ? (libraryData[id] ?? block)
+                              : block,
+                      ]),
+                  )
+                : overview.blocks,
+        [overview.blocks, libraryData],
+    );
     useEffect(() => {
         if (!editing) return;
         const beforeUnload = (e: BeforeUnloadEvent) => {
@@ -709,6 +820,33 @@ function Workspace({
             window.removeEventListener('beforeunload', beforeUnload);
             cancelVisit();
         };
+    }, [editing]);
+    // Editor shortcuts listen on the window: removing a block unmounts the
+    // focused control, and Ctrl+Z must still work from the page body.
+    const shortcuts = useRef<(e: KeyboardEvent) => void>(() => {});
+    shortcuts.current = (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement;
+        if (
+            dialog ||
+            ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+            target.isContentEditable
+        )
+            return;
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            void save();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) redo();
+            else undo();
+        }
+    };
+    useEffect(() => {
+        if (!editing) return;
+        const onKey = (e: KeyboardEvent) => shortcuts.current(e);
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
     }, [editing]);
     const change = useCallback(
         (next: Layout, message = 'Layout updated') => {
@@ -756,12 +894,47 @@ function Workspace({
             setAnnouncement('Your overview layout has been saved.');
             toast.success('Overview layout saved');
         } catch (e) {
+            const failure = e as Error & {
+                status?: number;
+                data?: { revision?: string | null; value?: unknown };
+            };
+            if (failure.status === 409 && failure.data)
+                setConflict({
+                    revision: failure.data.revision ?? null,
+                    value: failure.data
+                        .value as OverviewProps['preference']['value'],
+                });
             setError(
                 e instanceof Error ? e.message : 'Could not save this layout.',
             );
         } finally {
             setSaving(false);
         }
+    }
+    /** After a clash with another tab: keep the draft and save over it. */
+    function keepDraft() {
+        if (!conflict) return;
+        setRevision(conflict.revision);
+        setConflict(null);
+        setError('');
+        setAnnouncement(
+            'Your changes will replace the other tab’s layout when you save.',
+        );
+    }
+    /** After a clash with another tab: adopt the newer saved layout. */
+    function adoptLatest() {
+        if (!conflict) return;
+        const latest = {
+            ...conflict.value,
+            range: filters.range,
+            blocks: conflict.value.blocks ?? defaultBlocks(role),
+        };
+        setSaved(latest);
+        setRevision(conflict.revision);
+        setConflict(null);
+        setDraft(null);
+        setError('');
+        setAnnouncement('The layout from the other tab is now showing.');
     }
     function updateBlock(id: string, value: Partial<BlockLayout>) {
         change({
@@ -798,9 +971,9 @@ function Workspace({
     }
     function dataFor(block: BlockLayout): BlockData | undefined {
         const site = block.site === 'page' ? filters.site : block.site;
-        return (site === filters.site ? overview : scopes[site])?.blocks[
-            block.id
-        ];
+        return site === filters.site
+            ? pageBlocks[block.id]
+            : scopes[site]?.blocks[block.id];
     }
     function navigate(next: { role?: Role; site?: string; range?: Range }) {
         if (editing) return;
@@ -811,6 +984,7 @@ function Workspace({
                 ...filters,
                 ...next,
                 ...(next.role ? { site: 'all', range: undefined } : {}),
+                tab: tab === 'overview' ? undefined : tab,
             },
             { preserveScroll: true, replace: true },
         );
@@ -819,21 +993,25 @@ function Workspace({
         const blocks = tidyBlocks(current.blocks);
         let row: BlockLayout[] = [],
             width = 0;
+        // Measure each card as it will look outside the editor: its content
+        // without the tools and scope bars, plus the footer.
+        const viewHeight = (b: BlockLayout) => {
+            const card = board.current?.querySelector(`[data-block="${b.id}"]`);
+            const measure = (selector: string) =>
+                card?.querySelector(selector)?.getBoundingClientRect().height ??
+                0;
+            const kind = roleMeta.blocks.find((m) => m.id === b.id)?.kind;
+            return (
+                measure('.ov-card-inner') -
+                measure('.ov-block-tools') -
+                measure('.ov-block-bottom') +
+                (kind === 'focus' ? 0 : FOOTER_HEIGHT)
+            );
+        };
         const align = () => {
             const height = Math.min(
                 720,
-                Math.ceil(
-                    Math.max(
-                        ...row.map(
-                            (b) =>
-                                board.current
-                                    ?.querySelector(
-                                        `[data-block="${b.id}"] .ov-card-inner`,
-                                    )
-                                    ?.getBoundingClientRect().height ?? 0,
-                        ),
-                    ),
-                ),
+                Math.ceil(Math.max(...row.map(viewHeight))),
             );
             row.forEach((b) => {
                 b.height = height;
@@ -972,6 +1150,8 @@ function Workspace({
         governance: 'Board workspace',
     }[role];
     const previewMeta = roleMeta.blocks.find((b) => b.id === previewId);
+    const titleOf = (id: string | number) =>
+        roleMeta.blocks.find((b) => b.id === id)?.title ?? 'block';
     const needle = query.trim().toLowerCase();
     const foundSteps =
         dialog === 'find'
@@ -993,25 +1173,6 @@ function Workspace({
             data-editing={editing}
             data-density={current.density}
             data-role={role}
-            onKeyDown={(e) => {
-                if (
-                    !editing ||
-                    dialog ||
-                    ['INPUT', 'TEXTAREA'].includes(
-                        (e.target as HTMLElement).tagName,
-                    )
-                )
-                    return;
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                    e.preventDefault();
-                    void save();
-                }
-                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-                    e.preventDefault();
-                    if (e.shiftKey) redo();
-                    else undo();
-                }
-            }}
         >
             <PageHeader
                 icon={
@@ -1035,6 +1196,7 @@ function Workspace({
                     !editing && (
                         <>
                             <PageHeaderSearchTrigger
+                                className="ov-hero-find"
                                 placeholder="Find in overview…"
                                 onOpen={() => startDialog('find')}
                             />
@@ -1165,12 +1327,12 @@ function Workspace({
                                 <PageHeaderFilterSelect
                                     size="comfortable"
                                     icon={Building2}
-                                    label="All permitted sites"
+                                    label="All your sites"
                                     value={filters.site}
                                     options={[
                                         {
                                             value: 'all',
-                                            label: 'All permitted sites',
+                                            label: 'All your sites',
                                         },
                                         ...sites.map((s) => ({
                                             value: String(s.id),
@@ -1311,7 +1473,7 @@ function Workspace({
                 <div className="ov-editor-toolbar">
                     <div className="ov-editor-top">
                         <div>
-                            <span className="ov-eyebrow">MAKE IT YOURS</span>
+                            <span className="ov-eyebrow">Your layout</span>
                             <h2>Edit your overview</h2>
                             <p>
                                 {roleMeta.name} · {current.blocks.length} blocks
@@ -1331,6 +1493,10 @@ function Workspace({
                                 variant="ghost"
                                 disabled={saving}
                                 onClick={() => {
+                                    if (history.length) {
+                                        setConfirmCancel(true);
+                                        return;
+                                    }
                                     setDraft(null);
                                     setError('');
                                 }}
@@ -1417,9 +1583,23 @@ function Workspace({
                         </Button>
                     </div>
                     {error && (
-                        <p role="alert" className="ov-save-error">
-                            {error}
-                        </p>
+                        <div role="alert" className="ov-save-error">
+                            <p>{error}</p>
+                            {conflict && (
+                                <div className="ov-save-error-actions">
+                                    <Button size="sm" onClick={keepDraft}>
+                                        Keep my changes
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={adoptLatest}
+                                    >
+                                        Use the other tab’s layout
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             )}
@@ -1433,86 +1613,126 @@ function Workspace({
                 <OverviewDetailContext.Provider
                     value={editing ? null : setDetailRow}
                 >
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={dragEnd}
-                >
-                    <SortableContext
-                        items={shown.map((b) => b.id)}
-                        strategy={rectSortingStrategy}
+                    <DndContext
+                        accessibility={{
+                            announcements: {
+                                onDragStart: ({ active }) =>
+                                    `Picked up ${titleOf(active.id)}.`,
+                                onDragOver: ({ active, over }) =>
+                                    over
+                                        ? `${titleOf(active.id)} is over ${titleOf(over.id)}.`
+                                        : `${titleOf(active.id)} is not over a block.`,
+                                onDragEnd: ({ active, over }) =>
+                                    over
+                                        ? `${titleOf(active.id)} moved to where ${titleOf(over.id)} was.`
+                                        : `${titleOf(active.id)} dropped.`,
+                                onDragCancel: ({ active }) =>
+                                    `Moving ${titleOf(active.id)} was cancelled.`,
+                            },
+                            screenReaderInstructions: {
+                                draggable:
+                                    'To move a block, press Space or Enter, use the arrow keys, then press Space or Enter to drop it. Press Escape to cancel.',
+                            },
+                        }}
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={dragEnd}
                     >
-                        <div
-                            className="ov-board"
-                            ref={board}
-                            data-natural={
-                                !editing &&
-                                shown.every((block) => !block.height)
-                            }
+                        <SortableContext
+                            items={shown.map((b) => b.id)}
+                            strategy={rectSortingStrategy}
                         >
-                            {shown.map((block) => {
-                                const meta = roleMeta.blocks.find(
-                                    (b) => b.id === block.id,
-                                );
-                                if (!meta) return null;
-                                return (
-                                    <PuzzleBlock
-                                        key={block.id}
-                                        layout={block}
-                                        meta={meta}
-                                        data={dataFor(block)}
-                                        editing={editing}
-                                        expanded={tab === 'attention'}
-                                        onExpand={() => setTab('attention')}
-                                        onEdit={edit}
-                                        sites={sites}
-                                        onChange={(value) =>
-                                            updateBlock(block.id, value)
-                                        }
-                                        onRemove={() =>
-                                            change(
-                                                {
-                                                    ...current,
-                                                    blocks: current.blocks.filter(
+                            <div
+                                className="ov-board"
+                                ref={board}
+                                data-natural={
+                                    !editing &&
+                                    shown.every((block) => !block.height)
+                                }
+                            >
+                                {shown.map((block) => {
+                                    const meta = roleMeta.blocks.find(
+                                        (b) => b.id === block.id,
+                                    );
+                                    if (!meta) return null;
+                                    return (
+                                        <PuzzleBlock
+                                            key={block.id}
+                                            layout={block}
+                                            meta={meta}
+                                            data={dataFor(block)}
+                                            editing={editing}
+                                            expanded={tab === 'attention'}
+                                            onExpand={() => setTab('attention')}
+                                            onEdit={edit}
+                                            sites={sites}
+                                            onChange={(value) =>
+                                                updateBlock(block.id, value)
+                                            }
+                                            onRemove={() => {
+                                                const index =
+                                                    current.blocks.findIndex(
                                                         (b) =>
-                                                            b.id !== block.id,
+                                                            b.id === block.id,
+                                                    );
+                                                const next =
+                                                    current.blocks[index + 1] ??
+                                                    current.blocks[index - 1];
+                                                change(
+                                                    {
+                                                        ...current,
+                                                        blocks: current.blocks.filter(
+                                                            (b) =>
+                                                                b.id !==
+                                                                block.id,
+                                                        ),
+                                                    },
+                                                    `${meta.title} removed`,
+                                                );
+                                                // The focused ✕ unmounts; keep the
+                                                // keyboard user on the board.
+                                                requestAnimationFrame(() =>
+                                                    (
+                                                        board.current?.querySelector(
+                                                            next
+                                                                ? `[data-block="${next.id}"] .ov-drag-handle`
+                                                                : '.ov-add-tile',
+                                                        ) as HTMLElement | null
+                                                    )?.focus(),
+                                                );
+                                            }}
+                                            onMove={(delta) =>
+                                                change({
+                                                    ...current,
+                                                    blocks: moveBlock(
+                                                        current.blocks,
+                                                        block.id,
+                                                        delta,
                                                     ),
-                                                },
-                                                `${meta.title} removed`,
-                                            )
-                                        }
-                                        onMove={(delta) =>
-                                            change({
-                                                ...current,
-                                                blocks: moveBlock(
-                                                    current.blocks,
-                                                    block.id,
-                                                    delta,
-                                                ),
-                                            })
-                                        }
-                                    />
-                                );
-                            })}
-                            {editing && (
-                                // eslint-disable-next-line no-restricted-syntax -- an empty grid slot that opens the block library
-                                <button
-                                    type="button"
-                                    className="ov-add-tile"
-                                    onClick={() => startDialog('library')}
-                                >
-                                    <Plus size={22} />
-                                    <strong>Add another block</strong>
-                                    <span>
-                                        {roleMeta.blocks.length -
-                                            current.blocks.length}{' '}
-                                        more to choose from
-                                    </span>
-                                </button>
-                            )}
-                        </div>
-                    </SortableContext>
-                </DndContext>
+                                                })
+                                            }
+                                        />
+                                    );
+                                })}
+                                {editing && (
+                                    // eslint-disable-next-line no-restricted-syntax -- an empty grid slot that opens the block library
+                                    <button
+                                        type="button"
+                                        className="ov-add-tile"
+                                        onClick={() => startDialog('library')}
+                                    >
+                                        <Plus size={22} />
+                                        <strong>Add another block</strong>
+                                        <span>
+                                            {roleMeta.blocks.length -
+                                                current.blocks.length}{' '}
+                                            more to choose from
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
                 </OverviewDetailContext.Provider>
                 {!shown.length && !editing && (
                     <div className="ov-board-empty">
@@ -1536,7 +1756,8 @@ function Workspace({
                 ) : (
                     <span>Live records · {overview.scope}</span>
                 )}
-                {!editing && roles.length > 1 &&
+                {!editing &&
+                    roles.length > 1 &&
                     (isDefault ? (
                         <span className="ov-default-note">
                             <Check size={13} />
@@ -1546,7 +1767,10 @@ function Workspace({
                         <Button
                             variant="ghost"
                             size="sm"
+                            disabled={savingDefault}
                             onClick={async () => {
+                                if (savingDefault) return;
+                                setSavingDefault(true);
                                 try {
                                     await writeOverview(
                                         '/dashboard/default-role',
@@ -1562,6 +1786,8 @@ function Workspace({
                                             ? e.message
                                             : 'Could not save default',
                                     );
+                                } finally {
+                                    setSavingDefault(false);
                                 }
                             }}
                         >
@@ -1584,12 +1810,30 @@ function Workspace({
             >
                 <DialogContent
                     className={`ov-dialog ${dialog === 'library' && !previewId ? 'ov-library-dialog' : ''}`}
+                    onCloseAutoFocus={(e) => {
+                        const target = returnFocus.current
+                            ? (board.current?.querySelector(
+                                  returnFocus.current,
+                              ) as HTMLElement | null)
+                            : null;
+                        returnFocus.current = null;
+                        if (target) {
+                            e.preventDefault();
+                            target.focus({ preventScroll: true });
+                        }
+                    }}
                     // POPUP_STYLE_GUIDE width tokens: long form for the
                     // library grid, standard form for everything else.
                     style={
                         dialog === 'library' && !previewId
-                            ? { maxWidth: 'min(92vw, 900px)', width: 'min(92vw, 900px)' }
-                            : { maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }
+                            ? {
+                                  maxWidth: 'min(92vw, 900px)',
+                                  width: 'min(92vw, 900px)',
+                              }
+                            : {
+                                  maxWidth: 'min(92vw, 720px)',
+                                  width: 'min(92vw, 720px)',
+                              }
                     }
                 >
                     <DialogHeader>
@@ -1687,7 +1931,7 @@ function Workspace({
                                     const on = current.blocks.some(
                                         (b) => b.id === meta.id,
                                     );
-                                    const data = overview.blocks[meta.id];
+                                    const data = pageBlocks[meta.id];
                                     return (
                                         <article
                                             key={meta.id}
@@ -1724,6 +1968,7 @@ function Workspace({
                                             <button
                                                 type="button"
                                                 className="ov-preview-thumb"
+                                                data-preview-id={meta.id}
                                                 aria-label={`Preview ${meta.title}`}
                                                 onClick={() =>
                                                     setPreviewId(meta.id)
@@ -1770,7 +2015,10 @@ function Workspace({
                                                                   : data?.state ===
                                                                       'ready'
                                                                     ? 'Nothing recorded yet'
-                                                                    : 'Proposed summary'}
+                                                                    : data?.state ===
+                                                                        'deferred'
+                                                                      ? 'Loading preview…'
+                                                                      : 'Proposed summary'}
                                                         </span>
                                                     </>
                                                 )}
@@ -1843,7 +2091,7 @@ function Workspace({
                             <div className="ov-full-preview">
                                 <BlockContent
                                     meta={previewMeta}
-                                    data={overview.blocks[previewMeta.id]}
+                                    data={pageBlocks[previewMeta.id]}
                                     preview
                                 />
                             </div>
@@ -1856,7 +2104,17 @@ function Workspace({
                             <div className="ov-between">
                                 <Button
                                     variant="outline"
-                                    onClick={() => setPreviewId(null)}
+                                    onClick={() => {
+                                        const id = previewId;
+                                        setPreviewId(null);
+                                        requestAnimationFrame(() =>
+                                            (
+                                                document.querySelector(
+                                                    `[data-preview-id="${id}"]`,
+                                                ) as HTMLElement | null
+                                            )?.focus(),
+                                        );
+                                    }}
                                 >
                                     Back to blocks
                                 </Button>
@@ -2042,6 +2300,17 @@ function Workspace({
                                     >
                                         <TriangleAlert size={18} />
                                         <strong>{row.label}</strong>
+                                        <StatusBadge
+                                            variant={
+                                                row.tone === 'critical'
+                                                    ? 'critical'
+                                                    : 'warning'
+                                            }
+                                        >
+                                            {row.tone === 'critical'
+                                                ? 'Urgent'
+                                                : 'Due soon'}
+                                        </StatusBadge>
                                         {row.href && (
                                             <Link
                                                 href={row.href}
@@ -2063,35 +2332,54 @@ function Workspace({
                                     />
                                 )}
                                 {foundBlocks.map((meta) => (
-                                        // eslint-disable-next-line no-restricted-syntax -- a result row that scrolls to its block
-                                        <button
-                                            type="button"
-                                            key={meta.id}
-                                            onClick={() => {
-                                                setTab('overview');
-                                                setDialog(null);
-                                                requestAnimationFrame(() =>
-                                                    board.current
-                                                        ?.querySelector(
-                                                            `[data-block="${meta.id}"]`,
-                                                        )
-                                                        ?.scrollIntoView({
-                                                            block: 'center',
-                                                            behavior: 'auto',
-                                                        }),
-                                                );
-                                            }}
-                                        >
-                                            <LayoutDashboard size={16} />
-                                            <span>{meta.title}</span>
-                                            <ArrowDown size={15} />
-                                        </button>
-                                    ))}
+                                    // eslint-disable-next-line no-restricted-syntax -- a result row that scrolls to its block
+                                    <button
+                                        type="button"
+                                        key={meta.id}
+                                        onClick={() => {
+                                            setTab('overview');
+                                            setDialog(null);
+                                            requestAnimationFrame(() =>
+                                                board.current
+                                                    ?.querySelector(
+                                                        `[data-block="${meta.id}"]`,
+                                                    )
+                                                    ?.scrollIntoView({
+                                                        block: 'center',
+                                                        behavior: 'auto',
+                                                    }),
+                                            );
+                                            // Land keyboard focus on the
+                                            // block, not back on Find.
+                                            returnFocus.current = `[data-block="${meta.id}"]`;
+                                        }}
+                                    >
+                                        <LayoutDashboard size={16} />
+                                        <span>{meta.title}</span>
+                                        <ArrowDown size={15} />
+                                    </button>
+                                ))}
                             </div>
                         </>
                     )}
                 </DialogContent>
             </Dialog>
+            <ConfirmDialog
+                open={confirmCancel}
+                onClose={() => setConfirmCancel(false)}
+                onConfirm={() => {
+                    setConfirmCancel(false);
+                    setDraft(null);
+                    setConflict(null);
+                    setError('');
+                    setAnnouncement('Layout changes discarded');
+                }}
+                title="Discard your layout changes?"
+                description="Your saved overview stays as it was. The changes you made in this editing session will be lost."
+                confirmText="Discard changes"
+                cancelText="Keep editing"
+                variant="destructive"
+            />
             <Dialog
                 open={detailRow !== null}
                 onOpenChange={(open) => {
@@ -2150,7 +2438,9 @@ function Workspace({
                         )}
                         {!!detailRow.history?.length && (
                             <div className="ov-detail-history">
-                                <strong>Connection checks · last 24 hours</strong>
+                                <strong>
+                                    Connection checks · last 24 hours
+                                </strong>
                                 <ConnectionHistoryStrip row={detailRow} />
                             </div>
                         )}
@@ -2164,8 +2454,7 @@ function Workspace({
                             {detailRow.href && (
                                 <Button asChild>
                                     <Link href={detailRow.href}>
-                                        {detailRow.actionLabel ??
-                                            'Open record'}
+                                        {detailRow.actionLabel ?? 'Open record'}
                                         <ArrowUpRight />
                                     </Link>
                                 </Button>

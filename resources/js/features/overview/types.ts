@@ -82,7 +82,8 @@ export interface Row {
 }
 export interface BlockData {
     scopeMode?: 'site' | 'personal' | 'organisation';
-    state: 'ready' | 'proposed' | 'restricted' | 'unavailable';
+    /** deferred: a library block not on the layout, loaded when the editor opens. */
+    state: 'ready' | 'proposed' | 'restricted' | 'unavailable' | 'deferred';
     title?: string;
     subtitle: string;
     message?: string;
@@ -283,9 +284,12 @@ export async function writeOverview(url: string, body: unknown) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok)
-        throw new Error(
-            result.message ??
-                'Could not save. Your changes are still here; please try again.',
+        throw Object.assign(
+            new Error(
+                result.message ??
+                    'Could not save. Your changes are still here; please try again.',
+            ),
+            { status: response.status, data: result },
         );
     return result;
 }

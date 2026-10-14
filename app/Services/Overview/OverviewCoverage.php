@@ -14,8 +14,12 @@ final class OverviewCoverage
 {
     public function read(User $user, array $sites, array $siteIds): array
     {
-        $today = CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
-        $start = $today->addHours(7);
+        $now = CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'));
+        // The operational day runs 07:00–07:00. Before 07:00 the night shift on
+        // the floor belongs to yesterday's day, so it stays in view. setTime keeps
+        // 07:00 on daylight-saving days, where adding 7 hours would not.
+        $today = ($now->hour < 7 ? $now->subDay() : $now)->startOfDay();
+        $start = $today->setTime(7, 0);
         $end = $start->addDay();
         $shifts = app(OperationsDashboardScopeService::class)->shifts($user)->whereIn('site_id', $siteIds)
             ->where('starts_at', '<', $end->utc())->where('ends_at', '>', $start->utc());

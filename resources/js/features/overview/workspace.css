@@ -15,6 +15,9 @@
     --chart-5: oklch(0.669 0.059 260);
     color: var(--foreground);
 }
+/* Scoped to the whole page area, so shell content beside the overview
+   (the breadcrumb) reads its muted text on the same graphite ground. */
+.dark main:has(.ov-workspace),
 .dark .ov-workspace,
 .dark .ov-dialog {
     --background: oklch(0.234 0.017 280);
@@ -811,8 +814,15 @@
 .ov-team-row a:hover strong {
     color: var(--ov-brand-text);
 }
+/* Spoken in every width (the column headers are visual only); shown in
+   compact cards where the columns stack. */
 .ov-team-mobile-label {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 .ov-card[data-span='4'] .ov-team-head {
     display: none;
@@ -825,6 +835,11 @@
     grid-column: 1 / -1;
 }
 .ov-card[data-span='4'] .ov-team-mobile-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
     display: block;
     font-size: calc(10.5rem / 14);
     color: var(--muted-foreground);
@@ -1172,18 +1187,28 @@ span.ov-context-priorities > svg {
 .ov-data-table summary {
     cursor: pointer;
 }
-.ov-data-table > div {
-    max-height: 140px;
+.ov-data-table-scroll {
+    max-height: 180px;
     overflow: auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
-    gap: 8px;
-    margin-top: 10px;
+    margin-top: 8px;
 }
-.ov-data-table span {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
+.ov-data-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+.ov-data-table :is(th, td) {
+    padding: 4px 8px 4px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    font-weight: 400;
+}
+.ov-data-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    font-weight: 600;
+    color: var(--foreground);
 }
 .ov-distribution {
     display: flex;
@@ -1336,7 +1361,6 @@ span.ov-context-priorities > svg {
 }
 .ov-filter-count {
     font-size: calc(10.5rem / 14);
-    opacity: 0.75;
 }
 .ov-available-only {
     margin-left: auto;
@@ -1525,6 +1549,11 @@ span.ov-context-priorities > svg {
     background: var(--status-critical-bg);
     color: var(--status-critical-foreground);
     font-size: calc(12rem / 14);
+}
+.ov-save-error-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
 }
 .ov-board-empty {
     padding: 50px;
@@ -1956,10 +1985,9 @@ span.ov-context-priorities > svg {
     font-size: calc(12rem / 14);
 }
 .ov-section-heading span,
-.ov-assurance-item span,
+.ov-assurance-item > span:first-child > span,
 .ov-assurance-item small,
-.ov-service-tile small,
-.ov-priority-row > div:last-child > span {
+.ov-service-tile small {
     color: var(--muted-foreground);
     font-size: calc(11rem / 14);
     line-height: 1.5;
@@ -1971,14 +1999,14 @@ span.ov-context-priorities > svg {
     padding: 15px 0;
     border-top: 1px solid var(--border);
 }
-.ov-assurance-item > div {
+.ov-assurance-item > span {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 5px;
     min-width: 0;
 }
-.ov-assurance-item > div:last-child {
+.ov-assurance-item > span:last-child {
     align-items: flex-end;
     flex-shrink: 0;
 }
@@ -2009,7 +2037,7 @@ span.ov-context-priorities > svg {
     border-radius: 12px;
     background: var(--muted);
 }
-.ov-service-tile > div:first-child {
+.ov-service-tile > .ov-service-heading {
     display: flex;
     justify-content: space-between;
     width: 100%;
@@ -2049,8 +2077,8 @@ span.ov-context-priorities > svg {
     gap: 5px;
 }
 .ov-connection-legend i {
-    width: 7px;
-    height: 7px;
+    width: 12px;
+    height: 12px;
     border-radius: 2px;
     background: var(--muted-foreground);
 }
@@ -2303,4 +2331,53 @@ span.ov-context-priorities > svg {
     text-align: left;
     font: inherit;
     color: inherit;
+}
+/* Urgency shown by shape as well as colour on Needs attention rows. */
+.ov-priority-mark {
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 0.15em;
+}
+.ov-priority[data-tone='critical'] .ov-priority-mark {
+    color: var(--status-critical);
+}
+.ov-priority[data-tone='warning'] .ov-priority-mark {
+    color: var(--status-warning);
+}
+/* Connection checks: degraded is striped and a failure is crossed, so the
+   states differ without colour (the legend uses the same marks). */
+:is(.ov-connection-history, .ov-connection-legend) [data-state='degraded'] {
+    background-image: repeating-linear-gradient(
+        135deg,
+        transparent 0 3px,
+        color-mix(in oklab, var(--card) 55%, transparent) 3px 5px
+    );
+}
+:is(.ov-connection-history, .ov-connection-legend) [data-state='failed'] {
+    background-image:
+        linear-gradient(
+            45deg,
+            transparent 42%,
+            var(--card) 42% 58%,
+            transparent 58%
+        ),
+        linear-gradient(
+            -45deg,
+            transparent 42%,
+            var(--card) 42% 58%,
+            transparent 58%
+        );
+}
+/* Library category filter: the shared Toggle's "on" pair is under 4.5:1 on
+   this surface, so the selected chip uses the verified brand-fill tint. */
+.ov-library-filters [data-state='on'] {
+    background: color-mix(in oklab, var(--primary-fill) 10%, var(--card));
+    color: var(--ov-brand-text);
+}
+/* A narrow desktop window keeps the title readable: the rail's Find chip
+   stays, so the header search field can step aside. */
+@container overview (max-width: 900px) {
+    .ov-hero-find {
+        display: none;
+    }
 }

@@ -484,7 +484,7 @@ describe('work planning workspace', () => {
 
         fireEvent.click(
             within(header).getByRole('button', {
-                name: 'All permitted sites',
+                name: 'All your sites',
             }),
         );
         fireEvent.click(screen.getByRole('button', { name: 'Aurora House' }));

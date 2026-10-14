@@ -70,7 +70,7 @@ const props = (): OverviewProps => ({
         metrics: [],
         urgent: [],
         partial: false,
-        scope: 'All permitted sites',
+        scope: 'All your sites',
         period: { start: '2026-10-12', end: '2026-10-12' },
         updatedAt: '2026-10-12T00:00:00Z',
     },
@@ -94,6 +94,11 @@ beforeEach(() => {
     );
 });
 afterEach(() => vi.unstubAllGlobals());
+/** Layout saves only (the editor also loads the block library with a GET). */
+const layoutWrites = () =>
+    vi
+        .mocked(fetch)
+        .mock.calls.filter(([url]) => String(url).startsWith('/dashboard/layout'));
 
 describe('overview arrangements', () => {
     it('shows independent progress measures without adding overlapping counts into a donut', () => {
@@ -252,15 +257,31 @@ describe('overview arrangements', () => {
         expect(
             screen.getByText('Select a date on the chart to see its figures.'),
         ).toBeInTheDocument();
-        const figures = screen.getByText(/View chart figures/).closest(
-            'details',
-        )!;
-        expect(within(figures).getByText(/Mon 12 Oct/).parentElement).toHaveTextContent(
-            /0 \/ 0/,
-        );
-        expect(within(figures).getByText(/Tue 13 Oct/).parentElement).toHaveTextContent(
-            /— \/ —/,
-        );
+        // The figures are a real table: a header row, then one row per date.
+        const table = screen.getByRole('table', {
+            name: /figures by date/,
+        });
+        expect(
+            within(table)
+                .getAllByRole('columnheader')
+                .map((th) => th.textContent),
+        ).toEqual(['Date', 'Opened', 'Resolved']);
+        const measured = within(table).getByRole('row', { name: /Mon 12 Oct/ });
+        expect(
+            within(measured)
+                .getAllByRole('cell')
+                .map((td) => td.textContent),
+        ).toEqual(['0', '0']);
+        const future = within(table).getByRole('row', { name: /Tue 13 Oct/ });
+        expect(
+            within(future)
+                .getAllByRole('cell')
+                .map((td) => td.textContent),
+        ).toEqual(['No data yet', 'No data yet']);
+        // No hidden keyboard stop inside the chart image.
+        expect(
+            document.querySelector('.ov-area [tabindex="0"]'),
+        ).toBeNull();
     });
     it('keeps team work destinations separate and library previews non-interactive', () => {
         const data = {
@@ -887,7 +908,8 @@ describe('overview arrangements', () => {
             screen.getByRole('region', { name: 'Needs attention' }),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-        expect(fetch).not.toHaveBeenCalled();
+        // Opening the editor loads the block library; nothing is written.
+        expect(layoutWrites()).toHaveLength(0);
         expect(
             screen.getByRole('button', { name: 'Edit layout' }),
         ).toBeInTheDocument();
@@ -916,7 +938,7 @@ describe('overview arrangements', () => {
                 screen.getByRole('button', { name: 'Edit layout' }),
             ).toBeInTheDocument(),
         );
-        const call = vi.mocked(fetch).mock.calls[0];
+        const call = layoutWrites()[0];
         expect(call[0]).toBe('/dashboard/layout/worker');
         const saved = JSON.parse(call[1]!.body as string);
         expect(saved.value.blocks).toHaveLength(7);
@@ -1125,6 +1147,111 @@ describe('overview completion pass (13 Oct 2026)', () => {
         expect(dialog.querySelector('.ov-sketch')).not.toBeNull();
         expect(
             within(dialog).queryByText(/^0$/, { selector: 'strong' }),
+        ).not.toBeInTheDocument();
+    });
+});
+
+describe('overview audit fixes (14 Oct 2026)', () => {
+    const blockIds = (container: HTMLElement) =>
+        [...container.querySelectorAll('[data-block]')].map((el) =>
+            el.getAttribute('data-block'),
+        );
+
+    it('keeps Ctrl+Z working after removing a block moves focus off the board', () => {
+        const { container } = render(<OverviewWorkspace {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+        const before = blockIds(container);
+        const first = catalog.worker.blocks.find((b) => b.id === before[0])!;
+        fireEvent.click(
+            screen.getByRole('button', { name: `Remove ${first.title}` }),
+        );
+        expect(blockIds(container)).not.toContain(before[0]);
+        // The shortcut is heard from the page itself, not only inside the board.
+        fireEvent.keyDown(document.body, { key: 'z', ctrlKey: true });
+        expect(blockIds(container)).toEqual(before);
+    });
+
+    it('asks before Cancel throws away layout changes', () => {
+        const { container } = render(<OverviewWorkspace {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+        const before = blockIds(container);
+        const first = catalog.worker.blocks.find((b) => b.id === before[0])!;
+        fireEvent.click(
+            screen.getByRole('button', { name: `Remove ${first.title}` }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        const confirm = screen.getByRole('alertdialog', {
+            name: 'Discard your layout changes?',
+        });
+        fireEvent.click(
+            within(confirm).getByRole('button', { name: 'Keep editing' }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Save layout' }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard changes' }),
+        );
+        expect(
+            screen.queryByRole('button', { name: 'Save layout' }),
+        ).not.toBeInTheDocument();
+        expect(blockIds(container)).toEqual(before);
+    });
+
+    it('recovers from a save clash with another tab without a reload', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: false,
+            status: 409,
+            json: async () => ({
+                message:
+                    'This layout was changed in another tab. Your changes are still here.',
+                revision: 'newer-revision',
+                value: {
+                    blocks: [
+                        { id: 'attention', span: 12, height: 0, site: 'page' },
+                    ],
+                    copies: [],
+                    favorites: [],
+                    density: 'balanced',
+                    range: 'today',
+                },
+            }),
+        }));
+        vi.stubGlobal('fetch', fetchMock);
+        const { container } = render(<OverviewWorkspace {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save layout' }));
+        await waitFor(() =>
+            expect(screen.getByRole('alert')).toHaveTextContent(
+                'changed in another tab',
+            ),
+        );
+        // Keeping the draft sends the newer revision on the next save.
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Keep my changes' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save layout' }));
+        await waitFor(() => expect(layoutWrites()).toHaveLength(2));
+        const body = JSON.parse(
+            (layoutWrites()[1] as unknown as [string, RequestInit])[1]
+                .body as string,
+        );
+        expect(body.revision).toBe('newer-revision');
+        // Or adopt the other tab's layout outright.
+        await waitFor(() =>
+            expect(
+                screen.getByRole('button', {
+                    name: 'Use the other tab’s layout',
+                }),
+            ).toBeInTheDocument(),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Use the other tab’s layout' }),
+        );
+        expect(blockIds(container)).toEqual(['attention']);
+        expect(
+            screen.queryByRole('button', { name: 'Save layout' }),
         ).not.toBeInTheDocument();
     });
 });

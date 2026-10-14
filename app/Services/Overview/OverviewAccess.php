@@ -27,7 +27,9 @@ final class OverviewAccess
             || ($user->canDo('operations.dashboard.view') && ! $user->hasRole('team_lead'))) {
             $roles[] = 'manager';
         }
-        if ($user->canDo('hr.analytics.view')) {
+        // HR staff always get the HR overview (each block still checks its own
+        // permission); others need the workforce analytics permission.
+        if ($user->hasRole('hr') || $user->canDo('hr.analytics.view')) {
             $roles[] = 'hr';
         }
         if ($user->canDo('it.view') || $user->canDo('it.manage')) {
@@ -92,9 +94,14 @@ final class OverviewAccess
             ->whereNull('archived_at')->orderBy('name')->get(['id', 'name'])->toArray();
     }
 
+    /** @var array<string, array>|null Parsed once per request; it is read for every block. */
+    private static ?array $catalog = null;
+
     public function catalog(string $role): array
     {
-        return json_decode(file_get_contents(resource_path('js/features/overview/catalog.json')), true, flags: JSON_THROW_ON_ERROR)[$role];
+        self::$catalog ??= json_decode(file_get_contents(resource_path('js/features/overview/catalog.json')), true, flags: JSON_THROW_ON_ERROR);
+
+        return self::$catalog[$role];
     }
 
     public function preference(User $user, string $role): array

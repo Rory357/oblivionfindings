@@ -126,6 +126,11 @@ function SummaryItem({
                 className={className}
                 data-tone={tone}
                 aria-haspopup="dialog"
+                // A short name: the row's own content can include long
+                // descriptions such as 24 hourly connection checks.
+                aria-label={[row.label, row.status, row.detail, 'show details']
+                    .filter(Boolean)
+                    .join(', ')}
                 onClick={() => openDetail(row)}
             >
                 {children}
@@ -302,7 +307,7 @@ export function BlockContent({
 }) {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const openDetail = useContext(OverviewDetailContext);
-    if (!data)
+    if (!data || data.state === 'deferred')
         return (
             <div className="ov-block-skeleton" role="status" aria-busy="true">
                 <span className="sr-only">Loading this summary…</span>
@@ -404,7 +409,7 @@ export function BlockContent({
                         variant="compact"
                         icon={LockKeyhole}
                         heading="Decision permission required"
-                        description="Your permitted priorities remain available in Needs attention."
+                        description="Your other priorities are still in Needs attention."
                         className="ov-block-empty"
                     />
                 ) : data.decisions?.length ? (
@@ -436,7 +441,7 @@ export function BlockContent({
                         variant="compact"
                         icon={CheckCheck}
                         heading="No open decisions"
-                        description="No proposed or open decision papers in your permitted view."
+                        description="No proposed or open decision papers you can see."
                         className="ov-block-empty"
                     />
                 )}
@@ -457,7 +462,7 @@ export function BlockContent({
                                 variant="compact"
                                 icon={LockKeyhole}
                                 heading="Permission required"
-                                description="This register is outside your permitted view."
+                                description="You don’t have access to this register."
                                 className="ov-block-empty"
                             />
                         ) : section.rows.length ? (
@@ -468,7 +473,7 @@ export function BlockContent({
                                     preview={preview}
                                     className="ov-assurance-item"
                                 >
-                                    <div>
+                                    <span>
                                         <strong>{row.label}</strong>
                                         <span>{row.detail}</span>
                                         {row.date && (
@@ -480,8 +485,8 @@ export function BlockContent({
                                                 {formatDate(row.date)}
                                             </small>
                                         )}
-                                    </div>
-                                    <div>
+                                    </span>
+                                    <span>
                                         <StatusBadge
                                             variant={
                                                 row.tone === 'critical'
@@ -494,7 +499,7 @@ export function BlockContent({
                                             {row.status}
                                         </StatusBadge>
                                         <ArrowUpRight size={15} />
-                                    </div>
+                                    </span>
                                 </SummaryItem>
                             ))
                         ) : (
@@ -526,14 +531,14 @@ export function BlockContent({
                             preview={preview}
                             className="ov-service-tile"
                         >
-                            <div className="ov-service-heading">
+                            <span className="ov-service-heading">
                                 <span
                                     className={`ov-health-dot ${row.tone ?? 'neutral'}`}
                                     aria-hidden="true"
                                 />
                                 <strong>{row.label}</strong>
                                 <ArrowUpRight size={15} />
-                            </div>
+                            </span>
                             <StatusBadge
                                 variant={
                                     row.tone === 'critical'
@@ -553,7 +558,7 @@ export function BlockContent({
                     <EmptyState
                         variant="compact"
                         icon={CircleDashed}
-                        heading="No permitted device sites"
+                        heading="No sites with devices you can see"
                         description="Device observations will appear when equipment is assigned."
                         className="ov-block-empty"
                     />
@@ -587,7 +592,7 @@ export function BlockContent({
                             preview={preview}
                             className="ov-priority-row"
                         >
-                            <div
+                            <span
                                 className="ov-priority-ring"
                                 role="img"
                                 aria-label={`${row.label}: ${typeof row.value === 'number' ? `${row.value}% recorded progress` : 'Progress not recorded'}`}
@@ -618,8 +623,8 @@ export function BlockContent({
                                         ? `${Math.round(row.value)}%`
                                         : '—'}
                                 </b>
-                            </div>
-                            <div className="ov-priority-copy">
+                            </span>
+                            <span className="ov-priority-copy">
                                 <strong>{row.label}</strong>
                                 <small>
                                     Recorded goal progress · {row.detail}
@@ -633,7 +638,7 @@ export function BlockContent({
                                 >
                                     {row.status}
                                 </StatusBadge>
-                            </div>
+                            </span>
                             <ArrowUpRight size={15} />
                         </SummaryItem>
                     ))
@@ -1200,7 +1205,7 @@ export function BlockContent({
                                 <span>
                                     {first.date
                                         ? `${formatDate(first.date)}${first.end ? ` · until ${formatTime(first.end)}` : ''}`
-                                        : 'Current work in your permitted view'}
+                                        : 'Current work you can see'}
                                 </span>
                             </div>
                         )}
@@ -1240,11 +1245,12 @@ export function BlockContent({
                 <div
                     className="ov-area"
                     role="img"
-                    aria-label={`${data.title ?? meta.title}: ${data.series.map((p) => `${p.label}: ${data.seriesLabel ?? 'Recorded'} ${p.value === null ? 'No data' : `${p.value}${data.unit ?? ''}`}${p.comparison != null ? `, ${data.comparisonLabel} ${p.comparison}${data.unit ?? ''}` : ''}`).join('; ')}`}
+                    aria-label={`${data.title ?? meta.title} chart. Every figure is in the chart figures table below.`}
                 >
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                             data={data.series}
+                            accessibilityLayer={false}
                             className={preview ? undefined : 'ov-chart-pick'}
                             onClick={(state) => {
                                 if (!preview && state?.activeLabel != null)
@@ -1373,32 +1379,69 @@ export function BlockContent({
                                     data.unit === '%' &&
                                     point.planned !== undefined
                                 )
-                                    return `${formatDate(point.label)} · ${point.value === null ? 'No ended shifts to measure' : `${point.value}% delivered · ${point.completed} of ${point.planned} planned shifts`}`;
-                                return `${formatDate(point.label)} · ${data.seriesLabel ?? 'Recorded'}: ${point.value === null ? 'Not measured' : `${point.value}${data.unit ?? ''}`}${data.comparisonLabel ? ` · ${data.comparisonLabel}: ${point.comparison == null ? 'Not measured' : `${point.comparison}${data.unit ?? ''}`}` : ''}`;
+                                    return `${formatDate(point.label)} · ${point.value === null ? 'No ended shifts yet' : `${point.value}% delivered · ${point.completed} of ${point.planned} planned shifts`}`;
+                                return `${formatDate(point.label)} · ${data.seriesLabel ?? 'Recorded'}: ${point.value === null ? 'No data yet' : `${point.value}${data.unit ?? ''}`}${data.comparisonLabel ? ` · ${data.comparisonLabel}: ${point.comparison == null ? 'No data yet' : `${point.comparison}${data.unit ?? ''}`}` : ''}`;
                             })()}
                         </p>
                     </div>
                 )}
                 <details className="ov-data-table">
-                    <summary>
-                        View chart figures
-                        {data.comparisonLabel &&
-                            ` · ${data.seriesLabel} / ${data.comparisonLabel}`}
-                    </summary>
-                    <div>
-                        {data.series.map((p) => (
-                            <span key={p.label}>
-                                {formatDate(p.label)}{' '}
-                                <b>
-                                    {p.value === null
-                                        ? '—'
-                                        : `${p.value}${data.unit ?? ''}`}
-                                    {p.comparison !== undefined
-                                        ? ` / ${p.comparison === null ? '—' : `${p.comparison}${data.unit ?? ''}`}`
-                                        : ''}
-                                </b>
-                            </span>
-                        ))}
+                    <summary>View chart figures</summary>
+                    <div className="ov-data-table-scroll">
+                        <table>
+                            <caption className="sr-only">
+                                {data.title ?? meta.title} figures by date
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Date</th>
+                                    <th scope="col">
+                                        {data.seriesLabel ?? 'Recorded'}
+                                    </th>
+                                    {data.comparisonLabel && (
+                                        <th scope="col">
+                                            {data.comparisonLabel}
+                                        </th>
+                                    )}
+                                    {data.series.some(
+                                        (p) => p.planned !== undefined,
+                                    ) && (
+                                        <th scope="col">Completed / planned</th>
+                                    )}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.series.map((p) => (
+                                    <tr key={p.label}>
+                                        <th scope="row">
+                                            {formatDate(p.label)}
+                                        </th>
+                                        <td>
+                                            {p.value === null
+                                                ? 'No data yet'
+                                                : `${p.value}${data.unit ?? ''}`}
+                                        </td>
+                                        {data.comparisonLabel && (
+                                            <td>
+                                                {p.comparison == null
+                                                    ? 'No data yet'
+                                                    : `${p.comparison}${data.unit ?? ''}`}
+                                            </td>
+                                        )}
+                                        {data.series.some(
+                                            (point) =>
+                                                point.planned !== undefined,
+                                        ) && (
+                                            <td>
+                                                {p.planned !== undefined
+                                                    ? `${p.completed ?? 0} of ${p.planned}`
+                                                    : '—'}
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </details>
             </div>
@@ -1768,8 +1811,8 @@ export function BlockContent({
                         ))}
                         {!data.reviews.length && (
                             <p>
-                                No submitted requests are waiting in your
-                                permitted review queues.
+                                No submitted requests are waiting for your
+                                review.
                             </p>
                         )}
                         {(data.reviewTotal ?? 0) > data.reviews.length && (
@@ -1817,12 +1860,26 @@ export function BlockContent({
                                     </div>
                                 )}
                                 <div className="ov-priority-main">
-                                    {!featured && (
-                                        <span
-                                            className="ov-priority-dot"
-                                            aria-hidden="true"
-                                        />
-                                    )}
+                                    {/* Shape as well as colour: urgent, due soon, other. */}
+                                    {!featured &&
+                                        (row.tone === 'critical' ? (
+                                            <TriangleAlert
+                                                className="ov-priority-mark"
+                                                size={13}
+                                                aria-hidden="true"
+                                            />
+                                        ) : row.tone === 'warning' ? (
+                                            <Clock3
+                                                className="ov-priority-mark"
+                                                size={13}
+                                                aria-hidden="true"
+                                            />
+                                        ) : (
+                                            <span
+                                                className="ov-priority-dot"
+                                                aria-hidden="true"
+                                            />
+                                        ))}
                                     <span className="ov-priority-copy">
                                         <strong>
                                             {!featured && row.tone && (
