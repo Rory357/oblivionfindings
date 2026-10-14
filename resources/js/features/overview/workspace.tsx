@@ -678,20 +678,24 @@ function Workspace({
     const editing = draft !== null;
     // Warnings stay in Needs attention; only critical work is called urgent.
     const urgentNow = overview.urgent.filter((row) => row.tone === 'critical');
-    const scopeKey = [
-        ...new Set(
-            current.blocks
-                .map((b) => (b.site === 'page' ? filters.site : b.site))
-                .filter((s) => s !== filters.site),
-        ),
-    ]
+    // Blocks pinned to another site, grouped by site: "3:trend+sites,7:agenda".
+    // Each site fetch works out only its own pinned blocks.
+    const scopeKey = Object.entries(
+        current.blocks.reduce<Record<string, string[]>>((sites, b) => {
+            const site = b.site === 'page' ? filters.site : b.site;
+            if (site !== filters.site) (sites[site] ??= []).push(b.id);
+            return sites;
+        }, {}),
+    )
+        .map(([site, ids]) => `${site}:${[...ids].sort().join('+')}`)
         .sort()
         .join(',');
     useEffect(() => {
         const controller = new AbortController();
-        for (const site of scopeKey.split(',').filter(Boolean)) {
+        for (const entry of scopeKey.split(',').filter(Boolean)) {
+            const [site, ids] = entry.split(':');
             fetch(
-                `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site })}`,
+                `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site, blocks: ids.split('+').join(',') })}`,
                 {
                     signal: controller.signal,
                     headers: { Accept: 'application/json' },
@@ -732,6 +736,76 @@ function Workspace({
         }
         return () => controller.abort();
     }, [scopeKey, role, filters.range, overview, roleMeta]);
+    // The page load works out only the layout's blocks. The editor needs the
+    // whole library (previews, newly added blocks), so it loads it once here.
+    // Tied to the page data it was loaded with, so a refresh or new filters
+    // never show last time's previews.
+    const [libraryLoad, setLibraryLoad] = useState<{
+        source: OverviewData;
+        blocks: Record<string, BlockData>;
+    } | null>(null);
+    const libraryData =
+        libraryLoad?.source === overview ? libraryLoad.blocks : null;
+    useEffect(() => {
+        if (!editing || libraryData) return;
+        const setLibraryData = (blocks: Record<string, BlockData>) =>
+            setLibraryLoad({ source: overview, blocks });
+        const controller = new AbortController();
+        fetch(
+            `/dashboard/data?${new URLSearchParams({ role, range: filters.range, site: filters.site, blocks: 'all' })}`,
+            {
+                signal: controller.signal,
+                headers: { Accept: 'application/json' },
+            },
+        )
+            .then(async (response) => {
+                if (!response.ok) throw new Error('Library unavailable');
+                return (await response.json()) as OverviewData;
+            })
+            .then((data) => setLibraryData(data.blocks))
+            .catch((e) => {
+                if (e.name === 'AbortError') return;
+                setLibraryData(
+                    Object.fromEntries(
+                        roleMeta.blocks.map((b) => [
+                            b.id,
+                            {
+                                state: 'unavailable',
+                                subtitle: 'Information unavailable',
+                                message:
+                                    'This summary could not be loaded. Refresh to try again.',
+                                rows: [],
+                                series: [],
+                                total: null,
+                            } satisfies BlockData,
+                        ]),
+                    ),
+                );
+            });
+        return () => controller.abort();
+    }, [
+        editing,
+        libraryData,
+        overview,
+        role,
+        filters.range,
+        filters.site,
+        roleMeta,
+    ]);
+    const pageBlocks = useMemo(
+        () =>
+            libraryData
+                ? Object.fromEntries(
+                      Object.entries(overview.blocks).map(([id, block]) => [
+                          id,
+                          block.state === 'deferred'
+                              ? (libraryData[id] ?? block)
+                              : block,
+                      ]),
+                  )
+                : overview.blocks,
+        [overview.blocks, libraryData],
+    );
     useEffect(() => {
         if (!editing) return;
         const beforeUnload = (e: BeforeUnloadEvent) => {
@@ -897,9 +971,9 @@ function Workspace({
     }
     function dataFor(block: BlockLayout): BlockData | undefined {
         const site = block.site === 'page' ? filters.site : block.site;
-        return (site === filters.site ? overview : scopes[site])?.blocks[
-            block.id
-        ];
+        return site === filters.site
+            ? pageBlocks[block.id]
+            : scopes[site]?.blocks[block.id];
     }
     function navigate(next: { role?: Role; site?: string; range?: Range }) {
         if (editing) return;
@@ -1857,7 +1931,7 @@ function Workspace({
                                     const on = current.blocks.some(
                                         (b) => b.id === meta.id,
                                     );
-                                    const data = overview.blocks[meta.id];
+                                    const data = pageBlocks[meta.id];
                                     return (
                                         <article
                                             key={meta.id}
@@ -1941,7 +2015,10 @@ function Workspace({
                                                                   : data?.state ===
                                                                       'ready'
                                                                     ? 'Nothing recorded yet'
-                                                                    : 'Proposed summary'}
+                                                                    : data?.state ===
+                                                                        'deferred'
+                                                                      ? 'Loading preview…'
+                                                                      : 'Proposed summary'}
                                                         </span>
                                                     </>
                                                 )}
@@ -2014,7 +2091,7 @@ function Workspace({
                             <div className="ov-full-preview">
                                 <BlockContent
                                     meta={previewMeta}
-                                    data={overview.blocks[previewMeta.id]}
+                                    data={pageBlocks[previewMeta.id]}
                                     preview
                                 />
                             </div>

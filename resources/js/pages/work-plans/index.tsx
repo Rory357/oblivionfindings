@@ -997,7 +997,22 @@ export default function WorkPlans(props: Props) {
                     {...props}
                     plan={editing === 'new' ? null : editing}
                     history={editing === 'new' ? [] : props.history}
-                    onClose={() => setEditing(null)}
+                    onClose={() => {
+                        setEditing(null);
+                        // Drop the closed plan from the URL (and from the page
+                        // links built from it), so paging or a refresh doesn't
+                        // reopen it.
+                        if (filters.record)
+                            router.get(
+                                base,
+                                { ...filters, record: undefined },
+                                {
+                                    preserveScroll: true,
+                                    preserveState: true,
+                                    replace: true,
+                                },
+                            );
+                    }}
                 />
             )}
         </AppLayout>

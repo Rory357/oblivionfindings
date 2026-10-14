@@ -91,6 +91,10 @@ final class OverviewConnectedBlocks
         return ['state' => 'ready', 'subtitle' => $subtitle, 'href' => $href, 'rows' => $rows, 'series' => [], 'total' => $total, 'footnote' => $footnote];
     }
 
+    /**
+     * The worker's local midnight. Datetime columns are stored in UTC, so
+     * comparisons against them pass ->utc(); date-only columns use the date.
+     */
     private function today(): CarbonImmutable
     {
         return CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
@@ -120,7 +124,7 @@ final class OverviewConnectedBlocks
 
     private function changes(Builder $query, string $label, string $href): void
     {
-        foreach ((clone $query)->where('updated_at', '>=', $this->today()->subDays(6))->orderByDesc('updated_at')->limit(8)->get(['id', 'updated_at']) as $record) {
+        foreach ((clone $query)->where('updated_at', '>=', $this->today()->subDays(6)->utc())->orderByDesc('updated_at')->limit(8)->get(['id', 'updated_at']) as $record) {
             $this->activity[$query->getModel()->getTable().':'.$record->id] = [
                 'label' => $label.' #'.$record->id, 'detail' => 'Record updated', 'date' => $record->updated_at->toIso8601String(), 'href' => $href,
             ];
@@ -173,7 +177,7 @@ final class OverviewConnectedBlocks
         $href = '/operations/care-plans';
         $this->changes($query, 'Care plan', $href);
         if ($personal) {
-            $query->where('updated_at', '>=', $this->today()->subDays(30));
+            $query->where('updated_at', '>=', $this->today()->subDays(30)->utc());
             $total = (clone $query)->count();
             $rows = $query->orderByDesc('updated_at')->limit(6)->get(['id', 'version', 'updated_at'])->map(fn ($p) => [
                 'label' => 'Care plan #'.$p->id, 'status' => 'Version '.($p->version ?: 1), 'date' => $p->updated_at->toIso8601String(),
@@ -207,7 +211,7 @@ final class OverviewConnectedBlocks
                 if ($personal) {
                     $q->whereHas('supportWorkers', fn ($staff) => $staff->where('users.id', $user->id));
                 }
-            })->where('planned_departure', '>=', $start)->where('planned_departure', '<', $end);
+            })->where('planned_departure', '>=', $start->utc())->where('planned_departure', '<', $end->utc());
         $href = '/fleet-assets/outings';
         $this->changes($query, 'Community outing', $href);
         $total = (clone $query)->count();
@@ -215,7 +219,7 @@ final class OverviewConnectedBlocks
             'label' => 'Community outing #'.$outing->id, 'date' => $outing->planned_departure?->toIso8601String(), 'status' => Str::headline($outing->status), 'href' => $href.'/'.$outing->id,
         ])->all() : array_map(fn ($row) => $row + ['target' => $total, 'href' => $href], $this->groups($query));
 
-        return $this->ready(($personal ? 'Assigned clients' : 'Permitted sites').' · outings in the selected period', $href, $rows, $total, 'Recorded community outings; other activities remain in their care records');
+        return $this->ready(($personal ? 'Assigned clients' : 'Your sites').' · outings in the selected period', $href, $rows, $total, 'Recorded community outings; other activities remain in their care records');
     }
 
     private function offers(User $user, array $sites): array
@@ -228,12 +232,14 @@ final class OverviewConnectedBlocks
             ->whereHas('shift', fn ($q) => $q->whereIn('site_id', $sites)->where('starts_at', '>', now())->whereNotIn('status', ['completed', 'cancelled']));
         $href = '/operations/job-board';
         $rows = [];
-        $checked = 0;
         // Explicit bounded eligibility preview. Full matching and fresh claim checks remain on the job board.
-        foreach ($query->with('shift')->orderBy('id')->limit(40)->get() as $position) {
-            $checked++;
-            $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($position->shift, $user);
-            if ($eligibility->is_allowed) {
+        $positions = $query->with('shift')->orderBy('id')->limit(40)->get();
+        $checked = $positions->count();
+        // One batched check (shared relation loads and one shift query for the
+        // user) instead of a full evaluation per offer.
+        $eligibility = app(ShiftStaffEligibilityService::class)->evaluateMany($positions->pluck('shift')->unique('id')->values(), [$user]);
+        foreach ($positions as $position) {
+            if ($eligibility[$position->shift_id][$user->id]?->is_allowed ?? false) {
                 $rows[] = ['label' => 'Open shift #'.$position->shift_id, 'date' => $position->shift->starts_at->toIso8601String(), 'status' => 'Eligible at last check', 'href' => $href];
             }
         }
@@ -284,7 +290,7 @@ final class OverviewConnectedBlocks
             return $this->restricted();
         }
         $shifts = $this->sites->applyShiftScope(Shift::query(), $user, [])->whereIn('site_id', $sites)
-            ->whereNotNull('client_id')->where('status', 'completed')->where('starts_at', '>=', $start)->where('starts_at', '<', $end);
+            ->whereNotNull('client_id')->where('status', 'completed')->where('starts_at', '>=', $start->utc())->where('starts_at', '<', $end->utc());
         $ids = $shifts->pluck('id');
         $notes = ClientNote::query()->dailyNotes()->forUser($user)->whereIn('shift_id', $ids)->where('is_draft', false)
             ->whereHas('shift', fn ($q) => $q->whereColumn('shifts.client_id', 'client_notes.client_id')->whereColumn('shifts.user_id', 'client_notes.user_id'));

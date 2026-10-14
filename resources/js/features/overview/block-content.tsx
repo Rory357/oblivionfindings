@@ -307,7 +307,7 @@ export function BlockContent({
 }) {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const openDetail = useContext(OverviewDetailContext);
-    if (!data)
+    if (!data || data.state === 'deferred')
         return (
             <div className="ov-block-skeleton" role="status" aria-busy="true">
                 <span className="sr-only">Loading this summary…</span>

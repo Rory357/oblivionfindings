@@ -82,7 +82,8 @@ export interface Row {
 }
 export interface BlockData {
     scopeMode?: 'site' | 'personal' | 'organisation';
-    state: 'ready' | 'proposed' | 'restricted' | 'unavailable';
+    /** deferred: a library block not on the layout, loaded when the editor opens. */
+    state: 'ready' | 'proposed' | 'restricted' | 'unavailable' | 'deferred';
     title?: string;
     subtitle: string;
     message?: string;

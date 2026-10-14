@@ -94,6 +94,11 @@ beforeEach(() => {
     );
 });
 afterEach(() => vi.unstubAllGlobals());
+/** Layout saves only (the editor also loads the block library with a GET). */
+const layoutWrites = () =>
+    vi
+        .mocked(fetch)
+        .mock.calls.filter(([url]) => String(url).startsWith('/dashboard/layout'));
 
 describe('overview arrangements', () => {
     it('shows independent progress measures without adding overlapping counts into a donut', () => {
@@ -903,7 +908,8 @@ describe('overview arrangements', () => {
             screen.getByRole('region', { name: 'Needs attention' }),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-        expect(fetch).not.toHaveBeenCalled();
+        // Opening the editor loads the block library; nothing is written.
+        expect(layoutWrites()).toHaveLength(0);
         expect(
             screen.getByRole('button', { name: 'Edit layout' }),
         ).toBeInTheDocument();
@@ -932,7 +938,7 @@ describe('overview arrangements', () => {
                 screen.getByRole('button', { name: 'Edit layout' }),
             ).toBeInTheDocument(),
         );
-        const call = vi.mocked(fetch).mock.calls[0];
+        const call = layoutWrites()[0];
         expect(call[0]).toBe('/dashboard/layout/worker');
         const saved = JSON.parse(call[1]!.body as string);
         expect(saved.value.blocks).toHaveLength(7);
@@ -1226,9 +1232,9 @@ describe('overview audit fixes (14 Oct 2026)', () => {
             screen.getByRole('button', { name: 'Keep my changes' }),
         );
         fireEvent.click(screen.getByRole('button', { name: 'Save layout' }));
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(layoutWrites()).toHaveLength(2));
         const body = JSON.parse(
-            (fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1]
+            (layoutWrites()[1] as unknown as [string, RequestInit])[1]
                 .body as string,
         );
         expect(body.revision).toBe('newer-revision');

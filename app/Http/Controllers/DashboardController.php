@@ -28,20 +28,30 @@ final class DashboardController extends Controller
             return redirect()->route('clinical-portal.index');
         }
         [$role, $range, $site] = $this->filters($request);
+        $preference = $this->access->preference($user, $role);
+        // Only the blocks on this person's layout are worked out on page load;
+        // the editor fetches the rest of the library when it opens.
+        $layout = $preference['value']['blocks'] !== null
+            ? array_column($preference['value']['blocks'], 'id')
+            : array_column(array_slice($this->access->catalog($role)['blocks'], 0, 6), 'id');
 
         return inertia('dashboard', [
-            'overview' => app(OverviewData::class)->build($user, $role, $range, $site),
+            'overview' => app(OverviewData::class)->build($user, $role, $range, $site, $layout),
             'role' => $role, 'roles' => $this->access->roles($user), 'defaultRole' => $this->access->defaultRole($user),
             'sites' => $this->access->sites($user, $role), 'filters' => ['range' => $range, 'site' => $site],
-            'preference' => $this->access->preference($user, $role),
+            'preference' => $preference,
         ]);
     }
 
     public function data(Request $request)
     {
         [$role, $range, $site] = $this->filters($request);
+        // blocks=all (or no value) works out every library block; a list limits
+        // the optional blocks to those named (e.g. the ones pinned to a site).
+        $blocks = $request->validate(['blocks' => ['sometimes', 'string', 'max:2000', 'regex:/^(all|[a-z0-9-]+(,[a-z0-9-]+)*)$/']])['blocks'] ?? 'all';
+        $only = $blocks === 'all' ? null : array_values(array_intersect(explode(',', $blocks), array_column($this->access->catalog($role)['blocks'], 'id')));
 
-        return response()->json(app(OverviewData::class)->build($request->user(), $role, $range, $site))
+        return response()->json(app(OverviewData::class)->build($request->user(), $role, $range, $site, $only))
             ->header('Cache-Control', 'private, no-store');
     }
 

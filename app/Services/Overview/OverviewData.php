@@ -73,7 +73,12 @@ final class OverviewData
 
     public function __construct(private readonly OverviewAccess $access, private readonly UserSiteAccessService $siteAccess) {}
 
-    public function build(User $user, string $role, string $range, string $site): array
+    /**
+     * @param  list<string>|null  $only  Optional library blocks to work out; null works out all of
+     *                                   them. The core summaries are always built. Blocks left out
+     *                                   come back as 'deferred' and load when the editor opens.
+     */
+    public function build(User $user, string $role, string $range, string $site, ?array $only = null): array
     {
         $this->access->authorize($user, $role);
         $this->user = $user;
@@ -140,11 +145,18 @@ final class OverviewData
             'governance' => ['governance-declarations' => 'declarations'],
         };
         foreach ($optional as $id => $method) {
+            if ($only !== null && ! in_array($id, $only, true)) {
+                $this->deferred($id);
+
+                continue;
+            }
             $this->source('Block '.$id, fn () => $this->blocks[$id] = app(OverviewOptionalBlocks::class)->$method($user, $this->siteIds));
         }
         $connected = app(OverviewConnectedBlocks::class);
         foreach (OverviewConnectedBlocks::BLOCKS as $id) {
-            if (isset($this->blocks[$id])) {
+            if ($only !== null && isset($this->blocks[$id]) && ! in_array($id, $only, true)) {
+                $this->deferred($id);
+            } elseif (isset($this->blocks[$id])) {
                 $this->source('Block '.$id, fn () => $this->blocks[$id] = $connected->read($id, $user, $this->siteIds, $this->start, $this->end));
             }
         }
@@ -181,6 +193,13 @@ final class OverviewData
             'governance' => [['Board workspace', '/governance/dashboard'], ['My board work', '/governance/my-work']],
         };
         $this->blocks['shortcuts'] = $this->ready('Open your everyday workspaces', null, array_map(fn ($link) => ['label' => $link[0], 'href' => $link[1], 'detail' => 'Open workspace'], $links), count($links));
+        // A block that was asked for but is still unfilled was skipped by its
+        // permission check: say so, rather than calling it planned.
+        foreach ($this->blocks as $id => $block) {
+            if (($block['state'] ?? null) === 'proposed') {
+                $this->restricted($id);
+            }
+        }
         foreach ($this->blocks as $id => &$block) {
             $block['scopeMode'] ??= $id === 'governance-declarations' ? 'personal' : ($role === 'governance' ? 'organisation' : (($id === 'shortcuts' || ($role === 'worker' && in_array($id, ['sites', 'worker-learning', 'worker-leave', 'worker-requests', 'worker-policy-reading', 'worker-contacts'], true))) ? 'personal' : 'site'));
         }
@@ -237,9 +256,20 @@ final class OverviewData
         }
     }
 
+    /** The worker's local date: date-only columns are compared with it, not UTC today(). */
+    private function localToday(): CarbonImmutable
+    {
+        return CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
+    }
+
     private function ready(string $subtitle, ?string $href, array $rows = [], ?int $total = null, array $series = []): array
     {
         return ['state' => 'ready', 'subtitle' => $subtitle, 'href' => $href, 'rows' => $rows, 'series' => $series, 'total' => $total ?? count($rows)];
+    }
+
+    private function deferred(string $id): void
+    {
+        $this->blocks[$id] = ['state' => 'deferred', 'subtitle' => 'Loads when you add it', 'rows' => [], 'series' => [], 'total' => null];
     }
 
     private function restricted(string $id): void
@@ -372,7 +402,10 @@ final class OverviewData
             $this->restricted('agenda');
         }
         if ($worker || $this->user->canDo('timesheets.manageAny')) {
-            $timesheets = $worker ? $this->siteAccess->applyTimesheetScope(Timesheet::query(), $this->user)->where('user_id', $this->user->id) : $scope->timesheets($this->user);
+            // Reviewers count what the approvals page shows: the dashboard's optional
+            // all-sites bypass does not widen a review queue (as in managerReviews).
+            $timesheets = $worker ? $this->siteAccess->applyTimesheetScope(Timesheet::query(), $this->user)->where('user_id', $this->user->id)
+                : $this->siteAccess->applyTimesheetScope($scope->timesheets($this->user), $this->user, [])->whereNull('archived_at');
             $timesheets->whereIn('site_id', $this->siteIds);
             $pending = (clone $timesheets)->whereIn('status', $worker ? ['draft', 'returned'] : ['submitted'])->count();
             $sheetHref = $worker ? '/hr/my/time' : '/operations/timesheets';
@@ -383,7 +416,8 @@ final class OverviewData
             }
         }
         if (! $worker && ($this->user->canDo('incidents.viewAny') || $this->user->canDo('incidents.viewAssigned'))) {
-            $incidents = $scope->incidents($this->user)->whereHas('client', fn ($q) => $q->whereIn('site_id', $this->siteIds));
+            $incidents = $this->siteAccess->applyClientIncidentScope($scope->incidents($this->user), $this->user, ['sites.viewAll', 'incidents.manage'])
+                ->whereHas('client', fn ($q) => $q->whereIn('site_id', $this->siteIds));
             if (! $this->user->canDo('incidents.viewAny')) {
                 $incidents->whereIn('client_id', $this->user->assignedClients()->select('clients.id'));
             }
@@ -677,7 +711,7 @@ final class OverviewData
         }
         $this->blocks['trend'] = $this->ready('Recorded employment dates · selected period', $href, [], $count, $series);
         $this->blocks['trend'] += ['title' => 'Workforce movement', 'seriesLabel' => 'Headcount', 'footnote' => 'Retained employment dates · future dates not measured'];
-        $probation = (clone $query)->whereNotNull('probation_end_date')->whereBetween('probation_end_date', [today(), today()->addDays(30)]);
+        $probation = (clone $query)->whereNotNull('probation_end_date')->whereBetween('probation_end_date', [$this->localToday()->toDateString(), $this->localToday()->addDays(30)->toDateString()]);
         $n = (clone $probation)->count();
         $rows = $probation->orderBy('probation_end_date')->limit(6)->get(['id', 'probation_end_date'])->map(fn ($p) => ['label' => 'Probation review', 'date' => $p->probation_end_date->toDateString(), 'detail' => 'Open the employee record for detail', 'href' => $href])->all();
         $this->blocks['hr-probation'] = $this->ready('Reviews due in the next 30 days', $href, $rows, $n);
@@ -880,7 +914,9 @@ final class OverviewData
         $urgent = (clone $open)->where('priority', 'urgent')->count();
         $unassigned = (clone $open)->whereNull('assigned_to_user_id')->count();
         $this->addAttention('Urgent support work', $urgent, $href.'&ticket_priority=urgent', 'critical');
-        $this->addAttention('Tickets needing an owner', $unassigned, '/it?tab=tickets&view=unassigned', 'warning');
+        // Urgent tickets are already counted above; each ticket counts once.
+        $needsOwner = (clone $open)->whereNull('assigned_to_user_id')->where(fn ($q) => $q->whereNull('priority')->orWhere('priority', '!=', 'urgent'))->count();
+        $this->addAttention('Tickets needing an owner', $needsOwner, '/it?tab=tickets&view=unassigned', 'warning');
         $this->metrics[] = ['label' => 'Open tickets', 'value' => $n, 'caption' => 'Open service work you can see', 'href' => $href];
         $this->metrics[] = ['label' => 'Devices reporting', 'value' => null, 'instrument' => 'bar', 'display' => '—', 'caption' => 'Device monitoring permission required'];
         $sla = app(ItSlaReadService::class);
