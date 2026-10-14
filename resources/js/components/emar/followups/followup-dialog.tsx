@@ -456,7 +456,7 @@ function FollowupBody({
         else setErrors({});
         return !Object.keys(next).length;
     };
-    const save = async () => {
+    const save = () => {
         if (!validate() || sending) return;
         if (form.outcome === 'taken' && (!onReoffer || !row.reoffer_target)) {
             setErrors({
@@ -478,6 +478,20 @@ function FollowupBody({
                       : row.lead
                         ? 'signoff'
                         : 'complete';
+        void submit(action);
+    };
+    // Lane A8 (Main, 14 Oct): the lead confirms an open hospital stay is
+    // still going on; the next ask comes after the same time again.
+    const stillInHospital =
+        row.type === 'away_return' &&
+        row.context?.away_source === 'hospital' &&
+        row.can_complete &&
+        !row.completed_at;
+    const confirmStillInHospital = () => {
+        if (sending) return;
+        void submit('still_in_hospital');
+    };
+    const submit = async (action: string) => {
         const material = {
             ...form,
             action,
@@ -756,6 +770,23 @@ function FollowupBody({
                         medication record.
                     </p>
                 )}
+                {stillInHospital ? (
+                    <div className="space-y-2 border-t pt-3">
+                        <p className="text-subtle">
+                            Still in hospital? Their doses stay Away, and
+                            you’ll be asked again later.
+                        </p>
+                        <Button
+                            variant="outline"
+                            className="frontline-tap"
+                            disabled={sending}
+                            onClick={confirmStillInHospital}
+                        >
+                            They’re still in hospital
+                        </Button>
+                        <InputError message={errors.save} />
+                    </div>
+                ) : null}
             </div>
         ) : (
             <div className="flex flex-col gap-5">

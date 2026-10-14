@@ -103,6 +103,44 @@ const offline = {
     ),
 };
 
+const away = {
+    cap_hours: def(
+        'away',
+        'cap_hours',
+        'timing',
+        'With no recorded return, doses stay Away for',
+        { default: '24', range: [4, 168], unit: 'hours after the planned end', numeric: looser },
+    ),
+    return_followup: def(
+        'away',
+        'return_followup',
+        'timing',
+        'Ask the house lead to record the return',
+        {
+            default: 'yes',
+            rank: ['no', 'yes'],
+            options: [
+                { value: 'no', label: 'Off' },
+                { value: 'yes', label: 'On' },
+            ],
+        },
+    ),
+    hospital_no_discharge: def(
+        'away',
+        'hospital_no_discharge',
+        'timing',
+        'In hospital with no discharge recorded',
+        {
+            default: 'follow_up',
+            rank: ['follow_up', 'owed_after_cap'],
+            options: [
+                { value: 'follow_up', label: 'Stay Away' },
+                { value: 'owed_after_cap', label: 'Owed after the cap' },
+            ],
+        },
+    ),
+};
+
 const packPhoto = {
     show: def(
         'packPhoto',
@@ -182,8 +220,15 @@ const payload = (): SettingsPayload => ({
             audit_event: 'medications.offline_replay.updated',
             keys: Object.keys(offline),
         },
+        away: {
+            key: 'away',
+            view: 'rounds',
+            effect: 'From the next dose shown, at every house — a recorded return always counts',
+            audit_event: 'medications.away_no_return.updated',
+            keys: Object.keys(away),
+        },
     },
-    definitions: { pin, forgotten, offline, packPhoto, chartAlerts },
+    definitions: { pin, forgotten, offline, away, packPhoto, chartAlerts },
     values: {
         pin: {
             max_attempts: '5',
@@ -192,6 +237,11 @@ const payload = (): SettingsPayload => ({
         },
         forgotten: { forgotten_fallback: 'yes', confirm_minutes: '30' },
         offline: { max_hours: '12' },
+        away: {
+            cap_hours: '24',
+            return_followup: 'yes',
+            hospital_no_discharge: 'follow_up',
+        },
         packPhoto: { show: 'yes', no_photo: 'warn' },
         chartAlerts: { reconfirm: 'day' },
     },
@@ -203,6 +253,11 @@ const payload = (): SettingsPayload => ({
         },
         forgotten: { forgotten_fallback: null, confirm_minutes: null },
         offline: { max_hours: null },
+        away: {
+            cap_hours: null,
+            return_followup: null,
+            hospital_no_discharge: null,
+        },
         packPhoto: { show: null, no_photo: null },
         chartAlerts: { reconfirm: null },
     },
@@ -284,6 +339,56 @@ describe('Dose timing › Saved on a device (Lane A settings)', () => {
         renderWith(<DoseTiming q="device" show="all" clear={vi.fn()} />);
         expect(
             screen.getByLabelText('Can still be sent for'),
+        ).toBeInTheDocument();
+    });
+});
+
+describe('Dose timing › Away with no recorded return (Lane A8, D6)', () => {
+    it('edits how long doses stay Away and switches the lead’s follow-up off as a draft', () => {
+        const { draft } = renderWith(
+            <DoseTiming q="" show="all" clear={vi.fn()} />,
+        );
+        expect(
+            screen.getByText('Away with no recorded return'),
+        ).toBeInTheDocument();
+        const cap = screen.getByLabelText(
+            'With no recorded return, doses stay Away for',
+        );
+        expect(cap).toHaveValue(24);
+        fireEvent.change(cap, { target: { value: '12' } });
+        expect(draft()).toEqual({ away: { cap_hours: '12' } });
+
+        const followup = screen.getByRole('switch', {
+            name: 'Ask the house lead to record the return',
+        });
+        expect(followup).toBeChecked();
+        fireEvent.click(followup);
+        expect(draft()).toEqual({
+            away: { cap_hours: '12', return_followup: 'no' },
+        });
+    });
+
+    it('makes an open hospital stay owed after the cap as a draft (Main, 14 Oct)', () => {
+        const { draft } = renderWith(
+            <DoseTiming q="" show="all" clear={vi.fn()} />,
+        );
+        expect(
+            screen.getByText('In hospital with no discharge recorded'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Owed after the time above' }),
+        );
+        expect(draft()).toEqual({
+            away: { hospital_no_discharge: 'owed_after_cap' },
+        });
+    });
+
+    it('is found by searching for the setting’s own words', () => {
+        renderWith(<DoseTiming q="return" show="all" clear={vi.fn()} />);
+        expect(
+            screen.getByRole('switch', {
+                name: 'Ask the house lead to record the return',
+            }),
         ).toBeInTheDocument();
     });
 });

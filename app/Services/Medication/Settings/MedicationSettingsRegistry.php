@@ -6,6 +6,7 @@ use App\Models\BreakGlassPolicy;
 use App\Services\Medication\Alerts\MedicationAlertCatalogue;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\Controlled\ControlledSettingsFragment;
+use App\Services\Medication\DoseSlots\DoseAwaySources;
 use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationErrorWorkflow;
 use App\Services\Medication\MedicationSafetyPolicySettings;
@@ -144,6 +145,7 @@ class MedicationSettingsRegistry
             $this->chartAlertPrompts(),
             $this->doseTiming(),
             $this->offlineReplay(),
+            $this->awayNoReturn(),
             $this->competencyPolicy(),
             $this->witnessPinRules(),
             $this->forgottenPin(),
@@ -713,6 +715,66 @@ class MedicationSettingsRegistry
                     ],
                     default: $photos::NO_PHOTO_DEFAULT,
                     rank: ['warn', 'tick'],
+                ),
+            ],
+        );
+    }
+
+    /**
+     * Lane A8 settings (Stephan's D6 as decided by Main, 14 Oct): leave or
+     * respite with no recorded return stays Away this long after its planned
+     * end, then the doses are owed again; whether the house lead gets
+     * "Record the return"; and what an open hospital stay does after the
+     * cap. A longer cap, no follow-up, or keeping hospital Away loosens.
+     */
+    private function awayNoReturn(): MedicationSettingGroup
+    {
+        return new MedicationSettingGroup(
+            key: 'away',
+            view: self::VIEW_ROUNDS,
+            effect: 'From the next dose shown, at every house — a recorded return always counts',
+            auditEvent: 'medications.away_no_return.updated',
+            definitions: [
+                new MedicationSettingDefinition(
+                    group: 'away',
+                    key: 'cap_hours',
+                    storageKey: DoseAwaySources::NO_RETURN_CAP_SETTING,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'timing',
+                    label: 'With no recorded return, doses stay Away for',
+                    options: [],
+                    default: DoseAwaySources::NO_RETURN_CAP_DEFAULT,
+                    numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_LOOSER, 'off' => null, 'off_is_loosest' => false],
+                    range: DoseAwaySources::NO_RETURN_CAP_RANGE,
+                    unit: 'hours after the planned end',
+                ),
+                new MedicationSettingDefinition(
+                    group: 'away',
+                    key: 'return_followup',
+                    storageKey: DoseAwaySources::RETURN_FOLLOWUP_SETTING,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'timing',
+                    label: 'Ask the house lead to record the return',
+                    options: [
+                        'no' => 'Off — no follow-up; the doses still show as owed',
+                        'yes' => 'On — one “Record the return” follow-up for the house lead',
+                    ],
+                    default: DoseAwaySources::RETURN_FOLLOWUP_DEFAULT,
+                    rank: ['no', 'yes'],
+                ),
+                new MedicationSettingDefinition(
+                    group: 'away',
+                    key: 'hospital_no_discharge',
+                    storageKey: DoseAwaySources::HOSPITAL_NO_DISCHARGE_SETTING,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'timing',
+                    label: 'In hospital with no discharge recorded',
+                    options: [
+                        DoseAwaySources::HOSPITAL_FOLLOW_UP => 'Stay Away — the house lead records the discharge or confirms they’re still in hospital',
+                        DoseAwaySources::HOSPITAL_OWED_AFTER_CAP => 'Owed after the time above, with the same follow-up',
+                    ],
+                    default: DoseAwaySources::HOSPITAL_NO_DISCHARGE_DEFAULT,
+                    rank: [DoseAwaySources::HOSPITAL_FOLLOW_UP, DoseAwaySources::HOSPITAL_OWED_AFTER_CAP],
                 ),
             ],
         );

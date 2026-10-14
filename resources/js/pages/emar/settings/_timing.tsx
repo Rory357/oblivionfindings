@@ -5,15 +5,24 @@
  * (P01 C6(b)). "Remind staff to offer again" waits for P08a follow-ups, and
  * time-critical medicines for P01 — no stubs. */
 import { StatusBadge } from '@/components/ui/status-badge';
-import { AlarmClock, Clock, Repeat, RotateCcw, WifiOff } from 'lucide-react';
+import {
+    AlarmClock,
+    Clock,
+    DoorOpen,
+    Repeat,
+    RotateCcw,
+    WifiOff,
+} from 'lucide-react';
 import { useSettings } from './_context';
 import { decisionReviewer, isDirty, savedValue } from './_model';
 import { NoMatches, useRow } from './_sections';
 import type { RoundTemplate } from './_templates';
 import {
+    Choice,
     GroupGrid,
     GroupRow,
     NumberInput,
+    OnOff,
     Overview,
     Section,
     SettingGroup,
@@ -22,6 +31,8 @@ import {
 const G = 'timing';
 /** Lane A: how long a dose saved on a device can wait to be sent (EA-131). */
 const OFFLINE = 'offline';
+/** Lane A8 (D6): someone left and no return was recorded. */
+const AWAY = 'away';
 
 const match = (q: string, ...s: string[]) =>
     !q || s.some((x) => x.toLowerCase().includes(q.toLowerCase()));
@@ -43,6 +54,20 @@ export function DoseTiming({
     const offlineLabel = 'Can still be sent for';
     const offlineHint =
         'Older than this, it isn’t added to the chart. It goes to paper recovery, and the house lead gets a follow-up.';
+    const away = useRow(AWAY);
+    const awayCapDef = s.definitions[AWAY]?.cap_hours;
+    const awayFollowupDef = s.definitions[AWAY]?.return_followup;
+    const awayHospitalDef = s.definitions[AWAY]?.hospital_no_discharge;
+    const awayCapError = errors[`${AWAY}.cap_hours`];
+    const awayCapLabel = 'With no recorded return, doses stay Away for';
+    const awayCapHint =
+        'Counted from the end of planned leave or respite (from when they left if there’s no planned end). After this, their doses show as owed again. Recording the return ends Away sooner.';
+    const awayFollowupLabel = 'Ask the house lead to record the return';
+    const awayFollowupHint =
+        'One “Record the return” follow-up for the lead at the house, once the time is up. Recording the return closes it.';
+    const awayHospitalLabel = 'In hospital with no discharge recorded';
+    const awayHospitalHint =
+        'A hospital stay has no planned end. Once the time above has passed since admission, the house lead is asked to record the discharge or confirm they’re still in hospital — and asked again after the same time.';
     const def = (key: string) => s.definitions[G]?.[key];
     const input = (
         key: string,
@@ -222,6 +247,115 @@ export function DoseTiming({
                                 />
                             }
                         />
+                    </SettingGroup>
+                ) : null}
+                {awayCapDef ? (
+                    <SettingGroup
+                        id="away"
+                        icon={DoorOpen}
+                        title="Away with no recorded return"
+                        caption="Left for hospital, respite or a stay away, and no return recorded"
+                    >
+                        <GroupRow
+                            id="tm-away-cap_hours"
+                            label={awayCapLabel}
+                            hint={awayCapHint}
+                            state={away.state('cap_hours')}
+                            error={awayCapError}
+                            errorId="tm-away-cap_hours-error"
+                            hidden={
+                                !away.shown(
+                                    show,
+                                    q,
+                                    'cap_hours',
+                                    awayCapLabel,
+                                    awayCapHint,
+                                    awayCapDef.label,
+                                )
+                            }
+                            control={
+                                <NumberInput
+                                    id="tm-away-cap_hours"
+                                    value={away.value('cap_hours')}
+                                    unit="hours"
+                                    min={awayCapDef.range?.[0]}
+                                    max={awayCapDef.range?.[1]}
+                                    disabled={away.disabled}
+                                    error={awayCapError}
+                                    onChange={(v) => {
+                                        away.edit('cap_hours', v);
+                                        clearError(`${AWAY}.cap_hours`);
+                                    }}
+                                />
+                            }
+                        />
+                        {awayFollowupDef ? (
+                            <GroupRow
+                                id="tm-away-return_followup"
+                                label={awayFollowupLabel}
+                                hint={awayFollowupHint}
+                                state={away.state('return_followup')}
+                                hidden={
+                                    !away.shown(
+                                        show,
+                                        q,
+                                        'return_followup',
+                                        awayFollowupLabel,
+                                        awayFollowupHint,
+                                        awayFollowupDef.label,
+                                    )
+                                }
+                                control={
+                                    <OnOff
+                                        id="tm-away-return_followup"
+                                        checked={
+                                            away.value('return_followup') ===
+                                            'yes'
+                                        }
+                                        disabled={away.disabled}
+                                        onChange={(v) =>
+                                            away.edit(
+                                                'return_followup',
+                                                v ? 'yes' : 'no',
+                                            )
+                                        }
+                                    />
+                                }
+                            />
+                        ) : null}
+                        {awayHospitalDef ? (
+                            <GroupRow
+                                id="tm-away-hospital_no_discharge"
+                                label={awayHospitalLabel}
+                                hint={awayHospitalHint}
+                                state={away.state('hospital_no_discharge')}
+                                hidden={
+                                    !away.shown(
+                                        show,
+                                        q,
+                                        'hospital_no_discharge',
+                                        awayHospitalLabel,
+                                        awayHospitalHint,
+                                        awayHospitalDef.label,
+                                    )
+                                }
+                            >
+                                <Choice
+                                    value={away.value('hospital_no_discharge')}
+                                    disabled={away.disabled}
+                                    onChange={(v) =>
+                                        away.edit('hospital_no_discharge', v)
+                                    }
+                                    options={[
+                                        ['follow_up', 'Stay Away and ask the lead'],
+                                        [
+                                            'owed_after_cap',
+                                            'Owed after the time above',
+                                        ],
+                                    ]}
+                                />
+                            </GroupRow>
+                        ) : null}
                     </SettingGroup>
                 ) : null}
             </GroupGrid>

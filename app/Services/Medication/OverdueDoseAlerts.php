@@ -112,6 +112,14 @@ final class OverdueDoseAlerts
         }
         $this->reconcile(null, $now, $overdue);
 
+        // Lane A8 (D6): away past the cap with no recorded return has an
+        // owner; never let it stop the overdue alerts themselves.
+        try {
+            app(\App\Services\Medication\DoseSlots\AwayReturnFollowups::class)->sweep($now);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return $raised->values();
     }
 

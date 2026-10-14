@@ -97,7 +97,7 @@ final class MedicationFollowupController extends Controller
     {
         $data = $request->validate([
             'request_uuid' => ['required', 'uuid'], 'revision' => ['required', 'integer', 'min:1'],
-            'action' => ['required', 'in:effect,amend_effect,refusal,couldnt_check,reassign,confirmation,signoff,complete'],
+            'action' => ['required', 'in:effect,amend_effect,refusal,couldnt_check,reassign,confirmation,signoff,complete,still_in_hospital'],
             'outcome' => ['nullable', 'string', 'max:2000'], 'reason' => ['nullable', 'string', 'max:2000'],
             'again_at' => ['nullable', 'string', 'max:40'], 'owner_id' => ['nullable', 'integer', 'min:1'],
             'observations' => ['nullable', 'string', 'max:2000'], 'escalation_needed' => ['nullable', 'boolean'],
