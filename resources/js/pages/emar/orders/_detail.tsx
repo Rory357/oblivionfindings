@@ -247,6 +247,17 @@ export function OrderDetail({
                     {action === 'view' && section === 0 && (
                         <>
                             <OrderStatus order={order} />
+                            {order.prescriber_request?.url && (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="justify-self-start"
+                                >
+                                    <a href={order.prescriber_request.url}>
+                                        Open the request in Connected care
+                                    </a>
+                                </Button>
+                            )}
                             <ReviewCard
                                 icon={Pill}
                                 title={
