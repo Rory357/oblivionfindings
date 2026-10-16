@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- The whole service card is one keyboard-accessible button with a custom stacked layout. */
+/* eslint-disable no-restricted-syntax -- Each complete service row is one keyboard-accessible button or link. */
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -56,30 +56,33 @@ export function StaffServiceCards({
     const [peopleOpen, setPeopleOpen] = useState(false);
     return (
         <>
-            <div className="grid grid-cols-3 gap-4" aria-label="Staff services">
+            <div className="space-y-3" aria-label="Staff services">
                 {items.map((item) => {
                     const Icon = icons[item.icon];
                     const contents = (
                         <>
-                            <span className="flex items-center justify-between">
-                                <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
-                                    <Icon className="size-5" />
+                            <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
+                                <Icon className="size-5" aria-hidden="true" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <strong className="block text-base font-semibold">
+                                    {item.name}
+                                </strong>
+                                <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">
+                                    {item.description}
                                 </span>
-                                <ArrowUpRight className="size-4 text-muted-foreground" />
                             </span>
-                            <strong className="mt-4 block text-base">
-                                {item.name}
-                            </strong>
-                            <span className="mt-2 block flex-1 text-sm leading-relaxed text-muted-foreground">
-                                {item.description}
-                            </span>
-                            <span className="mt-5 block text-xs font-medium text-primary">
+                            <span className="shrink-0 rounded-full bg-muted/60 px-3 py-1.5 text-xs font-medium text-muted-foreground">
                                 {item.category}
                             </span>
+                            <ArrowUpRight
+                                className="size-5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
+                                aria-hidden="true"
+                            />
                         </>
                     );
                     const style =
-                        'flex min-h-52 flex-col rounded-2xl border border-border bg-card p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+                        'group flex min-h-24 w-full items-center gap-5 rounded-2xl border border-border bg-card px-5 py-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
                     return item.url ? (
                         <Link key={item.id} href={item.url} className={style}>
                             {contents}

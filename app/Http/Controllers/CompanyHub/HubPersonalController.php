@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\CompanyHub;
 
-use App\Domain\CompanyHub\Models\HubPage;
 use App\Domain\CompanyHub\Services\HubAccess;
+use App\Domain\CompanyHub\Services\HubBookmarks;
 use App\Domain\CompanyHub\Services\HubContent;
-use App\Domain\Hr\Models\HrCalendarEvent;
+use App\Domain\CompanyHub\Services\HubNotificationPreferences;
 use App\Domain\Hr\Services\HrCalendarAccessService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -14,13 +14,26 @@ use Illuminate\Validation\Rule;
 
 class HubPersonalController extends Controller
 {
-    public function notifications(Request $request, HubAccess $access)
+    public function notificationPreferences(Request $request, HubNotificationPreferences $preferences)
     {
-        $access->assertEnter($request->user());
-        $data = $request->validate(['news' => 'required|boolean', 'reviews' => 'required|boolean']);
-        DB::table('hub_preferences')->updateOrInsert(['user_id' => $request->user()->id], [
-            'notifications' => json_encode($data), 'updated_at' => now(),
+        return response()->json($preferences->read($request->user()))->header('Cache-Control', 'private, no-store');
+    }
+
+    public function notifications(Request $request, HubNotificationPreferences $preferences)
+    {
+        $guarded = $request->hasAny(['actor_id', 'version', 'recognition', 'replies', 'events']);
+        $data = $request->validate([
+            'actor_id' => [Rule::requiredIf($guarded), 'integer', 'min:1'],
+            'version' => [Rule::requiredIf($guarded), 'integer', 'min:1', 'max:2147483647'],
+            'recognition' => [Rule::requiredIf($guarded), 'boolean'],
+            'replies' => [Rule::requiredIf($guarded), 'boolean'], 'events' => [Rule::requiredIf($guarded), 'boolean'],
+            'news' => 'required|boolean', 'reviews' => [Rule::requiredIf(! $guarded), 'boolean'],
+            'user_id' => 'prohibited', 'author_id' => 'prohibited', 'id' => 'prohibited',
         ]);
+        $result = $preferences->save($request->user(), $data, $guarded);
+        if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+            return response()->json($result)->header('Cache-Control', 'private, no-store');
+        }
 
         return back()->with('success', 'Your hub notification preferences were saved.');
     }
@@ -47,24 +60,32 @@ class HubPersonalController extends Controller
 
     public function bookmark(Request $request, HubAccess $access, HrCalendarAccessService $calendar)
     {
-        $access->assertEnter($request->user());
+        $guarded = $request->boolean('hub_receipt') && $request->expectsJson() && ! $request->header('X-Inertia');
         $data = $request->validate([
-            'subject_type' => ['required', Rule::in(['page', 'event'])],
-            'subject_id' => 'required|integer', 'saved' => 'required|boolean',
+            'subject_type' => ['required', Rule::in(['page', 'event', 'media'])],
+            'subject_id' => $guarded ? 'required|integer|min:1|max:2147483647' : 'required|integer', 'saved' => 'required|boolean',
+            ...($guarded ? [
+                'hub_receipt' => 'required|boolean|accepted', 'actor_id' => 'required|integer|min:1|max:2147483647',
+                'expected_saved' => 'required|boolean', 'expected_version' => 'present|nullable|string|size:64',
+                'user_id' => 'prohibited', 'id' => 'prohibited',
+            ] : []),
         ]);
-        if ($data['subject_type'] === 'page') {
-            $access->assertRead($request->user(), HubPage::findOrFail($data['subject_id']));
-        } else {
-            $event = HrCalendarEvent::active()->findOrFail($data['subject_id']);
-            $calendar->assertCanViewEvent($request->user(), $event);
-        }
-        $key = ['user_id' => $request->user()->id, 'subject_type' => $data['subject_type'], 'subject_id' => $data['subject_id']];
-        if ($data['saved']) {
-            DB::table('hub_bookmarks')->insertOrIgnore([...$key, 'created_at' => now(), 'updated_at' => now()]);
-        } else {
-            DB::table('hub_bookmarks')->where($key)->delete();
+        $result = app(HubBookmarks::class)->set($request->user(), $data, $guarded);
+        if ($guarded) {
+            return response()->json($result)->header('Cache-Control', 'private, no-store');
         }
 
         return back()->with('success', $data['saved'] ? 'Saved for later.' : 'Removed from saved items.');
+    }
+
+    public function bookmarkState(Request $request, HubBookmarks $bookmarks)
+    {
+        $data = $request->validate([
+            'actor_id' => 'required|integer|min:1|max:2147483647',
+            'subject_type' => ['required', Rule::in(['page', 'event', 'media'])], 'subject_id' => 'required|integer|min:1|max:2147483647',
+            'user_id' => 'prohibited', 'id' => 'prohibited',
+        ]);
+
+        return response()->json($bookmarks->read($request->user(), $data))->header('Cache-Control', 'private, no-store');
     }
 }

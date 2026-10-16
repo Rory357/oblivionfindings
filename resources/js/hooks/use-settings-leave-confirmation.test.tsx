@@ -48,14 +48,22 @@ let navigation: FakeNavigation;
 function Harness({
     dirty = true,
     scope = 'actor-7',
+    saving = false,
 }: {
     dirty?: boolean;
     scope?: string;
+    saving?: boolean;
 }) {
-    return <Draft key={scope} dirty={dirty} />;
+    return <Draft key={scope} dirty={dirty} saving={saving} />;
 }
-function Draft({ dirty }: { dirty: boolean }) {
-    const leave = useSettingsLeaveConfirmation(dirty);
+function Draft({ dirty, saving }: { dirty: boolean; saving: boolean }) {
+    const leave = useSettingsLeaveConfirmation(
+        dirty,
+        undefined,
+        undefined,
+        undefined,
+        saving,
+    );
     return (
         <>
             <input aria-label="Private draft" defaultValue="unsaved value" />
@@ -87,6 +95,27 @@ afterEach(() => {
     Reflect.deleteProperty(window, 'navigation');
 });
 describe('Shared draft confirmation with native history', () => {
+    it('keeps a pending history decision locked until the current write finishes', () => {
+        const view = render(<Harness saving />);
+        act(() => navigation.back());
+        expect(screen.getByRole('alertdialog')).toHaveTextContent(
+            'Saving your changes',
+        );
+        expect(
+            screen.getByRole('button', { name: 'Discard and continue' }),
+        ).toBeDisabled();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard and continue' }),
+        );
+        expect(navigation.traverseTo).not.toHaveBeenCalled();
+        view.rerender(<Harness saving={false} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard and continue' }),
+        );
+        expect(navigation.traverseTo).toHaveBeenCalledExactlyOnceWith(
+            'previous',
+        );
+    });
     it('keeps values and current URL unchanged when a Back prompt is cancelled', () => {
         render(<Harness />);
         let event!: Event;

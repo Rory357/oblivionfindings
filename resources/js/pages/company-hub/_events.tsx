@@ -1,24 +1,21 @@
+import { EventBookingCutoff } from '@/components/hr/calendar/event-booking-cutoff';
 import {
     EventWizardDialog,
     type CalendarEventInitial,
 } from '@/components/hr/calendar/event-wizard-dialog';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { CalendarDays, Plus } from 'lucide-react';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { hubRequest } from './_api';
-import { EventDraftWorkspace } from './_event-drafts';
+import { useHubListControls } from './_reading-navigation';
+import { HubSelect } from './_select';
+
 import type { HubEvent, HubProps } from './_types';
 
 export type EventOptions = Pick<
@@ -30,7 +27,14 @@ export type EventOptions = Pick<
     | 'staff'
     | 'storyOptions'
     | 'emailAvailable'
-> & { can_manage_recurring?: boolean; can_publish?: boolean };
+> & {
+    can_manage_recurring?: boolean;
+    can_publish?: boolean;
+    can_schedule?: boolean;
+    cutoff_supported?: boolean;
+    personal_reminders_supported?: boolean;
+    actor_id?: number;
+};
 type EditScope = 'this' | 'following' | 'all';
 export function eventInitial(
     event: HubEvent,
@@ -43,6 +47,8 @@ export function eventInitial(
         registration_enabled: p.registration?.enabled,
         registration_capacity: p.registration?.capacity,
         registration_version: p.registration?.version,
+        registration_closes_before_minutes:
+            p.registration?.closes_before_minutes,
         recurrence_parent_id: p.recurrenceParentId,
         title: event.title,
         description: p.description,
@@ -76,156 +82,138 @@ export function eventInitial(
 export function EventEditorButton({
     event,
     onOpen,
-    onSaved,
 }: {
     event?: HubEvent;
     onOpen?: () => void;
     onSaved?: () => void;
 }) {
-    const [options, setOptions] = useState<EventOptions | null>(null);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-    const [scope, setScope] = useState<EditScope | null>(null);
-    const requestId = useRef(0);
-    useEffect(
-        () => () => {
-            requestId.current++;
-        },
-        [],
-    );
     return (
-        <>
-            <Button
-                variant={event ? 'outline' : 'default'}
-                disabled={busy}
-                onClick={async () => {
-                    const id = ++requestId.current;
-                    setBusy(true);
-                    setError('');
-                    try {
-                        const result = await hubRequest<EventOptions>(
-                            '/company-hub/events/options',
-                            'GET',
-                        );
-                        if (requestId.current !== id) return;
-                        setOptions(result);
-                        setScope(
-                            event?.extendedProps.recurring &&
-                                !event.extendedProps.recurrenceParentId
-                                ? null
-                                : 'all',
-                        );
-                        onOpen?.();
-                    } catch (e) {
-                        if (requestId.current === id)
-                            setError((e as Error).message);
-                    } finally {
-                        if (requestId.current === id) setBusy(false);
-                    }
-                }}
-            >
-                {event ? (
-                    'Edit event details'
-                ) : (
-                    <>
-                        <Plus className="size-4" /> Create event
-                    </>
-                )}
-            </Button>
-            {error && (
-                <p role="alert" className="text-sm text-destructive">
-                    {error}
-                </p>
+        <Button
+            variant={event ? 'outline' : 'default'}
+            disabled={event?.extendedProps.cancellation?.cancelled}
+            onClick={() => {
+                onOpen?.();
+                const date =
+                    event?.extendedProps.occurrenceDate ??
+                    event?.extendedProps.registration?.date ??
+                    event?.start.slice(0, 10);
+                router.visit(
+                    event
+                        ? '/company-hub/events/' +
+                              event.extendedProps.eventId +
+                              '?date=' +
+                              encodeURIComponent(date ?? '') +
+                              '&event_workspace=edit'
+                        : '/company-hub?view=events&event_workspace=new',
+                    { preserveState: true },
+                );
+            }}
+        >
+            {event ? (
+                'Edit event details'
+            ) : (
+                <>
+                    <Plus className="size-4" />
+                    Create event
+                </>
             )}
-            {options && !scope && (
-                <Dialog
-                    open
-                    onOpenChange={(open) => {
-                        if (!open) setOptions(null);
-                    }}
-                >
-                    <DialogContent className="overflow-x-hidden sm:max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle>Edit a recurring event</DialogTitle>
-                            <DialogDescription>
-                                Choose which dates you want to change.
-                                Registrations and individual date changes stay
-                                linked to the series.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-3">
-                            {options.can_manage_recurring && (
-                                <>
-                                    <Button
-                                        variant="outline"
-                                        className="w-full justify-start"
-                                        onClick={() => setScope('this')}
-                                    >
-                                        This date only
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="w-full justify-start"
-                                        onClick={() => setScope('following')}
-                                    >
-                                        This and following dates
-                                    </Button>
-                                </>
-                            )}
-                            <Button
-                                variant="outline"
-                                className="w-full justify-start"
-                                onClick={() => setScope('all')}
-                            >
-                                Whole series
-                            </Button>
-                            {!options.can_manage_recurring && (
-                                <p className="text-sm text-muted-foreground">
-                                    Changing individual dates requires
-                                    recurring-event permission.
-                                </p>
-                            )}
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
-            {options && scope && (
-                <EventWizardDialog
-                    open
-                    onClose={() => setOptions(null)}
-                    onSaved={() =>
-                        router.reload({
-                            only: ['events'],
-                            preserveScroll: true,
-                            onSuccess: onSaved,
-                        })
-                    }
-                    {...options}
-                    publishing={{ can_publish: !!options.can_publish }}
-                    initial={event ? eventInitial(event, scope) : null}
-                />
-            )}
-        </>
+        </Button>
     );
 }
 
-export function EventRegistration({ event }: { event: HubEvent }) {
+export function EventRegistration({
+    event,
+    readOnly = false,
+}: {
+    event: HubEvent;
+    readOnly?: boolean;
+}) {
+    const actorId = Number(
+        (usePage().props.auth as { user?: { id: number } })?.user?.id,
+    );
+    const registration = event.extendedProps.registration;
+    return (
+        <fieldset disabled={readOnly} className="min-w-0">
+            <RegistrationBody
+                key={`${actorId}:${event.id}:${event.extendedProps.editVersion}:${registration?.version}:${registration?.mine}:${registration?.personal_reminder?.version}:${registration?.cancelled}`}
+                event={event}
+                actorId={actorId}
+                readOnly={readOnly}
+            />
+        </fieldset>
+    );
+}
+
+function RegistrationBody({
+    event,
+    actorId,
+    readOnly,
+}: {
+    event: HubEvent;
+    actorId: number;
+    readOnly: boolean;
+}) {
     const [registration, setRegistration] = useState(
         event.extendedProps.registration,
     );
+    // A fresh notification projection must update delivery copy without resetting
+    // an organiser's unsaved settings or accepting a late, older delivery flag.
+    const [delivery, setDelivery] = useState({
+        source: event.extendedProps.registration,
+        allowed:
+            event.extendedProps.registration?.personal_reminder?.inapp_allowed,
+    });
+    const reminderInAppAllowed =
+        delivery.source === event.extendedProps.registration
+            ? delivery.allowed
+            : event.extendedProps.registration?.personal_reminder
+                  ?.inapp_allowed;
+    const acceptRegistration = (next: typeof registration) => {
+        setRegistration(next);
+        setDelivery({
+            source: event.extendedProps.registration,
+            allowed: next?.personal_reminder?.inapp_allowed,
+        });
+    };
     const [enabled, setEnabled] = useState(!!registration?.enabled);
     const [capacity, setCapacity] = useState(
         registration?.capacity?.toString() ?? '',
     );
+    const [cutoff, setCutoff] = useState(
+        registration?.closes_before_minutes?.toString() ?? '',
+    );
+    const [notice, setNotice] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
+    const [leaving, setLeaving] = useState(false);
+    const leaveTrigger = useRef<HTMLButtonElement | null>(null);
+    const leaveHeading = useRef<HTMLHeadingElement>(null);
+    const pending = useRef(false);
+    const alive = useRef(true);
+    useEffect(() => {
+        alive.current = true;
+        return () => {
+            alive.current = false;
+        };
+    }, []);
+    useEffect(() => {
+        if (leaving) leaveHeading.current?.focus();
+    }, [leaving]);
     if (!registration) return null;
-    const closed = !registration.enabled || new Date(event.start) <= new Date();
+    const cancelled = !!(
+        event.extendedProps.cancellation?.cancelled || registration.cancelled
+    );
+    const closed =
+        !registration.enabled ||
+        registration.can_respond === false ||
+        new Date(registration.closes_at || event.start) <= new Date();
     const hasPlace = ['going', 'waiting', 'maybe'].includes(
         registration.mine ?? '',
     );
     const respond = async (status: string) => {
+        if (readOnly || cancelled || pending.current) return;
+        pending.current = true;
         setBusy(true);
         setError('');
         try {
@@ -238,14 +226,128 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                 'POST',
                 { date: registration.date, status },
             );
-            setRegistration(result.registration);
-            router.reload({ only: ['events'], preserveScroll: true });
+            if (!alive.current) return;
+            if (result.registration?.date !== registration.date)
+                throw new Error(
+                    'This response belongs to another date. Reopen the event to check your registration.',
+                );
+            acceptRegistration(result.registration);
+            setLeaving(false);
+            router.reload({
+                only: ['events', 'selectedEvent'],
+                preserveScroll: true,
+            });
         } catch (e) {
-            setError((e as Error).message);
+            if (alive.current) setError((e as Error).message);
         } finally {
-            setBusy(false);
+            if (alive.current) {
+                pending.current = false;
+                setBusy(false);
+            }
         }
     };
+    const chooseResponse = (status: string, trigger: HTMLButtonElement) => {
+        if (readOnly) return;
+        if (
+            status === 'declined' &&
+            ['going', 'waiting'].includes(registration.mine ?? '')
+        ) {
+            leaveTrigger.current = trigger;
+            setLeaving(true);
+            setError('');
+        } else void respond(status);
+    };
+    const keepPlace = () => {
+        if (pending.current) return;
+        setLeaving(false);
+        requestAnimationFrame(() => leaveTrigger.current?.focus());
+    };
+    const reminder = registration.personal_reminder;
+    const changeReminder = async (enabled: boolean) => {
+        if (readOnly) return;
+        if (
+            pending.current ||
+            cancelled ||
+            !actorId ||
+            !reminder?.supported ||
+            !(enabled ? reminder.can_enable : reminder.can_disable)
+        )
+            return;
+        pending.current = true;
+        setBusy(true);
+        setError('');
+        setNotice('');
+        try {
+            const result = await hubRequest<{
+                actor_id: number;
+                event_id: number;
+                edit_version: number;
+                date: string;
+                registration: typeof registration;
+            }>(
+                `/company-hub/events/${event.extendedProps.eventId}/reminder`,
+                'PUT',
+                {
+                    actor_id: actorId,
+                    edit_version: event.extendedProps.editVersion,
+                    date: registration.date,
+                    reminder_version: reminder.version,
+                    enabled,
+                },
+            );
+            if (!alive.current) return;
+            if (
+                result.actor_id !== actorId ||
+                result.event_id !== event.extendedProps.eventId ||
+                result.edit_version !== event.extendedProps.editVersion ||
+                result.date !== registration.date ||
+                result.registration?.date !== registration.date ||
+                result.registration.personal_reminder?.enabled !== enabled ||
+                result.registration.personal_reminder.version !==
+                    reminder.version + 1
+            )
+                throw new Error(
+                    'The reminder response could not be confirmed. Reopen this event to check your saved choice.',
+                );
+            acceptRegistration(result.registration);
+            setNotice(
+                enabled
+                    ? 'Your day-before reminder is saved.'
+                    : 'Your personal reminder is turned off.',
+            );
+        } catch (e) {
+            if (alive.current) setError((e as Error).message);
+        } finally {
+            if (alive.current) {
+                pending.current = false;
+                setBusy(false);
+            }
+        }
+    };
+    if (cancelled) {
+        return (
+            <section
+                aria-label="Previous registration"
+                className="rounded-xl border bg-background/70 p-4"
+            >
+                <h3 className="text-sm font-semibold">Your earlier response</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                    {registration.mine === 'going'
+                        ? 'You were registered for this date.'
+                        : registration.mine === 'waiting'
+                          ? 'You were on the waiting list.'
+                          : registration.mine === 'maybe'
+                            ? 'You had marked this date as maybe.'
+                            : registration.mine === 'declined'
+                              ? 'You had declined this date.'
+                              : 'You had not registered for this date.'}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                    No action is needed.
+                </p>
+            </section>
+        );
+    }
     return (
         <div className="space-y-4 rounded-xl border p-4">
             {(registration.enabled || hasPlace || registration.attendance) && (
@@ -267,6 +369,27 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                               ? 'Your place is confirmed for this date.'
                               : 'Your choice applies to this date only.'}
                     </p>
+                    {registration.capacity !== null &&
+                        registration.capacity > 0 && (
+                            <div
+                                role="progressbar"
+                                aria-label="Event places filled"
+                                aria-valuenow={Math.min(
+                                    registration.going,
+                                    registration.capacity,
+                                )}
+                                aria-valuemin={0}
+                                aria-valuemax={registration.capacity}
+                                className="h-1.5 overflow-hidden rounded-full bg-primary/10"
+                            >
+                                <div
+                                    className="h-full rounded-full bg-primary"
+                                    style={{
+                                        width: `${Math.min(100, (registration.going / registration.capacity) * 100)}%`,
+                                    }}
+                                />
+                            </div>
+                        )}
                     {registration.attendance && (
                         <p className="text-sm font-medium">
                             Your attendance:{' '}
@@ -276,18 +399,76 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                             .
                         </p>
                     )}
-                    {closed ? (
+                    {leaving ? (
+                        <section
+                            className="space-y-3 rounded-xl bg-muted/40 p-3"
+                            aria-label="Confirm registration cancellation"
+                            data-event-cancellation-open
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    keepPlace();
+                                }
+                            }}
+                        >
+                            <h4
+                                ref={leaveHeading}
+                                tabIndex={-1}
+                                className="text-sm font-semibold"
+                            >
+                                {registration.mine === 'waiting'
+                                    ? 'Leave the waiting list?'
+                                    : 'Cancel your place?'}
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                                {registration.mine === 'waiting'
+                                    ? 'You will no longer be offered a place if one becomes available.'
+                                    : 'Your place will be available for someone else. You can register again while places are available.'}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={keepPlace}
+                                >
+                                    {registration.mine === 'waiting'
+                                        ? 'Stay on list'
+                                        : 'Keep my place'}
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    disabled={busy}
+                                    onClick={() => void respond('declined')}
+                                >
+                                    {busy
+                                        ? 'Saving…'
+                                        : registration.mine === 'waiting'
+                                          ? 'Leave waiting list'
+                                          : 'Confirm cancellation'}
+                                </Button>
+                            </div>
+                        </section>
+                    ) : closed ? (
                         <div className="space-y-3">
                             <p className="text-sm">
                                 Registration has closed for this date.
                             </p>
-                            {hasPlace && (
+                            {hasPlace && registration.can_decline !== false && (
                                 <Button
+                                    ref={leaveTrigger}
                                     variant="outline"
                                     disabled={busy}
-                                    onClick={() => void respond('declined')}
+                                    onClick={(e) =>
+                                        chooseResponse(
+                                            'declined',
+                                            e.currentTarget,
+                                        )
+                                    }
                                 >
-                                    Cancel my place
+                                    {registration.mine === 'waiting'
+                                        ? 'Leave waiting list'
+                                        : 'Cancel my place'}
                                 </Button>
                             )}
                         </div>
@@ -308,14 +489,20 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                                 ['maybe', 'Maybe'],
                                 [
                                     'declined',
-                                    registration.mine === 'going' ||
                                     registration.mine === 'waiting'
-                                        ? 'Cancel my place'
-                                        : 'Can’t attend',
+                                        ? 'Leave waiting list'
+                                        : registration.mine === 'going'
+                                          ? 'Cancel my place'
+                                          : 'Can’t attend',
                                 ],
                             ].map(([status, label]) => (
                                 <Button
                                     key={status}
+                                    ref={
+                                        status === 'declined'
+                                            ? leaveTrigger
+                                            : undefined
+                                    }
                                     disabled={busy}
                                     variant={
                                         registration.mine === status ||
@@ -324,13 +511,55 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                                             ? 'default'
                                             : 'outline'
                                     }
-                                    onClick={() => void respond(status)}
+                                    onClick={(e) =>
+                                        chooseResponse(status, e.currentTarget)
+                                    }
                                 >
                                     {label}
                                 </Button>
                             ))}
                         </div>
                     )}
+                    {registration.closes_at && !closed && (
+                        <p className="text-xs text-muted-foreground">
+                            Registration closes{' '}
+                            {formatDateTime(registration.closes_at)}.
+                        </p>
+                    )}
+                    {reminder?.supported &&
+                        actorId > 0 &&
+                        ['going', 'waiting'].includes(
+                            registration.mine ?? '',
+                        ) && (
+                            <div className="space-y-2 border-t pt-4">
+                                <label className="flex items-start gap-3 text-sm leading-5">
+                                    <Checkbox
+                                        className="mt-0.5"
+                                        checked={reminder.enabled}
+                                        disabled={
+                                            busy ||
+                                            !(reminder.enabled
+                                                ? reminder.can_disable
+                                                : reminder.can_enable)
+                                        }
+                                        onCheckedChange={(checked) =>
+                                            void changeReminder(
+                                                checked === true,
+                                            )
+                                        }
+                                    />
+                                    Remind me the day before
+                                </label>
+                                <p className="text-xs leading-relaxed text-muted-foreground">
+                                    {!reminderInAppAllowed
+                                        ? 'In-app event notifications are off. Turn them on in notification settings to receive this reminder.'
+                                        : !reminder.enabled &&
+                                            !reminder.can_enable
+                                          ? 'It is too late to add a day-before reminder for this date.'
+                                          : 'A notification here in the app. Your quiet-time settings still apply.'}
+                                </p>
+                            </div>
+                        )}
                 </>
             )}
             {(registration.can_configure ?? event.editable) && (
@@ -352,6 +581,7 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                                 id="registration-enabled"
                                 checked={enabled}
                                 onCheckedChange={setEnabled}
+                                disabled={busy}
                             />
                         </div>
                         <Label htmlFor="registration-capacity">
@@ -364,10 +594,21 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                             max={100000}
                             value={capacity}
                             onChange={(e) => setCapacity(e.target.value)}
+                            disabled={busy}
                         />
+                        {registration.cutoff_supported && actorId > 0 && (
+                            <EventBookingCutoff
+                                value={cutoff}
+                                onChange={setCutoff}
+                                disabled={busy}
+                            />
+                        )}
                         <Button
                             disabled={busy}
                             onClick={async () => {
+                                if (readOnly || pending.current || cancelled)
+                                    return;
+                                pending.current = true;
                                 setBusy(true);
                                 setError('');
                                 setSaved(false);
@@ -386,18 +627,63 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                                                 : null,
                                             version: registration.version,
                                             date: registration.date,
+                                            ...(registration.cutoff_supported &&
+                                            actorId > 0
+                                                ? {
+                                                      actor_id: actorId,
+                                                      edit_version:
+                                                          event.extendedProps
+                                                              .editVersion,
+                                                      closes_before_minutes:
+                                                          cutoff === ''
+                                                              ? null
+                                                              : Number(cutoff),
+                                                  }
+                                                : {}),
                                         },
                                     );
-                                    setRegistration(result.registration);
+                                    if (!alive.current) return;
+                                    if (
+                                        result.registration?.date !==
+                                        registration.date
+                                    )
+                                        throw new Error(
+                                            'These settings belong to another date. Reopen the event.',
+                                        );
+                                    if (
+                                        result.registration.version !==
+                                            registration.version + 1 ||
+                                        result.registration.enabled !==
+                                            enabled ||
+                                        result.registration.capacity !==
+                                            (capacity
+                                                ? Number(capacity)
+                                                : null) ||
+                                        (registration.cutoff_supported &&
+                                            actorId > 0 &&
+                                            result.registration
+                                                .closes_before_minutes !==
+                                                (cutoff === ''
+                                                    ? null
+                                                    : Number(cutoff)))
+                                    )
+                                        throw new Error(
+                                            'The registration settings could not be confirmed. Reopen the event to check the saved settings.',
+                                        );
+                                    acceptRegistration(result.registration);
                                     setSaved(true);
                                     router.reload({
-                                        only: ['events'],
+                                        only: ['events', 'selectedEvent'],
                                         preserveScroll: true,
                                     });
                                 } catch (e) {
-                                    setError((e as Error).message);
+                                    if (alive.current)
+                                        setError((e as Error).message);
                                 } finally {
-                                    setBusy(false);
+                                    if (alive.current) {
+                                        pending.current = false;
+                                        setBusy(false);
+                                    }
                                 }
                             }}
                         >
@@ -410,6 +696,11 @@ export function EventRegistration({ event }: { event: HubEvent }) {
                         )}
                     </div>
                 </details>
+            )}
+            {notice && (
+                <p role="status" className="text-sm text-primary">
+                    {notice}
+                </p>
             )}
             {error && (
                 <p role="alert" className="text-sm text-destructive">
@@ -427,17 +718,26 @@ export function EventBoard({
     data: HubProps;
     onEvent: (event: HubEvent) => void;
 }) {
-    const [query, setQuery] = useState('');
-    const [filter, setFilter] = useState('all');
-    const [category, setCategory] = useState('all');
     const currentYear = Number(
         new Intl.DateTimeFormat('en-NZ', {
             year: 'numeric',
             timeZone: 'Pacific/Auckland',
         }).format(new Date()),
     );
-    const [year, setYear] = useState(currentYear);
+    const [{ query, filter, category, year }, setControls] = useHubListControls(
+        'events',
+        { query: '', filter: 'all', category: 'all', year: currentYear },
+    );
+    const setQuery = (query: string) =>
+        setControls((previous) => ({ ...previous, query }));
+    const setFilter = (filter: string) =>
+        setControls((previous) => ({ ...previous, filter }));
+    const setCategory = (category: string) =>
+        setControls((previous) => ({ ...previous, category }));
+    const setYear = (year: number) =>
+        setControls((previous) => ({ ...previous, year }));
     const [history, setHistory] = useState<HubEvent[]>([]);
+    const historyYear = useRef<number | null>(null);
     const [historyBusy, setHistoryBusy] = useState(false);
     const [historyError, setHistoryError] = useState('');
     const [historyRetry, setHistoryRetry] = useState(0);
@@ -446,13 +746,16 @@ export function EventBoard({
         let current = true;
         setHistoryBusy(true);
         setHistoryError('');
-        setHistory([]);
+        if (historyYear.current !== year) setHistory([]);
         void hubRequest<{ events: HubEvent[] }>(
             `/company-hub/events/history?year=${year}`,
             'GET',
         )
             .then((result) => {
-                if (current) setHistory(result.events);
+                if (current) {
+                    historyYear.current = year;
+                    setHistory(result.events);
+                }
             })
             .catch((error) => {
                 if (current) setHistoryError((error as Error).message);
@@ -506,7 +809,12 @@ export function EventBoard({
     const events =
         filter === 'past'
             ? matching
-            : [...series.values()].map((dates) => dates[0]);
+            : [...series.values()].map(
+                  (dates) =>
+                      dates.find(
+                          (item) => !item.extendedProps.cancellation?.cancelled,
+                      ) ?? dates[0],
+              );
     return (
         <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -531,7 +839,16 @@ export function EventBoard({
                     )}
                     {data.capabilities.createEvent && !data.demo && (
                         <>
-                            <EventDraftWorkspace />
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    router.visit(
+                                        '/company-hub?view=events&event_workspace=drafts',
+                                    )
+                                }
+                            >
+                                Event drafts
+                            </Button>
                             <EventEditorButton />
                         </>
                     )}
@@ -545,25 +862,28 @@ export function EventBoard({
                     onChange={(e) => setQuery(e.target.value)}
                     className="max-w-sm"
                 />
-                <select
-                    className="hub-native-select"
-                    aria-label="Event category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                >
-                    <option value="all">All categories</option>
-                    {[
-                        ...new Set(
-                            source
-                                .map((e) => e.extendedProps.category)
-                                .filter(Boolean),
-                        ),
-                    ].map((value) => (
-                        <option key={value} value={value}>
-                            {value}
-                        </option>
-                    ))}
-                </select>
+                <div className="w-44 shrink-0">
+                    <HubSelect
+                        label="Event category"
+                        value={category}
+                        onChange={setCategory}
+                        options={[
+                            { value: 'all', label: 'All categories' },
+                            ...[
+                                ...new Set(
+                                    source
+                                        .map(
+                                            (event) =>
+                                                event.extendedProps.category,
+                                        )
+                                        .filter(
+                                            (value): value is string => !!value,
+                                        ),
+                                ),
+                            ].map((value) => ({ value, label: value })),
+                        ]}
+                    />
+                </div>
                 {[
                     ['all', 'All events'],
                     ['mine', 'My events'],
@@ -589,21 +909,21 @@ export function EventBoard({
                         Previous year
                     </Button>
                     <Label htmlFor="event-history-year">Year</Label>
-                    <select
-                        id="event-history-year"
-                        className="hub-native-select"
-                        value={year}
-                        onChange={(e) => setYear(Number(e.target.value))}
-                    >
-                        {Array.from(
-                            { length: currentYear - 1899 },
-                            (_, index) => currentYear - index,
-                        ).map((value) => (
-                            <option key={value} value={value}>
-                                {value}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="w-28 shrink-0">
+                        <HubSelect
+                            id="event-history-year"
+                            label="Year"
+                            value={String(year)}
+                            onChange={(value) => setYear(Number(value))}
+                            options={Array.from(
+                                { length: currentYear - 1899 },
+                                (_, index) => {
+                                    const value = String(currentYear - index);
+                                    return { value, label: value };
+                                },
+                            )}
+                        />
+                    </div>
                     <Button
                         variant="outline"
                         disabled={year >= currentYear}
@@ -652,6 +972,7 @@ export function EventBoard({
                         <Button
                             variant="ghost"
                             key={event.id}
+                            data-hub-event-key={event.id}
                             onClick={() => onEvent(event)}
                             className="h-auto flex-col items-stretch overflow-hidden rounded-xl border bg-card p-0 text-left whitespace-normal hover:bg-muted/40"
                         >
@@ -730,16 +1051,25 @@ export function EventBoard({
                                             attended
                                         </p>
                                     )}
-                                {filter !== 'past' && p.registration?.mine && (
-                                    <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-xs text-primary">
-                                        {p.registration.mine === 'going'
-                                            ? 'You’re going'
-                                            : p.registration.mine === 'waiting'
-                                              ? 'On waiting list'
-                                              : p.registration.mine === 'maybe'
-                                                ? 'Interested'
-                                                : 'Not attending'}
+                                {p.cancellation?.cancelled ? (
+                                    <span className="inline-flex items-center rounded-full border border-status-warning/30 bg-status-warning-bg px-3 py-1 text-xs font-medium text-status-warning">
+                                        Cancelled
                                     </span>
+                                ) : (
+                                    filter !== 'past' &&
+                                    p.registration?.mine && (
+                                        <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-xs text-primary">
+                                            {p.registration.mine === 'going'
+                                                ? 'You’re going'
+                                                : p.registration.mine ===
+                                                    'waiting'
+                                                  ? 'On waiting list'
+                                                  : p.registration.mine ===
+                                                      'maybe'
+                                                    ? 'Interested'
+                                                    : 'Not attending'}
+                                        </span>
+                                    )
                                 )}
                             </div>
                         </Button>

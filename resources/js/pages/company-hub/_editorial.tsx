@@ -7,7 +7,9 @@ import { EditorialInsights } from './_insights';
 import { MediaLibrary } from './_media-library';
 import { SharedNavigationDesigner } from './_navigation';
 import { EditorialCalendar } from './_planning';
+import { useHubListControls } from './_reading-navigation';
 import { ResourceCare, type ResourceReport } from './_resource-care';
+import { HubSelect } from './_select';
 import type { HubEvent } from './_types';
 
 export type EditorialPage = {
@@ -46,16 +48,22 @@ export function EditorialWorkspace({
     canCreate = true,
     onCreate,
     onEvent,
+    actorId = null,
 }: {
     pages: EditorialPage[];
     layout: boolean;
     canCreate?: boolean;
     onCreate: () => void;
     onEvent: (event: HubEvent) => void;
+    actorId?: number | null;
 }) {
-    const [mode, setMode] = useState('pages');
+    const [{ mode }, setControls] = useHubListControls('publishing', {
+        mode: 'pages',
+    });
+    const setMode = (mode: string) => setControls({ mode });
     const [navigationDirty, setNavigationDirty] = useState(false);
     const [mediaDirty, setMediaDirty] = useState(false);
+    const [planningOpen, setPlanningOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [status, setStatus] = useState('all');
     const filtered = pages.filter(
@@ -80,7 +88,8 @@ export function EditorialWorkspace({
                         aria-pressed={mode === key}
                         disabled={
                             (navigationDirty && key !== 'navigation') ||
-                            (mediaDirty && key !== 'media')
+                            (mediaDirty && key !== 'media') ||
+                            (planningOpen && key !== 'calendar')
                         }
                         onClick={() => setMode(key)}
                     >
@@ -91,7 +100,7 @@ export function EditorialWorkspace({
                     <Button
                         className="ml-auto"
                         onClick={onCreate}
-                        disabled={navigationDirty || mediaDirty}
+                        disabled={navigationDirty || mediaDirty || planningOpen}
                     >
                         <Plus className="size-4" />
                         Create page
@@ -111,19 +120,19 @@ export function EditorialWorkspace({
                                 onChange={(e) => setQuery(e.target.value)}
                             />
                         </label>
-                        <select
-                            className="hub-native-select"
-                            aria-label="Publishing status"
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value)}
-                        >
-                            <option value="all">All statuses</option>
-                            {Object.entries(statuses).map(([k, v]) => (
-                                <option key={k} value={k}>
-                                    {v}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="w-48 shrink-0">
+                            <HubSelect
+                                label="Publishing status"
+                                value={status}
+                                onChange={setStatus}
+                                options={[
+                                    { value: 'all', label: 'All statuses' },
+                                    ...Object.entries(statuses).map(
+                                        ([value, label]) => ({ value, label }),
+                                    ),
+                                ]}
+                            />
+                        </div>
                     </div>
                     <div className="hub-editorial-list">
                         {filtered.map((p) => (
@@ -153,7 +162,12 @@ export function EditorialWorkspace({
                     </div>
                 </>
             )}
-            {mode === 'calendar' && <EditorialCalendar onEvent={onEvent} />}
+            {mode === 'calendar' && (
+                <EditorialCalendar
+                    onEvent={onEvent}
+                    onWorkspaceChange={setPlanningOpen}
+                />
+            )}
             {mode === 'insights' && (
                 <EditorialInsights
                     canCreate={canCreate}
@@ -164,7 +178,9 @@ export function EditorialWorkspace({
             {mode === 'navigation' && layout && (
                 <SharedNavigationDesigner onDirtyChange={setNavigationDirty} />
             )}
-            {mode === 'resources' && <ResourceCare pages={pages} />}
+            {mode === 'resources' && (
+                <ResourceCare key={actorId} pages={pages} actorId={actorId} />
+            )}
         </section>
     );
 }

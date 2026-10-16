@@ -31,19 +31,19 @@ beforeEach(function () {
 test('editing resets current confirmation while retaining exact earlier content and receipt history', function () {
     $this->actingAs($this->reader);
     $version = $this->getJson($this->url)->assertOk()->json('version');
-    $this->postJson($this->url.'/acknowledge', ['version' => $version])->assertOk();
-    $this->postJson($this->url.'/acknowledge', ['version' => $version])->assertOk();
+    $this->postJson($this->url.'/acknowledge', ['actor_id' => $this->reader->id, 'version' => $version])->assertOk();
+    $this->postJson($this->url.'/acknowledge', ['actor_id' => $this->reader->id, 'version' => $version])->assertOk();
     expect($this->notice->acknowledgementHistory()->count())->toBe(1);
     $this->notice->update(['is_pinned' => true]);
     expect($this->getJson($this->url)->json('version'))->toBe($version);
     $this->notice->update(['content' => 'Second version']);
     $read = $this->getJson($this->url)->assertOk()->assertJsonPath('acknowledged_at', null);
-    $this->postJson($this->url.'/acknowledge', ['version' => $version])->assertConflict();
+    $this->postJson($this->url.'/acknowledge', ['actor_id' => $this->reader->id, 'version' => $version])->assertConflict();
     expect($this->notice->acknowledgements()->count())->toBe(0);
     $snapshot = json_decode(DB::table('hr_announcement_read_versions')->where('announcement_id', $this->notice->id)->where('read_version', 1)->value('content'), true);
     expect($snapshot['content'])->toBe('First version');
     $this->actingAs($this->editor)->getJson('/hr/announcements/'.$this->notice->id.'/tracking')->assertOk()->assertJsonPath('acknowledged', 0)->assertJsonPath('history.0.version', 1)->assertJsonPath('history.0.name', $this->reader->name);
-    $this->actingAs($this->reader)->postJson($this->url.'/acknowledge', ['version' => $read->json('version')])->assertOk();
+    $this->actingAs($this->reader)->postJson($this->url.'/acknowledge', ['actor_id' => $this->reader->id, 'version' => $read->json('version')])->assertOk();
     expect($this->notice->acknowledgements()->count())->toBe(1)->and($this->notice->acknowledgementHistory()->count())->toBe(2);
     expect(HrAnnouncement::withCount('acknowledgements')->find($this->notice->id)->acknowledgements_count)->toBe(1);
 });
@@ -52,10 +52,10 @@ test('attachment changes require a fresh read and unversioned historical receipt
     DB::table('hr_announcement_acknowledgements')->insert(['announcement_id' => $this->notice->id, 'user_id' => $this->reader->id, 'read_version' => 0, 'acknowledged_at' => now()]);
     $this->actingAs($this->reader);
     $version = $this->getJson($this->url)->assertOk()->assertJsonPath('acknowledged_at', null)->json('version');
-    $this->postJson($this->url.'/acknowledge', ['version' => $version])->assertOk();
+    $this->postJson($this->url.'/acknowledge', ['actor_id' => $this->reader->id, 'version' => $version])->assertOk();
     $file = $this->notice->attachments()->create(['disk' => 'private', 'path' => 'read-version.pdf', 'original_name' => 'Read this.pdf', 'mime' => 'application/pdf', 'size' => 42, 'uploaded_by' => $this->editor->id]);
     $this->getJson($this->url)->assertOk()->assertJsonPath('acknowledged_at', null);
-    $this->postJson($this->url.'/acknowledge', ['version' => $version])->assertConflict();
+    $this->postJson($this->url.'/acknowledge', ['actor_id' => $this->reader->id, 'version' => $version])->assertConflict();
     $file->delete();
     expect($this->notice->acknowledgementHistory()->count())->toBe(2)->and($this->notice->acknowledgements()->count())->toBe(0);
 });

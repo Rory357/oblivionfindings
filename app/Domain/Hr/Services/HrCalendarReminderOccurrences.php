@@ -20,15 +20,15 @@ class HrCalendarReminderOccurrences
                 return [];
             }
 
-            return $event->starts_at->gt($from) && $event->starts_at->lte($to) ? [['event' => $event, 'start' => $event->starts_at->copy(), 'end' => $event->ends_at->copy(), 'date' => $event->exception_date->toDateString()]] : [];
+            return ! app(HrCalendarCancellation::class)->marker($event, $event->starts_at) && $event->starts_at->gt($from) && $event->starts_at->lte($to) ? [['event' => $event, 'start' => $event->starts_at->copy(), 'end' => $event->ends_at->copy(), 'date' => $event->exception_date->toDateString()]] : [];
         }
         $children = $event->rrule ? HrCalendarEvent::where('recurrence_parent_id', $event->id)->get() : collect();
         $skip = $children->map(fn ($child) => $child->exception_date?->toDateString())->all();
         $due = collect($this->recurrence->between($event, $from, $to))
-            ->filter(fn ($date) => $date['start']->gt($from) && $date['start']->lte($to) && ! in_array($date['date'], $skip, true))
+            ->filter(fn ($date) => ! app(HrCalendarCancellation::class)->marker($event, $date['start']) && $date['start']->gt($from) && $date['start']->lte($to) && ! in_array($date['date'], $skip, true))
             ->map(fn ($date) => ['event' => $event, 'start' => $date['start'], 'end' => $date['end'], 'date' => $date['date']]);
         foreach ($children as $child) {
-            if (! $child->archived_at && ! $child->reminders_override && $child->starts_at->gt($from) && $child->starts_at->lte($to) && $this->validException($event, $child)) {
+            if (! $child->archived_at && ! app(HrCalendarCancellation::class)->marker($child, $child->starts_at) && ! $child->reminders_override && $child->starts_at->gt($from) && $child->starts_at->lte($to) && $this->validException($event, $child)) {
                 $due->push(['event' => $child, 'start' => $child->starts_at->copy(), 'end' => $child->ends_at->copy(), 'date' => $child->exception_date->toDateString()]);
             }
         }

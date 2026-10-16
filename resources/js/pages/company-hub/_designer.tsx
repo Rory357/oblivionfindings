@@ -1,6 +1,15 @@
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
     DndContext,
     KeyboardSensor,
@@ -24,20 +33,27 @@ import {
     ArrowDown,
     ArrowUp,
     Copy,
+    Eye,
+    EyeOff,
     GripVertical,
     Plus,
     Settings2,
     Trash2,
 } from 'lucide-react';
-import { useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { BlockContent } from './_blocks';
+import {
+    BlockResizeHandle,
+    blockWidthLabel,
+    type BlockSize,
+} from './_designer-resize';
 import {
     blockLibrary,
     blockSpan,
-    createBlock,
     duplicateSection,
     moveBlock,
 } from './_layout';
+import { HubSelect } from './_select';
 import type { HubBlock, HubProps, HubSection } from './_types';
 
 export type DesignerSelection = { section: string; block?: string } | null;
@@ -47,6 +63,9 @@ type DesignerProps = {
     selection: DesignerSelection;
     onSelect: (selection: DesignerSelection) => void;
     onChange: (sections: HubSection[]) => void;
+    onAddBlock: (sectionId: string) => void;
+    onAddSection: () => void;
+    onSectionRemoved?: () => void;
 };
 
 export function HubDesigner(props: DesignerProps) {
@@ -126,16 +145,7 @@ export function HubDesigner(props: DesignerProps) {
                 className="mt-5 w-full border-dashed"
                 variant="outline"
                 disabled={props.sections.length >= 12}
-                onClick={() => {
-                    const section = {
-                        id: crypto.randomUUID(),
-                        title: 'New section',
-                        columns: 1,
-                        blocks: [createBlock('text')],
-                    };
-                    props.onChange([...props.sections, section]);
-                    props.onSelect({ section: section.id });
-                }}
+                onClick={props.onAddSection}
             >
                 <Plus className="size-4" />
                 Add section
@@ -148,6 +158,8 @@ function DesignerSection(
     props: DesignerProps & { section: HubSection; index: number },
 ) {
     const { section, index, sections, selection, onChange, onSelect } = props;
+    const [removeOpen, setRemoveOpen] = useState(false);
+    const removeConfirmed = useRef(false);
     const {
         setNodeRef,
         transform,
@@ -156,11 +168,11 @@ function DesignerSection(
         attributes,
         listeners,
     } = useSortable({ id: `section:${section.id}` });
-    const [type, setType] = useState('text');
     const select = () => onSelect({ section: section.id });
     const { setNodeRef: dropRef } = useDroppable({ id: `drop:${section.id}` });
     return (
         <section
+            id={`hub-designer-section-${section.id}`}
             ref={setNodeRef}
             style={{
                 transform: CSS.Transform.toString(transform),
@@ -168,6 +180,7 @@ function DesignerSection(
             }}
             className="hub-designer-section"
             data-dragging={isDragging}
+            data-hidden={section.hidden || undefined}
             data-selected={
                 selection?.section === section.id && !selection.block
             }
@@ -183,10 +196,38 @@ function DesignerSection(
                     <GripVertical className="size-4" />
                 </Button>
                 <strong>{section.title || `Section ${index + 1}`}</strong>
+                {section.hidden && (
+                    <span className="text-xs text-muted-foreground">
+                        Hidden from staff
+                    </span>
+                )}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={
+                        section.hidden ? 'Show section' : 'Hide section'
+                    }
+                    onClick={() =>
+                        onChange(
+                            sections.map((item) =>
+                                item.id === section.id
+                                    ? { ...item, hidden: !item.hidden }
+                                    : item,
+                            ),
+                        )
+                    }
+                >
+                    {section.hidden ? (
+                        <Eye className="size-4" />
+                    ) : (
+                        <EyeOff className="size-4" />
+                    )}
+                </Button>
                 <Button
                     variant="ghost"
                     size="icon"
                     aria-label="Section settings"
+                    data-designer-edit
                     onClick={select}
                 >
                     <Settings2 className="size-4" />
@@ -230,14 +271,54 @@ function DesignerSection(
                     variant="ghost"
                     size="icon"
                     aria-label="Remove section"
-                    onClick={() => {
-                        onChange(sections.filter((s) => s.id !== section.id));
-                        onSelect(null);
-                    }}
+                    onClick={() => setRemoveOpen(true)}
                 >
                     <Trash2 className="size-4" />
                 </Button>
             </div>
+            <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
+                <DialogContent
+                    onCloseAutoFocus={(event) => {
+                        if (removeConfirmed.current) event.preventDefault();
+                    }}
+                >
+                    <DialogHeader>
+                        <DialogTitle>
+                            Remove {section.title || 'this section'}?
+                        </DialogTitle>
+                        <DialogDescription>
+                            This removes the section and its{' '}
+                            {section.blocks.length}{' '}
+                            {section.blocks.length === 1 ? 'block' : 'blocks'}{' '}
+                            from your draft. You can use Undo to bring it back.
+                            The published page stays unchanged.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setRemoveOpen(false)}
+                        >
+                            Keep section
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                removeConfirmed.current = true;
+                                onChange(
+                                    sections.filter(
+                                        (item) => item.id !== section.id,
+                                    ),
+                                );
+                                onSelect(null);
+                                props.onSectionRemoved?.();
+                            }}
+                        >
+                            Remove section and blocks
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <SortableContext
                 items={section.blocks.map((b) => `block:${b.id}`)}
                 strategy={rectSortingStrategy}
@@ -261,32 +342,12 @@ function DesignerSection(
                 {!section.blocks.length && (
                     <div className="hub-designer-drop">Drop a block here</div>
                 )}
-                <select
-                    className="hub-native-select"
-                    aria-label={`Block type for ${section.title || `section ${index + 1}`}`}
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                >
-                    {blockLibrary.map(([value, label]) => (
-                        <option key={value} value={value}>
-                            {label}
-                        </option>
-                    ))}
-                </select>
                 <Button
                     variant="outline"
+                    className="w-full border-dashed"
                     disabled={section.blocks.length >= 12}
-                    onClick={() => {
-                        const block = createBlock(type);
-                        onChange(
-                            sections.map((s) =>
-                                s.id === section.id
-                                    ? { ...s, blocks: [...s.blocks, block] }
-                                    : s,
-                            ),
-                        );
-                        onSelect({ section: section.id, block: block.id });
-                    }}
+                    aria-label={`Add block to ${section.title || `section ${index + 1}`}`}
+                    onClick={() => props.onAddBlock(section.id)}
                 >
                     <Plus className="size-4" />
                     Add block
@@ -318,18 +379,54 @@ function DesignerBlock({
         attributes,
         listeners,
     } = useSortable({ id: `block:${block.id}` });
+    const label =
+        block.title ||
+        blockLibrary.find(([type]) => type === block.type)?.[1] ||
+        'Content';
+    const [resizing, setResizing] = useState<BlockSize | null>(null);
+    const size = {
+        width: blockSpan(section, block, blockIndex),
+        min_height: block.min_height ?? 0,
+    };
+    const displayed = resizing ?? size;
+    const resize = (next: BlockSize) =>
+        onChange(
+            sections.map((item) =>
+                item.id === section.id
+                    ? {
+                          ...item,
+                          blocks: item.blocks.map((current) =>
+                              current.id === block.id
+                                  ? {
+                                        ...current,
+                                        ...(next.width !== size.width
+                                            ? { width: next.width }
+                                            : {}),
+                                        ...(next.min_height !== size.min_height
+                                            ? { min_height: next.min_height }
+                                            : {}),
+                                    }
+                                  : current,
+                          ),
+                      }
+                    : item,
+            ),
+        );
     const style = {
-        gridColumn: `span ${blockSpan(section, block, blockIndex)}`,
+        gridColumn: `span ${displayed.width}`,
         transform: CSS.Transform.toString(transform),
         transition: transition,
     } as CSSProperties;
     return (
         <article
+            id={`hub-designer-block-${block.id}`}
             ref={setNodeRef}
             style={style}
             className="hub-designer-block"
             data-dragging={isDragging}
             data-selected={selection?.block === block.id}
+            data-hidden={block.hidden || undefined}
+            data-resizing={!!resizing}
         >
             <div className="hub-designer-block-toolbar">
                 <Button
@@ -337,7 +434,7 @@ function DesignerBlock({
                     variant="ghost"
                     {...attributes}
                     {...listeners}
-                    aria-label={`Drag ${block.title}`}
+                    aria-label={`Drag ${label}`}
                 >
                     <GripVertical className="size-4" />
                 </Button>
@@ -346,15 +443,16 @@ function DesignerBlock({
                     onClick={() =>
                         onSelect({ section: section.id, block: block.id })
                     }
-                    aria-label={`Edit ${block.title}`}
+                    aria-label={`Edit ${label}`}
+                    data-designer-edit
                 >
                     <Settings2 className="size-3" />
-                    <span className="truncate">{block.title}</span>
+                    <span className="truncate">{label}</span>
                 </Button>
                 <Button
                     size="icon"
                     variant="ghost"
-                    aria-label={`Duplicate ${block.title}`}
+                    aria-label={`Duplicate ${label}`}
                     disabled={section.blocks.length >= 12}
                     onClick={() => {
                         const copy = {
@@ -375,55 +473,62 @@ function DesignerBlock({
                     <Copy className="size-3" />
                 </Button>
             </div>
-            <div className="hub-designer-render" inert>
-                <div className="hub-section-heading">
-                    <h2 className="text-section-title">{block.title}</h2>
-                </div>
+            <div
+                className="hub-designer-render"
+                data-block-type={block.type}
+                data-tone={block.tone ?? 'plain'}
+                style={{ minHeight: displayed.min_height || undefined }}
+                inert
+            >
+                {block.hidden && (
+                    <p className="mb-3 text-xs font-semibold text-muted-foreground">
+                        Hidden from staff · kept in your design
+                    </p>
+                )}
+                {block.type !== 'featured' && (
+                    <div className="hub-section-heading">
+                        <h2 className="text-section-title">{block.title}</h2>
+                    </div>
+                )}
                 {block.type === 'text' && !block.body ? (
                     <p className="text-sm text-muted-foreground">
                         Select this block to write your content.
                     </p>
                 ) : (
                     <BlockContent
-                        block={block}
-                        data={{ ...data, participation: null }}
+                        preview
+                        block={resizing ? { ...block, ...resizing } : block}
+                        data={{
+                            ...data,
+                            participation: null,
+                        }}
                         onEvent={() => {}}
                     />
                 )}
             </div>
-            <label className="hub-block-resize">
-                Width
-                <input
-                    type="range"
-                    min={3}
-                    max={12}
-                    step={1}
-                    value={blockSpan(section, block, blockIndex)}
-                    aria-label={`Width of ${block.title}`}
-                    onChange={(event) =>
-                        onChange(
-                            sections.map((s) =>
-                                s.id === section.id
-                                    ? {
-                                          ...s,
-                                          blocks: s.blocks.map((b) =>
-                                              b.id === block.id
-                                                  ? {
-                                                        ...b,
-                                                        width: Number(
-                                                            event.target.value,
-                                                        ),
-                                                    }
-                                                  : b,
-                                          ),
-                                      }
-                                    : s,
-                            ),
-                        )
-                    }
-                />
-                <span>{blockSpan(section, block, blockIndex)}/12</span>
-            </label>
+            <div className="hub-block-size">
+                <span
+                    className="hub-block-size-value"
+                    aria-label={`Size of ${label}`}
+                >
+                    {blockWidthLabel(displayed.width)} ·{' '}
+                    {displayed.min_height
+                        ? `${displayed.min_height}px min`
+                        : 'Auto height'}
+                </span>
+                <span className="hub-block-size-hint">
+                    Drag corner to resize
+                </span>
+            </div>
+            <BlockResizeHandle
+                label={label}
+                size={size}
+                onPreview={setResizing}
+                onCommit={resize}
+                onSelect={() =>
+                    onSelect({ section: section.id, block: block.id })
+                }
+            />
         </article>
     );
 }
@@ -438,6 +543,21 @@ export function SectionSettings({
     return (
         <div className="space-y-4">
             <h2 className="text-section-title">Section settings</h2>
+            <Label className="flex items-start justify-between gap-4 rounded-lg border p-3">
+                <span>
+                    <span className="block">Show section to staff</span>
+                    <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        Hidden sections stay in your draft, including their
+                        blocks. Publish to update what staff see.
+                    </span>
+                </span>
+                <Switch
+                    checked={!section.hidden}
+                    onCheckedChange={(visible) =>
+                        onChange({ hidden: !visible })
+                    }
+                />
+            </Label>
             <Label className="grid gap-2">
                 Section name
                 <Input
@@ -448,73 +568,74 @@ export function SectionSettings({
             </Label>
             <Label className="grid gap-2">
                 Columns
-                <select
-                    className="hub-native-select"
-                    value={section.columns}
-                    onChange={(e) =>
+                <HubSelect
+                    label="Columns"
+                    value={String(section.columns)}
+                    onChange={(value) =>
                         onChange({
-                            columns: Number(e.target.value),
+                            columns: Number(value),
                             blocks: section.blocks.map((b) => ({
                                 ...b,
                                 width: undefined,
                             })),
                         })
                     }
-                >
-                    {[1, 2, 3].map((n) => (
-                        <option key={n} value={n}>
-                            {n} {n === 1 ? 'column' : 'columns'}
-                        </option>
-                    ))}
-                </select>
+                    options={[1, 2, 3].map((n) => ({
+                        value: String(n),
+                        label: `${n} ${n === 1 ? 'column' : 'columns'}`,
+                    }))}
+                />
             </Label>
             {section.columns === 2 && (
                 <Label className="grid gap-2">
                     Column balance
-                    <select
-                        className="hub-native-select"
+                    <HubSelect
+                        label="Column balance"
                         value={section.layout ?? 'equal'}
-                        onChange={(e) =>
+                        onChange={(value) =>
                             onChange({
-                                layout: e.target.value as HubSection['layout'],
+                                layout: value as HubSection['layout'],
                             })
                         }
-                    >
-                        <option value="equal">Equal columns</option>
-                        <option value="wide-left">Wide left</option>
-                        <option value="wide-right">Wide right</option>
-                    </select>
+                        options={[
+                            { value: 'equal', label: 'Equal columns' },
+                            { value: 'wide-left', label: 'Wide left' },
+                            { value: 'wide-right', label: 'Wide right' },
+                        ]}
+                    />
                 </Label>
             )}
             <Label className="grid gap-2">
                 Background
-                <select
-                    className="hub-native-select"
+                <HubSelect
+                    label="Background"
                     value={section.tone ?? 'plain'}
-                    onChange={(e) =>
-                        onChange({ tone: e.target.value as HubSection['tone'] })
+                    onChange={(value) =>
+                        onChange({ tone: value as HubSection['tone'] })
                     }
-                >
-                    <option value="plain">Page background</option>
-                    <option value="soft">Soft contrast</option>
-                    <option value="brand">Company colour tint</option>
-                </select>
+                    options={[
+                        { value: 'plain', label: 'Page background' },
+                        { value: 'soft', label: 'Soft contrast' },
+                        { value: 'brand', label: 'Company colour tint' },
+                    ]}
+                />
             </Label>
             <Label className="grid gap-2">
                 Spacing
-                <select
-                    className="hub-native-select"
+                <HubSelect
+                    label="Spacing"
                     value={section.spacing ?? 'comfortable'}
-                    onChange={(e) =>
+                    onChange={(value) =>
                         onChange({
-                            spacing: e.target.value as HubSection['spacing'],
+                            spacing: value as HubSection['spacing'],
                         })
                     }
-                >
-                    <option value="compact">Compact</option>
-                    <option value="comfortable">Comfortable</option>
-                    <option value="spacious">Spacious</option>
-                </select>
+                    options={[
+                        { value: 'compact', label: 'Compact' },
+                        { value: 'comfortable', label: 'Comfortable' },
+                        { value: 'spacious', label: 'Spacious' },
+                    ]}
+                />
             </Label>
         </div>
     );

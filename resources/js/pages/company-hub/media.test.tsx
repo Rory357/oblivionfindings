@@ -35,6 +35,12 @@ const library = {
 beforeEach(() => {
     request.mockReset();
 });
+function choose(label: string, option: string) {
+    fireEvent.keyDown(screen.getByRole('combobox', { name: label }), {
+        key: 'ArrowDown',
+    });
+    fireEvent.click(screen.getByRole('option', { name: option }));
+}
 async function ready(
     props: Partial<React.ComponentProps<typeof MediaLibrary>> = {},
 ) {
@@ -85,12 +91,18 @@ it('preserves entered metadata on a version conflict and offers explicit discard
             version: 3,
         },
     );
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('region', { name: 'File details' }), {
+        key: 'Escape',
+    });
+    expect(
+        screen.getByRole('region', { name: 'File details' }),
+    ).toBeInTheDocument();
     fireEvent.click(
         screen.getByRole('button', { name: 'Discard changes and close' }),
     );
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+        screen.queryByRole('region', { name: 'File details' }),
+    ).not.toBeInTheDocument();
 });
 
 it('saves crop shape and focus as a new file without replacing or selecting the original', async () => {
@@ -109,9 +121,7 @@ it('saves crop shape and focus as a new file without replacing or selecting the 
         screen.getByRole('button', { name: 'Details for Workplace.png' }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Crop image' }));
-    fireEvent.change(screen.getByLabelText('Crop shape'), {
-        target: { value: '1:1' },
-    });
+    choose('Crop shape', 'Square · 1:1');
     fireEvent.change(
         screen.getByRole('slider', { name: 'Horizontal crop focus' }),
         { target: { value: '82' } },
@@ -221,9 +231,7 @@ it('saves an image description and album together and clears the dirty state', a
     fireEvent.change(screen.getByLabelText('Image description'), {
         target: { value: '' },
     });
-    fireEvent.change(screen.getByLabelText('Album', { exact: true }), {
-        target: { value: '2' },
-    });
+    choose('Album', 'Our company');
     fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
     await waitFor(() =>
         expect(
@@ -267,9 +275,7 @@ it('keeps successful batch uploads and reports an individual failure after refre
         .mockRejectedValueOnce(new Error('Unsupported file.'))
         .mockResolvedValueOnce(library);
     await ready();
-    fireEvent.click(
-        screen.getByRole('button', { name: 'Upload' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
     fireEvent.drop(
         screen.getByRole('button', { name: /Drag & drop files here/ }),
         {

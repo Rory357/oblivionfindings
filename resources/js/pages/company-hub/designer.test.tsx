@@ -66,9 +66,7 @@ describe('shared visual designer', () => {
                 onChange={change}
             />,
         );
-        fireEvent.change(screen.getByLabelText('Banner height'), {
-            target: { value: 'comfortable' },
-        });
+        fireEvent.click(screen.getByRole('radio', { name: 'Comfortable' }));
         expect(change).toHaveBeenCalledWith({
             ...defaultHero,
             style: 'image',

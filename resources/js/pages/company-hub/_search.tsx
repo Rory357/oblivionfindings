@@ -14,7 +14,7 @@ import {
     UsersRound,
     Wrench,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useHubListControls } from './_reading-navigation';
 import type { HubEvent, HubProps } from './_types';
 
 type Result = {
@@ -38,8 +38,20 @@ export function HubSearchResults({
     data: HubProps;
     onEvent: (event: HubEvent) => void;
 }) {
-    const [filter, setFilter] = useState('all');
-    const [limit, setLimit] = useState(20);
+    const [controls, setControls] = useHubListControls('search', {
+        query: data.search,
+        filter: 'all',
+        limit: 20,
+        preview: '',
+    });
+    const { filter, limit, preview } =
+        controls.query === data.search
+            ? controls
+            : { filter: 'all', limit: 20, preview: '' };
+    const setFilter = (filter: string) =>
+        setControls({ query: data.search, filter, limit: 20, preview: '' });
+    const setLimit = (limit: number) =>
+        setControls({ query: data.search, filter, limit, preview });
     const groups: Array<{
         id: string;
         label: string;
@@ -71,8 +83,8 @@ export function HubSearchResults({
                 meta: [p.resource_type, p.collection]
                     .filter(Boolean)
                     .join(' · '),
-                url: p.resource_url,
-                external: true,
+                url: p.reader_url ?? p.resource_url,
+                external: !p.reader_url,
             })),
         },
         {
@@ -87,7 +99,7 @@ export function HubSearchResults({
                     .join(' · '),
                 meta: p.shared_profile?.help_with.join(' · ') || 'Work contact',
                 url: data.demo
-                    ? destination('people', p.name)
+                    ? '/company-hub/showcase?story=sample-team'
                     : `/company-hub/people/${p.id}`,
             })),
         },
@@ -111,7 +123,13 @@ export function HubSearchResults({
                 id: e.id,
                 title: e.title,
                 summary: plain(e.extendedProps.description),
-                meta: [formatDateTime(e.start), e.extendedProps.location]
+                meta: [
+                    e.extendedProps.cancellation?.cancelled
+                        ? 'Cancelled'
+                        : null,
+                    formatDateTime(e.start),
+                    e.extendedProps.location,
+                ]
                     .filter(Boolean)
                     .join(' · '),
                 event: e,
@@ -123,10 +141,14 @@ export function HubSearchResults({
             icon: HeartHandshake,
             items: data.kudos.map((k) => ({
                 id: `kudos:${k.id}`,
-                title: `${k.to} · ${k.category}`,
+                title: [k.to || 'A colleague', k.category]
+                    .filter(Boolean)
+                    .join(' · '),
                 summary: k.message,
                 meta: `From ${k.from}`,
-                url: destination('shoutouts', data.search),
+                url: data.demo
+                    ? '/company-hub/showcase?view=shoutouts'
+                    : `/company-hub?view=shoutouts&recognition=${k.id}#kudos-${k.id}`,
             })),
         },
         {
@@ -138,7 +160,9 @@ export function HubSearchResults({
                 title: i.title,
                 summary: i.body,
                 meta: `${i.category} · ${i.status.replace(/_/g, ' ')}`,
-                url: destination('ideas', i.title),
+                url: data.demo
+                    ? '/company-hub/showcase?view=ideas'
+                    : `/company-hub?view=ideas&idea=${i.id}`,
             })),
         },
         {
@@ -157,10 +181,7 @@ export function HubSearchResults({
         },
     ];
     const total = groups.reduce((n, group) => n + group.items.length, 0);
-    const choose = (id: string) => {
-        setFilter(id);
-        setLimit(20);
-    };
+    const choose = setFilter;
     return (
         <section
             className="hub-search-results space-y-6"
@@ -191,6 +212,15 @@ export function HubSearchResults({
                         </Button>
                     ))}
             </div>
+            {data.document_text_incomplete && (
+                <p
+                    role="status"
+                    className="rounded-xl border bg-card p-4 text-sm text-muted-foreground"
+                >
+                    Some PDF text could not be searched. Try the document’s
+                    title or browse Resources.
+                </p>
+            )}
             {!total ? (
                 <Card className="items-center gap-0 px-8 py-12 text-center">
                     <Search className="mx-auto mb-4 size-7 text-muted-foreground" />
@@ -256,11 +286,6 @@ export function HubSearchResults({
                                                     <h3 className="font-medium text-foreground">
                                                         {item.title}
                                                     </h3>
-                                                    {item.summary && (
-                                                        <p className="mt-1 line-clamp-2 text-sm font-normal text-muted-foreground">
-                                                            {item.summary}
-                                                        </p>
-                                                    )}
                                                     <span className="mt-2 block text-xs font-normal text-muted-foreground">
                                                         {item.meta}
                                                     </span>
@@ -270,11 +295,14 @@ export function HubSearchResults({
                                         );
                                         const style =
                                             'flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring';
-                                        return item.event ? (
+                                        const opener = item.event ? (
                                             <Button
                                                 variant="ghost"
                                                 type="button"
                                                 key={item.id}
+                                                data-hub-event-key={
+                                                    item.event.id
+                                                }
                                                 className={`${style} h-auto rounded-none whitespace-normal`}
                                                 onClick={() =>
                                                     onEvent(item.event!)
@@ -300,6 +328,52 @@ export function HubSearchResults({
                                             >
                                                 {content}
                                             </Link>
+                                        );
+                                        const expanded = preview === item.id;
+                                        const previewId = `hub-search-preview-${group.id}-${item.id}`;
+                                        return (
+                                            <div key={item.id}>
+                                                <div className="flex items-center gap-3 pr-5">
+                                                    <div className="min-w-0 flex-1">
+                                                        {opener}
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        aria-expanded={expanded}
+                                                        aria-controls={
+                                                            previewId
+                                                        }
+                                                        aria-label={`${expanded ? 'Hide preview' : 'Preview'}: ${item.title}`}
+                                                        onClick={() =>
+                                                            setControls({
+                                                                query: data.search,
+                                                                filter,
+                                                                limit,
+                                                                preview:
+                                                                    expanded
+                                                                        ? ''
+                                                                        : item.id,
+                                                            })
+                                                        }
+                                                    >
+                                                        {expanded
+                                                            ? 'Hide preview'
+                                                            : 'Preview'}
+                                                    </Button>
+                                                </div>
+                                                {expanded && (
+                                                    <div
+                                                        id={previewId}
+                                                        role="region"
+                                                        aria-label={`Preview of ${item.title}`}
+                                                        className="mx-5 mb-5 border-l-2 border-primary/25 pl-4 text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap text-muted-foreground"
+                                                    >
+                                                        {item.summary ||
+                                                            'Open this result to view the available details.'}
+                                                    </div>
+                                                )}
+                                            </div>
                                         );
                                     })}
                             </div>

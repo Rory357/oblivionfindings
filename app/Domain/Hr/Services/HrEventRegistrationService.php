@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -15,6 +16,26 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 class HrEventRegistrationService
 {
     public function __construct(private readonly HrCalendarAccessService $access) {}
+
+    public function cutoffReady(): bool
+    {
+        return Schema::hasColumn('hr_calendar_events', 'registration_closes_before_minutes');
+    }
+
+    private function startsAt(HrCalendarEvent $event, string $date): ?Carbon
+    {
+        $event = $event->recurrence_parent_id ? $event : HrCalendarEvent::where('recurrence_parent_id', $event->id)->whereDate('exception_date', $date)->first() ?? $event;
+        $start = app(HrCalendarCancellation::class)->start($event, $date);
+
+        return $start ? app(HrCalendarCancellation::class)->instant($event, $start) : null;
+    }
+
+    private function closesAt(HrCalendarEvent $event, string $date): ?Carbon
+    {
+        $root = $event->recurrence_parent_id ? $event->recurrenceParent : $event;
+
+        return $this->startsAt($event, $date)?->subMinutes((int) $root?->getRawOriginal('registration_closes_before_minutes'));
+    }
 
     private function lockOccurrence(HrCalendarEvent $event): array
     {
@@ -31,9 +52,19 @@ class HrEventRegistrationService
         $rows = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('occurrence_date', $date)->get();
         $mine = $rows->firstWhere('user_id', $viewer->id);
         $queue = $rows->where('status', 'waiting')->sortBy([['queued_at', 'asc'], ['id', 'asc']])->values();
+        $cancelled = app(HrCalendarCancellation::class)->cancelled($event, $date);
+        $closes = $this->closesAt($event, $date);
 
         return [
-            'can_configure' => $this->access->canManageEvent($viewer, $event) && (! $root->hub_managed || $viewer->canDo('company_hub.publish')),
+            'can_configure' => ! $cancelled && ! $root->cancelled_at && $this->access->canManageEvent($viewer, $event) && (! $root->hub_managed || $viewer->canDo('company_hub.publish')),
+            'cancelled' => $cancelled,
+            'can_respond' => ! $cancelled && (bool) $root->registration_enabled && $closes?->isFuture(),
+            'can_decline' => ! $cancelled && in_array($mine?->status, ['going', 'waiting', 'maybe'], true),
+            'closes_at' => $closes?->toIso8601String(),
+            'cutoff_supported' => $this->cutoffReady(),
+            'closes_before_minutes' => $root->getRawOriginal('registration_closes_before_minutes') === null ? null : (int) $root->getRawOriginal('registration_closes_before_minutes'),
+            'personal_reminder' => app(HrCalendarPersonalReminders::class)->summary($viewer, $event, $date),
+            'place_reserved' => ! $cancelled && $mine?->status === 'going',
             'enabled' => (bool) $root->registration_enabled,
             'capacity' => $root->registration_capacity === null ? null : (int) $root->registration_capacity,
             'version' => (int) $root->registration_version,
@@ -52,9 +83,11 @@ class HrEventRegistrationService
         abort_unless($viewer->canDo('company_hub.view') || $viewer->canDo('hr.calendar.view'), 403);
         $this->access->assertCanViewEvent($viewer, $event);
         abort_if($event->archived_at, 404);
-        $range = $event->recurrence_parent_id ? $event->starts_at->toDateString() : $date;
+        $effective = $event->recurrence_parent_id ? $event : HrCalendarEvent::where('recurrence_parent_id', $event->id)->whereDate('exception_date', $date)->first() ?? $event;
+        $range = $effective->recurrence_parent_id ? $effective->starts_at->toDateString() : $date;
         $rows = app(HrCalendarAggregator::class)->feed($range, $range, ['event'], [], $viewer);
-        $row = collect($rows)->first(fn ($row) => (int) $row['extendedProps']['eventId'] === (int) $event->id
+        $row = collect($rows)->first(fn ($row) => ((int) $row['extendedProps']['eventId'] === (int) $event->id
+                || (! $event->recurrence_parent_id && (int) ($row['extendedProps']['recurrenceParentId'] ?? 0) === (int) $event->id))
             && ($row['extendedProps']['registration']['date'] ?? null) === $date);
         abort_unless($row, 404, 'This event occurrence is no longer available.');
 
@@ -67,9 +100,9 @@ class HrEventRegistrationService
             // All seat allocation/settings updates lock the same series row, including exceptions.
             [$root, $event] = $this->lockOccurrence($event);
             $row = $this->occurrence($viewer, $event, $date);
+            app(HrCalendarCancellation::class)->assertOpen($event, $date);
             abort_unless(app(HrCurrentStaffService::class)->isCurrent($viewer), 403);
             abort_unless($root->registration_enabled || $status === 'declined', 422, 'Registration is not open for this event.');
-            abort_if(Carbon::parse($row['start'])->isPast() && $status !== 'declined', 422, 'Registration has closed for this date.');
             $query = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('occurrence_date', $date);
             $mine = (clone $query)->where('user_id', $viewer->id)->first();
             $desired = $status;
@@ -77,6 +110,10 @@ class HrEventRegistrationService
                 $count = (clone $query)->where('status', 'going')->where('user_id', '!=', $viewer->id)->count();
                 $desired = $root->registration_capacity !== null && $count >= $root->registration_capacity ? 'waiting' : 'going';
             }
+            // A response saved before cutoff can be acknowledged after a delayed retry.
+            // No new/changed positive response or seat allocation is allowed after cutoff.
+            abort_if($status !== 'declined' && (! $this->startsAt($event, $date)?->isFuture()
+                || (! $this->closesAt($event, $date)?->isFuture() && $mine?->status !== $desired)), 422, 'Registration has closed for this date.');
             // Repeated requests retain queue position and never allocate a second seat.
             if ($mine?->status !== $desired) {
                 DB::table('hr_calendar_registrations')->updateOrInsert(
@@ -85,7 +122,7 @@ class HrEventRegistrationService
                         'created_at' => $mine?->created_at ?? now(), 'updated_at' => now(), 'version' => ($mine?->version ?? 0) + 1],
                 );
             }
-            if ($root->registration_enabled && Carbon::parse($row['start'])->isFuture()) {
+            if ($root->registration_enabled && $this->startsAt($event, $date)?->isFuture()) {
                 $this->promote($root, $event, $date);
             }
 
@@ -96,13 +133,29 @@ class HrEventRegistrationService
     public function configure(User $viewer, HrCalendarEvent $event, array $data): void
     {
         DB::transaction(function () use ($viewer, $event, $data) {
+            $viewer = $viewer->fresh();
+            abort_unless($viewer && app(HrCurrentStaffService::class)->isCurrent($viewer), 404);
             [$root, $event] = $this->lockOccurrence($event);
             $this->access->assertCanManageEvent($viewer, $event);
             abort_if($event->archived_at, 404);
             $this->access->assertCanManageEvent($viewer, $root);
             abort_if($root->archived_at, 404);
+            abort_if($root->cancelled_at, 409, 'This series was cancelled. Its registration settings remain in history.');
+            if ($event->recurrence_parent_id || ! empty($data['date'])) {
+                app(HrCalendarCancellation::class)->assertOpen($event, $data['date'] ?? $event->exception_date->toDateString());
+            }
             abort_if($root->hub_managed && ! $viewer->canDo('company_hub.publish'), 403, 'Publishing permission is required to change registration settings for a Hub event.');
             abort_unless((int) $root->registration_version === (int) $data['version'], 409, 'Registration settings changed. Reload before saving.');
+            $cutoff = [];
+            if (array_key_exists('closes_before_minutes', $data)) {
+                abort_unless((int) ($data['actor_id'] ?? 0) === (int) $viewer->id && (int) ($data['edit_version'] ?? 0) === (int) $root->edit_version, 409, 'Your account or event changed. Refresh its registration settings.');
+                if (! $this->cutoffReady()) {
+                    throw ValidationException::withMessages(['closes_before_minutes' => 'Booking cutoff settings are not available until the calendar update is installed.']);
+                }
+                $lead = $data['closes_before_minutes'];
+                abort_unless($lead === null || (filter_var($lead, FILTER_VALIDATE_INT) !== false && (int) $lead >= 0 && (int) $lead <= 43200), 422, 'Choose a booking cutoff up to 30 days before each event date.');
+                $cutoff = ['registration_closes_before_minutes' => $lead === null ? null : (int) $lead];
+            }
             $capacity = $data['capacity'] ?? null;
             $max = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('status', 'going')
                 ->where('occurrence_date', '>=', now()->toDateString())->selectRaw('COUNT(*) as places')->groupBy('occurrence_date')->get()->max('places');
@@ -110,7 +163,7 @@ class HrEventRegistrationService
                 throw ValidationException::withMessages(['capacity' => 'Capacity cannot be lower than the number already registered.']);
             }
             $root->forceFill(['registration_enabled' => $data['enabled'], 'registration_capacity' => $capacity,
-                'registration_version' => $root->registration_version + 1])->save();
+                'registration_version' => $root->registration_version + 1, ...$cutoff])->save();
             // Promotion occurs when capacity is raised, in original queue order.
             if ($data['enabled']) {
                 $dates = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('status', 'waiting')
@@ -125,6 +178,9 @@ class HrEventRegistrationService
 
     private function promote(HrCalendarEvent $root, HrCalendarEvent $event, string $date): void
     {
+        if (app(HrCalendarCancellation::class)->cancelled($event, $date)) {
+            return;
+        }
         $query = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('occurrence_date', $date);
         $free = $root->registration_capacity === null ? PHP_INT_MAX : max(0, $root->registration_capacity - (clone $query)->where('status', 'going')->count());
         foreach ((clone $query)->where('status', 'waiting')->orderBy('queued_at')->orderBy('id')->get() as $waiting) {
@@ -140,29 +196,95 @@ class HrEventRegistrationService
             } catch (HttpExceptionInterface $exception) {
                 continue;
             }
-            if (Carbon::parse($row['start'])->isPast()) {
+            if (! $this->startsAt($event, $date)?->isFuture()) {
                 continue;
             }
-            DB::table('hr_calendar_registrations')->where('id', $waiting->id)->update(['status' => 'going', 'queued_at' => null, 'updated_at' => now(), 'version' => $waiting->version + 1]);
-            // Database delivery is inside the same transaction as the promotion:
-            // retry/rollback cannot leave a notice without its seat or send it twice.
-            $person->notify(new CalendarPlaceAvailableNotification($event->id, $date));
+            $this->confirmWaiting($person, $event, $date, $waiting);
             $free--;
         }
     }
 
+    private function confirmWaiting(User $person, HrCalendarEvent $event, string $date, object $waiting): void
+    {
+        DB::table('hr_calendar_registrations')->where('id', $waiting->id)->update(['status' => 'going', 'queued_at' => null, 'updated_at' => now(), 'version' => $waiting->version + 1]);
+        // The seat and generic private receipt share the same transaction.
+        $notice = new CalendarPlaceAvailableNotification($event->id, $date);
+        if ($notice->shouldSend($person, 'database')) {
+            $person->notify($notice);
+        }
+    }
+
+    private function firstEligibleWaiting(HrCalendarEvent $root, HrCalendarEvent $event, string $date): ?object
+    {
+        if (! $root->registration_enabled || app(HrCalendarCancellation::class)->cancelled($event, $date)) {
+            return null;
+        }
+        $query = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('occurrence_date', $date);
+        if ($root->registration_capacity !== null && (clone $query)->where('status', 'going')->count() >= $root->registration_capacity) {
+            return null;
+        }
+        foreach ((clone $query)->where('status', 'waiting')->orderBy('queued_at')->orderBy('id')->get() as $waiting) {
+            $person = User::find($waiting->user_id);
+            if (! $person || (! $person->canDo('company_hub.view') && ! $person->canDo('hr.calendar.view')) || ! app(HrCurrentStaffService::class)->isCurrent($person) || ! $this->access->canViewEvent($person, $event)) {
+                continue;
+            }
+            try {
+                $row = $this->occurrence($person, $event, $date);
+            } catch (HttpExceptionInterface $error) {
+                continue;
+            }
+
+            return $this->startsAt($event, $date)?->isFuture() ? $waiting : null;
+        }
+
+        return null;
+    }
+
+    public function offerPlace(User $viewer, HrCalendarEvent $bound, array $data): array
+    {
+        return DB::transaction(function () use ($viewer, $bound, $data): array {
+            $viewer = $viewer->fresh();
+            abort_unless($viewer && app(HrCurrentStaffService::class)->isCurrent($viewer), 404);
+            [$root, $event] = $this->lockOccurrence($bound);
+            $this->access->assertCanManageEvent($viewer, $event);
+            $this->occurrence($viewer, $event, $data['date']);
+            abort_unless((int) $data['actor_id'] === (int) $viewer->id, 409, 'Your account changed. Reopen attendance.');
+            app(HrCalendarCancellation::class)->assertOpen($event, $data['date']);
+            abort_unless((int) $root->edit_version === (int) $data['edit_version'] && (int) $root->registration_version === (int) $data['registration_version'], 409, 'This event or its registration settings changed. Refresh attendance.');
+            $selected = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('occurrence_date', $data['date'])->where('id', $data['registration_id'])->lockForUpdate()->first();
+            abort_unless($selected && $this->access->visibleCurrentStaffQuery($viewer)->whereKey($selected->user_id)->exists(), 404);
+            abort_unless((int) $selected->version === (int) $data['version'], 409, 'This registration changed. Refresh attendance.');
+            if ($selected->status !== 'going') {
+                abort_unless($selected->status === 'waiting' && $this->firstEligibleWaiting($root, $event, $data['date'])?->id === $selected->id, 422, 'Only the first currently eligible waiting colleague can receive an available place.');
+                $this->confirmWaiting(User::findOrFail($selected->user_id), $event, $data['date'], $selected);
+                AuditLog::create(['user_id' => $viewer->id, 'action' => 'calendar.waiting_place_confirmed', 'auditable_type' => HrCalendarEvent::class,
+                    'auditable_id' => $event->id, 'meta' => ['registration_id' => $selected->id, 'occurrence_date' => $data['date']]]);
+            }
+
+            return ['roster' => $this->roster($viewer, $event->fresh(), $data['date']), 'registration' => $this->summary($viewer, $event->fresh(), $data['date'])];
+        }, 3);
+    }
+
     public function roster(User $viewer, HrCalendarEvent $event, string $date): array
     {
+        $viewer = $viewer->fresh();
+        abort_unless($viewer && app(HrCurrentStaffService::class)->isCurrent($viewer), 404);
+        $event = $event->fresh();
+        abort_unless($event, 404);
         $this->access->assertCanManageEvent($viewer, $event);
         $row = $this->occurrence($viewer, $event, $date);
         $rootId = $event->recurrence_parent_id ?? $event->id;
         $people = $this->access->visibleCurrentStaffQuery($viewer)->get(['id', 'name'])->keyBy('id');
+        $root = $event->recurrence_parent_id ? $event->recurrenceParent : $event;
+        $first = $this->firstEligibleWaiting($root, $event, $date);
         $registrations = DB::table('hr_calendar_registrations')->where('event_id', $rootId)->where('occurrence_date', $date)->orderBy('id')->get()
             ->filter(fn ($r) => $people->has($r->user_id))
             ->map(fn ($r) => ['id' => $r->id, 'name' => $people[$r->user_id]->name, 'status' => $r->status,
-                'attendance' => $r->attendance, 'version' => (int) $r->version, 'recorded_at' => $r->attendance_recorded_at])->values()->all();
+                'attendance' => $r->attendance, 'version' => (int) $r->version, 'recorded_at' => $r->attendance_recorded_at,
+                'can_offer_place' => $viewer->canDo('company_hub.write') && $viewer->canDo('hr.calendar.view') && $first?->id === $r->id])->values()->all();
 
-        return ['date' => $date, 'can_record' => Carbon::parse($row['start'])->lte(now()), 'registrations' => $registrations];
+        return ['actor_id' => $viewer->id, 'event_id' => $event->id, 'edit_version' => (int) $root->edit_version, 'registration_version' => (int) $root->registration_version,
+            'date' => $date, 'can_export' => true, 'can_record' => ! app(HrCalendarCancellation::class)->cancelled($event, $date) && $this->startsAt($event, $date)?->lte(now()), 'registrations' => $registrations];
     }
 
     public function attendance(User $viewer, HrCalendarEvent $event, string $date, int $registrationId, ?string $attendance, int $version): array
@@ -171,7 +293,8 @@ class HrEventRegistrationService
             [$root, $event] = $this->lockOccurrence($event);
             $this->access->assertCanManageEvent($viewer, $event);
             $row = $this->occurrence($viewer, $event, $date);
-            abort_if(Carbon::parse($row['start'])->isFuture(), 422, 'Attendance opens when this event starts.');
+            app(HrCalendarCancellation::class)->assertOpen($event, $date);
+            abort_if($this->startsAt($event, $date)?->isFuture(), 422, 'Attendance opens when this event starts.');
             abort_unless(in_array($attendance, [null, 'attended', 'no_show'], true), 422);
             $registration = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('occurrence_date', $date)->where('id', $registrationId)->lockForUpdate()->first();
             abort_unless($registration && $this->access->visibleCurrentStaffQuery($viewer)->whereKey($registration->user_id)->exists(), 404);

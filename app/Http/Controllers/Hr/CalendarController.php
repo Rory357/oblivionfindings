@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\CompanyHub\Services\HubEventMedia;
+use App\Domain\CompanyHub\Services\HubMediaLibrary;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrCalendarEventAttachment;
 use App\Domain\Hr\Models\HrCalendarEventCategory;
@@ -13,20 +15,25 @@ use App\Domain\Hr\Notifications\CalendarEventInviteNotification;
 use App\Domain\Hr\Notifications\CalendarEventRsvpNotification;
 use App\Domain\Hr\Services\HrCalendarAccessService;
 use App\Domain\Hr\Services\HrCalendarAggregator;
+use App\Domain\Hr\Services\HrCalendarCancellation;
+use App\Domain\Hr\Services\HrCalendarChanges;
 use App\Domain\Hr\Services\HrCalendarHubContent;
 use App\Domain\Hr\Services\HrCalendarRecurrence;
 use App\Domain\Hr\Services\HrCalendarReminderPreferences;
 use App\Domain\Hr\Services\HrCalendarSeriesService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Domain\Hr\Services\HrEventRegistrationService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\ShiftCoverageService;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -35,7 +42,43 @@ class CalendarController extends Controller
     use ServesPrivateAttachments;
 
     /** Upload mime allowlist (stored-XSS defence — see ServesPrivateAttachments). */
-    public const ATTACHMENT_MIMES = 'jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,csv,txt';
+    public const ATTACHMENT_MIMES = 'jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,pptx,csv,txt';
+
+    /** OOXML packages need byte-level validation, including staged copies with renamed display titles. */
+    public static function attachmentRule(): \Closure
+    {
+        return function (string $attribute, mixed $file, \Closure $fail): void {
+            if (! $file instanceof UploadedFile) {
+                return;
+            }
+            try {
+                $mime = self::attachmentMime($file);
+            } catch (ValidationException $error) {
+                $fail($error->validator->errors()->first());
+
+                return;
+            }
+            if (in_array(HubMediaLibrary::MIME_EXTENSIONS[$mime] ?? null, ['docx', 'xlsx', 'pptx'], true)) {
+                return;
+            }
+            $validator = Validator::make(['file' => $file], ['file' => 'mimes:'.self::ATTACHMENT_MIMES]);
+            if ($validator->fails()) {
+                $fail($validator->errors()->first());
+            }
+        };
+    }
+
+    public static function attachmentMime(UploadedFile $file): string
+    {
+        $mime = (string) $file->getMimeType();
+        foreach ([strtolower($file->getClientOriginalExtension()), HubMediaLibrary::MIME_EXTENSIONS[$file->getClientMimeType()] ?? null, HubMediaLibrary::MIME_EXTENSIONS[$mime] ?? null] as $extension) {
+            if (in_array($extension, ['docx', 'xlsx', 'pptx'], true)) {
+                return app(HubMediaLibrary::class)->uploadMime(new UploadedFile($file->getRealPath(), 'event-attachment.'.$extension, null, null, true));
+            }
+        }
+
+        return $mime;
+    }
 
     public function __construct(
         private readonly HrCalendarAggregator $aggregator,
@@ -315,7 +358,8 @@ class CalendarController extends Controller
         $audienceUserIds = $data['audience_user_ids'] ?? [];
         $reminders = $data['reminders'] ?? [];
         $hubContent = $data['hub_content'] ?? null;
-        unset($data['audience_type'], $data['audience_team'], $data['audience_user_ids'], $data['reminders'], $data['files'], $data['removed_attachment_ids'], $data['hub_content']);
+        $libraryImages = $this->libraryImages($request, $data);
+        unset($data['audience_type'], $data['audience_team'], $data['audience_user_ids'], $data['reminders'], $data['files'], $data['removed_attachment_ids'], $data['hub_content'], $data['hub_library_images'], $data['actor_id']);
         abort_if($request->input('removed_attachment_ids', []), 422, 'A new event has no files to remove.');
 
         $this->access->assertCanUseSite($user, isset($data['site_id']) ? (int) $data['site_id'] : null);
@@ -329,13 +373,15 @@ class CalendarController extends Controller
 
         $writtenFiles = [];
         try {
-            [$event, $newInvitees] = DB::transaction(function () use ($request, $user, $data, $audienceType, $audienceUserIds, $audienceTeam, $reminders, $hubContent, &$writtenFiles) {
+            [$event, $newInvitees] = DB::transaction(function () use ($request, $user, $data, $audienceType, $audienceUserIds, $audienceTeam, $reminders, $hubContent, $libraryImages, &$writtenFiles) {
                 $event = HrCalendarEvent::create(['created_by' => $user->id, ...$data]);
                 $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds, $audienceTeam);
                 $this->syncReminders($event, $reminders);
                 $uploads = $this->saveEventFiles($request, $event, [], $writtenFiles);
-                if ($hubContent !== null) {
-                    app(HrCalendarHubContent::class)->save($user, $event, $hubContent, $uploads);
+                $copies = app(HubEventMedia::class)->copyToEvent($user, $event, $libraryImages, $writtenFiles);
+                $content = $this->eventContent($user, $event, $hubContent, $copies);
+                if ($content !== null) {
+                    app(HrCalendarHubContent::class)->save($user, $event, $content, $uploads);
                 }
 
                 return [$event, $newInvitees];
@@ -364,7 +410,7 @@ class CalendarController extends Controller
         $this->assertEventIsActive($event);
 
         $request->validate([
-            'file' => ['required', 'file', 'max:10240', 'mimes:'.self::ATTACHMENT_MIMES],
+            'file' => ['required', 'file', 'max:10240', self::attachmentRule()],
             'edit_version' => ['required', 'integer', 'min:1'],
         ]);
 
@@ -407,31 +453,34 @@ class CalendarController extends Controller
     /** Stream an attachment from the private disk (hardened headers). */
     public function downloadAttachment(Request $request, HrCalendarEventAttachment $attachment)
     {
-        $user = $request->user();
-        abort_unless($this->canView($user), 403);
+        $user = $request->user()->fresh();
+        abort_unless($user && $this->canView($user), 403);
         $event = $attachment->event()->with('attendees')->firstOrFail();
         $this->access->assertCanViewEvent($user, $event);
-
-        return $this->streamPrivateAttachment(
+        abort_if($request->boolean('preview') && ! HubMediaLibrary::previewable($attachment->mime), 404);
+        $response = $this->streamPrivateAttachment(
             $attachment->disk,
             $attachment->path,
             $attachment->original_name,
             $attachment->mime,
+            $request->boolean('preview') ? 'inline' : 'attachment',
         );
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     /** @return array<string, mixed> */
     private function attachmentPayload(HrCalendarEventAttachment $attachment): array
     {
-        return [
+        return HubEventMedia::attachmentUrls([
             'id' => $attachment->id,
             'eventId' => $attachment->event_id,
             'inherited' => false,
             'name' => $attachment->original_name,
             'mime' => $attachment->mime,
             'size' => $attachment->size,
-            'url' => url('/hr/calendar/attachments/'.$attachment->id.'/download'),
-        ];
+        ], url('/hr/calendar/attachments/'.$attachment->id.'/download'));
     }
 
     /**
@@ -482,9 +531,10 @@ class CalendarController extends Controller
             'occurrence_date' => ['nullable', 'date'],
         ]);
 
+        $libraryImages = $this->libraryImages($request, $data);
         $copiedFiles = [];
         try {
-            return DB::transaction(function () use ($request, $user, $event, $data, &$copiedFiles) {
+            return DB::transaction(function () use ($request, $user, $event, $data, $libraryImages, &$copiedFiles) {
                 // Registration and series edits share the root lock, including exceptions.
                 $root = HrCalendarEvent::whereKey($event->recurrence_parent_id ?? $event->id)->lockForUpdate()->firstOrFail();
                 $event = $event->id === $root->id ? $root : HrCalendarEvent::whereKey($event->id)->lockForUpdate()->firstOrFail();
@@ -495,8 +545,9 @@ class CalendarController extends Controller
                 $this->assertHubWrite($request, $root);
                 $this->assertEditVersion($root, (int) $data['edit_version']);
                 $scope = $data['scope'] ?? 'all';
+                app(HrCalendarCancellation::class)->assertEditable($event, $scope, isset($data['occurrence_date']) ? Carbon::parse($data['occurrence_date'])->toDateString() : null);
                 $hubContent = $data['hub_content'] ?? null;
-                unset($data['hub_content']);
+                unset($data['hub_content'], $data['hub_library_images'], $data['actor_id']);
                 if (($scope === 'this' || $event->recurrence_parent_id) && isset($data['recurrence_timezone'])) {
                     abort_unless($data['recurrence_timezone'] === $root->recurrence_timezone, 422, 'A single date keeps the series repeat timing.');
                 }
@@ -540,6 +591,8 @@ class CalendarController extends Controller
                     $data['category_id'] = $this->resolveCategoryId($data['event_type']);
                 }
 
+                $changeContext = app(HrCalendarChanges::class)->capture($event, $scope, $occurrenceDate ? Carbon::parse($occurrenceDate)->toDateString() : null);
+
                 // Single-occurrence + "this & following" edits only apply to a recurring
                 // base and require the recurring-management permission.
                 if (in_array($scope, ['this', 'following'], true) && $event->rrule) {
@@ -570,10 +623,13 @@ class CalendarController extends Controller
                     }
 
                     $uploads = $this->saveEventFiles($request, $updated, [], $copiedFiles);
-                    if ($hubContent !== null) {
-                        app(HrCalendarHubContent::class)->save($user, $updated, $hubContent, $uploads, $attachmentMap);
+                    $copies = app(HubEventMedia::class)->copyToEvent($user, $updated, $libraryImages, $copiedFiles);
+                    $content = $this->eventContent($user, $updated, $hubContent, $copies);
+                    if ($content !== null) {
+                        app(HrCalendarHubContent::class)->save($user, $updated, $content, $uploads, $attachmentMap);
                     }
                     $root->increment('edit_version');
+                    $this->recordEventChanges($request, $user, $changeContext, $updated);
                     $request->attributes->set('hub.saved_event', $updated);
 
                     return redirect()->back()->with('savedEventId', $updated->id)->with('success', $scope === 'this' ? 'This occurrence was updated.' : 'This and following events were updated.');
@@ -610,10 +666,13 @@ class CalendarController extends Controller
                 }
 
                 $uploads = $this->saveEventFiles($request, $event, $removedIds, $copiedFiles);
-                if ($hubContent !== null) {
-                    app(HrCalendarHubContent::class)->save($user, $event, $hubContent, $uploads);
+                $copies = app(HubEventMedia::class)->copyToEvent($user, $event, $libraryImages, $copiedFiles);
+                $content = $this->eventContent($user, $event, $hubContent, $copies);
+                if ($content !== null) {
+                    app(HrCalendarHubContent::class)->save($user, $event, $content, $uploads);
                 }
                 $root->increment('edit_version');
+                $this->recordEventChanges($request, $user, $changeContext, $event);
                 $request->attributes->set('hub.saved_event', $event);
 
                 return redirect()->back()->with('savedEventId', $event->id)->with('success', 'Calendar event updated.');
@@ -625,14 +684,48 @@ class CalendarController extends Controller
         }
     }
 
+    private function recordEventChanges(Request $request, User $actor, array $context, HrCalendarEvent $event): void
+    {
+        if ($request->attributes->get('hub.approved_publication') === true) {
+            $request->attributes->set(HrCalendarChanges::CONTEXT, $context);
+        } else {
+            app(HrCalendarChanges::class)->deliver($actor, $context, $event);
+        }
+    }
+
     private function eventFileRules(): array
     {
         return [
             'files' => ['sometimes', 'array', 'max:10'],
-            'files.*' => ['file', 'max:10240', 'mimes:'.self::ATTACHMENT_MIMES],
+            'files.*' => ['file', 'max:10240', self::attachmentRule()],
             'removed_attachment_ids' => ['sometimes', 'array', 'max:100'],
             'removed_attachment_ids.*' => ['integer', 'distinct'],
         ];
+    }
+
+    private function libraryImages(Request $request, array $data): array
+    {
+        $images = $data['hub_library_images'] ?? [];
+        app(HubEventMedia::class)->assertBatchLimit(count($request->file('files', [])), $images);
+        if ($images !== []) {
+            $actor = $request->user()?->fresh();
+            abort_unless($actor && (int) $actor->id === (int) ($data['actor_id'] ?? 0), 409, 'Your account changed. Reopen the event before choosing files.');
+        }
+
+        return $images;
+    }
+
+    private function eventContent(User $actor, HrCalendarEvent $event, ?array $input, array $copies): ?array
+    {
+        if ($input === null && $copies === []) {
+            return null;
+        }
+        if ($input === null) {
+            $files = HrCalendarEventAttachment::whereIn('event_id', array_filter([$event->id, $event->recurrence_parent_id]))->get();
+            $input = app(HrCalendarHubContent::class)->read($actor, $event, $event->ends_at ?? now(), $files)['editor'] ?? [];
+        }
+
+        return HubEventMedia::materialiseContent($input, $copies);
     }
 
     private function prepareTiming(array $data, ?HrCalendarEvent $original = null): array
@@ -671,6 +764,9 @@ class CalendarController extends Controller
         $this->assertEventIsActive($root);
         $this->assertEventIsActive($event);
         $this->assertEditVersion($root, (int) $request->input('edit_version'));
+        if (! $lifecycle) {
+            app(HrCalendarCancellation::class)->assertEditable($event);
+        }
 
         return [$event, $root];
     }
@@ -706,7 +802,7 @@ class CalendarController extends Controller
             $writtenFiles[] = ['private', $path];
             $saved[] = $event->attachments()->create([
                 'uploaded_by' => $request->user()->id, 'disk' => 'private', 'path' => $path,
-                'original_name' => $file->getClientOriginalName(), 'mime' => $file->getMimeType(), 'size' => $file->getSize(),
+                'original_name' => $file->getClientOriginalName(), 'mime' => self::attachmentMime($file), 'size' => $file->getSize(),
             ])->id;
         }
         foreach ($event->attachments()->whereIn('id', $removedIds)->get() as $attachment) {
@@ -823,12 +919,18 @@ class CalendarController extends Controller
      */
     private function notifyNewInvitees(HrCalendarEvent $event, array $userIds): void
     {
+        $event = $event->fresh();
+        if (! $event || $event->archived_at || $event->cancelled_at || ($event->recurrence_parent_id && (! $event->recurrenceParent || $event->recurrenceParent->archived_at || $event->recurrenceParent->cancelled_at))) {
+            return;
+        }
         foreach ($userIds as $userId) {
             if ($userId === $event->created_by) {
                 continue;
             }
             $invitee = User::find($userId);
-            if (! $invitee) {
+            if (! $invitee || ! app(HrCurrentStaffService::class)->isCurrent($invitee)
+                || (! $invitee->canDo('company_hub.view') && ! $invitee->canDo('hr.calendar.view'))
+                || ! $this->access->canViewEvent($invitee, $event)) {
                 continue;
             }
             try {
@@ -863,28 +965,36 @@ class CalendarController extends Controller
             return back()->with('success', 'Your response for this date was saved.');
         }
 
+        abort_if($event->cancelled_at || $registrationEvent?->cancelled_at, 409, 'This event was cancelled. Its original responses remain in history.');
+
         $data = $request->validate([
             'status' => ['required', 'in:yes,no,maybe'],
         ]);
 
-        $attendee = $event->attendees()
-            ->where('audience_type', 'person')
-            ->where('user_id', $user->id)
-            ->first();
-
-        abort_unless($attendee !== null, 403, 'You are not on the invite list for this event.');
-
-        $attendee->update([
-            'rsvp_status' => $data['status'],
-            'responded_at' => now(),
-        ]);
+        DB::transaction(function () use ($event, $user, $data) {
+            $root = HrCalendarEvent::whereKey($event->recurrence_parent_id ?? $event->id)->lockForUpdate()->firstOrFail();
+            $current = HrCalendarEvent::whereKey($event->id)->lockForUpdate()->firstOrFail();
+            abort_unless((int) ($current->recurrence_parent_id ?? $current->id) === (int) $root->id, 409);
+            $this->access->assertCanViewEvent($user, $current);
+            abort_unless(app(HrCurrentStaffService::class)->isCurrent($user), 403);
+            $this->assertEventIsActive($root);
+            $this->assertEventIsActive($current);
+            abort_if($root->registration_enabled, 409, 'Registration settings changed. Reopen the event to choose a date.');
+            abort_if($root->cancelled_at || $current->cancelled_at, 409, 'This event was cancelled. Its original responses remain in history.');
+            $attendee = $root->attendees()->where('audience_type', 'person')->where('user_id', $user->id)->lockForUpdate()->first();
+            abort_unless($attendee, 403, 'You are not on the invite list for this event.');
+            $attendee->update(['rsvp_status' => $data['status'], 'responded_at' => now()]);
+        });
 
         // The organiser is waiting on responses — a quiet in-app note, no mail.
         if ($event->created_by && $event->created_by !== $user->id) {
             $organiser = User::find($event->created_by);
             if ($organiser) {
                 try {
-                    $organiser->notify(new CalendarEventRsvpNotification($event, $user, $data['status']));
+                    $notice = new CalendarEventRsvpNotification($event, $user, $data['status']);
+                    if ($notice->shouldSend($organiser, 'database')) {
+                        $organiser->notify($notice);
+                    }
                 } catch (\Throwable $exception) {
                     Log::warning('Failed to send RSVP notification', [
                         'event_id' => $event->id,

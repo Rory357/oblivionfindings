@@ -19,12 +19,20 @@ beforeEach(function () {
     $this->editor->roles()->attach(Role::where('name', 'hr')->firstOrFail());
     ensureCanonicalHrStaffProfile($this->editor, $this->site);
     $this->publisher = app(HubPublishing::class);
+    $this->completeStory = function (string $title) {
+        $page = $this->publisher->create($this->editor, 'news', $title, 'blank')->fresh();
+        $draft = [...$page->draft, 'sections' => [['id' => 'story', 'columns' => 1, 'blocks' => [[
+            'id' => 'body', 'type' => 'text', 'title' => 'Story content', 'body' => 'Useful information for colleagues.',
+        ]]]]];
+
+        return $this->publisher->save($this->editor, $page, $draft, $page->draft_version);
+    };
 });
 
 test('command search returns exact published pages visible colleagues and canonical service links with no private payloads', function () {
-    $page = $this->publisher->create($this->editor, 'news', 'Compass published guide');
-    $this->publisher->publish($this->editor, $page, 1, null, null);
-    $this->publisher->save($this->editor, $page, [...$page->draft, 'title' => 'Unpublished working title'], 1);
+    $page = ($this->completeStory)('Compass published guide');
+    $this->publisher->publish($this->editor, $page, $page->draft_version, null, null);
+    $this->publisher->save($this->editor, $page, [...$page->draft, 'title' => 'Unpublished working title'], $page->draft_version);
     $service = ItCatalogItem::factory()->create(['name' => 'Compass equipment help', 'site_scope' => [$this->site->id], 'form_schema' => ['fields' => [['key' => 'secret', 'label' => 'Private technician field', 'type' => 'text', 'visibility' => 'internal']]]]);
     $this->actingAs($this->reader)->getJson('/company-hub/search?query=Compass')->assertOk()->assertHeader('Cache-Control', 'no-store, private')
         ->assertJsonPath('actor_id', $this->reader->id)->assertJsonCount(3, 'results')
@@ -43,13 +51,13 @@ test('command lookup excludes drafts future expired and outside-audience content
     ensureCanonicalHrStaffProfile($this->editor, $this->site, ['secondary_site_ids' => [$outside->id]]);
     $this->editor = $this->editor->fresh();
     $this->publisher->create($this->editor, 'news', 'Sealed draft');
-    $scheduled = $this->publisher->create($this->editor, 'news', 'Sealed future');
-    $this->publisher->publish($this->editor, $scheduled, 1, now()->addDays(2)->toIso8601String(), null);
-    $private = $this->publisher->create($this->editor, 'news', 'Sealed outside site');
-    $private = $this->publisher->save($this->editor, $private, [...$private->draft, 'audience' => ['type' => 'sites', 'ids' => [$outside->id]]], 1);
-    $this->publisher->publish($this->editor, $private, 2, null, null);
-    $expired = $this->publisher->create($this->editor, 'news', 'Sealed expired');
-    $this->publisher->publish($this->editor, $expired, 1, null, now()->addMinute()->toIso8601String());
+    $scheduled = ($this->completeStory)('Sealed future');
+    $this->publisher->publish($this->editor, $scheduled, $scheduled->draft_version, now()->addDays(2)->toIso8601String(), null);
+    $private = ($this->completeStory)('Sealed outside site');
+    $private = $this->publisher->save($this->editor, $private, [...$private->draft, 'audience' => ['type' => 'sites', 'ids' => [$outside->id]]], $private->draft_version);
+    $this->publisher->publish($this->editor, $private, $private->draft_version, null, null);
+    $expired = ($this->completeStory)('Sealed expired');
+    $this->publisher->publish($this->editor, $expired, $expired->draft_version, null, now()->addMinute()->toIso8601String());
     $this->travel(2)->minutes();
     $outsider = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $outsider->roles()->attach(Role::where('name', 'support_worker')->firstOrFail());
@@ -70,8 +78,8 @@ test('command search finds deliberately shared skills and limits result groups a
     $this->actingAs($this->reader)->putJson('/company-hub/people/'.$profileId.'/profile', ['expected_version' => 0, 'about' => '', 'help_with' => ['Accessible documents']])->assertOk();
     $this->getJson('/company-hub/search?query=Accessible%20documents')->assertOk()->assertJsonCount(1, 'results')->assertJsonPath('results.0.kind', 'Person');
     foreach (range(1, 7) as $number) {
-        $page = $this->publisher->create($this->editor, 'news', 'Compass guide '.$number);
-        $this->publisher->publish($this->editor, $page, 1, null, null);
+        $page = ($this->completeStory)('Compass guide '.$number);
+        $this->publisher->publish($this->editor, $page, $page->draft_version, null, null);
     }
     foreach (range(1, 5) as $number) {
         ItCatalogItem::factory()->create(['name' => 'Compass service '.$number, 'site_scope' => [$this->site->id]]);

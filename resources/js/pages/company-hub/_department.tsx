@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { hubRequest } from './_api';
 import { HubBlocks, NewsCards } from './_blocks';
 import { CreateHubPageDialog } from './_dialogs';
+import { useHubPageCreation } from './_page-creation-context';
 import { PeopleDirectory } from './_people';
 import { ResourceLibrary } from './_resource-library';
 import type {
@@ -39,7 +40,9 @@ export function departmentPreview(
         owner:
             data.people?.find((person) => person.user_id === page.owner_id) ??
             null,
-        updates: related.filter((item) => item.kind === 'news'),
+        updates: related.filter(
+            (item) => item.kind === 'news' && item.show_in_news !== false,
+        ),
         resources: related.filter((item) =>
             ['knowledge', 'page'].includes(item.kind),
         ),
@@ -162,11 +165,25 @@ export function DepartmentSpace({
 }) {
     const [tab, setTab] = useState('overview');
     const [create, setCreate] = useState(false);
+    const openCreator = useHubPageCreation();
     const ids = space.teams.map((team) => team.id);
     const scoped = {
         ...data,
-        pages: [...space.updates, ...space.resources],
-        resourceItems: [],
+        blockData: preview ? undefined : data.blockData,
+        pages: [
+            ...space.updates,
+            ...space.resources,
+            ...data.pages.filter(
+                (page) =>
+                    page.kind === 'department' &&
+                    page.team_ids?.some((id) => ids.includes(id)),
+            ),
+        ],
+        resourceItems: (data.resourceItems ?? []).filter(
+            (item) =>
+                item.id === space.page_id ||
+                item.team_ids?.some((id) => ids.includes(id)),
+        ),
         people: space.people,
         kudos: data.kudos.filter((post) =>
             post.team_ids?.some((id) => ids.includes(id)),
@@ -188,12 +205,18 @@ export function DepartmentSpace({
                             Space owner
                         </p>
                         {space.owner ? (
-                            <Link
-                                className="font-medium text-primary hover:underline"
-                                href={`/company-hub/people/${space.owner.id}`}
-                            >
-                                {space.owner.name}
-                            </Link>
+                            data.demo ? (
+                                <p className="font-medium">
+                                    {space.owner.name}
+                                </p>
+                            ) : (
+                                <Link
+                                    className="font-medium text-primary hover:underline"
+                                    href={`/company-hub/people/${space.owner.id}`}
+                                >
+                                    {space.owner.name}
+                                </Link>
+                            )
                         ) : (
                             <p className="text-sm text-muted-foreground">
                                 No current owner contact is available.
@@ -206,13 +229,16 @@ export function DepartmentSpace({
                         )}
                     </div>
                 </div>
-                {!preview && space.teams.length > 0 && data.interests && (
-                    <FollowTeams
-                        key={`${space.actor_id}:${space.page_id}:${space.revision_id}`}
-                        space={space}
-                        initial={data.interests}
-                    />
-                )}
+                {!preview &&
+                    !data.demo &&
+                    space.teams.length > 0 &&
+                    data.interests && (
+                        <FollowTeams
+                            key={`${space.actor_id}:${space.page_id}:${space.revision_id}`}
+                            space={space}
+                            initial={data.interests}
+                        />
+                    )}
             </div>
             <div className="hub-department-tabs">
                 <PageHeaderRail
@@ -230,7 +256,9 @@ export function DepartmentSpace({
                         {
                             key: 'resources',
                             label: 'Resources',
-                            count: space.resources.length,
+                            count:
+                                space.resources.length +
+                                scoped.resourceItems.length,
                         },
                         {
                             key: 'people',
@@ -239,8 +267,24 @@ export function DepartmentSpace({
                         },
                     ]}
                 />
-                {!preview && space.can_create_update && (
-                    <Button variant="ghost" onClick={() => setCreate(true)}>
+                {!preview && !data.demo && space.can_create_update && (
+                    <Button
+                        variant="ghost"
+                        onClick={() =>
+                            openCreator
+                                ? openCreator({
+                                      initial: {
+                                          title: `An update from ${names}`,
+                                          kind: 'news',
+                                          template: 'story',
+                                          source_page_id: space.page_id,
+                                          source_revision_id: space.revision_id,
+                                      },
+                                      context: `Related to ${names}. This private draft starts with the space’s current audience. Review its content and audience before publishing.`,
+                                  })
+                                : setCreate(true)
+                        }
+                    >
                         <Plus className="size-4" />
                         New update
                     </Button>
@@ -260,6 +304,7 @@ export function DepartmentSpace({
             >
                 {tab === 'overview' && (
                     <HubBlocks
+                        preview={preview}
                         sections={content.sections}
                         data={scoped}
                         onEvent={onEvent}
@@ -268,6 +313,8 @@ export function DepartmentSpace({
                 )}
                 {tab === 'updates' && (
                     <NewsCards
+                        demo={data.demo}
+                        bookmarks={preview ? undefined : data.bookmarks}
                         pages={space.updates}
                         emptyMessage="Published stories from this team will appear here."
                     />
@@ -277,13 +324,16 @@ export function DepartmentSpace({
                 )}
                 {tab === 'people' && (
                     <PeopleDirectory
+                        readOnly={data.demo}
                         people={space.people}
                         canViewOrg={data.canViewOrg}
                     />
                 )}
             </div>
             <footer className="hub-department-footer">
-                <Link href="/company-hub?view=teams">
+                <Link
+                    href={`${data.demo ? '/company-hub/showcase' : '/company-hub'}?view=teams`}
+                >
                     <ArrowLeft className="size-4" />
                     All team spaces
                 </Link>
@@ -293,7 +343,7 @@ export function DepartmentSpace({
                         : `Published version ${space.version}`}
                 </span>
             </footer>
-            {!preview && (
+            {!preview && !data.demo && (
                 <CreateHubPageDialog
                     open={create}
                     close={() => setCreate(false)}

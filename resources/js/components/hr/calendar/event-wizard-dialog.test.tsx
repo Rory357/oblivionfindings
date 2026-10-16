@@ -1,10 +1,50 @@
 import { router } from '@inertiajs/react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { emptyEventHubContent } from './event-hub-fields';
+import type { EventLibraryPhoto } from './event-image-library';
+import { eventTimeInstant } from './event-time';
 import {
     EventWizardDialog,
     type CalendarEventInitial,
 } from './event-wizard-dialog';
+vi.mock('./event-image-library', () => ({
+    EventImageLibrary: ({
+        onSelect,
+    }: {
+        onSelect: (photo: EventLibraryPhoto) => void;
+    }) => (
+        // eslint-disable-next-line no-restricted-syntax -- Small library test double; production uses the shared Button.
+        <button
+            type="button"
+            onClick={() =>
+                onSelect({
+                    id: 41,
+                    version: 8,
+                    name: 'garden.jpg',
+                    url: '/company-hub/media/41',
+                    mime: 'image/jpeg',
+                    size: 20,
+                    hub_page_id: 2,
+                    page_title: 'Company story',
+                    alt: 'Herb garden',
+                    caption: 'Our afternoon.',
+                    album_id: 4,
+                    albumName: 'Together',
+                    crop: null,
+                })
+            }
+        >
+            Select library garden
+        </button>
+    ),
+}));
 
 const initial: CalendarEventInitial = {
     id: 4,
@@ -46,14 +86,451 @@ function continueTo(step: number) {
     for (let i = 0; i < step; i++)
         fireEvent.click(screen.getByRole('button', { name: /^Continue$/ }));
 }
+async function chooseEventOption(label: string, option: string) {
+    const trigger = screen.getByRole('combobox', { name: label });
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: option }));
+    await waitFor(() => expect(trigger).toHaveFocus());
+}
 
 describe('Canonical event editor saves', () => {
     beforeEach(() => {
         vi.spyOn(router, 'post').mockImplementation(() => undefined);
         vi.spyOn(router, 'delete').mockImplementation(() => undefined);
         props.onSaved.mockClear();
+        props.onClose.mockClear();
     });
     afterEach(() => vi.restoreAllMocks());
+    it('uses styled event menus and preserves organiser and one-event empty choices when saved', async () => {
+        render(
+            <EventWizardDialog
+                {...props}
+                presentation="page"
+                staff={[{ value: '42', label: 'Example host' }]}
+                categories={[
+                    {
+                        id: 1,
+                        key: 'company',
+                        label: 'Company',
+                        icon: null,
+                        color_token: 'hr',
+                    },
+                    {
+                        id: 2,
+                        key: 'training',
+                        label: 'Training',
+                        icon: null,
+                        color_token: 'hr',
+                    },
+                ]}
+                initial={{ ...initial, scope: 'all' }}
+                publishing={{ can_publish: true }}
+            />,
+        );
+        await chooseEventOption('Host', 'Example host');
+        expect(
+            screen.getByRole('combobox', { name: 'Host' }),
+        ).toHaveTextContent('Example host');
+        await chooseEventOption('Host', 'Use the organiser');
+        await chooseEventOption('Category', 'Training');
+        await chooseEventOption('Repeats', 'One event');
+        expect(
+            screen.queryByRole('button', { name: /Repeat until:/ }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        expect(vi.mocked(router.post).mock.calls[0][1]).toMatchObject({
+            event_type: 'training',
+            rrule: null,
+            hub_content: expect.objectContaining({ host_id: null }),
+        });
+    });
+    it('does not count retained canonical event files against the ten new draft file limit', () => {
+        render(
+            <EventWizardDialog
+                {...props}
+                presentation="page"
+                initial={{
+                    ...initial,
+                    scope: 'all',
+                    attachments: Array.from({ length: 11 }, (_, index) => ({
+                        ...initial.attachments![0],
+                        id: index + 1,
+                    })),
+                }}
+                publishing={{ draft_id: 5, can_publish: true, actor_id: 9 }}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cover & files' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Choose from company library' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Select library garden' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        expect(vi.mocked(router.post).mock.calls[0][1]).toMatchObject({
+            hub_library_images: [{ media_id: 41, version: 8 }],
+        });
+    });
+    it('counts retained private files and refuses an eleventh library selection', () => {
+        render(
+            <EventWizardDialog
+                {...props}
+                presentation="page"
+                initial={{
+                    ...initial,
+                    scope: 'all',
+                    attachments: Array.from({ length: 10 }, (_, index) => ({
+                        ...initial.attachments![0],
+                        id: -index - 1,
+                    })),
+                }}
+                publishing={{ draft_id: 5, can_publish: true, actor_id: 9 }}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cover & files' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Choose from company library' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Select library garden' }),
+        );
+        expect(
+            screen.queryByRole('radio', { name: 'Use garden.jpg as cover' }),
+        ).not.toBeInTheDocument();
+    });
+    it('saves library identity and version with ordered photo metadata in the private event draft', () => {
+        render(
+            <EventWizardDialog
+                {...props}
+                presentation="page"
+                initial={{
+                    ...initial,
+                    scope: 'all',
+                    hub_content: {
+                        ...emptyEventHubContent(),
+                        photo_details: [
+                            {
+                                ref: 'file:8',
+                                title: 'Existing title',
+                                alt: '',
+                                caption: 'Retain this',
+                                album: '',
+                            },
+                        ],
+                    },
+                }}
+                publishing={{ can_publish: true, actor_id: 9 }}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cover & files' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Choose from company library' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Select library garden' }),
+        );
+        fireEvent.click(
+            screen.getByRole('radio', { name: 'Use garden.jpg as cover' }),
+        );
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'Include garden.jpg in recap',
+            }),
+        );
+        fireEvent.change(screen.getByLabelText('Photo title'), {
+            target: { value: 'Planting together' },
+        });
+        fireEvent.change(screen.getByLabelText('Recap title'), {
+            target: { value: 'Our afternoon in the garden' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        const payload = vi.mocked(router.post).mock.calls[0][1];
+        expect(payload).toMatchObject({
+            actor_id: 9,
+            hub_library_images: [{ media_id: 41, version: 8 }],
+            hub_content: {
+                cover_ref: 'library:41',
+                gallery_refs: ['library:41'],
+                recap_title: 'Our afternoon in the garden',
+                photo_details: [
+                    { ref: 'file:8', caption: 'Retain this' },
+                    {
+                        ref: 'library:41',
+                        title: 'Planting together',
+                        alt: 'Herb garden',
+                        caption: 'Our afternoon.',
+                        album: 'Together',
+                    },
+                ],
+            },
+        });
+        expect(JSON.stringify(payload)).not.toContain('/company-hub/media/41');
+        expect(JSON.stringify(payload)).not.toContain('Company story');
+    });
+    it('keeps the dialog open during saving and ignores completion from a previous opening', async () => {
+        const view = render(<EventWizardDialog {...props} initial={initial} />);
+        continueTo(4);
+        fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+        const oldOptions = vi.mocked(router.post).mock.calls[0][2];
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(props.onClose).not.toHaveBeenCalled();
+        view.rerender(
+            <EventWizardDialog {...props} open={false} initial={initial} />,
+        );
+        view.rerender(
+            <EventWizardDialog
+                {...props}
+                initial={{ ...initial, title: 'Second invitation' }}
+            />,
+        );
+        continueTo(4);
+        fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+        await act(async () => {
+            oldOptions?.onSuccess?.({} as never);
+            oldOptions?.onFinish?.({} as never);
+        });
+        expect(props.onSaved).not.toHaveBeenCalled();
+        expect(screen.queryByText('Event updated')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(router.post).toHaveBeenCalledTimes(2);
+        expect(props.onClose).not.toHaveBeenCalled();
+    });
+    it('preserves a custom booking cutoff when reopening and saving a private event draft', () => {
+        render(
+            <EventWizardDialog
+                {...props}
+                presentation="page"
+                initial={{
+                    ...initial,
+                    scope: 'all',
+                    registration_enabled: true,
+                    registration_closes_before_minutes: 1260,
+                }}
+                publishing={{
+                    can_publish: true,
+                    actor_id: 9,
+                    cutoff_supported: true,
+                }}
+            />,
+        );
+        expect(screen.getByLabelText('Minutes before the start')).toHaveValue(
+            1260,
+        );
+        fireEvent.change(screen.getByLabelText('Minutes before the start'), {
+            target: { value: '' },
+        });
+        expect(screen.getByLabelText('Minutes before the start')).toBeVisible();
+        fireEvent.change(screen.getByLabelText('Minutes before the start'), {
+            target: { value: '120' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        expect(vi.mocked(router.post).mock.calls[0][1]).toMatchObject({
+            registration_closes_before_minutes: 120,
+        });
+    });
+    it('edits the Hub on the page, protects unsaved changes and saves the canonical private draft once', () => {
+        render(
+            <EventWizardDialog
+                {...props}
+                presentation="page"
+                initial={{ ...initial, scope: 'all' }}
+                publishing={{ can_publish: true, actor_id: 9 }}
+            />,
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Event title'), {
+            target: { value: 'A clearer invitation' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'Leave without these changes',
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+        expect(screen.getByLabelText('Event title')).toHaveValue(
+            'A clearer invitation',
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        expect(router.post).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(router.post).mock.calls[0]).toEqual(
+            expect.arrayContaining([
+                '/company-hub/event-drafts',
+                expect.objectContaining({
+                    mode: 'draft',
+                    actor_id: 9,
+                    title: 'A clearer invitation',
+                    source_event_id: 4,
+                    edit_version: 7,
+                    scope: 'all',
+                }),
+            ]),
+        );
+    });
+    it('previews the invitation and schedules only an explicit future New Zealand time', async () => {
+        render(
+            <EventWizardDialog
+                {...props}
+                presentation="page"
+                initial={{ ...initial, scope: 'all' }}
+                publishing={{
+                    can_publish: true,
+                    can_schedule: true,
+                    actor_id: 9,
+                }}
+            />,
+        );
+        fireEvent.click(
+            screen.getAllByRole('button', { name: 'Review invitation' })[0],
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Team learning' }),
+        ).toBeInTheDocument();
+        await chooseEventOption('Publication', 'Schedule for later');
+        fireEvent.click(screen.getByRole('button', { name: 'Schedule event' }));
+        expect(router.post).not.toHaveBeenCalled();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Publish date and time date: Choose date',
+            }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Next month' }),
+        );
+        const nextMonth = new Date(
+            new Date().getFullYear(),
+            new Date().getMonth() + 1,
+            1,
+        );
+        const dayLabel = nextMonth
+            .toLocaleDateString('en-NZ', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+            })
+            .replace(',', '');
+        fireEvent.click(
+            screen.getByRole('button', { name: new RegExp(`^${dayLabel}`) }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Schedule event' }));
+        expect(router.post).not.toHaveBeenCalled();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Publish date and time time: Choose time',
+            }),
+        );
+        fireEvent.change(
+            screen.getByLabelText('Publish date and time time hour'),
+            { target: { value: '10' } },
+        );
+        fireEvent.change(
+            screen.getByLabelText('Publish date and time time minute'),
+            { target: { value: '00' } },
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'AM' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Use time' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Schedule event' }));
+        expect(vi.mocked(router.post).mock.calls[0][1]).toMatchObject({
+            mode: 'schedule',
+            publish_at: eventTimeInstant(
+                `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01T10:00`,
+                false,
+            ),
+            actor_id: 9,
+        });
+    });
+    it.each(['page', 'dialog'] as const)(
+        'uses confirmed Rory dates and clocks in the %s event editor',
+        async (presentation) => {
+            render(
+                <EventWizardDialog
+                    {...props}
+                    presentation={presentation}
+                    initial={{ ...initial, scope: 'all' }}
+                    publishing={{ can_publish: true }}
+                />,
+            );
+            if (presentation === 'dialog') continueTo(1);
+            expect(
+                document.querySelector(
+                    'input[type="datetime-local"], input[type="date"], input[type="time"]',
+                ),
+            ).toBeNull();
+            fireEvent.click(
+                screen.getByRole('button', {
+                    name: 'Starts date: 21 Oct 2026',
+                }),
+            );
+            fireEvent.click(
+                await screen.findByRole('button', {
+                    name: 'Thu 22 October 2026',
+                }),
+            );
+            fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
+            expect(
+                screen.getByRole('button', {
+                    name: 'Starts date: 22 Oct 2026',
+                }),
+            ).toBeVisible();
+            expect(
+                screen.getByRole('button', { name: 'Starts time: 10:00 AM' }),
+            ).toBeVisible();
+            fireEvent.click(
+                screen.getByRole('checkbox', { name: 'All-day event' }),
+            );
+            expect(
+                screen.getByRole('button', { name: 'Starts: 22 Oct 2026' }),
+            ).toBeVisible();
+            expect(
+                screen.queryByRole('button', { name: /Starts time:/ }),
+            ).not.toBeInTheDocument();
+            const untilLabel =
+                presentation === 'page' ? 'Repeat until' : 'Until (optional)';
+            fireEvent.click(
+                screen.getByRole('button', {
+                    name: `${untilLabel}: Choose date`,
+                }),
+            );
+            expect(
+                await screen.findByRole('button', { name: 'Use date' }),
+            ).toBeDisabled();
+        },
+    );
+    it('keeps inherited series files and audience locked in the on-page occurrence editor', () => {
+        render(
+            <EventWizardDialog
+                {...props}
+                presentation="page"
+                initial={initial}
+                publishing={{ can_publish: false }}
+            />,
+        );
+        expect(
+            screen.getByRole('combobox', { name: 'Repeats' }),
+        ).toBeDisabled();
+        expect(
+            screen.getByRole('combobox', {
+                name: 'Who is invited?',
+            }),
+        ).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Cover & files' }));
+        expect(screen.getByText('Shared by the series')).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Remove series.txt' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getAllByRole('button', { name: 'Review invitation' })[0],
+        );
+        expect(
+            screen.queryByRole('button', { name: 'Publish event' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Send for review' }),
+        ).toBeEnabled();
+    });
     it('retains the canonical archive action for a publisher opening a live event', () => {
         render(
             <EventWizardDialog
@@ -107,7 +584,12 @@ describe('Canonical event editor saves', () => {
             <EventWizardDialog
                 {...props}
                 initial={initial}
-                publishing={{ draft_id: 12, version: 3, can_publish: false }}
+                publishing={{
+                    draft_id: 12,
+                    version: 3,
+                    can_publish: false,
+                    cutoff_supported: true,
+                }}
             />,
         );
         continueTo(4);
@@ -126,6 +608,9 @@ describe('Canonical event editor saves', () => {
         });
         expect(vi.mocked(router.post).mock.calls[0][1]).not.toHaveProperty(
             'registration_enabled',
+        );
+        expect(vi.mocked(router.post).mock.calls[0][1]).not.toHaveProperty(
+            'registration_closes_before_minutes',
         );
     });
     it('saves the selected reminder channel and explains unavailable email delivery', () => {
@@ -274,6 +759,7 @@ describe('Canonical event editor saves', () => {
             options?.onError?.({
                 edit_version: 'This event changed while you were editing.',
             });
+            options?.onFinish?.({} as never);
         });
         expect(screen.getByRole('alert')).toHaveTextContent(
             'This event changed',

@@ -25,11 +25,22 @@ class HrCalendarReminderRecipients
             ->filter(fn ($user) => $this->eligible($user, $root, $effective, $date))->values();
     }
 
-    public function eligible(User $user, HrCalendarEvent $root, HrCalendarEvent $effective, string $date): bool
+    public function eligible(User $user, HrCalendarEvent $root, HrCalendarEvent $effective, string $date, bool $personal = false): bool
     {
+        if (! $this->inAudience($user, $root, $effective)) {
+            return false;
+        }
+        $registration = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('occurrence_date', $date)->where('user_id', $user->id)->first();
+
+        return $root->registration_enabled ? in_array($registration?->status, $personal ? ['going', 'waiting'] : ['going', 'maybe'], true) : $registration?->status !== 'declined';
+    }
+
+    public function inAudience(User $user, HrCalendarEvent $root, HrCalendarEvent $effective): bool
+    {
+        $user = $user->fresh();
         // Calendar managers can read an event without belonging to its reminder audience.
         $access = app(HrCalendarAccessService::class);
-        if (! app(HrCurrentStaffService::class)->isCurrent($user) || ! $access->canViewEvent($user, $effective)) {
+        if (! $user || ! app(HrCurrentStaffService::class)->isCurrent($user) || ! $access->canViewEvent($user, $effective)) {
             return false;
         }
         $audiences = $root->attendees;
@@ -43,11 +54,7 @@ class HrCalendarReminderRecipients
                 default => false,
             };
         });
-        if (! $matches) {
-            return false;
-        }
-        $registration = DB::table('hr_calendar_registrations')->where('event_id', $root->id)->where('occurrence_date', $date)->where('user_id', $user->id)->first();
 
-        return $root->registration_enabled ? in_array($registration?->status, ['going', 'maybe'], true) : $registration?->status !== 'declined';
+        return $matches;
     }
 }

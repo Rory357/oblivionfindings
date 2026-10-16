@@ -1,3 +1,13 @@
+export class HubRequestError extends Error {
+    constructor(
+        message: string,
+        readonly status: number,
+    ) {
+        super(message);
+        this.name = 'HubRequestError';
+    }
+}
+
 export async function hubRequest<T>(
     url: string,
     method: string,
@@ -23,11 +33,12 @@ export async function hubRequest<T>(
         const messages = result.errors
             ? Object.values(result.errors).flat().join(' ')
             : result.message;
-        throw new Error(
+        throw new HubRequestError(
             messages ||
                 (response.status === 419
                     ? 'Your session has expired. Reload the page to sign in again.'
                     : 'Your changes could not be saved. Please try again.'),
+            response.status,
         );
     }
     return result as T;

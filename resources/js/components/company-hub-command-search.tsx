@@ -20,6 +20,7 @@ type HubMatch = {
     url: string;
 };
 type Lookup = {
+    incomplete?: boolean;
     actorId: number;
     query: string;
     state: 'loading' | 'ready' | 'error';
@@ -88,6 +89,7 @@ export function HubCommandResults({
                 );
                 if (!response.ok) throw new Error('Search unavailable');
                 const result = (await response.json()) as {
+                    document_text_incomplete?: boolean;
                     actor_id: number;
                     results: HubMatch[];
                 };
@@ -99,6 +101,7 @@ export function HubCommandResults({
                         query: q,
                         state: 'ready',
                         results: result.results,
+                        incomplete: result.document_text_incomplete === true,
                     });
             } catch {
                 if (!controller.signal.aborted)
@@ -177,6 +180,15 @@ export function HubCommandResults({
         );
     return (
         <CommandGroup heading="Company Hub results" forceMount>
+            {current.incomplete && (
+                <p
+                    role="status"
+                    className="px-3 py-3 text-xs text-muted-foreground"
+                >
+                    Some PDF text could not be searched. Try its title or browse
+                    Resources.
+                </p>
+            )}
             {current.results.map((item) => {
                 const Icon =
                     item.kind === 'Person'

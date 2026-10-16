@@ -34,6 +34,12 @@ const personal: SectionPreset = {
 };
 
 beforeEach(() => request.mockReset());
+function choose(label: string, option: string) {
+    fireEvent.keyDown(screen.getByRole('combobox', { name: label }), {
+        key: 'ArrowDown',
+    });
+    fireEvent.click(screen.getByRole('option', { name: option }));
+}
 async function open(
     props: Partial<React.ComponentProps<typeof SectionPresets>> = {},
 ) {
@@ -180,10 +186,7 @@ it('saves the selected layout to the chosen library and refreshes its contents',
     fireEvent.change(screen.getByLabelText('Save selected section as'), {
         target: { value: 'Team introduction' },
     });
-    fireEvent.change(
-        screen.getByRole('combobox', { name: 'Section library destination' }),
-        { target: { value: 'shared' } },
-    );
+    choose('Section library destination', 'Shared with editors');
     fireEvent.click(screen.getByRole('button', { name: 'Save section' }));
     expect(
         await screen.findByRole('button', { name: 'Insert Team introduction' }),
@@ -237,9 +240,14 @@ it('filters shared and personal layouts while respecting capacity and management
         can_share: false,
     });
     await open({ full: true });
+    fireEvent.keyDown(
+        screen.getByRole('combobox', { name: 'Section library destination' }),
+        { key: 'ArrowDown' },
+    );
     expect(
         screen.queryByRole('option', { name: 'Shared with editors' }),
     ).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
     expect(
         screen.queryByRole('button', {
             name: 'Remove Team introduction from library',
@@ -248,10 +256,7 @@ it('filters shared and personal layouts while respecting capacity and management
     expect(
         screen.getByRole('button', { name: 'Insert Team introduction' }),
     ).toBeDisabled();
-    fireEvent.change(
-        screen.getByRole('combobox', { name: 'Section library filter' }),
-        { target: { value: 'shared' } },
-    );
+    choose('Section library filter', 'Shared');
     expect(
         screen.queryByRole('button', { name: 'Insert My layout' }),
     ).not.toBeInTheDocument();

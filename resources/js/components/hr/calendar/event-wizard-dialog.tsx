@@ -21,7 +21,7 @@ import {
     X,
     type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
     emptyEventHubContent,
@@ -60,6 +60,14 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from './../wizard';
+import { EventBookingCutoff } from './event-booking-cutoff';
+import { EventDateField } from './event-date-field';
+import type { EventLibraryPhoto } from './event-image-library';
+import {
+    EventPageEditor,
+    type EventEditorData,
+    type EventPublicationMode,
+} from './event-page-editor';
 import { eventTimeInput, eventTimeInstant } from './event-time';
 
 export interface CalendarEventInitial {
@@ -68,6 +76,7 @@ export interface CalendarEventInitial {
     registration_enabled?: boolean;
     registration_capacity?: number | null;
     registration_version?: number;
+    registration_closes_before_minutes?: number | null;
     recurrence_parent_id?: number | null;
     title: string;
     description: string | null;
@@ -108,6 +117,8 @@ export interface EventAttachment {
     mime: string | null;
     size: number;
     url: string;
+    preview_url?: string | null;
+    download_url?: string;
     eventId?: number;
     inherited?: boolean;
 }
@@ -242,6 +253,7 @@ export function EventWizardDialog({
     publishing,
     initial,
     defaultDate,
+    presentation = 'dialog',
 }: {
     open: boolean;
     onClose: () => void;
@@ -254,7 +266,16 @@ export function EventWizardDialog({
     staff: PersonOption[];
     storyOptions?: { id: number; title: string }[];
     emailAvailable?: boolean;
-    publishing?: { draft_id?: number; version?: number; can_publish: boolean };
+    publishing?: {
+        draft_id?: number;
+        version?: number;
+        can_publish: boolean;
+        can_schedule?: boolean;
+        cutoff_supported?: boolean;
+        publish_at?: string | null;
+        actor_id?: number;
+    };
+    presentation?: 'dialog' | 'page';
     initial?: CalendarEventInitial | null;
     /** Click-to-create prefill (YYYY-MM-DD) when creating a new event. */
     defaultDate?: string | null;
@@ -273,15 +294,18 @@ export function EventWizardDialog({
     const wizard = useWizard(STEPS.length);
     const [submitted, setSubmitted] = useState(false);
     const [draftKey] = useState(() => crypto.randomUUID());
-    const [publicationMode, setPublicationMode] = useState<
-        'draft' | 'review' | 'publish'
-    >('draft');
+    const [publicationMode, setPublicationMode] =
+        useState<EventPublicationMode>('draft');
+    const pendingSave = useRef(false);
+    const editorGeneration = useRef(0);
+    const [pageBaseline, setPageBaseline] = useState('');
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [keepAdding, setKeepAdding] = useState(false);
     const [reminderChannel, setReminderChannel] = useState<
         'notification' | 'email'
     >('notification');
     const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+    const [libraryPhotos, setLibraryPhotos] = useState<EventLibraryPhoto[]>([]);
     const [existingAttachments, setExistingAttachments] = useState<
         EventAttachment[]
     >([]);
@@ -289,7 +313,7 @@ export function EventWizardDialog({
         [],
     );
 
-    const form = useForm({
+    const form = useForm<EventEditorData>({
         title: '',
         description: '',
         event_type: 'company',
@@ -314,13 +338,16 @@ export function EventWizardDialog({
         hub_content: emptyEventHubContent(),
         registration_enabled: false,
         registration_capacity: '',
+        registration_closes_before_minutes: '',
     });
 
     // Seed (create defaults or edit values) each time the dialog opens.
     useEffect(() => {
+        editorGeneration.current++;
+        pendingSave.current = false;
         if (!open) return;
         if (initial) {
-            form.setData({
+            const seeded: EventEditorData = {
                 title: initial.title,
                 description: initial.description ?? '',
                 event_type: initial.event_type,
@@ -349,7 +376,12 @@ export function EventWizardDialog({
                 registration_enabled: initial.registration_enabled ?? false,
                 registration_capacity:
                     initial.registration_capacity?.toString() ?? '',
-            });
+                registration_closes_before_minutes:
+                    initial.registration_closes_before_minutes?.toString() ??
+                    '',
+            };
+            form.setData(seeded);
+            setPageBaseline(JSON.stringify(seeded));
             setReminderChannel(
                 (initial.reminders?.[0]?.channel as 'notification' | 'email') ??
                     'notification',
@@ -363,15 +395,29 @@ export function EventWizardDialog({
                 is_all_day: false,
             }));
         }
+        if (!initial && !defaultDate)
+            setPageBaseline(JSON.stringify(form.data));
         wizard.reset();
         setSubmitted(false);
         setStagedFiles([]);
+        setLibraryPhotos([]);
         setRemovedAttachmentIds([]);
         if (!initial) setExistingAttachments([]);
+        return () => {
+            // Invalidate the current request generation; this ref does not hold a DOM node.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            editorGeneration.current++;
+            if (pendingSave.current) form.cancel();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
     const close = () => {
+        if (form.processing || pendingSave.current) return;
+        if (presentation === 'page') {
+            onClose();
+            return;
+        }
         const needsRefresh = 'edit_version' in form.errors;
         form.reset();
         form.clearErrors();
@@ -490,10 +536,17 @@ export function EventWizardDialog({
         }));
     };
 
-    const transform = (mode: 'draft' | 'review' | 'publish' = 'draft') =>
+    const transform = (
+        mode: EventPublicationMode = 'draft',
+        publishAt?: string,
+    ) =>
         form.transform((data) => {
-            const { registration_enabled, registration_capacity, ...details } =
-                data;
+            const {
+                registration_enabled,
+                registration_capacity,
+                registration_closes_before_minutes,
+                ...details
+            } = data;
             return {
                 ...details,
                 ...(initial && !publishing
@@ -502,6 +555,10 @@ export function EventWizardDialog({
                 ...(publishing
                     ? {
                           mode,
+                          ...(publishing.actor_id
+                              ? { actor_id: publishing.actor_id }
+                              : {}),
+                          ...(publishAt ? { publish_at: publishAt } : {}),
                           draft_key: draftKey,
                           version: publishing.version ?? null,
                           source_event_id: initial?.id || null,
@@ -509,6 +566,17 @@ export function EventWizardDialog({
                           ...(!isSingleDate
                               ? {
                                     registration_enabled,
+                                    ...(publishing.cutoff_supported
+                                        ? {
+                                              registration_closes_before_minutes:
+                                                  registration_closes_before_minutes ===
+                                                  ''
+                                                      ? null
+                                                      : Number(
+                                                            registration_closes_before_minutes,
+                                                        ),
+                                          }
+                                        : {}),
                                     registration_capacity: registration_capacity
                                         ? Number(registration_capacity)
                                         : null,
@@ -519,6 +587,14 @@ export function EventWizardDialog({
                       }
                     : {}),
                 files: stagedFiles,
+                ...(libraryPhotos.length
+                    ? {
+                          hub_library_images: libraryPhotos.map((photo) => ({
+                              media_id: photo.id,
+                              version: photo.version,
+                          })),
+                      }
+                    : {}),
                 removed_attachment_ids: removedAttachmentIds,
                 // Multipart omits empty arrays; preserve the intent to clear every reminder.
                 replace_reminders: true,
@@ -565,12 +641,13 @@ export function EventWizardDialog({
     };
 
     const finishSave = (addAnother: boolean) => {
-        onSaved();
+        if (presentation !== 'page') onSaved();
         if (addAnother) {
             form.reset();
             form.clearErrors();
             wizard.reset();
             setStagedFiles([]);
+            setLibraryPhotos([]);
             setRemovedAttachmentIds([]);
             setKeepAdding(true);
             toast.success('Event saved — add another');
@@ -581,8 +658,25 @@ export function EventWizardDialog({
 
     const submit = (
         addAnother = false,
-        mode: 'draft' | 'review' | 'publish' = 'draft',
+        mode: EventPublicationMode = 'draft',
+        publishAt?: string,
     ) => {
+        if (!open || pendingSave.current || form.processing || submitted)
+            return;
+        if (
+            libraryPhotos.length +
+                stagedFiles.length +
+                (publishing?.draft_id
+                    ? existingAttachments.filter((file) => file.id < 0).length
+                    : 0) >
+            10
+        ) {
+            form.setError(
+                'hub_content',
+                'Choose up to 10 files in total for this save, including selected library images.',
+            );
+            return;
+        }
         for (const field of ['starts_at', 'ends_at'] as const) {
             try {
                 eventTimeInstant(
@@ -596,37 +690,54 @@ export function EventWizardDialog({
                 return;
             }
         }
+        pendingSave.current = true;
+        const generation = editorGeneration.current;
+        const current = () => editorGeneration.current === generation;
         setPublicationMode(mode);
-        transform(mode);
+        transform(mode, publishAt);
         const opts = {
             preserveScroll: true,
             preserveState: true,
             forceFormData: true,
-            onError,
+            onError: (errors: Record<string, string>) => {
+                if (current()) onError(errors);
+            },
+            onFinish: () => {
+                if (current()) pendingSave.current = false;
+            },
         };
         if (publishing) {
             form.post(
                 `/company-hub/event-drafts${publishing.draft_id ? `/${publishing.draft_id}` : ''}`,
                 {
                     ...opts,
-                    onSuccess: () => finishSave(false),
+                    onSuccess: () => {
+                        if (current()) finishSave(false);
+                    },
                 },
             );
         } else if (isEdit && initial) {
             form.post(`/hr/calendar/events/${initial.id}`, {
                 ...opts,
-                onSuccess: () => finishSave(addAnother),
+                onSuccess: () => {
+                    if (current()) finishSave(addAnother);
+                },
             });
         } else {
             form.post('/hr/calendar/events', {
                 ...opts,
-                onSuccess: () => finishSave(addAnother),
+                onSuccess: () => {
+                    if (current()) finishSave(addAnother);
+                },
             });
         }
     };
 
     const doArchive = () => {
-        if (!initial || !canArchive) return;
+        if (!initial || !canArchive || pendingSave.current || form.processing)
+            return;
+        pendingSave.current = true;
+        const generation = editorGeneration.current;
         form.transform(() => ({
             edit_version: initial.edit_version,
             scope: 'all',
@@ -635,12 +746,97 @@ export function EventWizardDialog({
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
+                if (editorGeneration.current !== generation) return;
+                pendingSave.current = false;
                 onSaved();
                 toast.success('Event archived');
                 close();
             },
+            onFinish: () => {
+                if (editorGeneration.current === generation)
+                    pendingSave.current = false;
+            },
         });
     };
+
+    if (presentation === 'page' && publishing) {
+        if (!open) return null;
+        return (
+            <EventPageEditor
+                data={form.data}
+                set={(key, value) =>
+                    form.setData((data) => ({ ...data, [key]: value }))
+                }
+                errors={form.errors}
+                busy={form.processing}
+                dirty={
+                    !!pageBaseline &&
+                    (JSON.stringify(form.data) !== pageBaseline ||
+                        stagedFiles.length > 0 ||
+                        libraryPhotos.length > 0 ||
+                        removedAttachmentIds.length > 0)
+                }
+                submitted={submitted}
+                savedMode={publicationMode}
+                canSubmit={canSubmit}
+                canPublish={publishing.can_publish}
+                canSchedule={!!publishing.can_schedule}
+                cutoffSupported={!!publishing.cutoff_supported}
+                initialPublishAt={publishing.publish_at}
+                initial={initial}
+                sites={sites}
+                departments={departments}
+                teams={teams}
+                categories={categories}
+                staff={staff}
+                stories={storyOptions}
+                emailAvailable={emailAvailable}
+                attachments={existingAttachments}
+                files={stagedFiles}
+                libraryPhotos={libraryPhotos}
+                libraryActorId={publishing.actor_id}
+                retainedDraftFiles={
+                    publishing.draft_id
+                        ? existingAttachments.filter((file) => file.id < 0)
+                              .length
+                        : 0
+                }
+                onLibraryPhotosChange={setLibraryPhotos}
+                inherited={isInheritedFile}
+                addFiles={(files) =>
+                    setStagedFiles((prev) => [...prev, ...files])
+                }
+                removeFile={(index) => {
+                    form.setData(
+                        'hub_content',
+                        removePhotoReference(
+                            form.data.hub_content,
+                            'upload:' + index,
+                        ),
+                    );
+                    setStagedFiles((prev) =>
+                        prev.filter((_, i) => i !== index),
+                    );
+                }}
+                removeAttachment={(file) => {
+                    if (isInheritedFile(file)) return;
+                    form.setData(
+                        'hub_content',
+                        removePhotoReference(
+                            form.data.hub_content,
+                            'file:' + file.id,
+                        ),
+                    );
+                    setRemovedAttachmentIds((prev) => [...prev, file.id]);
+                    setExistingAttachments((prev) =>
+                        prev.filter((item) => item.id !== file.id),
+                    );
+                }}
+                onClose={close}
+                onSave={(mode, publishAt) => submit(false, mode, publishAt)}
+            />
+        );
+    }
 
     const RailIcon = meta.icon;
 
@@ -737,6 +933,7 @@ export function EventWizardDialog({
                         <button
                             type="button"
                             onClick={close}
+                            disabled={form.processing}
                             className="rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted"
                         >
                             Cancel
@@ -978,43 +1175,26 @@ export function EventWizardDialog({
                             All-day event
                         </label>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field
+                            <EventDateField
                                 label="Starts"
-                                required
+                                dateOnly={form.data.is_all_day}
+                                value={form.data.starts_at}
+                                onChange={(value) =>
+                                    form.setData('starts_at', value)
+                                }
+                                disabled={form.processing}
                                 error={form.errors.starts_at}
-                            >
-                                <Input
-                                    type={
-                                        form.data.is_all_day
-                                            ? 'date'
-                                            : 'datetime-local'
-                                    }
-                                    value={form.data.starts_at}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'starts_at',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
-                            <Field
+                            />
+                            <EventDateField
                                 label="Ends"
-                                required
+                                dateOnly={form.data.is_all_day}
+                                value={form.data.ends_at}
+                                onChange={(value) =>
+                                    form.setData('ends_at', value)
+                                }
+                                disabled={form.processing}
                                 error={form.errors.ends_at}
-                            >
-                                <Input
-                                    type={
-                                        form.data.is_all_day
-                                            ? 'date'
-                                            : 'datetime-local'
-                                    }
-                                    value={form.data.ends_at}
-                                    onChange={(e) =>
-                                        form.setData('ends_at', e.target.value)
-                                    }
-                                />
-                            </Field>
+                            />
                         </div>
                         <div className="mt-4 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-[12.5px] text-muted-foreground">
                             <AlarmClock className="h-4 w-4" />
@@ -1089,18 +1269,22 @@ export function EventWizardDialog({
                                     />
                                 </Field>
                                 {form.data.rrule ? (
-                                    <Field label="Until (optional)">
-                                        <Input
-                                            type="date"
-                                            value={form.data.recurrence_until}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'recurrence_until',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </Field>
+                                    <EventDateField
+                                        label="Until (optional)"
+                                        dateOnly
+                                        clearable
+                                        value={form.data.recurrence_until}
+                                        onChange={(value) =>
+                                            form.setData(
+                                                'recurrence_until',
+                                                value,
+                                            )
+                                        }
+                                        disabled={
+                                            isSingleDate || form.processing
+                                        }
+                                        error={form.errors.recurrence_until}
+                                    />
                                 ) : null}
                             </div>
                             {form.data.rrule ? (
@@ -1541,8 +1725,8 @@ export function EventWizardDialog({
                                     }
                                     hint={
                                         publishing
-                                            ? 'PDF, Word, Excel, images — up to 10 files, 10 MB each. New files stay private until publication.'
-                                            : 'PDF, Word, Excel, images — up to 10 files, 10 MB each. Saved with the event.'
+                                            ? 'PDF, Word, Excel, PowerPoint, images — up to 10 files, 10 MB each. New files stay private until publication.'
+                                            : 'PDF, Word, Excel, PowerPoint, images — up to 10 files, 10 MB each. Saved with the event.'
                                     }
                                 />
                             </div>
@@ -1621,6 +1805,21 @@ export function EventWizardDialog({
                                         }
                                     />
                                 </Field>
+                                {publishing.cutoff_supported && (
+                                    <EventBookingCutoff
+                                        value={
+                                            form.data
+                                                .registration_closes_before_minutes
+                                        }
+                                        onChange={(value) =>
+                                            form.setData(
+                                                'registration_closes_before_minutes',
+                                                value,
+                                            )
+                                        }
+                                        disabled={form.processing}
+                                    />
+                                )}
                                 <p className="text-xs text-muted-foreground">
                                     Each date has its own places and waiting
                                     list. Existing confirmed places are

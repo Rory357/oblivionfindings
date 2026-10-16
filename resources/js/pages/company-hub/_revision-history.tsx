@@ -1,20 +1,27 @@
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDateTime } from '@/lib/datetime';
+import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
+import { formatDateLong, formatDateTime } from '@/lib/datetime';
 import { shiftInputInstant } from '@/lib/workforce-time-input';
-import { Eye, FileText, History, MessageSquare, RotateCcw } from 'lucide-react';
+import {
+    ArrowLeft,
+    ArrowUpRight,
+    Check,
+    Eye,
+    EyeOff,
+    FileText,
+    History,
+    MessageSquare,
+    Pencil,
+    RotateCcw,
+    Sparkles,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { hubRequest } from './_api';
+import { HubRequestError, hubRequest } from './_api';
+import { HubDateTimeField } from './_date-fields';
 import { blockLibrary, blockSpan } from './_layout';
+import { HubFormattedText } from './_rich-text';
 import type { HubBlock, HubContent } from './_types';
 
 export type RevisionSummary = {
@@ -71,21 +78,34 @@ export function RevisionHistory({
     revisions,
     cursor = null,
     disabled,
+    restoreBlocked = false,
+    actorId,
+    hasSavedDraft = false,
     onChanged,
+    onClose,
 }: {
     pageId: number;
     version: number;
     revisions: RevisionSummary[];
     cursor?: number | null;
     disabled: boolean;
+    restoreBlocked?: boolean;
+    actorId?: number | null;
+    hasSavedDraft?: boolean;
     onChanged: () => void;
+    onClose?: () => void;
 }) {
     const [items, setItems] = useState(revisions);
     const [next, setNext] = useState(cursor);
-    const [selected, setSelected] = useState<number | null>(null);
+    const [selected, setSelected] = useState<number | 'draft' | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const generation = useRef(0);
+    const heading = useRef<HTMLHeadingElement>(null);
+    const opener = useRef<HTMLButtonElement | null>(null);
+    useEffect(() => {
+        if (selected === null) heading.current?.focus({ preventScroll: true });
+    }, [selected]);
     useEffect(() => {
         generation.current += 1;
         setItems(revisions);
@@ -98,120 +118,186 @@ export function RevisionHistory({
     }, [pageId, revisions, cursor]);
     return (
         <section className="hub-version-history">
-            <div className="mb-4 flex items-start gap-3">
-                <History className="mt-1 size-5 text-primary" />
-                <div>
-                    <h2 className="text-lg font-semibold">
-                        Version history & review
-                    </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Open an exact saved version before reviewing or
-                        restoring it. The current draft is separate.
-                    </p>
-                </div>
-            </div>
-            {!items.length && (
-                <p className="hub-empty-note">
-                    Your first submitted or published version will appear here.
-                </p>
-            )}
-            {items.map((revision) => (
-                <article className="hub-version-row" key={revision.id}>
-                    <div className="hub-version-number">
-                        v{revision.draft_version}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-medium">
-                                {revision.title ??
-                                    `Version ${revision.draft_version}`}
-                            </h3>
-                            <span
-                                className="hub-version-state"
-                                data-state={revision.state}
-                            >
-                                {revisionLabel(revision)}
-                            </span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            {revision.author ? `${revision.author} · ` : ''}
-                            {formatDateTime(revision.created_at)}
-                            {revision.is_current_draft
-                                ? ' · Matches current draft'
-                                : ''}
-                        </p>
-                        {revision.review_note && (
-                            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                                {revision.reviewed_by_name
-                                    ? `${revision.reviewed_by_name}: `
-                                    : ''}
-                                {revision.review_note}
-                            </p>
-                        )}
-                    </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelected(revision.id)}
-                    >
-                        <Eye className="size-4" />
-                        {revision.state === 'submitted'
-                            ? 'Review version'
-                            : 'View version'}
+            <div hidden={selected !== null}>
+                {onClose && (
+                    <Button variant="ghost" className="mb-4" onClick={onClose}>
+                        <ArrowLeft className="size-4" /> Back to draft
                     </Button>
-                </article>
-            ))}
-            {error && (
-                <p role="alert" className="mt-3 text-sm text-destructive">
-                    {error}
-                </p>
-            )}
-            {next && (
-                <Button
-                    className="mt-4"
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={async () => {
-                        const requestGeneration = generation.current;
-                        setBusy(true);
-                        setError('');
-                        try {
-                            const page = await hubRequest<HistoryPage>(
-                                `/company-hub/manage/${pageId}/revisions?before=${next}`,
-                                'GET',
-                            );
-                            if (generation.current !== requestGeneration)
-                                return;
-                            setItems((current) => [
-                                ...current,
-                                ...page.items.filter(
-                                    (item) =>
-                                        !current.some(
-                                            (old) => old.id === item.id,
-                                        ),
-                                ),
-                            ]);
-                            setNext(page.next_cursor);
-                        } catch (err) {
-                            if (generation.current === requestGeneration)
-                                setError((err as Error).message);
-                        } finally {
-                            if (generation.current === requestGeneration)
-                                setBusy(false);
-                        }
+                )}
+                <div className="mb-4 flex items-start gap-3">
+                    <History className="mt-1 size-5 text-primary" />
+                    <div>
+                        <h2
+                            ref={heading}
+                            tabIndex={-1}
+                            className="text-lg font-semibold outline-none"
+                        >
+                            Version history & review
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Open an exact saved version before reviewing or
+                            restoring it, or inspect the current saved draft.
+                        </p>
+                    </div>
+                </div>
+                {hasSavedDraft && actorId && (
+                    <article className="hub-version-row border-primary/25 bg-primary/5">
+                        <div className="hub-version-number">
+                            <Pencil className="size-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="font-medium">Current saved draft</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Version {version} · The saved draft, before any
+                                unsaved edits
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(event) => {
+                                opener.current = event.currentTarget;
+                                setSelected('draft');
+                            }}
+                        >
+                            <Eye className="size-4" />
+                            View saved draft
+                        </Button>
+                    </article>
+                )}
+                {!items.length && (
+                    <p className="hub-empty-note">
+                        Your first submitted or published version will appear
+                        here.
+                    </p>
+                )}
+                {items.map((revision) => (
+                    <article className="hub-version-row" key={revision.id}>
+                        <div className="hub-version-number">
+                            v{revision.draft_version}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="font-medium">
+                                    {revision.title ??
+                                        `Version ${revision.draft_version}`}
+                                </h3>
+                                <span
+                                    className="hub-version-state"
+                                    data-state={revision.state}
+                                >
+                                    {revisionLabel(revision)}
+                                </span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {revision.author ? `${revision.author} · ` : ''}
+                                {formatDateTime(revision.created_at)}
+                                {revision.is_current_draft
+                                    ? ' · Matches current draft'
+                                    : ''}
+                            </p>
+                            {revision.review_note && (
+                                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                                    {revision.reviewed_by_name
+                                        ? `${revision.reviewed_by_name}: `
+                                        : ''}
+                                    {revision.review_note}
+                                </p>
+                            )}
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(event) => {
+                                opener.current = event.currentTarget;
+                                setSelected(revision.id);
+                            }}
+                        >
+                            <Eye className="size-4" />
+                            {revision.state === 'submitted'
+                                ? 'Review version'
+                                : 'View version'}
+                        </Button>
+                    </article>
+                ))}
+                {error && (
+                    <p role="alert" className="mt-3 text-sm text-destructive">
+                        {error}
+                    </p>
+                )}
+                {next && (
+                    <Button
+                        className="mt-4"
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={async () => {
+                            const requestGeneration = generation.current;
+                            setBusy(true);
+                            setError('');
+                            try {
+                                const page = await hubRequest<HistoryPage>(
+                                    `/company-hub/manage/${pageId}/revisions?before=${next}`,
+                                    'GET',
+                                );
+                                if (generation.current !== requestGeneration)
+                                    return;
+                                setItems((current) => [
+                                    ...current,
+                                    ...page.items.filter(
+                                        (item) =>
+                                            !current.some(
+                                                (old) => old.id === item.id,
+                                            ),
+                                    ),
+                                ]);
+                                setNext(page.next_cursor);
+                            } catch (err) {
+                                if (generation.current === requestGeneration)
+                                    setError((err as Error).message);
+                            } finally {
+                                if (generation.current === requestGeneration)
+                                    setBusy(false);
+                            }
+                        }}
+                    >
+                        {busy ? 'Loading…' : 'Load older versions'}
+                    </Button>
+                )}
+            </div>
+            {selected === 'draft' && actorId && (
+                <SavedDraftPreview
+                    key={`${actorId}:${pageId}:${version}`}
+                    actorId={actorId}
+                    pageId={pageId}
+                    version={version}
+                    canEdit={!restoreBlocked}
+                    canReload={!disabled}
+                    onChanged={onChanged}
+                    onContinue={onClose}
+                    onBack={() => {
+                        setSelected(null);
+                        requestAnimationFrame(() =>
+                            opener.current?.focus({ preventScroll: true }),
+                        );
                     }}
-                >
-                    {busy ? 'Loading…' : 'Load older versions'}
-                </Button>
+                />
             )}
-            {selected !== null && (
-                <RevisionDialog
+            {typeof selected === 'number' && (
+                <RevisionWorkspace
                     key={selected}
                     pageId={pageId}
                     revisionId={selected}
                     version={version}
                     disabled={disabled}
-                    close={() => setSelected(null)}
+                    restoreBlocked={restoreBlocked}
+                    close={() => {
+                        setSelected(null);
+                        requestAnimationFrame(
+                            () =>
+                                opener.current?.isConnected &&
+                                opener.current.focus({ preventScroll: true }),
+                        );
+                    }}
                     onChanged={onChanged}
                 />
             )}
@@ -219,12 +305,221 @@ export function RevisionHistory({
     );
 }
 
+function SavedDraftPreview({
+    actorId,
+    pageId,
+    version,
+    canEdit,
+    canReload,
+    onBack,
+    onContinue,
+    onChanged,
+}: {
+    actorId: number;
+    pageId: number;
+    version: number;
+    canEdit: boolean;
+    canReload: boolean;
+    onBack: () => void;
+    onContinue?: () => void;
+    onChanged: () => void;
+}) {
+    type Snapshot = {
+        source: 'draft';
+        actor_id: number;
+        page_id: number;
+        version: number;
+        saved_at: string | null;
+        content: HubContent;
+    };
+    const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+    const [freshEditable, setFreshEditable] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [retry, setRetry] = useState(0);
+    const heading = useRef<HTMLHeadingElement>(null);
+    useEffect(() => {
+        heading.current?.focus({ preventScroll: true });
+        let active = true;
+        setLoading(true);
+        setError('');
+        setSnapshot(null);
+        setFreshEditable(false);
+        void hubRequest<{
+            current_draft: Snapshot | null;
+            blocked_reason: string | null;
+        }>(
+            `/company-hub/manage/${pageId}/draft?include_snapshot=1&actor_id=${actorId}&version=${version}`,
+            'GET',
+        )
+            .then((result) => {
+                if (!active) return;
+                const saved = result.current_draft;
+                if (saved === null) {
+                    setError(
+                        'There is no unpublished saved draft for this page. Reload the editor to see its current state.',
+                    );
+                    return;
+                }
+                if (
+                    !saved ||
+                    saved.source !== 'draft' ||
+                    saved.actor_id !== actorId ||
+                    saved.page_id !== pageId ||
+                    saved.version !== version ||
+                    !Array.isArray(saved.content?.sections)
+                )
+                    throw new Error(
+                        'This saved draft could not be confirmed. Reload the editor to see the current saved version.',
+                    );
+                setSnapshot(saved);
+                setFreshEditable(
+                    result.blocked_reason === null ||
+                        ['layout', 'published_audience'].includes(
+                            result.blocked_reason,
+                        ),
+                );
+            })
+            .catch((err: Error) => {
+                if (active) setError(err.message);
+            })
+            .finally(() => {
+                if (active) setLoading(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, [actorId, pageId, version, retry]);
+    return (
+        <section aria-label="Current saved draft preview" className="space-y-6">
+            <header className="space-y-3 border-b pb-5">
+                <Button variant="ghost" className="-ml-2" onClick={onBack}>
+                    <ArrowLeft className="size-4" />
+                    All saved versions
+                </Button>
+                <h2
+                    ref={heading}
+                    tabIndex={-1}
+                    className="text-xl font-semibold outline-none"
+                >
+                    Current saved draft · v{version}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                    This is the last confirmed saved content. Unsaved changes in
+                    the editor are not included.
+                </p>
+            </header>
+            {loading && (
+                <p role="status" className="hub-empty-note">
+                    Loading the saved draft…
+                </p>
+            )}
+            {error && (
+                <div
+                    role="alert"
+                    className="space-y-3 rounded-xl border border-destructive/30 p-4 text-sm"
+                >
+                    <p>{error}</p>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            disabled={loading}
+                            onClick={() => setRetry((n) => n + 1)}
+                        >
+                            Try again
+                        </Button>
+                        <Button
+                            variant="outline"
+                            disabled={!canReload}
+                            onClick={onChanged}
+                        >
+                            Reload editor
+                        </Button>
+                    </div>
+                    {!canReload && (
+                        <p>
+                            Return to the editor and save or discard your
+                            changes before reloading.
+                        </p>
+                    )}
+                </div>
+            )}
+            {snapshot && (
+                <div className="hub-review-layout">
+                    <RevisionSnapshot content={snapshot.content} />
+                    <aside className="hub-review-actions space-y-4">
+                        <span className="hub-version-state">
+                            Unpublished draft
+                        </span>
+                        {snapshot.saved_at && (
+                            <p className="text-xs text-muted-foreground">
+                                <strong className="mb-1 block text-foreground">
+                                    Saved version updated
+                                </strong>
+                                {formatDateTime(snapshot.saved_at)}
+                            </p>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                            Continue editing to make changes. Review and
+                            publication actions stay in the page editor.
+                        </p>
+                        {onContinue && (
+                            <Button
+                                disabled={!canEdit || !freshEditable}
+                                onClick={onContinue}
+                            >
+                                <Pencil className="size-4" />
+                                Continue editing
+                            </Button>
+                        )}
+                        {(!canEdit || !freshEditable) && (
+                            <p className="text-xs text-muted-foreground">
+                                This draft is currently locked for editing.
+                            </p>
+                        )}
+                    </aside>
+                </div>
+            )}
+        </section>
+    );
+}
+
 function SnapshotBlock({ block }: { block: HubBlock }) {
+    if (block.type === 'notice')
+        return (
+            <div className="hub-custom-callout">
+                <Sparkles
+                    className="size-5 shrink-0 text-primary"
+                    aria-hidden
+                />
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {block.body || 'No callout text in this saved version.'}
+                </p>
+            </div>
+        );
+    if (block.type === 'button')
+        return (
+            <div className="space-y-3">
+                {block.body && (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                        {block.body}
+                    </p>
+                )}
+                <span className="inline-flex items-center gap-2 rounded-lg bg-primary-fill px-4 py-2 text-sm font-medium text-primary-fill-foreground">
+                    {block.action_label || 'Explore'}
+                    <ArrowUpRight className="size-4" aria-hidden />
+                </span>
+                <p className="text-xs break-all text-muted-foreground">
+                    Destination: {block.url || 'No destination saved'}
+                </p>
+            </div>
+        );
     if (block.type === 'text')
         return (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                {block.body || 'No text in this saved version.'}
-            </p>
+            <HubFormattedText
+                value={block.rich_text}
+                body={block.body || 'No text in this saved version.'}
+            />
         );
     if (block.type === 'image' && block.media_id)
         return (
@@ -281,26 +576,40 @@ function SnapshotBlock({ block }: { block: HubBlock }) {
         );
     if (block.type === 'video')
         return (
-            <p className="text-sm break-all text-muted-foreground">
-                Video link: {block.url || 'No link saved'}
-            </p>
+            <div className="space-y-3">
+                {block.body && (
+                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                        {block.body}
+                    </p>
+                )}
+                <p className="text-sm break-all text-muted-foreground">
+                    Video link: {block.url || 'No link saved'}
+                </p>
+            </div>
         );
     if (block.type === 'file')
         return (
-            <div className="flex items-center gap-2 text-sm">
-                <FileText className="size-4" />
-                {block.media_id ? (
-                    <a
-                        className="text-primary underline"
-                        href={`/company-hub/media/${block.media_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        Open saved attachment
-                    </a>
-                ) : (
-                    'No attachment saved'
+            <div className="space-y-3">
+                {block.body && (
+                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                        {block.body}
+                    </p>
                 )}
+                <div className="flex items-center gap-2 text-sm">
+                    <FileText className="size-4" />
+                    {block.media_id ? (
+                        <a
+                            className="text-primary underline"
+                            href={`/company-hub/media/${block.media_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Open saved attachment
+                        </a>
+                    ) : (
+                        'No attachment saved'
+                    )}
+                </div>
             </div>
         );
     return (
@@ -365,6 +674,12 @@ export function RevisionSnapshot({ content }: { content: HubContent }) {
                     {section.title && (
                         <h4 className="mb-4 font-semibold">{section.title}</h4>
                     )}
+                    {section.hidden && (
+                        <p className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                            <EyeOff className="size-3.5" aria-hidden />
+                            Section hidden from staff in this version
+                        </p>
+                    )}
                     <div className="grid grid-cols-12 gap-5">
                         {section.blocks.map((block, index) => (
                             <article
@@ -374,6 +689,15 @@ export function RevisionSnapshot({ content }: { content: HubContent }) {
                                     gridColumn: `span ${blockSpan(section, block, index)}`,
                                 }}
                             >
+                                {block.hidden && (
+                                    <p className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                                        <EyeOff
+                                            className="size-3.5"
+                                            aria-hidden
+                                        />{' '}
+                                        Hidden from staff in this version
+                                    </p>
+                                )}
                                 {block.title && (
                                     <h5 className="mb-2 text-sm font-semibold">
                                         {block.title}
@@ -387,7 +711,58 @@ export function RevisionSnapshot({ content }: { content: HubContent }) {
             ))}
             {content.campaign && (
                 <section className="hub-revision-section">
-                    <h4 className="mb-3 font-semibold">Campaign activities</h4>
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                        <div>
+                            <h4 className="font-semibold">Campaign plan</h4>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                The plan saved with this version. Personal
+                                progress is not included.
+                            </p>
+                        </div>
+                        {content.campaign.ends_on && (
+                            <p className="shrink-0 rounded-lg bg-muted px-3 py-2 text-xs">
+                                Target date:{' '}
+                                {formatDateLong(content.campaign.ends_on)}
+                            </p>
+                        )}
+                    </div>
+                    {!!content.campaign.milestones?.length && (
+                        <div className="mb-6">
+                            <h5 className="mb-3 text-sm font-semibold">
+                                Shared milestones
+                            </h5>
+                            <ol className="space-y-2">
+                                {content.campaign.milestones.map(
+                                    (milestone) => (
+                                        <li
+                                            key={milestone.id}
+                                            className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                                        >
+                                            <span>{milestone.title}</span>
+                                            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs">
+                                                {milestone.status ===
+                                                    'done' && (
+                                                    <Check
+                                                        className="size-3.5"
+                                                        aria-hidden
+                                                    />
+                                                )}
+                                                {milestone.status === 'done'
+                                                    ? 'Complete'
+                                                    : milestone.status ===
+                                                        'active'
+                                                      ? 'In progress'
+                                                      : 'Up next'}
+                                            </span>
+                                        </li>
+                                    ),
+                                )}
+                            </ol>
+                        </div>
+                    )}
+                    <h5 className="mb-3 text-sm font-semibold">
+                        Personal activities
+                    </h5>
                     <ul className="space-y-2">
                         {content.campaign.steps.map((step) => (
                             <li className="text-sm" key={step.id}>
@@ -400,17 +775,54 @@ export function RevisionSnapshot({ content }: { content: HubContent }) {
                             </li>
                         ))}
                     </ul>
+                    <div
+                        className="mt-5 flex flex-wrap gap-2 text-xs text-muted-foreground"
+                        aria-label="Saved campaign selections"
+                    >
+                        {[
+                            [
+                                'News stories',
+                                content.campaign.story_ids?.length ?? 0,
+                            ],
+                            [
+                                'Resources',
+                                content.campaign.resource_ids?.length ?? 0,
+                            ],
+                            [
+                                'Events',
+                                content.campaign.event_keys?.length ?? 0,
+                            ],
+                        ].map(([label, count]) => (
+                            <span
+                                key={label}
+                                className="rounded-lg border px-3 py-2"
+                            >
+                                {label}: {count} selected
+                            </span>
+                        ))}
+                    </div>
+                </section>
+            )}
+            {!!content.checklist?.length && (
+                <section className="hub-revision-section">
+                    <h4 className="mb-3 font-semibold">Guide checklist</h4>
+                    <ol className="list-inside list-decimal space-y-2 text-sm">
+                        {content.checklist.map((step) => (
+                            <li key={step.id}>{step.title}</li>
+                        ))}
+                    </ol>
                 </section>
             )}
         </div>
     );
 }
 
-function RevisionDialog({
+function RevisionWorkspace({
     pageId,
     revisionId,
     version,
     disabled,
+    restoreBlocked,
     close,
     onChanged,
 }: {
@@ -418,6 +830,7 @@ function RevisionDialog({
     revisionId: number;
     version: number;
     disabled: boolean;
+    restoreBlocked: boolean;
     close: () => void;
     onChanged: () => void;
 }) {
@@ -431,6 +844,22 @@ function RevisionDialog({
     const [expiresAt, setExpiresAt] = useState('');
     const [confirm, setConfirm] = useState<string | null>(null);
     const [discard, setDiscard] = useState(false);
+    const [uncertain, setUncertain] = useState(false);
+    const pending = useRef(false);
+    const alive = useRef(false);
+    const heading = useRef<HTMLHeadingElement>(null);
+    const navigation = useSettingsLeaveConfirmation(
+        !!note.trim() || !!publishAt || !!expiresAt || busy || uncertain,
+        'Leave this saved-version review?',
+        'Your unsent feedback and timing choices will be discarded. An action already sent may still finish; check the saved versions before trying again.',
+    );
+    useEffect(() => {
+        alive.current = true;
+        heading.current?.focus({ preventScroll: true });
+        return () => {
+            alive.current = false;
+        };
+    }, []);
     useEffect(() => {
         let active = true;
         setLoading(true);
@@ -441,7 +870,16 @@ function RevisionDialog({
             'GET',
         )
             .then((result) => {
-                if (active) setDetail(result);
+                if (!active) return;
+                if (
+                    result.id !== revisionId ||
+                    !Number.isSafeInteger(result.page_version)
+                )
+                    throw new Error(
+                        'This saved version could not be confirmed. Reload it before continuing.',
+                    );
+                setDetail(result);
+                setUncertain(false);
             })
             .catch((err: Error) => {
                 if (active) setError(err.message);
@@ -454,62 +892,97 @@ function RevisionDialog({
         };
     }, [pageId, revisionId, reload]);
     const stale = detail && detail.page_version !== version;
-    const blocked = disabled || busy || loading || Boolean(stale);
+    const blocked = disabled || busy || loading || uncertain || Boolean(stale);
     const attemptClose = () => {
-        if (busy) return;
+        if (pending.current) return;
         if (note.trim() || publishAt || expiresAt) setDiscard(true);
         else close();
     };
     const action = async (type: string) => {
-        if (!detail || blocked) return;
+        if (
+            !detail ||
+            pending.current ||
+            blocked ||
+            (type === 'restore' && restoreBlocked)
+        )
+            return;
+        pending.current = true;
         setBusy(true);
         setError('');
         try {
             const base = `/company-hub/manage/${pageId}/revisions/${revisionId}`;
+            let result: { saved?: boolean };
             if (type === 'approve')
-                await hubRequest(`${base}/approve`, 'POST', {
+                result = await hubRequest(`${base}/approve`, 'POST', {
                     version: detail.page_version,
                     publish_at: publishAt ? shiftInputInstant(publishAt) : null,
                     expires_at: expiresAt ? shiftInputInstant(expiresAt) : null,
                 });
             else if (type === 'restore')
-                await hubRequest(`${base}/restore`, 'POST', {
+                result = await hubRequest(`${base}/restore`, 'POST', {
                     version: detail.page_version,
                 });
             else
-                await hubRequest(`${base}/review`, 'POST', {
+                result = await hubRequest(`${base}/review`, 'POST', {
                     version: detail.page_version,
                     action: type,
                     note: type === 'request_changes' ? note.trim() : null,
                 });
-            close();
-            onChanged();
+            if (!alive.current) return;
+            if (result.saved !== true) {
+                setUncertain(true);
+                setConfirm(null);
+                setError(
+                    'We couldn’t confirm the saved action. Check the current version before trying again.',
+                );
+                return;
+            }
+            navigation.discardAndRun(() => {
+                close();
+                onChanged();
+            });
         } catch (err) {
+            if (!alive.current) return;
+            if (
+                !(err instanceof HubRequestError) ||
+                ![403, 404, 409, 422, 429].includes(err.status)
+            )
+                setUncertain(true);
             setError((err as Error).message);
             setConfirm(null);
         } finally {
-            setBusy(false);
+            if (alive.current) {
+                pending.current = false;
+                setBusy(false);
+            }
         }
     };
     return (
-        <Dialog
-            open
-            onOpenChange={(open) => {
-                if (!open) attemptClose();
-            }}
-        >
-            <DialogContent className="max-h-[90vh] overflow-x-hidden overflow-y-auto sm:max-w-5xl">
-                <DialogHeader>
-                    <DialogTitle>
+        <>
+            <section aria-label="Saved version review" className="space-y-6">
+                <header className="space-y-3 border-b pb-5">
+                    <Button
+                        variant="ghost"
+                        className="-ml-2"
+                        disabled={busy}
+                        onClick={attemptClose}
+                    >
+                        <ArrowLeft className="size-4" /> All saved versions
+                    </Button>
+                    <h2
+                        ref={heading}
+                        tabIndex={-1}
+                        className="text-2xl font-semibold tracking-tight outline-none"
+                    >
                         {detail
                             ? `Version ${detail.draft_version} · ${revisionLabel(detail)}`
                             : 'Open saved version'}
-                    </DialogTitle>
-                    <DialogDescription>
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
                         Review the saved content below. Reading a version does
                         not change the draft or the live page.
-                    </DialogDescription>
-                </DialogHeader>
+                    </p>
+                </header>
                 {loading && (
                     <p role="status" className="hub-empty-note">
                         Loading the saved version…
@@ -601,7 +1074,9 @@ function RevisionDialog({
                                         size="sm"
                                         variant="outline"
                                         disabled={disabled || busy}
-                                        onClick={onChanged}
+                                        onClick={() =>
+                                            navigation.request(onChanged)
+                                        }
                                     >
                                         Reload editor
                                     </Button>
@@ -645,13 +1120,13 @@ function RevisionDialog({
                                         <Label htmlFor="review-publish">
                                             Publish at (optional)
                                         </Label>
-                                        <Input
+                                        <HubDateTimeField
                                             id="review-publish"
-                                            type="datetime-local"
+                                            label="Publish at"
                                             value={publishAt}
                                             disabled={blocked}
-                                            onChange={(e) =>
-                                                setPublishAt(e.target.value)
+                                            onChange={(value) =>
+                                                setPublishAt(value)
                                             }
                                         />
                                     </div>
@@ -659,13 +1134,13 @@ function RevisionDialog({
                                         <Label htmlFor="review-expiry">
                                             Expires at (optional)
                                         </Label>
-                                        <Input
+                                        <HubDateTimeField
                                             id="review-expiry"
-                                            type="datetime-local"
+                                            label="Expires at"
                                             value={expiresAt}
                                             disabled={blocked}
-                                            onChange={(e) =>
-                                                setExpiresAt(e.target.value)
+                                            onChange={(value) =>
+                                                setExpiresAt(value)
                                             }
                                         />
                                     </div>
@@ -705,15 +1180,16 @@ function RevisionDialog({
                             <Button
                                 className="w-full"
                                 variant="outline"
-                                disabled={blocked}
+                                disabled={blocked || restoreBlocked}
                                 onClick={() => setConfirm('restore')}
                             >
                                 <RotateCcw className="size-4" />
                                 Restore to draft
                             </Button>
                             <p className="text-xs text-muted-foreground">
-                                Restoring replaces your draft with this version.
-                                Staff keep seeing the current published page.
+                                {restoreBlocked
+                                    ? 'Withdraw the review or cancel the scheduled publication before restoring a draft.'
+                                    : 'Your current saved draft stays in version history. Restoring replaces the editing draft; staff keep seeing the current published page.'}
                             </p>
                             {confirm && (
                                 <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
@@ -758,6 +1234,15 @@ function RevisionDialog({
                         {error}
                     </p>
                 )}
+                {uncertain && (
+                    <Button
+                        variant="outline"
+                        disabled={busy || loading}
+                        onClick={() => setReload((value) => value + 1)}
+                    >
+                        Check current version
+                    </Button>
+                )}
                 {discard && (
                     <div className="flex items-center gap-3 rounded-lg border p-3">
                         <p className="flex-1 text-sm">
@@ -784,7 +1269,8 @@ function RevisionDialog({
                         Close review
                     </Button>
                 </div>
-            </DialogContent>
-        </Dialog>
+            </section>
+            {navigation.confirmation}
+        </>
     );
 }

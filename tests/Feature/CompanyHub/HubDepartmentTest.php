@@ -71,7 +71,7 @@ test('team update creation inherits only the current published teams and audienc
     $created = HubPage::where('kind', 'news')->sole();
     $response->assertRedirect('/company-hub/manage/'.$created->id.'/edit');
     expect($created->owner_id)->toBe($this->editor->id)->and($created->draft['team_ids'])->toBe([$this->team->id])
-        ->and($created->draft['audience'])->toBe(['type' => 'sites', 'ids' => [$this->site->id]])
+        ->and($created->draft['audience']['type'])->toBe('sites')->and($created->draft['audience']['ids'])->toBe([$this->site->id])
         ->and($created->draft['sections'][0]['id'])->toBe('priorities')->and($created->revisions()->count())->toBe(0);
     $this->actingAs($this->reader)->get('/company-hub/read/'.$created->slug)->assertNotFound();
     $this->actingAs($this->editor)->postJson('/company-hub/pages', [...$payload, 'kind' => 'page'])->assertUnprocessable();
@@ -83,7 +83,7 @@ test('team update creation inherits only the current published teams and audienc
 
 test('team following preserves unrelated interests is private and rejects stale account page or preference context', function () {
     $discovery = app(HubDiscovery::class);
-    $discovery->saveInterests($this->reader, ['version' => 1, 'topics' => ['Learning'], 'teams' => [$this->otherTeam->id]]);
+    $discovery->saveInterests($this->reader, ['actor_id' => $this->reader->id, 'version' => 1, 'topics' => ['Learning'], 'teams' => [$this->otherTeam->id]]);
     $payload = ['actor_id' => $this->reader->id, 'revision_id' => $this->release->id, 'version' => 2, 'following' => true];
     $this->actingAs($this->reader)->putJson($this->followUrl, $payload)->assertOk()->assertHeader('Cache-Control', 'no-store, private')
         ->assertJsonPath('interests.topics', ['Learning'])->assertJsonPath('interests.teams', [$this->otherTeam->id, $this->team->id]);

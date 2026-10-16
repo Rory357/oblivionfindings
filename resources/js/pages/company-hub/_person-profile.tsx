@@ -10,10 +10,20 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
 import { Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
+    Copy,
+    Eye,
     HeartHandshake,
     Mail,
     MapPin,
@@ -23,7 +33,10 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { hubRequest } from './_api';
+import { toast } from 'sonner';
+import { HubRequestError, hubRequest } from './_api';
+import { HubPersonAvatar } from './_person-avatar';
+import { useHubReading } from './_reading-navigation';
 import type { HubPageSummary, HubPerson } from './_types';
 
 function ProfileEditor({
@@ -35,14 +48,21 @@ function ProfileEditor({
     onClose: () => void;
     onSaved: (person: HubPerson) => void;
 }) {
-    const initial = person.shared_profile;
+    const [initial] = useState(person.shared_profile);
     const [about, setAbout] = useState(initial?.about ?? '');
     const [skills, setSkills] = useState(initial?.help_with ?? []);
     const [skill, setSkill] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    const [preview, setPreview] = useState(false);
+    const [needsReload, setNeedsReload] = useState(false);
     const [confirm, setConfirm] = useState<'discard' | 'reload' | null>(null);
     const alive = useRef(true);
+    const pending = useRef(false);
+    const heading = useRef<HTMLHeadingElement>(null);
+    useEffect(() => {
+        heading.current?.focus({ preventScroll: true });
+    }, [preview]);
     useEffect(() => {
         alive.current = true;
         return () => {
@@ -53,8 +73,17 @@ function ProfileEditor({
         about !== (initial?.about ?? '') ||
         JSON.stringify(skills) !== JSON.stringify(initial?.help_with ?? []) ||
         !!skill.trim();
+    const leave = useSettingsLeaveConfirmation(
+        dirty || saving,
+        saving
+            ? 'Leave while your profile is saving?'
+            : 'Discard profile changes?',
+        saving
+            ? 'Your save may still finish after you leave. Check your shared profile before saving again.'
+            : 'Your unsaved introduction and skills will be discarded. Cancel to keep editing.',
+    );
     const close = () => {
-        if (!saving) {
+        if (!pending.current) {
             if (dirty) setConfirm('discard');
             else onClose();
         }
@@ -73,16 +102,28 @@ function ProfileEditor({
         return [...current, value];
     };
     const add = () => {
+        if (pending.current || confirm) return;
         try {
             setSkills(appendSkill(skills));
             setSkill('');
-            setError('');
+            if (!needsReload) setError('');
+        } catch (e) {
+            setError((e as Error).message);
+        }
+    };
+    const showPreview = () => {
+        if (pending.current || confirm) return;
+        try {
+            setSkills(appendSkill(skills));
+            setSkill('');
+            if (!needsReload) setError('');
+            setPreview(true);
         } catch (e) {
             setError((e as Error).message);
         }
     };
     const save = async () => {
-        if (saving) return;
+        if (pending.current || confirm || needsReload) return;
         let next: string[];
         try {
             next = appendSkill(skills);
@@ -90,6 +131,7 @@ function ProfileEditor({
             setError((e as Error).message);
             return;
         }
+        pending.current = true;
         setSaving(true);
         setError('');
         try {
@@ -102,156 +144,308 @@ function ProfileEditor({
                     help_with: next,
                 },
             );
-            if (alive.current) onSaved(result.person);
+            if (!alive.current) return;
+            if (
+                result.person?.id !== person.id ||
+                result.person.user_id !== person.user_id ||
+                result.person.shared_profile?.version !==
+                    (initial?.version ?? 0) + 1
+            ) {
+                setNeedsReload(true);
+                setError(
+                    'Your saved profile could not be confirmed. Reload your current profile before saving again.',
+                );
+                return;
+            }
+            onSaved(result.person);
         } catch (e) {
-            if (alive.current) setError((e as Error).message);
+            if (alive.current) {
+                if (
+                    e instanceof HubRequestError &&
+                    [401, 403, 409, 419].includes(e.status)
+                )
+                    setNeedsReload(true);
+                setError((e as Error).message);
+            }
         } finally {
-            if (alive.current) setSaving(false);
+            if (alive.current) {
+                pending.current = false;
+                setSaving(false);
+            }
         }
     };
     return (
         <>
-            <Dialog open onOpenChange={(open) => !open && close()}>
-                <DialogContent
-                    className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
-                    showCloseButton={!saving}
+            <Sheet open onOpenChange={(open) => !open && close()}>
+                <SheetContent
+                    side="right"
+                    className="gap-0 overflow-hidden p-0 sm:max-w-[600px]"
+                    overlayClassName="bg-black/30 backdrop-blur-[2px]"
+                    closeButtonClassName={
+                        saving ? 'pointer-events-none opacity-30' : ''
+                    }
+                    closeLabel="Close profile editor"
                 >
-                    <DialogHeader>
-                        <DialogTitle>Edit your shared profile</DialogTitle>
-                        <DialogDescription>
-                            Your introduction and skills are visible to
-                            colleagues who can see your directory profile.
-                            Choose what you want to share.
-                        </DialogDescription>
-                    </DialogHeader>
+                    <SheetHeader className="shrink-0 border-b px-7 pt-7 pr-14 pb-6">
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-primary uppercase">
+                            Your shared profile
+                        </p>
+                        <SheetTitle
+                            ref={heading}
+                            tabIndex={-1}
+                            className="text-2xl"
+                        >
+                            {preview
+                                ? 'Preview your profile'
+                                : 'A little more you'}
+                        </SheetTitle>
+                        <SheetDescription>
+                            {preview
+                                ? 'This is how your introduction and skills will appear to colleagues who can see your directory profile.'
+                                : 'Help colleagues know what to come to you for. Choose what you want to share.'}
+                        </SheetDescription>
+                    </SheetHeader>
                     <form
-                        className="space-y-5"
+                        className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
                             event.preventDefault();
                             void save();
                         }}
                     >
-                        <div className="space-y-2">
-                            <Label htmlFor="hub-profile-about">About me</Label>
-                            <Textarea
-                                id="hub-profile-about"
-                                value={about}
-                                maxLength={1600}
-                                rows={5}
-                                disabled={saving}
-                                onChange={(e) => setAbout(e.target.value)}
-                                placeholder="Introduce yourself, your work and what you enjoy about your role…"
-                                aria-describedby="hub-profile-about-hint"
-                            />
-                            <p
-                                id="hub-profile-about-hint"
-                                className="text-xs text-muted-foreground"
-                            >
-                                {about.length}/1,600 characters · Leave empty to
-                                remove your introduction.
-                            </p>
-                        </div>
-                        <div className="space-y-3">
-                            <Label htmlFor="hub-profile-skill">
-                                I can help with
-                            </Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="hub-profile-skill"
-                                    value={skill}
-                                    maxLength={60}
-                                    disabled={saving}
-                                    onChange={(e) => setSkill(e.target.value)}
-                                    placeholder="Add a skill or area of knowledge…"
-                                    aria-describedby="hub-profile-skills-hint"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            add();
-                                        }
-                                    }}
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={add}
-                                    disabled={saving || !skill.trim()}
+                        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-7 py-6">
+                            {preview ? (
+                                <Card
+                                    className="gap-5 p-6"
+                                    aria-label="Shared profile preview"
                                 >
-                                    <Plus className="size-4" />
-                                    Add
-                                </Button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {skills.map((s) => (
-                                    <span
-                                        key={s}
-                                        className="flex items-center gap-1 rounded-full bg-muted py-1 pr-1 pl-3 text-sm"
-                                    >
-                                        {s}
-                                        <Button
-                                            type="button"
-                                            size="icon"
-                                            variant="ghost"
-                                            className="size-7 rounded-full"
-                                            aria-label={`Remove ${s}`}
-                                            disabled={saving}
-                                            onClick={() =>
-                                                setSkills(
-                                                    skills.filter(
-                                                        (value) => value !== s,
-                                                    ),
-                                                )
-                                            }
+                                    <div className="flex items-center gap-4">
+                                        <span
+                                            className="hub-person-avatar"
+                                            aria-hidden
                                         >
-                                            <X className="size-3.5" />
-                                        </Button>
-                                    </span>
-                                ))}
-                            </div>
-                            <p
-                                id="hub-profile-skills-hint"
-                                className="text-xs text-muted-foreground"
-                            >
-                                {skills.length}/10 skills · Colleagues can
-                                search for these in the Hub.
-                            </p>
-                        </div>
-                        <p className="rounded-lg border p-3 text-sm text-muted-foreground">
-                            Your role, department and work contacts come from
-                            your staff record. Contact People & Culture to
-                            correct these details.
-                        </p>
-                        {error && (
-                            <div
-                                role="alert"
-                                className="space-y-2 text-sm text-destructive"
-                            >
-                                <p>{error}</p>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setConfirm('reload')}
+                                            {person.name
+                                                .split(' ')
+                                                .slice(0, 2)
+                                                .map((name) => name[0])
+                                                .join('')}
+                                        </span>
+                                        <div>
+                                            <h2 className="text-lg font-semibold">
+                                                {person.name}
+                                            </h2>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                {[
+                                                    person.position ||
+                                                        'Colleague',
+                                                    person.department,
+                                                    person.site,
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(' · ')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 border-t pt-5">
+                                        <h3 className="font-semibold">
+                                            About me
+                                        </h3>
+                                        <p className="text-sm leading-7 whitespace-pre-wrap">
+                                            {about.trim() ||
+                                                'This colleague hasn’t added an introduction yet.'}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <h3 className="font-semibold">
+                                            I can help with
+                                        </h3>
+                                        {skills.length ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {skills.map((topic) => (
+                                                    <span
+                                                        key={topic}
+                                                        className="rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
+                                                    >
+                                                        {topic}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">
+                                                This colleague hasn’t added
+                                                skills yet.
+                                            </p>
+                                        )}
+                                    </div>
+                                </Card>
+                            ) : (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="hub-profile-about">
+                                            About me
+                                        </Label>
+                                        <Textarea
+                                            id="hub-profile-about"
+                                            value={about}
+                                            maxLength={1600}
+                                            rows={5}
+                                            disabled={saving}
+                                            onChange={(e) =>
+                                                setAbout(e.target.value)
+                                            }
+                                            placeholder="Introduce yourself, your work and what you enjoy about your role…"
+                                            aria-describedby="hub-profile-about-hint"
+                                        />
+                                        <p
+                                            id="hub-profile-about-hint"
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            {about.length}/1,600 characters ·
+                                            Leave empty to remove your
+                                            introduction.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label htmlFor="hub-profile-skill">
+                                            I can help with
+                                        </Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                id="hub-profile-skill"
+                                                value={skill}
+                                                maxLength={60}
+                                                disabled={saving}
+                                                onChange={(e) =>
+                                                    setSkill(e.target.value)
+                                                }
+                                                placeholder="Add a skill or area of knowledge…"
+                                                aria-describedby="hub-profile-skills-hint"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        add();
+                                                    }
+                                                }}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={add}
+                                                disabled={
+                                                    saving || !skill.trim()
+                                                }
+                                            >
+                                                <Plus className="size-4" />
+                                                Add
+                                            </Button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {skills.map((s) => (
+                                                <span
+                                                    key={s}
+                                                    className="flex items-center gap-1 rounded-full bg-muted py-1 pr-1 pl-3 text-sm"
+                                                >
+                                                    {s}
+                                                    <Button
+                                                        type="button"
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="size-7 rounded-full"
+                                                        aria-label={`Remove ${s}`}
+                                                        disabled={saving}
+                                                        onClick={() =>
+                                                            setSkills(
+                                                                skills.filter(
+                                                                    (value) =>
+                                                                        value !==
+                                                                        s,
+                                                                ),
+                                                            )
+                                                        }
+                                                    >
+                                                        <X className="size-3.5" />
+                                                    </Button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <p
+                                            id="hub-profile-skills-hint"
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            {skills.length}/10 skills ·
+                                            Colleagues can search for these in
+                                            the Hub.
+                                        </p>
+                                    </div>
+                                    <p className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                        Your role, department and work contacts
+                                        come from your staff record. Contact
+                                        People & Culture to correct these
+                                        details.
+                                    </p>
+                                </>
+                            )}
+                            {error && (
+                                <div
+                                    role="alert"
+                                    className="space-y-2 text-sm text-destructive"
                                 >
-                                    Reload current profile
-                                </Button>
-                            </div>
-                        )}
-                        <DialogFooter>
+                                    <p>{error}</p>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setConfirm('reload')}
+                                    >
+                                        Reload current profile
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                        <footer className="flex shrink-0 items-center justify-between gap-3 border-t bg-card px-7 py-5">
                             <Button
                                 type="button"
                                 variant="outline"
                                 disabled={saving}
-                                onClick={close}
+                                onClick={
+                                    preview ? () => setPreview(false) : close
+                                }
                             >
-                                Cancel
+                                {preview ? (
+                                    <>
+                                        <ArrowLeft className="size-4" />
+                                        Back to editing
+                                    </>
+                                ) : (
+                                    'Cancel'
+                                )}
                             </Button>
-                            <Button type="submit" disabled={saving || !dirty}>
-                                {saving ? 'Saving…' : 'Save shared profile'}
-                            </Button>
-                        </DialogFooter>
+                            <div className="flex gap-2">
+                                {!preview && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={saving || !!confirm}
+                                        onClick={showPreview}
+                                    >
+                                        <Eye className="size-4" />
+                                        Preview
+                                    </Button>
+                                )}
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        saving ||
+                                        !dirty ||
+                                        needsReload ||
+                                        !!confirm
+                                    }
+                                >
+                                    {saving ? 'Saving…' : 'Save shared profile'}
+                                </Button>
+                            </div>
+                        </footer>
                     </form>
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
             <Dialog
                 open={!!confirm}
                 onOpenChange={(open) => !open && setConfirm(null)}
@@ -278,11 +472,13 @@ function ProfileEditor({
                         </Button>
                         <Button
                             onClick={() => {
-                                if (confirm === 'reload')
-                                    router.reload({
-                                        only: ['selectedPerson', 'people'],
-                                    });
-                                onClose();
+                                leave.discardAndRun(() => {
+                                    if (confirm === 'reload')
+                                        router.reload({
+                                            only: ['selectedPerson', 'people'],
+                                        });
+                                    onClose();
+                                });
                             }}
                         >
                             {confirm === 'reload'
@@ -292,6 +488,7 @@ function ProfileEditor({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            {leave.confirmation}
         </>
     );
 }
@@ -309,6 +506,7 @@ export function PersonProfile({
     onRecognise?: (id: number) => void;
     pages?: HubPageSummary[];
 }) {
+    const reading = useHubReading();
     // A fresh server projection always supersedes a local save, including
     // current work details and access after an account or permission change.
     const [change, setChange] = useState<{
@@ -336,22 +534,33 @@ export function PersonProfile({
             aria-label={`${person.name} shared profile`}
         >
             <Button asChild variant="ghost" className="-ml-3">
-                <Link href="/company-hub?view=people">
+                <Link
+                    data-hub-reading-back
+                    href={reading?.returnHref ?? '/company-hub?view=people'}
+                    onClick={(event) => {
+                        if (
+                            reading?.returnLabel &&
+                            event.button === 0 &&
+                            !event.metaKey &&
+                            !event.ctrlKey &&
+                            !event.shiftKey &&
+                            !event.altKey
+                        ) {
+                            event.preventDefault();
+                            reading.back();
+                        }
+                    }}
+                >
                     <ArrowLeft className="size-4" />
-                    All people
+                    {reading?.returnLabel ?? 'All people'}
                 </Link>
             </Button>
             <Card className="hub-profile-heading flex-row items-center gap-6 p-7">
-                <span
-                    className="hub-person-avatar hub-profile-avatar"
-                    aria-hidden
-                >
-                    {person.name
-                        .split(' ')
-                        .slice(0, 2)
-                        .map((n) => n[0])
-                        .join('')}
-                </span>
+                <HubPersonAvatar
+                    name={person.name}
+                    url={person.avatar_url}
+                    className="size-20 text-xl"
+                />
                 <div className="min-w-0 flex-1 space-y-2">
                     <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                         Our people
@@ -384,12 +593,14 @@ export function PersonProfile({
                             Edit shared profile
                         </Button>
                     )}
-                    {onRecognise && !person.can_edit_profile && (
-                        <Button onClick={() => onRecognise(person.user_id)}>
-                            <HeartHandshake className="size-4" />
-                            Give a shout-out
-                        </Button>
-                    )}
+                    {onRecognise &&
+                        !person.can_edit_profile &&
+                        person.can_recognise !== false && (
+                            <Button onClick={() => onRecognise(person.user_id)}>
+                                <HeartHandshake className="size-4" />
+                                Give a shout-out
+                            </Button>
+                        )}
                 </div>
             </Card>
             {saved && (
@@ -458,13 +669,41 @@ export function PersonProfile({
                             Work contacts
                         </h2>
                         {person.work_email && (
-                            <a
-                                className="flex items-start gap-2 text-sm break-all text-primary"
-                                href={`mailto:${person.work_email}`}
-                            >
-                                <Mail className="mt-0.5 size-4 shrink-0" />
-                                {person.work_email}
-                            </a>
+                            <div className="space-y-2">
+                                <a
+                                    className="flex items-start gap-2 text-sm break-all text-primary"
+                                    href={`mailto:${person.work_email}`}
+                                >
+                                    <Mail className="mt-0.5 size-4 shrink-0" />
+                                    {person.work_email}
+                                </a>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        if (!navigator.clipboard?.writeText) {
+                                            toast.error(
+                                                'Could not copy. Select the email address to copy it manually.',
+                                            );
+                                            return;
+                                        }
+                                        void navigator.clipboard
+                                            .writeText(person.work_email!)
+                                            .then(() =>
+                                                toast.success(
+                                                    'Work email copied.',
+                                                ),
+                                            )
+                                            .catch(() =>
+                                                toast.error(
+                                                    'Could not copy. Select the email address to copy it manually.',
+                                                ),
+                                            );
+                                    }}
+                                >
+                                    <Copy className="size-4" /> Copy email
+                                </Button>
+                            </div>
                         )}
                         {person.work_phone && (
                             <a
@@ -546,6 +785,7 @@ export function PersonProfile({
             </footer>
             {editing && person.can_edit_profile && (
                 <ProfileEditor
+                    key={`${person.id}:${person.user_id}`}
                     person={person}
                     onClose={() => setEditing(false)}
                     onSaved={(fresh) => {

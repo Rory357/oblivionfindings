@@ -71,17 +71,28 @@ class HrCalendarExport
                     continue;
                 }
                 if ($exception['visible']) {
-                    // An override replaces the recurrence. EXDATE is reserved for cancelled/hidden dates.
+                    // Visible cancelled dates retain an override; EXDATE conceals archived/hidden dates.
                     $overrides[] = $exception;
                 } else {
                     $lines[] = $this->date('EXDATE', $exception['start'], $root->is_all_day, $dateZone);
                 }
             }
-            array_push($lines, ...[...$this->alarm($reminder), 'END:VEVENT']);
+            array_push($lines, ...[...($root->cancelled_at ? [] : $this->alarm($reminder)), 'END:VEVENT']);
+            // Preserve completed dates and the UID without expanding an unbounded
+            // cancelled series: RFC 5545 recurrence range overrides the later dates.
+            if ($root->cancelled_at && ! app(HrCalendarCancellation::class)->marker($root, $start)) {
+                $candidates = $this->recurrence->between($root, $root->cancelled_at->copy()->subDay()->startOfDay(), $phase['until'] ?? Carbon::parse('9999-12-31')->endOfDay(), 4);
+                $cancelled = collect($candidates)->first(fn ($date) => $date['start']->gte($start) && app(HrCalendarCancellation::class)->marker($root, $date['start']));
+                if ($cancelled) {
+                    $rangeId = str_replace('RECURRENCE-ID', 'RECURRENCE-ID;RANGE=THISANDFUTURE', $this->date('RECURRENCE-ID', $cancelled['start'], $root->is_all_day, $dateZone));
+                    array_push($lines, ...[...$this->event($root, $uid, $cancelled['start'], $cancelled['end'], 'UTC'), $rangeId, 'END:VEVENT']);
+                }
+            }
             foreach ($overrides as $exception) {
                 $child = $exception['child'];
                 array_push($lines, ...[...$this->event($child, $uid, $child->starts_at, $child->ends_at, 'UTC', (int) $root->edit_version),
-                    $this->date('RECURRENCE-ID', $exception['start'], $root->is_all_day, $dateZone), ...$this->alarm($reminder), 'END:VEVENT']);
+                    $this->date('RECURRENCE-ID', $exception['start'], $root->is_all_day, $dateZone),
+                    ...(app(HrCalendarCancellation::class)->marker($child, $child->starts_at) ? [] : $this->alarm($reminder)), 'END:VEVENT']);
             }
         }
         $lines[] = 'END:VCALENDAR';
@@ -113,6 +124,7 @@ class HrCalendarExport
     private function event(HrCalendarEvent $event, string $uid, Carbon $start, Carbon $end, string $zone, ?int $seriesVersion = null): array
     {
         return ['BEGIN:VEVENT', 'UID:'.$uid, 'DTSTAMP:'.Carbon::now()->utc()->format('Ymd\THis\Z'), 'SEQUENCE:'.max(1, (int) $event->edit_version, $seriesVersion ?? 1),
+            'STATUS:'.(app(HrCalendarCancellation::class)->marker($event, $start) ? 'CANCELLED' : 'CONFIRMED'),
             'SUMMARY:'.$this->escape($event->title), 'DESCRIPTION:'.$this->escape($event->description), 'LOCATION:'.$this->escape($event->location),
             $this->date('DTSTART', $start, $event->is_all_day, $zone),
             $event->is_all_day ? $this->date('DTEND', $end->copy()->startOfDay()->addDay(), true, $zone)

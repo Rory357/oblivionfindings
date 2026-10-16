@@ -55,7 +55,7 @@ test('an offset schedule publishes at the exact instant and Hub staff can read a
     Notification::assertNotSentTo($this->editor, AnnouncementPublishedNotification::class);
     $read = $this->getJson('/company-hub/announcements/'.$notice->id)->assertOk();
     expect($notice->acknowledgements()->count())->toBe(0);
-    $this->postJson('/company-hub/announcements/'.$notice->id.'/acknowledge', ['version' => $read->json('version')])->assertOk();
+    $this->postJson('/company-hub/announcements/'.$notice->id.'/acknowledge', ['actor_id' => $this->reader->id, 'version' => $read->json('version')])->assertOk();
     $this->actingAs($this->editor)->delete('/hr/announcements/'.$notice->id)->assertRedirect();
     $this->actingAs($this->reader)->getJson('/company-hub/announcements/'.$notice->id)->assertNotFound();
 });

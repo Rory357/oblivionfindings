@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { eventTimeInput, eventTimeInstant } from './event-time';
 describe('calendar editor times', () => {
+    it('rejects a partially chosen calendar or clock before timezone conversion', () => {
+        expect(() => eventTimeInstant('2026-10-21T', false)).toThrow(
+            'Choose both a date and a time.',
+        );
+        expect(() => eventTimeInstant('T09:30', false)).toThrow(
+            'Choose both a date and a time.',
+        );
+    });
     it('round-trips NZ summer and winter inputs through UTC without shifting the displayed time', () => {
         expect(eventTimeInstant('2026-10-13T05:00', false)).toBe(
             '2026-10-12T16:00:00.000Z',

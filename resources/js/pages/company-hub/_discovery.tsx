@@ -1,21 +1,44 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Grid2X2, List, PenLine, Search } from 'lucide-react';
 import { useState } from 'react';
-import { BlockContent, NewsCards } from './_blocks';
+import { NewsCards } from './_blocks';
+import { HubBrowseSelect } from './_browse-select';
+import { useHubBrowseState } from './_browse-state';
+import { CreateHubPageDialog } from './_dialogs';
+import { useHubPageCreation } from './_page-creation-context';
+import { pageMatches } from './_reader-discovery';
 import type { HubProps } from './_types';
 
 export function HubNewsroom({ data }: { data: HubProps }) {
-    const [category, setCategory] = useState('all');
-    const [query, setQuery] = useState('');
-    const [sort, setSort] = useState('latest');
-    const stories = data.pages.filter((p) => p.kind === 'news');
+    const {
+        state: { category, query, sort, layout },
+        set,
+        browse,
+    } = useHubBrowseState(
+        'news',
+        {
+            category: 'all',
+            query: '',
+            sort: 'latest',
+            layout: 'cards',
+        },
+        data.demo,
+    );
+    const setCategory = (value: string) => set('category', value);
+    const setQuery = (value: string) => set('query', value);
+    const setSort = (value: string) => set('sort', value);
+    const setLayout = (value: string) => set('layout', value);
+    const [create, setCreate] = useState(false);
+    const openCreator = useHubPageCreation();
+    const stories = data.pages.filter(
+        (p) => p.kind === 'news' && p.show_in_news !== false,
+    );
     const matches = stories
         .filter(
             (p) =>
                 (category === 'all' || p.category === category) &&
-                `${p.title} ${p.summary}`
-                    .toLowerCase()
-                    .includes(query.toLowerCase()),
+                pageMatches(p, query),
         )
         .sort((a, b) =>
             sort === 'featured'
@@ -26,32 +49,84 @@ export function HubNewsroom({ data }: { data: HubProps }) {
                   : b.published_at.localeCompare(a.published_at),
         );
     return (
-        <section className="space-y-5">
-            <div className="hub-library-tools">
-                <Input
-                    className="max-w-sm"
-                    aria-label="Search news"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Find a story…"
-                />
-                <select
-                    className="hub-native-select"
-                    aria-label="News order"
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value)}
-                >
-                    <option value="latest">Latest first</option>
-                    <option value="featured">Featured first</option>
-                    <option value="oldest">Oldest first</option>
-                </select>
+        <section
+            className="hub-newsroom space-y-5"
+            aria-label="Company newsroom"
+        >
+            <div className="hub-discovery-heading">
+                <div>
+                    <h2>Company news</h2>
+                    <p>The people, ideas and moments bringing us together.</p>
+                </div>
+                {data.capabilities.write && !data.demo && (
+                    <Button
+                        onClick={() =>
+                            openCreator
+                                ? openCreator({
+                                      initial: {
+                                          title: '',
+                                          kind: 'news',
+                                          template: 'story',
+                                      },
+                                      context:
+                                          'Share a story with your company. It starts as a private draft for you to shape and review.',
+                                  })
+                                : setCreate(true)
+                        }
+                    >
+                        <PenLine className="size-4" />
+                        Write a story
+                    </Button>
+                )}
             </div>
-            <div className="flex flex-wrap gap-2" aria-label="News categories">
+            <div className="hub-library-tools">
+                <label className="hub-library-search">
+                    <Search className="size-4" />
+                    <Input
+                        aria-label="Search news"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Find a story, author, team or topic…"
+                    />
+                </label>
+                <HubBrowseSelect
+                    label="News order"
+                    value={sort}
+                    onChange={setSort}
+                    options={[
+                        { value: 'latest', label: 'Latest first' },
+                        { value: 'featured', label: 'Featured first' },
+                        { value: 'oldest', label: 'Oldest first' },
+                    ]}
+                />
+                <Button
+                    size="icon"
+                    variant={layout === 'cards' ? 'secondary' : 'ghost'}
+                    aria-label="News card view"
+                    aria-pressed={layout === 'cards'}
+                    onClick={() => setLayout('cards')}
+                >
+                    <Grid2X2 className="size-4" />
+                </Button>
+                <Button
+                    size="icon"
+                    variant={layout === 'list' ? 'secondary' : 'ghost'}
+                    aria-label="News list view"
+                    aria-pressed={layout === 'list'}
+                    onClick={() => setLayout('list')}
+                >
+                    <List className="size-4" />
+                </Button>
+            </div>
+            <div
+                className="hub-news-categories flex flex-wrap gap-2"
+                aria-label="News categories"
+            >
                 {['all', ...new Set(stories.map((p) => p.category))].map(
                     (c) => (
                         <Button
                             size="sm"
-                            variant={category === c ? 'default' : 'outline'}
+                            variant="ghost"
                             aria-pressed={category === c}
                             key={c}
                             onClick={() => setCategory(c)}
@@ -63,107 +138,47 @@ export function HubNewsroom({ data }: { data: HubProps }) {
             </div>
             <p className="text-xs text-muted-foreground" role="status">
                 {matches.length} {matches.length === 1 ? 'story' : 'stories'}
+                {(query || category !== 'all') && (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ml-3"
+                        onClick={() => {
+                            setQuery('');
+                            setCategory('all');
+                        }}
+                    >
+                        Clear filters
+                    </Button>
+                )}
             </p>
             <NewsCards
                 pages={matches}
                 demo={data.demo}
-                emptyMessage="No stories match this view. Try another category or search."
+                layout={layout === 'list' ? 'list' : 'cards'}
+                browse={browse}
+                bookmarks={data.bookmarks}
+                emptyMessage={
+                    stories.length === 0
+                        ? data.capabilities.write
+                            ? 'Your newsroom is ready. Write your first story to welcome colleagues, share a company update or celebrate a team.'
+                            : 'Company stories will appear here when they are published. Explore the people and resources in your Hub in the meantime.'
+                        : 'No stories match this view. Clear the filters or try another search.'
+                }
             />
+            {!data.demo && (
+                <CreateHubPageDialog
+                    open={create}
+                    close={() => setCreate(false)}
+                    initial={{ title: '', kind: 'news', template: 'story' }}
+                    context="Share a story with your company. It starts as a private draft for you to shape and review."
+                />
+            )}
         </section>
     );
 }
 
-export function RecognitionBoard({
-    data,
-    onRecognise,
-}: {
-    data: HubProps;
-    onRecognise?: (userId?: number) => void;
-}) {
-    const [category, setCategory] = useState('all');
-    const [query, setQuery] = useState('');
-    const [mode, setMode] = useState('recent');
-    const kudos = data.kudos.filter(
-        (k) =>
-            (category === 'all' || k.category === category) &&
-            `${k.to} ${k.from} ${k.message}`
-                .toLowerCase()
-                .includes(query.toLowerCase()),
-    );
-    const ordered = [...kudos].sort((a, b) =>
-        mode === 'spotlight'
-            ? Object.values(b.reactions).reduce((sum, r) => sum + r.count, 0) -
-              Object.values(a.reactions).reduce((sum, r) => sum + r.count, 0)
-            : b.created_at.localeCompare(a.created_at),
-    );
-    return (
-        <section className="space-y-5">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <h2 className="text-xl font-semibold">
-                        Good work deserves to be seen
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                        Celebrate a colleague or recognise a team through the
-                        shared recognition form.
-                    </p>
-                </div>
-                {onRecognise && (
-                    <Button onClick={() => onRecognise()}>
-                        Give a shout-out
-                    </Button>
-                )}
-            </div>
-            <div className="hub-library-tools">
-                <Input
-                    className="max-w-sm"
-                    aria-label="Search shout-outs"
-                    placeholder="Search people or messages…"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                />
-                <select
-                    aria-label="Company value"
-                    className="hub-native-select"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                >
-                    <option value="all">All values</option>
-                    {[...new Set(data.kudos.map((k) => k.category))].map(
-                        (c) => (
-                            <option key={c}>{c}</option>
-                        ),
-                    )}
-                </select>
-                <Button
-                    variant={mode === 'recent' ? 'secondary' : 'ghost'}
-                    aria-pressed={mode === 'recent'}
-                    onClick={() => setMode('recent')}
-                >
-                    Most recent
-                </Button>
-                <Button
-                    variant={mode === 'spotlight' ? 'secondary' : 'ghost'}
-                    aria-pressed={mode === 'spotlight'}
-                    onClick={() => setMode('spotlight')}
-                >
-                    Most celebrated
-                </Button>
-            </div>
-            <BlockContent
-                block={{
-                    id: 'recognition-feed',
-                    type: 'shoutouts',
-                    title: 'Company recognition',
-                    limit: ordered.length || 1,
-                }}
-                data={{ ...data, kudos: ordered }}
-                onEvent={() => {}}
-                onRecognise={onRecognise}
-            />
-        </section>
-    );
-}
+export { RecognitionBoard } from './_recognition';
 
 export function RelatedPages({ data }: { data: HubProps }) {
     const selected = data.selectedPage;
@@ -173,6 +188,7 @@ export function RelatedPages({ data }: { data: HubProps }) {
             (p) =>
                 p.id !== selected.id &&
                 p.kind === selected.kind &&
+                (p.kind !== 'news' || p.show_in_news !== false) &&
                 p.category === selected.content.category,
         )
         .slice(0, 3);
@@ -184,7 +200,11 @@ export function RelatedPages({ data }: { data: HubProps }) {
                     ? 'More stories like this'
                     : 'Related resources and pages'}
             </h2>
-            <NewsCards pages={related} demo={data.demo} />
+            <NewsCards
+                pages={related}
+                demo={data.demo}
+                bookmarks={data.bookmarks}
+            />
         </section>
     );
 }

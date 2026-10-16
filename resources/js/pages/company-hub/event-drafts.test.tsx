@@ -60,32 +60,83 @@ const options = {
     categories: [],
     storyOptions: [],
 };
+function choose(label: string, option: string) {
+    fireEvent.keyDown(screen.getByRole('combobox', { name: label }), {
+        key: 'ArrowDown',
+    });
+    fireEvent.click(screen.getByRole('option', { name: option }));
+}
 async function openWorkspace(canPublish = true, source = draft) {
     request
         .mockResolvedValueOnce({ can_publish: canPublish, drafts: [source] })
         .mockResolvedValueOnce(options);
     render(<EventDraftWorkspace />);
-    fireEvent.click(screen.getByRole('button', { name: 'Event drafts' }));
-    if (source.archived_at)
-        fireEvent.change(
-            screen.getByRole('combobox', { name: 'Event draft status' }),
-            { target: { value: 'archived' } },
-        );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    if (source.archived_at) choose('Event draft status', 'Archived drafts');
     fireEvent.click(
         await screen.findByRole('button', { name: /Welcome afternoon/ }),
     );
 }
 describe('Event publication workspace', () => {
+    it('keeps scheduled drafts locked until cancellation is confirmed', async () => {
+        await openWorkspace(true, {
+            ...draft,
+            state: 'scheduled',
+            publish_at: '2099-10-20T00:00:00Z',
+        });
+        expect(
+            screen.queryByRole('button', { name: 'Edit draft' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Archive draft' }),
+        ).not.toBeInTheDocument();
+        request.mockRejectedValueOnce(
+            new Error('The schedule changed. Refresh drafts.'),
+        );
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Cancel publication & edit draft',
+            }),
+        );
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'The schedule changed',
+        );
+        expect(
+            screen.queryByRole('button', { name: 'Edit draft' }),
+        ).not.toBeInTheDocument();
+        request.mockResolvedValueOnce({
+            draft: { ...draft, state: 'draft', version: 4, publish_at: null },
+        });
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Cancel publication & edit draft',
+            }),
+        );
+        expect(
+            await screen.findByRole('button', { name: 'Edit draft' }),
+        ).toBeEnabled();
+        expect(reload).not.toHaveBeenCalled();
+    });
+    it('rejects an acknowledgement of a different draft', async () => {
+        await openWorkspace();
+        request.mockResolvedValueOnce({
+            draft: { ...draft, id: 99, version: 4, state: 'published' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Approve & publish' }),
+        );
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'could not be confirmed',
+        );
+        expect(reload).not.toHaveBeenCalled();
+    });
     beforeEach(() => {
         vi.clearAllMocks();
         window.history.replaceState({}, '', '/company-hub?view=events');
     });
     it('clears the selected review when switching to a different history view', async () => {
         await openWorkspace();
-        fireEvent.change(
-            screen.getByRole('combobox', { name: 'Event draft status' }),
-            { target: { value: 'published' } },
-        );
+        choose('Event draft status', 'Published history');
         expect(
             screen.queryByRole('button', { name: 'Approve & publish' }),
         ).not.toBeInTheDocument();

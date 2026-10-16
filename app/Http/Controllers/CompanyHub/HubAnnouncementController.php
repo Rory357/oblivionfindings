@@ -17,6 +17,15 @@ class HubAnnouncementController extends Controller
 {
     use ServesPrivateAttachments;
 
+    private function currentActor(User $user, bool $lock = false): User
+    {
+        $query = User::query()->whereKey($user->id);
+        $actor = ($lock ? $query->lockForUpdate() : $query)->first();
+        abort_unless($actor, 403);
+
+        return $actor;
+    }
+
     private function assertRead(User $user, HrAnnouncement $announcement): void
     {
         app(HubAccess::class)->assertEnter($user);
@@ -34,6 +43,7 @@ class HubAnnouncementController extends Controller
         ])->all();
 
         return [
+            'actor_id' => (int) $user->id,
             ...$announcement->only(['id', 'title', 'content', 'priority', 'requires_acknowledgement']),
             'author' => $announcement->creator?->name, 'published_at' => $announcement->published_at->toIso8601String(),
             'ack_deadline' => $announcement->ack_deadline?->toIso8601String(), 'attachments' => $attachments,
@@ -46,20 +56,27 @@ class HubAnnouncementController extends Controller
 
     public function show(Request $request, HrAnnouncement $announcement)
     {
-        $this->assertRead($request->user(), $announcement);
+        $actor = $this->currentActor($request->user());
+        $this->assertRead($actor, $announcement);
 
-        return response()->json($this->payload($request->user(), $announcement))->header('Cache-Control', 'private, no-store');
+        return response()->json($this->payload($actor, $announcement))->header('Cache-Control', 'private, no-store');
     }
 
     public function acknowledge(Request $request, HrAnnouncement $announcement)
     {
-        $data = $request->validate(['version' => 'required|string|size:64']);
+        $data = $request->validate([
+            'actor_id' => 'required|integer|min:1|max:2147483647',
+            'version' => 'required|string|size:64',
+        ]);
         $payload = DB::transaction(function () use ($request, $announcement, $data) {
+            $actor = $this->currentActor($request->user(), true);
+            app(HubAccess::class)->assertEnter($actor);
+            abort_unless((int) $data['actor_id'] === (int) $actor->id, 409, 'Your signed-in account changed. Reload this announcement before confirming it.');
             $announcement = HrAnnouncement::whereKey($announcement->id)->lockForUpdate()->firstOrFail();
-            $this->assertRead($request->user(), $announcement);
-            app(AnnouncementReadState::class)->confirm($announcement, $request->user(), $data['version']);
+            $this->assertRead($actor, $announcement);
+            app(AnnouncementReadState::class)->confirm($announcement, $actor, $data['version']);
 
-            return $this->payload($request->user(), $announcement);
+            return ['saved' => true, ...$this->payload($actor, $announcement)];
         });
 
         return response()->json($payload)->header('Cache-Control', 'private, no-store');
@@ -67,9 +84,10 @@ class HubAnnouncementController extends Controller
 
     public function attachment(Request $request, HrAnnouncementAttachment $attachment)
     {
+        $actor = $this->currentActor($request->user());
         $announcement = $attachment->announcement;
         abort_unless($announcement, 404);
-        $this->assertRead($request->user(), $announcement);
+        $this->assertRead($actor, $announcement);
         $response = $this->streamPrivateAttachment($attachment->disk, $attachment->path, $attachment->original_name, $attachment->mime);
         $response->headers->set('Cache-Control', 'private, no-store');
 

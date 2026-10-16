@@ -23,6 +23,12 @@ vi.mock('@/components/it/it-service-catalogue', () => ({
     ),
 }));
 vi.mock('@/components/it/ticket-drawer', () => ({ TicketDrawer: () => null }));
+function choose(label: string, option: string) {
+    fireEvent.keyDown(screen.getByRole('combobox', { name: label }), {
+        key: 'ArrowDown',
+    });
+    fireEvent.click(screen.getByRole('option', { name: option }));
+}
 const event = {
     id: 'event-4-date',
     title: 'Compass gathering',
@@ -98,6 +104,96 @@ const data = {
 } as HubProps;
 
 describe('Company Hub discovery', () => {
+    it('keeps fictional people, ideas and recognition search results inside the showcase', () => {
+        render(
+            <HubSearchResults
+                data={{
+                    ...data,
+                    demo: true,
+                    resourceItems: [],
+                    searchServices: [],
+                    announcements: [],
+                }}
+                onEvent={vi.fn()}
+            />,
+        );
+        for (const link of screen.getAllByRole('link')) {
+            expect(link.getAttribute('href')).toMatch(
+                /^\/company-hub\/showcase\?/,
+            );
+        }
+    });
+    it('previews authorised search summaries inline without opening or changing a result', () => {
+        const onEvent = vi.fn();
+        const view = render(<HubSearchResults data={data} onEvent={onEvent} />);
+        const preview = screen.getByRole('button', {
+            name: 'Preview: Compass gathering',
+        });
+        fireEvent.click(preview);
+        expect(
+            screen.getByRole('region', {
+                name: 'Preview of Compass gathering',
+            }),
+        ).toHaveTextContent('Meet colleagues');
+        expect(
+            screen.getByRole('button', {
+                name: 'Hide preview: Compass gathering',
+            }),
+        ).toHaveAttribute('aria-expanded', 'true');
+        expect(onEvent).not.toHaveBeenCalled();
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Hide preview: Compass gathering',
+            }),
+        );
+        expect(
+            screen.queryByRole('region', {
+                name: 'Preview of Compass gathering',
+            }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(preview);
+        view.rerender(
+            <HubSearchResults
+                data={{ ...data, events: [] }}
+                onEvent={onEvent}
+            />,
+        );
+        expect(screen.queryByText('Meet colleagues')).not.toBeInTheDocument();
+    });
+
+    it('renders message-only recognition without inventing a missing category label', () => {
+        render(
+            <HubSearchResults
+                data={{
+                    ...data,
+                    kudos: data.kudos.map((post) => ({
+                        ...post,
+                        category: null,
+                    })),
+                }}
+                onEvent={vi.fn()}
+            />,
+        );
+        const result = screen.getByRole('region', {
+            name: 'Shout-outs results',
+        });
+        expect(
+            within(result).getByRole('link', { name: /Compass Colleague/ }),
+        ).toHaveTextContent('Compass Colleague');
+        expect(result).not.toHaveTextContent('null');
+        fireEvent.click(
+            within(result).getByRole('button', {
+                name: 'Preview: Compass Colleague',
+            }),
+        );
+        expect(
+            within(result).getByRole('region', {
+                name: 'Preview of Compass Colleague',
+            }),
+        ).toHaveTextContent('Thank you for helping');
+    });
+
     it.each([false, true])(
         'uses the canonical saved-draft setting: %s',
         (enabled) => {
@@ -151,7 +247,7 @@ describe('Company Hub discovery', () => {
             screen.getByRole('link', { name: /Compass notice/ }),
         ).toHaveAttribute('href', '/company-hub?view=updates&announcement=6');
         fireEvent.click(
-            screen.getByRole('button', { name: /Compass gathering/ }),
+            screen.getByRole('button', { name: /^Compass gathering/ }),
         );
         expect(onEvent).toHaveBeenCalledWith(event);
         fireEvent.click(screen.getByRole('button', { name: 'People 1' }));
@@ -329,10 +425,7 @@ describe('Company Hub discovery', () => {
             screen.getByRole('textbox', { name: 'Search services' }),
             { target: { value: '' } },
         );
-        fireEvent.change(
-            screen.getByRole('combobox', { name: 'Service category' }),
-            { target: { value: 'staff:People & Culture' } },
-        );
+        choose('Service category', 'People & Culture');
         expect(
             screen.queryByRole('link', { name: /Explore learning/ }),
         ).not.toBeInTheDocument();

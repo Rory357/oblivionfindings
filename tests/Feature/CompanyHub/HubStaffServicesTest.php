@@ -25,9 +25,13 @@ beforeEach(function () {
 
 test('staff services link to canonical self-service and global discovery includes those destinations', function () {
     $this->actingAs($this->reader)->get('/company-hub?view=services')->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->has('services.handoffs', 5)->where('services.handoffs.1.url', '/hr/my/leave')
+        ->has('services.handoffs', 6)->where('services.handoffs.1.url', '/hr/my/leave')
         ->where('services.handoffs.2.url', '/hr/my/policies')->where('services.handoffs.3.url', '/hr/my/training')
-        ->where('services.handoffs.4.url', '/hr/my/profile')->has('services.peopleContacts', 0));
+        ->where('services.handoffs.4.url', '/hr/my/profile')
+        ->where('services.handoffs.5.url', '/company-hub?view=resources')->has('services.peopleContacts', 0));
+    $this->get('/company-hub?search=Learning%20resources')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('searchServices', 1)->where('searchServices.0.id', 'staff:learning-resources')
+        ->where('searchServices.0.url', '/company-hub?view=resources'));
     $this->get('/company-hub?search=leave')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->has('searchServices', 1)->where('searchServices.0.id', 'staff:leave')->where('searchServices.0.url', '/hr/my/leave')
         ->missing('searchServices.0.form_schema')->where('services', null));

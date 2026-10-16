@@ -70,6 +70,12 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks,
+                // Herd and common static hosts register .js, but not .mjs,
+                // as JavaScript. Module workers require a JavaScript MIME type.
+                assetFileNames: (asset) =>
+                    asset.names.some((name) => name === 'pdf.worker.min.mjs')
+                        ? 'assets/[name]-[hash].js'
+                        : 'assets/[name]-[hash][extname]',
             },
         },
     },

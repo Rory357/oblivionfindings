@@ -11,6 +11,43 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { PageHeaderRail } from './page-header';
 
 afterEach(cleanup);
+it('caps wide rails while keeping the active destination visible and every other view in More', () => {
+    const width = vi
+        .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+        .mockReturnValue(2000);
+    const itemWidth = vi
+        .spyOn(HTMLElement.prototype, 'offsetWidth', 'get')
+        .mockReturnValue(100);
+    try {
+        render(
+            <PageHeaderRail
+                items={[
+                    { key: 'a', label: 'Alpha' },
+                    { key: 'b', label: 'Beta' },
+                    { key: 'c', label: 'Gamma' },
+                ]}
+                value="c"
+                maxVisible={2}
+                showFind={false}
+                onSelect={vi.fn()}
+            />,
+        );
+        expect(screen.getAllByRole('tab')).toHaveLength(2);
+        expect(screen.getByRole('tab', { name: 'Gamma' })).toHaveAttribute(
+            'aria-selected',
+            'true',
+        );
+        expect(
+            screen.queryByRole('tab', { name: 'Beta' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'More views (1)' }),
+        ).toBeVisible();
+    } finally {
+        width.mockRestore();
+        itemWidth.mockRestore();
+    }
+});
 const items = [
     { key: 'teams', label: 'Teams' },
     { key: 'queues', label: 'Queues' },
@@ -54,10 +91,7 @@ it.each(['Escape', 'Close'])(
         });
         await waitFor(() => expect(input).toHaveFocus());
         if (method === 'Escape') fireEvent.keyDown(input, { key: 'Escape' });
-        else
-            fireEvent.click(
-                screen.getByRole('button', { name: 'Close' }),
-            );
+        else fireEvent.click(screen.getByRole('button', { name: 'Close' }));
         await waitFor(() =>
             expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
         );

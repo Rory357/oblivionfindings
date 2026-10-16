@@ -58,6 +58,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class MyHrController extends Controller
@@ -98,32 +99,21 @@ class MyHrController extends Controller
                 && $this->currentStaff->isCurrent($user),
             403,
         );
-        $currentStaffRecipientRule = $this->currentStaff->recipientRule();
-
-        $validated = $request->validate([
-            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id', $currentStaffRecipientRule],
-            'to_user_ids' => ['required_without:to_user_id', 'array', 'min:1'],
-            'to_user_ids.*' => ['integer', 'exists:users,id', $currentStaffRecipientRule],
-            'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
-            'impact' => ['nullable', 'string', Rule::in(array_keys(FeedService::KUDOS_IMPACTS))],
-            'message' => ['required', 'string', 'max:2000'],
-        ]);
-
-        $recipientIds = $validated['to_user_ids'] ?? [$validated['to_user_id']];
+        $validated = $request->validate($this->feedService->recognitionRules($request->all()));
+        abort_if(isset($validated['actor_id']) && (int) $validated['actor_id'] !== (int) $user->id, 409, 'Your signed-in account changed. Reopen recognition before sending.');
 
         try {
-            $this->feedService->sendKudosToMany(
-                $user,
-                $recipientIds,
-                $validated['category'],
-                $validated['message'],
-                $validated['impact'] ?? null,
-            );
+            $this->feedService->sendRecognition($user, $validated);
+        } catch (ValidationException $exception) {
+            throw $exception;
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        $count = count($recipientIds);
+        if (! empty($validated['to_department_id'])) {
+            return redirect()->back()->with('success', 'Recognition sent to the whole team! 🎉');
+        }
+        $count = count($validated['to_user_ids'] ?? [$validated['to_user_id']]);
 
         return redirect()->back()->with('success', $count > 1 ? "Kudos sent to {$count} colleagues! 🎉" : 'Kudos sent! 🎉');
     }
@@ -179,7 +169,7 @@ class MyHrController extends Controller
         $kudos = HrKudos::query()->findOrFail($kudos->getKey());
         abort_unless($this->feedService->canViewKudos($kudos, $user), 404);
         abort_unless($user->canDo('hr.recognition.give'), 403);
-        abort_unless(in_array($user->id, [$kudos->from_user_id, $kudos->to_user_id], true), 403);
+        abort_unless($this->feedService->canReplyKudos($kudos, $user), 403);
 
         $validated = $request->validate([
             'body' => ['required', 'string', 'max:2000'],
@@ -270,8 +260,8 @@ class MyHrController extends Controller
             ->first();
 
         // Kudos received (last 30 days)
-        $kudosReceived = HrKudos::query()
-            ->where('to_user_id', $user->id)
+        $kudosReceived = $this->feedService->visibleKudosQuery($user)
+            ->receivedBy($user->id)
             ->where('created_at', '>=', now()->subDays(30))
             ->count();
 

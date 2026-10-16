@@ -12,13 +12,20 @@ use Illuminate\Validation\ValidationException;
 
 class HubNavigation
 {
-    public const VIEWS = ['home' => 'Home', 'news' => 'News', 'shoutouts' => 'Shout-outs', 'events' => 'Events', 'resources' => 'Resources', 'pages' => 'Pages', 'people' => 'People', 'teams' => 'Teams', 'campaigns' => 'Campaigns', 'ideas' => 'Ideas', 'following' => 'Following', 'updates' => 'Updates', 'services' => 'Services', 'publishing' => 'Publishing', 'saved' => 'Saved'];
+    public const VIEWS = ['home' => 'Home', 'news' => 'News', 'shoutouts' => 'Shout-outs', 'events' => 'Events', 'resources' => 'Resources', 'guides' => 'Company guides', 'pages' => 'Pages', 'people' => 'People', 'teams' => 'Teams', 'campaigns' => 'Campaigns', 'ideas' => 'Ideas', 'following' => 'Following', 'updates' => 'Updates', 'services' => 'Services', 'publishing' => 'Publishing', 'saved' => 'Saved'];
 
     public function __construct(private readonly HubAccess $access) {}
 
-    public function defaults(): array
+    public function defaults(?array $publishedPages = null): array
     {
         $items = collect(self::VIEWS)->map(fn ($label, $key) => ['id' => $key, 'type' => 'view', 'label' => $label, 'target' => $key, 'parent' => '', 'hidden' => false])->values()->all();
+        if ($publishedPages !== null) {
+            foreach (collect($publishedPages)->where('kind', '!=', 'home')->where('show_in_navigation', true)->sortBy('navigation_order')->take(33) as $page) {
+                $items[] = ['id' => 'page-'.$page['id'], 'type' => 'page', 'label' => $page['title'], 'target' => (string) $page['id'], 'parent' => '', 'hidden' => false];
+            }
+
+            return $items;
+        }
         // Preserve the previous page-navigation configuration until the shared
         // menu is first published; only published snapshot fields are used.
         $pages = HubPage::with('currentRelease')->where('kind', '!=', 'home')->get()
@@ -32,8 +39,14 @@ class HubNavigation
         return $items;
     }
 
-    private function pages(User $user): array
+    private function pages(User $user, ?array $publishedPages = null): array
     {
+        if ($publishedPages !== null) {
+            return collect($publishedPages)->where('kind', '!=', 'home')->mapWithKeys(fn ($page) => [(string) $page['id'] => [
+                'id' => (string) $page['id'], 'title' => $page['title'], 'url' => '/company-hub/read/'.$page['slug'],
+            ]])->all();
+        }
+
         return HubPage::with('currentRelease')->where('kind', '!=', 'home')->get()
             ->mapWithKeys(function ($page) use ($user) {
                 $revision = $this->access->visibleRevision($user, $page);
@@ -42,18 +55,19 @@ class HubNavigation
             })->all();
     }
 
-    public function forUser(User $user): array
+    /** Optional summaries must be current server-authorised published pages. */
+    public function forUser(User $user, ?array $publishedPages = null): array
     {
         $this->access->assertEnter($user);
         $row = DB::table('hub_navigation')->where('id', 1)->first();
-        $items = $row?->published ? json_decode($row->published, true) : $this->defaults();
+        $items = $row?->published ? json_decode($row->published, true) : $this->defaults($publishedPages);
 
-        return $this->resolve($user, $items);
+        return $this->resolve($user, $items, $publishedPages);
     }
 
-    private function resolve(User $user, array $items): array
+    private function resolve(User $user, array $items, ?array $publishedPages = null): array
     {
-        $pages = $this->pages($user);
+        $pages = $this->pages($user, $publishedPages);
         $items = collect($items)->filter(function ($item) use ($pages, $user) {
             if ($item['hidden']) {
                 return false;

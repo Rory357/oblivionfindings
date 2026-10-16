@@ -1,12 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDate, formatRelative } from '@/lib/datetime';
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import {
     ArrowUpRight,
     Bell,
     BookOpen,
-    Bookmark,
     CalendarDays,
     Check,
     CheckCheck,
@@ -20,7 +19,10 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { hubRequest } from './_api';
+import { HubBookmarkButton, useHubBookmarks } from './_bookmarks';
 import { InterestsDialog } from './_interests';
+import { useHubListControls } from './_reading-navigation';
+import { HubSelect } from './_select';
 import type { HubEvent, HubInterests, HubProps, HubUpdate } from './_types';
 
 const labels = {
@@ -46,19 +48,51 @@ export function UpdatesFeed({
     data,
     following = false,
     onEvent,
+    onSeenChange,
 }: {
     data: HubProps;
     following?: boolean;
     onEvent: (event: HubEvent) => void;
+    onSeenChange?: (seen: string[]) => void;
 }) {
     const [interests, setInterests] = useState(data.interests);
     const [choosing, setChoosing] = useState(false);
-    const [filter, setFilter] = useState('all');
-    const [type, setType] = useState('all');
-    const [query, setQuery] = useState('');
-    const [page, setPage] = useState(1);
+    const searchSource = (data.search ?? '').slice(0, 200);
+    const initialControls = {
+        filter: 'all',
+        type: 'all',
+        query: '',
+        page: 1,
+        searchSource,
+    };
+    const [controls, setControls] = useHubListControls(
+        following ? 'following' : 'updates',
+        initialControls,
+    );
+    const { filter, type, query, page } =
+        controls.searchSource === searchSource ? controls : initialControls;
+    useEffect(() => {
+        if (controls.searchSource !== searchSource) {
+            setControls({
+                filter: 'all',
+                type: 'all',
+                query: '',
+                page: 1,
+                searchSource,
+            });
+        }
+    }, [controls.searchSource, searchSource, setControls]);
+    const setFilter = (filter: string) =>
+        setControls((previous) => ({ ...previous, filter, page: 1 }));
+    const setType = (type: string) =>
+        setControls((previous) => ({ ...previous, type, page: 1 }));
+    const setQuery = (query: string) =>
+        setControls((previous) => ({ ...previous, query, page: 1 }));
+    const setPage = (page: number) =>
+        setControls((previous) => ({ ...previous, page }));
     const [seen, setSeen] = useState<string[]>([]);
-    const [bookmarks, setBookmarks] = useState(data.bookmarks);
+    const bookmarkSession = useHubBookmarks();
+    const bookmarks = bookmarkSession?.bookmarks ?? data.bookmarks;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
@@ -67,9 +101,6 @@ export function UpdatesFeed({
         batch: string;
     } | null>(null);
     useEffect(() => {
-        setPage(1);
-    }, [filter, type, query]);
-    useEffect(() => {
         setSeen([]);
         setUndo(null);
     }, [data.updates]);
@@ -77,14 +108,12 @@ export function UpdatesFeed({
         setInterests((current) =>
             current &&
             data.interests &&
+            current.actor_id === data.interests.actor_id &&
             current.version > data.interests.version
                 ? current
                 : data.interests,
         );
     }, [data.interests]);
-    useEffect(() => {
-        setBookmarks(data.bookmarks);
-    }, [data.bookmarks]);
     const isSaved = (item: HubUpdate) =>
         item.bookmark &&
         bookmarks.some(
@@ -135,7 +164,9 @@ export function UpdatesFeed({
                 marked: string[];
                 batch: string;
             }>('/company-hub/seen', 'POST', { keys });
-            setSeen((current) => [...new Set([...current, ...result.marked])]);
+            const nextSeen = [...new Set([...seen, ...result.marked])];
+            setSeen(nextSeen);
+            onSeenChange?.(nextSeen);
             setUndo(result.marked.length ? result : null);
             setMessage(
                 `${result.marked.length} ${result.marked.length === 1 ? 'update' : 'updates'} marked as seen.`,
@@ -155,9 +186,9 @@ export function UpdatesFeed({
                 keys: undo.marked,
                 undo_batch: undo.batch,
             });
-            setSeen((current) =>
-                current.filter((key) => !undo.marked.includes(key)),
-            );
+            const nextSeen = seen.filter((key) => !undo.marked.includes(key));
+            setSeen(nextSeen);
+            onSeenChange?.(nextSeen);
             setUndo(null);
             setMessage('Seen change undone.');
         } catch (err) {
@@ -165,42 +196,6 @@ export function UpdatesFeed({
         } finally {
             setBusy(false);
         }
-    };
-    const save = (item: HubUpdate) => {
-        if (!item.bookmark || busy || data.demo) return;
-        const saved = !!isSaved(item);
-        setBusy(true);
-        setError('');
-        router.post(
-            '/company-hub/bookmarks',
-            { ...item.bookmark, saved: !saved },
-            {
-                preserveScroll: true,
-                onSuccess: () =>
-                    setBookmarks((current) =>
-                        saved
-                            ? current.filter(
-                                  (b) =>
-                                      b.subject_type !==
-                                          item.bookmark!.subject_type ||
-                                      b.subject_id !==
-                                          item.bookmark!.subject_id,
-                              )
-                            : [
-                                  ...current.filter(
-                                      (b) =>
-                                          b.subject_type !==
-                                              item.bookmark!.subject_type ||
-                                          b.subject_id !==
-                                              item.bookmark!.subject_id,
-                                  ),
-                                  item.bookmark!,
-                              ],
-                    ),
-                onError: (errors) => setError(Object.values(errors).join(' ')),
-                onFinish: () => setBusy(false),
-            },
-        );
     };
     const saveInterests = (result: HubInterests) => {
         setInterests(result);
@@ -328,19 +323,20 @@ export function UpdatesFeed({
                         onChange={(e) => setQuery(e.target.value)}
                     />
                 </div>
-                <select
-                    className="hub-native-select"
-                    aria-label="Update type"
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                >
-                    <option value="all">All types</option>
-                    {Object.entries(labels).map(([key, label]) => (
-                        <option key={key} value={key}>
-                            {label}
-                        </option>
-                    ))}
-                </select>
+                <div className="w-52 shrink-0">
+                    <HubSelect
+                        label="Update type"
+                        value={type}
+                        onChange={setType}
+                        options={[
+                            { value: 'all', label: 'All types' },
+                            ...Object.entries(labels).map(([value, label]) => ({
+                                value,
+                                label,
+                            })),
+                        ]}
+                    />
+                </div>
                 <Button
                     variant="outline"
                     disabled={busy || data.demo || !shown.some((i) => i.unread)}
@@ -439,6 +435,7 @@ export function UpdatesFeed({
                                 // eslint-disable-next-line no-restricted-syntax
                                 <button
                                     className="hub-update-open"
+                                    data-hub-event-key={event.id}
                                     onClick={() => {
                                         if (item.unread)
                                             void markSeen([item.key]);
@@ -460,20 +457,23 @@ export function UpdatesFeed({
                                 </Link>
                             )}
                             <div className="hub-update-actions">
-                                {item.bookmark && (
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        disabled={busy || data.demo}
-                                        aria-label={`${isSaved(item) ? 'Unsave' : 'Save'} ${item.title}`}
-                                        aria-pressed={!!isSaved(item)}
-                                        onClick={() => save(item)}
-                                    >
-                                        <Bookmark
-                                            className={`size-4 ${isSaved(item) ? 'fill-current text-primary' : ''}`}
+                                {item.bookmark &&
+                                    (item.bookmark.subject_type === 'page' ||
+                                        item.bookmark.subject_type ===
+                                            'event') && (
+                                        <HubBookmarkButton
+                                            subject={{
+                                                subject_type:
+                                                    item.bookmark.subject_type,
+                                                subject_id:
+                                                    item.bookmark.subject_id,
+                                            }}
+                                            title={item.title}
+                                            saved={!!isSaved(item)}
+                                            disabled={busy || data.demo}
+                                            compact
                                         />
-                                    </Button>
-                                )}
+                                    )}
                                 {item.unread ? (
                                     <Button
                                         size="icon"
@@ -559,6 +559,10 @@ export function UpdatesFeed({
                     initial={interests}
                     onClose={() => setChoosing(false)}
                     onSaved={saveInterests}
+                    onReloaded={(result) => {
+                        setInterests(result);
+                        setMessage('');
+                    }}
                 />
             )}
         </section>

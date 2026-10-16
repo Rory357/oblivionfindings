@@ -10,6 +10,7 @@ import { formatRelative } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import { ArrowUpRight, ClipboardList, Search } from 'lucide-react';
 import { useState } from 'react';
+import { HubSelect } from './_select';
 import { StaffServiceCards, type StaffService } from './_staff-services';
 import type { HubPerson } from './_types';
 
@@ -107,32 +108,36 @@ export function ServicesWorkspace({
                                 placeholder="What do you need a hand with?"
                             />
                         </label>
-                        <select
-                            className="hub-native-select"
-                            aria-label="Service category"
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                        >
-                            <option value="all">All services</option>
-                            {[
-                                ...new Set(
-                                    (data.handoffs ?? []).map(
-                                        (item) => item.category,
-                                    ),
-                                ),
-                            ].map((c) => (
-                                <option key={`staff:${c}`} value={`staff:${c}`}>
-                                    {c}
-                                </option>
-                            ))}
-                            {[
-                                ...new Set(data.items.map((i) => i.category)),
-                            ].map((c) => (
-                                <option key={c} value={c}>
-                                    {c.replace(/_/g, ' ')}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="w-48 shrink-0">
+                            <HubSelect
+                                label="Service category"
+                                value={category}
+                                onChange={setCategory}
+                                options={[
+                                    { value: 'all', label: 'All services' },
+                                    ...[
+                                        ...new Set(
+                                            (data.handoffs ?? []).map(
+                                                (item) => item.category,
+                                            ),
+                                        ),
+                                    ].map((value) => ({
+                                        value: `staff:${value}`,
+                                        label: value,
+                                    })),
+                                    ...[
+                                        ...new Set(
+                                            data.items.map(
+                                                (item) => item.category,
+                                            ),
+                                        ),
+                                    ].map((value) => ({
+                                        value,
+                                        label: value.replace(/_/g, ' '),
+                                    })),
+                                ]}
+                            />
+                        </div>
                     </div>
                     {handoffs.length > 0 && (
                         <StaffServiceCards

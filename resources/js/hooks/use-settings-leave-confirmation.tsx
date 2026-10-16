@@ -12,21 +12,26 @@ export function useSettingsLeaveConfirmation(
     title = 'Discard unsaved settings?',
     description = 'Your unsaved entries will be discarded. A save already sent may still finish; review the saved settings before retrying it. Cancel to keep editing.',
     onDiscard?: () => void,
+    saving = false,
 ) {
     const [pending, setPending] = useState<{
         run: () => void;
         cancel?: () => void;
     } | null>(null);
     const approved = useRef(false);
-    const discardAndRun = (run: () => void) => {
+    const preserveAndRun = (run: () => void) => {
         approved.current = true;
         try {
-            onDiscard?.();
             run();
         } finally {
             approved.current = false;
         }
     };
+    const discardAndRun = (run: () => void) =>
+        preserveAndRun(() => {
+            onDiscard?.();
+            run();
+        });
     const request = useCallback(
         (run: () => void) => {
             if (dirty) setPending({ run });
@@ -65,19 +70,26 @@ export function useSettingsLeaveConfirmation(
         request,
         historyProtectionAvailable: draftHistoryNavigation() !== null,
         discardAndRun,
+        preserveAndRun,
         confirmation: (
             <ConfirmDialog
                 open={dirty && pending !== null}
                 onClose={() => {
+                    if (saving) return;
                     pending?.cancel?.();
                     setPending(null);
                 }}
                 onConfirm={() => {
-                    if (!dirty || !pending) return;
+                    if (saving || !dirty || !pending) return;
                     discardAndRun(pending.run);
                 }}
-                title={title}
-                description={description}
+                title={saving ? 'Saving your changes…' : title}
+                description={
+                    saving
+                        ? 'Please wait for the current save to finish. Your writing stays here.'
+                        : description
+                }
+                processing={saving ? true : undefined}
                 confirmText="Discard and continue"
             />
         ),

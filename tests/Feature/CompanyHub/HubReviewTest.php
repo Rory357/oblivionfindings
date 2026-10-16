@@ -23,13 +23,17 @@ beforeEach(function () {
     $this->writer = $this->writer->fresh();
     $this->publisher = app(HubPublishing::class);
     $this->page = $this->publisher->create($this->writer, 'news', 'A draft for review');
+    $draft = $this->page->draft;
+    $draft['sections'][0]['blocks'][0]['body'] = 'A complete story for the publication and review workflow.';
+    $this->page->update(['draft' => $draft]);
     $this->base = '/company-hub/manage/'.$this->page->id;
 });
 
 test('saved version history returns exact immutable content without exposing it in the initial list', function () {
     $old = $this->publisher->submit($this->writer, $this->page, 1);
+    $this->publisher->reviewDecision($this->writer, $this->page, $old, 'withdraw', 1, null);
     $this->page = $this->publisher->save($this->writer, $this->page, [...$this->page->draft, 'title' => 'A newer draft'], 1);
-    $this->actingAs($this->writer)->getJson($this->base.'/revisions')->assertOk()->assertJsonCount(1, 'items')->assertJsonMissingPath('items.0.content')->assertJsonPath('items.0.title', 'A draft for review')->assertJsonPath('items.0.state', 'superseded');
+    $this->actingAs($this->writer)->getJson($this->base.'/revisions')->assertOk()->assertJsonCount(1, 'items')->assertJsonMissingPath('items.0.content')->assertJsonPath('items.0.title', 'A draft for review')->assertJsonPath('items.0.state', 'withdrawn');
     $this->getJson($this->base.'/revisions/'.$old->id)->assertOk()->assertJsonPath('content.title', 'A draft for review')->assertJsonPath('page_version', 2)->assertJsonPath('can_approve', false);
     $this->get($this->base.'/edit')->assertInertia(fn (Assert $p) => $p->component('company-hub/editor')->has('revisions', 1)->missing('revisions.0.content'));
     expect($old->fresh()->content['title'])->toBe('A draft for review');
@@ -44,6 +48,9 @@ test('history filters the original snapshot audience and conceals direct foreign
     $this->postJson($this->base.'/revisions/'.$secret->id.'/restore', ['version' => 1])->assertNotFound();
     $this->postJson($this->base.'/revisions/'.$secret->id.'/review', ['action' => 'request_changes', 'version' => 1, 'note' => 'Feedback'])->assertNotFound();
     $other = $this->publisher->create($this->editor, 'news', 'Another page');
+    $draft = $other->draft;
+    $draft['sections'][0]['blocks'][0]['body'] = 'The other page has complete authored content.';
+    $other->update(['draft' => $draft]);
     $visible = $this->publisher->submit($this->editor, $other, 1);
     $this->getJson($this->base.'/revisions/'.$visible->id)->assertNotFound();
     $this->writer->permissionOverrides()->updateExistingPivot(Permission::where('key', 'company_hub.write')->value('id'), ['allowed' => false]);
@@ -86,9 +93,10 @@ test('author withdrawal and draft edits prevent later approval of obsolete submi
     $this->actingAs($this->writer)->postJson($this->base.'/revisions/'.$submitted->id.'/review', ['action' => 'withdraw', 'version' => 1])->assertOk();
     $this->actingAs($this->editor)->postJson($this->base.'/revisions/'.$submitted->id.'/approve')->assertConflict();
     $new = $this->publisher->submit($this->writer, $this->page, 1);
+    $this->publisher->reviewDecision($this->writer, $this->page, $new, 'withdraw', 1, null);
     $this->page = $this->publisher->save($this->writer, $this->page, [...$this->page->draft, 'summary' => 'Changed after submission.'], 1);
     $this->postJson($this->base.'/revisions/'.$new->id.'/approve')->assertConflict();
-    expect($new->fresh()->state)->toBe('superseded')->and($this->page->fresh()->liveRevision())->toBeNull();
+    expect($new->fresh()->state)->toBe('withdrawn')->and($this->page->fresh()->liveRevision())->toBeNull();
 });
 
 test('cancelling a future release preserves the current live page and rejects late or unauthorised cancellation', function () {

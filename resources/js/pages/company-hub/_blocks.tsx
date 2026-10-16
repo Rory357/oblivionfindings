@@ -1,4 +1,3 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -9,98 +8,35 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
-import { Link, router } from '@inertiajs/react';
+import { formatDate, formatDateTime } from '@/lib/datetime';
+import { Link } from '@inertiajs/react';
 import {
     ArrowRight,
     ArrowUpRight,
     Cake,
     CalendarDays,
     FileText,
-    Heart,
-    HeartHandshake,
     MapPin,
-    Newspaper,
     PartyPopper,
     Sparkles,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { CampaignBlock } from './_campaign-block';
+import { DynamicBlock } from './_dynamic-blocks';
+import { FeaturedTiles } from './_featured';
 import { blockSpan } from './_layout';
-import { HubPoll, ReplyForm } from './_participation';
-import type {
-    HubBlock,
-    HubEvent,
-    HubPageSummary,
-    HubProps,
-    HubSection,
-} from './_types';
+import { NewsCards } from './_news-cards';
+import { HubPoll } from './_participation';
+import { RecognitionCard } from './_recognition-card';
+import { HubFormattedText } from './_rich-text';
+import type { HubBlock, HubEvent, HubProps, HubSection } from './_types';
+import { fileSize } from './_upload';
 
 export function HubEmpty({ children }: { children: ReactNode }) {
     return <p className="hub-empty-state">{children}</p>;
 }
 
-export function NewsCards({
-    pages,
-    demo = false,
-    emptyMessage = 'Company stories will appear here as they are published.',
-}: {
-    pages: HubPageSummary[];
-    demo?: boolean;
-    emptyMessage?: string;
-}) {
-    return pages.length ? (
-        <div className="hub-news-grid">
-            {pages.map((page) => (
-                <Link
-                    key={page.id}
-                    href={
-                        demo
-                            ? `/company-hub/showcase?story=${page.slug}`
-                            : `/company-hub/read/${page.slug}`
-                    }
-                    className="hub-story-card group focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    {page.cover_url ? (
-                        <img
-                            loading="lazy"
-                            src={page.cover_url}
-                            alt=""
-                            className="aspect-[2/1] w-full object-cover"
-                        />
-                    ) : (
-                        <div className="hub-news-image flex aspect-[3/1] items-center justify-between px-5">
-                            <Newspaper className="size-8 text-primary" />
-                            <span className="text-caption font-medium text-primary">
-                                {page.category}
-                            </span>
-                        </div>
-                    )}
-                    <div className="hub-story-copy">
-                        <div className="text-caption mb-2 flex flex-wrap items-center gap-2 text-muted-foreground">
-                            <span>{page.category}</span>
-                            <span aria-hidden="true">·</span>
-                            <span>{formatDate(page.published_at)}</span>
-                        </div>
-                        <h3 className="text-section-title leading-snug group-hover:text-primary">
-                            {page.title}
-                        </h3>
-                        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-                            {page.summary}
-                        </p>
-                        <span className="mt-4 flex items-center gap-2 text-sm font-medium text-primary">
-                            {page.kind === 'news'
-                                ? 'Read story'
-                                : 'Explore resource'}
-                            <ArrowRight className="size-4" />
-                        </span>
-                    </div>
-                </Link>
-            ))}
-        </div>
-    ) : (
-        <HubEmpty>{emptyMessage}</HubEmpty>
-    );
-}
+export { NewsCards } from './_news-cards';
 
 export function HubBlocks({
     sections,
@@ -108,71 +44,96 @@ export function HubBlocks({
     onEvent,
     onRecognise,
     hideViewHeading = false,
+    preview = false,
 }: {
     sections: HubSection[];
     data: HubProps;
     onEvent: (event: HubEvent) => void;
     onRecognise?: (userId?: number) => void;
     hideViewHeading?: boolean;
+    preview?: boolean;
 }) {
     return (
         <div className="hub-sections">
-            {sections.map((section) => (
-                <div
-                    key={section.id}
-                    className="hub-section-layout"
-                    data-columns={section.columns}
-                    data-tone={section.tone}
-                    data-spacing={section.spacing}
-                >
-                    {section.blocks.map((block, index) => (
-                        <section
-                            key={block.id}
-                            className="hub-surface"
-                            style={{
-                                gridColumn: `span ${blockSpan(section, block, index)}`,
-                            }}
-                            data-block-type={block.type}
-                            aria-label={block.title}
-                        >
-                            {!hideViewHeading && (
-                                <div className="hub-section-heading">
-                                    <h2
-                                        id={`block-${block.id}`}
-                                        tabIndex={-1}
-                                        className="text-section-title"
-                                    >
-                                        {block.title}
-                                    </h2>
-                                    {[
-                                        'news',
-                                        'shoutouts',
-                                        'events',
-                                        'resources',
-                                    ].includes(block.type) && (
-                                        <Link
-                                            href={`${data.demo ? '/company-hub/showcase' : '/company-hub'}?view=${block.type}`}
-                                            className="frontline-tap inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline"
-                                        >
-                                            All{' '}
-                                            {block.type === 'shoutouts'
-                                                ? 'shout-outs'
-                                                : block.type}
-                                            <ArrowRight className="size-3.5" />
-                                        </Link>
+            {sections
+                .filter((section) => !section.hidden)
+                .map((section) => ({
+                    ...section,
+                    blocks: section.blocks.filter((block) => !block.hidden),
+                }))
+                .filter((section) => section.blocks.length)
+                .map((section) => (
+                    <div
+                        key={section.id}
+                        className="hub-section-layout"
+                        data-columns={section.columns}
+                        data-tone={section.tone}
+                        data-spacing={section.spacing}
+                    >
+                        {section.blocks.map((block, index) => (
+                            <section
+                                key={block.id}
+                                className="hub-surface"
+                                style={{
+                                    gridColumn: `span ${blockSpan(section, block, index)}`,
+                                    minHeight: block.min_height || undefined,
+                                }}
+                                data-block-type={block.type}
+                                data-tone={block.tone ?? 'plain'}
+                                aria-label={
+                                    block.type === 'featured'
+                                        ? 'Featured stories'
+                                        : block.title
+                                }
+                                id={
+                                    block.type === 'featured'
+                                        ? `block-${block.id}`
+                                        : undefined
+                                }
+                                tabIndex={
+                                    block.type === 'featured' ? -1 : undefined
+                                }
+                            >
+                                {!hideViewHeading &&
+                                    block.type !== 'featured' && (
+                                        <div className="hub-section-heading">
+                                            <h2
+                                                id={`block-${block.id}`}
+                                                tabIndex={-1}
+                                                className="text-section-title"
+                                            >
+                                                {block.title}
+                                            </h2>
+                                            {[
+                                                'news',
+                                                'shoutouts',
+                                                'events',
+                                                'resources',
+                                            ].includes(block.type) && (
+                                                <Link
+                                                    href={`${data.demo ? '/company-hub/showcase' : '/company-hub'}?view=${block.type}`}
+                                                    className="frontline-tap inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline"
+                                                >
+                                                    All{' '}
+                                                    {block.type === 'shoutouts'
+                                                        ? 'shout-outs'
+                                                        : block.type}
+                                                    <ArrowRight className="size-3.5" />
+                                                </Link>
+                                            )}
+                                        </div>
                                     )}
-                                </div>
-                            )}
-                            <BlockContent
-                                block={block}
-                                data={data}
-                                onEvent={onEvent}
-                                onRecognise={onRecognise}
-                            />
-                        </section>
-                    ))}
-                </div>
-            ))}
+                                <BlockContent
+                                    preview={preview}
+                                    block={block}
+                                    data={data}
+                                    onEvent={onEvent}
+                                    onRecognise={onRecognise}
+                                />
+                            </section>
+                        ))}
+                    </div>
+                ))}
         </div>
     );
 }
@@ -182,108 +143,166 @@ export function BlockContent({
     data,
     onEvent,
     onRecognise,
+    preview = false,
 }: {
     block: HubBlock;
     data: HubProps;
     onEvent: (event: HubEvent) => void;
     onRecognise?: (userId?: number) => void;
+    preview?: boolean;
 }) {
     const limit = block.limit ?? 6;
-    const spotlight =
-        data.pages.find((page) => page.kind === 'news' && page.featured) ??
-        data.pages.find((page) => page.kind === 'news');
-    if (block.type === 'file')
+    if (block.type === 'campaign')
+        return <CampaignBlock block={block} data={data} />;
+    if (block.type === 'featured')
+        return (
+            <FeaturedTiles
+                feature={data.blockData?.[block.id]?.featured}
+                layout={
+                    block.layout === 'equal' || block.layout === 'single'
+                        ? block.layout
+                        : 'mosaic'
+                }
+                demo={data.demo}
+                minHeight={block.min_height}
+            />
+        );
+    if (block.type === 'notice')
+        return (
+            <div className="hub-custom-callout">
+                <Sparkles className="size-5 shrink-0 text-primary" />
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {block.body || 'Add your message in the page editor.'}
+                </p>
+            </div>
+        );
+    if (block.type === 'button')
+        return (
+            <div className="space-y-4">
+                {block.body && (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                        {block.body}
+                    </p>
+                )}
+                {block.url ? (
+                    <Button asChild>
+                        <a
+                            href={block.url}
+                            rel="noopener noreferrer"
+                            target={
+                                block.url.startsWith('https:')
+                                    ? '_blank'
+                                    : undefined
+                            }
+                        >
+                            {block.action_label || 'Explore'}
+                            <ArrowUpRight className="size-4" />
+                        </a>
+                    </Button>
+                ) : (
+                    <HubEmpty>
+                        Add a button label and destination in the page editor.
+                    </HubEmpty>
+                )}
+            </div>
+        );
+    if (block.type === 'file') {
+        const document = data.resourceItems?.find(
+            (item) => item.media_id === block.media_id,
+        );
         return block.media_id ? (
-            <Button variant="outline" asChild>
-                <a href={`/company-hub/media/${block.media_id}`}>
-                    Download {block.title}
-                    <ArrowUpRight className="size-4" />
-                </a>
-            </Button>
+            <div className="space-y-4">
+                {block.body && (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                        {block.body}
+                    </p>
+                )}
+                <div className="flex flex-wrap items-center gap-3">
+                    {!preview && document?.reader_url && (
+                        <Button asChild>
+                            <Link href={document.reader_url}>
+                                <FileText className="size-4" /> Read document
+                            </Link>
+                        </Button>
+                    )}
+                    <Button variant="outline" asChild>
+                        <a
+                            href={`/company-hub/media/${block.media_id}?download=1`}
+                        >
+                            Download {block.title}
+                            <ArrowUpRight className="size-4" />
+                        </a>
+                    </Button>
+                </div>
+                {document?.filename && (
+                    <p className="text-xs text-muted-foreground">
+                        {document.filename}
+                        {typeof document.size === 'number'
+                            ? ` · ${fileSize(document.size)}`
+                            : ''}
+                        {document.document_file_version
+                            ? ` · Version ${document.document_file_version}`
+                            : ''}
+                    </p>
+                )}
+            </div>
         ) : (
             <HubEmpty>Add a file in the page editor.</HubEmpty>
         );
-    if (block.type === 'poll') return <HubPoll block={block} data={data} />;
-    if (block.type === 'people')
-        return (
-            <Card className="space-y-3 p-5">
-                <h3 className="font-semibold">Find the right person</h3>
-                <p className="text-sm text-muted-foreground">
-                    Connect with colleagues and see their work contact details
-                    in the staff directory.
-                </p>
-                {!!data.people?.length && (
-                    <div className="grid grid-cols-2 gap-3">
-                        {data.people
-                            .filter(
-                                (p) =>
-                                    !block.category ||
-                                    p.department === block.category,
-                            )
-                            .slice(0, limit)
-                            .map((person) => (
-                                <div
-                                    key={person.id}
-                                    className="rounded-lg border p-3"
-                                >
-                                    <strong className="text-sm">
-                                        <Link
-                                            href={`/company-hub/people/${person.id}`}
-                                        >
-                                            {person.name}
-                                        </Link>
-                                    </strong>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        {[person.position, person.department]
-                                            .filter(Boolean)
-                                            .join(' · ')}
-                                    </p>
-                                    {person.work_email && (
-                                        <a
-                                            className="mt-2 block truncate text-xs text-primary"
-                                            href={`mailto:${person.work_email}`}
-                                        >
-                                            {person.work_email}
-                                        </a>
-                                    )}
-                                    {person.work_phone && (
-                                        <a
-                                            className="mt-1 block text-xs text-primary"
-                                            href={`tel:${person.work_phone}`}
-                                        >
-                                            {person.work_phone}
-                                        </a>
-                                    )}
-                                </div>
-                            ))}
-                    </div>
-                )}
-                <Button variant="outline" asChild>
-                    <Link href="/company-hub?view=people">
-                        Open staff directory
-                        <ArrowRight className="size-4" />
-                    </Link>
-                </Button>
-            </Card>
-        );
+    }
+    if (block.type === 'poll')
+        return <HubPoll block={block} data={data} preview={preview} />;
+    if (['services', 'teams', 'people'].includes(block.type))
+        return <DynamicBlock block={block} data={data} />;
     if (block.type === 'text')
-        return (
-            <div className="space-y-4 text-base leading-relaxed">
-                {(block.body ?? '').split('\n\n').map((paragraph, i) => (
-                    <p key={i} className="whitespace-pre-wrap">
-                        {paragraph}
-                    </p>
-                ))}
-            </div>
-        );
+        return <HubFormattedText value={block.rich_text} body={block.body} />;
     if (block.type === 'resources') {
-        const resources = data.pages
-            .filter(
-                (page) =>
-                    ['page', 'knowledge'].includes(page.kind) &&
-                    (!block.category || page.category === block.category),
-            )
-            .slice(0, limit);
+        const resources =
+            data.blockData?.[block.id]?.resources ??
+            data.pages
+                .filter(
+                    (page) =>
+                        ['page', 'knowledge'].includes(page.kind) &&
+                        (!block.category || page.category === block.category),
+                )
+                .slice(0, limit);
+        if (resources.length && block.layout === 'cards')
+            return (
+                <div
+                    className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3"
+                    aria-label="Company resources"
+                >
+                    {resources.map((page) => (
+                        <Link
+                            key={page.id}
+                            href={
+                                data.demo
+                                    ? `/company-hub/showcase?story=${page.slug}`
+                                    : (page.resource_url ??
+                                      `/company-hub/read/${page.slug}`)
+                            }
+                            className="group flex min-w-0 flex-col rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <span className="mb-5 flex items-center justify-between gap-3">
+                                <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                                    <FileText className="size-5" />
+                                </span>
+                                <ArrowUpRight className="size-4 text-muted-foreground group-hover:text-primary" />
+                            </span>
+                            <span className="font-semibold">{page.title}</span>
+                            {page.summary && (
+                                <span className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                                    {page.summary}
+                                </span>
+                            )}
+                            <span className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-5 text-xs text-muted-foreground">
+                                <span>{page.category}</span>
+                                <span>{formatDate(page.published_at)}</span>
+                            </span>
+                        </Link>
+                    ))}
+                </div>
+            );
         return resources.length ? (
             <Table aria-label="Company resources">
                 <TableHeader>
@@ -302,7 +321,8 @@ export function BlockContent({
                                     href={
                                         data.demo
                                             ? `/company-hub/showcase?story=${page.slug}`
-                                            : `/company-hub/read/${page.slug}`
+                                            : (page.resource_url ??
+                                              `/company-hub/read/${page.slug}`)
                                     }
                                 >
                                     <FileText className="mt-0.5 size-5 shrink-0 text-primary" />
@@ -337,42 +357,50 @@ export function BlockContent({
     if (block.type === 'news')
         return (
             <NewsCards
+                bookmarks={preview ? undefined : data.bookmarks}
                 demo={data.demo}
+                layout={block.layout === 'list' ? 'list' : 'cards'}
                 emptyMessage={
                     data.search
                         ? 'No news matches your search. Try a different word.'
                         : undefined
                 }
-                pages={data.pages
-                    .filter(
-                        (p) =>
-                            p.kind === 'news' &&
-                            (!block.category || p.category === block.category),
-                    )
-                    .filter(
-                        (p) =>
-                            data.view !== 'home' ||
-                            data.selectedPage ||
-                            p.id !== spotlight?.id,
-                    )
-                    .slice(0, limit)}
+                pages={
+                    data.blockData?.[block.id]?.news ??
+                    data.pages
+                        .filter(
+                            (p) =>
+                                p.kind === 'news' &&
+                                p.show_in_news !== false &&
+                                (!block.category ||
+                                    p.category === block.category),
+                        )
+                        .slice(0, limit)
+                }
             />
         );
     if (block.type === 'links') {
         const links = block.links ?? [];
         return links.length ? (
-            <Card unstyled className="hub-quick-links">
+            <Card
+                unstyled
+                className="hub-quick-links"
+                data-layout={block.layout ?? 'cards'}
+            >
                 {links.map((link) => (
                     <a
                         key={link.id}
-                        href={link.url}
+                        href={link.url || undefined}
+                        aria-disabled={!link.url}
                         rel={
-                            link.url.startsWith('https:')
+                            link.url?.startsWith('https:')
                                 ? 'noopener noreferrer'
                                 : undefined
                         }
                         target={
-                            link.url.startsWith('https:') ? '_blank' : undefined
+                            link.url?.startsWith('https:')
+                                ? '_blank'
+                                : undefined
                         }
                         className="hub-quick-link focus-visible:ring-2 focus-visible:ring-ring"
                     >
@@ -403,100 +431,13 @@ export function BlockContent({
         return (
             <div className="space-y-4">
                 {data.kudos.slice(0, limit).map((kudos) => (
-                    <article
-                        id={`kudos-${kudos.id}`}
+                    <RecognitionCard
                         key={kudos.id}
-                        className="hub-recognition-card scroll-mt-28"
-                    >
-                        <div className="flex items-center gap-3">
-                            <Avatar className="size-10">
-                                <AvatarFallback className="bg-primary/10 text-primary">
-                                    {kudos.to
-                                        ?.split(' ')
-                                        .map((v) => v[0])
-                                        .slice(0, 2)
-                                        .join('')}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0 flex-1">
-                                <h3 className="font-semibold">{kudos.to}</h3>
-                                <p className="text-caption text-muted-foreground">
-                                    Recognised by {kudos.from}
-                                </p>
-                            </div>
-                            <HeartHandshake className="size-6 shrink-0 text-primary" />
-                        </div>
-                        <p className="my-4 text-sm leading-relaxed whitespace-pre-wrap">
-                            {kudos.message}
-                        </p>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <span className="text-caption font-medium text-primary">
-                                {kudos.category}
-                            </span>
-                            <span className="text-caption text-muted-foreground">
-                                {formatRelative(kudos.created_at)}
-                            </span>
-                        </div>
-                        <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-3">
-                            {Object.entries(kudos.reactions).map(
-                                ([emoji, reaction]) => (
-                                    <Button
-                                        key={emoji}
-                                        variant={
-                                            reaction.mine
-                                                ? 'secondary'
-                                                : 'ghost'
-                                        }
-                                        size="sm"
-                                        className="frontline-tap"
-                                        disabled={
-                                            data.demo ||
-                                            !data.capabilities.recognise
-                                        }
-                                        aria-label={`${emoji === 'heart' ? 'Appreciate' : emoji === 'party' ? 'Celebrate' : 'Applaud'} ${kudos.to}`}
-                                        aria-pressed={reaction.mine}
-                                        onClick={() =>
-                                            router.post(
-                                                `/hr/feed/kudos/${kudos.id}/react`,
-                                                { emoji },
-                                                { preserveScroll: true },
-                                            )
-                                        }
-                                    >
-                                        {emoji === 'heart' ? (
-                                            <Heart className="size-4" />
-                                        ) : emoji === 'party' ? (
-                                            <PartyPopper className="size-4" />
-                                        ) : (
-                                            <Sparkles className="size-4" />
-                                        )}
-                                        {reaction.count || ''}
-                                    </Button>
-                                ),
-                            )}
-                        </div>
-                        {kudos.replies.length > 0 && (
-                            <details className="mt-3 text-sm">
-                                <summary className="frontline-tap cursor-pointer text-muted-foreground">
-                                    {kudos.replies.length} replies
-                                </summary>
-                                <div className="mt-3 space-y-3">
-                                    {kudos.replies.map((reply) => (
-                                        <p key={reply.id}>
-                                            <strong>{reply.name}</strong>
-                                            <br />
-                                            {reply.body}
-                                        </p>
-                                    ))}
-                                </div>
-                            </details>
-                        )}
-                        {kudos.can_reply && data.capabilities.recognise && (
-                            <ReplyForm
-                                url={`/hr/feed/kudos/${kudos.id}/reply`}
-                            />
-                        )}
-                    </article>
+                        kudos={kudos}
+                        data={data}
+                        compact
+                        readOnly={preview}
+                    />
                 ))}
                 {data.kudos.length === 0 && (
                     <HubEmpty>
@@ -575,6 +516,7 @@ export function BlockContent({
                 {data.events.slice(0, limit).map((event) => (
                     <Button
                         key={event.id}
+                        data-hub-event-key={event.id}
                         unstyled
                         onClick={() => onEvent(event)}
                         className="hub-event-card group"
@@ -590,6 +532,11 @@ export function BlockContent({
                         <h3 className="text-section-title whitespace-normal">
                             {event.title}
                         </h3>
+                        {event.extendedProps.cancellation?.cancelled && (
+                            <span className="mt-2 inline-flex rounded-full bg-status-warning-bg px-2.5 py-1 text-xs font-medium text-status-warning">
+                                Cancelled
+                            </span>
+                        )}
                         <p className="mt-2 text-sm text-muted-foreground">
                             {event.allDay
                                 ? 'All day'
@@ -633,20 +580,27 @@ export function BlockContent({
         );
     if (block.type === 'video' && block.url)
         return (
-            <a
-                href={block.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="frontline-tap inline-flex items-center gap-2 text-primary underline"
-            >
-                Watch {block.title}
-                <ArrowUpRight className="size-4" />
-            </a>
+            <div className="space-y-4">
+                {block.body && (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                        {block.body}
+                    </p>
+                )}
+                <a
+                    href={block.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="frontline-tap inline-flex items-center gap-2 text-primary underline"
+                >
+                    Watch {block.title}
+                    <ArrowUpRight className="size-4" />
+                </a>
+            </div>
         );
     if (block.type === 'notices')
         return (
             <div className="space-y-3">
-                {data.announcements.map((notice) => (
+                {data.announcements.slice(0, limit).map((notice) => (
                     <Link
                         key={notice.id}
                         href={`/company-hub?view=updates&announcement=${notice.id}`}

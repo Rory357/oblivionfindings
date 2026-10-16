@@ -38,6 +38,9 @@ beforeEach(function () {
     ensureCanonicalHrStaffProfile($this->reader, $this->site);
     $this->publisher = app(HubPublishing::class);
     $this->page = $this->publisher->create($this->editor, 'news', 'A company story');
+    $draft = $this->page->draft;
+    $draft['sections'][0]['blocks'][0]['body'] = 'A complete company story for focused publication contracts.';
+    $this->page->update(['draft' => $draft]);
 });
 
 test('interests persist per person with version conflicts and canonical department boundaries', function () {
@@ -45,7 +48,7 @@ test('interests persist per person with version conflicts and canonical departme
     $private = HrDepartment::create(['name' => 'Other site team', 'is_active' => true]);
     $private->sites()->attach(Site::factory()->create(['is_active' => true])->id);
     $this->actingAs($this->reader)->getJson('/company-hub/interests')->assertOk()->assertJsonPath('version', 1);
-    $data = ['topics' => ['Learning'], 'teams' => [$team->id], 'version' => 1];
+    $data = ['actor_id' => $this->reader->id, 'topics' => ['Learning'], 'teams' => [$team->id], 'version' => 1];
     $this->putJson('/company-hub/interests', $data)->assertOk()->assertJsonPath('version', 2)->assertJsonPath('topics', ['Learning']);
     $this->putJson('/company-hub/interests', $data)->assertConflict();
     $this->putJson('/company-hub/interests', [...$data, 'version' => 2, 'teams' => [$private->id]])->assertUnprocessable();
@@ -53,15 +56,17 @@ test('interests persist per person with version conflicts and canonical departme
     expect(app(HubDiscovery::class)->preferences($this->editor)['topics'])->toBe([]);
     $team->update(['is_active' => false]);
     $this->getJson('/company-hub/interests')->assertJsonPath('teams', []);
-    $this->putJson('/company-hub/interests', ['topics' => [], 'teams' => [], 'version' => 2])->assertOk()->assertJsonPath('topics', []);
+    $this->putJson('/company-hub/interests', ['actor_id' => $this->reader->id, 'topics' => [], 'teams' => [], 'version' => 2])->assertOk()->assertJsonPath('topics', []);
 });
 
 test('interest discovery uses only current authorised published metadata including scheduled and expired pages', function () {
     $team = HrDepartment::create(['name' => 'Learning team', 'is_active' => true]);
-    $content = [...$this->page->draft, 'topics' => ['Learning'], 'team_ids' => [$team->id]];
+    $content = [...$this->page->draft, 'topics' => ['Learning'], 'team_ids' => [$team->id],
+        'sections' => [['id' => 'story', 'columns' => 1, 'blocks' => [['id' => 'intro', 'type' => 'text',
+            'title' => 'Current published learning', 'body' => 'A complete published story for canonical interest discovery and scheduled release checks.']]]]];
     $this->page = $this->publisher->save($this->editor, $this->page, $content, 1);
     $this->publisher->publish($this->editor, $this->page, 2, null, now()->addDays(3)->toIso8601String());
-    app(HubDiscovery::class)->saveInterests($this->reader, ['topics' => ['Learning'], 'teams' => [], 'version' => 1]);
+    app(HubDiscovery::class)->saveInterests($this->reader, ['actor_id' => $this->reader->id, 'topics' => ['Learning'], 'teams' => [], 'version' => 1]);
     $updates = app(HubFeed::class)->forUser($this->reader)['updates'];
     expect($updates)->toHaveCount(1)->and($updates[0]['following'])->toBeTrue()->and($updates[0]['topics'])->toBe(['Learning']);
     $content['topics'] = ['Digital tools'];
@@ -114,7 +119,7 @@ test('update seen batches do not hide new revisions or other users updates and u
 
 test('event discovery deduplicates occurrences and interests never bypass its audience', function () {
     $team = HrDepartment::create(['name' => 'Events team', 'is_active' => true]);
-    app(HubDiscovery::class)->saveInterests($this->reader, ['topics' => [], 'teams' => [$team->id], 'version' => 1]);
+    app(HubDiscovery::class)->saveInterests($this->reader, ['actor_id' => $this->reader->id, 'topics' => [], 'teams' => [$team->id], 'version' => 1]);
     $event = HrCalendarEvent::create(['title' => 'Shared learning', 'event_type' => 'company', 'department_id' => $team->id, 'starts_at' => now()->addDays(3)->setTime(10, 0), 'ends_at' => now()->addDays(3)->setTime(11, 0), 'rrule' => 'FREQ=WEEKLY;COUNT=3', 'created_by' => $this->editor->id]);
     $feed = app(HubFeed::class)->forUser($this->reader);
     expect($feed['events'])->toHaveCount(3)->and($feed['updates'])->toHaveCount(1)->and($feed['updates'][0]['following'])->toBeTrue();
@@ -290,6 +295,9 @@ test('people cards disclose work contacts only and exclude staff outside approve
 
 test('polls bind votes to the published question and replace duplicate responses', function () {
     $draft = $this->page->draft;
+    $draft['sections'] = [['id' => 'main', 'columns' => 1, 'blocks' => [
+        ['id' => 'intro', 'type' => 'text', 'title' => 'A company story', 'body' => 'A complete story for canonical poll publication.'],
+    ]]];
     $draft['sections'][0]['blocks'][] = ['id' => 'poll', 'type' => 'poll', 'title' => 'Your say', 'question' => 'Next activity?', 'options' => ['Walk', 'Lunch']];
     $this->page = $this->publisher->save($this->editor, $this->page, $draft, 1);
     $this->publisher->publish($this->editor, $this->page, 2, null, null);
@@ -304,7 +312,7 @@ test('polls bind votes to the published question and replace duplicate responses
     $this->page = $this->publisher->save($this->editor, $this->page, $draft, 2);
     $this->publisher->publish($this->editor, $this->page, 3, null, null);
     $this->post($url, $vote)->assertConflict();
-    expect(app(HubParticipation::class)->read($this->reader, $this->page->fresh())['polls']['poll']['total'])->toBe(0);
+    expect(app(HubParticipation::class)->read($this->reader, $this->page->fresh())['polls']['poll']['total'])->toBeNull();
 });
 
 test('interactions obey live settings and hidden pages deny direct writes', function () {
@@ -328,7 +336,13 @@ test('comment moderation is scoped to the page and requires ownership or permiss
 });
 
 test('news notices honour opt-out and repeat delivery does not duplicate the bell', function () {
-    $this->publisher->publish($this->editor, $this->page, 1, null, null);
+    $content = [...$this->page->draft, 'topics' => ['Learning'], 'sections' => [['id' => 'story', 'columns' => 1,
+        'blocks' => [['id' => 'intro', 'type' => 'text', 'title' => 'A company story', 'body' => 'A complete story for the news delivery regression.']]]]];
+    $this->page = $this->publisher->save($this->editor, $this->page, $content, 1);
+    $this->publisher->publish($this->editor, $this->page, 2, null, null);
+    foreach ([$this->reader, $this->editor] as $viewer) {
+        app(HubDiscovery::class)->saveInterests($viewer, ['actor_id' => $viewer->id, 'topics' => ['Learning'], 'teams' => [], 'version' => 1]);
+    }
     $this->actingAs($this->reader)->put('/company-hub/notifications', ['news' => false, 'reviews' => true])->assertRedirect();
     app(HubNotices::class)->deliver();
     expect($this->reader->notifications()->count())->toBe(0)->and($this->editor->notifications()->count())->toBe(1);
@@ -427,6 +441,9 @@ test('restoring a revision creates a draft without replacing the current live st
 
 test('a revision belonging to another page cannot be restored using a forged identifier', function () {
     $other = $this->publisher->create($this->editor, 'news', 'Other page');
+    $draft = $other->draft;
+    $draft['sections'][0]['blocks'][0]['body'] = 'A complete published page for direct-object denial.';
+    $other->update(['draft' => $draft]);
     $revision = $this->publisher->publish($this->editor, $other, 1, null, null);
     $this->actingAs($this->editor)->post('/company-hub/manage/'.$this->page->id.'/revisions/'.$revision->id.'/restore', ['version' => 1])->assertNotFound();
 });
@@ -505,7 +522,13 @@ test('personal shortcuts are isolated to their owner and reject executable links
 
 test('bookmarks cannot be used to probe unpublished pages and saving twice is idempotent', function () {
     $this->actingAs($this->reader)->post('/company-hub/bookmarks', ['subject_type' => 'page', 'subject_id' => $this->page->id, 'saved' => true])->assertNotFound();
-    $this->publisher->publish($this->editor, $this->page, 1, null, null);
+    $draft = $this->page->draft;
+    $draft['sections'] = [['id' => 'story', 'columns' => 1, 'blocks' => [[
+        'id' => 'body', 'type' => 'text', 'title' => 'Saved story',
+        'body' => 'A complete published story for the canonical bookmark contract.',
+    ]]]];
+    $this->page = $this->publisher->save($this->editor, $this->page, $draft, 1);
+    $this->publisher->publish($this->editor, $this->page, 2, null, null);
     foreach ([1, 2] as $attempt) {
         $this->post('/company-hub/bookmarks', ['subject_type' => 'page', 'subject_id' => $this->page->id, 'saved' => true])->assertRedirect();
     }
@@ -539,13 +562,12 @@ test('hero and visual layout publish atomically and survive a draft edit', funct
     $this->putJson('/company-hub/manage/'.$saved->id, ['content' => $draft, 'version' => 3])->assertNotFound();
 });
 
-test('visual settings reject invalid widths unsafe hero links and incomplete actions', function () {
+test('visual settings reject unsafe fields while incomplete hero actions save but cannot publish', function () {
     foreach ([
         ['sections.0.blocks.0.width', 13],
         ['hero.action_url', 'javascript:alert(1)'],
         ['hero.overlay', 5],
         ['hero.focal_x', 101],
-        ['hero.action_label', 'Missing destination'],
         ['hero.alignment', 'right'],
         ['hero.icon', '<script>'],
         ['hero.show_search', 'yes'],
@@ -557,6 +579,11 @@ test('visual settings reject invalid widths unsafe hero links and incomplete act
         $this->actingAs($this->editor)->putJson('/company-hub/manage/'.$this->page->id, ['content' => $draft, 'version' => 1])->assertUnprocessable();
     }
     expect($this->page->fresh()->draft_version)->toBe(1);
+    $draft = $this->page->draft;
+    $draft['hero']['action_label'] = 'Missing destination';
+    $this->actingAs($this->editor)->putJson('/company-hub/manage/'.$this->page->id, ['content' => $draft, 'version' => 1])->assertOk()
+        ->assertJsonPath('readiness.content_ready', false)->assertJsonPath('readiness.issues.0.code', 'hero_action');
+    $this->postJson('/company-hub/manage/'.$this->page->id.'/publish', ['version' => 2])->assertUnprocessable()->assertJsonValidationErrors('hero.action_url');
 });
 
 test('hero summary is stable during search and excludes private unpublished and expired pages', function () {
@@ -900,7 +927,7 @@ test('discovery recognition follows visible teams and honours removal of recogni
     Notification::fake();
     $team = HrDepartment::create(['name' => 'Care team', 'is_active' => true]);
     ensureCanonicalHrStaffProfile($this->reader, $this->site, ['department_id' => $team->id]);
-    app(HubDiscovery::class)->saveInterests($this->reader, ['topics' => [], 'teams' => [$team->id], 'version' => 1]);
+    app(HubDiscovery::class)->saveInterests($this->reader, ['actor_id' => $this->reader->id, 'topics' => [], 'teams' => [$team->id], 'version' => 1]);
     $kudos = app(FeedService::class)->sendKudos($this->editor, $this->reader->id, 'teamwork', 'Thank you for sharing your learning.');
     $items = collect(app(HubFeed::class)->forUser($this->reader)['updates'])->where('type', 'shoutouts')->values();
     expect($items)->toHaveCount(1)->and($items[0]['following'])->toBeTrue()->and($items[0]['key'])->toBe('kudos:'.$kudos->id);

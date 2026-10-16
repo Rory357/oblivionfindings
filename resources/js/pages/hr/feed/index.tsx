@@ -333,10 +333,14 @@ export default function FeedIndex({
                                     key={`p-${post.id}`}
                                     post={post}
                                     categoryLabel={
-                                        kudosCategories[post.kudos.category] ??
                                         post.kudos.category
+                                            ? (kudosCategories[
+                                                  post.kudos.category
+                                              ] ?? post.kudos.category)
+                                            : null
                                     }
                                     impactLabel={
+                                        post.kudos.impact_label ??
                                         kudosImpacts[post.kudos.impact] ??
                                         post.kudos.impact
                                     }

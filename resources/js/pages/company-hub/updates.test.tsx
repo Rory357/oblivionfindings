@@ -1,4 +1,5 @@
 import {
+    act,
     fireEvent,
     render,
     screen,
@@ -6,23 +7,30 @@ import {
     within,
 } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HubBookmarksProvider } from './_bookmarks';
 import { InterestsDialog } from './_interests';
 import type { HubInterests, HubProps, HubUpdate } from './_types';
 import { UpdatesFeed } from './_updates';
 
-const { request, post } = vi.hoisted(() => ({
+const { request, post, account } = vi.hoisted(() => ({
     request: vi.fn(),
     post: vi.fn(),
+    account: { id: 11 },
 }));
-vi.mock('./_api', () => ({ hubRequest: request }));
+vi.mock('./_api', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('./_api')>()),
+    hubRequest: request,
+}));
 vi.mock('@inertiajs/react', () => ({
-    router: { post },
+    router: { post, on: () => vi.fn() },
+    usePage: () => ({ props: { auth: { user: account } } }),
     Link: ({ children, ...props }: React.ComponentProps<'a'>) => (
         <a {...props}>{children}</a>
     ),
 }));
 
 const interests: HubInterests = {
+    actor_id: 11,
     version: 2,
     topics: ['Learning'],
     teams: [7],
@@ -81,6 +89,7 @@ const data = {
 
 describe('Company Hub discovery', () => {
     beforeEach(() => {
+        account.id = 11;
         request.mockReset();
         post.mockReset();
     });
@@ -114,6 +123,7 @@ describe('Company Hub discovery', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save interests' }));
         await screen.findByRole('alert');
         expect(request).toHaveBeenCalledWith('/company-hub/interests', 'PUT', {
+            actor_id: 11,
             version: 2,
             topics: ['Learning', 'Wellbeing'],
             teams: [],
@@ -125,6 +135,12 @@ describe('Company Hub discovery', () => {
         request.mockResolvedValueOnce({ ...interests, version: 3, topics: [] });
         fireEvent.click(
             screen.getByRole('button', { name: 'Reload saved choices' }),
+        );
+        expect(
+            screen.getByText('Discard unsaved choices?'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard and reload' }),
         );
         await waitFor(() =>
             expect(
@@ -151,8 +167,148 @@ describe('Company Hub discovery', () => {
         );
         fireEvent.click(screen.getByRole('checkbox', { name: 'Learning' }));
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(close).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+        expect(
+            screen.getByRole('checkbox', { name: 'Learning' }),
+        ).not.toBeChecked();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard changes' }),
+        );
         expect(close).toHaveBeenCalled();
         expect(request).not.toHaveBeenCalled();
+    });
+
+    it.each([{ actor_id: 12 }, { version: 2 }, { topics: [] }])(
+        'does not accept an unconfirmed interests acknowledgement: %j',
+        async (patch) => {
+            const saved = vi.fn(),
+                close = vi.fn();
+            request.mockResolvedValueOnce({
+                ...interests,
+                version: 3,
+                ...patch,
+            });
+            render(
+                <InterestsDialog
+                    initial={interests}
+                    onSaved={saved}
+                    onClose={close}
+                />,
+            );
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Save interests' }),
+            );
+            expect(await screen.findByRole('alert')).toHaveTextContent(
+                'could not be confirmed',
+            );
+            expect(saved).not.toHaveBeenCalled();
+            expect(close).not.toHaveBeenCalled();
+            expect(
+                screen.getByRole('button', { name: 'Save interests' }),
+            ).toBeDisabled();
+        },
+    );
+
+    it('ignores a completed interests save after the active account changes', async () => {
+        let resolve!: (value: HubInterests) => void;
+        request.mockReturnValueOnce(
+            new Promise<HubInterests>((done) => {
+                resolve = done;
+            }),
+        );
+        const saved = vi.fn(),
+            close = vi.fn();
+        const view = render(
+            <InterestsDialog
+                initial={interests}
+                onSaved={saved}
+                onClose={close}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save interests' }));
+        account.id = 12;
+        view.rerender(
+            <InterestsDialog
+                initial={{ ...interests, actor_id: 12, topics: [] }}
+                onSaved={saved}
+                onClose={close}
+            />,
+        );
+        await act(async () => resolve({ ...interests, version: 3 }));
+        expect(saved).not.toHaveBeenCalled();
+        expect(close).not.toHaveBeenCalled();
+        expect(
+            screen.getByRole('checkbox', { name: 'Learning' }),
+        ).not.toBeChecked();
+    });
+
+    it('locks repeated saves and dismissal until the interests request finishes', async () => {
+        let resolve!: (value: HubInterests) => void;
+        request.mockReturnValueOnce(
+            new Promise<HubInterests>((done) => {
+                resolve = done;
+            }),
+        );
+        const saved = vi.fn(),
+            close = vi.fn();
+        render(
+            <InterestsDialog
+                initial={interests}
+                onSaved={saved}
+                onClose={close}
+            />,
+        );
+        const save = screen.getByRole('button', { name: 'Save interests' });
+        fireEvent.click(save);
+        fireEvent.click(save);
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+        expect(close).not.toHaveBeenCalled();
+        await act(async () => resolve({ ...interests, version: 3 }));
+        expect(saved).toHaveBeenCalledExactlyOnceWith({
+            ...interests,
+            version: 3,
+        });
+        expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects another account’s reload without replacing the edited selections', async () => {
+        request.mockRejectedValueOnce(new Error('Please retry.'));
+        render(
+            <InterestsDialog
+                initial={interests}
+                onSaved={vi.fn()}
+                onClose={vi.fn()}
+            />,
+        );
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Wellbeing' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save interests' }));
+        await screen.findByRole('alert');
+        request.mockResolvedValueOnce({
+            ...interests,
+            actor_id: 12,
+            topics: [],
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Reload saved choices' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard and reload' }),
+        );
+        await waitFor(() =>
+            expect(screen.getByRole('alert')).toHaveTextContent(
+                'different sign-in',
+            ),
+        );
+        expect(
+            screen.getByRole('checkbox', { name: 'Wellbeing' }),
+        ).toBeChecked();
+        expect(
+            screen.getByRole('button', { name: 'Save interests' }),
+        ).toBeDisabled();
     });
 
     it('keeps newly saved choices when an older page response arrives', async () => {
@@ -183,6 +339,73 @@ describe('Company Hub discovery', () => {
         expect(screen.getByText('Wellbeing')).toBeVisible();
     });
 
+    it('keeps confirmed reloaded interests across closing and reopening without claiming a save', async () => {
+        const current = {
+            ...interests,
+            version: 3,
+            topics: ['Wellbeing'],
+            teams: [],
+        };
+        request.mockRejectedValueOnce(new Error('Changed in another window.'));
+        render(<UpdatesFeed data={data} following onEvent={vi.fn()} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Manage interests' }),
+        );
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Wellbeing' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save interests' }));
+        await screen.findByRole('alert');
+        request.mockResolvedValueOnce(current);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Reload saved choices' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard and reload' }),
+        );
+        await waitFor(() =>
+            expect(
+                screen.getByRole('checkbox', { name: 'Learning' }),
+            ).not.toBeChecked(),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Your interests have been saved.'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: /Learning story/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: /Team guide/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            within(screen.getByLabelText('Followed interests')).getByText(
+                'Wellbeing',
+            ),
+        ).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Manage interests' }),
+        );
+        expect(
+            screen.getByRole('checkbox', { name: 'Wellbeing' }),
+        ).toBeChecked();
+        expect(
+            screen.getByRole('checkbox', { name: 'Learning' }),
+        ).not.toBeChecked();
+        request.mockResolvedValueOnce({ ...current, version: 4 });
+        fireEvent.click(screen.getByRole('button', { name: 'Save interests' }));
+        await screen.findByText('Your interests have been saved.');
+        expect(request).toHaveBeenLastCalledWith(
+            '/company-hub/interests',
+            'PUT',
+            {
+                actor_id: 11,
+                version: 3,
+                topics: ['Wellbeing'],
+                teams: [],
+            },
+        );
+    });
+
     it('pages through long update sets and marks only the visible page', async () => {
         const many = Array.from({ length: 65 }, (_, i) =>
             item(`page:${i + 1}:1`, `Story ${i + 1}`),
@@ -208,11 +431,18 @@ describe('Company Hub discovery', () => {
     });
 
     it('marks only matching shown updates and can undo the exact server batch', async () => {
+        const seenChanged = vi.fn();
         request.mockResolvedValueOnce({
             marked: ['page:1:4'],
             batch: 'batch-one',
         });
-        render(<UpdatesFeed data={data} onEvent={vi.fn()} />);
+        render(
+            <UpdatesFeed
+                data={data}
+                onEvent={vi.fn()}
+                onSeenChange={seenChanged}
+            />,
+        );
         fireEvent.change(
             screen.getByRole('textbox', { name: 'Search your updates' }),
             { target: { value: 'Learning story' } },
@@ -221,6 +451,7 @@ describe('Company Hub discovery', () => {
             screen.getByRole('button', { name: 'Mark shown as seen' }),
         );
         await screen.findByText('1 update marked as seen.');
+        expect(seenChanged).toHaveBeenLastCalledWith(['page:1:4']);
         expect(request).toHaveBeenCalledWith('/company-hub/seen', 'POST', {
             keys: ['page:1:4'],
         });
@@ -238,6 +469,7 @@ describe('Company Hub discovery', () => {
             keys: ['page:1:4'],
             undo_batch: 'batch-one',
         });
+        expect(seenChanged).toHaveBeenLastCalledWith([]);
     });
 
     it('keeps confirmations in needs-attention after marking them seen', async () => {
@@ -266,10 +498,11 @@ describe('Company Hub discovery', () => {
         const open = vi.fn();
         request.mockRejectedValue(new Error('Please refresh this update.'));
         render(<UpdatesFeed data={data} onEvent={open} />);
-        fireEvent.change(
+        fireEvent.keyDown(
             screen.getByRole('combobox', { name: 'Update type' }),
-            { target: { value: 'events' } },
+            { key: 'ArrowDown' },
         );
+        fireEvent.click(screen.getByRole('option', { name: 'Events' }));
         fireEvent.click(
             screen.getByRole('button', {
                 name: /Company team.*Learning session/,
@@ -284,16 +517,37 @@ describe('Company Hub discovery', () => {
         ).toBeEnabled();
     });
 
-    it('saves a story through the existing bookmark contract', () => {
-        render(<UpdatesFeed data={data} onEvent={vi.fn()} />);
+    it('saves a story with a confirmed bookmark receipt and offers Undo', async () => {
+        request.mockResolvedValueOnce({
+            saved: true,
+            actor_id: 11,
+            subject_type: 'page',
+            subject_id: 1,
+            bookmarked: true,
+            version: 'a'.repeat(64),
+            previous_saved: false,
+            changed: true,
+        });
+        render(
+            <HubBookmarksProvider actorId={11} initial={data.bookmarks}>
+                <UpdatesFeed data={data} onEvent={vi.fn()} />
+            </HubBookmarksProvider>,
+        );
         fireEvent.click(
             screen.getByRole('button', { name: 'Save Learning story' }),
         );
-        expect(post).toHaveBeenCalledWith(
-            '/company-hub/bookmarks',
-            { subject_type: 'page', subject_id: 1, saved: true },
-            expect.objectContaining({ preserveScroll: true }),
-        );
+        expect(request).toHaveBeenCalledWith('/company-hub/bookmarks', 'POST', {
+            hub_receipt: true,
+            actor_id: 11,
+            subject_type: 'page',
+            subject_id: 1,
+            saved: true,
+            expected_saved: false,
+            expected_version: null,
+        });
+        expect(
+            await screen.findByRole('button', { name: 'Undo saved change' }),
+        ).toBeEnabled();
     });
 
     it('shows no editor or shared-layout controls in the personal interests chooser', () => {

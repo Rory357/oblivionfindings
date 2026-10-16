@@ -28,10 +28,14 @@ export function isKnowledgePage(kind: string, content: HubContent) {
     return (
         kind === 'knowledge' ||
         (kind === 'page' &&
-            ['Guide', 'Policy', 'Checklist', 'Form'].includes(
+            ['Guide', 'Policy', 'Process', 'Checklist', 'Form'].includes(
                 content.resource_type ?? '',
             ))
     );
+}
+
+export function supportsPersonalSteps(content: HubContent) {
+    return ['Checklist', 'Process'].includes(content.resource_type ?? '');
 }
 
 export function knowledgePreview(
@@ -327,9 +331,42 @@ export function KnowledgeReader({
     publishedAt?: string;
     preview?: boolean;
 }) {
-    const blocks = content.sections.flatMap((section) => section.blocks);
-    const steps =
-        content.resource_type === 'Checklist' ? (content.checklist ?? []) : [];
+    const blocks = content.sections
+        .filter((section) => !section.hidden)
+        .flatMap((section) => section.blocks.filter((block) => !block.hidden));
+    const steps = supportsPersonalSteps(content)
+        ? (content.checklist ?? [])
+        : [];
+    const [activeSection, setActiveSection] = useState(blocks[0]?.id ?? '');
+    const sectionIds = blocks.map((block) => block.id).join('|');
+    useEffect(() => {
+        if (typeof IntersectionObserver === 'undefined') return;
+        const inView = new Set<Element>();
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) inView.add(entry.target);
+                    else inView.delete(entry.target);
+                });
+                const visible = [...inView].sort(
+                    (a, b) =>
+                        a.getBoundingClientRect().top -
+                        b.getBoundingClientRect().top,
+                );
+                if (visible[0])
+                    setActiveSection(visible[0].id.slice('block-'.length));
+            },
+            { rootMargin: '-120px 0px -120px 0px', threshold: 0 },
+        );
+        sectionIds
+            .split('|')
+            .filter(Boolean)
+            .forEach((id) => {
+                const section = document.getElementById(`block-${id}`);
+                if (section) observer.observe(section);
+            });
+        return () => observer.disconnect();
+    }, [sectionIds]);
     return (
         <div className="hub-knowledge-reader">
             <div className="hub-guide-main">
@@ -352,6 +389,16 @@ export function KnowledgeReader({
                             : 'Not scheduled'}
                     </span>
                 </div>
+                {!preview && knowledge?.review_overdue && (
+                    <div
+                        role="status"
+                        className="rounded-xl border border-status-warning/30 bg-status-warning/5 p-4 text-sm text-status-warning-foreground"
+                    >
+                        This resource is due for review. If you need to confirm
+                        a step, contact the page owner or one of the teams shown
+                        here.
+                    </div>
+                )}
                 {steps.length > 0 &&
                     (preview ? (
                         <Card
@@ -391,8 +438,20 @@ export function KnowledgeReader({
                             className="hub-guide-contents"
                         >
                             {blocks.map((block) => (
-                                <a key={block.id} href={`#block-${block.id}`}>
-                                    {block.title}
+                                <a
+                                    key={block.id}
+                                    href={`#block-${block.id}`}
+                                    aria-current={
+                                        activeSection === block.id
+                                            ? 'location'
+                                            : undefined
+                                    }
+                                    onClick={() => setActiveSection(block.id)}
+                                >
+                                    {block.title ||
+                                        (block.type === 'featured'
+                                            ? 'Featured stories'
+                                            : 'Page section')}
                                 </a>
                             ))}
                         </nav>

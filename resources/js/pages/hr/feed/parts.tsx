@@ -60,10 +60,15 @@ export type KudosReply = {
 
 export type KudosData = {
     id: number;
-    category: string;
+    category: string | null;
+    category_label?: string | null;
     impact: string;
+    impact_label?: string;
     from_user: FeedUser | null;
     to_user: FeedUser | null;
+    recipient_type?: 'person' | 'team';
+    to_department_id?: number | null;
+    to_department?: { id: number; name: string } | null;
     reactions: ReactionSummary;
     replies: KudosReply[];
     can_reply: boolean;
@@ -414,7 +419,7 @@ export function KudosCard({
     canModerate = false,
 }: {
     post: FeedPost;
-    categoryLabel: string;
+    categoryLabel: string | null;
     impactLabel: string;
     employeeById: Map<number, FeedEmployee>;
     canModerate?: boolean;
@@ -476,9 +481,16 @@ export function KudosCard({
                             <Heart className="h-4 w-4 text-status-critical" />
                             <span className="text-muted-foreground">to</span>
                             <span className="font-semibold">
-                                {kudos.to_user?.name ?? 'a colleague'}
+                                {kudos.recipient_type === 'team'
+                                    ? (kudos.to_department?.name ??
+                                      'an unavailable team')
+                                    : (kudos.to_user?.name ?? 'a colleague')}
                             </span>
-                            <Badge variant="secondary">{categoryLabel}</Badge>
+                            {categoryLabel && (
+                                <Badge variant="secondary">
+                                    {categoryLabel}
+                                </Badge>
+                            )}
                         </div>
 
                         <p className="mt-2 text-sm whitespace-pre-wrap">
@@ -512,7 +524,11 @@ export function KudosCard({
                                     },
                                 )
                             }
-                            replyDisabledNote={`Only ${kudos.from_user?.name ?? 'the sender'} and ${kudos.to_user?.name ?? 'the recipient'} can reply to this thread.`}
+                            replyDisabledNote={
+                                kudos.recipient_type === 'team'
+                                    ? 'Only the sender and eligible members who received this team shout-out can reply.'
+                                    : `Only ${kudos.from_user?.name ?? 'the sender'} and ${kudos.to_user?.name ?? 'the recipient'} can reply to this thread.`
+                            }
                         />
                     </div>
                 </div>

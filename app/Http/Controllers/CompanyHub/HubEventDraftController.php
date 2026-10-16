@@ -5,6 +5,7 @@ namespace App\Http\Controllers\CompanyHub;
 use App\Domain\CompanyHub\Models\HubEventDraft;
 use App\Domain\CompanyHub\Models\HubEventDraftFile;
 use App\Domain\CompanyHub\Services\HubEventPublishing;
+use App\Domain\CompanyHub\Services\HubMediaLibrary;
 use App\Domain\Hr\Models\HrCalendarEventAttachment;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
@@ -33,7 +34,7 @@ class HubEventDraftController extends Controller
         }
 
         return back()->with('hubEventDraftId', $draft->id)->with('success', match ($draft->state) {
-            'published' => 'Event published.', 'review' => 'Event submitted for review.', default => 'Private event draft saved.',
+            'published' => 'Event published.', 'review' => 'Event submitted for review.', 'scheduled' => 'Event publication scheduled.', default => 'Private event draft saved.',
         });
     }
 
@@ -44,10 +45,13 @@ class HubEventDraftController extends Controller
 
     public function attachment(Request $request, HubEventDraftFile $file, HubEventPublishing $publishing)
     {
+        $file = $file->fresh();
+        abort_unless($file, 404);
         $publishing->assertEdit($request->user(), $file->draft);
         abort_unless($file->retained, 404);
+        abort_if($request->boolean('preview') && ! HubMediaLibrary::previewable($file->mime), 404);
 
-        $response = $this->streamPrivateAttachment('private', $file->path, $file->original_name, $file->mime);
+        $response = $this->streamPrivateAttachment('private', $file->path, $file->original_name, $file->mime, $request->boolean('preview') ? 'inline' : 'attachment');
         $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;
@@ -55,10 +59,14 @@ class HubEventDraftController extends Controller
 
     public function eventAttachment(Request $request, HubEventDraft $draft, HrCalendarEventAttachment $attachment, HubEventPublishing $publishing)
     {
+        $draft = $draft->fresh();
+        $attachment = $attachment->fresh();
+        abort_unless($draft && $attachment, 404);
         $publishing->assertEdit($request->user(), $draft);
         $files = collect($publishing->serialize($draft)['initial']['attachments']);
         abort_unless($files->contains('id', $attachment->id), 404);
-        $response = $this->streamPrivateAttachment($attachment->disk, $attachment->path, $attachment->original_name, $attachment->mime);
+        abort_if($request->boolean('preview') && ! HubMediaLibrary::previewable($attachment->mime), 404);
+        $response = $this->streamPrivateAttachment($attachment->disk, $attachment->path, $attachment->original_name, $attachment->mime, $request->boolean('preview') ? 'inline' : 'attachment');
         $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;

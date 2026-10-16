@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\CompanyHub\Services\HubEventMedia;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
@@ -193,6 +194,21 @@ class HrCalendarAggregator
         return $out->values();
     }
 
+    /** Project a server-resolved occurrence without expanding unrelated calendar records. */
+    public function projectOccurrence(User $viewer, HrCalendarEvent $event, Carbon $start, Carbon $end, ?string $date = null): array
+    {
+        // Dates come from the canonical recurrence resolver, not request input.
+        $this->access->assertCanViewEvent($viewer, $event);
+        abort_if($event->archived_at, 404);
+        $event->loadMissing(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name', 'reminders', 'attachments',
+            'recurrenceParent.attendees.user:id,name', 'recurrenceParent.reminders', 'recurrenceParent.attachments']);
+        abort_if($event->recurrence_parent_id && (! $event->recurrenceParent || $event->recurrenceParent->archived_at), 404);
+        $this->viewer = $viewer;
+        $this->viewerId = $viewer->id;
+
+        return $this->eventRow($event, $start, $end, $date, $event->recurrence_parent_id !== null);
+    }
+
     /** Build one feed row for an event (or one expanded occurrence of it). */
     private function eventRow(HrCalendarEvent $e, ?Carbon $start, ?Carbon $end, ?string $occurrenceDate = null, bool $isException = false): array
     {
@@ -215,6 +231,7 @@ class HrCalendarAggregator
                 'eventId' => $e->id,
                 'hubContent' => $this->viewer && $end ? app(HrCalendarHubContent::class)->read($this->viewer, $e, $end, $attachments) : null,
                 'editVersion' => (int) $presentationEvent->edit_version,
+                'cancellation' => $start ? app(HrCalendarCancellation::class)->state($e, $start, $this->viewer) : null,
                 'category' => $e->event_type,
                 'site' => $e->site?->name,
                 'siteId' => $e->site_id,
@@ -254,15 +271,14 @@ class HrCalendarAggregator
                     ])->values()->all()
                     : [],
                 'attachments' => $presentationEvent->relationLoaded('attachments')
-                    ? $attachments->map(fn ($a) => [
+                    ? $attachments->map(fn ($a) => HubEventMedia::attachmentUrls([
                         'id' => $a->id,
                         'eventId' => $a->event_id,
                         'inherited' => (int) $a->event_id !== (int) $e->id,
                         'name' => $a->original_name,
                         'mime' => $a->mime,
                         'size' => (int) $a->size,
-                        'url' => url('/hr/calendar/attachments/'.$a->id.'/download'),
-                    ])->values()->all()
+                    ], url('/hr/calendar/attachments/'.$a->id.'/download')))->values()->all()
                     : [],
             ],
         ];

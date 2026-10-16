@@ -4,6 +4,7 @@ namespace App\Domain\CompanyHub\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Domain\Hr\Services\HrProfilePhotoStorageService;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,7 +23,7 @@ class HubDirectory
     private function visibleProfiles(User $viewer): Builder
     {
         $this->access->assertEnter($viewer);
-        $ids = $this->sites->applyStaffScope($this->staff->currentUsersQuery()->select('users.id'), $viewer);
+        $ids = (new UserSiteAccessService)->applyStaffScope($this->staff->currentUsersQuery()->select('users.id'), $viewer);
 
         return HrEmployeeProfile::query()->whereIn('user_id', $ids)
             ->with(['user:id,name', 'primarySite:id,name', 'departmentRelation:id,name']);
@@ -30,7 +31,9 @@ class HubDirectory
 
     public function people(User $viewer, string $search = ''): array
     {
-        $allowedSites = $this->sites->accessibleSiteIds($viewer, UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS);
+        $viewer = $viewer->fresh();
+        abort_unless($viewer, 403);
+        $allowedSites = (new UserSiteAccessService)->accessibleSiteIds($viewer, UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS);
 
         $profiles = $this->visibleProfiles($viewer)->get();
         $managerIds = $profiles->pluck('id', 'user_id');
@@ -38,7 +41,7 @@ class HubDirectory
         $org = $viewer->canDo('hr.orgchart.view') || $viewer->canDo('hr.employees.viewAny');
 
         return $profiles
-            ->map(fn ($profile) => [...$this->card($profile, $allowedSites),
+            ->map(fn ($profile) => [...$this->card($profile, $allowedSites), ...$this->actions($profile, $viewer),
                 ...$this->sharedFields($profile, $viewer, $shared[$profile->user_id] ?? null),
                 'manager_id' => $org ? ($managerIds[$profile->manager_user_id] ?? null) : null,
             ])
@@ -49,16 +52,31 @@ class HubDirectory
 
     public function person(User $viewer, int $profileId): array
     {
+        $viewer = $viewer->fresh();
+        abort_unless($viewer, 403);
         $profile = $this->visibleProfiles($viewer)->whereKey($profileId)->firstOrFail();
 
         $org = $viewer->canDo('hr.orgchart.view') || $viewer->canDo('hr.employees.viewAny');
 
         return [
-            ...$this->card($profile, $this->sites->accessibleSiteIds($viewer, UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS)),
+            ...$this->card($profile, (new UserSiteAccessService)->accessibleSiteIds($viewer, UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS)),
+            ...$this->actions($profile, $viewer),
             ...$this->sharedFields($profile, $viewer, DB::table('hub_work_profiles')->where('user_id', $profile->user_id)->first()),
             'manager_id' => $org && $profile->manager_user_id ? $this->visibleProfiles($viewer)->where('user_id', $profile->manager_user_id)->value('id') : null,
-            'staff_record_url' => $viewer->canDo('hr.employees.viewAny') && $this->sites->applyHistoricalHrEmployeeProfileScope(HrEmployeeProfile::query(), $viewer)->whereKey($profile->id)->exists() ? '/hr/people/'.$profile->id : null,
+            'staff_record_url' => $viewer->canDo('hr.employees.viewAny') && (new UserSiteAccessService)->applyHistoricalHrEmployeeProfileScope(HrEmployeeProfile::query(), $viewer)->whereKey($profile->id)->exists() ? '/hr/people/'.$profile->id : null,
         ];
+    }
+
+    /** Calendar host IDs are User IDs; reader links use authorised HR work-profile IDs. */
+    public function profileUrlForUser(User $viewer, int $userId): ?string
+    {
+        $viewer = $viewer->fresh();
+        if (! $viewer || ! $this->access->canEnter($viewer)) {
+            return null;
+        }
+        $id = $this->visibleProfiles($viewer)->where('user_id', $userId)->value('id');
+
+        return $id ? '/company-hub/people/'.$id : null;
     }
 
     private function sharedFields(HrEmployeeProfile $profile, User $viewer, ?object $shared): array
@@ -76,8 +94,10 @@ class HubDirectory
 
     public function peopleSupportContacts(User $viewer): array
     {
+        $viewer = $viewer->fresh();
+        abort_unless($viewer, 403);
         $departments = ['hr', 'human resources', 'people & culture', 'people and culture'];
-        $allowedSites = $this->sites->accessibleSiteIds($viewer, UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS);
+        $allowedSites = (new UserSiteAccessService)->accessibleSiteIds($viewer, UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS);
 
         return $this->visibleProfiles($viewer)->where(function (Builder $query) use ($departments) {
             $query->whereHas('departmentRelation', fn ($department) => $department->where('is_active', true)->whereIn(DB::raw('LOWER(name)'), $departments))
@@ -100,6 +120,15 @@ class HubDirectory
             'work_phone' => $profile->work_phone ?: null,
             'first_aider' => (bool) $profile->is_first_aider,
             'fire_warden' => (bool) $profile->is_fire_warden,
+            'avatar_url' => app(HrProfilePhotoStorageService::class)->readableDisk($profile->profile_photo_path, (int) $profile->id) !== null
+                ? route('hr.directory.photo', ['profile' => $profile->id]) : null,
         ];
+    }
+
+    private function actions(HrEmployeeProfile $profile, User $viewer): array
+    {
+        $recognise = $viewer->canDo('hr.recognition.give');
+
+        return ['can_recognise' => $recognise, 'recognition_user_id' => $recognise ? (int) $profile->user_id : null, 'chat_url' => null];
     }
 }

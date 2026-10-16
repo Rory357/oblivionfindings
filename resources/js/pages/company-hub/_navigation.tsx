@@ -16,6 +16,7 @@ import {
     PopoverAnchor,
     PopoverContent,
 } from '@/components/ui/popover';
+import { registerDraftHistoryGuard } from '@/lib/draft-history';
 import {
     DndContext,
     KeyboardSensor,
@@ -38,10 +39,12 @@ import {
     ArrowUp,
     ArrowUpRight,
     ChevronDown,
+    Eye,
     EyeOff,
     FolderPlus,
     GripVertical,
     LockKeyhole,
+    Pencil,
     Plus,
     RotateCcw,
     Save,
@@ -49,8 +52,12 @@ import {
     Trash2,
     Undo2,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { hubRequest } from './_api';
+import { navigationDiscovery } from './_navigation-discovery';
+import { HubSelect } from './_select';
+import type { HubUpdate } from './_types';
 
 export type NavigationItem = {
     id: string;
@@ -77,10 +84,20 @@ export function HubNavigationRail({
     items,
     current,
     onPreview,
+    editing = false,
+    selectedId,
+    onNavigate,
+    updates = [],
+    relatedPageIds = [],
 }: {
     items: NavigationItem[];
     current: string;
     onPreview?: (item: NavigationItem) => void;
+    editing?: boolean;
+    selectedId?: string;
+    onNavigate?: (href: string) => void;
+    updates?: HubUpdate[];
+    relatedPageIds?: number[];
 }) {
     const container = useRef<HTMLElement>(null);
     const trigger = useRef<HTMLElement | null>(null);
@@ -90,16 +107,34 @@ export function HubNavigationRail({
             container.current!.getBoundingClientRect(),
     });
     const [group, setGroup] = useState<string | null>(null);
-    const visible = items.filter((item) => !item.hidden);
+    const visible = items.filter((item) => editing || !item.hidden);
     const roots = visible.filter(
         (item) =>
             !item.parent &&
-            (item.type !== 'group' ||
+            (editing ||
+                item.type !== 'group' ||
                 visible.some((child) => child.parent === item.id)),
     );
-    const selected = visible.find(
-        (item) => `${item.type}:${item.target}` === current,
-    );
+    const selected =
+        visible.find((item) => `${item.type}:${item.target}` === current) ??
+        (current === 'view:guides'
+            ? (visible.find(
+                  (item) =>
+                      item.type === 'group' &&
+                      visible.some(
+                          (child) =>
+                              child.parent === item.id &&
+                              child.type === 'page' &&
+                              relatedPageIds.includes(Number(child.target)),
+                      ),
+              ) ??
+              visible.find(
+                  (item) => item.type === 'view' && item.target === 'resources',
+              ))
+            : undefined);
+    const openGroup = !editing
+        ? roots.find((item) => item.id === group && item.type === 'group')
+        : undefined;
     const visit = (item: NavigationItem) => {
         if (onPreview) {
             onPreview(item);
@@ -108,6 +143,7 @@ export function HubNavigationRail({
         if (!item.url) return;
         if (item.url.startsWith('https://'))
             window.open(item.url, '_blank', 'noopener,noreferrer');
+        else if (onNavigate) onNavigate(item.url);
         else router.visit(item.url);
     };
     return (
@@ -121,15 +157,29 @@ export function HubNavigationRail({
                     onPreview ? 'Navigation preview views' : 'Company Hub views'
                 }
                 showFind={false}
+                maxVisible={8}
                 items={roots.map((item) => ({
                     key: item.id,
                     label: item.label,
+                    ...(!editing
+                        ? { overflow: navigationDiscovery(item, updates) }
+                        : {}),
                     ...(item.type === 'group' ? { icon: ChevronDown } : {}),
+                    ...(editing && item.hidden ? { icon: EyeOff } : {}),
                 }))}
-                value={selected?.parent || selected?.id || ''}
+                value={
+                    selectedId
+                        ? items.find((item) => item.id === selectedId)
+                              ?.parent || selectedId
+                        : selected?.parent || selected?.id || ''
+                }
                 onSelect={(id) => {
                     const item = roots.find((entry) => entry.id === id);
                     if (!item) return;
+                    if (editing) {
+                        onPreview?.(item);
+                        return;
+                    }
                     if (item.type !== 'group') {
                         visit(item);
                         return;
@@ -148,39 +198,60 @@ export function HubNavigationRail({
                 }}
             />
             <Popover
-                open={!!group}
+                open={!!openGroup}
                 onOpenChange={(open) => !open && setGroup(null)}
             >
                 <PopoverAnchor virtualRef={anchor} />
                 <PopoverContent
                     align="start"
-                    className="w-64 p-2"
-                    aria-label={roots.find((item) => item.id === group)?.label}
+                    className="w-80 p-2"
+                    aria-label={openGroup?.label}
                     onCloseAutoFocus={(event) => {
                         event.preventDefault();
                         trigger.current?.focus();
                     }}
                 >
                     <p className="px-3 py-2 text-xs font-semibold text-muted-foreground">
-                        {roots.find((item) => item.id === group)?.label}
+                        {openGroup?.label}
                     </p>
                     {visible
                         .filter((item) => item.parent === group)
-                        .map((item) => (
-                            <Button
-                                variant="ghost"
-                                key={item.id}
-                                type="button"
-                                className="h-auto w-full justify-between gap-3 px-3 py-2.5 text-left text-sm font-normal"
-                                onClick={() => {
-                                    setGroup(null);
-                                    visit(item);
-                                }}
-                            >
-                                {item.label}
-                                <ArrowUpRight className="size-3.5" />
-                            </Button>
-                        ))}
+                        .map((item) => {
+                            const discovery = navigationDiscovery(
+                                item,
+                                updates,
+                            );
+                            const Icon = discovery.icon;
+                            return (
+                                <Button
+                                    variant="ghost"
+                                    key={item.id}
+                                    type="button"
+                                    className="h-auto w-full justify-between gap-3 px-3 py-2.5 text-left text-sm font-normal"
+                                    onClick={() => {
+                                        setGroup(null);
+                                        visit(item);
+                                    }}
+                                >
+                                    <Icon className="size-4 shrink-0 text-muted-foreground" />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-center gap-2">
+                                            <span>{item.label}</span>
+                                            {discovery.unread && (
+                                                <span
+                                                    className="size-1.5 shrink-0 rounded-full bg-primary"
+                                                    aria-label="New updates"
+                                                />
+                                            )}
+                                        </span>
+                                        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                                            {discovery.description}
+                                        </span>
+                                    </span>
+                                    <ArrowUpRight className="size-3.5 shrink-0" />
+                                </Button>
+                            );
+                        })}
                 </PopoverContent>
             </Popover>
         </nav>
@@ -210,16 +281,44 @@ export function moveNavigation(
     );
 }
 
+export type NavigationEditorSlots = {
+    rail: HTMLElement | null;
+    inspector: HTMLElement | null;
+};
+
+function NavigationPlacement({
+    embedded,
+    target,
+    children,
+}: {
+    embedded: boolean;
+    target?: HTMLElement | null;
+    children: ReactNode;
+}) {
+    return embedded
+        ? target
+            ? createPortal(children, target)
+            : null
+        : children;
+}
+
 export function SharedNavigationDesigner({
     onDirtyChange,
+    onBusyChange,
+    onPublished,
+    editorSlots,
 }: {
     onDirtyChange: (dirty: boolean) => void;
+    onBusyChange?: (busy: boolean) => void;
+    onPublished?: (workspace: NavigationWorkspace) => void;
+    editorSlots?: NavigationEditorSlots;
 }) {
     const [workspace, setWorkspace] = useState<NavigationWorkspace | null>(
         null,
     );
     const [items, setItems] = useState<NavigationItem[]>([]);
     const [selectedId, setSelectedId] = useState('home');
+    const [previewingMenu, setPreviewingMenu] = useState(false);
     const [history, setHistory] = useState<NavigationItem[][]>([]);
     const [busy, setBusy] = useState(false),
         [error, setError] = useState(''),
@@ -232,6 +331,11 @@ export function SharedNavigationDesigner({
         !!workspace &&
         JSON.stringify(items) !== JSON.stringify(workspace.draft);
     const dirtyRef = useRef(dirty);
+    const mutationLock = useRef(false);
+    const inspectorTarget = editorSlots?.inspector;
+    useEffect(() => {
+        inspectorTarget?.closest('aside')?.scrollTo?.({ top: 0 });
+    }, [selectedId, inspectorTarget]);
     dirtyRef.current = dirty;
     useEffect(() => {
         onDirtyChange(dirty);
@@ -258,13 +362,18 @@ export function SharedNavigationDesigner({
     }, [loadKey]);
     useEffect(() => {
         const warn = (event: BeforeUnloadEvent) => {
-            if (dirtyRef.current) event.preventDefault();
+            if (dirtyRef.current || mutationLock.current) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
         };
         const unsubscribe = router.on('before', (event) => {
-            if (dirtyRef.current) {
+            if (dirtyRef.current || mutationLock.current) {
                 event.preventDefault();
                 setError(
-                    'Save your menu draft or discard local changes before leaving.',
+                    mutationLock.current
+                        ? 'Wait for the menu change to finish before leaving.'
+                        : 'Save your menu draft or discard local changes before leaving.',
                 );
             }
         });
@@ -274,6 +383,17 @@ export function SharedNavigationDesigner({
             window.removeEventListener('beforeunload', warn);
         };
     }, []);
+    useEffect(() => {
+        if (!dirty && !busy) return;
+        return registerDraftHistoryGuard((_continueHistory, cancelHistory) => {
+            cancelHistory();
+            setError(
+                mutationLock.current
+                    ? 'Wait for the menu change to finish before leaving.'
+                    : 'Save your menu draft or discard local changes before leaving.',
+            );
+        });
+    }, [dirty, busy]);
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(KeyboardSensor, {
@@ -281,15 +401,17 @@ export function SharedNavigationDesigner({
         }),
     );
     const edit = (next: NavigationItem[]) => {
-        if (busy) return;
+        if (mutationLock.current) return;
         setHistory((past) => [...past.slice(-39), items]);
         setItems(next);
         setError('');
         setNotice('');
     };
     const change = async (action: 'save' | 'publish' | 'discard') => {
-        if (!workspace) return;
+        if (!workspace || mutationLock.current) return;
+        mutationLock.current = true;
         setBusy(true);
+        onBusyChange?.(true);
         setError('');
         try {
             const data = await hubRequest<NavigationWorkspace>(
@@ -313,23 +435,32 @@ export function SharedNavigationDesigner({
                       ? 'Draft saved. Staff still see the published menu.'
                       : 'Navigation draft discarded. The published menu is unchanged.',
             );
-            if (action === 'publish')
-                router.reload({
-                    only: ['sharedNavigation'],
-                    preserveScroll: true,
-                });
+            // Embedded editors keep their unsaved page state and update the
+            // preview directly instead of triggering an Inertia page refresh.
+            if (action === 'publish') {
+                if (onPublished) onPublished(data);
+                else {
+                    mutationLock.current = false;
+                    router.reload({
+                        only: ['sharedNavigation'],
+                        preserveScroll: true,
+                    });
+                }
+            }
         } catch (e) {
             setError((e as Error).message);
             setConfirmation(null);
         } finally {
+            mutationLock.current = false;
             setBusy(false);
+            onBusyChange?.(false);
         }
     };
     const add = (type: NavigationItem['type']) => {
         const item: NavigationItem = {
             id: `nav-${crypto.randomUUID()}`,
             type,
-            label: type === 'group' ? 'New menu' : 'New link',
+            label: type === 'group' ? 'New menu' : 'New tab',
             target: '',
             parent: '',
             hidden: false,
@@ -338,6 +469,19 @@ export function SharedNavigationDesigner({
         setSelectedId(item.id);
     };
     const selected = items.find((item) => item.id === selectedId) ?? items[0];
+    const removeSelected = () => {
+        if (!selected || selected.id === 'home' || mutationLock.current) return;
+        edit(
+            items
+                .filter((item) => item.id !== selected.id)
+                .map((item) =>
+                    item.parent === selected.id
+                        ? { ...item, parent: '' }
+                        : item,
+                ),
+        );
+        setSelectedId('home');
+    };
     const groups = items.filter((item) => item.type === 'group');
     const ordered = items
         .filter((item) => !item.parent)
@@ -385,7 +529,9 @@ export function SharedNavigationDesigner({
             <div className="flex flex-wrap items-center gap-2">
                 <div className="mr-auto">
                     <h2 className="text-xl font-semibold">
-                        A clear path through your hub
+                        {editorSlots
+                            ? 'Editing shared tabs'
+                            : 'A clear path through your hub'}
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                         {dirty
@@ -406,29 +552,33 @@ export function SharedNavigationDesigner({
                     <Undo2 className="size-4" />
                     Undo
                 </Button>
-                <Button
-                    variant="outline"
-                    disabled={busy || items.length >= 48}
-                    onClick={() => add('link')}
-                >
-                    <Plus className="size-4" />
-                    Add link
-                </Button>
-                <Button
-                    variant="outline"
-                    disabled={busy || items.length >= 48}
-                    onClick={() => add('group')}
-                >
-                    <FolderPlus className="size-4" />
-                    Add group
-                </Button>
+                {!editorSlots && (
+                    <Button
+                        variant="outline"
+                        disabled={busy || items.length >= 48}
+                        onClick={() => add('link')}
+                    >
+                        <Plus className="size-4" />
+                        Add tab
+                    </Button>
+                )}
+                {!editorSlots && (
+                    <Button
+                        variant="outline"
+                        disabled={busy || items.length >= 48}
+                        onClick={() => add('group')}
+                    >
+                        <FolderPlus className="size-4" />
+                        Add group
+                    </Button>
+                )}
                 <Button
                     variant="outline"
                     disabled={busy || !dirty}
                     onClick={() => void change('save')}
                 >
                     <Save className="size-4" />
-                    Save draft
+                    {editorSlots ? 'Save tabs draft' : 'Save draft'}
                 </Button>
                 {workspace.can_publish && (
                     <Button
@@ -456,321 +606,411 @@ export function SharedNavigationDesigner({
                     {notice}
                 </p>
             )}
-            <div className="hub-nav-preview">
-                <p>Live navigation preview</p>
-                <HubNavigationRail
-                    items={items}
-                    current="view:home"
-                    onPreview={(item) =>
-                        setNotice(
-                            `Preview: ${item.label} opens ${summary(item)}. Save and publish to apply this menu.`,
-                        )
-                    }
-                />
-            </div>
-            <div className="hub-nav-designer">
-                <div>
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        accessibility={{
-                            announcements: {
-                                onDragStart: ({ active }) =>
-                                    `Picked up ${items.find((item) => item.id === active.id)?.label ?? 'menu item'}. Use the arrow keys to move it, then Space to drop.`,
-                                onDragOver: ({ active, over }) => {
-                                    if (!over) return;
-                                    const from = items.find(
-                                            (item) => item.id === active.id,
-                                        ),
-                                        target = items.find(
-                                            (item) => item.id === over.id,
-                                        );
-                                    return from?.parent === target?.parent &&
-                                        target?.id !== 'home'
-                                        ? `Move ${from?.label} to ${target?.label}.`
-                                        : 'Keep this item in its current menu. Choose a different parent in settings.';
-                                },
-                                onDragEnd: ({ active, over }) => {
-                                    const from = items.find(
-                                            (item) => item.id === active.id,
-                                        ),
-                                        target = items.find(
-                                            (item) => item.id === over?.id,
-                                        );
-                                    return over &&
-                                        from?.parent === target?.parent &&
-                                        target?.id !== 'home'
-                                        ? `Placed ${from?.label} at ${target?.label}.`
-                                        : 'Menu order unchanged.';
-                                },
-                                onDragCancel: () =>
-                                    'Move cancelled. Menu order unchanged.',
-                            },
-                        }}
-                        onDragEnd={({ active, over }) => {
-                            if (over && active.id !== over.id)
-                                edit(
-                                    moveNavigation(
-                                        items,
-                                        String(active.id),
-                                        String(over.id),
-                                    ),
-                                );
-                        }}
-                    >
-                        <SortableContext
-                            items={ordered.map((item) => item.id)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            <div className="space-y-2">
-                                {ordered.map((item) => {
-                                    const peers = items.filter(
-                                            (peer) =>
-                                                peer.parent === item.parent &&
-                                                peer.id !== 'home',
-                                        ),
-                                        index = peers.indexOf(item);
-                                    return (
-                                        <NavigationRow
-                                            key={item.id}
-                                            item={item}
-                                            selected={selected?.id === item.id}
-                                            summary={summary(item) ?? ''}
-                                            busy={busy}
-                                            onSelect={() =>
-                                                setSelectedId(item.id)
-                                            }
-                                            up={index > 0}
-                                            down={
-                                                index >= 0 &&
-                                                index < peers.length - 1
-                                            }
-                                            onMove={(step) => {
-                                                const target =
-                                                    peers[index + step];
-                                                if (target)
-                                                    edit(
-                                                        moveNavigation(
-                                                            items,
-                                                            item.id,
-                                                            target.id,
-                                                        ),
-                                                    );
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </SortableContext>
-                    </DndContext>
-                    <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-                        Drag within a menu, or use the arrows. Choose a parent
-                        menu in settings to move a link into a group. Home
-                        always stays first. Destinations keep their existing
-                        access permissions.
-                    </p>
+            {editorSlots && previewingMenu && !notice && (
+                <p role="status" className="text-sm text-muted-foreground">
+                    Previewing your unpublished menu. Open a group to check its
+                    links; nothing navigates or publishes.
+                </p>
+            )}
+            {!editorSlots && (
+                <div className="hub-nav-preview">
+                    <p>Live navigation preview</p>
+                    <HubNavigationRail
+                        items={items}
+                        current="view:home"
+                        onPreview={(item) =>
+                            setNotice(
+                                `Preview: ${item.label} opens ${summary(item)}. Save and publish to apply this menu.`,
+                            )
+                        }
+                    />
                 </div>
-                {selected && (
-                    <aside
-                        className="hub-nav-inspector"
-                        aria-label="Navigation item settings"
-                    >
-                        <h3 className="font-semibold">
-                            {selected.type === 'group'
-                                ? 'Menu group'
-                                : 'Navigation link'}
-                        </h3>
-                        <fieldset disabled={busy} className="space-y-5">
-                            <Label className="grid gap-2">
-                                Navigation label
-                                <Input
-                                    value={selected.label}
-                                    maxLength={60}
-                                    onChange={(e) =>
-                                        update({ label: e.target.value })
-                                    }
-                                />
-                            </Label>
-                            {selected.type !== 'group' &&
-                                selected.id !== 'home' && (
-                                    <Label className="grid gap-2">
-                                        Destination type
-                                        <select
-                                            aria-label="Destination type"
-                                            className="hub-native-select"
-                                            value={selected.type}
-                                            onChange={(e) =>
-                                                update({
-                                                    type: e.target
-                                                        .value as NavigationItem['type'],
-                                                    target: '',
-                                                })
-                                            }
-                                        >
-                                            <option value="view">
-                                                Hub view
-                                            </option>
-                                            <option value="page">
-                                                Published page
-                                            </option>
-                                            <option value="link">
-                                                Web or application link
-                                            </option>
-                                        </select>
-                                    </Label>
-                                )}
-                            {selected.type === 'view' && (
-                                <Label className="grid gap-2">
-                                    Hub view
-                                    <select
-                                        aria-label="Hub view"
-                                        className="hub-native-select"
-                                        value={selected.target}
-                                        disabled={selected.id === 'home'}
-                                        onChange={(e) =>
-                                            update({ target: e.target.value })
-                                        }
-                                    >
-                                        <option value="">Choose a view</option>
-                                        {Object.entries(workspace.views).map(
-                                            ([key, label]) => (
-                                                <option key={key} value={key}>
-                                                    {label}
-                                                </option>
-                                            ),
-                                        )}
-                                    </select>
-                                </Label>
-                            )}
-                            {selected.type === 'page' && (
-                                <Label className="grid gap-2">
-                                    Published page
-                                    <select
-                                        aria-label="Published page"
-                                        className="hub-native-select"
-                                        value={selected.target}
-                                        onChange={(e) =>
-                                            update({ target: e.target.value })
-                                        }
-                                    >
-                                        <option value="">
-                                            Choose a published page
-                                        </option>
-                                        {workspace.pages.map((page) => (
-                                            <option
-                                                key={page.id}
-                                                value={page.id}
-                                            >
-                                                {page.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Label>
-                            )}
-                            {selected.type === 'link' && (
-                                <Label className="grid gap-2">
-                                    Destination
-                                    <Input
-                                        placeholder="https://… or /application-page"
-                                        value={selected.target}
-                                        maxLength={2000}
-                                        onChange={(e) =>
-                                            update({ target: e.target.value })
-                                        }
-                                    />
-                                </Label>
-                            )}
-                            {selected.type !== 'group' &&
-                                selected.id !== 'home' && (
-                                    <Label className="grid gap-2">
-                                        Parent menu
-                                        <select
-                                            aria-label="Parent menu"
-                                            className="hub-native-select"
-                                            value={selected.parent}
-                                            onChange={(e) =>
-                                                update({
-                                                    parent: e.target.value,
-                                                })
-                                            }
-                                        >
-                                            <option value="">Top level</option>
-                                            {groups.map((group) => (
-                                                <option
-                                                    key={group.id}
-                                                    value={group.id}
-                                                >
-                                                    {group.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </Label>
-                                )}
-                            {selected.id === 'home' ? (
-                                <p className="text-xs text-muted-foreground">
-                                    Home stays visible and first so everyone can
-                                    find their way back.
-                                </p>
-                            ) : (
-                                <label className="flex items-center gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
-                                        checked={selected.hidden}
-                                        onChange={(e) =>
-                                            update({ hidden: e.target.checked })
-                                        }
-                                    />
-                                    Hide from staff
-                                </label>
-                            )}
-                            {selected.id !== 'home' && (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        edit(
-                                            items
-                                                .filter(
-                                                    (item) =>
-                                                        item.id !== selected.id,
-                                                )
-                                                .map((item) =>
-                                                    item.parent === selected.id
-                                                        ? {
-                                                              ...item,
-                                                              parent: '',
-                                                          }
-                                                        : item,
-                                                ),
-                                        );
-                                        setSelectedId('home');
-                                    }}
-                                >
-                                    <Trash2 className="size-4" />
-                                    Remove{' '}
-                                    {selected.type === 'group'
-                                        ? 'group'
-                                        : 'link'}
-                                </Button>
-                            )}
-                        </fieldset>
+            )}
+            {editorSlots && (
+                <NavigationPlacement embedded target={editorSlots.rail}>
+                    <div className="flex w-full min-w-0 items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                            <HubNavigationRail
+                                key={previewingMenu ? 'preview' : 'edit'}
+                                items={items}
+                                current={previewingMenu ? 'view:home' : ''}
+                                editing={!previewingMenu}
+                                selectedId={
+                                    previewingMenu ? undefined : selected?.id
+                                }
+                                onPreview={(item) =>
+                                    previewingMenu
+                                        ? setNotice(
+                                              `Preview: ${item.label} opens ${summary(item)}. Your unpublished menu has not been applied.`,
+                                          )
+                                        : setSelectedId(item.id)
+                                }
+                            />
+                        </div>
                         <Button
                             variant="ghost"
-                            disabled={busy || (!dirty && !workspace.has_draft)}
-                            onClick={() => setConfirmation('discard')}
+                            className="hub-glass-button mb-1 min-w-[132px] shrink-0 justify-center"
+                            disabled={busy}
+                            aria-pressed={previewingMenu}
+                            onClick={() => {
+                                setPreviewingMenu(!previewingMenu);
+                                setNotice('');
+                            }}
                         >
-                            <RotateCcw className="size-4" />
-                            Discard navigation draft
+                            {previewingMenu ? (
+                                <Pencil className="size-4" />
+                            ) : (
+                                <Eye className="size-4" />
+                            )}
+                            {previewingMenu ? 'Edit tabs' : 'Preview menu'}
                         </Button>
-                        <p className="text-xs leading-relaxed text-muted-foreground">
-                            One shared menu for staff. Page links only appear
-                            while that person can read the published page.{' '}
-                            {workspace.can_publish
-                                ? 'Save the draft, then publish when ready.'
-                                : 'A person with publishing permission must publish your saved draft.'}
+                        <Button
+                            variant="ghost"
+                            className="hub-glass-button mb-1 shrink-0"
+                            disabled={busy || items.length >= 48}
+                            onClick={() => add('link')}
+                        >
+                            <Plus className="size-4" />
+                            Add tab
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="hub-glass-button mb-1 shrink-0"
+                            aria-label="Add group"
+                            disabled={busy || items.length >= 48}
+                            onClick={() => add('group')}
+                        >
+                            <FolderPlus className="size-4" />
+                        </Button>
+                    </div>
+                </NavigationPlacement>
+            )}
+            <NavigationPlacement
+                embedded={!!editorSlots}
+                target={editorSlots?.inspector}
+            >
+                <div
+                    className={`hub-nav-designer ${editorSlots ? 'hub-nav-inline-inspector' : ''}`}
+                >
+                    <div>
+                        {editorSlots && (
+                            <h3 className="mb-3 text-sm font-semibold">
+                                Tab order and groups
+                            </h3>
+                        )}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            accessibility={{
+                                announcements: {
+                                    onDragStart: ({ active }) =>
+                                        `Picked up ${items.find((item) => item.id === active.id)?.label ?? 'menu item'}. Use the arrow keys to move it, then Space to drop.`,
+                                    onDragOver: ({ active, over }) => {
+                                        if (!over) return;
+                                        const from = items.find(
+                                                (item) => item.id === active.id,
+                                            ),
+                                            target = items.find(
+                                                (item) => item.id === over.id,
+                                            );
+                                        return from?.parent ===
+                                            target?.parent &&
+                                            target?.id !== 'home'
+                                            ? `Move ${from?.label} to ${target?.label}.`
+                                            : 'Keep this item in its current menu. Choose a different parent in settings.';
+                                    },
+                                    onDragEnd: ({ active, over }) => {
+                                        const from = items.find(
+                                                (item) => item.id === active.id,
+                                            ),
+                                            target = items.find(
+                                                (item) => item.id === over?.id,
+                                            );
+                                        return over &&
+                                            from?.parent === target?.parent &&
+                                            target?.id !== 'home'
+                                            ? `Placed ${from?.label} at ${target?.label}.`
+                                            : 'Menu order unchanged.';
+                                    },
+                                    onDragCancel: () =>
+                                        'Move cancelled. Menu order unchanged.',
+                                },
+                            }}
+                            onDragEnd={({ active, over }) => {
+                                if (over && active.id !== over.id)
+                                    edit(
+                                        moveNavigation(
+                                            items,
+                                            String(active.id),
+                                            String(over.id),
+                                        ),
+                                    );
+                            }}
+                        >
+                            <SortableContext
+                                items={ordered.map((item) => item.id)}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                <div className="space-y-2">
+                                    {ordered.map((item) => {
+                                        const peers = items.filter(
+                                                (peer) =>
+                                                    peer.parent ===
+                                                        item.parent &&
+                                                    peer.id !== 'home',
+                                            ),
+                                            index = peers.indexOf(item);
+                                        return (
+                                            <NavigationRow
+                                                key={item.id}
+                                                item={item}
+                                                selected={
+                                                    selected?.id === item.id
+                                                }
+                                                summary={summary(item) ?? ''}
+                                                busy={busy}
+                                                onSelect={() =>
+                                                    setSelectedId(item.id)
+                                                }
+                                                up={index > 0}
+                                                down={
+                                                    index >= 0 &&
+                                                    index < peers.length - 1
+                                                }
+                                                onMove={(step) => {
+                                                    const target =
+                                                        peers[index + step];
+                                                    if (target)
+                                                        edit(
+                                                            moveNavigation(
+                                                                items,
+                                                                item.id,
+                                                                target.id,
+                                                            ),
+                                                        );
+                                                }}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
+                        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+                            Drag within a menu, or use the arrows. Choose a
+                            parent menu in settings to move a link into a group.
+                            Home always stays first. Destinations keep their
+                            existing access permissions.
                         </p>
-                    </aside>
-                )}
-            </div>
+                    </div>
+                    {selected && (
+                        <aside
+                            className="hub-nav-inspector"
+                            aria-label="Navigation item settings"
+                        >
+                            <div className="flex items-center justify-between gap-3">
+                                <h3 className="font-semibold">
+                                    {selected.type === 'group'
+                                        ? 'Menu group'
+                                        : 'Navigation tab'}
+                                </h3>
+                                {selected.id !== 'home' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="shrink-0 px-2 text-xs"
+                                        disabled={busy}
+                                        onClick={removeSelected}
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                        Remove{' '}
+                                        {selected.type === 'group'
+                                            ? 'group'
+                                            : 'tab'}
+                                    </Button>
+                                )}
+                            </div>
+                            <fieldset disabled={busy} className="space-y-5">
+                                <Label className="grid gap-2">
+                                    Navigation label
+                                    <Input
+                                        value={selected.label}
+                                        maxLength={60}
+                                        onChange={(e) =>
+                                            update({ label: e.target.value })
+                                        }
+                                    />
+                                </Label>
+                                {selected.type !== 'group' &&
+                                    selected.id !== 'home' && (
+                                        <Label className="grid gap-2">
+                                            Destination type
+                                            <HubSelect
+                                                label="Destination type"
+                                                value={selected.type}
+                                                disabled={busy}
+                                                onChange={(value) =>
+                                                    update({
+                                                        type: value as NavigationItem['type'],
+                                                        target: '',
+                                                    })
+                                                }
+                                                options={[
+                                                    {
+                                                        value: 'view',
+                                                        label: 'Hub view',
+                                                    },
+                                                    {
+                                                        value: 'page',
+                                                        label: 'Published page',
+                                                    },
+                                                    {
+                                                        value: 'link',
+                                                        label: 'Web or application link',
+                                                    },
+                                                ]}
+                                            />
+                                        </Label>
+                                    )}
+                                {selected.type === 'view' && (
+                                    <Label className="grid gap-2">
+                                        Hub view
+                                        <HubSelect
+                                            label="Hub view"
+                                            value={selected.target}
+                                            disabled={
+                                                busy || selected.id === 'home'
+                                            }
+                                            onChange={(value) =>
+                                                update({
+                                                    target: value,
+                                                })
+                                            }
+                                            options={[
+                                                {
+                                                    value: '',
+                                                    label: 'Choose a view',
+                                                },
+                                                ...Object.entries(
+                                                    workspace.views,
+                                                ).map(([value, label]) => ({
+                                                    value,
+                                                    label,
+                                                })),
+                                            ]}
+                                        />
+                                    </Label>
+                                )}
+                                {selected.type === 'page' && (
+                                    <Label className="grid gap-2">
+                                        Published page
+                                        <HubSelect
+                                            label="Published page"
+                                            value={selected.target}
+                                            disabled={busy}
+                                            onChange={(value) =>
+                                                update({
+                                                    target: value,
+                                                })
+                                            }
+                                            options={[
+                                                {
+                                                    value: '',
+                                                    label: 'Choose a published page',
+                                                },
+                                                ...workspace.pages.map(
+                                                    (page) => ({
+                                                        value: String(page.id),
+                                                        label: page.title,
+                                                    }),
+                                                ),
+                                            ]}
+                                        />
+                                    </Label>
+                                )}
+                                {selected.type === 'link' && (
+                                    <Label className="grid gap-2">
+                                        Destination
+                                        <Input
+                                            placeholder="https://… or /application-page"
+                                            value={selected.target}
+                                            maxLength={2000}
+                                            onChange={(e) =>
+                                                update({
+                                                    target: e.target.value,
+                                                })
+                                            }
+                                        />
+                                    </Label>
+                                )}
+                                {selected.type !== 'group' &&
+                                    selected.id !== 'home' && (
+                                        <Label className="grid gap-2">
+                                            Parent menu
+                                            <HubSelect
+                                                label="Parent menu"
+                                                value={selected.parent}
+                                                disabled={busy}
+                                                onChange={(value) =>
+                                                    update({
+                                                        parent: value,
+                                                    })
+                                                }
+                                                options={[
+                                                    {
+                                                        value: '',
+                                                        label: 'Top level',
+                                                    },
+                                                    ...groups.map((group) => ({
+                                                        value: group.id,
+                                                        label: group.label,
+                                                    })),
+                                                ]}
+                                            />
+                                        </Label>
+                                    )}
+                                {selected.id === 'home' ? (
+                                    <p className="text-xs text-muted-foreground">
+                                        Home stays visible and first so everyone
+                                        can find their way back.
+                                    </p>
+                                ) : (
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <input
+                                            type="checkbox"
+                                            checked={selected.hidden}
+                                            onChange={(e) =>
+                                                update({
+                                                    hidden: e.target.checked,
+                                                })
+                                            }
+                                        />
+                                        Hide from staff
+                                    </label>
+                                )}
+                            </fieldset>
+                            <Button
+                                variant="ghost"
+                                disabled={
+                                    busy || (!dirty && !workspace.has_draft)
+                                }
+                                onClick={() => setConfirmation('discard')}
+                            >
+                                <RotateCcw className="size-4" />
+                                Discard navigation draft
+                            </Button>
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                                One shared menu for staff. Page links only
+                                appear while that person can read the published
+                                page. Removing a tab keeps its page and content.{' '}
+                                {workspace.can_publish
+                                    ? 'Save the draft, then publish when ready.'
+                                    : 'A person with publishing permission must publish your saved draft.'}
+                            </p>
+                        </aside>
+                    )}
+                </div>
+            </NavigationPlacement>
             <Dialog
                 open={!!confirmation}
                 onOpenChange={(open) => !busy && !open && setConfirmation(null)}

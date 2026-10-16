@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Hr\Concerns;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPublicHoliday;
@@ -78,8 +77,8 @@ trait BuildsMyHrShell
             ->where(fn ($q) => $q->whereNull('employee_acknowledged')->orWhere('employee_acknowledged', false))
             ->count();
 
-        $kudosThisMonth = HrKudos::query()
-            ->where('to_user_id', $user->id)
+        $kudosThisMonth = $this->feedService->visibleKudosQuery($user)
+            ->receivedBy($user->id)
             ->where('created_at', '>=', now()->startOfMonth())
             ->count();
 

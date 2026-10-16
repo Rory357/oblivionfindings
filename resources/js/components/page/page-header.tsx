@@ -1208,6 +1208,8 @@ export interface PageHeaderRailItem<K extends string = string> {
     count?: number;
     /** Alert counts keep the fixed critical pair in every state. */
     alert?: boolean;
+    /** Optional discovery copy shown only inside More; tab geometry stays unchanged. */
+    overflow?: { description: string; icon?: IconType; unread?: boolean };
 }
 
 /** Must match the rail container's `gap-1`. */
@@ -1302,6 +1304,7 @@ export function PageHeaderRail<K extends string>({
     ariaLabel = 'Views',
     onItemContextMenu,
     decorations,
+    maxVisible,
 }: {
     items: PageHeaderRailItem<K>[];
     value: K;
@@ -1314,6 +1317,8 @@ export function PageHeaderRail<K extends string>({
     ariaLabel?: string;
     onItemContextMenu?: (key: K, event: React.MouseEvent) => void;
     decorations?: Partial<Record<K, ReactNode>>;
+    /** Optional visual cap; overflow retains every destination and the active tab. */
+    maxVisible?: number;
 }) {
     const frontline = useContext(PageHeaderFrontlineContext);
     const pillClass = cn(railPillClass, frontline && 'frontline-hit');
@@ -1335,6 +1340,10 @@ export function PageHeaderRail<K extends string>({
         if (!container || !measureRow) return;
 
         const compute = () => {
+            const limit =
+                maxVisible === undefined
+                    ? items.length
+                    : Math.max(1, Math.floor(maxVisible));
             const available = container.clientWidth;
             if (available <= 0) return;
             // Measurement row: one node per item, then More, then Find.
@@ -1348,7 +1357,7 @@ export function PageHeaderRail<K extends string>({
 
             const total =
                 itemW.reduce((acc, w) => acc + w + RAIL_GAP, 0) + findW;
-            if (total <= available) {
+            if (total <= available && items.length <= limit) {
                 setVisibleKeys(null);
                 return;
             }
@@ -1359,6 +1368,7 @@ export function PageHeaderRail<K extends string>({
             let fit = 0;
             while (
                 fit < items.length &&
+                fit < limit &&
                 used + itemW[fit] + (fit > 0 ? RAIL_GAP : 0) <= budget
             ) {
                 used += itemW[fit] + (fit > 0 ? RAIL_GAP : 0);
@@ -1377,6 +1387,7 @@ export function PageHeaderRail<K extends string>({
                 let rest = budget - itemW[activeIdx] - RAIL_GAP;
                 const kept: K[] = [];
                 for (let i = 0; i < items.length; i += 1) {
+                    if (kept.length >= limit - 1) break;
                     if (i === activeIdx) continue;
                     const w = itemW[i] + (kept.length > 0 ? RAIL_GAP : 0);
                     if (w > rest) break;
@@ -1401,7 +1412,7 @@ export function PageHeaderRail<K extends string>({
         observer.observe(measureRow);
         return () => observer.disconnect();
         // eslint-disable-next-line react-hooks/exhaustive-deps -- itemsKey stands in for items
-    }, [itemsKey, value, onFind, showFind, frontline]);
+    }, [itemsKey, value, onFind, showFind, frontline, maxVisible]);
 
     const visibleItems =
         visibleKeys == null
@@ -1550,7 +1561,12 @@ export function PageHeaderRail<K extends string>({
                     </PopoverTrigger>
                     <PopoverContent
                         align="end"
-                        className="w-60 p-1.5"
+                        className={cn(
+                            'p-1.5',
+                            overflowItems.some((item) => item.overflow)
+                                ? 'w-80'
+                                : 'w-60',
+                        )}
                         onCloseAutoFocus={(event) => {
                             const content = event.currentTarget;
                             const active = document.activeElement;
@@ -1570,7 +1586,7 @@ export function PageHeaderRail<K extends string>({
                         }}
                     >
                         {overflowItems.map((it) => {
-                            const Icon = it.icon;
+                            const Icon = it.overflow?.icon ?? it.icon;
                             return (
                                 <button
                                     key={it.key}
@@ -1596,8 +1612,23 @@ export function PageHeaderRail<K extends string>({
                                     {Icon ? (
                                         <Icon className="size-4 text-muted-foreground" />
                                     ) : null}
-                                    <span className="flex-1 truncate">
-                                        {it.label}
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-center gap-2">
+                                            <span className="truncate">
+                                                {it.label}
+                                            </span>
+                                            {it.overflow?.unread && (
+                                                <span
+                                                    className="size-1.5 shrink-0 rounded-full bg-primary"
+                                                    aria-label="New updates"
+                                                />
+                                            )}
+                                        </span>
+                                        {it.overflow && (
+                                            <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                                                {it.overflow.description}
+                                            </span>
+                                        )}
                                     </span>
                                     {it.count != null ? (
                                         <span

@@ -18,6 +18,7 @@ import {
     createBlock,
     duplicateSection,
 } from './_layout';
+import { HubSelect } from './_select';
 import type { HubSection } from './_types';
 
 export type SectionPreset = {
@@ -35,7 +36,7 @@ type Library = {
     removed_presets?: RemovedPreset[];
 };
 const starters = [
-    { title: 'Welcome & essentials', types: ['text', 'links'] },
+    { title: 'Welcome & essentials', types: ['text', 'services'] },
     { title: 'Meet the team', types: ['people', 'resources'] },
     { title: 'Recognition & connection', types: ['shoutouts', 'events'] },
 ];
@@ -216,9 +217,13 @@ export function SectionPresets({
                                     title: preset.title,
                                     columns: 2,
                                     layout: 'wide-left',
-                                    blocks: preset.types.map((type) =>
-                                        createBlock(type),
-                                    ),
+                                    blocks: preset.types.map((type, index) => ({
+                                        ...createBlock(type),
+                                        width: index === 0 ? 8 : 4,
+                                        ...(type === 'people'
+                                            ? { mode: 'cards' }
+                                            : {}),
+                                    })),
                                 })
                             }
                         >
@@ -241,28 +246,28 @@ export function SectionPresets({
                         <div className="flex items-end gap-2">
                             <Label className="grid flex-1 gap-2">
                                 Save to
-                                <select
-                                    aria-label="Section library destination"
-                                    className="hub-native-select"
+                                <HubSelect
+                                    label="Section library destination"
                                     value={scope}
-                                    onChange={(e) =>
-                                        setScope(
-                                            e.target.value as
-                                                | 'personal'
-                                                | 'shared',
-                                        )
+                                    onChange={(value) =>
+                                        setScope(value as 'personal' | 'shared')
                                     }
                                     disabled={busy || loading}
-                                >
-                                    <option value="personal">
-                                        My sections
-                                    </option>
-                                    {library.can_share && (
-                                        <option value="shared">
-                                            Shared with editors
-                                        </option>
-                                    )}
-                                </select>
+                                    options={[
+                                        {
+                                            value: 'personal',
+                                            label: 'My sections',
+                                        },
+                                        ...(library.can_share
+                                            ? [
+                                                  {
+                                                      value: 'shared',
+                                                      label: 'Shared with editors',
+                                                  },
+                                              ]
+                                            : []),
+                                    ]}
+                                />
                             </Label>
                             <Button
                                 disabled={
@@ -292,16 +297,18 @@ export function SectionPresets({
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                     />
-                    <select
-                        aria-label="Section library filter"
-                        className="hub-native-select min-w-32 shrink-0"
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value)}
-                    >
-                        <option value="all">All sections</option>
-                        <option value="shared">Shared</option>
-                        <option value="personal">Mine</option>
-                    </select>
+                    <div className="w-40 shrink-0">
+                        <HubSelect
+                            label="Section library filter"
+                            value={filter}
+                            onChange={setFilter}
+                            options={[
+                                { value: 'all', label: 'All sections' },
+                                { value: 'shared', label: 'Shared' },
+                                { value: 'personal', label: 'Mine' },
+                            ]}
+                        />
+                    </div>
                     <Button
                         size="icon"
                         variant="ghost"

@@ -1,0 +1,17 @@
+{
+  "errors": [],
+  "verified": [
+    "hero and block media return preserves unsaved input",
+    "independent sections and layout settings",
+    "block duplicate and undo",
+    "birthday off until individual HR enablement",
+    "moderator restore versus author removal",
+    "idea history retains earlier updates",
+    "shortcut URL validation",
+    "saved preferences",
+    "scheduled draft discard guard",
+    "version restore as draft",
+    "designer at 1024px"
+  ],
+  "scope": "Fictional local preview only"
+}

@@ -1,4 +1,5 @@
 import { PageHeader } from '@/components/page/page-header';
+import { AppreciationIcon } from '@/components/recognition/appreciation-icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDate } from '@/lib/datetime';
@@ -8,13 +9,7 @@ import {
     ArrowUp,
     ArrowUpRight,
     BookOpen,
-    Building2,
-    DoorOpen,
-    Flag,
-    HeartHandshake,
-    Newspaper,
     Search,
-    Sparkles,
     UsersRound,
 } from 'lucide-react';
 import {
@@ -24,18 +19,11 @@ import {
     type CSSProperties,
     type FormEvent,
     type ReactNode,
+    type Ref,
 } from 'react';
+import { heroIcons } from './_hero-icons';
 import { defaultHero } from './_hero-settings';
 import type { HubContent, HubHeroSummary, HubPageSummary } from './_types';
-
-const heroIcons = {
-    'heart-handshake': HeartHandshake,
-    newspaper: Newspaper,
-    sparkles: Sparkles,
-    'building-2': Building2,
-    flag: Flag,
-    'door-open': DoorOpen,
-};
 
 export function HubSiteHeader({
     content,
@@ -45,6 +33,7 @@ export function HubSiteHeader({
     onSubmit,
     children,
     onEditHero,
+    editHeroRef,
     compactNavigation = true,
     summary = [],
 }: {
@@ -55,6 +44,7 @@ export function HubSiteHeader({
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
     children: ReactNode;
     onEditHero?: () => void;
+    editHeroRef?: Ref<HTMLButtonElement>;
     compactNavigation?: boolean;
     summary?: HubHeroSummary;
 }) {
@@ -93,6 +83,11 @@ export function HubSiteHeader({
                 style={
                     {
                         '--hub-shade': hero.overlay / 100,
+                        '--hub-text-shade': Math.max(
+                            0,
+                            (0.72 - hero.overlay / 100) /
+                                (1 - hero.overlay / 100),
+                        ),
                         '--hub-heading-gutter': hero.show_search
                             ? '260px'
                             : onEditHero
@@ -157,6 +152,7 @@ export function HubSiteHeader({
                                     className="hub-glass-button"
                                     variant="ghost"
                                     onClick={onEditHero}
+                                    ref={editHeroRef}
                                 >
                                     Edit hero
                                 </Button>
@@ -253,7 +249,12 @@ export function HubHero({
             ? `${baseUrl}?story=${page.slug}`
             : `/company-hub/read/${page.slug}`;
     const others = pages
-        .filter((page) => page.id !== featured?.id && page.kind === 'news')
+        .filter(
+            (page) =>
+                page.id !== featured?.id &&
+                page.kind === 'news' &&
+                page.show_in_news !== false,
+        )
         .slice(0, 2);
     const links = content.sections
         .flatMap((section) => section.blocks)
@@ -318,7 +319,7 @@ export function HubHero({
                     {actions}
                     {recognise && (
                         <Button variant="outline" onClick={recognise}>
-                            <Sparkles className="size-4" />
+                            <AppreciationIcon className="size-4" />
                             Give a shout-out
                         </Button>
                     )}
@@ -404,11 +405,6 @@ export function HubArticleHeader({
                 {content.category}
                 {publishedAt && ` · ${formatDate(publishedAt)}`}
             </p>
-            {content.summary && content.hero?.show_summary !== false && (
-                <p className="mt-3 max-w-3xl text-base leading-relaxed text-muted-foreground">
-                    {content.summary}
-                </p>
-            )}
             {content.cover_id && content.hero?.style !== 'image' && (
                 <img
                     className="mt-5 max-h-80 w-full rounded-lg object-cover"

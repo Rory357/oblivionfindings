@@ -47,7 +47,7 @@ class HubDepartment
             abort_unless($ids !== [], 409, 'No teams are currently available in this space. Reload the page.');
             $teams = $data['following'] ? array_values(array_unique([...$preferences['teams'], ...$ids])) : array_values(array_diff($preferences['teams'], $ids));
             abort_if(count($teams) > 100, 422, 'You can follow up to 100 teams. Update your interests before following another team.');
-            $saved = $this->discovery->saveInterests($viewer, ['version' => $data['version'], 'topics' => $preferences['topics'], 'teams' => $teams]);
+            $saved = $this->discovery->saveInterests($viewer, ['actor_id' => $data['actor_id'], 'version' => $data['version'], 'topics' => $preferences['topics'], 'teams' => $teams]);
 
             return ['actor_id' => (int) $viewer->id, 'page_id' => $page->id, 'revision_id' => $revision->id, 'interests' => $saved];
         });

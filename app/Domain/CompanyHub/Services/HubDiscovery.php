@@ -3,7 +3,9 @@
 namespace App\Domain\CompanyHub\Services;
 
 use App\Domain\Hr\Services\HrCalendarAccessService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,12 +18,13 @@ class HubDiscovery
 
     public function preferences(User $user): array
     {
-        app(HubAccess::class)->assertEnter($user);
+        $user = $this->currentViewer($user);
         $teams = app(HrCalendarAccessService::class)->visibleDepartmentsQuery($user)->orderBy('name')->get(['id', 'name'])->toArray();
         $row = DB::table('hub_preferences')->where('user_id', $user->id)->first();
         $stored = json_decode($row?->interests ?? '{}', true);
 
         return [
+            'actor_id' => (int) $user->id,
             'version' => (int) ($row?->interests_version ?? 1),
             'topics' => array_values(array_intersect($stored['topics'] ?? [], self::TOPICS)),
             'teams' => array_values(array_intersect($stored['teams'] ?? [], array_column($teams, 'id'))),
@@ -31,27 +34,43 @@ class HubDiscovery
 
     public function saveInterests(User $user, array $data): array
     {
-        $allowed = $this->preferences($user);
-        if (array_diff($data['topics'], self::TOPICS) || array_diff($data['teams'], array_column($allowed['available_teams'], 'id'))) {
-            throw ValidationException::withMessages(['interests' => 'Choose topics and teams currently available to you.']);
-        }
-        DB::transaction(function () use ($user, $data): void {
+        abort_unless(isset($data['actor_id']) && (int) $data['actor_id'] === (int) $user->id, 409, 'Your signed-in account changed. Reload your saved interests before continuing.');
+
+        return DB::transaction(function () use ($user, $data): array {
             User::whereKey($user->id)->lockForUpdate()->firstOrFail();
-            $row = DB::table('hub_preferences')->where('user_id', $user->id)->first();
+            $user = $this->currentViewer($user);
+            $allowed = $this->preferences($user);
+            $row = DB::table('hub_preferences')->where('user_id', $user->id)->lockForUpdate()->first();
             abort_unless((int) $data['version'] === (int) ($row?->interests_version ?? 1), 409, 'Your interests changed in another window. Reload your saved choices before trying again.');
+            if (array_diff($data['topics'], self::TOPICS) || array_diff($data['teams'], array_column($allowed['available_teams'], 'id'))) {
+                throw ValidationException::withMessages(['interests' => 'Choose topics and teams currently available to you.']);
+            }
             DB::table('hub_preferences')->updateOrInsert(['user_id' => $user->id], [
                 'interests' => json_encode(['topics' => array_values($data['topics']), 'teams' => array_map('intval', array_values($data['teams']))]),
                 'interests_version' => $data['version'] + 1, 'updated_at' => now(),
             ]);
-        });
 
-        return $this->preferences($user);
+            return $this->preferences($user);
+        });
+    }
+
+    private function currentViewer(User $user): User
+    {
+        $current = User::find($user->id);
+        $sites = new UserSiteAccessService;
+        $access = new HubAccess(app(HrCurrentStaffService::class), $sites);
+        abort_unless($current && $access->canEnter($current) && $sites->applyStaffScope(User::query()->whereKey($current->id), $current)->exists(), 403);
+
+        return $current;
     }
 
     public function updates(User $user, array $pages, array $kudos, array $events, array $announcements, array $interests): array
     {
         $items = [];
         foreach ($pages as $page) {
+            if ($page['kind'] === 'news' && ! ($page['show_in_news'] ?? true)) {
+                continue;
+            }
             $type = match ($page['kind']) {
                 'news' => 'news', 'campaign' => 'campaigns', 'department' => 'teams', default => 'resources',
             };
@@ -67,7 +86,7 @@ class HubDiscovery
             $items[] = [
                 'key' => 'kudos:'.$post['id'], 'type' => 'shoutouts',
                 'title' => ($post['to'] ?: 'A colleague').' received a shout-out', 'summary' => $post['message'],
-                'owner' => $post['from'], 'at' => $post['created_at'], 'url' => '/company-hub?view=shoutouts#kudos-'.$post['id'],
+                'owner' => $post['from'], 'at' => $post['created_at'], 'url' => HubRecognition::readerUrl((int) $post['id']),
                 'topics' => ['People & culture'], 'teams' => $post['team_ids'] ?? [],
             ];
         }

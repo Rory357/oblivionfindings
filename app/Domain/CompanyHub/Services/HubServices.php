@@ -24,6 +24,7 @@ class HubServices
             ['id' => 'policies', 'name' => 'Policies and guidance', 'description' => 'Read current policies and complete required acknowledgements in My HR.', 'category' => 'People & Culture', 'icon' => 'policies', 'url' => '/hr/my/policies'],
             ['id' => 'learning', 'name' => 'Explore learning', 'description' => 'View your assigned training and compliance requirements in My HR.', 'category' => 'Learning & development', 'icon' => 'learning', 'url' => '/hr/my/training'],
             ['id' => 'profile', 'name' => 'Update my details', 'description' => 'Review and update your own personal information in My HR.', 'category' => 'People & Culture', 'icon' => 'profile', 'url' => '/hr/my/profile'],
+            ['id' => 'learning-resources', 'name' => 'Learning resources', 'description' => 'Find practical learning materials, useful guidance and shared resources in the Company Hub.', 'category' => 'Learning & development', 'icon' => 'learning', 'url' => '/company-hub?view=resources'],
         ];
         $maintenance = app(MaintenanceAccessService::class);
         if ($maintenance->canReport($user) && $maintenance->approvedSiteIds($user) !== []) {
@@ -36,9 +37,10 @@ class HubServices
     public function search(User $user, string $search): array
     {
         return [
-            ...collect($this->catalogue($user, $search))->map(fn ($item) => collect($item)->only(['id', 'name', 'description', 'category'])->all())->all(),
+            ...collect($this->catalogue($user, $search))->map(fn ($item) => [...collect($item)->only(['id', 'name', 'description', 'category'])->all(), 'icon' => 'computer'])->all(),
             ...collect($this->handoffs($user, $search))->map(fn ($item) => [
                 'id' => 'staff:'.$item['id'], 'name' => $item['name'], 'description' => $item['description'], 'category' => $item['category'],
+                'icon' => $item['icon'],
                 'url' => $item['url'] ?? '/company-hub?view=services&search='.rawurlencode($item['name']),
             ])->all(),
         ];

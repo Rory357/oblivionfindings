@@ -54,10 +54,13 @@ class HrCalendarSeriesService
                 $this->access->assertCanManageEvent($actor, $parent);
                 abort_unless($actor->canDo('calendar.manage_recurring'), 403);
                 abort_if($parent->archived_at || $parent->recurrence_parent_id || ! $parent->rrule, 404);
+                app(HrCalendarCancellation::class)->assertEditable($parent, $following ? 'following' : 'this', $date);
                 $futureRows = DB::table('hr_calendar_registrations')->where('event_id', $parent->id)->where('occurrence_date', '>=', $date)->get();
                 $children = HrCalendarEvent::where('recurrence_parent_id', $parent->id)->whereDate('exception_date', '>=', $date)->lockForUpdate()->get();
                 $deliveries = DB::table(HrCalendarReminderDelivery::TABLE)->where('event_id', $parent->id)->where('occurrence_date', '>=', $date)->get();
-                $latest = max([$date, ...$futureRows->pluck('occurrence_date')->all(), ...$children->map(fn ($c) => $c->exception_date->toDateString())->all(), ...$deliveries->pluck('occurrence_date')->all()]);
+                $personalReminders = app(HrCalendarPersonalReminders::class)->ready()
+                    ? DB::table(HrCalendarPersonalReminders::TABLE)->where('event_id', $parent->id)->where('occurrence_date', '>=', $date)->lockForUpdate()->get() : collect();
+                $latest = max([$date, ...$futureRows->pluck('occurrence_date')->all(), ...$children->map(fn ($c) => $c->exception_date->toDateString())->all(), ...$deliveries->pluck('occurrence_date')->all(), ...$personalReminders->pluck('occurrence_date')->all()]);
                 $oldDates = $this->dates($parent, Carbon::parse($latest)->endOfDay());
                 $offset = array_search($date, $oldDates, true);
                 abort_if($offset === false, 422, 'Choose an existing date in this series.');
@@ -94,13 +97,14 @@ class HrCalendarSeriesService
                 $next = HrCalendarEvent::create([...$base, 'starts_at' => $start, 'ends_at' => $start->copy()->addSeconds($parent->ends_at->getTimestamp() - $parent->starts_at->getTimestamp()),
                     'recurrence_until' => $parent->recurrence_until, ...$data, 'rrule' => $rule]);
                 $next->forceFill(['registration_enabled' => $parent->registration_enabled, 'registration_capacity' => $parent->registration_capacity,
-                    'registration_version' => $parent->registration_version + 1, 'edit_version' => $parent->edit_version + 1])->save();
+                    'registration_version' => $parent->registration_version + 1, 'edit_version' => $parent->edit_version + 1,
+                    ...(app(HrEventRegistrationService::class)->cutoffReady() ? ['registration_closes_before_minutes' => $parent->registration_closes_before_minutes] : [])])->save();
                 $newDates = $this->dates($next, Carbon::parse('9999-12-31')->endOfDay(), count($oldDates) - $offset);
                 $map = array_combine(array_slice($oldDates, $offset, count($newDates)), array_slice($newDates, 0, count($oldDates) - $offset));
                 if (! $next->rrule && $children->isNotEmpty()) {
                     throw ValidationException::withMessages(['rrule' => 'Keep the series recurring while it has individual date changes.']);
                 }
-                foreach ([...$futureRows->pluck('occurrence_date')->all(), ...$children->map(fn ($c) => $c->exception_date->toDateString())->all()] as $savedDate) {
+                foreach ([...$futureRows->pluck('occurrence_date')->all(), ...$children->map(fn ($c) => $c->exception_date->toDateString())->all(), ...$personalReminders->pluck('occurrence_date')->all()] as $savedDate) {
                     if (! isset($map[$savedDate])) {
                         throw ValidationException::withMessages(['rrule' => 'Keep enough future dates for the saved registrations and individual event changes.']);
                     }
@@ -120,6 +124,10 @@ class HrCalendarSeriesService
                     } elseif ($delivery->state === 'pending') {
                         DB::table(HrCalendarReminderDelivery::TABLE)->where('id', $delivery->id)->update(['state' => 'skipped', 'outcome' => 'date_removed', 'retry_at' => null, 'updated_at' => now()]);
                     }
+                }
+                foreach ($personalReminders as $choice) {
+                    DB::table(HrCalendarPersonalReminders::TABLE)->where('id', $choice->id)->update(['event_id' => $next->id,
+                        'occurrence_date' => $map[$choice->occurrence_date], 'version' => $choice->version + 1, 'updated_at' => now()]);
                 }
                 foreach ($parent->attendees()->get() as $attendee) {
                     $values = $attendee->only(['user_id', 'audience_type', 'audience_ref', 'rsvp_status', 'responded_at']);

@@ -404,7 +404,7 @@ test('removing a kudos also removes its feed post, reactions and replies', funct
         $this->worker,
         $this->teammate->id,
         'teamwork',
-        'Nice one!',
+        'Thoughtful work!',
     );
     app(FeedService::class)->toggleReaction($kudos, $this->teammate->id, 'heart');
     app(FeedService::class)->addReply($kudos, $this->teammate->id, 'Thanks!');

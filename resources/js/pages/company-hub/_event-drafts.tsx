@@ -1,30 +1,33 @@
+import { bookingCutoffLabel } from '@/components/hr/calendar/event-booking-cutoff';
 import {
     EventWizardDialog,
     type CalendarEventInitial,
 } from '@/components/hr/calendar/event-wizard-dialog';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDateTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
-import { FilePenLine, LockKeyhole, RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, LockKeyhole, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { hubRequest } from './_api';
 import type { EventOptions } from './_events';
+import { HubSelect } from './_select';
 
 export type EventDraft = {
     new_event?: boolean;
+    publish_at?: string | null;
+    schedule_error?: string | null;
     id: number;
     version: number;
-    state: 'draft' | 'review' | 'changes_requested' | 'published';
+    state:
+        | 'draft'
+        | 'review'
+        | 'changes_requested'
+        | 'published'
+        | 'scheduled'
+        | 'schedule_blocked';
     archived_at: string | null;
     owner: string;
     feedback: string | null;
@@ -32,18 +35,31 @@ export type EventDraft = {
     published_at: string | null;
     initial: CalendarEventInitial;
 };
-type Workspace = { can_publish: boolean; drafts: EventDraft[] };
+type Workspace = {
+    actor_id?: number;
+    can_schedule?: boolean;
+    can_publish: boolean;
+    drafts: EventDraft[];
+};
 const labels = {
     draft: 'Private draft',
     review: 'Awaiting review',
     changes_requested: 'Changes requested',
     published: 'Published',
+    scheduled: 'Scheduled',
+    schedule_blocked: 'Publication needs attention',
 };
 
 export function EventDraftWorkspace() {
-    const [open, setOpen] = useState(() =>
-        new URLSearchParams(window.location.search).has('event_draft'),
-    );
+    const open = true;
+    const pending = useRef(false);
+    const alive = useRef(true);
+    useEffect(() => {
+        alive.current = true;
+        return () => {
+            alive.current = false;
+        };
+    }, []);
     const [workspace, setWorkspace] = useState<Workspace | null>(null);
     const [options, setOptions] = useState<EventOptions | null>(null);
     const [selectedId, setSelectedId] = useState<number | null>(
@@ -73,6 +89,10 @@ export function EventDraftWorkspace() {
         ])
             .then(([next, choices]) => {
                 if (!current) return;
+                if (next.actor_id !== choices.actor_id)
+                    throw new Error(
+                        'Your account has changed. Refresh drafts to continue.',
+                    );
                 setWorkspace(next);
                 setOptions(choices);
             })
@@ -100,7 +120,8 @@ export function EventDraftWorkspace() {
                 .includes(query.toLowerCase()),
     );
     const transition = async (action: string) => {
-        if (!selected || busy || loading) return;
+        if (!selected || busy || loading || pending.current) return;
+        pending.current = true;
         setBusy(true);
         setError('');
         setMessage('');
@@ -110,10 +131,21 @@ export function EventDraftWorkspace() {
                 'POST',
                 {
                     action,
+                    ...(workspace?.actor_id
+                        ? { actor_id: workspace.actor_id }
+                        : {}),
                     version: selected.version,
                     feedback: action === 'return' ? feedback : undefined,
                 },
             );
+            if (!alive.current) return;
+            if (
+                result.draft.id !== selected.id ||
+                result.draft.version <= selected.version
+            )
+                throw new Error(
+                    'The saved version could not be confirmed. Refresh drafts before continuing.',
+                );
             setWorkspace((current) =>
                 current
                     ? {
@@ -130,50 +162,56 @@ export function EventDraftWorkspace() {
             setFeedback('');
             setMessage(
                 action === 'approve'
-                    ? 'Event published. Staff can now see the approved version.'
-                    : action === 'return'
-                      ? 'Feedback returned to the author.'
-                      : action === 'withdraw'
-                        ? 'Review withdrawn. You can edit this draft again.'
-                        : action === 'archive'
-                          ? 'Private draft archived. The published event is unchanged.'
-                          : 'Private draft restored.',
+                    ? result.draft.state === 'scheduled'
+                        ? 'Event scheduled for publication.'
+                        : 'Event published. Staff can now see the approved version.'
+                    : action === 'cancel_schedule'
+                      ? 'Publication cancelled. The private draft can be edited again.'
+                      : action === 'return'
+                        ? 'Feedback returned to the author.'
+                        : action === 'withdraw'
+                          ? 'Review withdrawn. You can edit this draft again.'
+                          : action === 'archive'
+                            ? 'Private draft archived. The published event is unchanged.'
+                            : 'Private draft restored.',
             );
             if (action === 'approve')
                 router.reload({ only: ['events'], preserveScroll: true });
         } catch (e) {
+            if (!alive.current) return;
             setError((e as Error).message);
         } finally {
+            pending.current = false;
             setBusy(false);
         }
     };
     return (
         <>
-            <Button
-                variant="outline"
-                onClick={() => {
-                    setOpen(true);
-                    setMessage('');
-                }}
-            >
-                <FilePenLine className="size-4" />
-                Event drafts
-            </Button>
-            <Dialog
-                open={open && !editing}
-                onOpenChange={(value) => {
-                    if (!busy) setOpen(value);
-                }}
-            >
-                <DialogContent className="max-h-[90vh] overflow-x-hidden overflow-y-auto sm:max-w-6xl">
-                    <DialogHeader>
-                        <DialogTitle>Event drafts</DialogTitle>
-                        <DialogDescription>
+            {!editing && (
+                <section
+                    className="space-y-6"
+                    aria-label="Event drafts workspace"
+                >
+                    <header>
+                        <Button
+                            variant="ghost"
+                            className="mb-3 -ml-3"
+                            disabled={busy}
+                            onClick={() =>
+                                router.visit('/company-hub?view=events')
+                            }
+                        >
+                            <ArrowLeft className="size-4" />
+                            Back to events
+                        </Button>
+                        <h1 className="text-2xl font-semibold tracking-tight">
+                            Event drafts
+                        </h1>
+                        <p className="mt-2 text-sm text-muted-foreground">
                             Prepare, review and publish company events. Private
-                            changes stay here until an authorised editor
-                            publishes them.
-                        </DialogDescription>
-                    </DialogHeader>
+                            changes stay here until publication.
+                        </p>
+                    </header>
                     <div className="flex items-center gap-3">
                         <Input
                             aria-label="Search event drafts"
@@ -181,22 +219,38 @@ export function EventDraftWorkspace() {
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
-                        <select
-                            className="hub-native-select min-w-44 shrink-0"
-                            aria-label="Event draft status"
-                            value={filter}
-                            onChange={(e) => {
-                                setFilter(e.target.value);
-                                setSelectedId(null);
-                                setReturning(false);
-                                setMessage('');
-                            }}
-                        >
-                            <option value="active">In progress</option>
-                            <option value="review">Awaiting review</option>
-                            <option value="published">Published history</option>
-                            <option value="archived">Archived drafts</option>
-                        </select>
+                        <div className="w-48 shrink-0">
+                            <HubSelect
+                                label="Event draft status"
+                                value={filter}
+                                onChange={(value) => {
+                                    setFilter(value);
+                                    setSelectedId(null);
+                                    setReturning(false);
+                                    setMessage('');
+                                }}
+                                options={[
+                                    { value: 'active', label: 'In progress' },
+                                    {
+                                        value: 'review',
+                                        label: 'Awaiting review',
+                                    },
+                                    { value: 'scheduled', label: 'Scheduled' },
+                                    {
+                                        value: 'schedule_blocked',
+                                        label: 'Needs attention',
+                                    },
+                                    {
+                                        value: 'published',
+                                        label: 'Published history',
+                                    },
+                                    {
+                                        value: 'archived',
+                                        label: 'Archived drafts',
+                                    },
+                                ]}
+                            />
+                        </div>
                         <Button
                             variant="outline"
                             disabled={loading || busy}
@@ -295,6 +349,20 @@ export function EventDraftWorkspace() {
                                         </p>
                                     </div>
                                 </div>
+                                {selected.publish_at && (
+                                    <p className="text-sm">
+                                        Publication:{' '}
+                                        {formatDateTime(selected.publish_at)}
+                                    </p>
+                                )}
+                                {selected.schedule_error && (
+                                    <p
+                                        role="alert"
+                                        className="text-sm text-destructive"
+                                    >
+                                        {selected.schedule_error}
+                                    </p>
+                                )}
                                 {selected.feedback && (
                                     <div className="rounded-xl border bg-muted/50 p-4">
                                         <h3 className="text-sm font-semibold">
@@ -310,6 +378,23 @@ export function EventDraftWorkspace() {
                                     options={options}
                                 />
                                 <div className="flex flex-wrap gap-2 border-t pt-4">
+                                    {!selected.archived_at &&
+                                        [
+                                            'scheduled',
+                                            'schedule_blocked',
+                                        ].includes(selected.state) && (
+                                            <Button
+                                                variant="outline"
+                                                disabled={busy || loading}
+                                                onClick={() =>
+                                                    void transition(
+                                                        'cancel_schedule',
+                                                    )
+                                                }
+                                            >
+                                                Cancel publication & edit draft
+                                            </Button>
+                                        )}
                                     {!selected.archived_at &&
                                         ['draft', 'changes_requested'].includes(
                                             selected.state,
@@ -338,7 +423,9 @@ export function EventDraftWorkspace() {
                                                                 )
                                                             }
                                                         >
-                                                            Approve & publish
+                                                            {selected.publish_at
+                                                                ? 'Approve & schedule'
+                                                                : 'Approve & publish'}
                                                         </Button>
                                                         <Button
                                                             variant="outline"
@@ -368,7 +455,11 @@ export function EventDraftWorkspace() {
                                                 </Button>
                                             </>
                                         )}
-                                    {selected.state !== 'published' && (
+                                    {![
+                                        'published',
+                                        'scheduled',
+                                        'schedule_blocked',
+                                    ].includes(selected.state) && (
                                         <Button
                                             variant="outline"
                                             disabled={busy || loading}
@@ -444,17 +535,22 @@ export function EventDraftWorkspace() {
                             </div>
                         )}
                     </div>
-                </DialogContent>
-            </Dialog>
+                </section>
+            )}
             {editing && options && (
                 <EventWizardDialog
                     open
+                    presentation="page"
                     {...options}
                     initial={editing.initial}
                     publishing={{
                         draft_id: editing.id,
                         version: editing.version,
                         can_publish: !!workspace?.can_publish,
+                        can_schedule: !!workspace?.can_schedule,
+                        cutoff_supported: !!options.cutoff_supported,
+                        actor_id: workspace?.actor_id,
+                        publish_at: editing.publish_at,
                     }}
                     onClose={() => {
                         setEditing(null);
@@ -572,6 +668,20 @@ function EventDraftPreview({
                                   .join(', ')
                             : 'No reminders',
                     ],
+                    ...(options.cutoff_supported &&
+                    event.registration_enabled &&
+                    event.scope !== 'this' &&
+                    !event.recurrence_parent_id
+                        ? [
+                              [
+                                  'Registration closes',
+                                  bookingCutoffLabel(
+                                      event.registration_closes_before_minutes?.toString() ??
+                                          '',
+                                  ),
+                              ],
+                          ]
+                        : []),
                 ].map(([label, value]) => (
                     <div key={label}>
                         <dt className="text-xs text-muted-foreground">

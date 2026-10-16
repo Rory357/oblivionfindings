@@ -26,6 +26,7 @@ class HubPlanningController extends Controller
             'owner_id' => 'required|integer', 'template' => ['required', Rule::in(HubTemplates::KEYS)], 'brief' => 'nullable|string|max:2000',
             'audience' => 'required|array:type,ids', 'audience.type' => ['required', Rule::in(['all', 'sites', 'departments'])],
             'audience.ids' => 'present|array|max:100', 'audience.ids.*' => 'integer|distinct', 'version' => $plan ? 'required|integer|min:1' : 'nullable',
+            'actor_id' => 'sometimes|required|integer|min:1',
         ]);
         $data['owner_id'] = (int) $data['owner_id'];
         $data['version'] = (int) ($data['version'] ?? 1);
@@ -36,10 +37,10 @@ class HubPlanningController extends Controller
 
     public function start(Request $request, HubEditorialPlan $plan, HubPlanning $planning)
     {
-        $data = $request->validate(['version' => 'required|integer|min:1']);
-        $page = $planning->start($request->user(), $plan, (int) $data['version']);
+        $data = $request->validate(['version' => 'required|integer|min:1', 'actor_id' => 'sometimes|required|integer|min:1']);
+        $page = $planning->start($request->user(), $plan, (int) $data['version'], $data);
 
-        return response()->json(['url' => '/company-hub/manage/'.$page->id.'/edit', 'page_id' => $page->id]);
+        return response()->json(['url' => '/company-hub/manage/'.$page->id.'/edit', 'page_id' => $page->id, 'actor_id' => (int) $request->user()->getAuthIdentifier()]);
     }
 
     public function insights(Request $request, HubInsights $insights)

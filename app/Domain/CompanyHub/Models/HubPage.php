@@ -13,7 +13,7 @@ class HubPage extends Model
 {
     protected $guarded = ['id'];
 
-    protected $casts = ['draft' => 'array', 'draft_version' => 'integer', 'archived_at' => 'datetime'];
+    protected $casts = ['draft' => 'array', 'draft_version' => 'integer', 'archived_at' => 'datetime', 'draft_discarded_at' => 'datetime'];
 
     public function owner(): BelongsTo
     {

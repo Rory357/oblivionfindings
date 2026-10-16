@@ -9,7 +9,11 @@ import {
 import { useState, type AnchorHTMLAttributes } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HubBlocks } from './_blocks';
-import { ChecklistSettings, KnowledgeReader } from './_knowledge';
+import {
+    ChecklistSettings,
+    KnowledgeReader,
+    isKnowledgePage,
+} from './_knowledge';
 import type {
     HubChecklistProgress,
     HubContent,
@@ -18,6 +22,78 @@ import type {
 } from './_types';
 
 const { request } = vi.hoisted(() => ({ request: vi.fn() }));
+it('keeps all intersecting guide sections when deciding the current contents link', () => {
+    let notify!: IntersectionObserverCallback;
+    vi.stubGlobal(
+        'IntersectionObserver',
+        class {
+            constructor(callback: IntersectionObserverCallback) {
+                notify = callback;
+            }
+            observe() {}
+            disconnect() {}
+        },
+    );
+    try {
+        render(
+            <KnowledgeReader
+                content={{
+                    ...content,
+                    sections: [
+                        {
+                            id: 'reading',
+                            columns: 1,
+                            blocks: [
+                                {
+                                    id: 'a',
+                                    type: 'text',
+                                    title: 'First section',
+                                },
+                                {
+                                    id: 'b',
+                                    type: 'text',
+                                    title: 'Second section',
+                                },
+                            ],
+                        },
+                    ],
+                }}
+            >
+                <section id="block-a">First body</section>
+                <section id="block-b">Second body</section>
+            </KnowledgeReader>,
+        );
+        const a = document.getElementById('block-a')!;
+        const b = document.getElementById('block-b')!;
+        vi.spyOn(a, 'getBoundingClientRect').mockReturnValue({
+            top: 130,
+        } as DOMRect);
+        vi.spyOn(b, 'getBoundingClientRect').mockReturnValue({
+            top: 250,
+        } as DOMRect);
+        const entry = (target: Element, isIntersecting: boolean) =>
+            ({ target, isIntersecting }) as IntersectionObserverEntry;
+        act(() =>
+            notify(
+                [entry(a, true), entry(b, true)],
+                {} as IntersectionObserver,
+            ),
+        );
+        expect(
+            screen.getByRole('link', { name: 'First section' }),
+        ).toHaveAttribute('aria-current', 'location');
+        act(() => notify([entry(a, false)], {} as IntersectionObserver));
+        expect(
+            screen.getByRole('link', { name: 'Second section' }),
+        ).toHaveAttribute('aria-current', 'location');
+        act(() => notify([entry(a, true)], {} as IntersectionObserver));
+        expect(
+            screen.getByRole('link', { name: 'First section' }),
+        ).toHaveAttribute('aria-current', 'location');
+    } finally {
+        vi.unstubAllGlobals();
+    }
+});
 vi.mock('./_api', () => ({ hubRequest: request }));
 vi.mock('@inertiajs/react', () => ({
     Link: (props: AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props} />,
@@ -84,13 +160,15 @@ const knowledge: HubKnowledge = {
 function Reader({
     data = knowledge,
     preview = false,
+    resourceType = 'Checklist',
 }: {
     data?: HubKnowledge;
     preview?: boolean;
+    resourceType?: string;
 }) {
     return (
         <KnowledgeReader
-            content={content}
+            content={{ ...content, resource_type: resourceType }}
             knowledge={data}
             publishedAt="2026-10-13T00:00:00Z"
             preview={preview}
@@ -128,47 +206,52 @@ describe('knowledge reader', () => {
             screen.getByText(/do not record a policy read confirmation/),
         ).toBeVisible();
     });
-    it('saves and removes an exact personal step and displays the server-confirmed progress', async () => {
-        request.mockImplementation((_url, _method, body) =>
-            Promise.resolve({
-                ...knowledge,
-                steps: knowledge.steps.map((step) => ({
-                    ...step,
-                    done: step.id === body.step_id && body.done,
-                })),
-            }),
-        );
-        render(<Reader />);
-        fireEvent.click(
-            screen.getByRole('checkbox', { name: 'Meet your buddy' }),
-        );
-        await waitFor(() =>
-            expect(
+    it.each(['Checklist', 'Process'])(
+        'saves and removes an exact personal %s step and displays server-confirmed progress',
+        async (resourceType) => {
+            request.mockImplementation((_url, _method, body) =>
+                Promise.resolve({
+                    ...knowledge,
+                    steps: knowledge.steps.map((step) => ({
+                        ...step,
+                        done: step.id === body.step_id && body.done,
+                    })),
+                }),
+            );
+            render(<Reader resourceType={resourceType} />);
+            fireEvent.click(
                 screen.getByRole('checkbox', { name: 'Meet your buddy' }),
-            ).toBeChecked(),
-        );
-        expect(request).toHaveBeenCalledWith(
-            '/company-hub/pages/11/checklist',
-            'PUT',
-            {
-                actor_id: 7,
-                revision_id: 30,
-                step_id: 'welcome',
-                step_key: knowledge.steps[0].key,
-                done: true,
-            },
-        );
-        expect(screen.getByText('1 of 2 complete')).toBeVisible();
-        fireEvent.click(
-            screen.getByRole('checkbox', { name: 'Meet your buddy' }),
-        );
-        await waitFor(() =>
-            expect(
+            );
+            await waitFor(() =>
+                expect(
+                    screen.getByRole('checkbox', { name: 'Meet your buddy' }),
+                ).toBeChecked(),
+            );
+            expect(request).toHaveBeenCalledWith(
+                '/company-hub/pages/11/checklist',
+                'PUT',
+                {
+                    actor_id: 7,
+                    revision_id: 30,
+                    step_id: 'welcome',
+                    step_key: knowledge.steps[0].key,
+                    done: true,
+                },
+            );
+            expect(screen.getByText('1 of 2 complete')).toBeVisible();
+            fireEvent.click(
                 screen.getByRole('checkbox', { name: 'Meet your buddy' }),
-            ).not.toBeChecked(),
-        );
-        expect(screen.getByRole('status')).toHaveTextContent('Progress saved');
-    });
+            );
+            await waitFor(() =>
+                expect(
+                    screen.getByRole('checkbox', { name: 'Meet your buddy' }),
+                ).not.toBeChecked(),
+            );
+            expect(screen.getByRole('status')).toHaveTextContent(
+                'Progress saved',
+            );
+        },
+    );
     it('keeps the previous state and explains a rejected stale instruction', async () => {
         request.mockRejectedValue(
             new Error(
@@ -225,27 +308,46 @@ describe('knowledge reader', () => {
         expect(screen.getByText('0 of 2 complete')).toBeVisible();
         expect(screen.queryByText('Progress saved')).not.toBeInTheDocument();
     });
-    it('shows disabled unchecked steps in the editor preview without writing personal progress', () => {
+    it.each(['Checklist', 'Process'])(
+        'previews disabled unchecked %s steps without writing personal progress',
+        (resourceType) => {
+            render(
+                <Reader
+                    data={{
+                        ...knowledge,
+                        steps: knowledge.steps.map((step) => ({
+                            ...step,
+                            done: true,
+                        })),
+                    }}
+                    preview
+                    resourceType={resourceType}
+                />,
+            );
+            expect(
+                screen.getByRole('checkbox', { name: 'Meet your buddy' }),
+            ).toBeDisabled();
+            expect(
+                screen.getByRole('checkbox', { name: 'Meet your buddy' }),
+            ).not.toBeChecked();
+            expect(screen.getByText(/Draft preview/)).toBeVisible();
+            expect(request).not.toHaveBeenCalled();
+        },
+    );
+    it('treats a Process as a knowledge page without inventing steps for a prose-only process', () => {
+        const prose = { ...content, resource_type: 'Process', checklist: [] };
+        expect(isKnowledgePage('page', prose)).toBe(true);
         render(
-            <Reader
-                data={{
-                    ...knowledge,
-                    steps: knowledge.steps.map((step) => ({
-                        ...step,
-                        done: true,
-                    })),
-                }}
-                preview
-            />,
+            <KnowledgeReader
+                content={prose}
+                knowledge={{ ...knowledge, steps: [] }}
+            >
+                <p>Read the procedure.</p>
+            </KnowledgeReader>,
         );
-        expect(
-            screen.getByRole('checkbox', { name: 'Meet your buddy' }),
-        ).toBeDisabled();
-        expect(
-            screen.getByRole('checkbox', { name: 'Meet your buddy' }),
-        ).not.toBeChecked();
-        expect(screen.getByText(/Draft preview/)).toBeVisible();
-        expect(request).not.toHaveBeenCalled();
+        expect(screen.getByText('Read the procedure.')).toBeVisible();
+        expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+        expect(screen.queryByText('Your checklist')).not.toBeInTheDocument();
     });
     it('edits reorders and removes checklist steps without replacing their stable identities', () => {
         let result = content.checklist!;

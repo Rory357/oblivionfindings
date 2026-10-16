@@ -156,4 +156,34 @@ class HrCalendarRecurrence
 
         return Carbon::parse($value, $zone)->endOfDay()->utc();
     }
+
+    /** Latest surviving historic date without materialising an unlimited series' lifetime. */
+    public function latestBefore(HrCalendarEvent $event, Carbon $to, array $excludedDates = []): ?array
+    {
+        if (! $event->starts_at || ! $event->ends_at) {
+            return null;
+        }
+        $rule = $this->rule($event->rrule);
+        $end = $event->recurrence_until ? $to->copy()->min($event->recurrence_until) : $to->copy();
+        $windowDays = max(31, ($rule['interval'] ?? 1) * match ($rule['freq'] ?? '') {
+            'WEEKLY' => 21,
+            'MONTHLY' => 93,
+            default => 3,
+        });
+        while ($end->gte($event->starts_at)) {
+            // Finite COUNT rules are capped by validation at 10,000; unlimited
+            // rules walk small windows backwards, including suppressed dates.
+            $start = ($rule['count'] ?? null) !== null || ! $rule
+                ? $event->starts_at->copy() : $end->copy()->subDays($windowDays)->max($event->starts_at);
+            $dates = $this->between($event, $start, $end);
+            foreach (array_reverse($dates) as $date) {
+                if (! in_array($date['date'], $excludedDates, true)) {
+                    return $date;
+                }
+            }
+            $end = $start->subSecond();
+        }
+
+        return null;
+    }
 }

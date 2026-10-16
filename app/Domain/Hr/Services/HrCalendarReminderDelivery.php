@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\CompanyHub\Services\HubNotificationPreferences;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrCalendarEventReminder;
 use App\Domain\Hr\Notifications\CalendarReminderNotification;
@@ -45,7 +46,7 @@ class HrCalendarReminderDelivery
             });
         }
 
-        return $count;
+        return $count + app(HrCalendarPersonalReminders::class)->stage($now);
     }
 
     public function deliver(Carbon $now): int
@@ -62,13 +63,15 @@ class HrCalendarReminderDelivery
                 $ready = collect();
                 foreach ($rows as $delivery) {
                     $root = $roots->get($delivery->event_id);
-                    $current = $root ? $this->current($root, $delivery, $now) : null;
-                    if (! $user || ! $current || ! $this->recipients->eligible($user, $root, $current['event'], $delivery->occurrence_date)) {
+                    $personal = $user && $root ? app(HrCalendarPersonalReminders::class)->current($user, $root, $delivery, $now) : null;
+                    $current = $root ? $this->current($root, $delivery, $now) ?? $personal : null;
+                    if (! $user || ! $current || (! $personal && ! $this->recipients->eligible($user, $root, $current['event'], $delivery->occurrence_date))) {
                         $this->finish($delivery->id, 'skipped', 'event_or_recipient_unavailable', $now);
 
                         continue;
                     }
-                    if (! $this->preferences->allows($user, $delivery->channel)) {
+                    // Filter each current receipt before coalescing or a mixed email digest.
+                    if (! app(HubNotificationPreferences::class)->allowsEvent($user, $current['event']) || ! $this->preferences->allows($user, $delivery->channel)) {
                         $this->finish($delivery->id, 'skipped', 'notification_preference', $now);
 
                         continue;

@@ -1,31 +1,20 @@
+import { AppreciationIcon } from '@/components/recognition/appreciation-icon';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Link } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, BookOpen, Images } from 'lucide-react';
-import { useState } from 'react';
+import { BookOpen, Images } from 'lucide-react';
+import { EventGallery } from './_event-gallery';
 import type { HubEvent } from './_types';
 
-export function EventStory({ event }: { event: HubEvent }) {
+export function EventStory({
+    event,
+    onRecognise,
+}: {
+    event: HubEvent;
+    onRecognise?: () => void;
+}) {
     const content = event.extendedProps.hubContent;
-    const [photo, setPhoto] = useState<number | null>(null);
     if (!content) return null;
     const gallery = content.gallery;
-    const previous = () =>
-        setPhoto((index) =>
-            index === null
-                ? null
-                : (index + gallery.length - 1) % gallery.length,
-        );
-    const next = () =>
-        setPhoto((index) =>
-            index === null ? null : (index + 1) % gallery.length,
-        );
     const agenda = content.agenda
         .split('\n')
         .map((item) => item.trim())
@@ -49,7 +38,16 @@ export function EventStory({ event }: { event: HubEvent }) {
                             Your host
                         </p>
                         <p className="text-sm font-medium">
-                            {content.host.name}
+                            {content.host.profile_url ? (
+                                <Link
+                                    href={content.host.profile_url}
+                                    className="text-primary underline-offset-4 hover:underline"
+                                >
+                                    {content.host.name}
+                                </Link>
+                            ) : (
+                                content.host.name
+                            )}
                         </p>
                     </div>
                 </div>
@@ -82,7 +80,7 @@ export function EventStory({ event }: { event: HubEvent }) {
                         Photos & recaps
                     </div>
                     <h3 className="text-xl font-semibold">
-                        A little look back
+                        {content.recap_title || 'A little look back'}
                     </h3>
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">
                         {content.recap ||
@@ -97,26 +95,11 @@ export function EventStory({ event }: { event: HubEvent }) {
                             .
                         </p>
                     )}
-                    {gallery.length > 0 && (
-                        <div className="grid grid-cols-3 gap-3">
-                            {gallery.map((image, index) => (
-                                <Button
-                                    key={image.id}
-                                    type="button"
-                                    variant="ghost"
-                                    aria-label={`View event photo ${index + 1} of ${gallery.length}`}
-                                    onClick={() => setPhoto(index)}
-                                    className="h-auto overflow-hidden rounded-xl border p-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-                                >
-                                    <img
-                                        src={image.url}
-                                        alt=""
-                                        className="h-36 w-full object-cover transition-transform hover:scale-105"
-                                    />
-                                </Button>
-                            ))}
-                        </div>
-                    )}
+                    <EventGallery
+                        key={event.id}
+                        photos={gallery}
+                        title={event.title}
+                    />
                     {content.story && (
                         <Button variant="outline" asChild>
                             <Link href={content.story.url}>
@@ -125,55 +108,29 @@ export function EventStory({ event }: { event: HubEvent }) {
                             </Link>
                         </Button>
                     )}
-                </section>
-            )}
-            <Dialog
-                open={photo !== null}
-                onOpenChange={(open) => !open && setPhoto(null)}
-            >
-                <DialogContent
-                    style={{
-                        width: 'min(92vw, 980px)',
-                        maxWidth: 'min(92vw, 980px)',
-                    }}
-                    onKeyDown={(e) => {
-                        if (e.key === 'ArrowLeft') {
-                            e.preventDefault();
-                            previous();
-                        }
-                        if (e.key === 'ArrowRight') {
-                            e.preventDefault();
-                            next();
-                        }
-                    }}
-                >
-                    <DialogHeader>
-                        <DialogTitle>{event.title} · Photos</DialogTitle>
-                        <DialogDescription>
-                            Photo {(photo ?? 0) + 1} of {gallery.length}
-                        </DialogDescription>
-                    </DialogHeader>
-                    {photo !== null && gallery[photo] && (
-                        <img
-                            className="max-h-[65vh] w-full rounded-lg object-contain"
-                            src={gallery[photo].url}
-                            alt={`Event photo ${photo + 1}`}
-                        />
-                    )}
-                    {gallery.length > 1 && (
-                        <div className="flex justify-between">
-                            <Button variant="outline" onClick={previous}>
-                                <ArrowLeft className="size-4" />
-                                Previous photo
-                            </Button>
-                            <Button variant="outline" onClick={next}>
-                                Next photo
-                                <ArrowRight className="size-4" />
+                    {onRecognise && (
+                        <div className="flex items-center justify-between gap-4 border-t pt-4">
+                            <div>
+                                <h4 className="text-sm font-semibold">
+                                    Good moments start with good people.
+                                </h4>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                    Choose the colleagues you’d like to
+                                    recognise and share a thank-you.
+                                </p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                className="shrink-0"
+                                onClick={() => onRecognise()}
+                            >
+                                <AppreciationIcon className="size-4" />
+                                Thank the team
                             </Button>
                         </div>
                     )}
-                </DialogContent>
-            </Dialog>
+                </section>
+            )}
         </>
     );
 }

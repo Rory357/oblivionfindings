@@ -1,6 +1,7 @@
 import type { HubBlock, HubSection } from './_types';
 
 export const blockLibrary = [
+    ['featured', 'Featured stories'],
     ['text', 'Text & story'],
     ['news', 'Company news'],
     ['shoutouts', 'Shout-outs'],
@@ -11,8 +12,13 @@ export const blockLibrary = [
     ['image', 'Image'],
     ['video', 'Video link'],
     ['notices', 'Important notices'],
+    ['notice', 'Custom callout'],
+    ['button', 'Call to action'],
     ['people', 'Staff directory'],
+    ['teams', 'Team spaces'],
+    ['services', 'Staff services'],
     ['poll', 'Quick poll'],
+    ['campaign', 'Campaign'],
     ['file', 'Downloadable file'],
 ] as const;
 
@@ -21,7 +27,16 @@ export function createBlock(type: string): HubBlock {
         id: crypto.randomUUID(),
         type,
         title: blockLibrary.find((b) => b[0] === type)?.[1] ?? 'Content',
+        ...(type === 'featured'
+            ? { title: '', story_id: null, layout: 'mosaic' as const }
+            : {}),
+        ...(type === 'button'
+            ? { action_label: 'Explore', body: '', url: '' }
+            : {}),
+        ...(type === 'notice' ? { body: '' } : {}),
         ...(type === 'text' ? { body: '' } : {}),
+        ...(type === 'people' ? { mode: 'finder' as const } : {}),
+        ...(type === 'campaign' ? { limit: 1 } : {}),
         ...(type === 'links' ? { links: [] } : {}),
         ...(type === 'poll'
             ? {
@@ -35,6 +50,9 @@ export function createBlock(type: string): HubBlock {
             'shoutouts',
             'celebrations',
             'resources',
+            'people',
+            'teams',
+            'services',
         ].includes(type)
             ? { limit: 4 }
             : {}),

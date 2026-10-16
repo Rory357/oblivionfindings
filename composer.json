@@ -24,6 +24,7 @@
         "phpseclib/phpseclib": "^3.0",
         "pragmarx/google2fa": "^9.0",
         "predis/predis": "^2.2",
+        "smalot/pdfparser": "2.13.1",
         "socialiteproviders/google": "^4.1",
         "socialiteproviders/microsoft": "^4.6",
         "twilio/sdk": "^8.11"

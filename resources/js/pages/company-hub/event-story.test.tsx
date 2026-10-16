@@ -35,7 +35,7 @@ describe('Event story', () => {
             screen.getByRole('link', { name: 'Read story: Our story' }),
         ).toHaveAttribute('href', '/company-hub/read/our-story');
         fireEvent.click(
-            screen.getByRole('button', { name: 'View event photo 2 of 2' }),
+            screen.getByRole('button', { name: 'View event photo 2 of 2: two.png' }),
         );
         const dialog = screen.getByRole('dialog');
         expect(within(dialog).getByRole('img')).toHaveAttribute(

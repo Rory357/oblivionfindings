@@ -24,6 +24,29 @@ class HubPlanning
         abort_unless($user->canDo('company_hub.write') || $user->canDo('company_hub.edit_all') || $user->canDo('company_hub.layout'), 403);
     }
 
+    private function currentActor(User $user): User
+    {
+        $user = $user->fresh();
+        abort_unless($user, 403);
+        $this->assertWorkspace($user);
+
+        return $user;
+    }
+
+    private function assertActor(User $user, array $context): void
+    {
+        abort_if(array_key_exists('actor_id', $context) && (int) $context['actor_id'] !== (int) $user->id, 409, 'Your signed-in account changed. Reload the planning workspace.');
+    }
+
+    private function sameAudience(array $current, array $submitted): bool
+    {
+        // JSON object key ordering does not change the original audience settings.
+        ksort($current);
+        ksort($submitted);
+
+        return $current === $submitted;
+    }
+
     private function candidate(array $audience, int $ownerId): HubPage
     {
         return new HubPage(['kind' => 'news', 'owner_id' => $ownerId, 'draft' => ['audience' => $audience]]);
@@ -77,8 +100,17 @@ class HubPlanning
                 $date = CarbonImmutable::parse($draft['initial']['starts_at'])->setTimezone($start->timezone)->toDateString();
                 if (str_starts_with($date, $month)) {
                     $items[] = ['key' => 'event-draft:'.$draft['id'], 'type' => 'event', 'date' => $date, 'title' => $draft['initial']['title'], 'owner' => $draft['owner'], 'status' => match ($draft['state']) {
-                        'review' => 'Event awaiting review', 'changes_requested' => 'Event changes requested', default => 'Private event draft'
+                        'review' => 'Event awaiting review', 'changes_requested' => 'Event changes requested', 'scheduled' => 'Event publication scheduled',
+                        'schedule_blocked' => 'Event publication needs attention', default => 'Private event draft'
                     }, 'url' => '/company-hub?view=events&event_draft='.$draft['id']];
+                }
+                if (in_array($draft['state'], ['scheduled', 'schedule_blocked'], true) && $draft['publish_at']) {
+                    $publicationDate = CarbonImmutable::parse($draft['publish_at'])->setTimezone($start->timezone)->toDateString();
+                    if (str_starts_with($publicationDate, $month)) {
+                        $items[] = ['key' => 'event-publication:'.$draft['id'], 'type' => 'event', 'date' => $publicationDate,
+                            'title' => $draft['initial']['title'], 'owner' => $draft['owner'], 'status' => $draft['state'] === 'scheduled' ? 'Scheduled event publication' : 'Event publication needs attention',
+                            'url' => '/company-hub?view=events&event_draft='.$draft['id']];
+                    }
                 }
             }
         }
@@ -146,18 +178,20 @@ class HubPlanning
 
     public function save(User $user, array $data, ?HubEditorialPlan $plan = null): array
     {
-        $this->assertWorkspace($user);
+        $user = $this->currentActor($user);
 
         return DB::transaction(function () use ($user, $data, $plan) {
             if ($plan) {
                 $plan = HubEditorialPlan::whereKey($plan->id)->lockForUpdate()->firstOrFail();
                 abort_unless($this->canEdit($user, $plan), 404);
+                $this->assertActor($user, $data);
                 abort_unless($plan->version === $data['version'], 409, 'This plan has changed. Reload the calendar before editing it again.');
-                if ($plan->hub_page_id && ($plan->owner_id !== $data['owner_id'] || $plan->template !== $data['template'] || $plan->audience !== $data['audience'])) {
+                if ($plan->hub_page_id && ($plan->owner_id !== $data['owner_id'] || $plan->template !== $data['template'] || ! $this->sameAudience($plan->audience, $data['audience']))) {
                     throw ValidationException::withMessages(['plan' => 'Change ownership or audience in the linked page editor. The original plan settings are retained.']);
                 }
             } else {
                 abort_unless($user->canDo('company_hub.write'), 403);
+                $this->assertActor($user, $data);
             }
             $candidate = $this->candidate($data['audience'], $data['owner_id']);
             abort_unless($this->access->canAuthorAudience($user, $candidate->draft), 422, 'Choose an audience within your approved access.');
@@ -177,17 +211,18 @@ class HubPlanning
             }
             $this->audit($user, $plan, 'saved');
 
-            return $this->serialize($plan->fresh(['owner', 'page']));
+            return [...$this->serialize($plan->fresh(['owner', 'page'])), 'actor_id' => (int) $user->id];
         });
     }
 
-    public function start(User $user, HubEditorialPlan $plan, int $version): HubPage
+    public function start(User $user, HubEditorialPlan $plan, int $version, array $context = []): HubPage
     {
-        $this->assertWorkspace($user);
+        $user = $this->currentActor($user);
 
-        return DB::transaction(function () use ($user, $plan, $version) {
+        return DB::transaction(function () use ($user, $plan, $version, $context) {
             $plan = HubEditorialPlan::whereKey($plan->id)->lockForUpdate()->firstOrFail();
             abort_unless($this->canEdit($user, $plan), 404);
+            $this->assertActor($user, $context);
             // Retrying an already linked plan opens the same draft, never creates another page.
             if ($plan->hub_page_id) {
                 return $plan->page;
@@ -195,9 +230,7 @@ class HubPlanning
             abort_unless($plan->version === $version, 409, 'This plan has changed. Reload the calendar before starting its draft.');
             $owner = User::find($plan->owner_id);
             abort_unless($owner && $this->access->canEdit($owner, $this->candidate($plan->audience, $plan->owner_id)), 422, 'Reassign the plan to a current author who can edit its audience.');
-            $kind = match ($plan->template) {
-                'guide' => 'knowledge', 'team' => 'department', 'campaign' => 'campaign', 'information', 'blank', 'welcome' => 'page', default => 'news'
-            };
+            $kind = array_column(HubTemplates::catalogue(), 'kind', 'key')[$plan->template] ?? 'news';
             $page = $this->publishing->create($user, $kind, $plan->title, $plan->template);
             $page->refresh();
             $page = $this->publishing->save($user, $page, [...$page->draft, 'audience' => $plan->audience, 'planned_for' => $plan->target_date->toDateString()], $page->draft_version);

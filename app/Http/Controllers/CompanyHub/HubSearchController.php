@@ -15,6 +15,7 @@ class HubSearchController extends Controller
         return response()->json([
             'actor_id' => $request->user()->id,
             'results' => $search->search($request->user(), $data['query']),
+            'document_text_incomplete' => $search->documentTextIncomplete(),
         ], 200, ['Cache-Control' => 'no-store, private']);
     }
 }

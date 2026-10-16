@@ -1,21 +1,33 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link } from '@inertiajs/react';
-import { Network, Search, UsersRound } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronRight, Network, Search, UsersRound } from 'lucide-react';
+import { HubBrowseSelect } from './_browse-select';
+import { HubPersonAvatar } from './_person-avatar';
+import { useHubListControls } from './_reading-navigation';
 import type { HubPerson } from './_types';
 
 export function PeopleDirectory({
     people,
     canViewOrg,
+    readOnly = false,
 }: {
     people: HubPerson[];
     canViewOrg?: boolean;
+    readOnly?: boolean;
 }) {
-    const [query, setQuery] = useState('');
-    const [department, setDepartment] = useState('all');
-    const [site, setSite] = useState('all');
-    const [mode, setMode] = useState('cards');
+    const [{ query, department, site, mode }, setControls] = useHubListControls(
+        'people',
+        { query: '', department: 'all', site: 'all', mode: 'cards' },
+    );
+    const setQuery = (query: string) =>
+        setControls((previous) => ({ ...previous, query }));
+    const setDepartment = (department: string) =>
+        setControls((previous) => ({ ...previous, department }));
+    const setSite = (site: string) =>
+        setControls((previous) => ({ ...previous, site }));
+    const setMode = (mode: string) =>
+        setControls((previous) => ({ ...previous, mode }));
     const own = people.find((p) => p.can_edit_profile);
     const filtered = people.filter(
         (p) =>
@@ -34,32 +46,44 @@ export function PeopleDirectory({
                 .includes(query.toLowerCase()),
     );
     const groups = [...new Set(filtered.map((p) => p.manager_id ?? 0))];
-    const card = (p: HubPerson) => (
-        <Button
-            key={p.id}
-            variant="ghost"
-            className="hub-person-card h-auto whitespace-normal"
-            asChild
-        >
-            <Link href={`/company-hub/people/${p.id}`}>
-                <span className="hub-person-avatar" aria-hidden>
-                    {p.name
-                        .split(' ')
-                        .slice(0, 2)
-                        .map((n) => n[0])
-                        .join('')}
-                </span>
-                <strong>{p.name}</strong>
-                <span>{p.position || 'Colleague'}</span>
-                <small>
-                    {[p.department, p.site].filter(Boolean).join(' · ')}
-                </small>
-                {!!p.shared_profile?.help_with.length && (
-                    <span className="hub-person-badges">
-                        {p.shared_profile.help_with.slice(0, 3).map((skill) => (
-                            <span key={skill}>{skill}</span>
-                        ))}
+    const departments = [
+        ...new Set(people.flatMap((p) => (p.department ? [p.department] : []))),
+    ];
+    const sites = [...new Set(people.flatMap((p) => (p.site ? [p.site] : [])))];
+    const clearFilters = () =>
+        setControls((previous) => ({
+            ...previous,
+            query: '',
+            department: 'all',
+            site: 'all',
+        }));
+    const card = (p: HubPerson) => {
+        const content = (
+            <>
+                <HubPersonAvatar
+                    name={p.name}
+                    url={p.avatar_url}
+                    className="size-11 self-start text-xs"
+                />
+                <span className="flex min-w-0 flex-1 flex-col items-start gap-1 [overflow-wrap:anywhere]">
+                    <strong className="font-semibold">{p.name}</strong>
+                    <span className="text-sm font-normal">
+                        {p.position || 'Colleague'}
                     </span>
+                    <small className="font-normal text-muted-foreground">
+                        {[p.department, p.site].filter(Boolean).join(' · ')}
+                    </small>
+                    {!!p.shared_profile?.help_with.length && (
+                        <span className="mt-1 text-xs leading-relaxed font-normal text-muted-foreground">
+                            {p.shared_profile.help_with.slice(0, 3).join(' · ')}
+                        </span>
+                    )}
+                </span>
+                {!readOnly && (
+                    <ChevronRight
+                        className="size-4 shrink-0 text-muted-foreground"
+                        aria-hidden
+                    />
                 )}
                 {(p.first_aider || p.fire_warden) && (
                     <span className="hub-person-badges">
@@ -67,9 +91,33 @@ export function PeopleDirectory({
                         {p.fire_warden && <span>Fire warden</span>}
                     </span>
                 )}
-            </Link>
-        </Button>
-    );
+            </>
+        );
+        if (readOnly)
+            return (
+                <article
+                    key={p.id}
+                    className="flex min-h-28 items-center gap-4 border-b px-2 py-5"
+                >
+                    {content}
+                </article>
+            );
+        return (
+            <Button
+                key={p.id}
+                variant="ghost"
+                className="h-auto min-h-28 w-full justify-start gap-4 rounded-none border-b px-2 py-5 text-left whitespace-normal hover:bg-accent/50"
+                asChild
+            >
+                <Link
+                    href={`/company-hub/people/${p.id}`}
+                    data-hub-return-key={`person:${p.id}`}
+                >
+                    {content}
+                </Link>
+            </Button>
+        );
+    };
     return (
         <section className="space-y-5" aria-label="People directory">
             <div className="hub-library-tools">
@@ -82,39 +130,7 @@ export function PeopleDirectory({
                         onChange={(e) => setQuery(e.target.value)}
                     />
                 </label>
-                <select
-                    className="hub-native-select"
-                    aria-label="Department"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                >
-                    <option value="all">All departments</option>
-                    {[
-                        ...new Set(
-                            people.map((p) => p.department).filter(Boolean),
-                        ),
-                    ].map((d) => (
-                        <option key={d} value={d!}>
-                            {d}
-                        </option>
-                    ))}
-                </select>
-                <select
-                    className="hub-native-select"
-                    aria-label="Site"
-                    value={site}
-                    onChange={(e) => setSite(e.target.value)}
-                >
-                    <option value="all">All sites</option>
-                    {[
-                        ...new Set(people.map((p) => p.site).filter(Boolean)),
-                    ].map((s) => (
-                        <option key={s} value={s!}>
-                            {s}
-                        </option>
-                    ))}
-                </select>
-                {own && (
+                {own && !readOnly && (
                     <Button variant="outline" asChild>
                         <Link href={`/company-hub/people/${own.id}`}>
                             My shared profile
@@ -134,11 +150,51 @@ export function PeopleDirectory({
                     </Button>
                 )}
             </div>
-            <p className="text-sm text-muted-foreground">
-                {filtered.length}{' '}
-                {filtered.length === 1 ? 'colleague' : 'colleagues'} · Work
-                contact details
-            </p>
+            <div className="flex items-start justify-between gap-4">
+                <div
+                    className="flex flex-wrap gap-2"
+                    role="group"
+                    aria-label="Filter by department"
+                >
+                    {['all', ...departments].map((item) => (
+                        <Button
+                            key={item}
+                            size="sm"
+                            variant="ghost"
+                            aria-pressed={department === item}
+                            className={
+                                department === item
+                                    ? 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
+                                    : 'border border-transparent bg-muted/50 font-normal'
+                            }
+                            onClick={() => setDepartment(item)}
+                        >
+                            {item === 'all' ? 'All departments' : item}
+                        </Button>
+                    ))}
+                </div>
+                <HubBrowseSelect
+                    label="Site"
+                    value={site}
+                    onChange={setSite}
+                    options={[
+                        { value: 'all', label: 'All sites' },
+                        ...sites.map((name) => ({ value: name, label: name })),
+                    ]}
+                />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+                <p role="status" className="text-sm text-muted-foreground">
+                    {filtered.length}{' '}
+                    {filtered.length === 1 ? 'colleague' : 'colleagues'} · Work
+                    contact details
+                </p>
+                {(query || department !== 'all' || site !== 'all') && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters}>
+                        Clear filters
+                    </Button>
+                )}
+            </div>
             {mode === 'org' && canViewOrg ? (
                 groups.map((id) => (
                     <section className="hub-org-group" key={id}>
@@ -147,7 +203,7 @@ export function PeopleDirectory({
                             {people.find((p) => p.id === id)?.name ??
                                 'No visible reporting line'}
                         </h3>
-                        <div className="hub-people-grid">
+                        <div className="grid grid-cols-2 gap-x-7">
                             {filtered
                                 .filter((p) => (p.manager_id ?? 0) === id)
                                 .map(card)}
@@ -155,7 +211,9 @@ export function PeopleDirectory({
                     </section>
                 ))
             ) : (
-                <div className="hub-people-grid">{filtered.map(card)}</div>
+                <div className="grid grid-cols-2 gap-x-7">
+                    {filtered.map(card)}
+                </div>
             )}
             {filtered.length === 0 && (
                 <div className="hub-empty-note">

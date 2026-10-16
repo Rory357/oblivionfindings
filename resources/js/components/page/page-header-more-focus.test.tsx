@@ -70,6 +70,35 @@ const finishClosing = async () => {
 };
 
 describe('More view focus when a worker continues immediately', () => {
+    it('shows discovery details only in More and keeps its destination selectable', async () => {
+        const select = vi.fn();
+        render(
+            <PageHeaderRail
+                items={items.map((item) => ({
+                    ...item,
+                    overflow: {
+                        description: `Explore ${item.label}`,
+                        unread: item.key === 'notifications',
+                    },
+                }))}
+                value="roster"
+                onSelect={select}
+            />,
+        );
+        expect(
+            screen.queryByText('Explore Notifications'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /^More views/ }));
+        await finishClosing();
+        expect(screen.getByText('Explore Notifications')).toBeInTheDocument();
+        expect(screen.getByLabelText('New updates')).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: /Notifications.*Explore Notifications/,
+            }),
+        );
+        expect(select).toHaveBeenCalledWith('notifications');
+    });
     it('preserves focus moved to the next control after selecting an overflow view', async () => {
         render(<Workspace />);
         fireEvent.click(screen.getByRole('button', { name: /^More views/ }));

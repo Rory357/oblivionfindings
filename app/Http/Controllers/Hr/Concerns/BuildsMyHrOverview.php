@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Hr\Concerns;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
-use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingTask;
@@ -14,6 +13,7 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\ESignatureService;
+use App\Domain\Hr\Services\HrRecognitionReplies;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
@@ -61,11 +61,12 @@ trait BuildsMyHrOverview
     {
         $column = $box === 'given' ? 'from_user_id' : 'to_user_id';
 
-        $query = HrKudos::query()
-            ->where($column, $user->id)
+        $query = $this->feedService->visibleKudosQuery($user)
+            ->when($box === 'given', fn ($query) => $query->where($column, $user->id), fn ($query) => $query->receivedBy($user->id))
             ->with([
                 'fromUser:id,name',
                 'toUser:id,name',
+                'toDepartment:id,name',
                 'reactions.user:id,name',
                 'replies' => fn ($q) => $q->orderBy('created_at'),
                 'replies.user:id,name',
@@ -89,6 +90,8 @@ trait BuildsMyHrOverview
             ->pluck('position_title', 'user_id');
 
         return $kudos->map(function (HrKudos $k) use ($user, $roles) {
+            $team = $k->isTeamRecognition();
+            $recipientName = $team ? $k->toDepartment?->name : $k->toUser?->name;
             $reactions = ['heart' => [], 'party' => [], 'hands' => []];
             foreach ($k->reactions as $reaction) {
                 if (! array_key_exists($reaction->emoji, $reactions)) {
@@ -103,18 +106,16 @@ trait BuildsMyHrOverview
                 ];
             }
 
-            $replies = $k->replies->map(fn (HrKudosReply $reply) => [
-                'id' => $reply->id,
-                'user_id' => $reply->user_id,
-                'name' => $reply->user?->name ?? 'Someone',
-                'initials' => $this->myHrInitials($reply->user?->name ?? '?'),
-                'you' => $reply->user_id === $user->id,
-                'body' => $reply->body,
-                'created_at' => $reply->created_at?->toIso8601String(),
+            $replies = app(HrRecognitionReplies::class)->project($user, $k)->map(fn ($reply) => [
+                ...$reply,
+                'initials' => $this->myHrInitials($reply['name']),
+                'you' => (int) $reply['user_id'] === (int) $user->id,
             ])->values()->all();
 
             return [
                 'id' => $k->id,
+                'recipient_type' => $team ? 'team' : 'person',
+                'to_department_id' => $k->to_department_id,
                 'giver' => [
                     'id' => $k->from_user_id,
                     'name' => $k->fromUser?->name ?? 'A teammate',
@@ -123,13 +124,19 @@ trait BuildsMyHrOverview
                     'you' => $k->from_user_id === $user->id,
                 ],
                 'recipient' => [
-                    'id' => $k->to_user_id,
-                    'name' => $k->toUser?->name ?? 'A teammate',
-                    'initials' => $this->myHrInitials($k->toUser?->name ?? '?'),
-                    'role' => $roles[$k->to_user_id] ?? null,
-                    'you' => $k->to_user_id === $user->id,
+                    'id' => $team ? null : $k->to_user_id,
+                    'type' => $team ? 'team' : 'person',
+                    'department_id' => $team ? $k->to_department_id : null,
+                    'name' => $recipientName ?? ($team ? 'Team unavailable' : 'A teammate'),
+                    'initials' => $this->myHrInitials($recipientName ?? '?'),
+                    'role' => $team ? 'Team' : ($roles[$k->to_user_id] ?? null),
+                    'you' => $team ? $k->recipients()->whereKey($user->id)->exists() : $k->to_user_id === $user->id,
                 ],
+                'can_reply' => $this->feedService->canReplyKudos($k, $user),
                 'category' => $k->category,
+                'category_label' => $k->categoryLabel(),
+                'impact' => $k->impactKey(),
+                'impact_label' => $k->impactLabel(),
                 'message' => $k->message,
                 'created_at' => $k->created_at?->toIso8601String(),
                 'reactions' => $reactions,
@@ -140,8 +147,8 @@ trait BuildsMyHrOverview
 
     private function overviewLatestKudos(User $user): ?array
     {
-        $kudos = HrKudos::query()
-            ->where('to_user_id', $user->id)
+        $kudos = $this->feedService->visibleKudosQuery($user)
+            ->receivedBy($user->id)
             ->with('fromUser:id,name')
             ->orderByDesc('created_at')
             ->first();
@@ -156,6 +163,9 @@ trait BuildsMyHrOverview
             'from' => $kudos->fromUser?->name,
             'from_initials' => $this->myHrInitials($kudos->fromUser?->name ?? '?'),
             'category' => $kudos->category,
+            'category_label' => $kudos->categoryLabel(),
+            'impact' => $kudos->impactKey(),
+            'impact_label' => $kudos->impactLabel(),
             'message' => $kudos->message,
             'created_at' => $kudos->created_at?->toIso8601String(),
         ];

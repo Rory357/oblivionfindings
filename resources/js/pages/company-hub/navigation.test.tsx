@@ -1,5 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EditHubTabs } from './_edit-tabs';
 import {
     HubNavigationRail,
     SharedNavigationDesigner,
@@ -85,6 +93,7 @@ const workspace: NavigationWorkspace = {
     views: { home: 'Home', news: 'News', resources: 'Resources' },
     can_publish: true,
 };
+afterEach(() => Reflect.deleteProperty(window, 'navigation'));
 
 describe('Shared Company Hub navigation', () => {
     beforeEach(() => {
@@ -103,7 +112,7 @@ describe('Shared Company Hub navigation', () => {
         ).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('tab', { name: 'Everyday help' }));
         fireEvent.click(
-            await screen.findByRole('button', { name: 'Resources' }),
+            await screen.findByRole('button', { name: /^Resources/ }),
         );
         expect(visit).toHaveBeenCalledWith('/company-hub?view=resources');
     });
@@ -198,6 +207,73 @@ describe('Shared Company Hub navigation', () => {
             preserveScroll: true,
         });
     });
+    it('blocks native Back while tab edits or a save are pending and releases it once saved', async () => {
+        const browser = Object.assign(new EventTarget(), {
+            currentEntry: { key: 'tabs' },
+            traverseTo: vi.fn(() => ({ finished: Promise.resolve() })),
+        });
+        Object.defineProperty(window, 'navigation', {
+            configurable: true,
+            value: browser,
+        });
+        const back = () => {
+            const event = Object.assign(
+                new Event('navigate', { cancelable: true }),
+                {
+                    navigationType: 'traverse',
+                    destination: { key: 'previous', sameDocument: true },
+                },
+            );
+            act(() => {
+                browser.dispatchEvent(event);
+            });
+            return event;
+        };
+        const view = render(
+            <SharedNavigationDesigner onDirtyChange={() => {}} />,
+        );
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Edit News' }),
+        );
+        expect(back().defaultPrevented).toBe(false);
+        fireEvent.change(screen.getByLabelText('Navigation label'), {
+            target: { value: 'Company stories' },
+        });
+        expect(back().defaultPrevented).toBe(true);
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'Save your menu draft or discard local changes',
+        );
+        expect(screen.getByLabelText('Navigation label')).toHaveValue(
+            'Company stories',
+        );
+        let finish!: (value: NavigationWorkspace) => void;
+        request.mockImplementationOnce(
+            () =>
+                new Promise<NavigationWorkspace>((resolve) => {
+                    finish = resolve;
+                }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        expect(back().defaultPrevented).toBe(true);
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'Wait for the menu change to finish',
+        );
+        await act(async () => {
+            finish({
+                ...workspace,
+                version: 4,
+                has_draft: true,
+                draft: items.map((item) =>
+                    item.id === 'news'
+                        ? { ...item, label: 'Company stories' }
+                        : item,
+                ),
+            });
+        });
+        expect(back().defaultPrevented).toBe(false);
+        expect(browser.traverseTo).not.toHaveBeenCalled();
+        view.unmount();
+    });
     it('retains local edits after a conflict and requires confirmation before replacing them', async () => {
         render(<SharedNavigationDesigner onDirtyChange={() => {}} />);
         fireEvent.click(
@@ -237,19 +313,20 @@ describe('Shared Company Hub navigation', () => {
         });
         expect(groupOption).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Edit Resources' }));
-        const target = (
-            screen.getByRole('option', {
-                name: 'Useful things',
-            }) as HTMLOptionElement
-        ).value;
-        fireEvent.change(screen.getByLabelText('Parent menu'), {
-            target: { value: target },
-        });
+        fireEvent.keyDown(
+            screen.getByRole('combobox', { name: 'Parent menu' }),
+            { key: 'ArrowDown' },
+        );
+        fireEvent.click(
+            await screen.findByRole('option', { name: 'Useful things' }),
+        );
         expect(
             screen.getByRole('tab', { name: 'Useful things' }),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-        expect(screen.getByLabelText('Parent menu')).toHaveValue('');
+        expect(
+            screen.getByRole('combobox', { name: 'Parent menu' }),
+        ).toHaveTextContent('Top level');
     });
     it('shows a draft-only editor no publishing action', async () => {
         request.mockResolvedValue({
@@ -269,5 +346,247 @@ describe('Shared Company Hub navigation', () => {
         expect(
             screen.getByText(/person with publishing permission/),
         ).toBeInTheDocument();
+    });
+    it('adds and removes a page tab locally, keeps Home fixed and supports undo', async () => {
+        request.mockResolvedValue({
+            ...workspace,
+            pages: [
+                {
+                    id: '12',
+                    title: 'Our handbook',
+                    url: '/company-hub/read/handbook',
+                },
+            ],
+        });
+        render(<SharedNavigationDesigner onDirtyChange={() => {}} />);
+        await screen.findByRole('button', { name: 'Edit Home' });
+        expect(
+            screen.queryByRole('button', { name: 'Remove tab' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Drag Home' }),
+        ).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Add tab' }));
+        fireEvent.change(screen.getByLabelText('Navigation label'), {
+            target: { value: 'Handbook' },
+        });
+        fireEvent.keyDown(
+            screen.getByRole('combobox', { name: 'Destination type' }),
+            { key: 'ArrowDown' },
+        );
+        fireEvent.click(
+            await screen.findByRole('option', { name: 'Published page' }),
+        );
+        fireEvent.keyDown(
+            screen.getByRole('combobox', { name: 'Published page' }),
+            { key: 'ArrowDown' },
+        );
+        fireEvent.click(
+            await screen.findByRole('option', { name: 'Our handbook' }),
+        );
+        expect(screen.getByRole('tab', { name: 'Handbook' })).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Remove tab' }));
+        expect(
+            screen.queryByRole('tab', { name: 'Handbook' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+        expect(screen.getByRole('tab', { name: 'Handbook' })).toBeVisible();
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+    it('previews unpublished group links on the page without navigating or saving', async () => {
+        request.mockResolvedValue({
+            ...workspace,
+            draft: [
+                home,
+                group,
+                { ...news, parent: group.id },
+                { ...resources, parent: group.id, hidden: true },
+            ],
+        });
+        render(
+            <>
+                <div data-testid="hero-rail" />
+                <aside data-testid="page-panel" />
+            </>,
+        );
+        render(
+            <EditHubTabs
+                onClose={vi.fn()}
+                onPublished={vi.fn()}
+                editorSlots={{
+                    rail: screen.getByTestId('hero-rail'),
+                    inspector: screen.getByTestId('page-panel'),
+                }}
+            />,
+        );
+        const rail = within(screen.getByTestId('hero-rail'));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Edit News' }),
+        );
+        fireEvent.change(screen.getByLabelText('Navigation label'), {
+            target: { value: 'Our stories' },
+        });
+        fireEvent.click(rail.getByRole('button', { name: 'Preview menu' }));
+        fireEvent.click(rail.getByRole('tab', { name: 'Everyday help' }));
+        expect(
+            screen.getByRole('button', { name: /^Our stories/ }),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: 'Resources' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /^Our stories/ }));
+        expect(
+            screen.getByText(/Preview: Our stories opens News/),
+        ).toBeVisible();
+        expect(visit).not.toHaveBeenCalled();
+        expect(request).toHaveBeenCalledTimes(1);
+        fireEvent.click(rail.getByRole('button', { name: 'Edit tabs' }));
+        expect(screen.getByLabelText('Navigation label')).toHaveValue(
+            'Our stories',
+        );
+        expect(
+            screen.getByRole('button', { name: 'Save tabs draft' }),
+        ).toBeEnabled();
+    });
+    it('edits the real page rail with settings in its existing panel and no editor modal', async () => {
+        render(
+            <>
+                <div data-testid="hero-rail" />
+                <aside data-testid="page-panel" />
+            </>,
+        );
+        render(
+            <EditHubTabs
+                onClose={vi.fn()}
+                onPublished={vi.fn()}
+                editorSlots={{
+                    rail: screen.getByTestId('hero-rail'),
+                    inspector: screen.getByTestId('page-panel'),
+                }}
+            />,
+        );
+        const rail = within(screen.getByTestId('hero-rail'));
+        const panel = within(screen.getByTestId('page-panel'));
+        fireEvent.click(await rail.findByRole('tab', { name: 'News' }));
+        expect(panel.getByLabelText('Navigation label')).toHaveValue('News');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Live navigation preview'),
+        ).not.toBeInTheDocument();
+        fireEvent.change(panel.getByLabelText('Navigation label'), {
+            target: { value: 'Our stories' },
+        });
+        expect(rail.getByRole('tab', { name: 'Our stories' })).toBeVisible();
+        fireEvent.click(panel.getByRole('button', { name: 'Remove tab' }));
+        expect(
+            rail.queryByRole('tab', { name: 'Our stories' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+        expect(rail.getByRole('tab', { name: 'Our stories' })).toBeVisible();
+        fireEvent.click(rail.getByRole('button', { name: 'Add group' }));
+        expect(panel.getByLabelText('Navigation label')).toHaveValue(
+            'New menu',
+        );
+        fireEvent.click(rail.getByRole('tab', { name: 'Home' }));
+        expect(
+            panel.queryByRole('button', { name: 'Remove tab' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(rail.getByRole('tab', { name: 'New menu' }));
+        expect(panel.getByLabelText('Navigation label')).toHaveValue(
+            'New menu',
+        );
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+    it('confirms local tab changes before closing without altering the saved navigation', async () => {
+        const close = vi.fn();
+        render(<EditHubTabs onClose={close} onPublished={vi.fn()} />);
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Edit News' }),
+        );
+        fireEvent.change(screen.getByLabelText('Navigation label'), {
+            target: { value: 'Stories' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Done editing tabs' }),
+        );
+        const confirmation = screen.getByRole('region', {
+            name: 'Unsaved tab changes',
+        });
+        expect(
+            within(confirmation).getByText(
+                /Your page content and saved navigation drafts/,
+            ),
+        ).toBeVisible();
+        fireEvent.click(
+            within(confirmation).getByRole('button', {
+                name: 'Keep editing tabs',
+            }),
+        );
+        expect(close).not.toHaveBeenCalled();
+        expect(screen.getByLabelText('Navigation label')).toHaveValue(
+            'Stories',
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Done editing tabs' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Leave without saving' }),
+        );
+        expect(close).toHaveBeenCalledOnce();
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+    it('blocks closing during a save and retains edits when the save fails', async () => {
+        const close = vi.fn();
+        render(<EditHubTabs onClose={close} onPublished={vi.fn()} />);
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Edit News' }),
+        );
+        fireEvent.change(screen.getByLabelText('Navigation label'), {
+            target: { value: 'Stories' },
+        });
+        let fail!: (error: Error) => void;
+        request.mockImplementation(
+            () =>
+                new Promise((_resolve, reject) => {
+                    fail = reject;
+                }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Done editing tabs' }),
+        );
+        expect(close).not.toHaveBeenCalled();
+        expect(
+            screen.getByRole('button', { name: 'Done editing tabs' }),
+        ).toBeDisabled();
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(request).toHaveBeenCalledTimes(2);
+        await act(async () =>
+            fail(new Error('Another editor changed the menu.')),
+        );
+        expect(screen.getByLabelText('Navigation label')).toHaveValue(
+            'Stories',
+        );
+        expect(screen.getByRole('alert')).toHaveTextContent('Another editor');
+        expect(
+            screen.getByRole('button', { name: 'Done editing tabs' }),
+        ).toBeEnabled();
+    });
+    it('updates an embedded preview after publication without refreshing the page editor', async () => {
+        const published = vi.fn();
+        request.mockResolvedValue({ ...workspace, has_draft: true });
+        render(<EditHubTabs onClose={vi.fn()} onPublished={published} />);
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Publish navigation' }),
+        );
+        const result = { ...workspace, version: 4 };
+        request.mockResolvedValue(result);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Publish shared menu' }),
+        );
+        await waitFor(() => expect(published).toHaveBeenCalledWith(result));
+        expect(reload).not.toHaveBeenCalled();
+        expect(visit).not.toHaveBeenCalled();
     });
 });

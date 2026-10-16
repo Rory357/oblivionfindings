@@ -2,22 +2,25 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { formatRelative } from '@/lib/datetime';
 import { router, useForm } from '@inertiajs/react';
-import { Heart, PartyPopper, Sparkles } from 'lucide-react';
-import { useState } from 'react';
-import { ReportResource } from './_resource-care';
-import type { HubBlock, HubProps } from './_types';
+import { Heart, PartyPopper, Send, Sparkles } from 'lucide-react';
+import { useId, useState } from 'react';
+import { StoryDiscussion } from './_discussion';
+import { ResourceReports } from './_resource-reports';
+import type { HubProps } from './_types';
 
 export function ReplyForm({
     url,
     label = 'Add a reply',
     parentId,
+    onPosted,
 }: {
     url: string;
     label?: string;
     parentId?: number;
+    onPosted?: () => void;
 }) {
+    const fieldId = useId();
     const form = useForm({
         body: '',
         kind: 'comment',
@@ -25,55 +28,99 @@ export function ReplyForm({
     });
     return (
         <form
-            className="mt-4 space-y-3"
+            className="hub-recognition-reply-form"
             onSubmit={(event) => {
                 event.preventDefault();
+                if (form.processing || !form.data.body.trim()) return;
                 form.post(url, {
                     preserveScroll: true,
-                    onSuccess: () => form.reset('body'),
+                    onSuccess: () => {
+                        form.reset('body');
+                        onPosted?.();
+                    },
                 });
             }}
         >
-            <Label className="block space-y-2">
-                <span>{label}</span>
-                <Textarea
-                    required
-                    maxLength={2000}
-                    rows={2}
-                    value={form.data.body}
-                    onChange={(event) =>
-                        form.setData('body', event.target.value)
-                    }
-                    placeholder="Keep it kind and constructive…"
-                />
+            <Label htmlFor={fieldId} className="sr-only">
+                {label}
             </Label>
+            <Textarea
+                id={fieldId}
+                className="hub-recognition-reply-input"
+                required
+                disabled={form.processing}
+                maxLength={2000}
+                rows={form.data.body ? 3 : 1}
+                value={form.data.body}
+                onChange={(event) => form.setData('body', event.target.value)}
+                onKeyDown={(event) => {
+                    if (
+                        (event.ctrlKey || event.metaKey) &&
+                        event.key === 'Enter'
+                    ) {
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                    }
+                }}
+                placeholder="Add a little encouragement…"
+            />
             {form.errors.body && (
                 <p role="alert" className="text-sm text-destructive">
                     {form.errors.body}
                 </p>
             )}
-            <Button
-                disabled={form.processing || !form.data.body.trim()}
-                type="submit"
-            >
-                {form.processing ? 'Posting…' : 'Post'}
-            </Button>
+            <div className="hub-recognition-reply-footer">
+                <span className="text-xs text-muted-foreground">
+                    Ctrl / ⌘ + Enter to post. Enter adds a new line.
+                </span>
+                <Button
+                    disabled={form.processing || !form.data.body.trim()}
+                    type="submit"
+                >
+                    <Send className="size-3.5" />
+                    {form.processing ? 'Posting…' : 'Post reply'}
+                </Button>
+            </div>
         </form>
     );
 }
 
 export function PageParticipation({ data }: { data: HubProps }) {
     const activity = data.participation;
-    const [replyTo, setReplyTo] = useState<number | null>(null);
     const [error, setError] = useState('');
-    if (!activity || !data.selectedPage) return null;
+    if (
+        !activity ||
+        !data.selectedPage ||
+        activity.page_id !== data.selectedPage.id ||
+        (data.selectedPage.revision_id !== undefined &&
+            activity.revision_id !== data.selectedPage.revision_id)
+    )
+        return null;
     const content = data.selectedPage.content;
+    const hasFeedback =
+        ['page', 'knowledge'].includes(data.selectedPage.kind ?? '') &&
+        !!activity.helpful;
+    const hasReactions =
+        content.reactions_enabled && Object.keys(activity.reactions).length > 0;
+    const hasDiscussion =
+        content.comments_enabled ||
+        (!data.demo &&
+            !!activity.can_moderate &&
+            !!activity.actor_id &&
+            !!activity.revision_id);
+    if (!hasFeedback && !hasReactions && !hasDiscussion) return null;
     return (
         <Card className="space-y-5 p-5 sm:p-6">
             <div>
-                <h2 className="text-section-title">Join the conversation</h2>
+                <h2 className="text-section-title">
+                    {hasDiscussion || hasReactions
+                        ? 'Join the conversation'
+                        : 'Resource feedback'}
+                </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    A little encouragement makes a difference.
+                    {hasDiscussion || hasReactions
+                        ? 'A little encouragement makes a difference.'
+                        : 'Help keep this resource useful for everyone.'}
                 </p>
             </div>
             {['page', 'knowledge'].includes(data.selectedPage.kind ?? '') &&
@@ -82,15 +129,17 @@ export function PageParticipation({ data }: { data: HubProps }) {
                         <span className="text-sm">
                             Was this resource helpful?
                         </span>
-                        {!data.demo && (
-                            <ReportResource pageId={data.selectedPage.id} />
+                        {!data.demo && data.resourceReports && (
+                            <ResourceReports data={data.resourceReports} />
                         )}
                         <Button
+                            disabled={data.demo}
                             variant={
                                 activity.helpful.mine ? 'secondary' : 'outline'
                             }
                             aria-pressed={activity.helpful.mine}
                             onClick={() =>
+                                !data.demo &&
                                 router.post(
                                     `/company-hub/pages/${activity.page_id}/interactions`,
                                     {
@@ -137,12 +186,14 @@ export function PageParticipation({ data }: { data: HubProps }) {
                                       : 'Applaud';
                             return (
                                 <Button
+                                    disabled={data.demo}
                                     key={key}
                                     variant={
                                         reaction.mine ? 'secondary' : 'outline'
                                     }
                                     aria-pressed={reaction.mine}
                                     onClick={() =>
+                                        !data.demo &&
                                         router.post(
                                             `/company-hub/pages/${activity.page_id}/interactions`,
                                             {
@@ -162,189 +213,14 @@ export function PageParticipation({ data }: { data: HubProps }) {
                     )}
                 </div>
             )}
-            {content.comments_enabled && (
-                <>
-                    <ReplyForm
-                        url={`/company-hub/pages/${activity.page_id}/interactions`}
-                        label="Add a comment"
-                    />
-                    <div className="divide-y divide-border">
-                        {activity.comments
-                            .filter((comment) => !comment.parent_id)
-                            .map((comment) => (
-                                <article key={comment.id} className="py-4">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <p className="text-sm">
-                                            <strong>{comment.name}</strong>
-                                            <span className="ml-2 text-muted-foreground">
-                                                {formatRelative(
-                                                    comment.created_at,
-                                                )}
-                                            </span>
-                                        </p>
-                                        {comment.can_remove && (
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() =>
-                                                    router.delete(
-                                                        `/company-hub/pages/${activity.page_id}/interactions/${comment.id}`,
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
-                                                    )
-                                                }
-                                            >
-                                                Remove comment
-                                            </Button>
-                                        )}
-                                    </div>
-                                    <p className="mt-2 text-sm leading-relaxed break-words whitespace-pre-wrap">
-                                        {comment.body}
-                                    </p>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        aria-expanded={replyTo === comment.id}
-                                        onClick={() =>
-                                            setReplyTo(
-                                                replyTo === comment.id
-                                                    ? null
-                                                    : comment.id,
-                                            )
-                                        }
-                                    >
-                                        Reply
-                                    </Button>
-                                    <div className="ml-5 space-y-3 border-l pl-4">
-                                        {activity.comments
-                                            .filter(
-                                                (reply) =>
-                                                    reply.parent_id ===
-                                                    comment.id,
-                                            )
-                                            .map((reply) => (
-                                                <article
-                                                    key={reply.id}
-                                                    className="py-2 text-sm"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <strong>
-                                                            {reply.name}
-                                                        </strong>
-                                                        {reply.can_remove && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                onClick={() =>
-                                                                    router.delete(
-                                                                        `/company-hub/pages/${activity.page_id}/interactions/${reply.id}`,
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                Remove reply
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                    <p className="whitespace-pre-wrap">
-                                                        {reply.body}
-                                                    </p>
-                                                </article>
-                                            ))}
-                                    </div>
-                                    {replyTo === comment.id && (
-                                        <ReplyForm
-                                            key={comment.id}
-                                            url={`/company-hub/pages/${activity.page_id}/interactions`}
-                                            parentId={comment.id}
-                                            label={`Reply to ${comment.name}`}
-                                        />
-                                    )}
-                                </article>
-                            ))}
-                    </div>
-                </>
-            )}
+            <StoryDiscussion
+                activity={activity}
+                title={content.title}
+                commentsEnabled={content.comments_enabled}
+                demo={data.demo}
+            />
         </Card>
     );
 }
 
-export function HubPoll({ block, data }: { block: HubBlock; data: HubProps }) {
-    const activity = data.participation;
-    const poll = activity?.polls[block.id];
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-    return (
-        <Card className="space-y-4 p-5">
-            <p className="font-semibold">{block.question}</p>
-            <p className="text-sm text-muted-foreground">
-                Your answer is recorded. Colleagues see the totals.
-            </p>
-            <div className="space-y-2">
-                {block.options?.map((option, index) => {
-                    const count = poll?.counts[index] ?? 0;
-                    const percent = poll?.total
-                        ? Math.round((count / poll.total) * 100)
-                        : 0;
-                    return (
-                        <Button
-                            key={index}
-                            variant="outline"
-                            className="relative h-auto min-h-11 w-full justify-between overflow-hidden p-3 text-left whitespace-normal"
-                            disabled={!poll || busy || poll.closed}
-                            aria-pressed={poll?.mine === index}
-                            onClick={() => {
-                                if (!activity || !poll) return;
-                                setBusy(true);
-                                setError('');
-                                router.post(
-                                    `/company-hub/pages/${activity.page_id}/interactions`,
-                                    {
-                                        kind: 'vote',
-                                        block_id: block.id,
-                                        poll_key: poll.key,
-                                        choice: index,
-                                    },
-                                    {
-                                        preserveScroll: true,
-                                        onError: (errors) =>
-                                            setError(
-                                                Object.values(errors).join(' '),
-                                            ),
-                                        onFinish: () => setBusy(false),
-                                    },
-                                );
-                            }}
-                        >
-                            <span
-                                aria-hidden
-                                className="absolute inset-y-0 left-0 bg-primary/10"
-                                style={{ width: `${percent}%` }}
-                            />
-                            <span className="relative">
-                                {option}
-                                {poll?.mine === index ? ' · Your choice' : ''}
-                            </span>{' '}
-                            <span className="relative ml-3 shrink-0 text-sm">
-                                {poll ? `${percent}%` : ''}
-                            </span>
-                        </Button>
-                    );
-                })}
-            </div>
-            <p aria-live="polite" className="text-sm text-muted-foreground">
-                {poll
-                    ? `${poll.total} ${poll.total === 1 ? 'response' : 'responses'}${poll.closed ? ' · Poll closed' : ' · You can change your answer'}`
-                    : 'Voting opens when this page is published.'}
-            </p>
-            {error && (
-                <p role="alert" className="text-sm text-destructive">
-                    {error}
-                </p>
-            )}
-        </Card>
-    );
-}
+export { HubPoll } from './_poll';

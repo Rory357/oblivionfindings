@@ -4,6 +4,8 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\CompanyHub\Models\HubPage;
 use App\Domain\CompanyHub\Services\HubAccess;
+use App\Domain\CompanyHub\Services\HubDirectory;
+use App\Domain\CompanyHub\Services\HubEventMedia;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrCalendarEventAttachment;
 use App\Models\User;
@@ -19,15 +21,13 @@ class HrCalendarHubContent
     public function rules(): array
     {
         return [
-            'hub_content' => ['sometimes', 'array:host_id,agenda,recap,story_id,cover_ref,cover_alt,gallery_refs'],
+            'hub_content' => ['sometimes', 'array:host_id,agenda,recap,recap_title,story_id,cover_ref,cover_alt,gallery_refs,photo_details'],
             'hub_content.host_id' => ['nullable', 'integer'],
             'hub_content.agenda' => ['nullable', 'string', 'max:6000'],
             'hub_content.recap' => ['nullable', 'string', 'max:8000'],
             'hub_content.story_id' => ['nullable', 'integer'],
-            'hub_content.cover_ref' => ['nullable', 'string', 'regex:/^(file|upload):[0-9]+$/'],
             'hub_content.cover_alt' => ['nullable', 'string', 'max:240'],
-            'hub_content.gallery_refs' => ['sometimes', 'array', 'max:12'],
-            'hub_content.gallery_refs.*' => ['string', 'distinct', 'regex:/^(file|upload):[0-9]+$/'],
+            ...app(HubEventMedia::class)->rules(),
         ];
     }
 
@@ -70,6 +70,9 @@ class HrCalendarHubContent
                 return null;
             }
             [$kind, $key] = explode(':', $ref);
+            if (! in_array($kind, ['file', 'upload'], true)) {
+                throw ValidationException::withMessages([$field => 'Choose a photo owned by this event.']);
+            }
             $id = $kind === 'upload' ? ($uploads[(int) $key] ?? null) : ($copied[(int) $key] ?? (int) $key);
             $file = $id ? $allowed->get($id) : null;
             if (! $file || ! in_array($file->mime, self::IMAGE_TYPES, true)) {
@@ -80,8 +83,10 @@ class HrCalendarHubContent
         };
         $event->update(['hub_content' => [
             'host_id' => $host, 'agenda' => trim($input['agenda'] ?? ''), 'recap' => trim($input['recap'] ?? ''), 'story_id' => $story,
+            'recap_title' => array_key_exists('recap_title', $input) ? trim($input['recap_title'] ?? '') : ($previous['recap_title'] ?? ''),
             'cover_id' => $resolve($input['cover_ref'] ?? null, 'hub_content.cover_ref'), 'cover_alt' => trim($input['cover_alt'] ?? ''),
             'gallery_ids' => array_values(array_unique(array_map(fn ($ref) => $resolve($ref, 'hub_content.gallery_refs'), $input['gallery_refs'] ?? []))),
+            'photo_details' => HubEventMedia::storedDetails($input, $previous, $allowed->filter(fn ($file) => in_array($file->mime, self::IMAGE_TYPES, true))->keys()->map(fn ($id) => (int) $id)->all(), $resolve, $copied),
         ]]);
     }
 
@@ -90,7 +95,8 @@ class HrCalendarHubContent
         $resolve = fn ($id) => $map[$id] ?? (in_array($id, $retained, true) ? $id : null);
 
         return [...$content, 'cover_id' => $resolve($content['cover_id'] ?? 0),
-            'gallery_ids' => array_values(array_filter(array_map($resolve, $content['gallery_ids'] ?? [])))];
+            'gallery_ids' => array_values(array_filter(array_map($resolve, $content['gallery_ids'] ?? []))),
+            'photo_details' => HubEventMedia::copyDetails($content['photo_details'] ?? [], $map, $retained)];
     }
 
     public function read(User $viewer, HrCalendarEvent $event, Carbon $end, Collection $attachments): array
@@ -109,18 +115,22 @@ class HrCalendarHubContent
         $revision = $story ? app(HubAccess::class)->visibleRevision($viewer, $story) : null;
         $past = $this->finishedAt($end, (bool) $event->is_all_day)->isPast();
         $canEdit = app(HrCalendarAccessService::class)->canManageEvent($viewer, $event);
-        $fileBase = app(HubAccess::class)->canEnter($viewer) ? '/company-hub/event-files/' : '/hr/calendar/attachments/';
-        $image = fn ($file) => ['id' => $file->id, 'name' => $file->original_name, 'url' => $fileBase.$file->id];
-        $gallery = $photos->only($details['gallery_ids'] ?? [])->values();
+        $hubReader = app(HubAccess::class)->canEnter($viewer);
+        $fileBase = $hubReader ? '/company-hub/event-files/' : '/hr/calendar/attachments/';
+        $fileSuffix = $hubReader ? '' : '/download';
+        $image = fn ($file) => ['id' => $file->id, 'name' => $file->original_name, 'url' => $fileBase.$file->id.$fileSuffix];
+        $gallery = HubEventMedia::orderedPhotos($details['gallery_ids'] ?? [], $photos);
 
         return [
             'cover' => $cover ? [...$image($cover), 'alt' => $details['cover_alt'] ?? ''] : null,
-            'host' => $host ? ['id' => $host->id, 'name' => $host->name] : null,
+            'host' => $host ? ['id' => $host->id, 'name' => $host->name, 'profile_url' => app(HubDirectory::class)->profileUrlForUser($viewer, (int) $host->id)] : null,
             'agenda' => $details['agenda'] ?? '', 'recap' => $past ? ($details['recap'] ?? '') : '',
-            'gallery' => $past ? $gallery->map($image)->all() : [],
+            'recap_title' => $past ? ($details['recap_title'] ?? '') : '',
+            'gallery' => $past ? $gallery->map(fn ($file) => app(HubEventMedia::class)->readerPhoto($viewer, $file, $details['photo_details'][$file->id] ?? [], $fileBase, $fileSuffix))->all() : [],
             'story' => $past && $revision ? ['title' => $revision->content['title'], 'url' => '/company-hub/read/'.$story->slug] : null,
             'past' => $past,
             'editor' => $canEdit ? ['host_id' => $host?->id, 'agenda' => $details['agenda'] ?? '', 'recap' => $details['recap'] ?? '',
+                'recap_title' => $details['recap_title'] ?? '', 'photo_details' => HubEventMedia::editorDetails($details['photo_details'] ?? [], $photos),
                 'story_id' => $revision ? $story->id : null, 'cover_ref' => $cover ? 'file:'.$cover->id : '', 'cover_alt' => $details['cover_alt'] ?? '',
                 'gallery_refs' => $gallery->map(fn ($file) => 'file:'.$file->id)->all()] : null,
         ];

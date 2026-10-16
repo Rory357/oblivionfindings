@@ -19,6 +19,8 @@ export function eventTimeInstant(
     original?: string,
 ): string {
     if (!value || allDay) return value;
+    if (!/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(value))
+        throw new Error('Choose both a date and a time.');
     const choices = workerTimeOffsets(value);
     if (!choices.length)
         throw new Error(
