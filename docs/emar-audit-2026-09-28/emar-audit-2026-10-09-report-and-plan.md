@@ -523,3 +523,20 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - A race-timing test.
   - Lane A is fixing both and rebasing onto 1c77a0115 because of the C10 overlap.
 - **Lane B EA-106:** 1 red, the 404 body not identical. Lane B is fixing it and merging main because of the C10 overlap in MedicationsApiController.
+- **18 Oct: ALL ACTIVE eMAR LANES (A, B, C + Permissions Sync) LIVE ON `main` (`1a9150d64`).**
+  - **Lane A A5–A9 & A8 LIVE: merge `05cc99707`.**
+    - Restored `CarbonImmutable` import dropped during the C10 rebase in `WorkerMedsController` and stabilised `app.debug=false` in `LaneAStopSettlementTest`.
+    - Gates: Pest 164 + 221 + 64 passed (909 assertions on the 6 re-verified files), vitest 114, eslint 0.
+  - **Lane B EA-106 LIVE: merge `c4278e17a`.**
+    - API corrections (`/api/medications/clients/{client}/administrations/{administration}/correct`) follow the person rule, conceal out-of-scope and controlled administrations with identical 404s, and route through the canonical correction path.
+    - Gates: Pest 66 (1,125 assertions) + 287 (3,844 assertions) passed.
+  - **Permissions Sync LIVE: `1a9150d64`.**
+    - Synced `medications.stock.receive`, `medications.downtime.manage`, and `medications.emergency_policy.manage` definitions and role grants (`provider_manager`, `coordinator`, `clinical_lead`, `team_lead`) into `database/seeders/RbacSeeder.php` so reseeding preserves all grant-migrated keys (EA-054, EA-076, EA-162).
+    - Added `medications.stockReceive` to `HandleInertiaRequests.php`.
+    - Gates: `TeamLeadMedicationBaselineTest` + `ApprovedMedicationGrantsTest` 13/13 passed (126 assertions).
+  - **Lane C 1440×900 Screenshot Walk PASSED (`scratchpad/lanec-walk/shots/`).**
+    - All 14 screens (`p02-140-hub-mar-charts`, `p02-145-hub-medicines`, `p02-01-chart-day`, `p02-09-as-needed`, `p02-09b-as-needed-limit`, `p02-20-medicines-current`, `p02-30-support-by-medicine`, `p02-30b-support-filtered`, `p02-60-inr`, `p02-80-history-doses`, `p08b-errors`, `p11-elig-register`, `p11-elig-witness`, `p06-stock`) captured at 1440×900 against `oblivion_findings_lanec_browser` and verified against the approved mockups.
+  - **Parked / Held for other lanes:**
+    - **C5** (handover, clock-out due-only check, shift cancellation follow-ups) — parked on workforce collision files (`AttendanceService`, `ShiftCancellationService`).
+    - **C6** (incident/Control Room NZ time & auto-incident routing) — parked on H&S/Control Room collision files (`SignalProcessingService`, `Incident*Service`).
+
