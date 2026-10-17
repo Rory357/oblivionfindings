@@ -576,6 +576,8 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $actor = $this->userWithPermissions([
             'medications.administer.correct',
         ], $context['local_site']);
+        // EA-106: corrections follow the person rule; this corrector supports the person.
+        $context['local_client']->supportWorkers()->attach($actor->id);
         $localAdministration = ClientMedicationAdministration::query()->create([
             'client_id' => $context['local_client']->id,
             'client_medication_id' => $context['local_medication']->id,

@@ -399,6 +399,8 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $reporter = User::factory()->create();
         $original = $this->administration($client, $medication, $reporter, 'given');
         $submitter = $this->userWithPermissions(['medications.administer.correct'], $site);
+        // EA-106: API corrections follow the person rule; the submitter supports the person.
+        $client->supportWorkers()->attach($submitter->id);
         $approver = $this->userWithPermissions(['medications.administer.correct'], $site);
         $payload = [
             'status' => 'refused',

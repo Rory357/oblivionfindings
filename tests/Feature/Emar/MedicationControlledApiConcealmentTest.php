@@ -218,6 +218,8 @@ class MedicationControlledApiConcealmentTest extends TestCase
             'medications.administer.correct',
             'medications.controlled.record',
         ], $site);
+        // EA-106: corrections follow the person rule; this corrector supports the person.
+        $client->supportWorkers()->attach($actor->id);
         $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'controlled_drug' => true,
@@ -302,6 +304,8 @@ class MedicationControlledApiConcealmentTest extends TestCase
             'medications.administer.correct',
             'medications.controlled.record',
         ], $site);
+        // EA-106: corrections follow the person rule; this corrector supports the person.
+        $client->supportWorkers()->attach($actor->id);
         $performer = User::factory()->create();
         $witness = User::factory()->create();
         $priorRequester = User::factory()->create();
