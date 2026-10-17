@@ -771,7 +771,13 @@ class MedicationOrderLifecycleTest extends TestCase
         }
     }
 
-    public function test_administration_waiting_behind_discontinue_lock_fails_after_revalidation(): void
+    /**
+     * EA-041 (Lane A9, approved 14 Oct): the waiting dose was due and given
+     * before the stop, so it is still owed. After the discontinue commits,
+     * the writer revalidates under the lock against the stopped order and
+     * records it; the order stays ceased and owes nothing after the stop.
+     */
+    public function test_administration_waiting_behind_discontinue_lock_revalidates_and_records_a_dose_given_before_the_stop(): void
     {
         $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
@@ -815,13 +821,10 @@ class MedicationOrderLifecycleTest extends TestCase
             $process->wait();
             $this->assertTrue($process->isSuccessful(), trim($process->getErrorOutput()));
             $result = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
-            $this->assertFalse($result['success']);
-            // The post-lock reload sees active=false. Canonical schedule-cell
-            // resolution therefore conceals the now-unavailable order before
-            // the later active-state validator can return 422.
-            $this->assertSame(404, $result['status']);
-            $this->assertDatabaseMissing('client_medication_administrations', [
+            $this->assertTrue($result['success']);
+            $this->assertDatabaseHas('client_medication_administrations', [
                 'client_medication_id' => $medication->id,
+                'status' => 'given',
             ]);
             $this->assertSame('ceased', $medication->fresh()->state);
         } finally {

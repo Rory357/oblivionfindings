@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
@@ -787,11 +788,24 @@ export function ManageAlertsDialog({
         });
     };
 
-    const saveSuppression = () => {
+    // EA-055: pausing a person's due and late dose alerts loosens a safety
+    // check, so it is confirmed in red first (approved "Loosens this check").
+    const [confirmPause, setConfirmPause] = useState(false);
+    const postSuppression = () => {
         suppressForm.post(`/emar/clients/${clientId}/alert-suppression`, {
             preserveScroll: true,
             onSuccess: onClose,
         });
+    };
+    const saveSuppression = () => {
+        if (
+            suppressForm.data.suppress_med_admin_alerts &&
+            !suppression.suppressed
+        ) {
+            setConfirmPause(true);
+            return;
+        }
+        postSuppression();
     };
 
     return (
@@ -897,7 +911,7 @@ export function ManageAlertsDialog({
                                         },
                                         {
                                             value: 'mdt_decision',
-                                            label: 'MDT decision',
+                                            label: 'Team decision (MDT)',
                                         },
                                         {
                                             value: 'clinical_judgement',
@@ -905,7 +919,7 @@ export function ManageAlertsDialog({
                                         },
                                         {
                                             value: 'client_preference',
-                                            label: 'Client preference',
+                                            label: 'The person’s choice',
                                         },
                                     ]}
                                 />
@@ -996,6 +1010,32 @@ export function ManageAlertsDialog({
                     </div>
                 </form>
             )}
+            <ConfirmDialog
+                frontline
+                open={confirmPause}
+                onClose={() => setConfirmPause(false)}
+                onConfirm={() => {
+                    setConfirmPause(false);
+                    postSuppression();
+                }}
+                title="Pause due and late dose alerts?"
+                description={
+                    <>
+                        <span className="block font-semibold text-status-critical">
+                            Loosens this check
+                        </span>
+                        <span className="mt-1 block">
+                            Due and late dose alerts stop for this person until
+                            they’re turned back on. Staff and leads won’t be
+                            reminded about missed doses. The pause, its basis
+                            and reason show on their medication record.
+                        </span>
+                    </>
+                }
+                confirmText="Pause alerts"
+                cancelText="Keep alerts on"
+                variant="destructive"
+            />
         </MedsWizardDialog>
     );
 }

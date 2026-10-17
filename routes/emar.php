@@ -4,6 +4,7 @@ use App\Http\Controllers\BreakGlassController;
 use App\Http\Middleware\MedicationCapturedByGuard;
 use Inertia\Middleware\EncryptHistory;
 use App\Http\Controllers\ClientAllergyRecordController;
+use App\Http\Controllers\Emar\ChartAlertReadController;
 use App\Http\Controllers\Emar\ClientMedicationDayController;
 use App\Http\Controllers\Emar\CompetencyExemptionController;
 use App\Http\Controllers\Emar\ControlledProductController;
@@ -103,6 +104,12 @@ Route::middleware(['auth', EncryptHistory::class, MedicationCapturedByGuard::cla
     Route::post('/meds/today/offline-review', [OfflineReplayReviewController::class, 'store'])
         ->middleware('permission:medications.administer.record')->middleware('throttle:60,1')
         ->name('meds.today.offline_review');
+
+    // eMAR audit Lane A5 (EA-005): the worker read a "Prompt staff" chart alert.
+    Route::post('/meds/today/chart-alerts/{alert}/read', [ChartAlertReadController::class, 'store'])
+        ->whereNumber('alert')
+        ->middleware('permission:medications.administer.record')->middleware('throttle:60,1')
+        ->name('meds.today.chart_alert_read');
 
     Route::get('/meds/today/doses/requirements', [DoseRequirementsController::class, 'scheduled'])
         ->middleware('permission:medications.administer.record')

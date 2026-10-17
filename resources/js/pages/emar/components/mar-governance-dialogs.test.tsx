@@ -48,6 +48,50 @@ describe('INR recording review', () => {
             expect.any(Object),
         );
     });
+    it('confirms pausing due and late dose alerts as loosening a check (EA-055)', () => {
+        const post = vi.spyOn(router, 'post').mockImplementation(() => {});
+        render(
+            <ManageAlertsDialog
+                clientId={42}
+                onClose={vi.fn()}
+                suppression={{ suppressed: false, reason: null }}
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: /Reminders.*Medication-admin alerts/,
+            }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Suppressed' }));
+        fireEvent.pointerDown(
+            screen.getByRole('combobox', { name: /decision basis/ }),
+            { button: 0, ctrlKey: false, pointerType: 'mouse' },
+        );
+        fireEvent.click(
+            screen.getByRole('option', { name: 'Team decision (MDT)' }),
+        );
+        fireEvent.change(
+            screen.getByPlaceholderText(
+                'Why are med-admin alerts being suppressed?',
+            ),
+            { target: { value: 'Agreed at the review meeting' } },
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save setting' }));
+
+        // Nothing changes until the red confirm.
+        expect(post).not.toHaveBeenCalled();
+        expect(screen.getByText('Loosens this check')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Pause alerts' }));
+        expect(post).toHaveBeenCalledWith(
+            '/emar/clients/42/alert-suppression',
+            expect.objectContaining({
+                suppress_med_admin_alerts: true,
+                basis: 'mdt_decision',
+            }),
+            expect.any(Object),
+        );
+    });
+
     it('retains supplied details across steps and sends the existing command only after review', () => {
         vi.useFakeTimers({ toFake: ['Date'] });
         vi.setSystemTime(new Date('2026-10-04T00:00:00Z'));

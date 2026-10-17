@@ -253,7 +253,12 @@ class OverdueDoseAlertsTest extends TestCase
         $this->assertSame('2 overdue dose(s): Metformin, Controlled medicine', $this->dashboardRow($this->aroha)?->message);
     }
 
-    public function test_pausing_the_order_resolves_its_overdue_alert(): void
+    /**
+     * EA-041 (Lane A9): pausing the order doesn't settle the 7:00 dose that
+     * was already overdue. It stays owed, and its alert open, until someone
+     * records what happened.
+     */
+    public function test_pausing_the_order_keeps_its_overdue_dose_owed_until_it_is_recorded(): void
     {
         $this->at('2026-06-15 08:30');
         $this->artisan('emar:send-alerts')->assertSuccessful();
@@ -261,7 +266,10 @@ class OverdueDoseAlertsTest extends TestCase
 
         $this->at('2026-06-15 08:40');
         $this->orders['Metformin']->pause('Held for blood tests.', User::factory()->create(['approved_at' => now()])->id);
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->fresh()->status);
 
+        $this->record('Metformin', '07:00', 'withheld');
         $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
     }
 
@@ -363,14 +371,18 @@ class OverdueDoseAlertsTest extends TestCase
         $this->assertTrue($second->fresh()->isActionable());
     }
 
-    public function test_ceasing_the_order_resolves_its_overdue_alert(): void
+    /**
+     * EA-041 (Lane A9): ceasing the order owes nothing due after the stop,
+     * but the 7:00 dose already overdue stays owed, and its alert open,
+     * until what happened is recorded.
+     */
+    public function test_ceasing_the_order_keeps_its_overdue_dose_owed_until_it_is_recorded(): void
     {
         // 8:30: only Metformin's 7:00 dose is overdue.
         $this->at('2026-06-15 08:30');
         $this->artisan('emar:send-alerts')->assertSuccessful();
         $alert = $this->openAlerts()->sole();
 
-        // Ceased: its doses are no longer owed, and Meds today stops listing them.
         $this->at('2026-06-15 08:40');
         $this->orders['Metformin']->update([
             'state' => 'ceased',
@@ -379,7 +391,10 @@ class OverdueDoseAlertsTest extends TestCase
             'ceased_reason' => 'Stopped by the GP.',
             'ceased_by' => User::factory()->create(['approved_at' => now()])->id,
         ]);
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->fresh()->status);
 
+        $this->record('Metformin', '07:00', 'withheld');
         $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
         $this->assertNull($this->dashboardRow($this->aroha));
     }

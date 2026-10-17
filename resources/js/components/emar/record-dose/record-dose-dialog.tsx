@@ -32,6 +32,13 @@ import { ErrorState } from '@/components/ui/error-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingState } from '@/components/ui/loading-state';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { TilePicker } from '@/components/wizard/primitives';
 import {
@@ -41,7 +48,11 @@ import {
     WizardStepPane,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
-import { formatDateTime } from '@/lib/datetime';
+import {
+    formatDateTime,
+    workerTimeOffset,
+    workerTimeOffsets,
+} from '@/lib/datetime';
 import {
     createMedicationMutationReplayState,
     prepareMedicationMutationReplayState,
@@ -192,6 +203,8 @@ interface FormState {
     changeAck?: boolean;
     /** A11: "I’ve checked the label" when there's no pack photo and the organisation asks for it. */
     labelChecked?: boolean;
+    /** EA-042: which occurrence of a repeated NZ clock time ("+13:00"/"+12:00"). */
+    whenOffset?: string;
 }
 export type PendingDose = {
     form: FormState;
@@ -782,6 +795,8 @@ function RecordDoseForm({
                 packLines: [],
                 cdBalance: '',
                 packChecked: false,
+                // "Now" is now's own occurrence in the repeated DST hour.
+                whenOffset: workerTimeOffset(new Date().toISOString()),
             },
     );
     const [errors, setErrors] = useState<Errors>({});
@@ -810,6 +825,8 @@ function RecordDoseForm({
     const [refreshing, setRefreshing] = useState(false);
     // EA-149: the last attempt never left the browser (what to do next).
     const [notSent, setNotSent] = useState<string | null>(null);
+    // EA-005: "Prompt staff" chart alerts this worker has read in this dialog.
+    const [readAlerts, setReadAlerts] = useState<number[]>([]);
     const dirty = useRef(Boolean(recovered));
     const bodyRef = useRef<HTMLDivElement>(null);
     const replay = useRef(createMedicationMutationReplayState());
@@ -961,19 +978,34 @@ function RecordDoseForm({
     const windowClosesLocal = due
         ? nzLocal(new Date(due.window_closes_at))
         : null;
+    // EA-042: the NZ wall time the worker chose as one instant. On the April
+    // DST night 02:00–02:59 happens twice (they choose which); on the
+    // September night it doesn't happen at all.
+    const whenOffsets = f.when ? workerTimeOffsets(f.when) : [];
+    const whenOffset =
+        whenOffsets.length === 1
+            ? whenOffsets[0]
+            : whenOffsets.includes(f.whenOffset ?? '')
+              ? (f.whenOffset as string)
+              : null;
+    const whenInstant =
+        f.when && whenOffset ? `${f.when}:00${whenOffset}` : null;
+    const whenMs = whenInstant ? Date.parse(whenInstant) : null;
     const outsideWindow = !!(
         due &&
         givenLike &&
         f.when &&
-        windowClosesLocal &&
-        f.when > windowClosesLocal
+        (whenMs !== null
+            ? whenMs > Date.parse(due.window_closes_at)
+            : windowClosesLocal && f.when > windowClosesLocal)
     );
     const beforeWindow = !!(
         due &&
         givenLike &&
         f.when &&
-        windowOpensLocal &&
-        f.when < windowOpensLocal
+        (whenMs !== null
+            ? whenMs < Date.parse(due.window_opens_at)
+            : windowOpensLocal && f.when < windowOpensLocal)
     );
     const windowLabel = due
         ? `${timeLabel(due.window_opens_at)}–${timeLabel(due.window_closes_at)}`
@@ -1002,7 +1034,13 @@ function RecordDoseForm({
                 e.scan =
                     'Check the packed medicine code before recording a given dose.';
             if (!f.when) e.when = 'Choose the date and time it was given.';
-            else if (f.when > nowLocal)
+            else if (whenOffsets.length === 0)
+                e.when =
+                    'This NZ time didn’t happen — the clocks went forward. Choose a real time.';
+            else if (whenOffset === null)
+                e.when =
+                    'This NZ time happened twice when the clocks went back. Choose which one it was.';
+            else if (whenMs !== null ? whenMs > Date.now() : f.when > nowLocal)
                 e.when = 'The time can’t be later than now.';
             else if (beforeWindow)
                 e.when = `Early doses aren’t recorded — the window opens at ${timeLabel(due?.window_opens_at)}.`;
@@ -1188,7 +1226,12 @@ function RecordDoseForm({
                     ? f.labelChecked === true
                     : undefined,
             client_medication_id: req.order.id,
-            administered_at: givenLike ? `${f.when}:00` : `${nowLocal}:00`,
+            // EA-042: always one NZ instant, never a bare wall time.
+            administered_at: givenLike
+                ? (whenInstant ?? `${f.when}:00`)
+                : new Date(
+                      Math.floor(Date.now() / 60000) * 60000,
+                  ).toISOString(),
             notes: f.note.trim() || null,
             medication_round_id: roundId,
             shift_id: shiftContext?.shiftId,
@@ -1949,6 +1992,53 @@ function RecordDoseForm({
             now: server?.now ?? orderFacts(req.order),
         };
     })();
+    // EA-005: chart alerts set to "Prompt staff" are read before recording,
+    // once a day (the server keeps the reading; a read today stays read).
+    const chartAlerts = req.chart_alerts ?? [];
+    const alertRead = (id: number) =>
+        readAlerts.includes(id) ||
+        chartAlerts.some((a) => a.id === id && a.read_at !== null);
+    const unreadAlerts = chartAlerts.filter((a) => !alertRead(a.id));
+    const markAlertRead = (id: number) => {
+        setReadAlerts((ids) => (ids.includes(id) ? ids : [...ids, id]));
+        void axios
+            .post(
+                `/meds/today/chart-alerts/${id}/read`,
+                {},
+                { headers: { Accept: 'application/json' } },
+            )
+            .catch(() => undefined);
+    };
+    const alertNotices = chartAlerts.map((alert) => (
+        <Notice
+            key={`chart-alert-${alert.id}`}
+            tone={alert.type === 'warfarin' ? 'critical' : 'warning'}
+            live={alertRead(alert.id) ? 'note' : 'alert'}
+            title={`Chart alert: ${alert.title}`}
+        >
+            {alert.detail ? <p>{alert.detail}</p> : null}
+            <div
+                className="mt-2 flex items-center gap-2"
+                data-field={`chartAlert-${alert.id}`}
+            >
+                <Checkbox
+                    id={`rd-alert-${alert.id}`}
+                    checked={alertRead(alert.id)}
+                    disabled={alertRead(alert.id)}
+                    onCheckedChange={(v) => {
+                        if (v === true) markAlertRead(alert.id);
+                    }}
+                />
+                <Label
+                    htmlFor={`rd-alert-${alert.id}`}
+                    className="text-sm font-normal"
+                >
+                    I’ve read this alert
+                </Label>
+            </div>
+        </Notice>
+    ));
+
     const changeTime = change?.verified_at ?? change?.changed_at ?? null;
     const changeNotice = change ? (
         <Notice
@@ -2007,6 +2097,7 @@ function RecordDoseForm({
             ) : null}
             <IdentityHeader req={req} />
             {changeNotice}
+            {alertNotices}
             <AllergyNotice req={req} />
             {req.allergy.match && !req.block_given ? (
                 <Notice
@@ -2116,6 +2207,7 @@ function RecordDoseForm({
         <div className="space-y-4">
             <IdentityHeader req={req} compact />
             {mode !== 'record' ? changeNotice : null}
+            {mode !== 'record' ? alertNotices : null}
             <AllergyNotice req={req} compact />
             {reofferClosed ? (
                 <Notice
@@ -2306,6 +2398,38 @@ function RecordDoseForm({
                             clearable={false}
                             hint="Now by default. The exact minute is kept."
                         />
+                        {whenOffsets.length > 1 ? (
+                            <div className="mt-2 space-y-1.5">
+                                <Label htmlFor="rd-when-offset">
+                                    Which occurrence of this time?
+                                </Label>
+                                <Select
+                                    value={f.whenOffset ?? ''}
+                                    onValueChange={(v) =>
+                                        set({ whenOffset: v })
+                                    }
+                                >
+                                    <SelectTrigger
+                                        id="rd-when-offset"
+                                        className="w-full"
+                                    >
+                                        <SelectValue placeholder="Choose the clock reading" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {whenOffsets.map((offset, index) => (
+                                            <SelectItem
+                                                key={offset}
+                                                value={offset}
+                                            >
+                                                {index === 0
+                                                    ? 'First time round (NZDT, before the clocks went back)'
+                                                    : 'Second time round (NZST, after the clocks went back)'}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ) : null}
                     </div>
                     {outsideWindow ? (
                         <ReasonSelect
@@ -2889,9 +3013,11 @@ function RecordDoseForm({
                 ? 'Tick “I’ve checked the label” to continue'
                 : f.step === changeStep && change && f.changeAck !== true
                   ? 'Confirm you’ve checked the new instructions'
-                  : f.step === 2 && reviewExpired
-                    ? 'Refresh the safety check first'
-                    : null;
+                  : f.step === changeStep && unreadAlerts.length > 0
+                    ? 'Read the chart alerts first'
+                    : f.step === 2 && reviewExpired
+                      ? 'Refresh the safety check first'
+                      : null;
     const lockedForward = mode !== 'record' && f.step === 1;
     const footerStart =
         phase === 'duplicate' ? null : f.step > 0 &&

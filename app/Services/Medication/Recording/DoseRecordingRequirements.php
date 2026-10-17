@@ -6,7 +6,9 @@ use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationAlert;
 use App\Models\MedicationAdminRule;
+use App\Models\MedicationChartAlertRead;
 use App\Models\MedicationOrderRevision;
 use App\Models\MedicationOrderVersion;
 use App\Models\MedicationRefusalFollowup;
@@ -156,6 +158,19 @@ final class DoseRecordingRequirements
         }
 
         return $visible;
+    }
+
+    /**
+     * The person gate alone, for things about the person rather than one
+     * order (EA-005 chart alert reads): may record, may read this person's
+     * medicines, and the house is in their access or a shift is with them.
+     */
+    public function isPersonVisible(User $viewer, Client $client): bool
+    {
+        return $viewer->canDo('medications.administer.record')
+            && $this->personReadable($viewer, $client)
+            && (in_array((int) $client->site_id, $this->siteAccess->accessibleSiteIds($viewer, self::SITE_BYPASS), true)
+                || $this->hasShiftWith($viewer, $client, CarbonImmutable::now()));
     }
 
     /** The one per-person medication record gate (MedicationRecordAccess, P02). */
@@ -393,6 +408,8 @@ final class DoseRecordingRequirements
             $result['order_fingerprint'] = PaperEntryService::orderFingerprint($order);
             // EA-059: checked at a new version since its last recorded dose.
             $result['order_change'] = $this->orderChangeFacts($order);
+            // EA-005: the person's chart alerts set to "Prompt staff".
+            $result['chart_alerts'] = $this->promptAlerts($viewer, $client);
         }
 
         return $result;
@@ -780,6 +797,45 @@ final class DoseRecordingRequirements
     }
 
     /**
+     * EA-005: the person's enabled, unresolved chart alerts set to "Prompt
+     * staff", each with when this worker read it today (NZ), so the dialog
+     * shows them before recording and asks once a day.
+     *
+     * @return list<array{id: int, type: string, title: string, detail: ?string, read_at: ?string}>
+     */
+    private function promptAlerts(User $viewer, Client $client): array
+    {
+        $alerts = ClientMedicationAlert::query()
+            ->where('client_id', $client->id)
+            ->where('enabled', true)
+            ->whereNull('resolved_at')
+            ->where('prompt_on_open', true)
+            ->orderBy('id')
+            ->get(['id', 'type', 'title', 'detail']);
+        if ($alerts->isEmpty()) {
+            return [];
+        }
+        $readOn = CarbonImmutable::now($this->schedule->workerTimezone())->toDateString();
+        // Medication settings: confirm once a day (default) or every dose.
+        $reads = app(ChartAlertPromptSettings::class)->everyDose() ? collect() : MedicationChartAlertRead::query()
+            ->whereIn('client_medication_alert_id', $alerts->modelKeys())
+            ->where('user_id', $viewer->id)
+            ->where('read_on', $readOn)
+            ->get(['client_medication_alert_id', 'read_at'])
+            ->keyBy('client_medication_alert_id');
+
+        return $alerts->map(fn (ClientMedicationAlert $alert): array => [
+            'id' => (int) $alert->id,
+            'type' => (string) $alert->type,
+            'title' => (string) $alert->title,
+            'detail' => $alert->detail,
+            'read_at' => DoseOrderTimelineFactory::rawInstant(
+                $reads->get($alert->id)?->getRawOriginal('read_at'),
+            )?->toIso8601String(),
+        ])->values()->all();
+    }
+
+    /**
      * EA-059 (approved P01 v2 "This order changed — check the new
      * instructions"): the order's current version was checked as a change
      * after its last recorded dose. "before" is the version it replaced and
@@ -959,8 +1015,8 @@ final class DoseRecordingRequirements
             ? (int) $existing->corrected_of_id
             : (int) $existing->id;
         $refusedAt = DoseOrderTimelineFactory::rawInstant($existing->getRawOriginal('administered_at'));
-        $tz = $this->schedule->workerTimezone();
-        if ($refusedAt === null || $refusedAt->setTimezone($tz)->toDateString() !== $now->setTimezone($tz)->toDateString()) {
+        // EA-147: open until the order's next dose is due, across midnight.
+        if ($refusedAt === null || ! $this->contract->reofferStillOwed($existing, $now)) {
             return null;
         }
 

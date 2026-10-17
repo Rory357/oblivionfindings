@@ -56,14 +56,16 @@ final class MedicationFollowupService
         // eMAR audit Lane A3: a dose saved on a device that didn't reach the chart.
         'offline_review' => 'Dose saved on a device, not recorded',
         'duplicate_supply' => 'Check for a duplicate supply',
+        // eMAR audit Lane A8 (D6): away past the cap with no recorded return.
+        'away_return' => 'Record the return',
     ];
 
     public const LEAD_TYPES = ['unconfirmed', 'partial', 'disputed', 'override', 'countersign', 'handover', 'reconciliation',
         'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review',
-        'offline_review', 'duplicate_supply'];
+        'offline_review', 'duplicate_supply', 'away_return'];
 
     public const SOURCE_OWNED_TYPES = ['confirm', 'override', 'countersign', 'reconciliation',
-        'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review'];
+        'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review', 'away_return'];
 
     public const SOURCE_TYPES = [
         'support-reassessment' => 'reassess_support', 'order-check' => 'order_check',
@@ -380,7 +382,7 @@ final class MedicationFollowupService
         }
 
         return [
-            'id' => $row->id, 'type' => $row->type, 'label' => self::TYPES[$row->type],
+            'id' => $row->id, 'type' => $row->type, 'label' => is_string($row->context['label'] ?? null) ? $row->context['label'] : self::TYPES[$row->type],
             'client' => ['id' => $row->client->id, 'name' => $row->client->full_name],
             'site' => ['id' => $row->client->site_id, 'name' => $row->client->site?->name],
             'medication' => $row->medication ? ['id' => $row->medication->id, 'name' => $row->medication->name] : null,
@@ -647,6 +649,19 @@ final class MedicationFollowupService
         }
         if ($row->type === 'confirm' && $action === 'confirmation') {
             throw ValidationException::withMessages(['action' => 'Answer through the named colleague confirmation request so its expiry and evidence are checked.']);
+        }
+        // Lane A8 (Main, 14 Oct): the lead confirms an open hospital stay is
+        // still going on; the next "record the discharge" comes after another cap.
+        if ($action === \App\Services\Medication\DoseSlots\AwayReturnFollowups::STILL_IN_HOSPITAL) {
+            if ($row->type !== \App\Services\Medication\DoseSlots\AwayReturnFollowups::TYPE
+                || ($row->context['away_source'] ?? null) !== \App\Services\Medication\DoseSlots\DoseAwaySources::HOSPITAL
+                || ! app(\App\Services\Medication\DoseSlots\AwayReturnFollowups::class)->hospitalStillOpen((int) ($row->context['away_id'] ?? 0))) {
+                throw ValidationException::withMessages(['action' => 'Only an open hospital stay can be confirmed as continuing. Record the discharge instead.']);
+            }
+            $row->update(['completed_at' => now('UTC'), 'completed_by' => $actor->id, 'state' => 'done',
+                'context' => [...$row->context, 'outcome' => 'still_in_hospital', 'confirmed_at' => now('UTC')->toIso8601String()]]);
+
+            return [];
         }
         if ($action === 'signoff' && in_array($row->type, self::LEAD_TYPES, true)) {
             if (in_array($row->type, self::SOURCE_OWNED_TYPES, true)) {

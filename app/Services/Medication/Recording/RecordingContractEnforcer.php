@@ -8,6 +8,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\User;
+use App\Services\MarScheduleService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\MedicationErrorReporter;
@@ -17,6 +18,7 @@ use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Support\Medication\MedicationStockQuantity;
 use Brick\Math\BigDecimal;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
@@ -365,11 +367,7 @@ final class RecordingContractEnforcer
             return null;
         }
 
-        $refusedAt = DoseOrderTimelineFactory::rawInstant($existing->getRawOriginal('administered_at'));
-        $tz = (string) config('app.worker_timezone', 'Pacific/Auckland');
-        if ($refusedAt === null
-            || $refusedAt->setTimezone($tz)->toDateString()
-                !== CarbonImmutable::now()->setTimezone($tz)->toDateString()) {
+        if (! $this->reofferStillOwed($existing, CarbonImmutable::now())) {
             return null;
         }
 
@@ -379,6 +377,43 @@ final class RecordingContractEnforcer
             ->lockForUpdate()
             ->latest('id')
             ->first();
+    }
+
+    /**
+     * EA-147: a refusal may be re-offered while its follow-up is open, until
+     * the order's next scheduled dose is due — across midnight if need be
+     * (a 22:00 refusal followed up at 00:20). Never before it was refused,
+     * and never past the next dose (that dose is its own record). With no
+     * next dose found, 24 hours after the refused dose was due.
+     */
+    public function reofferStillOwed(ClientMedicationAdministration $refusal, CarbonImmutable $now): bool
+    {
+        $refusedAt = DoseOrderTimelineFactory::rawInstant($refusal->getRawOriginal('administered_at'));
+        $dueAt = DoseOrderTimelineFactory::rawInstant($refusal->getRawOriginal('scheduled_for')) ?? $refusedAt;
+        if ($refusedAt === null || $dueAt === null || $now->lt($refusedAt)) {
+            return false;
+        }
+        $order = ClientMedication::withTrashed()->find($refusal->client_medication_id);
+        $next = $order !== null ? $this->nextScheduledDoseAfter($order, $dueAt) : null;
+
+        return $now->lt($next ?? $dueAt->addDay());
+    }
+
+    private function nextScheduledDoseAfter(ClientMedication $order, CarbonImmutable $dueAt): ?CarbonImmutable
+    {
+        $schedule = app(MarScheduleService::class);
+        $tz = $schedule->workerTimezone();
+        $day = Carbon::instance($dueAt->toMutable())->timezone($tz)->startOfDay();
+        foreach ([0, 1, 2] as $offset) {
+            foreach ($schedule->scheduledTimesForDate($order, $day->copy()->addDays($offset)) as $time) {
+                $candidate = CarbonImmutable::instance($time)->utc();
+                if ($candidate->gt($dueAt->addMinute())) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return null;
     }
 
     /** Close the refusal's follow-up with what the re-offer recorded. */
