@@ -92,10 +92,14 @@ class TeamLeadMedicationBaselineTest extends TestCase
             'medications.alerts.manage_house',
             // Approved house-level workflows have their own exact capabilities.
             'medications.controlled.manage',
+            'medications.downtime.manage',
             'medications.errors.manage',
             'medications.followups.manage',
+            'medications.orders.manage',
             'medications.reports.view',
             'medications.reviews.manage',
+            'medications.stock.receive',
+            'medications.stock.update',
             ...self::FRONTLINE_KEYS,
         ], $teamLead);
     }

@@ -711,6 +711,7 @@ class HandleInertiaRequests extends Middleware
                 'reportsExport' => $user->canDo('medications.reports.export'),
                 'reportsView' => $user->canDo('medications.reports.view'),
                 'auditExport' => $user->canDo('medications.audit.export'),
+                'stockReceive' => $user->canDo('medications.stock.receive'),
                 'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledView' => $user->canDo('medications.controlled.view'),
                 'controlledRecord' => $user->canDo('medications.controlled.record'),

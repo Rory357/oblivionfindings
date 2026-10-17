@@ -60,8 +60,11 @@ class ApprovedMedicationGrantsTest extends TestCase
         $this->seed(RbacSeeder::class);
         // A deployed database before this lane's migrations: RefreshDatabase
         // already ran them on an empty roles table (creating the key, granting
-        // nothing), then the seeder gave admin every key that existed.
+        // nothing), then the seeder gave admin and team_lead the current keys.
         Permission::query()->where('key', 'medications.stock.receive')->delete();
+        $teamLeadId = Role::query()->where('name', 'team_lead')->value('id');
+        $preC4Ids = Permission::query()->whereIn('key', ['medications.orders.manage', 'medications.stock.update'])->pluck('id');
+        DB::table('role_permission')->where('role_id', $teamLeadId)->whereIn('permission_id', $preC4Ids)->delete();
         Cache::flush();
         Storage::fake('local');
         Storage::fake('private');
@@ -280,18 +283,17 @@ class ApprovedMedicationGrantsTest extends TestCase
 
     public function test_the_emergency_policy_grant_survives_an_rbac_reseed(): void
     {
-        // EA-162: RbacSeeder syncs provider_manager to its own list, which
-        // does not name the key the 3 Oct migration granted.
+        // EA-162: RbacSeeder now includes emergency_policy.manage and the C4/C1 grants.
         $this->migrate(self::EMERGENCY_POLICY_MIGRATION);
         $this->assertContains('medications.emergency_policy.manage', $this->roleKeys('provider_manager'));
 
         $this->seed(RbacSeeder::class);
 
-        if (! in_array('medications.emergency_policy.manage', $this->roleKeys('provider_manager'), true)) {
-            $this->markTestIncomplete('EA-162 reproduced: a reseed removes provider_manager\'s emergency-policy grant. '
-                .'The fix is a RbacSeeder change (collision file), reported to Main instead of edited.');
-        }
         $this->assertContains('medications.emergency_policy.manage', $this->roleKeys('provider_manager'));
+        $this->assertContains('medications.orders.manage', $this->roleKeys('team_lead'));
+        $this->assertContains('medications.stock.receive', $this->roleKeys('team_lead'));
+        $this->assertContains('medications.stock.update', $this->roleKeys('team_lead'));
+        $this->assertContains('medications.downtime.manage', $this->roleKeys('team_lead'));
     }
 
     /** @return array{0: ClientMedication, 1: ?ClientMedicationStock} */
