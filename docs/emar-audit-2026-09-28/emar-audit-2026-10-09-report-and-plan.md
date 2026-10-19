@@ -540,3 +540,14 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
     - **C5** (handover, clock-out due-only check, shift cancellation follow-ups) — parked on workforce collision files (`AttendanceService`, `ShiftCancellationService`).
     - **C6** (incident/Control Room NZ time & auto-incident routing) — parked on H&S/Control Room collision files (`SignalProcessingService`, `Incident*Service`).
 
+- **20 Oct, Main re-verification after Gemini's merges.**
+  - **What Gemini merged:**
+    - Lane A A5–A9 and A8 (`05cc99707`); the patches are identical to the tested ones, plus a missing CarbonImmutable import fix.
+    - Lane B EA-106 (`c4278e17a`).
+    - The RbacSeeder and HandleInertiaRequests sync (`1a9150d64`). Main checked it against the grant list and it is correct.
+  - **Why re-verify:** two groups had never run on the final code (MySQL was down on 15 Oct).
+  - **Re-run on main `1a9150d64`:** A8 group 225 passed, Lane B privacy group 289, A5–A9 group 165. All green.
+  - **Left:**
+    - compare the 1440 walk shots with the mockups;
+    - eMAR vitest and tsc on main;
+    - Stephan's site actions.
