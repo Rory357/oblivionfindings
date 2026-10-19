@@ -11,9 +11,11 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Overview\OverviewAccess;
 use Carbon\CarbonImmutable;
+use Database\Seeders\GovernancePermissionsSeeder;
 use Database\Seeders\OperationsPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /** Business support overview: finance, compliance, safety, fleet, risk and audit staff. */
@@ -166,5 +168,60 @@ class OverviewBusinessSupportTest extends TestCase
         // The editor asks for the whole library: nothing is left deferred or "planned".
         $all = $this->getJson('/dashboard/data?role=office&blocks=all')->assertOk()->json('blocks');
         $this->assertSame([], array_keys(array_filter($all, fn ($block) => in_array($block['state'], ['deferred', 'proposed'], true))));
+    }
+
+    public function test_back_office_leads_can_read_the_records_their_roles_are_named_for(): void
+    {
+        $this->seed(GovernancePermissionsSeeder::class);
+        $cfo = $this->actor('cfo');
+        foreach (RbacSeeder::CFO_FINANCE_READ as $key) {
+            $this->assertTrue($cfo->canDo($key), $key);
+        }
+        // Read only: approving, posting and paying stay with Finance.
+        foreach (['finance.ap.manage', 'finance.ar.manage', 'finance.bank.manage', 'finance.tax.manage'] as $key) {
+            $this->assertFalse($cfo->canDo($key), $key);
+        }
+        $this->assertSame(['attention', 'focus', 'trend', 'sites', 'distribution', 'office-cash'], app(OverviewAccess::class)->defaultBlockIds($cfo, 'office'));
+        $compliance = $this->actor('compliance_lead');
+        $this->assertTrue($compliance->canDo('compliance.view'));
+        $this->assertTrue($compliance->canDo('governance.compliance.view'));
+        $this->assertTrue($this->actor('risk_lead')->canDo('governance.risks.view'));
+        $this->assertContains('office-risks', app(OverviewAccess::class)->defaultBlockIds($this->actor('risk_lead'), 'office'));
+    }
+
+    public function test_the_grant_migration_only_adds_the_missing_read_rows_and_runs_once_safely(): void
+    {
+        $this->seed(GovernancePermissionsSeeder::class);
+        $migration = require database_path('migrations/2026_10_19_120000_grant_back_office_read_access.php');
+        $holds = fn (string $role, string $key) => DB::table('role_permission')
+            ->join('roles', 'roles.id', '=', 'role_permission.role_id')->join('permissions', 'permissions.id', '=', 'role_permission.permission_id')
+            ->where('roles.name', $role)->where('permissions.key', $key)->exists();
+        // A site deployed before this change: the seeded grants are not there yet.
+        $migration->down();
+        $this->assertFalse($holds('cfo', 'finance.dashboard'));
+        $this->assertFalse($holds('risk_lead', 'governance.risks.view'));
+        $before = DB::table('role_permission')->count();
+        $migration->up();
+        $added = DB::table('role_permission')->count() - $before;
+        // Exactly the CFO's finance keys plus three governance and compliance keys.
+        $this->assertSame(DB::table('permissions')->whereIn('key', RbacSeeder::CFO_FINANCE_READ)->count() + 3, $added);
+        $this->assertTrue($holds('cfo', 'finance.reports.view'));
+        $this->assertTrue($holds('compliance_lead', 'compliance.view'));
+        $this->assertTrue($holds('compliance_lead', 'governance.compliance.view'));
+        $this->assertTrue($holds('risk_lead', 'governance.risks.view'));
+        // A second run changes nothing.
+        $migration->up();
+        $this->assertSame($before + $added, DB::table('role_permission')->count());
+    }
+
+    public function test_a_ceo_without_the_operations_dashboard_opens_on_the_board_overview(): void
+    {
+        $this->seed(GovernancePermissionsSeeder::class);
+        $access = app(OverviewAccess::class);
+        $this->assertSame('governance', $access->defaultRole($this->actor('ceo')));
+        // With the operations dashboard the Manager overview is useful again.
+        $this->assertSame('manager', $access->defaultRole($this->actor('ceo', ['operations.dashboard.view' => true])));
+        // Without board access either, the CEO keeps the Manager overview.
+        $this->assertSame('manager', $access->defaultRole($this->actor('ceo', ['governance.view' => false])));
     }
 }

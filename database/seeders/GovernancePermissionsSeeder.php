@@ -261,6 +261,15 @@ class GovernancePermissionsSeeder extends Seeder
             }
         }
 
+        // Back-office leads read the governance records their roles are named for
+        // (19 Oct 2026; grant migration 2026_10_19_120000_grant_back_office_read_access).
+        foreach (['risk_lead' => ['governance.risks.view'], 'compliance_lead' => ['governance.compliance.view']] as $name => $keys) {
+            $role = Role::where('name', $name)->first();
+            if ($role) {
+                $role->permissions()->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id'));
+            }
+        }
+
         // Assign treasurer permissions (member with finance responsibility)
         $treasurerRoles = Role::whereIn('name', ['board_treasurer', 'treasurer'])->get();
         foreach ($treasurerRoles as $role) {

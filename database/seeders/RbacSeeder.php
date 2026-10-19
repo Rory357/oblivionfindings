@@ -24,6 +24,16 @@ class RbacSeeder extends Seeder
     ];
 
     /**
+     * The CFO role's finance grants: read-only, the same set auditors hold.
+     * The grant migration 2026_10_19_120000 gives existing sites the same set.
+     */
+    public const CFO_FINANCE_READ = [
+        'finance.dashboard', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites', 'finance.ledger.view',
+        'finance.ap.view', 'finance.ar.view', 'finance.bank.view', 'finance.tax.view', 'finance.assets.view',
+        'finance.petty_cash.view', 'finance.reports.view',
+    ];
+
+    /**
      * Independent safety/privacy decisions. Only the explicit product policy
      * in run() assigns them; broad administrator access does not imply them.
      * Every seeder that backfills the admin role must exclude these keys.
@@ -981,8 +991,19 @@ class RbacSeeder extends Seeder
                         'safeguarding.viewAny',
                         'safeguarding.viewSensitive',
                         'safeguarding.declassification.approve',
+                        // Read the compliance dashboard their role is named for (19 Oct 2026).
+                        'compliance.view',
                     ])
                     ->pluck('id'),
+            );
+        }
+
+        // CFO: read every finance record (the auditor's view-only set). Approving,
+        // posting and paying stay with Finance until Stephan decides otherwise.
+        // Grant migration: 2026_10_19_120000_grant_back_office_read_access.
+        if ($cfo) {
+            $cfo->permissions()->syncWithoutDetaching(
+                Permission::query()->whereIn('key', self::CFO_FINANCE_READ)->pluck('id'),
             );
         }
 

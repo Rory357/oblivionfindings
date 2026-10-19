@@ -57,6 +57,10 @@ final class OverviewAccess
             return $preferred['role'];
         }
         $role = match (true) {
+            // A CEO without the operations dashboard would open on an overview of
+            // "Permission required" cards; their board workspace is the useful one.
+            $user->hasRole('ceo') && ! $user->hasRole('admin', 'provider_manager') && ! $user->canDo('operations.dashboard.view')
+                && $user->canDo('governance.view') => 'governance',
             $user->hasRole('admin', 'provider_manager', 'ceo', 'coo') => 'manager',
             $user->hasRole('hr') => 'hr',
             $user->hasRole('it_manager') => 'it',
