@@ -86,6 +86,30 @@ class StockPacksWorkflowTest extends TestCase
                 $quantities, array_keys($quantities))];
     }
 
+    /**
+     * Lane C (Main, 20 Oct): the P06 hub carries the medication pages'
+     * middleware — history encrypted (Back after sign-out shows nothing) and a
+     * save made on a shared device by another worker refused before any
+     * handler, as the older stock writes already are.
+     */
+    public function test_the_hub_encrypts_its_history_and_refuses_a_save_made_by_another_worker(): void
+    {
+        extract($this->fixture());
+        $page = $this->actingAs($actor)->get('/emar/stock/packs')->assertOk()->viewData('page');
+        $this->assertTrue($page['encryptHistory']);
+
+        $colleague = User::factory()->create(['approved_at' => now()]);
+        $movements = MedicationStockMovement::query()->count();
+        $this->postJson('/emar/stock/packs/commands', [...$this->receipt($med->id), 'queued_offline' => true, 'captured_by_user_id' => $colleague->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['captured_by_user_id' => 'saved on this device by another worker']);
+        $this->assertSame($movements, MedicationStockMovement::query()->count());
+
+        // The worker's own saved action passes the guard.
+        $this->postJson('/emar/stock/packs/commands', [...$this->receipt($med->id), 'captured_by_user_id' => $actor->id])
+            ->assertJsonMissingValidationErrors('captured_by_user_id');
+    }
+
     public function test_selected_person_scopes_every_pack_view_and_metric_with_full_authorized_house_available(): void
     {
         [$actor, $site, $people] = $this->personReadFixture();

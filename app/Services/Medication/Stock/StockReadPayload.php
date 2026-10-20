@@ -13,6 +13,8 @@ use App\Models\User;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\PharmacyConnect\PharmacyDispatchPresentation;
+use App\Services\Medication\PharmacyConnect\PharmacyPartnerRegistry;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity as Qty;
 use App\Support\Medication\PharmacySupplyRules;
@@ -96,10 +98,16 @@ final class StockReadPayload
         $orders = MedicationPharmacyOrder::whereIn('client_id', $clientIds)->whereIn('client_medication_id', $medicationIds)
             ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'));
         $ordersPage = (clone $orders)->when($search !== '', fn ($q) => $q->where(fn ($q) => $q->where('pharmacy_name', 'like', '%'.$search.'%')->orWhereHas('medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%'))))->with(['client', 'medication'])->latest('id')->paginate(25, ['*'], 'orders_page')->withQueryString();
+        // EA-138 (Lane C, 20 Oct): where each connected pharmacy send stands,
+        // on the row, while the pharmacy connection runs (as the Stock overview).
+        $dispatches = app(PharmacyPartnerRegistry::class)->enabled()
+            ? app(PharmacyDispatchPresentation::class)->rowStates($ordersPage->getCollection()->pluck('id')->map(fn ($id): int => (int) $id)->all())
+            : [];
         $ordersPage->through(fn ($o) => [
             ...$o->only(['id', 'client_medication_id', 'pharmacy_name', 'status', 'quantity_ordered', 'quantity_received', 'quantity_dispensed', 'order_notes',
                 'needed_by', 'expected_delivery', 'communication_method', 'communication_reference', 'communication_recorded_at', 'closure_reason', 'batch_number', 'batch_expiry']),
             'medication_name' => $o->medication->name, 'client_name' => $o->client->full_name, 'controlled' => (bool) $o->medication->controlled_drug,
+            'dispatch' => $dispatches[(int) $o->id] ?? null,
         ]);
         $counts = MedicationStockCountRecord::whereIn('client_medication_stock_id', (clone $stocks)->select('id'));
         $countsPage = (clone $counts)->when($search !== '', fn ($q) => $q->whereHas('stock.medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%')))->with(['stock.medication.client', 'countedBy'])->latest('id')->paginate(25, ['*'], 'counts_page')->withQueryString();

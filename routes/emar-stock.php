@@ -3,14 +3,18 @@
 use App\Http\Controllers\Emar\MedicationStockController;
 use App\Http\Controllers\Emar\MedicationStockPhotoController;
 use App\Http\Controllers\Emar\PersonMedicationPhotosController;
+use App\Http\Middleware\MedicationCapturedByGuard;
 use Illuminate\Support\Facades\Route;
+use Inertia\Middleware\EncryptHistory;
 
 // The P06 Stock hub (Lane C4). House leads hold medications.stock.receive
 // (receive, photograph, count, going out and coming back) and stock.update
 // (everything); coordinators and finance hold stock.update (Stephan, 10 Oct).
 // MedicationStockController::command checks each action's key, and every
-// command is scoped to the houses and people the actor can open.
-Route::middleware(['auth', 'permission:medications.view', 'permission:medications.stock.receive|medications.stock.update', \App\Http\Middleware\ShareConnectedCareSwitches::class])
+// command is scoped to the houses and people the actor can open. Like every
+// other medication page (routes/emar.php), its history is encrypted and a save
+// made on a shared device by another worker is refused before any handler.
+Route::middleware(['auth', 'permission:medications.view', 'permission:medications.stock.receive|medications.stock.update', \App\Http\Middleware\ShareConnectedCareSwitches::class, EncryptHistory::class, MedicationCapturedByGuard::class])
     ->prefix('emar/stock/packs')->group(function (): void {
         Route::get('/', [MedicationStockController::class, 'index'])->name('emar.stock.packs');
         Route::get('/medicine/{medication}', [MedicationStockController::class, 'detail'])->whereNumber('medication')->name('emar.stock.packs.detail');

@@ -50,6 +50,7 @@ import {
     NewSupplyOrder,
     SupplyOrderDialog,
 } from './_dialogs';
+import { PharmacyDispatchChip } from './_hub-tables';
 import { ControlledOpeningDialog } from './_opening';
 import { PackPhotoDialog } from './_photo';
 import { ReceiveWizard } from './_receive';
@@ -664,7 +665,16 @@ export default function StockHub({
                                 key: 'status',
                                 label: 'Status',
                                 width: '1.1fr',
-                                cell: (order) => <State value={order.status} />,
+                                cell: (order) => (
+                                    <div className="grid justify-items-start gap-1">
+                                        <State value={order.status} />
+                                        {order.dispatch ? (
+                                            <PharmacyDispatchChip
+                                                dispatch={order.dispatch}
+                                            />
+                                        ) : null}
+                                    </div>
+                                ),
                             },
                         ]}
                     />

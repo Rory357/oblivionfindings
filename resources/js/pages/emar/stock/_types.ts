@@ -1,3 +1,5 @@
+import type { PharmacyOrderRow } from './_hub-types';
+
 export type Pager<T> = {
     data: T[];
     total: number;
@@ -102,6 +104,8 @@ export type SupplyOrder = {
     closure_reason: string | null;
     batch_number: string | null;
     batch_expiry: string | null;
+    /** EA-138: the connected pharmacy send, while the connection runs. */
+    dispatch?: PharmacyOrderRow['dispatch'];
 };
 export type StockCount = {
     id: number;
