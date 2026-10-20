@@ -10,6 +10,7 @@ import {
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
     PageHeaderStatusChip,
@@ -34,6 +35,7 @@ import {
     Clock,
     Eye,
     Package,
+    PackageCheck,
     Pill,
     ShieldCheck,
     Truck,
@@ -54,6 +56,7 @@ import { StockMeters, type StockMetrics } from './_meters';
 import { ControlledOpeningDialog } from './_opening';
 import { PackPhotoDialog } from './_photo';
 import { ReceiveWizard } from './_receive';
+import { ReceivePicker, receiveBlockedReason } from './_receive-picker';
 import { useStockCommand } from './_requests';
 import { TableList } from './_table-list';
 import type {
@@ -156,6 +159,7 @@ type Modal =
       }
     | { kind: 'order'; order: SupplyOrder }
     | { kind: 'count'; record: StockCount }
+    | { kind: 'receive_pick' }
     | null;
 
 export default function StockHub({
@@ -241,12 +245,7 @@ export default function StockHub({
                       label: 'Receive a delivery',
                       icon: Truck,
                       onClick: () => openItem(item, 'receive'),
-                      disabled:
-                          !item.lots_started && item.stock_id !== null
-                              ? 'Pack tracking has not been set up.'
-                              : !(item.receivable ?? item.active)
-                                ? 'This medicine has been stopped.'
-                                : undefined,
+                      disabled: receiveBlockedReason(item),
                   },
                   {
                       label: 'Count it',
@@ -421,6 +420,16 @@ export default function StockHub({
                             >
                                 Stock overview
                             </PageHeaderGlassButton>
+                            {can.receive && (
+                                <PageHeaderPrimaryButton
+                                    icon={PackageCheck}
+                                    onClick={() =>
+                                        setModal({ kind: 'receive_pick' })
+                                    }
+                                >
+                                    Receive a delivery
+                                </PageHeaderPrimaryButton>
+                            )}
                         </>
                     }
                     meters={<StockMeters metrics={metrics} open={visit} />}
@@ -762,6 +771,21 @@ export default function StockHub({
                     lotsEnabled={lots_enabled}
                     onClose={() => setModal(null)}
                     onSaved={refresh}
+                />
+            )}
+            {modal?.kind === 'receive_pick' && (
+                <ReceivePicker
+                    sites={sites}
+                    siteId={filters.site_id}
+                    onPick={({ medicationId, order }) =>
+                        setModal({
+                            kind: 'item',
+                            id: medicationId,
+                            action: 'receive',
+                            order,
+                        })
+                    }
+                    onClose={() => setModal(null)}
                 />
             )}
             {modal?.kind === 'order' && (

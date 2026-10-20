@@ -129,7 +129,7 @@ class StockHubApprovedViewTest extends TestCase
             'reason' => 'Synthetic count awaiting sign-off',
         ])->assertOk()->json('count_id');
 
-        return compact('site', 'lead', 'reader', 'aroha', 'tama', 'm', 'o', 'countId');
+        return compact('site', 'elsewhere', 'lead', 'reader', 'aroha', 'tama', 'm', 'o', 'countId');
     }
 
     public function test_the_six_approved_meters_count_the_houses_and_people_the_list_shows(): void
@@ -180,5 +180,49 @@ class StockHubApprovedViewTest extends TestCase
         $this->get('/emar/stock/packs?show=low')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
             ->where('items.total', 3)
             ->where('items.data', fn ($rows) => collect($rows)->pluck('name')->all() === ['Alpha low', 'Charlie expired', 'Echo controlled']));
+    }
+
+    /**
+     * Approved P06 header "Receive a delivery" (Main, 20 Oct): a picker, not
+     * a new flow — deliveries due from the pharmacy first, then the other
+     * medicines at the house — handing over to the existing receive dialog
+     * and its `receive` command.
+     */
+    public function test_receive_a_delivery_lists_deliveries_due_first_then_other_medicines_and_saves_with_the_receive_command(): void
+    {
+        extract($this->house());
+        $choices = $this->actingAs($lead)->getJson('/emar/stock/packs/receive-choices')->assertOk();
+        $this->assertStringContainsString('no-store', (string) $choices->headers->get('Cache-Control'));
+        // Due by date first, then undated; never drafts, sent orders or the other house.
+        $this->assertSame([$o['due']->id, $o['controlled_due']->id, $o['part']->id], array_column($choices->json('orders'), 'id'));
+        $this->assertTrue($choices->json('orders.1.controlled'));
+        // Then every other medicine that can be received at the house, by name.
+        $this->assertSame(['Alpha low', 'Charlie expired'], array_column($choices->json('medicines'), 'name'));
+        $this->assertFalse($choices->json('more'));
+
+        $this->getJson('/emar/stock/packs/receive-choices?search=charlie')->assertOk()
+            ->assertJsonPath('orders', [])->assertJsonPath('medicines.0.name', 'Charlie expired')->assertJsonCount(1, 'medicines');
+
+        // The chosen delivery saves through the hub's own receive command.
+        $receipt = ['action' => 'receive', 'client_medication_id' => $m['expiring']->id, 'request_uuid' => (string) Str::uuid(),
+            'pharmacy_order_id' => $o['part']->id, 'source' => 'pharmacy', 'source_reference' => 'Pharmacy order #'.$o['part']->id,
+            'label_checked' => true, 'packs' => [['quantity' => '18', 'batch_number' => 'SYN-REST', 'batch_not_printed' => false,
+                'expiry_month' => '06/2027', 'expiry_not_printed' => false]]];
+        $this->postJson('/emar/stock/packs/commands', $receipt)->assertOk();
+        $this->assertSame('delivered', $o['part']->fresh()->status);
+        $this->assertSame('28.00', ClientMedicationStock::where('client_medication_id', $m['expiring']->id)->value('on_hand'));
+    }
+
+    public function test_receive_a_delivery_keeps_the_list_scope_and_hides_controlled_receipts_from_readers_without_them(): void
+    {
+        extract($this->house());
+        $choices = $this->actingAs($reader)->getJson('/emar/stock/packs/receive-choices?site_id='.$site->id)->assertOk();
+        $this->assertSame([$o['due']->id, $o['part']->id], array_column($choices->json('orders'), 'id'));
+        $this->assertSame(['Alpha low', 'Charlie expired'], array_column($choices->json('medicines'), 'name'));
+        $this->assertStringNotContainsString('Echo controlled', $choices->getContent());
+
+        $this->getJson('/emar/stock/packs/receive-choices?site_id='.$elsewhere->id)->assertNotFound();
+        config(['medications.stock_lots_enabled' => false]);
+        $this->getJson('/emar/stock/packs/receive-choices')->assertForbidden();
     }
 }

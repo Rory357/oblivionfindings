@@ -18,6 +18,8 @@ Route::middleware(['auth', 'permission:medications.view', 'permission:medication
     ->prefix('emar/stock/packs')->group(function (): void {
         Route::get('/', [MedicationStockController::class, 'index'])->name('emar.stock.packs');
         Route::get('/medicine/{medication}', [MedicationStockController::class, 'detail'])->whereNumber('medication')->name('emar.stock.packs.detail');
+        // Approved P06 "Receive a delivery": the picker's choices, in the list's scope.
+        Route::get('/receive-choices', [MedicationStockController::class, 'receiveChoices'])->name('emar.stock.packs.receive-choices');
         Route::post('/commands', [MedicationStockController::class, 'command'])->name('emar.stock.packs.command');
     });
 // P02 person record › Medicines › Photos (Lane C11): the per-person record gate

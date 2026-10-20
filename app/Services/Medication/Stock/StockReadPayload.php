@@ -106,12 +106,7 @@ final class StockReadPayload
         $dispatches = app(PharmacyPartnerRegistry::class)->enabled()
             ? app(PharmacyDispatchPresentation::class)->rowStates($ordersPage->getCollection()->pluck('id')->map(fn ($id): int => (int) $id)->all())
             : [];
-        $ordersPage->through(fn ($o) => [
-            ...$o->only(['id', 'client_medication_id', 'pharmacy_name', 'status', 'quantity_ordered', 'quantity_received', 'quantity_dispensed', 'order_notes',
-                'needed_by', 'expected_delivery', 'communication_method', 'communication_reference', 'communication_recorded_at', 'closure_reason', 'batch_number', 'batch_expiry']),
-            'medication_name' => $o->medication->name, 'client_name' => $o->client->full_name, 'controlled' => (bool) $o->medication->controlled_drug,
-            'dispatch' => $dispatches[(int) $o->id] ?? null,
-        ]);
+        $ordersPage->through(fn ($o) => [...$this->orderRow($o), 'dispatch' => $dispatches[(int) $o->id] ?? null]);
         $counts = MedicationStockCountRecord::whereIn('client_medication_stock_id', (clone $stocks)->select('id'));
         $countsPage = (clone $counts)->when($search !== '', fn ($q) => $q->whereHas('stock.medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%')))->with(['stock.medication.client', 'countedBy'])->latest('id')->paginate(25, ['*'], 'counts_page')->withQueryString();
         $countsPage->through(fn ($c) => $this->countPresentation($c));
@@ -227,6 +222,56 @@ final class StockReadPayload
             ])->all();
 
         return $item;
+    }
+
+    /**
+     * Approved P06 header "Receive a delivery" (Main, 20 Oct): the medicines a
+     * delivery can be received for — deliveries due from the pharmacy first
+     * (dated, then undated), then every other receivable medicine at the
+     * house. The list's scope: houses, the person rule and controlled
+     * concealment; controlled medicines only for people who receive them with
+     * a witness. The choice opens the existing receive dialog and command.
+     */
+    public function receiveChoices(Request $request): array
+    {
+        $actor = $request->user();
+        $lotsEnabled = (bool) config('medications.stock_lots_enabled', false);
+        abort_unless($lotsEnabled && ($actor->canDo('medications.stock.update') || $actor->canDo('medications.stock.receive')), 403);
+        $controlled = $actor->canDo('medications.stock.update') && $actor->canDo('medications.controlled.view') && $actor->canDo('medications.controlled.record');
+        $site = $request->filled('site_id') ? $request->integer('site_id') : null;
+        $siteIds = $this->scope->readerSiteIds($actor, 'medications.view', $site);
+        if ($site) {
+            $siteIds = [$site];
+        }
+        $clientIds = $this->access->readableClientIds($actor, Client::whereIn('site_id', $siteIds)->pluck('id'));
+        $search = mb_substr(trim($request->string('search')->toString()), 0, 100);
+        $medications = ClientMedication::query()->current()->whereIn('client_id', $clientIds)
+            ->when(! $controlled, fn ($query) => $query->where('controlled_drug', false))
+            // MedicationStockService::receivable(): active, or held (EA-073).
+            ->where(fn ($query) => $query->where(fn ($q) => $q->where('active', true)->where('state', 'active'))->orWhere('state', 'paused'))
+            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q->where('name', 'like', '%'.$search.'%')
+                ->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', '%'.$search.'%')->orWhere('last_name', 'like', '%'.$search.'%'))));
+        $orders = MedicationPharmacyOrder::query()->whereIn('client_id', $clientIds)->whereIn('client_medication_id', (clone $medications)->select('id'))
+            ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'))
+            ->whereIn('status', ['dispensed', 'part_received'])->with(['client', 'medication'])
+            ->orderByRaw('expected_delivery IS NULL')->orderBy('expected_delivery')->orderBy('id')->limit(50)->get();
+        $medicines = (clone $medications)->whereNotIn('id', $orders->pluck('client_medication_id')->all())
+            ->with(['client.site', 'stock.lots'])->orderBy('name')->orderBy('id')->limit(101)->get();
+
+        return [
+            'orders' => $orders->map(fn ($order) => $this->orderRow($order))->values()->all(),
+            'medicines' => $medicines->take(100)->map(fn ($med) => $this->item($med))->values()->all(),
+            'more' => $medicines->count() > 100,
+        ];
+    }
+
+    private function orderRow(MedicationPharmacyOrder $order): array
+    {
+        return [
+            ...$order->only(['id', 'client_medication_id', 'pharmacy_name', 'status', 'quantity_ordered', 'quantity_received', 'quantity_dispensed', 'order_notes',
+                'needed_by', 'expected_delivery', 'communication_method', 'communication_reference', 'communication_recorded_at', 'closure_reason', 'batch_number', 'batch_expiry']),
+            'medication_name' => $order->medication->name, 'client_name' => $order->client->full_name, 'controlled' => (bool) $order->medication->controlled_drug,
+        ];
     }
 
     private function countPresentation(MedicationStockCountRecord $count): array
