@@ -128,10 +128,12 @@ final class StockReadPayload
             : [];
         $ordersPage->through(fn ($o) => [...$this->orderRow($o), 'dispatch' => $dispatches[(int) $o->id] ?? null]);
         $counts = MedicationStockCountRecord::whereIn('client_medication_stock_id', (clone $stocks)->select('id'));
-        $countsPage = (clone $counts)->when($search !== '', fn ($q) => $q->whereHas('stock.medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%')))->with(['stock.medication.client', 'countedBy'])->latest('id')->paginate(25, ['*'], 'counts_page')->withQueryString();
+        $countsPage = (clone $counts)->when($search !== '', fn ($q) => $q->whereHas('stock.medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%')))->with(['stock.medication.client', 'countedBy', 'reviewedBy'])
+            // Approved P06 Counts (1440-14): differences to sign off first, then recent counts.
+            ->orderByRaw("CASE WHEN state = 'needs_review' THEN 0 ELSE 1 END")->latest('id')->paginate(25, ['*'], 'counts_page')->withQueryString();
         $countsPage->through(fn ($c) => $this->countPresentation($c));
         $focusedCount = $request->filled('count_id') ? $this->countPresentation((clone $counts)
-            ->with(['stock.medication.client', 'countedBy'])->findOrFail($request->integer('count_id'))) : null;
+            ->with(['stock.medication.client', 'countedBy', 'reviewedBy'])->findOrFail($request->integer('count_id'))) : null;
         $movements = MedicationStockMovement::query()->when($search !== '', fn ($q) => $q->whereHas('lot.stock.medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%')))->whereIn('medication_stock_lot_id', (clone $lots)->select('id'))->with(['lot.stock.medication.client', 'recordedBy'])
             ->when($view === 'removals', fn ($q) => $q->whereIn('kind', ['returned_pharmacy', 'removed_expired', 'damaged', 'quarantined']))
             ->latest('id')->paginate(25, ['*'], 'moves_page')->withQueryString();
@@ -351,7 +353,11 @@ final class StockReadPayload
     {
         return [...$count->only(['id', 'state', 'lines', 'reason', 'counted_at', 'review_reason']),
             'medication_id' => $count->stock->client_medication_id, 'medication_name' => $count->stock->medication->name,
-            'client_name' => $count->stock->medication->client->full_name, 'counted_by_name' => $count->countedBy?->name];
+            'client_name' => $count->stock->medication->client->full_name, 'counted_by_name' => $count->countedBy?->name,
+            // Approved P06: the totals as whole numbers, and who signed a difference off.
+            'counted_total' => Qty::display(collect($count->lines ?? [])->reduce(fn ($sum, $line) => Qty::add($sum, $line['counted'] ?? 0), '0')),
+            'expected_total' => Qty::display(collect($count->lines ?? [])->reduce(fn ($sum, $line) => Qty::add($sum, $line['expected'] ?? 0), '0')),
+            'reviewed_at' => $count->reviewed_at?->toIso8601String(), 'reviewed_by_name' => $count->reviewedBy?->name];
     }
 
     private function item(ClientMedication $med): array

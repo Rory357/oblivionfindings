@@ -358,4 +358,31 @@ class StockHubApprovedViewTest extends TestCase
         $this->assertNotNull($rows->firstWhere('id', $cancelled->id)['closed_at']);
         $this->assertArrayHasKey('created_at', $part);
     }
+
+    /**
+     * Approved P06 Counts (1440-14): differences to sign off first, then the
+     * recent counts, with the totals counted and expected as whole numbers and
+     * who signed a difference off.
+     */
+    public function test_counts_list_differences_to_sign_off_first_with_totals_and_who_signed_off(): void
+    {
+        extract($this->house());
+        $lot = MedicationStockLot::whereHas('stock', fn ($q) => $q->where('client_medication_id', $m['expiring']->id))->sole();
+        $matched = $this->actingAs($lead)->postJson('/emar/stock/packs/commands', [
+            'action' => 'count', 'client_medication_id' => $m['expiring']->id, 'request_uuid' => (string) Str::uuid(),
+            'lines' => [['lot_id' => $lot->id, 'revision' => $lot->revision, 'quantity' => '10.00']],
+        ])->assertOk()->json('count_id');
+
+        $rows = collect($this->get('/emar/stock/packs?view=counts')->assertOk()->inertiaProps('counts.data'));
+        $this->assertSame([$countId, $matched], $rows->pluck('id')->all());
+        $this->assertSame(['19', '20'], [$rows[0]['counted_total'], $rows[0]['expected_total']]);
+        $this->assertSame(['10', '10'], [$rows[1]['counted_total'], $rows[1]['expected_total']]);
+
+        $this->postJson('/emar/stock/packs/commands', ['action' => 'count_review', 'client_medication_id' => $m['fine']->id, 'count_id' => $countId,
+            'request_uuid' => (string) Str::uuid(), 'reason' => 'Synthetic: one tablet dropped'])->assertOk();
+        $signed = collect($this->get('/emar/stock/packs?view=counts')->assertOk()->inertiaProps('counts.data'))->firstWhere('id', $countId);
+        $this->assertSame('reviewed', $signed['state']);
+        $this->assertSame($lead->name, $signed['reviewed_by_name']);
+        $this->assertNotNull($signed['reviewed_at']);
+    }
 }

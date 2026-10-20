@@ -46,6 +46,7 @@ import {
 import { useEffect, useState } from 'react';
 import { MedicinePicture } from '../catalogue/_medicine-picture';
 import { ConnectedServicesMenu } from '../connected/_entry-points';
+import { CountsView } from './_counts-view';
 import {
     CountReview,
     CountWizard,
@@ -639,48 +640,7 @@ export default function StockHub({
                     />
                 )}
                 {filters.view === 'counts' && (
-                    <TableList
-                        title="Recent counts"
-                        pager={counts}
-                        name={(record) => record.medication_name}
-                        subline={(record) => record.client_name}
-                        open={countOpen}
-                        actions={(record) => [
-                            {
-                                label:
-                                    record.state === 'needs_review' &&
-                                    can.manage
-                                        ? 'Review this count'
-                                        : 'Open the count',
-                                icon: ClipboardCheck,
-                                onClick: () => countOpen(record),
-                            },
-                        ]}
-                        columns={[
-                            {
-                                key: 'counted',
-                                label: 'Counted',
-                                width: '1.2fr',
-                                cell: (record) =>
-                                    formatDateTime(record.counted_at),
-                            },
-                            {
-                                key: 'person',
-                                label: 'Counted by',
-                                width: '1fr',
-                                cell: (record) =>
-                                    record.counted_by_name ?? 'Unknown',
-                            },
-                            {
-                                key: 'status',
-                                label: 'Result',
-                                width: '1fr',
-                                cell: (record) => (
-                                    <State value={record.state} />
-                                ),
-                            },
-                        ]}
-                    />
+                    <CountsView pager={counts} can={can} open={countOpen} />
                 )}
                 {['movements', 'removals'].includes(filters.view) && (
                     <TableList

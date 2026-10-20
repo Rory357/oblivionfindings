@@ -155,6 +155,11 @@ export type StockCount = {
         counted: string;
         revision: number;
     }[];
+    /** Approved P06 Counts: totals as whole numbers, and who signed a difference off. */
+    counted_total?: string;
+    expected_total?: string;
+    reviewed_at?: string | null;
+    reviewed_by_name?: string | null;
 };
 export type Movement = {
     id: number;
