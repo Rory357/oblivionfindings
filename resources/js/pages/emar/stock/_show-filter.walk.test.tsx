@@ -147,7 +147,10 @@ describe('Stock hub › Show (P06)', () => {
             row({ id: 2, name: 'Losartan 50 mg tablet', open_order: late }),
         ]);
         expect(
-            screen.getByText(/^Delivery overdue — expected .+ \(#52\)$/),
+            // The desktop table; the phone cards repeat the same line.
+            within(screen.getByRole('table')).getByText(
+                /^Delivery overdue — expected .+ \(#52\)$/,
+            ),
         ).toBeInTheDocument();
     });
 
