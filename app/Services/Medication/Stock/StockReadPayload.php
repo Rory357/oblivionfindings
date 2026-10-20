@@ -84,11 +84,14 @@ final class StockReadPayload
         }
         $quantitySql = StockAvailability::usableQuantitySql();
         $today = $this->stock->today();
+        // Approved P06 "Running low": at or below the reorder level, or out.
+        $runningLow = fn ($stock) => $stock->where(fn ($s) => $s->whereRaw('('.$quantitySql.') <= 0', [$today])
+            ->orWhere(fn ($r) => $r->whereNotNull('reorder_level')->whereRaw('('.$quantitySql.') <= client_medication_stocks.reorder_level', [$today])));
         $itemsQuery = (clone $medications)
             ->when($view === 'expiring', fn ($q) => $q->whereHas('stock.lots', fn ($l) => $l->where('quantity_remaining', '>', 0)
                 ->where('state', 'open')->whereNotNull('expiry_date')->where('expiry_date', '<=', CarbonImmutable::parse($this->stock->today())->addDays(30)->toDateString())))
             ->when($view === 'stock' && $show === 'out', fn ($q) => $q->whereHas('stock', fn ($s) => $s->whereRaw('('.$quantitySql.') <= 0', [$today])))
-            ->when($view === 'stock' && $show === 'low', fn ($q) => $q->whereHas('stock', fn ($s) => $s->whereNotNull('reorder_level')->whereRaw('('.$quantitySql.') <= client_medication_stocks.reorder_level', [$today])));
+            ->when($view === 'stock' && $show === 'low', fn ($q) => $q->whereHas('stock', $runningLow));
         $items = $itemsQuery->with(['client.site', 'stock.lots'])
             ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q->where('name', 'like', '%'.$search.'%')
                 ->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', '%'.$search.'%')->orWhere('last_name', 'like', '%'.$search.'%'))
@@ -121,6 +124,26 @@ final class StockReadPayload
             'medication_id' => $m->lot->stock->client_medication_id, 'medication_name' => $m->lot->stock->medication->name,
             'client_name' => $m->lot->stock->medication->client->full_name, 'recorded_by_name' => $m->recordedBy?->name]);
 
+        // Approved P06 meters (Main, 20 Oct): every figure reads the list's own
+        // scope — houses, the person rule and controlled concealment — so a
+        // reader without controlled view counts only visible medicines.
+        $controlledView = $actor->canDo('medications.controlled.view');
+        $lowStocks = $runningLow(clone $stocks);
+        $openDated = (clone $lots)->where('quantity_remaining', '>', 0)->where('state', 'open')->whereNotNull('expiry_date');
+        $toReceive = (clone $orders)->whereIn('status', ['dispensed', 'part_received']);
+        $meters = [
+            'running_low' => (clone $lowStocks)->count(),
+            'running_low_first' => ClientMedication::query()->whereIn('id', (clone $lowStocks)->select('client_medication_id'))->orderBy('name')->orderBy('id')->value('name'),
+            'expired' => (clone $openDated)->where('expiry_date', '<', $today)->count(),
+            'to_receive' => (clone $toReceive)->count(),
+            'to_receive_due' => (clone $toReceive)->whereNotNull('expected_delivery')->where('expected_delivery', '<=', $today)->count(),
+            'to_receive_part' => (clone $toReceive)->where('status', 'part_received')->count(),
+            'pharmacy_orders' => (clone $orders)->whereIn('status', ['draft', 'submitted', 'confirmed'])->count(),
+            'drafts' => (clone $orders)->where('status', 'draft')->count(),
+            'people' => ClientMedication::query()->whereIn('id', (clone $stocks)->select('client_medication_id'))->distinct()->count('client_id'),
+            'controlled_hidden' => $controlledView ? 0 : ClientMedication::query()->current()->whereIn('client_id', $clientIds)->where('controlled_drug', true)->count(),
+        ];
+
         return [
             'items' => $items, 'orders' => $ordersPage, 'counts' => $countsPage, 'movements' => $movements, 'focused_count' => $focusedCount,
             'focused_lot_id' => $lotId,
@@ -133,7 +156,9 @@ final class StockReadPayload
                 'expiring' => (clone $lots)->where('quantity_remaining', '>', 0)->where('state', 'open')->whereNotNull('expiry_date')->where('expiry_date', '<=', CarbonImmutable::parse($this->stock->today())->addDays(30)->toDateString())->count(),
                 'orders' => (clone $orders)->whereNotIn('status', PharmacySupplyRules::CLOSED)->count(),
                 'counts' => (clone $counts)->where('state', 'needs_review')->count(),
+                ...$meters,
             ],
+            'controlled_left_out' => ! $controlledView,
             // Approved P06 Q5: receive-level actions with either key; the rest stay stock.update.
             'can' => ['photograph' => app(PackPhotoReceiptSettings::class)->canPhotograph($actor), 'receive' => config('medications.stock_lots_enabled', false) && ($actor->canDo('medications.stock.update') || $actor->canDo('medications.stock.receive')), 'manage' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update'), 'receive_controlled' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update') && $actor->canDo('medications.controlled.view') && $actor->canDo('medications.controlled.record') && $siteIds !== [], 'controlled' => $actor->canDo('medications.controlled.view')],
             'lots_enabled' => (bool) config('medications.stock_lots_enabled', false),

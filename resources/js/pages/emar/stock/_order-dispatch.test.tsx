@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import StockHub from './StockHub';
+import { stockMeters } from './__fixtures__/meters';
 import type { SupplyOrder } from './_types';
 
 vi.mock('@/layouts/app-layout', () => ({
@@ -76,13 +77,7 @@ describe('Stock hub › Deliveries & orders (EA-138)', () => {
                 sites={[]}
                 pharmacies={[]}
                 filters={{ view: 'orders', search: '', site_id: null }}
-                metrics={{
-                    tracked: 0,
-                    out: 0,
-                    expiring: 0,
-                    orders: 2,
-                    counts: 0,
-                }}
+                metrics={stockMeters({ orders: 2, to_receive: 0 })}
                 can={{ manage: false, receive: false, controlled: false }}
                 lots_enabled
             />,

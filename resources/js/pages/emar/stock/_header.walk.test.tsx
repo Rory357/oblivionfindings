@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import StockHub from './StockHub';
+import { stockMeters } from './__fixtures__/meters';
 
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
@@ -36,7 +37,7 @@ const hub = (
             sites={sites}
             pharmacies={[]}
             filters={{ view: 'stock', search: '', site_id: siteId }}
-            metrics={{ tracked: 0, out: 0, expiring: 0, orders: 0, counts: 0 }}
+            metrics={stockMeters()}
             can={{ manage: false, receive: false, controlled: false }}
             lots_enabled
         />,

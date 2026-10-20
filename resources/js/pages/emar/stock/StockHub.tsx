@@ -10,9 +10,6 @@ import {
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderRail,
     PageHeaderSearch,
     PageHeaderStatusChip,
@@ -53,6 +50,7 @@ import {
     SupplyOrderDialog,
 } from './_dialogs';
 import { PharmacyDispatchChip } from './_hub-tables';
+import { StockMeters, type StockMetrics } from './_meters';
 import { ControlledOpeningDialog } from './_opening';
 import { PackPhotoDialog } from './_photo';
 import { ReceiveWizard } from './_receive';
@@ -134,13 +132,10 @@ type Props = {
         lot_id?: number | null;
         medication_id?: number | null;
     };
-    metrics: {
-        tracked: number;
-        out: number;
-        expiring: number;
-        orders: number;
-        counts: number;
-    };
+    /** The approved P06 meters, in the list’s scope (Main, 20 Oct). */
+    metrics: StockMetrics;
+    /** No controlled-medicine view: the counts and list cover visible medicines. */
+    controlled_left_out?: boolean;
     can: Capabilities;
     lots_enabled: boolean;
     selected_client?: { id: number; name: string } | null;
@@ -176,6 +171,7 @@ export default function StockHub({
     lots_enabled,
     selected_client = null,
     focused_count = null,
+    controlled_left_out = false,
 }: Props) {
     // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
     const breadcrumbs = useEmarBreadcrumbs();
@@ -350,14 +346,14 @@ export default function StockHub({
             key: 'orders' as const,
             label: 'Deliveries & orders',
             icon: Truck,
-            count: metrics.orders,
+            // Approved P06: deliveries to receive and counts to sign off; no zeros.
+            count: metrics.to_receive || undefined,
         },
         {
             key: 'counts' as const,
             label: 'Counts',
             icon: ClipboardCheck,
-            count: metrics.counts,
-            alert: metrics.counts > 0,
+            count: metrics.counts || undefined,
         },
         { key: 'expiring' as const, label: 'Expiring', icon: Package },
         { key: 'removals' as const, label: 'Removals', icon: Package },
@@ -427,71 +423,7 @@ export default function StockHub({
                             </PageHeaderGlassButton>
                         </>
                     }
-                    meters={
-                        <>
-                            <PageHeaderMeterBlock
-                                label="Tracked"
-                                onClick={() =>
-                                    visit({ view: 'stock', show: 'all' })
-                                }
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.tracked}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Stock records
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Out of stock"
-                                tone={metrics.out ? 'critical' : 'brand'}
-                                onClick={() =>
-                                    visit({ view: 'stock', show: 'out' })
-                                }
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.out}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Check supply
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="To receive"
-                                onClick={() => visit({ view: 'orders' })}
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.orders}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Open supply records
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Expiring"
-                                onClick={() => visit({ view: 'expiring' })}
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.expiring}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Packs within 30 days
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Counts to sign off"
-                                tone={metrics.counts ? 'warning' : 'brand'}
-                                onClick={() => visit({ view: 'counts' })}
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.counts}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Lead review needed
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                        </>
-                    }
+                    meters={<StockMeters metrics={metrics} open={visit} />}
                     filters={
                         <>
                             <PageHeaderFilterSelect
@@ -546,7 +478,10 @@ export default function StockHub({
                                     options={[
                                         { value: 'all', label: 'All stock' },
                                         { value: 'out', label: 'Out of stock' },
-                                        { value: 'low', label: 'Running low' },
+                                        {
+                                            value: 'low',
+                                            label: 'Running low or out',
+                                        },
                                     ]}
                                     onChange={(value) => visit({ show: value })}
                                 />
@@ -576,6 +511,12 @@ export default function StockHub({
                         />
                     }
                 />
+                {controlled_left_out && (
+                    <p className="text-caption text-muted-foreground">
+                        Controlled medicines are left out of these counts and
+                        this list. The counts cover visible medicines.
+                    </p>
+                )}
                 {['stock', 'expiring'].includes(filters.view) && (
                     <TableList
                         title={
