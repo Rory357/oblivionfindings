@@ -15,6 +15,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\PharmacyConnect\PharmacyDispatchPresentation;
 use App\Services\Medication\PharmacyConnect\PharmacyPartnerRegistry;
+use App\Services\Medication\Support\MedicationSupport;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity as Qty;
 use App\Support\Medication\PharmacySupplyRules;
@@ -80,7 +81,7 @@ final class StockReadPayload
             $view = 'stock';
         }
         $show = $request->string('show', 'all')->toString();
-        if (! in_array($show, ['all', 'out', 'low'], true)) {
+        if (! in_array($show, ['all', 'out', 'low', 'attention', 'self'], true)) {
             $show = 'all';
         }
         $quantitySql = StockAvailability::usableQuantitySql();
@@ -92,17 +93,27 @@ final class StockReadPayload
             ->when($view === 'expiring', fn ($q) => $q->whereHas('stock.lots', fn ($l) => $l->where('quantity_remaining', '>', 0)
                 ->where('state', 'open')->whereNotNull('expiry_date')->where('expiry_date', '<=', CarbonImmutable::parse($this->stock->today())->addDays(30)->toDateString())))
             ->when($view === 'stock' && $show === 'out', fn ($q) => $q->whereHas('stock', fn ($s) => $s->whereRaw('('.$quantitySql.') <= 0', [$today])))
-            ->when($view === 'stock' && $show === 'low', fn ($q) => $q->whereHas('stock', $runningLow));
+            ->when($view === 'stock' && $show === 'low', fn ($q) => $q->whereHas('stock', $runningLow))
+            // Approved P06 Show › Needs attention (Main, 21 Oct): out or low, a pack expiring
+            // within 30 days, a count waiting for sign-off, or an overdue order.
+            ->when($view === 'stock' && $show === 'attention', fn ($q) => $q->where(fn ($w) => $w->whereHas('stock', $runningLow)
+                ->orWhereHas('stock.lots', fn ($l) => $l->where('quantity_remaining', '>', 0)->where('state', 'open')->whereNotNull('expiry_date')
+                    ->where('expiry_date', '<=', CarbonImmutable::parse($today)->addDays(30)->toDateString()))
+                ->orWhereHas('stock', fn ($s) => $s->whereIn('client_medication_stocks.id', MedicationStockCountRecord::query()->where('state', 'needs_review')->select('client_medication_stock_id')))
+                ->orWhereIn('client_medications.id', $this->overdueOrders($today)->select('client_medication_id'))))
+            // Approved P06 Show › Self-managed: the person manages it (P03 support).
+            ->when($view === 'stock' && $show === 'self', fn ($q) => $q->whereIn('client_medications.id', $this->selfManagedIds(clone $medications)));
         $itemsQuery->when($search !== '', fn ($query) => $query->where(fn ($q) => $q->where('name', 'like', '%'.$search.'%')
             ->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', '%'.$search.'%')->orWhere('last_name', 'like', '%'.$search.'%'))
             ->orWhereHas('stock.lots', fn ($l) => $l->where('batch_number', 'like', '%'.$search.'%'))));
         // Approved P06 caption "n shown · n people": the people across the whole list.
         $itemPeople = (clone $itemsQuery)->distinct()->count('client_id');
         $items = $itemsQuery->with(['client.site', 'stock.lots'])->orderBy('name')->orderBy('id')->paginate(25, ['*'], 'items_page')->withQueryString();
-        [$openOrders, $toSignOff] = $this->rowWork($items->getCollection());
+        [$openOrders, $toSignOff, $support] = $this->rowWork($items->getCollection());
         $items->through(fn ($med) => [...$this->item($med),
             'open_order' => isset($openOrders[$med->id]) ? $this->orderRow($openOrders[$med->id]) : null,
             'count_to_sign_off' => ($count = $toSignOff[$med->stock?->id ?? 0] ?? null) ? ['id' => (int) $count->id, 'counted_at' => $count->counted_at?->toIso8601String()] : null,
+            'self_managed' => ($support[(int) $med->id] ?? 'staff_given') === 'self_managed',
         ]);
         $orders = MedicationPharmacyOrder::whereIn('client_id', $clientIds)->whereIn('client_medication_id', $medicationIds)
             ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'));
@@ -276,9 +287,10 @@ final class StockReadPayload
      * Approved P06 stock rows (Main, 20 Oct): for one page of medicines, the
      * open order each row's state line and button follow — a due delivery
      * before a sent order before a draft, never an order filed under another
-     * person — and the latest count waiting for sign-off. Two queries a page.
+     * person — the latest count waiting for sign-off, and each medicine's P03
+     * support mode.
      *
-     * @return array{0: array<int, MedicationPharmacyOrder>, 1: array<int, MedicationStockCountRecord>}
+     * @return array{0: array<int, MedicationPharmacyOrder>, 1: array<int, MedicationStockCountRecord>, 2: array<int, string>}
      */
     private function rowWork($medicines): array
     {
@@ -294,7 +306,23 @@ final class StockReadPayload
             ->orderByDesc('id')->get(['id', 'client_medication_stock_id', 'counted_at'])
             ->unique('client_medication_stock_id')->keyBy('client_medication_stock_id')->all();
 
-        return [$orders, $counts];
+        return [$orders, $counts, app(MedicationSupport::class)->modes($medicines)];
+    }
+
+    /** Approved P06 "overdue": sent or dispensed, and past its expected delivery — or, undated, past the date it was needed by. */
+    private function overdueOrders(string $today)
+    {
+        return MedicationPharmacyOrder::query()->whereIn('status', ['submitted', 'confirmed', 'dispensed', 'part_received'])
+            ->where(fn ($o) => $o->where('expected_delivery', '<', $today)->orWhere(fn ($n) => $n->whereNull('expected_delivery')->where('needed_by', '<', $today)))
+            ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'));
+    }
+
+    /** @return list<int> the medicines in this scope that their person manages (P03). */
+    private function selfManagedIds($medications): array
+    {
+        $modes = app(MedicationSupport::class)->modes($medications->get(['id', 'client_id']));
+
+        return array_keys(array_filter($modes, fn (string $mode): bool => $mode === 'self_managed'));
     }
 
     private function orderRow(MedicationPharmacyOrder $order): array
@@ -303,6 +331,9 @@ final class StockReadPayload
             ...$order->only(['id', 'client_medication_id', 'pharmacy_name', 'status', 'quantity_ordered', 'quantity_received', 'quantity_dispensed', 'order_notes',
                 'needed_by', 'expected_delivery', 'communication_method', 'communication_reference', 'communication_recorded_at', 'closure_reason', 'batch_number', 'batch_expiry']),
             'medication_name' => $order->medication->name, 'client_name' => $order->client->full_name, 'controlled' => (bool) $order->medication->controlled_drug,
+            'overdue' => in_array($order->status, ['submitted', 'confirmed', 'dispensed', 'part_received'], true)
+                && ($order->expected_delivery ? $order->expected_delivery->toDateString() < StockAvailability::today()
+                    : ($order->needed_by !== null && $order->needed_by->toDateString() < StockAvailability::today())),
             'still_to_come' => $order->status === 'part_received'
                 ? Qty::display(Qty::maxZero(Qty::subtract($order->quantity_dispensed ?? $order->quantity_ordered, $order->quantity_received ?? 0))) : null,
         ];

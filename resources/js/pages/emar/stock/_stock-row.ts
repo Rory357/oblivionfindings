@@ -17,7 +17,8 @@ export type StockRowState =
     | 'count_due'
     | 'use_first'
     | 'expiring'
-    | 'ok';
+    | 'ok'
+    | 'self_managed';
 
 /** Approved P06 defaults (P11 Q5): warn within 30 days, "use first" within 7. */
 const EXPIRY_WARN_DAYS = 30;
@@ -34,6 +35,10 @@ export const monthYear = (date: string) =>
     `${date.slice(5, 7)}/${date.slice(0, 4)}`;
 
 export function orderLine(order: SupplyOrder): string {
+    if (order.overdue)
+        return order.expected_delivery
+            ? `Delivery overdue — expected ${formatDateOnly(order.expected_delivery)} (#${order.id})`
+            : `Overdue — needed by ${order.needed_by ? formatDateOnly(order.needed_by) : 'an earlier date'} (#${order.id})`;
     switch (order.status) {
         case 'draft':
             return `Order drafted — not sent to the pharmacy yet (#${order.id})`;
@@ -49,6 +54,22 @@ export function orderLine(order: SupplyOrder): string {
 }
 
 export function stockRow(item: StockItem): {
+    state: StockRowState;
+    lines: string[];
+} {
+    const row = stockFacts(item);
+    // P03 support (Main, 21 Oct): say so first; the badge only when nothing else needs saying.
+    if (!item.self_managed) return row;
+    return {
+        state: row.state === 'ok' ? 'self_managed' : row.state,
+        lines: [
+            `${item.client_name} manages this medicine themselves`,
+            ...row.lines,
+        ],
+    };
+}
+
+function stockFacts(item: StockItem): {
     state: StockRowState;
     lines: string[];
 } {

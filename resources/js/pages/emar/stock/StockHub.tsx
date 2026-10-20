@@ -103,6 +103,20 @@ function State({ value }: { value: string }) {
         </StatusBadge>
     );
 }
+// The approved P06 Show filter (README §2, 1440-02/-04; Main, 21 Oct).
+const SHOW_OPTIONS = [
+    { value: 'all', label: 'All medicines' },
+    { value: 'attention', label: 'Needs attention' },
+    { value: 'low', label: 'Running low or out' },
+    { value: 'self', label: 'Self-managed' },
+];
+const SHOW_TITLES: Record<string, string> = {
+    all: 'Medicines held',
+    attention: 'Needs attention',
+    low: 'Running low or out',
+    self: 'Self-managed',
+    out: 'Out of stock',
+};
 const moveLabels: Record<string, string> = {
     opening: 'Recorded balance',
     received: 'Received',
@@ -492,14 +506,23 @@ export default function StockHub({
                                     label="Show"
                                     value={filters.show ?? 'all'}
                                     options={[
-                                        { value: 'all', label: 'All stock' },
-                                        { value: 'out', label: 'Out of stock' },
-                                        {
-                                            value: 'low',
-                                            label: 'Running low or out',
-                                        },
+                                        ...SHOW_OPTIONS,
+                                        // An older ?show=out link still shows what it filters.
+                                        ...(filters.show === 'out'
+                                            ? [
+                                                  {
+                                                      value: 'out',
+                                                      label: SHOW_TITLES.out,
+                                                  },
+                                              ]
+                                            : []),
                                     ]}
-                                    onChange={(value) => visit({ show: value })}
+                                    onChange={(value) =>
+                                        visit({
+                                            show:
+                                                value === 'all' ? null : value,
+                                        })
+                                    }
                                 />
                             )}
                             <PageHeaderFilterButton
@@ -544,11 +567,8 @@ export default function StockHub({
                         title={
                             filters.view === 'expiring'
                                 ? 'Packs needing an expiry check'
-                                : filters.show === 'low'
-                                  ? 'Running low or out'
-                                  : filters.show === 'out'
-                                    ? 'Out of stock'
-                                    : 'Medicines held'
+                                : (SHOW_TITLES[filters.show ?? 'all'] ??
+                                  'Medicines held')
                         }
                         caption={stockCaption(
                             items,

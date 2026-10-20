@@ -62,6 +62,49 @@ final class MedicationSupport
             ->where('self_managed', true)->exists() ? 'self_managed' : 'staff_given';
     }
 
+    /**
+     * Each medicine's current support mode, for many medicines at once — the
+     * rule mode() applies to one: the latest effective support change for
+     * that person and medicine, else the completed assessment's recorded
+     * scope, else today's self-managed dose slot, else Administer. A person
+     * whose support record needs reconciliation reads as Administer here
+     * (mode() refuses them outright). Approved P06 Show › Self-managed.
+     *
+     * @param  iterable<ClientMedication>  $medicines
+     * @return array<int, string>
+     */
+    public function modes(iterable $medicines): array
+    {
+        $medicines = collect($medicines);
+        if ($medicines->isEmpty()) {
+            return [];
+        }
+        $ids = $medicines->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $clientIds = $medicines->pluck('client_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $assessments = MedicationSelfAdminAssessment::query()->whereIn('client_id', $clientIds)
+            ->whereNotIn('id', MedicationSelfAdminAssessment::withTrashed()->whereIn('client_id', $clientIds)->whereNotNull('supersedes_id')->select('supersedes_id'))
+            ->get()->groupBy('client_id');
+        $changes = MedicationSupportChange::query()->whereIn('client_medication_id', $ids)->where('effective_at', '<=', now('UTC'))
+            ->orderByDesc('effective_at')->orderByDesc('id')->get()->groupBy('client_medication_id');
+        $slots = MedicationDoseSlot::query()->whereIn('client_medication_id', $ids)->whereNull('superseded_at')
+            ->whereDate('nz_date', now('Pacific/Auckland')->toDateString())->where('self_managed', true)
+            ->get(['client_id', 'client_medication_id']);
+
+        return $medicines->mapWithKeys(function ($medicine) use ($assessments, $changes, $slots) {
+            $id = (int) $medicine->id;
+            $client = (int) $medicine->client_id;
+            $change = $changes->get($id, collect())->first(fn ($row) => (int) $row->client_id === $client);
+            if ($change) {
+                return [$id => $change->mode];
+            }
+            $current = $assessments->get($client, collect());
+            $legacy = $current->count() === 1 ? $this->legacyMode($current->first(), $id) : null;
+            $slot = $slots->contains(fn ($row) => (int) $row->client_medication_id === $id && (int) $row->client_id === $client);
+
+            return [$id => $legacy ?? ($slot ? 'self_managed' : 'staff_given')];
+        })->all();
+    }
+
     /** Read existing recorded support, without inventing a formal agreement. */
     private function legacyMode(?MedicationSelfAdminAssessment $assessment, int $medicationId): ?string
     {

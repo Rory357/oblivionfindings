@@ -18,6 +18,7 @@ const BADGE: Record<StockRowState, { label: string; variant: StatusVariant }> =
         use_first: { label: 'Use first', variant: 'warning' },
         expiring: { label: 'Expiring', variant: 'info' },
         ok: { label: 'In stock', variant: 'success' },
+        self_managed: { label: 'Self-managed', variant: 'neutral' },
     };
 
 export type StockRowActions = {

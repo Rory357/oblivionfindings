@@ -49,6 +49,8 @@ export type StockItem = {
     /** The order the row follows: a due delivery, then a sent order, then a draft. */
     open_order?: SupplyOrder | null;
     count_to_sign_off?: { id: number; counted_at: string | null } | null;
+    /** P03 support: the person manages this medicine themselves. */
+    self_managed?: boolean;
 };
 export type PackPhoto = {
     id: number;
@@ -125,6 +127,8 @@ export type SupplyOrder = {
     dispatch?: PharmacyOrderRow['dispatch'];
     /** A part delivery: what is still to come (MedicationStockQuantity::display). */
     still_to_come?: string | null;
+    /** Past its expected delivery, or (undated) the date it was needed by. */
+    overdue?: boolean;
 };
 export type StockCount = {
     id: number;

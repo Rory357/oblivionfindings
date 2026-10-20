@@ -7,7 +7,9 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationPharmacyOrder;
+use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationStockLot;
+use App\Models\MedicationSupportChange;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -271,5 +273,67 @@ class StockHubApprovedViewTest extends TestCase
         $this->assertSame(['Alpha low', 'Bravo expiring', 'Charlie expired', 'Delta fine'], collect($hidden['items']['data'])->pluck('name')->all());
         $this->assertSame(2, $hidden['item_people']);
         $this->assertStringNotContainsString('Echo controlled', json_encode($hidden['items']).json_encode($hidden['movements']));
+    }
+
+    /**
+     * Approved P06 Show › Needs attention (Main, 21 Oct): out, running low,
+     * expiring within 30 days, a count waiting for sign-off, or an order past
+     * its expected delivery (or, undated, past the date it was needed by).
+     */
+    public function test_needs_attention_lists_out_low_expiring_counts_to_sign_off_and_overdue_orders(): void
+    {
+        extract($this->house());
+        $this->medicine($aroha, 'Golf steady', '20.00', null, '2027-06-30', $lead);
+        $late = $this->medicine($tama, 'Hotel overdue', '20.00', null, '2027-06-30', $lead);
+        $this->order($late, 'submitted', '2026-10-15', $lead);
+        $onTime = $this->medicine($tama, 'India on time', '20.00', null, '2027-06-30', $lead);
+        $this->order($onTime, 'dispensed', '2026-10-22', $lead);
+        $needed = $this->medicine($aroha, 'Juliet needed', '20.00', null, '2027-06-30', $lead);
+        MedicationPharmacyOrder::create(['client_id' => $aroha->id, 'client_medication_id' => $needed->id, 'pharmacy_name' => 'Synthetic pharmacy',
+            'quantity_ordered' => 28, 'quantity_received' => 0, 'status' => 'confirmed', 'needed_by' => '2026-10-19', 'ordered_by' => $lead->id]);
+
+        $props = $this->actingAs($lead)->get('/emar/stock/packs?show=attention')->assertOk()->inertiaProps();
+        $this->assertSame('attention', $props['filters']['show']);
+        $this->assertSame(['Alpha low', 'Bravo expiring', 'Charlie expired', 'Delta fine', 'Echo controlled', 'Hotel overdue', 'Juliet needed'],
+            collect($props['items']['data'])->pluck('name')->all());
+        $rows = collect($props['items']['data'])->keyBy('name');
+        $this->assertTrue($rows['Hotel overdue']['open_order']['overdue']);
+        $this->assertTrue($rows['Juliet needed']['open_order']['overdue']);
+        $this->assertFalse($rows['Delta fine']['open_order']['overdue']);
+
+        $this->assertSame(['Alpha low', 'Bravo expiring', 'Charlie expired', 'Delta fine', 'Hotel overdue', 'Juliet needed'],
+            collect($this->actingAs($reader)->get('/emar/stock/packs?show=attention')->assertOk()->inertiaProps('items.data'))->pluck('name')->all());
+    }
+
+    /**
+     * Approved P06 Show › Self-managed (Main, 21 Oct): the medicines a person
+     * manages themselves, from their P03 support — the latest support change,
+     * else the completed assessment's recorded scope.
+     */
+    public function test_self_managed_lists_the_medicines_people_manage_themselves_from_their_support(): void
+    {
+        extract($this->house());
+        $golf = $this->medicine($aroha, 'Golf self-managed', '20.00', null, '2027-06-30', $lead);
+        $assessment = MedicationSelfAdminAssessment::query()->create([
+            'client_id' => $aroha->id, 'wishes_to_self_administer' => true, 'people_involved' => ['The person'],
+            'cognitive_capacity' => 5, 'physical_dexterity' => 5, 'vision_ability' => 5, 'swallowing_ability' => 5, 'understanding_score' => 5,
+            'can_identify_medications' => true, 'can_read_labels' => true, 'can_open_packaging' => true, 'can_manage_timing' => true, 'can_store_safely' => true,
+            'willing_to_self_admin' => true, 'storage_location' => 'own_drawer', 'reassessment_interval_months' => 12,
+            'status' => 'completed', 'outcome' => 'independent', 'assessment_date' => '2026-10-02', 'assessed_by' => $lead->id,
+            'med_scope' => [['med_id' => $golf->id, 'scope' => 'self_managed'], ['med_id' => $m['low']->id, 'scope' => 'self_managed']],
+        ]);
+        // A later support change wins over the recorded scope.
+        foreach ([[$m['low'], 'prompted'], [$m['expiring'], 'self_managed']] as [$med, $mode]) {
+            MedicationSupportChange::query()->create(['client_id' => $aroha->id, 'client_medication_id' => $med->id, 'assessment_id' => $assessment->id,
+                'mode' => $mode, 'previous_mode' => 'staff_given', 'reason' => 'synthetic_support_change', 'recorded_by' => $lead->id,
+                'occurred_at' => now()->subDay(), 'effective_at' => now()->subDay()]);
+        }
+
+        $rows = collect($this->actingAs($lead)->get('/emar/stock/packs?show=self')->assertOk()->inertiaProps('items.data'));
+        $this->assertSame(['Bravo expiring', 'Golf self-managed'], $rows->pluck('name')->all());
+        $this->assertTrue($rows->every(fn ($row) => $row['self_managed'] === true));
+        $all = collect($this->get('/emar/stock/packs')->assertOk()->inertiaProps('items.data'))->keyBy('name');
+        $this->assertFalse($all['Alpha low']['self_managed']);
+        $this->assertFalse($all['Delta fine']['self_managed']);
     }
 }
