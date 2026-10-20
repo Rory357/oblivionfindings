@@ -7,6 +7,7 @@ import {
 import { type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -26,13 +27,14 @@ import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
 import { medicationReturnParams } from '@/lib/medication-navigation';
 import { Head, router } from '@inertiajs/react';
 import {
     ArrowLeftRight,
     Camera,
     ClipboardCheck,
+    Clock,
     Eye,
     Package,
     Pill,
@@ -179,6 +181,19 @@ export default function StockHub({
     const breadcrumbs = useEmarBreadcrumbs();
     const [search, setSearch] = useState(filters.search);
     const [modal, setModal] = useState<Modal>(null);
+    // The approved P06 header: the houses in view (the House filter narrows
+    // them to one), and when the stock was read.
+    const [asAt, setAsAt] = useState(() => new Date().toISOString());
+    const sitesInView = filters.site_id
+        ? sites.filter((site) => site.id === filters.site_id)
+        : sites;
+    const houseNames = sitesInView.map((site) => site.name);
+    const houses =
+        houseNames.length > 3
+            ? `${houseNames.slice(0, 3).join(', ')} and ${houseNames.length - 3} more`
+            : houseNames.length > 1
+              ? `${houseNames.slice(0, -1).join(', ')} and ${houseNames[houseNames.length - 1]}`
+              : (houseNames[0] ?? 'your houses');
     useEffect(() => {
         if (filters.medication_id)
             setModal({ kind: 'item', id: filters.medication_id });
@@ -367,10 +382,11 @@ export default function StockHub({
                     icon={Package}
                     titleChip={
                         <PageHeaderStatusChip variant="neutral">
-                            Supply and pack records
+                            {houseNames.length}{' '}
+                            {houseNames.length === 1 ? 'house' : 'houses'}
                         </PageHeaderStatusChip>
                     }
-                    subline="Person-owned medicines, deliveries and counts"
+                    subline={`Medicines held for people at ${houses} · times in Pacific/Auckland`}
                     actions={
                         <>
                             <MedicationJourneyReturn />
@@ -535,6 +551,17 @@ export default function StockHub({
                                     onChange={(value) => visit({ show: value })}
                                 />
                             )}
+                            <PageHeaderFilterButton
+                                icon={Clock}
+                                onClick={() =>
+                                    router.reload({
+                                        onSuccess: () =>
+                                            setAsAt(new Date().toISOString()),
+                                    })
+                                }
+                            >
+                                As at {formatTime(asAt)} · Pacific/Auckland
+                            </PageHeaderFilterButton>
                         </>
                     }
                     rail={
