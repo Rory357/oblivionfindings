@@ -566,3 +566,12 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
    - Should the home Overview show medication "due now" and alert counts again?
    - Should relief workers get overdue alerts before clocking in? Today they can't open the chart until they do.
 5. Parked by design: C5 (clock-out and shift cancellation) and C6 (alert signals) wait until the workforce and Control Room work is finished.
+- **20 Oct: 1440 walk fixes LIVE (merge `cfded99c3`).**
+  - Medicine names no longer carry the dose text.
+  - An empty day reads "No scheduled doses today".
+  - History uses EmptyState and the shared paginator.
+  - Gates: paginator vitest 9, eslint 0 on 8 files, tsc showing only the 8 known non-eMAR errors, plus the eMAR vitest 697 run.
+  - **Programme status:** every planned lane item is live. Remaining work:
+    - Lane C's single comparison pass on the P08b, P11 and P06 walk shots;
+    - Stephan's site actions (§8);
+    - C5 and C6, parked.
