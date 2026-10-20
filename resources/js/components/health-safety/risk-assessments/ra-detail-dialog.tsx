@@ -2,6 +2,7 @@
  * event-detail-dialog chrome (248px rail + scroll-contained main column + Options footer)
  * with the same dialog sizing as the Add-Client wizard. Styled native controls; semantic
  * design tokens only. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -27,7 +28,7 @@ import {
     X,
     type LucideIcon,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
     AcceptableBadge,
     attachMeta,
@@ -98,6 +99,10 @@ export function RaDetailDialog({
 }) {
     const canManage = detail.can.manage;
     const AttachIcon = attachMeta(detail.attached_to.type).icon;
+    const [fileToRemove, setFileToRemove] = useState<
+        RaDetail['attachments'][number] | null
+    >(null);
+    const [removingFile, setRemovingFile] = useState(false);
 
     const actions: {
         key: RaModalKind;
@@ -155,11 +160,21 @@ export function RaDetailDialog({
         }
     }
 
-    const removeAttachment = (attId: number) =>
+    const removeAttachment = () => {
+        if (!fileToRemove) return;
         router.delete(
-            `/health-safety/risk-assessments/${detail.id}/attachments/${attId}`,
-            { preserveScroll: true, preserveState: true },
+            `/health-safety/risk-assessments/${detail.id}/attachments/${fileToRemove.id}`,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setRemovingFile(true),
+                onFinish: () => {
+                    setRemovingFile(false);
+                    setFileToRemove(null);
+                },
+            },
         );
+    };
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -409,9 +424,7 @@ export function RaDetailDialog({
                                                     <button
                                                         type="button"
                                                         onClick={() =>
-                                                            removeAttachment(
-                                                                a.id,
-                                                            )
+                                                            setFileToRemove(a)
                                                         }
                                                         aria-label={`Remove ${a.original_name}`}
                                                         className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-status-critical"
@@ -468,6 +481,27 @@ export function RaDetailDialog({
                         ) : null}
                     </div>
                 </div>
+
+                <ConfirmDialog
+                    open={fileToRemove !== null}
+                    onClose={() => {
+                        if (!removingFile) setFileToRemove(null);
+                    }}
+                    onConfirm={removeAttachment}
+                    title="Remove this file?"
+                    description={
+                        <>
+                            <span className="font-medium text-foreground">
+                                {fileToRemove?.original_name}
+                            </span>{' '}
+                            will be permanently deleted from this risk
+                            assessment. This cannot be undone.
+                        </>
+                    }
+                    confirmText="Remove file"
+                    variant="destructive"
+                    processing={removingFile}
+                />
             </DialogContent>
         </Dialog>
     );

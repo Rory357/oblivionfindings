@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import HeadingSmall from '@/components/heading-small';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Archive,
     Baby,
@@ -929,6 +930,31 @@ function ContextCard({
         }>
     >;
 }) {
+    const [confirmArchive, setConfirmArchive] = useState(false);
+    const [savingActive, setSavingActive] = useState(false);
+
+    // Send this card's own values: the shared edit form may still hold
+    // another context's data (or none) at the moment of the click.
+    const saveActive = (isActive: boolean) =>
+        router.put(
+            `/settings/service-contexts/${c.id}`,
+            {
+                type: c.type ?? types?.[0]?.code ?? 'residential',
+                name: c.name ?? '',
+                description: c.description ?? '',
+                site_id: c.site_id ?? '',
+                is_active: isActive,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setSavingActive(true),
+                onFinish: () => {
+                    setSavingActive(false);
+                    setConfirmArchive(false);
+                },
+            },
+        );
+
     return (
         <div className={`rounded-lg border border-l-4 ${colours.border} p-3`}>
             <div className="flex items-start justify-between gap-2">
@@ -1550,24 +1576,43 @@ function ContextCard({
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7 text-muted-foreground hover:text-status-warning"
+                        disabled={savingActive}
                         onClick={() => {
-                            // Toggle active/inactive as archive action
-                            editForm.setData({
-                                type:
-                                    c.type ?? types?.[0]?.code ?? 'residential',
-                                name: c.name ?? '',
-                                description: c.description ?? '',
-                                site_id: c.site_id ?? '',
-                                is_active: !c.is_active,
-                            });
-                            editForm.put(`/settings/service-contexts/${c.id}`);
+                            // Archive asks first; restoring is safe to do at once.
+                            if (c.is_active) setConfirmArchive(true);
+                            else saveActive(true);
                         }}
                         title={c.is_active ? 'Archive' : 'Restore'}
+                        aria-label={
+                            c.is_active ? `Archive ${c.name}` : `Restore ${c.name}`
+                        }
                     >
                         <Archive className="h-3.5 w-3.5" />
                     </Button>
                 </div>
             </div>
+            <ConfirmDialog
+                open={confirmArchive}
+                onClose={() => {
+                    if (!savingActive) setConfirmArchive(false);
+                }}
+                onConfirm={() => saveActive(false)}
+                title="Archive this service context?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {c.name}
+                        </span>{' '}
+                        will be marked inactive and no longer offered when
+                        setting up rosters and medication rounds. Records that
+                        already use it keep it, and you can restore it here at
+                        any time.
+                    </>
+                }
+                confirmText="Archive context"
+                variant="destructive"
+                processing={savingActive}
+            />
         </div>
     );
 }

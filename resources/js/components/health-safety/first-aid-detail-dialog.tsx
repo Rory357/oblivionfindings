@@ -5,6 +5,7 @@
  * = "steps", Step X of Y header, footer Options bar) exactly like drill-detail-dialog.tsx.
  * Write workflows replace the body as panes (Add-Client idiom). Premium evidence upload
  * lives in the Evidence section. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import {
     AttachmentUploader,
@@ -622,6 +623,27 @@ function FollowupsSection({
 }
 
 function EvidenceSection({ d }: { d: FirstAidDetail }) {
+    const [fileToRemove, setFileToRemove] = useState<
+        FirstAidDetail['attachments'][number] | null
+    >(null);
+    const [removingFile, setRemovingFile] = useState(false);
+
+    const removeFile = () => {
+        if (!fileToRemove) return;
+        router.delete(
+            `/health-safety/first-aid/${d.id}/attachments/${fileToRemove.id}`,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setRemovingFile(true),
+                onFinish: () => {
+                    setRemovingFile(false);
+                    setFileToRemove(null);
+                },
+            },
+        );
+    };
+
     return (
         <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
@@ -668,17 +690,10 @@ function EvidenceSection({ d }: { d: FirstAidDetail }) {
                             {d.can.manage ? (
                                 <button
                                     type="button"
-                                    onClick={() =>
-                                        router.delete(
-                                            `/health-safety/first-aid/${d.id}/attachments/${a.id}`,
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                            },
-                                        )
-                                    }
+                                    onClick={() => setFileToRemove(a)}
                                     className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical"
                                     title="Remove"
+                                    aria-label={`Remove ${a.original_name}`}
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </button>
@@ -695,6 +710,27 @@ function EvidenceSection({ d }: { d: FirstAidDetail }) {
                     hint="ACC45 form, injury photos, treatment notes — up to 20 MB each"
                 />
             ) : null}
+
+            <ConfirmDialog
+                open={fileToRemove !== null}
+                onClose={() => {
+                    if (!removingFile) setFileToRemove(null);
+                }}
+                onConfirm={removeFile}
+                title="Remove this file?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {fileToRemove?.original_name}
+                        </span>{' '}
+                        will be permanently deleted from this first-aid record.
+                        This cannot be undone.
+                    </>
+                }
+                confirmText="Remove file"
+                variant="destructive"
+                processing={removingFile}
+            />
         </div>
     );
 }
