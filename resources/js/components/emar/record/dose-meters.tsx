@@ -38,9 +38,11 @@ export function DoseMeters({
                 <PageHeaderMeterCaption>
                     {unavailable
                         ? 'Today’s dose history can’t be read'
-                        : doses.due && doses.due_until
-                          ? `Until ${formatTime(doses.due_until)}`
-                          : 'Nothing due right now'}
+                        : none
+                          ? 'No scheduled doses today'
+                          : doses.due && doses.due_until
+                            ? `Until ${formatTime(doses.due_until)}`
+                            : 'Nothing due right now'}
                 </PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock
@@ -55,9 +57,11 @@ export function DoseMeters({
                 <PageHeaderMeterCaption>
                     {unavailable
                         ? '—'
-                        : doses.late && doses.oldest_late
-                          ? `Oldest due ${formatTime(doses.oldest_late)}`
-                          : 'None late'}
+                        : none
+                          ? 'No scheduled doses today'
+                          : doses.late && doses.oldest_late
+                            ? `Oldest due ${formatTime(doses.oldest_late)}`
+                            : 'None late'}
                 </PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock

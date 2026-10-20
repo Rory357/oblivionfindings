@@ -42,6 +42,10 @@ describe('record header dose meters (EA-110)', () => {
         );
         expect(screen.getAllByText('n/a')).toHaveLength(3);
         expect(screen.getByText('No doses due yet')).toBeInTheDocument();
+        // 1440 walk: an empty day says so under Due now and Late alike.
+        expect(screen.getAllByText('No scheduled doses today')).toHaveLength(2);
+        expect(screen.queryByText('Nothing due right now')).toBeNull();
+        expect(screen.queryByText('None late')).toBeNull();
     });
 
     it('says the day is unavailable rather than showing zeros', () => {
