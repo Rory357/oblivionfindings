@@ -575,3 +575,8 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
     - Lane C's single comparison pass on the P08b, P11 and P06 walk shots;
     - Stephan's site actions (§8);
     - C5 and C6, parked.
+- **20 Oct: Stephan approved C5 and C6 now** ("Go ahead"), despite the earlier collision hold.
+  - **C5 → Lane A, branch `claude/emar-c5`:** clock-out counts only doses that are due and recordable, a handover CD discrepancy raises a follow-up, and shift cancellation goes through the guarded path.
+  - **C6 → Lane B, branch `claude/emar-c6`:** NZ times in incident and CR text, auto-incidents get shift and owner routing, missed and late rules get recipients, and medication incidents get controlled concealment.
+  - Both lanes keep edits minimal and list the changed workforce/CR methods for whoever later merges the uncommitted Codex and parent-checkout WIP.
+  - **/emar/stock decision (Main):** redirect to the approved P06 hub if the hub offers every old action; otherwise Lane C sends the gap list.
