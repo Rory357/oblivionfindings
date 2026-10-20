@@ -407,4 +407,28 @@ class StockHubApprovedViewTest extends TestCase
             array_column($this->actingAs($lead)->get('/emar/stock/packs?view=removals')->assertOk()->inertiaProps('expiry_packs.data'), 'medication_name'));
         $this->assertSame([], $this->get('/emar/stock/packs')->assertOk()->inertiaProps('expiry_packs.data'));
     }
+
+    /**
+     * Approved P06 Removals (1440-16) and Recent movements (1440-11): what was
+     * removed or returned, with its unit and whole-number quantity, and each
+     * movement's signed change ("-6", "+20").
+     */
+    public function test_removals_carry_units_and_movements_their_signed_change(): void
+    {
+        extract($this->house());
+        $lot = MedicationStockLot::whereHas('stock', fn ($q) => $q->where('client_medication_id', $m['expired']->id))->sole();
+        $this->actingAs($lead)->postJson('/emar/stock/packs/commands', ['action' => 'move', 'client_medication_id' => $m['expired']->id,
+            'request_uuid' => (string) Str::uuid(), 'lot_id' => $lot->id, 'kind' => 'removed_expired', 'quantity' => '6',
+            'reason' => 'Synthetic: expired pack out of the cabinet'])->assertOk();
+
+        $removed = $this->get('/emar/stock/packs?view=removals')->assertOk()->inertiaProps();
+        $this->assertSame(['removed_expired'], array_column($removed['movements']['data'], 'kind'));
+        $this->assertSame(['6', 'tablets', '-6'], [$removed['movements']['data'][0]['quantity_display'], $removed['movements']['data'][0]['unit'],
+            $removed['movements']['data'][0]['change_display']]);
+        $this->assertSame([], $removed['expiry_packs']['data']);
+
+        $opening = collect($this->get('/emar/stock/packs')->assertOk()->inertiaProps('movements.data'))
+            ->firstWhere('medication_name', 'Delta fine');
+        $this->assertSame(['opening', '+20'], [$opening['kind'], $opening['change_display']]);
+    }
 }

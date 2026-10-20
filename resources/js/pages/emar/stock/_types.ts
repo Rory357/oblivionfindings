@@ -170,6 +170,9 @@ export type Movement = {
     quantity: string;
     /** MedicationStockQuantity::display: whole when whole. */
     quantity_display?: string;
+    /** Approved P06: the stock unit, and the signed change ("-6", "+20"). */
+    unit?: string | null;
+    change_display?: string;
     balance_before: string;
     balance_after: string;
     reason: string;

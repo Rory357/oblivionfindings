@@ -3,6 +3,7 @@ import { ListCaption } from '@/components/lists/list-caption';
 import { Button } from '@/components/ui/button';
 import { formatDateOnly, formatTime } from '@/lib/datetime';
 import { ArrowLeftRight, Eye } from 'lucide-react';
+import { amount } from './_stock-row';
 import type { Movement } from './_types';
 
 /**
@@ -66,8 +67,7 @@ export function RecentMovements({
                         cell: (move) => (
                             <span className="grid">
                                 <span className="font-semibold">
-                                    {label(move)} ·{' '}
-                                    {move.quantity_display ?? move.quantity}
+                                    {`${label(move)} · ${amount(move.change_display ?? move.quantity_display ?? move.quantity, move.unit ?? null)}`}
                                 </span>
                                 {move.reason ? (
                                     <span className="text-caption">

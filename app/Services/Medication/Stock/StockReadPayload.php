@@ -139,6 +139,8 @@ final class StockReadPayload
             ->latest('id')->paginate(25, ['*'], 'moves_page')->withQueryString();
         $movements->through(fn ($m) => [...$m->only(['id', 'kind', 'quantity', 'balance_before', 'balance_after', 'reason', 'notes', 'recorded_at', 'administration_id', 'controlled_entry_id', 'destruction_id', 'transit_log_id', 'stock_count_record_id', 'reverses_movement_id', 'return_of_id']),
             'quantity_display' => Qty::display($m->quantity),
+            // Approved P06 Removals and Recent movements: the unit, and the signed change ("-6", "+20").
+            'unit' => $m->lot->stock->unit, 'change_display' => $this->signedChange($m->balance_before, $m->balance_after),
             'medication_id' => $m->lot->stock->client_medication_id, 'medication_name' => $m->lot->stock->medication->name,
             'client_name' => $m->lot->stock->medication->client->full_name, 'recorded_by_name' => $m->recordedBy?->name]);
 
@@ -353,6 +355,13 @@ final class StockReadPayload
             'days' => (int) CarbonImmutable::parse($today)->diffInDays(CarbonImmutable::parse($lot->expiry_date->toDateString()), false),
             'quantity' => Qty::display($lot->quantity_remaining), 'unit' => $lot->stock->unit,
         ])->values()->all(), 'more' => $rows->count() > 200];
+    }
+
+    private function signedChange(int|float|string $before, int|float|string $after): string
+    {
+        $change = Qty::subtract($after, $before);
+
+        return (Qty::greaterThan($change, 0) ? '+' : '').Qty::display($change);
     }
 
     private function orderRow(MedicationPharmacyOrder $order): array

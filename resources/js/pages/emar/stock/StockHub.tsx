@@ -62,6 +62,7 @@ import { PackPhotoDialog } from './_photo';
 import { ReceiveWizard } from './_receive';
 import { ReceivePicker, receiveBlockedReason } from './_receive-picker';
 import { RecentMovements } from './_recent-movements';
+import { RemovalsView } from './_removals-view';
 import { useStockCommand } from './_requests';
 import { stockCaption, stockColumns } from './_stock-columns';
 import { TableList } from './_table-list';
@@ -123,12 +124,13 @@ const SHOW_TITLES: Record<string, string> = {
 const moveLabels: Record<string, string> = {
     opening: 'Recorded balance',
     received: 'Received',
-    given: 'Given',
-    going_out: 'Went out',
-    coming_back: 'Came back',
-    returned_pharmacy: 'Returned to pharmacy',
-    removed_expired: 'Expired pack removed',
-    damaged: 'Damaged stock removed',
+    // The approved P06 words (data.ts MOVE_LABEL).
+    given: 'Doses given',
+    going_out: 'Went out with the person',
+    coming_back: 'Came back with the person',
+    returned_pharmacy: 'Returned to the pharmacy',
+    removed_expired: 'Expired — removed',
+    damaged: 'Damaged or dropped',
     quarantined: 'Pack taken out of use',
     count_correction: 'Count correction',
     controlled_receipt: 'Controlled receipt',
@@ -663,13 +665,28 @@ export default function StockHub({
                 {filters.view === 'counts' && (
                     <CountsView pager={counts} can={can} open={countOpen} />
                 )}
-                {['movements', 'removals'].includes(filters.view) && (
-                    <TableList
-                        title={
-                            filters.view === 'removals'
-                                ? 'Removed or taken out of use'
-                                : 'All movements'
+                {filters.view === 'removals' && (
+                    <RemovalsView
+                        packs={expiry_packs.data}
+                        moves={movements}
+                        can={can}
+                        label={(move) =>
+                            moveLabels[move.kind] ??
+                            move.kind.replaceAll('_', ' ')
                         }
+                        openMedicine={(id) => setModal({ kind: 'item', id })}
+                        remove={(pack) =>
+                            setModal({
+                                kind: 'item',
+                                id: pack.medication_id,
+                                action: 'move',
+                            })
+                        }
+                    />
+                )}
+                {filters.view === 'movements' && (
+                    <TableList
+                        title="All movements"
                         pager={movements}
                         name={(move) => move.medication_name}
                         subline={(move) => move.client_name}

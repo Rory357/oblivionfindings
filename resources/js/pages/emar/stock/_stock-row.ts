@@ -24,10 +24,10 @@ export type StockRowState =
 const EXPIRY_WARN_DAYS = 30;
 const EXPIRY_CRITICAL_DAYS = 7;
 
-/** "68 tablets", "1 tablet", "2.5 mL". */
+/** "68 tablets", "1 tablet", "-1 tablet", "2.5 mL". */
 export function amount(quantity: string, unit: string | null): string {
     const label = unit ?? '';
-    return `${quantity} ${quantity === '1' ? label.replace(/s$/, '') : label}`.trim();
+    return `${quantity} ${/^[+-]?1$/.test(quantity) ? label.replace(/s$/, '') : label}`.trim();
 }
 
 /** Pack expiry as printed on the pack: month and year. */
