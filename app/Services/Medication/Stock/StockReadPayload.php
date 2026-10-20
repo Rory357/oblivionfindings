@@ -18,6 +18,7 @@ use App\Services\Medication\PharmacyConnect\PharmacyPartnerRegistry;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity as Qty;
 use App\Support\Medication\PharmacySupplyRules;
+use App\Support\Medication\StockLotRules;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 
@@ -92,12 +93,17 @@ final class StockReadPayload
                 ->where('state', 'open')->whereNotNull('expiry_date')->where('expiry_date', '<=', CarbonImmutable::parse($this->stock->today())->addDays(30)->toDateString())))
             ->when($view === 'stock' && $show === 'out', fn ($q) => $q->whereHas('stock', fn ($s) => $s->whereRaw('('.$quantitySql.') <= 0', [$today])))
             ->when($view === 'stock' && $show === 'low', fn ($q) => $q->whereHas('stock', $runningLow));
-        $items = $itemsQuery->with(['client.site', 'stock.lots'])
-            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q->where('name', 'like', '%'.$search.'%')
-                ->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', '%'.$search.'%')->orWhere('last_name', 'like', '%'.$search.'%'))
-                ->orWhereHas('stock.lots', fn ($l) => $l->where('batch_number', 'like', '%'.$search.'%'))))
-            ->orderBy('name')->orderBy('id')->paginate(25, ['*'], 'items_page')->withQueryString();
-        $items->through(fn ($med) => $this->item($med));
+        $itemsQuery->when($search !== '', fn ($query) => $query->where(fn ($q) => $q->where('name', 'like', '%'.$search.'%')
+            ->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', '%'.$search.'%')->orWhere('last_name', 'like', '%'.$search.'%'))
+            ->orWhereHas('stock.lots', fn ($l) => $l->where('batch_number', 'like', '%'.$search.'%'))));
+        // Approved P06 caption "n shown · n people": the people across the whole list.
+        $itemPeople = (clone $itemsQuery)->distinct()->count('client_id');
+        $items = $itemsQuery->with(['client.site', 'stock.lots'])->orderBy('name')->orderBy('id')->paginate(25, ['*'], 'items_page')->withQueryString();
+        [$openOrders, $toSignOff] = $this->rowWork($items->getCollection());
+        $items->through(fn ($med) => [...$this->item($med),
+            'open_order' => isset($openOrders[$med->id]) ? $this->orderRow($openOrders[$med->id]) : null,
+            'count_to_sign_off' => ($count = $toSignOff[$med->stock?->id ?? 0] ?? null) ? ['id' => (int) $count->id, 'counted_at' => $count->counted_at?->toIso8601String()] : null,
+        ]);
         $orders = MedicationPharmacyOrder::whereIn('client_id', $clientIds)->whereIn('client_medication_id', $medicationIds)
             ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'));
         $ordersPage = (clone $orders)->when($search !== '', fn ($q) => $q->where(fn ($q) => $q->where('pharmacy_name', 'like', '%'.$search.'%')->orWhereHas('medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%'))))->with(['client', 'medication'])->latest('id')->paginate(25, ['*'], 'orders_page')->withQueryString();
@@ -116,6 +122,7 @@ final class StockReadPayload
             ->when($view === 'removals', fn ($q) => $q->whereIn('kind', ['returned_pharmacy', 'removed_expired', 'damaged', 'quarantined']))
             ->latest('id')->paginate(25, ['*'], 'moves_page')->withQueryString();
         $movements->through(fn ($m) => [...$m->only(['id', 'kind', 'quantity', 'balance_before', 'balance_after', 'reason', 'notes', 'recorded_at', 'administration_id', 'controlled_entry_id', 'destruction_id', 'transit_log_id', 'stock_count_record_id', 'reverses_movement_id', 'return_of_id']),
+            'quantity_display' => Qty::display($m->quantity),
             'medication_id' => $m->lot->stock->client_medication_id, 'medication_name' => $m->lot->stock->medication->name,
             'client_name' => $m->lot->stock->medication->client->full_name, 'recorded_by_name' => $m->recordedBy?->name]);
 
@@ -141,7 +148,7 @@ final class StockReadPayload
 
         return [
             'items' => $items, 'orders' => $ordersPage, 'counts' => $countsPage, 'movements' => $movements, 'focused_count' => $focusedCount,
-            'focused_lot_id' => $lotId,
+            'focused_lot_id' => $lotId, 'item_people' => $itemPeople,
             'sites' => $this->scope->sitePicker($allSites)->map->only(['id', 'name']),
             'pharmacies' => (clone $orders)->distinct()->orderBy('pharmacy_name')->pluck('pharmacy_name')->filter()->values(),
             'filters' => ['view' => $view, 'search' => $search, 'site_id' => $site, 'client_id' => $clientId, 'show' => $show, 'medication_id' => $medicineId, 'lot_id' => $lotId],
@@ -265,12 +272,39 @@ final class StockReadPayload
         ];
     }
 
+    /**
+     * Approved P06 stock rows (Main, 20 Oct): for one page of medicines, the
+     * open order each row's state line and button follow — a due delivery
+     * before a sent order before a draft, never an order filed under another
+     * person — and the latest count waiting for sign-off. Two queries a page.
+     *
+     * @return array{0: array<int, MedicationPharmacyOrder>, 1: array<int, MedicationStockCountRecord>}
+     */
+    private function rowWork($medicines): array
+    {
+        $rank = ['dispensed' => 0, 'part_received' => 1, 'confirmed' => 2, 'submitted' => 3, 'draft' => 4];
+        $orders = MedicationPharmacyOrder::query()->whereIn('client_medication_id', $medicines->pluck('id')->all())
+            ->whereIn('status', array_keys($rank))
+            ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'))
+            ->with(['client', 'medication'])->orderByDesc('id')->get()
+            ->sortBy(fn ($order) => $rank[$order->status], SORT_REGULAR)
+            ->groupBy('client_medication_id')->map->first()->all();
+        $stockIds = $medicines->map(fn ($med) => $med->stock?->id)->filter()->values()->all();
+        $counts = MedicationStockCountRecord::query()->whereIn('client_medication_stock_id', $stockIds)->where('state', 'needs_review')
+            ->orderByDesc('id')->get(['id', 'client_medication_stock_id', 'counted_at'])
+            ->unique('client_medication_stock_id')->keyBy('client_medication_stock_id')->all();
+
+        return [$orders, $counts];
+    }
+
     private function orderRow(MedicationPharmacyOrder $order): array
     {
         return [
             ...$order->only(['id', 'client_medication_id', 'pharmacy_name', 'status', 'quantity_ordered', 'quantity_received', 'quantity_dispensed', 'order_notes',
                 'needed_by', 'expected_delivery', 'communication_method', 'communication_reference', 'communication_recorded_at', 'closure_reason', 'batch_number', 'batch_expiry']),
             'medication_name' => $order->medication->name, 'client_name' => $order->client->full_name, 'controlled' => (bool) $order->medication->controlled_drug,
+            'still_to_come' => $order->status === 'part_received'
+                ? Qty::display(Qty::maxZero(Qty::subtract($order->quantity_dispensed ?? $order->quantity_ordered, $order->quantity_received ?? 0))) : null,
         ];
     }
 
@@ -302,6 +336,34 @@ final class StockReadPayload
             'pack_count' => $lots->where('quantity_remaining', '>', 0)->count(), 'next_batch' => $stock?->currentBatchNumber(),
             'next_expiry' => $stock?->currentExpiryDate()?->toDateString(), 'expired_packs' => $expired, 'state' => $state,
             'days_supply' => null, // Requires P01's explicit same-unit daily stock-use contract; never guess mg -> tablets.
+            ...$this->rowQuantities($stock, $started, $next),
+        ];
+    }
+
+    /**
+     * Approved P06 stock row (Main, 20 Oct): quantities as staff read them —
+     * whole when whole ("68"), the decimal only when real ("2.5"), and "0"
+     * a real balance — from MedicationStockQuantity::display; the expired
+     * packs to take out of use; and the next pack, for "use first" lines.
+     */
+    private function rowQuantities(?ClientMedicationStock $stock, bool $started, ?MedicationStockLot $next): array
+    {
+        $today = StockAvailability::today();
+        $usable = $stock ? app(StockAvailability::class)->usableQuantity($stock) : null;
+        $lots = $stock && $started ? app(StockAvailability::class)->packs($stock) : collect();
+        $expired = $lots->filter(fn ($lot) => $lot->state === 'open' && Qty::greaterThan($lot->quantity_remaining, 0)
+            && $lot->expiry_date !== null && $lot->expiry_date->toDateString() < $today)->sortBy(fn ($lot) => [$lot->expiry_date->toDateString(), $lot->id]);
+
+        return [
+            'usable_display' => $usable === null ? null : Qty::display($usable),
+            'physical_display' => $stock?->on_hand === null ? null : Qty::display($stock->on_hand),
+            'reorder_display' => $stock?->reorder_level === null ? null : Qty::display($stock->reorder_level),
+            'expired_lots' => $expired->map(fn ($lot) => ['batch_number' => $lot->batch_number, 'expiry_date' => $lot->expiry_date->toDateString(),
+                'quantity' => Qty::display($lot->quantity_remaining)])->values()->all(),
+            'usable_packs' => $lots->filter(fn ($lot) => StockLotRules::usable($lot->toArray(), $today))->count(),
+            'next_quantity' => $next ? Qty::display($next->quantity_remaining) : null,
+            'next_expiry_in_days' => $next?->expiry_date
+                ? (int) CarbonImmutable::parse($today)->diffInDays(CarbonImmutable::parse($next->expiry_date->toDateString()), false) : null,
         ];
     }
 }

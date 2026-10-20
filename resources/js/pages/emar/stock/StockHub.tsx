@@ -61,6 +61,7 @@ import { ReceiveWizard } from './_receive';
 import { ReceivePicker, receiveBlockedReason } from './_receive-picker';
 import { RecentMovements } from './_recent-movements';
 import { useStockCommand } from './_requests';
+import { stockCaption, stockColumns } from './_stock-columns';
 import { TableList } from './_table-list';
 import type {
     Capabilities,
@@ -142,6 +143,8 @@ type Props = {
     metrics: StockMetrics;
     /** No controlled-medicine view: the counts and list cover visible medicines. */
     controlled_left_out?: boolean;
+    /** People across the whole stock list, for "n shown · n people". */
+    item_people?: number;
     can: Capabilities;
     lots_enabled: boolean;
     selected_client?: { id: number; name: string } | null;
@@ -179,6 +182,7 @@ export default function StockHub({
     selected_client = null,
     focused_count = null,
     controlled_left_out = false,
+    item_people,
 }: Props) {
     // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
     const breadcrumbs = useEmarBreadcrumbs();
@@ -212,6 +216,7 @@ export default function StockHub({
                 'counts',
                 'movements',
                 'metrics',
+                'item_people',
                 'pharmacies',
             ],
             preserveScroll: true,
@@ -539,76 +544,49 @@ export default function StockHub({
                         title={
                             filters.view === 'expiring'
                                 ? 'Packs needing an expiry check'
-                                : 'Stock'
+                                : filters.show === 'low'
+                                  ? 'Running low or out'
+                                  : filters.show === 'out'
+                                    ? 'Out of stock'
+                                    : 'Medicines held'
                         }
+                        caption={stockCaption(
+                            items,
+                            item_people ??
+                                new Set(
+                                    items.data.map((item) => item.client_id),
+                                ).size,
+                            metrics.controlled_hidden,
+                        )}
+                        identityLabel="Medicine"
+                        identityWidth="1.25fr"
                         pager={items}
                         name={(item) => item.name}
                         subline={(item) =>
-                            `${item.client_name} · ${item.site_name ?? 'House not available'}`
+                            [
+                                item.site_name,
+                                item.controlled ? 'controlled' : null,
+                                item.held ? 'on hold' : null,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ')
                         }
                         open={openItem}
                         actions={itemActions}
-                        columns={[
-                            {
-                                key: 'quantity',
-                                label: 'Stock available',
-                                width: '1fr',
-                                cell: (item) => (
-                                    <div>
-                                        {item.usable_on_hand == null
-                                            ? 'Unknown'
-                                            : `${item.usable_on_hand} ${item.unit ?? ''} usable`}
-                                        {item.physical_on_hand != null && (
-                                            <p className="text-caption">
-                                                {item.physical_on_hand}{' '}
-                                                physically held
-                                            </p>
-                                        )}
-                                    </div>
-                                ),
-                            },
-                            {
-                                key: 'next',
-                                label: 'Use first',
-                                width: '1.5fr',
-                                cell: (item) => (
-                                    <div>
-                                        <span>
-                                            {item.next_batch ??
-                                                (item.lots_started
-                                                    ? 'Batch unknown'
-                                                    : 'Packs not set up')}
-                                        </span>
-                                        <p className="text-caption">
-                                            {item.next_expiry
-                                                ? formatDateOnly(
-                                                      item.next_expiry,
-                                                  )
-                                                : 'Expiry unknown'}
-                                        </p>
-                                    </div>
-                                ),
-                            },
-                            {
-                                key: 'state',
-                                label: 'Supply status',
-                                width: '1.2fr',
-                                cell: (item) => (
-                                    <div>
-                                        <State value={item.state} />
-                                        {item.expired_packs > 0 && (
-                                            <p className="text-caption">
-                                                {item.expired_packs} expired{' '}
-                                                {item.expired_packs === 1
-                                                    ? 'pack'
-                                                    : 'packs'}{' '}
-                                                — take out of use
-                                            </p>
-                                        )}
-                                    </div>
-                                ),
-                            },
-                        ]}
+                        columns={stockColumns(can, {
+                            receive: (item, order) =>
+                                setModal({
+                                    kind: 'item',
+                                    id: item.id,
+                                    action: 'receive',
+                                    order,
+                                }),
+                            remove: (item) => openItem(item, 'move'),
+                            signOff: (countId) => visit({ count_id: countId }),
+                            order: (item) => openItem(item, 'order'),
+                            sendOrder: (order) =>
+                                setModal({ kind: 'order', order }),
+                        })}
                     />
                 )}
                 {filters.view === 'stock' && (
@@ -758,7 +736,8 @@ export default function StockHub({
                                 key: 'qty',
                                 label: 'Quantity',
                                 width: '0.7fr',
-                                cell: (move) => move.quantity,
+                                cell: (move) =>
+                                    move.quantity_display ?? move.quantity,
                             },
                             {
                                 key: 'why',

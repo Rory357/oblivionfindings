@@ -76,7 +76,7 @@ class StockHubApprovedViewTest extends TestCase
         $med = ClientMedication::query()->forceCreate(['client_id' => $client->id, 'name' => $name, 'dosage' => '1 tablet',
             'frequency' => 'PRN', 'is_prn' => true, 'controlled_drug' => $controlled, 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
         $stock = ClientMedicationStock::create(['client_medication_id' => $med->id, 'on_hand' => $onHand, 'unit' => 'tablets',
-            'reorder_level' => $reorder, 'expiry_date' => $expiry, 'batch_number' => 'SYN-'.Str::upper(Str::random(4))]);
+            'reorder_level' => $reorder, 'expiry_date' => $expiry, 'batch_number' => 'SYN-'.Str::upper(Str::substr($name, 0, 3))]);
         DB::transaction(fn () => app(MedicationStockService::class)->startLots($stock, $actor, (string) Str::uuid()));
 
         return $med;
@@ -224,5 +224,52 @@ class StockHubApprovedViewTest extends TestCase
         $this->getJson('/emar/stock/packs/receive-choices?site_id='.$elsewhere->id)->assertNotFound();
         config(['medications.stock_lots_enabled' => false]);
         $this->getJson('/emar/stock/packs/receive-choices')->assertForbidden();
+    }
+
+    /**
+     * Approved P06 stock table (Main, 20 Oct): whole-number quantities from
+     * MedicationStockQuantity::display ("0" is a real balance, never a
+     * missing one), the facts each row's state lines need — expired packs,
+     * the next pack, the open order and the count to sign off — and the
+     * people count for the "n shown · n people" caption.
+     */
+    public function test_stock_rows_carry_whole_number_quantities_and_the_facts_their_state_lines_need(): void
+    {
+        extract($this->house());
+        // An order filed under the wrong person never reaches the medicine's row.
+        MedicationPharmacyOrder::create(['client_id' => $tama->id, 'client_medication_id' => $m['low']->id, 'pharmacy_name' => 'Synthetic pharmacy',
+            'quantity_ordered' => 5, 'quantity_received' => 0, 'status' => 'dispensed', 'ordered_by' => $lead->id]);
+        $props = $this->actingAs($lead)->get('/emar/stock/packs')->assertOk()->inertiaProps();
+        $rows = collect($props['items']['data'])->keyBy('name');
+        $this->assertSame(2, $props['item_people']);
+
+        $this->assertSame('3', $rows['Alpha low']['usable_display']);
+        $this->assertSame('3', $rows['Alpha low']['physical_display']);
+        $this->assertSame('5', $rows['Alpha low']['reorder_display']);
+        $this->assertSame('0', $rows['Charlie expired']['usable_display']);
+        $this->assertSame('6', $rows['Charlie expired']['physical_display']);
+        $this->assertSame([['batch_number' => 'SYN-CHA', 'expiry_date' => '2026-10-01', 'quantity' => '6']], $rows['Charlie expired']['expired_lots']);
+        $this->assertSame(0, $rows['Charlie expired']['usable_packs']);
+        $this->assertSame(1, $rows['Bravo expiring']['usable_packs']);
+        $this->assertSame(16, $rows['Bravo expiring']['next_expiry_in_days']);
+        $this->assertSame('10', $rows['Bravo expiring']['next_quantity']);
+        $this->assertNull($rows['Delta fine']['days_supply']);
+
+        // The open order on the row: due deliveries before sent orders before drafts.
+        $this->assertSame($o['due']->id, $rows['Delta fine']['open_order']['id']);
+        $this->assertSame('dispensed', $rows['Delta fine']['open_order']['status']);
+        $this->assertSame($o['part']->id, $rows['Bravo expiring']['open_order']['id']);
+        $this->assertSame('18', $rows['Bravo expiring']['open_order']['still_to_come']);
+        $this->assertSame($o['draft']->id, $rows['Alpha low']['open_order']['id']);
+        $this->assertNull($rows['Charlie expired']['open_order']);
+        $this->assertSame($countId, $rows['Delta fine']['count_to_sign_off']['id']);
+        $this->assertNull($rows['Alpha low']['count_to_sign_off']);
+        $this->assertContains('20', collect($props['movements']['data'])->pluck('quantity_display')->all());
+
+        // Controlled concealment holds on every new fact.
+        $hidden = $this->actingAs($reader)->get('/emar/stock/packs')->assertOk()->inertiaProps();
+        $this->assertSame(['Alpha low', 'Bravo expiring', 'Charlie expired', 'Delta fine'], collect($hidden['items']['data'])->pluck('name')->all());
+        $this->assertSame(2, $hidden['item_people']);
+        $this->assertStringNotContainsString('Echo controlled', json_encode($hidden['items']).json_encode($hidden['movements']));
     }
 }

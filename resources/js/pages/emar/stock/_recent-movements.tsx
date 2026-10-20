@@ -66,7 +66,8 @@ export function RecentMovements({
                         cell: (move) => (
                             <span className="grid">
                                 <span className="font-semibold">
-                                    {label(move)} · {move.quantity}
+                                    {label(move)} ·{' '}
+                                    {move.quantity_display ?? move.quantity}
                                 </span>
                                 {move.reason ? (
                                     <span className="text-caption">

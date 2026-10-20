@@ -32,6 +32,23 @@ export type StockItem = {
     expired_packs: number;
     state: string;
     days_supply: number | null;
+    /** Approved P06 row (Main, 20 Oct): MedicationStockQuantity::display — "68", "2.5", "0". */
+    usable_display?: string | null;
+    physical_display?: string | null;
+    reorder_display?: string | null;
+    /** Open packs past their expiry, still held: take out of use. */
+    expired_lots?: {
+        batch_number: string | null;
+        expiry_date: string;
+        quantity: string;
+    }[];
+    /** Open, unexpired packs; the next one to use and how far off its expiry is. */
+    usable_packs?: number;
+    next_quantity?: string | null;
+    next_expiry_in_days?: number | null;
+    /** The order the row follows: a due delivery, then a sent order, then a draft. */
+    open_order?: SupplyOrder | null;
+    count_to_sign_off?: { id: number; counted_at: string | null } | null;
 };
 export type PackPhoto = {
     id: number;
@@ -106,6 +123,8 @@ export type SupplyOrder = {
     batch_expiry: string | null;
     /** EA-138: the connected pharmacy send, while the connection runs. */
     dispatch?: PharmacyOrderRow['dispatch'];
+    /** A part delivery: what is still to come (MedicationStockQuantity::display). */
+    still_to_come?: string | null;
 };
 export type StockCount = {
     id: number;
@@ -131,6 +150,8 @@ export type Movement = {
     client_name: string;
     kind: string;
     quantity: string;
+    /** MedicationStockQuantity::display: whole when whole. */
+    quantity_display?: string;
     balance_before: string;
     balance_after: string;
     reason: string;
