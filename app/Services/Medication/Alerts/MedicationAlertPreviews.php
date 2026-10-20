@@ -32,6 +32,7 @@ class MedicationAlertPreviews
         MedicationAlertCatalogue::OUT_OF_STOCK => ['Out of stock', 'Levetiracetam for Tama W. is out of stock. Kōwhai House.', 'A medicine at Kōwhai House is out of stock.', false],
         MedicationAlertCatalogue::CD_CHECK => ['Controlled-drug balance check overdue', 'No controlled-drug balance check at Rimu House for 7 days (2 medicines).', 'A controlled-drug check at Rimu House is overdue.', true],
         MedicationAlertCatalogue::REVIEW_DUE => ['Medication review due', 'Aroha N.’s medication chart review is due by 5 Oct 2026. Kōwhai House.', 'A medication review is due.', false],
+        MedicationAlertCatalogue::DOSE_INCIDENT => ['Dose incident to submit', 'Tama W. — a dose of Metformin 500 mg was recorded as missed. Its draft incident waits to be submitted. Kōwhai House.', 'A dose incident at Kōwhai House waits to be submitted.', false],
     ];
 
     /**

@@ -277,10 +277,11 @@ it('raises low stock, expiring, expired and out-of-stock alerts from the stock c
         ->and($messages['expiry'])->toBe('Enoxaparin 40 mg for Aroha N. expires on 6 Oct 2026. Kōwhai House.')
         ->and($messages['outOfStock'])->toBe('Levetiracetam for Aroha N. is out of stock. Kōwhai House.');
     // v5 defaults: low stock to the house lead and stock staff; expiring to stock staff.
+    // Team leads update stock since the C4 grants, so the lead is stock staff too.
     expect(b2Told($lead, 'stock'))->toBeTrue()
         ->and(b2Told($stockStaff, 'stock'))->toBeTrue()
         ->and(b2Told($stockStaff, 'expiry'))->toBeTrue()
-        ->and(b2Told($lead, 'expiry'))->toBeFalse()
+        ->and(b2Told($lead, 'expiry'))->toBeTrue()
         ->and(b2Told($lead, 'outOfStock'))->toBeTrue();
     expect(MedicationAlert::query()->where('type', 'expiry')->value('severity'))->toBe('critical');
 });

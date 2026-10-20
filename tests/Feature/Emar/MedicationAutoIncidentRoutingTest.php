@@ -151,7 +151,7 @@ final class MedicationAutoIncidentRoutingTest extends TestCase
         $this->assertNull($service->handleLateDose($onTime, 30));
 
         $alerts = MedicationAlert::query()->where('type', MedicationAlertCatalogue::DOSE_INCIDENT)->orderBy('id')->get();
-        $this->assertSame(['dose-incident:'.$first->id, 'dose-incident:'.$second->id], $alerts->pluck('dedupe_key')->all());
+        $this->assertSame(['doseIncident:dose-incident:'.$first->id, 'doseIncident:dose-incident:'.$second->id], $alerts->pluck('dedupe_key')->all());
         $this->assertSame([$this->person->id, $this->person->id], $alerts->pluck('client_id')->map(fn ($id) => (int) $id)->all());
         $this->assertSame(2, $lead->notifications()->where('data->alert_key', MedicationAlertCatalogue::DOSE_INCIDENT)->count());
         $this->assertSame([MedicationAlertCatalogue::HOUSE_LEAD], MedicationAlertCatalogue::ALERTS[MedicationAlertCatalogue::DOSE_INCIDENT]['default']);
