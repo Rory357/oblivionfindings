@@ -248,4 +248,19 @@ class OverviewBusinessSupportTest extends TestCase
         $this->assertTrue($this->actor('provider_manager')->canDo('operations.dashboard.view'));
         $this->assertFalse($this->actor('provider_manager')->canDo('operations.dashboard.viewAllSites'));
     }
+
+    public function test_sites_that_never_had_the_all_sites_dashboard_permission_get_it(): void
+    {
+        // Deploys skip seeders: a site set up before the key existed has no such permission.
+        DB::table('permissions')->where('key', 'operations.dashboard.viewAllSites')->delete();
+        $this->assertFalse($this->actor('ceo')->canDo('operations.dashboard.viewAllSites'));
+        $migration = require database_path('migrations/2026_10_20_100000_create_operations_dashboard_all_sites_permission.php');
+        $migration->up();
+        $migration->up();
+        $this->assertSame(1, DB::table('permissions')->where('key', 'operations.dashboard.viewAllSites')->count());
+        foreach (['admin', 'ceo', 'coo'] as $role) {
+            $this->assertTrue($this->actor($role)->canDo('operations.dashboard.viewAllSites'), $role);
+        }
+        $this->assertFalse($this->actor('provider_manager')->canDo('operations.dashboard.viewAllSites'));
+    }
 }
