@@ -551,3 +551,18 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
     - compare the 1440 walk shots with the mockups;
     - eMAR vitest and tsc on main;
     - Stephan's site actions.
+- **20 Oct: front end verified, and the 1440 walk compared with the mockups.**
+  - eMAR vitest at main plus the walk fixes (`eb1aee005`): 99 files, 697 tests passed. tsc shows no eMAR errors; the 8 errors are in auth, portal and the Company Hub test.
+  - Walk compared with the P02 mockups. Most gaps were walk-data artefacts: no doses scheduled on the walk date, three sites named "Kōwhai House", and null verified_by.
+  - Three real fixes from Lane C (`718831d67`, front end only):
+    - medicine names no longer carry the dose text;
+    - an empty day reads "No scheduled doses today";
+    - History uses EmptyState and the shared paginator. LaravelPagination gains an optional `onPage`; existing callers are unchanged, and a new test covers both paths.
+## 8 Hand-over: what Stephan does on the test site
+1. Check that `qpdf` is installed on the server. EA-141 personal backup passphrases need it.
+2. Open Medication Settings › Witness PIN and save the PIN rules once.
+3. Run `php artisan db:seed --class=RbacSeeder` once, so the synced eMAR grants reach existing roles. Grant migrations already cover deployed sites; this keeps a reseed consistent.
+4. Optional product questions:
+   - Should the home Overview show medication "due now" and alert counts again?
+   - Should relief workers get overdue alerts before clocking in? Today they can't open the chart until they do.
+5. Parked by design: C5 (clock-out and shift cancellation) and C6 (alert signals) wait until the workforce and Control Room work is finished.
