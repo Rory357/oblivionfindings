@@ -22,7 +22,12 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class RoleScope
 {
-    public function handle(Request $request, Closure $next, string $target = 'my-day'): Response
+    /**
+     * @param  string|null  $alsoAllow  A permission that also passes on this route, e.g. the
+     *                                  operations dashboard for executives who hold it but
+     *                                  manage no rosters (`role_scope:my-day,operations.dashboard.view`).
+     */
+    public function handle(Request $request, Closure $next, string $target = 'my-day', ?string $alsoAllow = null): Response
     {
         $user = $request->user();
 
@@ -44,7 +49,8 @@ class RoleScope
             $user->canDo('timesheets.manageAny') ||
             $user->canDo('timesheets.approve') ||
             $user->canDo('rostering.viewAny') ||
-            $user->canDo('hr.analytics.view');
+            $user->canDo('hr.analytics.view') ||
+            ($alsoAllow !== null && $user->canDo($alsoAllow));
 
         if ($hasManagerCap) {
             return $next($request);
