@@ -45,6 +45,7 @@ type Props = {
     };
     filter: string;
     stats: { pending: number; approved_this_month: number; total: number };
+    can_review?: boolean;
 };
 
 const statusColors: Record<string, string> = {
@@ -66,6 +67,7 @@ export default function VisitRequests({
     requests,
     filter,
     stats,
+    can_review = false,
 }: Props) {
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
@@ -285,54 +287,59 @@ export default function VisitRequests({
                                                 )}
 
                                                 {/* Actions for pending */}
-                                                {req.status === 'pending' && (
-                                                    <div className="mt-3 space-y-2">
-                                                        <Input
-                                                            placeholder="Add a note (optional)..."
-                                                            className="h-8 text-xs"
-                                                            value={
-                                                                reviewNotes[
-                                                                    req.id
-                                                                ] ?? ''
-                                                            }
-                                                            onChange={(e) =>
-                                                                setReviewNotes({
-                                                                    ...reviewNotes,
-                                                                    [req.id]:
-                                                                        e.target
-                                                                            .value,
-                                                                })
-                                                            }
-                                                        />
-                                                        <div className="flex gap-2">
-                                                            <Button
-                                                                size="sm"
-                                                                className="gap-1.5"
-                                                                onClick={() =>
-                                                                    approve(
-                                                                        req.id,
+                                                {can_review &&
+                                                    req.status ===
+                                                        'pending' && (
+                                                        <div className="mt-3 space-y-2">
+                                                            <Input
+                                                                placeholder="Add a note (optional)..."
+                                                                className="h-8 text-xs"
+                                                                value={
+                                                                    reviewNotes[
+                                                                        req.id
+                                                                    ] ?? ''
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setReviewNotes(
+                                                                        {
+                                                                            ...reviewNotes,
+                                                                            [req.id]:
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                        },
                                                                     )
                                                                 }
-                                                            >
-                                                                <Check className="h-3.5 w-3.5" />
-                                                                Approve
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="gap-1.5 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                                                onClick={() =>
-                                                                    decline(
-                                                                        req.id,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <X className="h-3.5 w-3.5" />
-                                                                Decline
-                                                            </Button>
+                                                            />
+                                                            <div className="flex gap-2">
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="gap-1.5"
+                                                                    onClick={() =>
+                                                                        approve(
+                                                                            req.id,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Check className="h-3.5 w-3.5" />
+                                                                    Approve
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="gap-1.5 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
+                                                                    onClick={() =>
+                                                                        decline(
+                                                                            req.id,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <X className="h-3.5 w-3.5" />
+                                                                    Decline
+                                                                </Button>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    )}
                                             </div>
                                         </div>
                                     </CardContent>

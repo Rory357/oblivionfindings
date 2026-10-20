@@ -324,14 +324,16 @@ class ClientConsent extends Model
     }
 
     /**
-     * Check if consent is expiring soon.
+     * Check if consent is expiring soon. Carbon 3's diffInDays() is signed,
+     * so a future expiry gave a negative count and every dated consent read
+     * as expiring soon; compare against the window's end instead.
      */
     public function isExpiringSoon(int $days = 30): bool
     {
         return $this->status === 'given'
             && $this->expires_at
             && $this->expires_at->isFuture()
-            && $this->expires_at->diffInDays(now()) <= $days;
+            && $this->expires_at->lte(now()->addDays($days));
     }
 
     /**

@@ -50,6 +50,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 type Props = {
     client: { id: number; first_name: string; last_name: string };
     pending_visit_count: number;
+    can_view_visit_requests?: boolean;
 };
 
 type ViewKey = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek';
@@ -209,7 +210,11 @@ function renderEventContent(eventInfo: {
     );
 }
 
-export default function ClientCalendar({ client, pending_visit_count }: Props) {
+export default function ClientCalendar({
+    client,
+    pending_visit_count,
+    can_view_visit_requests = false,
+}: Props) {
     const name = `${client.first_name} ${client.last_name}`.trim();
     const calendarRef = useRef<FullCalendar>(null);
     const [currentView, setCurrentView] = useState<ViewKey>('timeGridWeek');
@@ -424,24 +429,26 @@ export default function ClientCalendar({ client, pending_visit_count }: Props) {
                                         Back to Profile
                                     </Link>
                                 </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-start gap-2 text-sm"
-                                    asChild
-                                >
-                                    <Link
-                                        href={`/operations/clients/${client.id}/visit-requests`}
+                                {can_view_visit_requests && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-start gap-2 text-sm"
+                                        asChild
                                     >
-                                        <Users className="h-4 w-4" />
-                                        Visit Requests
-                                        {pending_visit_count > 0 && (
-                                            <span className="ml-auto rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
-                                                {pending_visit_count}
-                                            </span>
-                                        )}
-                                    </Link>
-                                </Button>
+                                        <Link
+                                            href={`/operations/clients/${client.id}/visit-requests`}
+                                        >
+                                            <Users className="h-4 w-4" />
+                                            Visit Requests
+                                            {pending_visit_count > 0 && (
+                                                <span className="ml-auto rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
+                                                    {pending_visit_count}
+                                                </span>
+                                            )}
+                                        </Link>
+                                    </Button>
+                                )}
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -616,20 +623,22 @@ export default function ClientCalendar({ client, pending_visit_count }: Props) {
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                             <span>View Day</span>
                         </Button>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-auto w-full justify-start gap-2 px-3 py-2"
-                            onClick={() => {
-                                setCtxMenu(null);
-                                router.visit(
-                                    `/operations/clients/${client.id}/visit-requests`,
-                                );
-                            }}
-                        >
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>Visit Requests</span>
-                        </Button>
+                        {can_view_visit_requests && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="h-auto w-full justify-start gap-2 px-3 py-2"
+                                onClick={() => {
+                                    setCtxMenu(null);
+                                    router.visit(
+                                        `/operations/clients/${client.id}/visit-requests`,
+                                    );
+                                }}
+                            >
+                                <Users className="h-4 w-4 text-muted-foreground" />
+                                <span>Visit Requests</span>
+                            </Button>
+                        )}
                     </div>
                 )}
 
