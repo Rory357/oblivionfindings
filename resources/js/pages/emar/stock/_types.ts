@@ -129,6 +129,15 @@ export type SupplyOrder = {
     still_to_come?: string | null;
     /** Past its expected delivery, or (undated) the date it was needed by. */
     overdue?: boolean;
+    /** Approved P06 rows: the unit, whole-number quantities and the dates the state lines read. */
+    unit?: string | null;
+    received_display?: string;
+    dispensed_display?: string | null;
+    created_at?: string | null;
+    submitted_at?: string | null;
+    dispensed_at?: string | null;
+    delivered_at?: string | null;
+    closed_at?: string | null;
 };
 export type StockCount = {
     id: number;

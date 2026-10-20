@@ -53,9 +53,9 @@ import {
     NewSupplyOrder,
     SupplyOrderDialog,
 } from './_dialogs';
-import { PharmacyDispatchChip } from './_hub-tables';
 import { StockMeters, type StockMetrics } from './_meters';
 import { ControlledOpeningDialog } from './_opening';
+import { OrdersView } from './_orders-view';
 import { PackPhotoDialog } from './_photo';
 import { ReceiveWizard } from './_receive';
 import { ReceivePicker, receiveBlockedReason } from './_receive-picker';
@@ -623,56 +623,19 @@ export default function StockHub({
                     />
                 )}
                 {filters.view === 'orders' && (
-                    <TableList
-                        title="Deliveries and pharmacy orders"
+                    <OrdersView
                         pager={orders}
-                        name={(order) => order.medication_name}
-                        subline={(order) =>
-                            `${order.client_name} · Order #${order.id}`
-                        }
+                        can={can}
                         open={orderOpen}
+                        receive={(order) =>
+                            setModal({
+                                kind: 'item',
+                                id: order.client_medication_id,
+                                action: 'receive',
+                                order,
+                            })
+                        }
                         actions={orderActions}
-                        columns={[
-                            {
-                                key: 'pharmacy',
-                                label: 'Pharmacy',
-                                width: '1.3fr',
-                                cell: (order) => order.pharmacy_name,
-                            },
-                            {
-                                key: 'qty',
-                                label: 'Received / ordered',
-                                width: '1fr',
-                                cell: (order) =>
-                                    `${Number(order.quantity_received ?? 0)} / ${order.quantity_ordered}`,
-                            },
-                            {
-                                key: 'due',
-                                label: 'Due to arrive',
-                                width: '1fr',
-                                cell: (order) =>
-                                    order.expected_delivery
-                                        ? formatDateOnly(
-                                              order.expected_delivery,
-                                          )
-                                        : 'Not recorded',
-                            },
-                            {
-                                key: 'status',
-                                label: 'Status',
-                                width: '1.1fr',
-                                cell: (order) => (
-                                    <div className="grid justify-items-start gap-1">
-                                        <State value={order.status} />
-                                        {order.dispatch ? (
-                                            <PharmacyDispatchChip
-                                                dispatch={order.dispatch}
-                                            />
-                                        ) : null}
-                                    </div>
-                                ),
-                            },
-                        ]}
                     />
                 )}
                 {filters.view === 'counts' && (

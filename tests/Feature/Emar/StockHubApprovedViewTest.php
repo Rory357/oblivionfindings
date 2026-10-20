@@ -336,4 +336,26 @@ class StockHubApprovedViewTest extends TestCase
         $this->assertFalse($all['Alpha low']['self_managed']);
         $this->assertFalse($all['Delta fine']['self_managed']);
     }
+
+    /**
+     * Approved P06 Deliveries & orders (1440-12): To receive · Waiting on the
+     * pharmacy · Drafts · Closed, so the server keeps each section together
+     * across pages; rows carry the unit, whole-number quantities and the
+     * dates their state lines read.
+     */
+    public function test_deliveries_and_orders_come_in_the_approved_sections_with_units_and_dates(): void
+    {
+        extract($this->house());
+        $cancelled = $this->order($m['fine'], 'cancelled', null, $lead);
+        $cancelled->forceFill(['closure_reason' => 'Synthetic: doctor stopped it', 'closed_at' => now()->subHour()])->save();
+        $rows = collect($this->actingAs($lead)->get('/emar/stock/packs?view=orders')->assertOk()->inertiaProps('orders.data'));
+        $this->assertSame([$o['controlled_due']->id, $o['part']->id, $o['due']->id, $o['submitted']->id, $o['controlled_draft']->id, $o['draft']->id, $cancelled->id],
+            $rows->pluck('id')->all());
+        $part = $rows->firstWhere('id', $o['part']->id);
+        $this->assertSame('tablets', $part['unit']);
+        $this->assertSame('10', $part['received_display']);
+        $this->assertSame('18', $part['still_to_come']);
+        $this->assertNotNull($rows->firstWhere('id', $cancelled->id)['closed_at']);
+        $this->assertArrayHasKey('created_at', $part);
+    }
 }

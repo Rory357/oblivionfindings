@@ -117,7 +117,10 @@ final class StockReadPayload
         ]);
         $orders = MedicationPharmacyOrder::whereIn('client_id', $clientIds)->whereIn('client_medication_id', $medicationIds)
             ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'));
-        $ordersPage = (clone $orders)->when($search !== '', fn ($q) => $q->where(fn ($q) => $q->where('pharmacy_name', 'like', '%'.$search.'%')->orWhereHas('medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%'))))->with(['client', 'medication'])->latest('id')->paginate(25, ['*'], 'orders_page')->withQueryString();
+        $ordersPage = (clone $orders)->when($search !== '', fn ($q) => $q->where(fn ($q) => $q->where('pharmacy_name', 'like', '%'.$search.'%')->orWhereHas('medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%'))))->with(['client', 'medication.stock'])
+            // Approved P06 sections (1440-12): to receive, waiting on the pharmacy, drafts, closed.
+            ->orderByRaw("CASE WHEN status IN ('dispensed', 'part_received') THEN 0 WHEN status IN ('submitted', 'confirmed') THEN 1 WHEN status = 'draft' THEN 2 ELSE 3 END")
+            ->latest('id')->paginate(25, ['*'], 'orders_page')->withQueryString();
         // EA-138 (Lane C, 20 Oct): where each connected pharmacy send stands,
         // on the row, while the pharmacy connection runs (as the Stock overview).
         $dispatches = app(PharmacyPartnerRegistry::class)->enabled()
@@ -271,7 +274,7 @@ final class StockReadPayload
                 ->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', '%'.$search.'%')->orWhere('last_name', 'like', '%'.$search.'%'))));
         $orders = MedicationPharmacyOrder::query()->whereIn('client_id', $clientIds)->whereIn('client_medication_id', (clone $medications)->select('id'))
             ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'))
-            ->whereIn('status', ['dispensed', 'part_received'])->with(['client', 'medication'])
+            ->whereIn('status', ['dispensed', 'part_received'])->with(['client', 'medication.stock'])
             ->orderByRaw('expected_delivery IS NULL')->orderBy('expected_delivery')->orderBy('id')->limit(50)->get();
         $medicines = (clone $medications)->whereNotIn('id', $orders->pluck('client_medication_id')->all())
             ->with(['client.site', 'stock.lots'])->orderBy('name')->orderBy('id')->limit(101)->get();
@@ -298,7 +301,7 @@ final class StockReadPayload
         $orders = MedicationPharmacyOrder::query()->whereIn('client_medication_id', $medicines->pluck('id')->all())
             ->whereIn('status', array_keys($rank))
             ->whereHas('medication', fn ($q) => $q->whereColumn('client_medications.client_id', 'medication_pharmacy_orders.client_id'))
-            ->with(['client', 'medication'])->orderByDesc('id')->get()
+            ->with(['client', 'medication.stock'])->orderByDesc('id')->get()
             ->sortBy(fn ($order) => $rank[$order->status], SORT_REGULAR)
             ->groupBy('client_medication_id')->map->first()->all();
         $stockIds = $medicines->map(fn ($med) => $med->stock?->id)->filter()->values()->all();
@@ -329,7 +332,12 @@ final class StockReadPayload
     {
         return [
             ...$order->only(['id', 'client_medication_id', 'pharmacy_name', 'status', 'quantity_ordered', 'quantity_received', 'quantity_dispensed', 'order_notes',
-                'needed_by', 'expected_delivery', 'communication_method', 'communication_reference', 'communication_recorded_at', 'closure_reason', 'batch_number', 'batch_expiry']),
+                'needed_by', 'expected_delivery', 'communication_method', 'communication_reference', 'communication_recorded_at', 'closure_reason', 'batch_number', 'batch_expiry',
+                'created_at', 'submitted_at', 'dispensed_at', 'delivered_at', 'closed_at']),
+            // Approved P06 rows: the unit and whole-number quantities (MedicationStockQuantity::display).
+            'unit' => $order->medication->stock?->unit,
+            'received_display' => Qty::display($order->quantity_received ?? 0),
+            'dispensed_display' => $order->quantity_dispensed === null ? null : Qty::display($order->quantity_dispensed),
             'medication_name' => $order->medication->name, 'client_name' => $order->client->full_name, 'controlled' => (bool) $order->medication->controlled_drug,
             'overdue' => in_array($order->status, ['submitted', 'confirmed', 'dispensed', 'part_received'], true)
                 && ($order->expected_delivery ? $order->expected_delivery->toDateString() < StockAvailability::today()
