@@ -245,6 +245,10 @@ export default function UserShow({
         Session | 'others' | null
     >(null);
     const [endingSessions, setEndingSessions] = useState(false);
+    const [confirmSuspend, setConfirmSuspend] = useState(false);
+    const [suspending, setSuspending] = useState(false);
+    const [roleToRemove, setRoleToRemove] = useState<Role | null>(null);
+    const [removingRole, setRemovingRole] = useState(false);
     const stats = login_stats ?? {
         this_month: 0,
         last_ip: undefined,
@@ -325,13 +329,7 @@ export default function UserShow({
                                     variant="outline"
                                     dusk="user-suspend-action"
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    onClick={() =>
-                                        router.post(
-                                            `${usersBasePath}/${u.id}/suspend`,
-                                            {},
-                                            { preserveScroll: true },
-                                        )
-                                    }
+                                    onClick={() => setConfirmSuspend(true)}
                                 >
                                     <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />{' '}
                                     Suspend
@@ -597,28 +595,14 @@ export default function UserShow({
                                                         variant="ghost"
                                                         size="icon"
                                                         dusk={`user-role-remove-${role.id}`}
-                                                        onClick={() => {
-                                                            const newIds =
-                                                                Array.from(
-                                                                    assignedIds,
-                                                                ).filter(
-                                                                    (id) =>
-                                                                        id !==
-                                                                        role.id,
-                                                                );
-                                                            router.put(
-                                                                `${usersBasePath}/${u.id}`,
-                                                                {
-                                                                    role_ids:
-                                                                        newIds,
-                                                                },
-                                                                {
-                                                                    preserveScroll: true,
-                                                                },
-                                                            );
-                                                        }}
+                                                        onClick={() =>
+                                                            setRoleToRemove(
+                                                                role,
+                                                            )
+                                                        }
                                                         className="h-7 w-7 rounded text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical"
                                                         title="Remove role"
+                                                        aria-label={`Remove role ${role.label || role.name}`}
                                                     >
                                                         <X className="h-3.5 w-3.5" />
                                                     </Button>
@@ -1081,6 +1065,38 @@ export default function UserShow({
             },
         });
     };
+    const suspendUser = () =>
+        router.post(
+            `${usersBasePath}/${u.id}/suspend`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setSuspending(true),
+                onFinish: () => {
+                    setSuspending(false);
+                    setConfirmSuspend(false);
+                },
+            },
+        );
+    const removeRole = () => {
+        if (roleToRemove === null) return;
+        router.put(
+            `${usersBasePath}/${u.id}`,
+            {
+                role_ids: Array.from(assignedIds).filter(
+                    (id) => id !== roleToRemove.id,
+                ),
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setRemovingRole(true),
+                onFinish: () => {
+                    setRemovingRole(false);
+                    setRoleToRemove(null);
+                },
+            },
+        );
+    };
     const sessionDevice =
         sessionsToEnd !== null && sessionsToEnd !== 'others'
             ? parseBrowser(sessionsToEnd.user_agent)
@@ -1120,6 +1136,39 @@ export default function UserShow({
                 confirmText={endSessionsCopy.confirmText}
                 variant="destructive"
                 processing={endingSessions}
+            />
+            <ConfirmDialog
+                open={confirmSuspend}
+                onClose={() => {
+                    if (!suspending) setConfirmSuspend(false);
+                }}
+                onConfirm={suspendUser}
+                title={`Suspend ${u.name ?? 'this user'}?`}
+                description={`${u.name ?? 'This user'} will be signed out the next time they use the app and can't sign in again until someone approves their account. Their records and roles are kept.`}
+                confirmText="Suspend user"
+                variant="destructive"
+                processing={suspending}
+            />
+            <ConfirmDialog
+                open={roleToRemove !== null}
+                onClose={() => {
+                    if (!removingRole) setRoleToRemove(null);
+                }}
+                onConfirm={removeRole}
+                title="Remove this role?"
+                description={
+                    <>
+                        {u.name ?? 'This user'} loses the access that comes with{' '}
+                        <span className="font-medium text-foreground">
+                            {roleToRemove?.label || roleToRemove?.name}
+                        </span>{' '}
+                        straight away, unless another of their roles also gives
+                        it. You can add the role back at any time.
+                    </>
+                }
+                confirmText="Remove role"
+                variant="destructive"
+                processing={removingRole}
             />
         </AppLayout>
     );

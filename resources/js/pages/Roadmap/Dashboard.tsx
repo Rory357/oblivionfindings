@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -513,6 +514,12 @@ export default function RoadmapDashboard({
     const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
     const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
     const [suggestionNotesDraft, setSuggestionNotesDraft] = useState('');
+    // A reject the manager asked for, waiting on the confirmation dialog.
+    const [pendingReject, setPendingReject] = useState<
+        | { kind: 'suggestion'; id: number; title: string; notes: string }
+        | { kind: 'decision'; id: number; type: string }
+        | null
+    >(null);
     const [showTechnicalPayload, setShowTechnicalPayload] = useState(false);
     const planDetailSectionRef = useRef<HTMLDivElement | null>(null);
     const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(
@@ -1016,6 +1023,11 @@ export default function RoadmapDashboard({
         },
         [can.manageDecisions, refreshAll],
     );
+
+    const rejectInFlight =
+        pendingReject !== null &&
+        actionLoadingKey ===
+            `${pendingReject.kind}:${pendingReject.id}:rejected`;
 
     const generatePlan = useCallback(async () => {
         if (!can.manageRoadmap) {
@@ -2380,9 +2392,14 @@ export default function RoadmapDashboard({
                                                             size="sm"
                                                             variant="outline"
                                                             onClick={() =>
-                                                                void resolveDecision(
-                                                                    decision.id,
-                                                                    'rejected',
+                                                                setPendingReject(
+                                                                    {
+                                                                        kind: 'decision',
+                                                                        id: decision.id,
+                                                                        type: statusLabel(
+                                                                            decision.request_type,
+                                                                        ),
+                                                                    },
                                                                 )
                                                             }
                                                             disabled={
@@ -2893,11 +2910,12 @@ export default function RoadmapDashboard({
                                             <Button
                                                 variant="outline"
                                                 onClick={() =>
-                                                    void triageSuggestion(
-                                                        selectedSuggestion.id,
-                                                        'rejected',
-                                                        suggestionNotesDraft,
-                                                    )
+                                                    setPendingReject({
+                                                        kind: 'suggestion',
+                                                        id: selectedSuggestion.id,
+                                                        title: selectedSuggestion.title,
+                                                        notes: suggestionNotesDraft,
+                                                    })
                                                 }
                                                 disabled={
                                                     actionLoadingKey ===
@@ -2925,6 +2943,59 @@ export default function RoadmapDashboard({
                         )}
                     </DialogContent>
                 </Dialog>
+
+                <ConfirmDialog
+                    open={pendingReject !== null}
+                    onClose={() => {
+                        if (!rejectInFlight) setPendingReject(null);
+                    }}
+                    onConfirm={() => {
+                        if (!pendingReject) return;
+                        const request =
+                            pendingReject.kind === 'suggestion'
+                                ? triageSuggestion(
+                                      pendingReject.id,
+                                      'rejected',
+                                      pendingReject.notes,
+                                  )
+                                : resolveDecision(pendingReject.id, 'rejected');
+                        void request.finally(() => setPendingReject(null));
+                    }}
+                    title={
+                        pendingReject?.kind === 'decision'
+                            ? 'Reject this decision request?'
+                            : 'Reject this suggestion?'
+                    }
+                    description={
+                        pendingReject?.kind === 'decision' ? (
+                            <>
+                                This{' '}
+                                <span className="font-medium text-foreground">
+                                    {pendingReject.type}
+                                </span>{' '}
+                                request is closed as rejected and leaves the
+                                pending list. If it is linked to a board
+                                resolution that is still open, that resolution
+                                is cancelled too.
+                            </>
+                        ) : (
+                            <>
+                                <span className="font-medium text-foreground">
+                                    {pendingReject?.title}
+                                </span>{' '}
+                                is marked rejected and leaves the triage list.
+                                Any notes you typed are saved with it.
+                            </>
+                        )
+                    }
+                    confirmText={
+                        pendingReject?.kind === 'decision'
+                            ? 'Reject request'
+                            : 'Reject suggestion'
+                    }
+                    variant="destructive"
+                    processing={rejectInFlight}
+                />
             </PageLayout>
         </AppLayout>
     );

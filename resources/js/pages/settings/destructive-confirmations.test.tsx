@@ -30,7 +30,9 @@ const router = vi.hoisted(() => {
         put: vi.fn((_url: string, _data: unknown, options?: VisitOptions) =>
             settle(options),
         ),
-        post: vi.fn(),
+        post: vi.fn((_url: string, _data: unknown, options?: VisitOptions) =>
+            settle(options),
+        ),
     };
 });
 
@@ -61,8 +63,16 @@ vi.mock('@/layouts/settings/layout', () => ({
     default: ({ children }: PropsWithChildren) => <>{children}</>,
 }));
 vi.mock('@/components/page', () => ({
-    PageHero: () => null,
-    PageLayout: ({ children }: PropsWithChildren) => <>{children}</>,
+    PageHero: ({ actions }: { actions?: ReactNode }) => <>{actions}</>,
+    PageLayout: ({
+        hero,
+        children,
+    }: PropsWithChildren<{ hero?: ReactNode }>) => (
+        <>
+            {hero}
+            {children}
+        </>
+    ),
 }));
 vi.mock('@/routes/two-factor', () => {
     const route = (url: string) =>
@@ -241,6 +251,141 @@ describe('System › Users: end sessions', () => {
         );
 
         expect(router.delete).not.toHaveBeenCalled();
+    });
+
+    it('ends all of the sessions once confirmed', async () => {
+        openSessionsTab();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: /Terminate All Other Sessions/,
+            }),
+        );
+
+        expect(router.delete).not.toHaveBeenCalled();
+        expect(dialog()).toHaveTextContent(
+            'Mere Tane will be signed out on every device straight away',
+        );
+
+        fireEvent.click(
+            within(dialog()).getByRole('button', { name: 'End all sessions' }),
+        );
+
+        expect(router.delete).toHaveBeenCalledTimes(1);
+        expect(router.delete).toHaveBeenCalledWith(
+            '/system/users/7/sessions',
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+    });
+
+    it('keeps this device signed in when an admin ends their own other sessions', () => {
+        page.props = { auth: { user: { id: 7 } } };
+        render(<UserShow user={user} active_sessions={sessions} />);
+        fireEvent.mouseDown(screen.getByRole('tab', { name: 'Sessions' }));
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: /Terminate All Other Sessions/,
+            }),
+        );
+
+        expect(
+            within(dialog()).getByText('End all your other sessions?'),
+        ).toBeInTheDocument();
+        expect(dialog()).toHaveTextContent('This device stays signed in.');
+        fireEvent.click(
+            within(dialog()).getByRole('button', {
+                name: 'End other sessions',
+            }),
+        );
+
+        expect(router.delete).toHaveBeenCalledWith(
+            '/system/users/7/sessions',
+            expect.anything(),
+        );
+    });
+});
+
+describe('System › Users: suspend and remove role', () => {
+    const roles = [
+        { id: 3, name: 'manager', label: 'Manager' },
+        { id: 4, name: 'support_worker', label: 'Support worker' },
+    ];
+    const user = {
+        id: 7,
+        name: 'Mere Tane',
+        email: 'mere@example.test',
+        is_active: true,
+        roles,
+    };
+
+    beforeEach(() => {
+        page.props = { auth: { user: { id: 1 } } };
+    });
+
+    it('asks before suspending, then suspends that user', async () => {
+        render(<UserShow user={user} allRoles={roles} />);
+        fireEvent.click(screen.getByRole('button', { name: /Suspend/ }));
+
+        expect(router.post).not.toHaveBeenCalled();
+        expect(
+            within(dialog()).getByText('Suspend Mere Tane?'),
+        ).toBeInTheDocument();
+        expect(dialog()).toHaveTextContent(
+            "can't sign in again until someone approves their account",
+        );
+
+        fireEvent.click(
+            within(dialog()).getByRole('button', { name: 'Suspend user' }),
+        );
+
+        expect(router.post).toHaveBeenCalledWith(
+            '/system/users/7/suspend',
+            {},
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+    });
+
+    it('asks before removing a role, then keeps every other role', async () => {
+        render(<UserShow user={user} allRoles={roles} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Remove role Manager' }),
+        );
+
+        expect(router.put).not.toHaveBeenCalled();
+        expect(within(dialog()).getByText('Remove this role?')).toBeInTheDocument();
+        expect(dialog()).toHaveTextContent(
+            'Mere Tane loses the access that comes with Manager',
+        );
+
+        fireEvent.click(
+            within(dialog()).getByRole('button', { name: 'Remove role' }),
+        );
+
+        expect(router.put).toHaveBeenCalledWith(
+            '/system/users/7',
+            { role_ids: [4] },
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+    });
+
+    it('keeps the role when the admin cancels', () => {
+        render(<UserShow user={user} allRoles={roles} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Remove role Manager' }),
+        );
+        fireEvent.click(
+            within(dialog()).getByRole('button', { name: 'Cancel' }),
+        );
+
+        expect(router.put).not.toHaveBeenCalled();
     });
 });
 
