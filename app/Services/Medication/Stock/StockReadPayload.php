@@ -165,6 +165,7 @@ final class StockReadPayload
         return [
             'items' => $items, 'orders' => $ordersPage, 'counts' => $countsPage, 'movements' => $movements, 'focused_count' => $focusedCount,
             'focused_lot_id' => $lotId, 'item_people' => $itemPeople,
+            'expiry_packs' => in_array($view, ['expiring', 'removals'], true) ? $this->expiryPacks($lots, $today, $search, $view === 'removals') : ['data' => [], 'more' => false],
             'sites' => $this->scope->sitePicker($allSites)->map->only(['id', 'name']),
             'pharmacies' => (clone $orders)->distinct()->orderBy('pharmacy_name')->pluck('pharmacy_name')->filter()->values(),
             'filters' => ['view' => $view, 'search' => $search, 'site_id' => $site, 'client_id' => $clientId, 'show' => $show, 'medication_id' => $medicineId, 'lot_id' => $lotId],
@@ -328,6 +329,30 @@ final class StockReadPayload
         $modes = app(MedicationSupport::class)->modes($medications->get(['id', 'client_id']));
 
         return array_keys(array_filter($modes, fn (string $mode): bool => $mode === 'self_managed'));
+    }
+
+    /**
+     * Approved P06 Expiring (1440-15) and Removals' "To remove" (1440-16): open
+     * packs past, or within 30 days of, their expiry — soonest first, in the
+     * list's scope — with the days to go and whole-number quantities.
+     *
+     * @return array{data: list<array<string, mixed>>, more: bool}
+     */
+    private function expiryPacks($lots, string $today, string $search, bool $expiredOnly): array
+    {
+        $rows = (clone $lots)->where('state', 'open')->where('quantity_remaining', '>', 0)->whereNotNull('expiry_date')
+            ->where('expiry_date', $expiredOnly ? '<' : '<=', $expiredOnly ? $today : CarbonImmutable::parse($today)->addDays(30)->toDateString())
+            ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w->where('batch_number', 'like', '%'.$search.'%')
+                ->orWhereHas('stock.medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%'))))
+            ->with('stock.medication.client')->orderBy('expiry_date')->orderBy('id')->limit(201)->get();
+
+        return ['data' => $rows->take(200)->map(fn ($lot) => [
+            'id' => (int) $lot->id, 'medication_id' => (int) $lot->stock->client_medication_id, 'medication_name' => $lot->stock->medication->name,
+            'client_name' => $lot->stock->medication->client->full_name, 'controlled' => (bool) $lot->stock->medication->controlled_drug,
+            'batch_number' => $lot->batch_number, 'expiry_date' => $lot->expiry_date->toDateString(),
+            'days' => (int) CarbonImmutable::parse($today)->diffInDays(CarbonImmutable::parse($lot->expiry_date->toDateString()), false),
+            'quantity' => Qty::display($lot->quantity_remaining), 'unit' => $lot->stock->unit,
+        ])->values()->all(), 'more' => $rows->count() > 200];
     }
 
     private function orderRow(MedicationPharmacyOrder $order): array

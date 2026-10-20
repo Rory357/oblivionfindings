@@ -216,3 +216,18 @@ export type LatestPackPhoto = {
     now_pack?: string | null;
     source?: string | null;
 };
+/** Approved P06 Expiring and Removals: an open pack past, or within 30 days of, its expiry. */
+export type ExpiryPack = {
+    id: number;
+    medication_id: number;
+    medication_name: string;
+    client_name: string;
+    controlled: boolean;
+    batch_number: string | null;
+    expiry_date: string;
+    /** Days from today (NZ) to the expiry; negative once expired. */
+    days: number;
+    /** MedicationStockQuantity::display. */
+    quantity: string;
+    unit: string | null;
+};

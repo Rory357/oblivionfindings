@@ -107,7 +107,8 @@ afterEach(() => {
 });
 
 describe('Stock pictures load for the opened medicine', () => {
-    it.each(['stock', 'expiring'] as const)(
+    // The approved Expiring view lists packs, not medicines (P06 1440-15).
+    it.each(['stock'] as const)(
         '%s keeps 25 rows compact and fetches only the opened medicine picture',
         async (view) => {
             showStock(view);

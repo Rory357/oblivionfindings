@@ -385,4 +385,26 @@ class StockHubApprovedViewTest extends TestCase
         $this->assertSame($lead->name, $signed['reviewed_by_name']);
         $this->assertNotNull($signed['reviewed_at']);
     }
+
+    /**
+     * Approved P06 Expiring (1440-15) and Removals' "To remove" (1440-16):
+     * the open packs past or within 30 days of their expiry, soonest first, in
+     * the list's scope, with days to go and whole-number quantities.
+     */
+    public function test_expiring_lists_the_packs_due_and_removals_the_expired_ones_still_held(): void
+    {
+        extract($this->house());
+        $packs = $this->actingAs($lead)->get('/emar/stock/packs?view=expiring')->assertOk()->inertiaProps('expiry_packs');
+        $this->assertSame(['Charlie expired', 'Bravo expiring', 'Echo controlled'], array_column($packs['data'], 'medication_name'));
+        $this->assertSame([-19, 16, 21], array_column($packs['data'], 'days'));
+        $this->assertSame(['6', '10', '2'], array_column($packs['data'], 'quantity'));
+        $this->assertSame(['SYN-CHA', '2026-10-01', 'tablets'], [$packs['data'][0]['batch_number'], $packs['data'][0]['expiry_date'], $packs['data'][0]['unit']]);
+        $this->assertFalse($packs['more']);
+
+        $this->assertSame(['Charlie expired', 'Bravo expiring'],
+            array_column($this->actingAs($reader)->get('/emar/stock/packs?view=expiring')->assertOk()->inertiaProps('expiry_packs.data'), 'medication_name'));
+        $this->assertSame(['Charlie expired'],
+            array_column($this->actingAs($lead)->get('/emar/stock/packs?view=removals')->assertOk()->inertiaProps('expiry_packs.data'), 'medication_name'));
+        $this->assertSame([], $this->get('/emar/stock/packs')->assertOk()->inertiaProps('expiry_packs.data'));
+    }
 }

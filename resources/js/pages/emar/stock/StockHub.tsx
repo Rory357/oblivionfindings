@@ -54,6 +54,7 @@ import {
     NewSupplyOrder,
     SupplyOrderDialog,
 } from './_dialogs';
+import { ExpiringView } from './_expiring-view';
 import { StockMeters, type StockMetrics } from './_meters';
 import { ControlledOpeningDialog } from './_opening';
 import { OrdersView } from './_orders-view';
@@ -66,6 +67,7 @@ import { stockCaption, stockColumns } from './_stock-columns';
 import { TableList } from './_table-list';
 import type {
     Capabilities,
+    ExpiryPack,
     ItemDetail,
     Movement,
     Pager,
@@ -160,6 +162,8 @@ type Props = {
     controlled_left_out?: boolean;
     /** People across the whole stock list, for "n shown · n people". */
     item_people?: number;
+    /** Approved P06 Expiring and Removals: packs past or near their expiry. */
+    expiry_packs?: { data: ExpiryPack[]; more: boolean };
     can: Capabilities;
     lots_enabled: boolean;
     selected_client?: { id: number; name: string } | null;
@@ -198,6 +202,7 @@ export default function StockHub({
     focused_count = null,
     controlled_left_out = false,
     item_people,
+    expiry_packs = { data: [], more: false },
 }: Props) {
     // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
     const breadcrumbs = useEmarBreadcrumbs();
@@ -232,6 +237,7 @@ export default function StockHub({
                 'movements',
                 'metrics',
                 'item_people',
+                'expiry_packs',
                 'pharmacies',
             ],
             preserveScroll: true,
@@ -563,13 +569,28 @@ export default function StockHub({
                         this list. The counts cover visible medicines.
                     </p>
                 )}
-                {['stock', 'expiring'].includes(filters.view) && (
+                {filters.view === 'expiring' && (
+                    <ExpiringView
+                        packs={expiry_packs.data}
+                        more={expiry_packs.more}
+                        can={can}
+                        open={(pack) =>
+                            setModal({ kind: 'item', id: pack.medication_id })
+                        }
+                        remove={(pack) =>
+                            setModal({
+                                kind: 'item',
+                                id: pack.medication_id,
+                                action: 'move',
+                            })
+                        }
+                    />
+                )}
+                {filters.view === 'stock' && (
                     <TableList
                         title={
-                            filters.view === 'expiring'
-                                ? 'Packs needing an expiry check'
-                                : (SHOW_TITLES[filters.show ?? 'all'] ??
-                                  'Medicines held')
+                            SHOW_TITLES[filters.show ?? 'all'] ??
+                            'Medicines held'
                         }
                         caption={stockCaption(
                             items,
