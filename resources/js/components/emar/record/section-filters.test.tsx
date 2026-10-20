@@ -285,3 +285,43 @@ describe('record section filters, remaining P02 set (Lane C9f)', () => {
         );
     });
 });
+
+describe('medicine names on the record (1440 walk)', () => {
+    const losartan = medicine({
+        id: 9,
+        name: 'Losartan 50 mg tablet',
+        strength: '1 tablet (50 mg)',
+        amount: '1 tablet',
+    });
+
+    it('names a medicine without its prescribed dose text', async () => {
+        serve({ rows: [losartan], hidden: 0 });
+        render(
+            <MedicinesSection
+                clientId={7}
+                stopped={false}
+                search=""
+                onMedicine={vi.fn()}
+            />,
+        );
+        expect(
+            (await screen.findAllByText('Losartan 50 mg tablet')).length,
+        ).toBeGreaterThan(0);
+        expect(screen.queryByText(/Losartan 50 mg tablet 1 tablet/)).toBeNull();
+    });
+
+    it('still finds a medicine by its prescribed dose text', async () => {
+        serve({ rows: [losartan], hidden: 0 });
+        render(
+            <MedicinesSection
+                clientId={7}
+                stopped={false}
+                search="(50 mg)"
+                onMedicine={vi.fn()}
+            />,
+        );
+        expect(
+            (await screen.findAllByText('Losartan 50 mg tablet')).length,
+        ).toBeGreaterThan(0);
+    });
+});
