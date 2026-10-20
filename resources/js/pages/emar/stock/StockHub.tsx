@@ -30,12 +30,14 @@ import { medicationReturnParams } from '@/lib/medication-navigation';
 import { Head, router } from '@inertiajs/react';
 import {
     ArrowLeftRight,
+    CalendarClock,
     Camera,
     ClipboardCheck,
     Clock,
     Eye,
     Package,
     PackageCheck,
+    PackageMinus,
     Pill,
     ShieldCheck,
     Truck,
@@ -57,6 +59,7 @@ import { ControlledOpeningDialog } from './_opening';
 import { PackPhotoDialog } from './_photo';
 import { ReceiveWizard } from './_receive';
 import { ReceivePicker, receiveBlockedReason } from './_receive-picker';
+import { RecentMovements } from './_recent-movements';
 import { useStockCommand } from './_requests';
 import { TableList } from './_table-list';
 import type {
@@ -354,9 +357,8 @@ export default function StockHub({
             icon: ClipboardCheck,
             count: metrics.counts || undefined,
         },
-        { key: 'expiring' as const, label: 'Expiring', icon: Package },
-        { key: 'removals' as const, label: 'Removals', icon: Package },
-        { key: 'movements' as const, label: 'Movements', icon: ArrowLeftRight },
+        { key: 'expiring' as const, label: 'Expiring', icon: CalendarClock },
+        { key: 'removals' as const, label: 'Removals', icon: PackageMinus },
         ...(can.controlled
             ? [
                   {
@@ -511,7 +513,13 @@ export default function StockHub({
                     rail={
                         <PageHeaderRail
                             items={rail}
-                            value={filters.view}
+                            // All movements (?view=movements) sits under Stock.
+                            value={
+                                filters.view === 'movements'
+                                    ? 'stock'
+                                    : filters.view
+                            }
+                            ariaLabel="Stock views"
                             onSelect={(view) =>
                                 view === 'controlled'
                                     ? router.visit('/emar/controlled')
@@ -601,6 +609,19 @@ export default function StockHub({
                                 ),
                             },
                         ]}
+                    />
+                )}
+                {filters.view === 'stock' && (
+                    <RecentMovements
+                        moves={movements.data}
+                        label={(move) =>
+                            moveLabels[move.kind] ??
+                            move.kind.replaceAll('_', ' ')
+                        }
+                        open={(move) =>
+                            setModal({ kind: 'item', id: move.medication_id })
+                        }
+                        viewAll={() => visit({ view: 'movements' })}
                     />
                 )}
                 {filters.view === 'orders' && (
@@ -705,7 +726,7 @@ export default function StockHub({
                         title={
                             filters.view === 'removals'
                                 ? 'Removed or taken out of use'
-                                : 'Recent movements'
+                                : 'All movements'
                         }
                         pager={movements}
                         name={(move) => move.medication_name}
