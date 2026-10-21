@@ -75,7 +75,9 @@ describe('Stock hub meters (P06)', () => {
         const buttons = labels.map(meter);
         buttons.forEach((button) => expect(button).not.toBeNull());
         const positions = buttons.map((button) =>
-            Array.from(document.querySelectorAll('button')).indexOf(button),
+            Array.from(
+                document.querySelectorAll<HTMLElement>('button'),
+            ).indexOf(button),
         );
         expect(positions).toEqual([...positions].sort((a, b) => a - b));
         expect(meter('Running low')).toHaveTextContent('2');
