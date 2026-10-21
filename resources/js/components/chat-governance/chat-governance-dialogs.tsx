@@ -29,7 +29,7 @@ const dialogs: Record<
     investigation: {
         title: 'Authorised investigation access',
         description:
-            'Open one private staff conversation, read-only, for a recorded case.',
+            'Open private staff conversations, read-only, for a recorded case.',
         icon: ShieldCheck,
         width: 720,
     },

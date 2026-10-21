@@ -116,10 +116,7 @@ if (typeof window !== 'undefined') {
     window.addEventListener('keydown', mark, { capture: true, passive: true });
 }
 
-export async function chatRequest<T>(
-    path: string,
-    options: ChatRequestOptions = {},
-): Promise<T> {
+function chatRequestHeaders(options: ChatRequestOptions) {
     const token = document.cookie
         .split('; ')
         .find((part) => part.startsWith('XSRF-TOKEN='))
@@ -136,6 +133,14 @@ export async function chatRequest<T>(
     if (meta) headers.set('X-CSRF-TOKEN', meta);
     if (options.body && !(options.body instanceof FormData))
         headers.set('Content-Type', 'application/json');
+    return headers;
+}
+
+export async function chatRequest<T>(
+    path: string,
+    options: ChatRequestOptions = {},
+): Promise<T> {
+    const headers = chatRequestHeaders(options);
     if (options.body instanceof FormData && options.onUploadProgress)
         return uploadRequest<T>(path, options, headers);
     const requestOptions = { ...options };
@@ -156,6 +161,41 @@ export async function chatRequest<T>(
     }
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
+}
+
+export type ChatFileResponse = {
+    blob: Blob;
+    filename: string | null;
+    headers: Headers;
+};
+
+/** A request answered with a file (for example a logged export); errors still arrive as JSON. */
+export async function chatFileRequest(
+    path: string,
+    options: ChatRequestOptions = {},
+): Promise<ChatFileResponse> {
+    const headers = chatRequestHeaders(options);
+    // JSON first, so refusals and validation errors come back as JSON.
+    headers.set('Accept', 'application/json, application/pdf');
+    const requestOptions = { ...options };
+    delete requestOptions.onUploadProgress;
+    const response = await fetch(path, {
+        ...requestOptions,
+        headers,
+        credentials: 'same-origin',
+        cache: 'no-store',
+    });
+    if (!response.ok) {
+        const result = (await response.json().catch(() => ({}))) as {
+            message?: string;
+            code?: string;
+            errors?: Record<string, string[]>;
+        };
+        throw responseError(response.status, result);
+    }
+    const disposition = response.headers.get('Content-Disposition') ?? '';
+    const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? null;
+    return { blob: await response.blob(), filename, headers: response.headers };
 }
 
 export const conversationPath = (id: number) => `/chat/api/conversations/${id}`;

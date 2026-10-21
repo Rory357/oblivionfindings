@@ -51,17 +51,22 @@ it('tells a settings administrator that investigation needs the restricted role 
     expect(chatRequest).not.toHaveBeenCalled();
 });
 
-it('requires a case, a reason and one conversation before logging bound case access', async () => {
+it('requires a case, a reason and at least one conversation before logging bound case access', async () => {
     vi.mocked(chatRequest).mockImplementation(async (path: string) => {
         if (path.includes('/conversations?q='))
             return { conversations: [conversation] };
         if (path.endsWith('/grants'))
-            return { grant_id: 9, url: '/settings/chat/investigations/9' };
+            return {
+                grant_id: 9,
+                grant_ids: [9],
+                url: '/settings/chat/investigations/9',
+            };
         return {
             grants: [
                 {
                     id: 9,
                     case_reference: 'HR-14',
+                    case_batch: 'b-1',
                     conversation,
                     expires_at: '2026-10-21T00:00:00.000Z',
                     revoked_at: null,
@@ -87,7 +92,7 @@ it('requires a case, a reason and one conversation before logging bound case acc
     });
     fireEvent.click(screen.getByRole('button', { name: /Find/ }));
     fireEvent.click(
-        await screen.findByRole('button', {
+        await screen.findByRole('checkbox', {
             name: /Direct chat · Alex Morgan, Sam Lee/,
         }),
     );
@@ -101,7 +106,7 @@ it('requires a case, a reason and one conversation before logging bound case acc
     const [, options] = call!;
     expect(new Headers(options?.headers).get('X-Chat-Actor')).toBe('7');
     expect(JSON.parse(String(options?.body))).toEqual({
-        conversation_id: 41,
+        conversation_ids: [41],
         case_reference: 'HR-14',
         reason: 'Complaint about night shift messages',
         duration_hours: 24,
@@ -270,10 +275,12 @@ it('renders the investigation view read-only without sending anything on open', 
         grant: {
             id: 9,
             case_reference: 'HR-14',
+            case_batch: null,
             reason: 'Formal complaint',
             expires_at: '2026-10-21T00:00:00.000Z',
         },
         conversation: { ...conversation, held: true },
+        case_conversations: [{ grant_id: 9, conversation, active: false }],
         holds: [
             {
                 id: 3,
@@ -327,5 +334,7 @@ it('renders the investigation view read-only without sending anything on open', 
     expect(screen.getByText('Original wording')).toBeTruthy();
     expect(screen.getByText('roster.pdf')).toBeTruthy();
     expect(screen.queryByRole('textbox')).toBeNull();
+    // Access ended before this render: no export is offered.
+    expect(screen.queryByRole('button', { name: /Export PDF/ })).toBeNull();
     expect(chatRequest).not.toHaveBeenCalled();
 });
