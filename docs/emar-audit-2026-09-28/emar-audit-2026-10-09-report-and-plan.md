@@ -590,3 +590,11 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Gates: c6a 137, c6b 159.
   - Deferred: outbox and retry for other Control Room delivery failures.
 - **21 Oct: heavy-lock floor.** The floor is now read from `~/.claude/heavy-lock-floor-mb`. It is temporarily 5120 MB (Stephan) while other sessions pause for eMAR; restore it to 5632 when eMAR is done.
+- **21 Oct: C5 LIVE, `cfbb53075`.**
+  - Clock-out counts only doses that are due and that the worker leaving can record, and a forced clock-out hands doses over.
+  - A handover CD discrepancy creates a lead follow-up, with a controlled floor.
+  - Shift cancellation no longer rewrites dose records; each recorded dose gets one lead review.
+  - Gates: 150, and 261 with 1 failure that predates C5.
+  - Follow-up (Lane A, `claude/emar-c5b`):
+    - the stale architecture test line;
+    - ShiftSeriesController::cancelFuture and RespiteShiftSync bypass the review and use a UTC day boundary.
