@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { PresenceBadge, PresenceDot } from '@/components/presence-dot';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -178,6 +179,26 @@ export default function PortalMessages({
         senderName: string;
         content: string;
     } | null>(null);
+    // Delete in the message menu only opens the confirmation; the request is
+    // sent from its confirm button.
+    const [messageToDelete, setMessageToDelete] = useState<number | null>(
+        null,
+    );
+    const [deletingMessage, setDeletingMessage] = useState(false);
+    const deleteMessage = useCallback(() => {
+        if (messageToDelete === null) return;
+        router.delete(
+            `/portal/clients/${client.id}/messages/archive/${messageToDelete}`,
+            {
+                preserveScroll: true,
+                onStart: () => setDeletingMessage(true),
+                onFinish: () => {
+                    setDeletingMessage(false);
+                    setMessageToDelete(null);
+                },
+            },
+        );
+    }, [client.id, messageToDelete]);
     const dragCounter = useRef(0);
     const [activeMessages, setActiveMessages] = useState<Message[]>(
         propMsgs ?? [],
@@ -1533,19 +1554,10 @@ export default function PortalMessages({
                                             variant="ghost"
                                             className="h-auto w-full justify-start gap-3 rounded-lg px-3 py-2 text-sm text-status-critical hover:bg-status-critical-bg dark:hover:bg-status-critical"
                                             onClick={() => {
-                                                if (
-                                                    ctxMenu.messageId &&
-                                                    confirm(
-                                                        'Delete this message? It will show as "deleted" but data is kept for auditing.',
-                                                    )
-                                                ) {
-                                                    router.delete(
-                                                        `/portal/clients/${client.id}/messages/archive/${ctxMenu.messageId}`,
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
+                                                if (ctxMenu.messageId)
+                                                    setMessageToDelete(
+                                                        ctxMenu.messageId,
                                                     );
-                                                }
                                                 setCtxMenu(null);
                                             }}
                                         >
@@ -1741,6 +1753,19 @@ export default function PortalMessages({
                         </div>
                     </DialogContent>
                 </Dialog>
+
+                <ConfirmDialog
+                    open={messageToDelete !== null}
+                    onClose={() => {
+                        if (!deletingMessage) setMessageToDelete(null);
+                    }}
+                    onConfirm={deleteMessage}
+                    title="Delete this message?"
+                    description="Everyone in this chat will see “This message was deleted” instead. A copy is still kept on file, and you can’t undo this."
+                    confirmText="Delete message"
+                    variant="destructive"
+                    processing={deletingMessage}
+                />
             </PageLayout>
         </AppLayout>
     );

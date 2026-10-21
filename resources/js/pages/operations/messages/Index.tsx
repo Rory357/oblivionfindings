@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -219,6 +220,23 @@ export default function MessagesChat({
         senderName: string;
         content: string;
     } | null>(null);
+    // Delete in the message menu only opens the confirmation; the request is
+    // sent from its confirm button.
+    const [messageToDelete, setMessageToDelete] = useState<number | null>(
+        null,
+    );
+    const [deletingMessage, setDeletingMessage] = useState(false);
+    const deleteMessage = useCallback(() => {
+        if (messageToDelete === null) return;
+        router.delete(`/operations/messages/archive/${messageToDelete}`, {
+            preserveScroll: true,
+            onStart: () => setDeletingMessage(true),
+            onFinish: () => {
+                setDeletingMessage(false);
+                setMessageToDelete(null);
+            },
+        });
+    }, [messageToDelete]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -1406,17 +1424,10 @@ export default function MessagesChat({
                                         variant="ghost"
                                         className="h-auto w-full justify-start gap-3 rounded-lg px-3 py-2 text-sm text-status-critical hover:bg-status-critical-bg dark:hover:bg-status-critical"
                                         onClick={() => {
-                                            if (
-                                                ctxMenu.messageId &&
-                                                confirm(
-                                                    'Delete this message? It will show as "deleted" but data is kept for auditing.',
-                                                )
-                                            ) {
-                                                router.delete(
-                                                    `/operations/messages/archive/${ctxMenu.messageId}`,
-                                                    { preserveScroll: true },
+                                            if (ctxMenu.messageId)
+                                                setMessageToDelete(
+                                                    ctxMenu.messageId,
                                                 );
-                                            }
                                             setCtxMenu(null);
                                         }}
                                     >
@@ -1444,6 +1455,19 @@ export default function MessagesChat({
                     )}
                 </div>
             )}
+
+            <ConfirmDialog
+                open={messageToDelete !== null}
+                onClose={() => {
+                    if (!deletingMessage) setMessageToDelete(null);
+                }}
+                onConfirm={deleteMessage}
+                title="Delete this message?"
+                description="Everyone in this conversation will see “This message was deleted” in its place. A copy is still kept in the organisation’s records, and you can’t undo this."
+                confirmText="Delete message"
+                variant="destructive"
+                processing={deletingMessage}
+            />
         </AppLayout>
     );
 }

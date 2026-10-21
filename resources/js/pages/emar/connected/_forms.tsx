@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { SettingsNotice } from '@/components/settings/settings-notice';
@@ -518,59 +519,91 @@ export function RevokeAccess({
     const command = useCommand();
     const [reason, setReason] = useState('');
     const [saved, setSaved] = useState(false);
+    // Neither withdrawal can be reversed in the app (ExternalClinicalAccess::
+    // revokeIdentity / revokeGrant), so the wizard's last button asks first
+    // (GOOD-CATCHES §3, eMAR row 204).
+    const [confirming, setConfirming] = useState(false);
+    const revoke = async () => {
+        const done = await command.run(
+            '/emar/connected-care/' + kind + '/' + id + '/revoke',
+            { client_id: clientId, reason },
+        );
+        setConfirming(false);
+        if (done) {
+            setSaved(true);
+            onSaved();
+        }
+    };
     return (
-        <ReviewWizard
-            title={
-                kind === 'clinicians'
-                    ? 'Withdraw prescriber identity'
-                    : 'Revoke access'
-            }
-            description={kind === 'clinicians' ? name + ' · All houses' : name}
-            onClose={onClose}
-            busy={command.busy}
-            error={command.error}
-            disabled={command.uncertain}
-            saved={saved}
-            saveLabel={
-                kind === 'clinicians' ? 'Withdraw identity' : 'Revoke access'
-            }
-            onSave={async () => {
-                if (
-                    await command.run(
-                        '/emar/connected-care/' + kind + '/' + id + '/revoke',
-                        { client_id: clientId, reason },
-                    )
-                ) {
-                    setSaved(true);
-                    onSaved();
+        <>
+            <ConfirmDialog
+                frontline
+                open={confirming}
+                onClose={() => {
+                    if (!command.busy) setConfirming(false);
+                }}
+                onConfirm={() => void revoke()}
+                processing={command.busy}
+                variant="destructive"
+                {...(kind === 'clinicians'
+                    ? {
+                          title: `Withdraw ${name}’s prescriber identity?`,
+                          description: `${name} loses connected care access for every person, in every house, straight away. Their sign-in only lets them change their password or sign out. This can’t be undone in the app.`,
+                          confirmText: 'Withdraw identity',
+                      }
+                    : {
+                          title: `Revoke ${name}’s access?`,
+                          description: `${name} can no longer see or act for this person in connected care. This can’t be undone; a new grant would be needed.`,
+                          confirmText: 'Revoke access',
+                      })}
+            />
+            <ReviewWizard
+                title={
+                    kind === 'clinicians'
+                        ? 'Withdraw prescriber identity'
+                        : 'Revoke access'
                 }
-            }}
-            steps={[
-                {
-                    label: 'Reason',
-                    valid: !!reason.trim(),
-                    content: (
-                        <Field label="Reason" required>
-                            <Textarea
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                            />
-                        </Field>
-                    ),
-                },
-            ]}
-            review={[
-                { label: 'Prescriber', value: name },
-                {
-                    label: 'Effect',
-                    value:
-                        kind === 'clinicians'
-                            ? 'End this clinician’s access to every granted person'
-                            : 'End this named-person grant',
-                },
-                { label: 'Reason', value: reason },
-            ]}
-        />
+                description={
+                    kind === 'clinicians' ? name + ' · All houses' : name
+                }
+                onClose={onClose}
+                busy={command.busy}
+                error={command.error}
+                disabled={command.uncertain}
+                saved={saved}
+                saveLabel={
+                    kind === 'clinicians'
+                        ? 'Withdraw identity'
+                        : 'Revoke access'
+                }
+                onSave={() => setConfirming(true)}
+                steps={[
+                    {
+                        label: 'Reason',
+                        valid: !!reason.trim(),
+                        content: (
+                            <Field label="Reason" required>
+                                <Textarea
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                />
+                            </Field>
+                        ),
+                    },
+                ]}
+                review={[
+                    { label: 'Prescriber', value: name },
+                    {
+                        label: 'Effect',
+                        value:
+                            kind === 'clinicians'
+                                ? 'End this clinician’s access to every granted person'
+                                : 'End this named-person grant',
+                    },
+                    { label: 'Reason', value: reason },
+                ]}
+            />
+        </>
     );
 }
 

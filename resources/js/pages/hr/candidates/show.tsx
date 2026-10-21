@@ -4,6 +4,7 @@ import {
     type OfferRole,
     type OfferSite,
 } from '@/components/hr';
+import InputError from '@/components/input-error';
 import {
     PageHero,
     type PageHeroBadge,
@@ -67,6 +68,7 @@ import {
     FileText,
     FolderOpen,
     Gift,
+    Loader2,
     Mail,
     MessageSquare,
     Phone,
@@ -258,6 +260,9 @@ function formatNZDateTime(dateStr: string): string {
     });
 }
 
+/** CandidateController::declineOfferApproval — reason nullable, max 2000. */
+const DECLINE_REASON_MAX = 2000;
+
 function isExpired(dateStr: string | null): boolean {
     if (!dateStr) return false;
     return new Date(dateStr) < new Date();
@@ -375,6 +380,10 @@ export default function CandidateShow({
         destructive?: boolean;
         action: () => void;
     } | null>(null);
+    const [offerToDecline, setOfferToDecline] = useState<number | null>(null);
+    const [declineReason, setDeclineReason] = useState('');
+    const [declineError, setDeclineError] = useState<string | undefined>();
+    const [decliningOffer, setDecliningOffer] = useState(false);
 
     function rejectApplication(applicationId: number) {
         setConfirmState({
@@ -439,15 +448,38 @@ export default function CandidateShow({
             { preserveScroll: true },
         );
     }
+    // "Decline" opens a dialog with an optional reason; the request is sent
+    // only from its submit button.
     function declineOfferApproval(offerId: number) {
-        const reason = window.prompt(
-            'Decline this offer for changes. Reason (optional):',
-        );
-        if (reason === null) return; // cancelled — don't decline
+        setDeclineReason('');
+        setDeclineError(undefined);
+        setOfferToDecline(offerId);
+    }
+    function submitDeclineOffer(e: React.FormEvent) {
+        e.preventDefault();
+        if (offerToDecline === null) return;
+        const reason = declineReason.trim();
+        // Server rule: reason nullable|string|max:2000.
+        if (reason.length > DECLINE_REASON_MAX) {
+            setDeclineError(
+                `Keep the reason to ${DECLINE_REASON_MAX.toLocaleString('en-NZ')} characters or fewer.`,
+            );
+            return;
+        }
         router.post(
-            `/hr/recruitment/offers/${offerId}/decline-approval`,
+            `/hr/recruitment/offers/${offerToDecline}/decline-approval`,
             { reason },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onStart: () => setDecliningOffer(true),
+                onSuccess: () => setOfferToDecline(null),
+                onError: (errors) =>
+                    setDeclineError(
+                        errors.reason ??
+                            'Could not decline the offer. Try again.',
+                    ),
+                onFinish: () => setDecliningOffer(false),
+            },
         );
     }
 
@@ -2510,6 +2542,69 @@ export default function CandidateShow({
                     offerId={respondOffer.offerId}
                 />
             )}
+
+            <Dialog
+                open={offerToDecline !== null}
+                onOpenChange={(o) => {
+                    if (!o && !decliningOffer) setOfferToDecline(null);
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <form onSubmit={submitDeclineOffer} className="grid gap-4">
+                        <DialogHeader>
+                            <DialogTitle>
+                                Decline this offer for changes?
+                            </DialogTitle>
+                            <DialogDescription>
+                                The offer isn&apos;t approved. It goes back to
+                                the person who drafted it so they can change it
+                                and ask for approval again. They&apos;re told,
+                                along with your reason if you give one. The
+                                candidate isn&apos;t told.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="decline-offer-reason">
+                                Reason (optional)
+                            </Label>
+                            <Textarea
+                                id="decline-offer-reason"
+                                value={declineReason}
+                                onChange={(e) => {
+                                    setDeclineReason(e.target.value);
+                                    if (declineError)
+                                        setDeclineError(undefined);
+                                }}
+                                maxLength={DECLINE_REASON_MAX}
+                                rows={3}
+                                placeholder="e.g. Start date needs to move to March"
+                                aria-invalid={Boolean(declineError)}
+                            />
+                            <InputError message={declineError} />
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOfferToDecline(null)}
+                                disabled={decliningOffer}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="destructive"
+                                disabled={decliningOffer}
+                            >
+                                {decliningOffer ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : null}
+                                Decline offer
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <AlertDialog
                 open={confirmState !== null}

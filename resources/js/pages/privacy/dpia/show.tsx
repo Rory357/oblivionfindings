@@ -1,10 +1,13 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
+import { PrivacyFieldDialog } from '@/components/privacy/privacy-field-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
 
 type PIA = {
     id: number;
@@ -66,6 +69,24 @@ const renderList = (items?: string[] | null) => {
 export default function ShowPIA({ dpia }: Props) {
     const { auth } = usePage().props as any;
     const can = auth?.can?.privacy ?? {};
+    const [confirmApprove, setConfirmApprove] = useState(false);
+    const [approving, setApproving] = useState(false);
+    const [reviewOpen, setReviewOpen] = useState(false);
+
+    // DPIAController::approve sets the outcome, approver and approval time.
+    const approve = () =>
+        router.post(
+            `/privacy/pia/${dpia.id}/approve`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setApproving(true),
+                onFinish: () => {
+                    setApproving(false);
+                    setConfirmApprove(false);
+                },
+            },
+        );
     const riskLabels: Record<string, string> = {
         low: 'low',
         medium: 'medium',
@@ -275,13 +296,7 @@ export default function ShowPIA({ dpia }: Props) {
                             {dpia.outcome !== 'approved' && (
                                 <Button
                                     size="sm"
-                                    onClick={() => {
-                                        if (confirm('Approve this PIA?')) {
-                                            router.post(
-                                                `/privacy/pia/${dpia.id}/approve`,
-                                            );
-                                        }
-                                    }}
+                                    onClick={() => setConfirmApprove(true)}
                                 >
                                     <CheckCircle className="mr-1 h-4 w-4" />
                                     Approve
@@ -290,17 +305,7 @@ export default function ShowPIA({ dpia }: Props) {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                    const notes = prompt('Enter review notes:');
-                                    if (notes) {
-                                        router.post(
-                                            `/privacy/pia/${dpia.id}/review`,
-                                            {
-                                                review_notes: notes,
-                                            },
-                                        );
-                                    }
-                                }}
+                                onClick={() => setReviewOpen(true)}
                             >
                                 <AlertTriangle className="mr-1 h-4 w-4" />
                                 Request Privacy Officer Review
@@ -308,6 +313,46 @@ export default function ShowPIA({ dpia }: Props) {
                         </CardContent>
                     </Card>
                 )}
+
+                <ConfirmDialog
+                    open={confirmApprove}
+                    onClose={() => {
+                        if (!approving) setConfirmApprove(false);
+                    }}
+                    onConfirm={approve}
+                    title="Approve this privacy impact assessment?"
+                    description={
+                        <>
+                            <span className="font-medium text-foreground">
+                                {dpia.assessment_name}
+                            </span>{' '}
+                            will be marked as approved, with your name and
+                            today's date. No one else is notified. You can still
+                            ask the privacy officer to review it later.
+                        </>
+                    }
+                    confirmText="Approve assessment"
+                    variant="default"
+                    processing={approving}
+                />
+                <PrivacyFieldDialog
+                    open={reviewOpen}
+                    onClose={() => setReviewOpen(false)}
+                    title="Ask the privacy officer to review this assessment?"
+                    description={`The assessment is marked as needing privacy officer review, and your notes are saved with it in place of any earlier review notes.${dpia.outcome === 'approved' ? ' It will no longer show as approved.' : ''} The privacy officer isn't notified automatically, so let them know.`}
+                    fields={[
+                        {
+                            name: 'review_notes',
+                            label: 'Notes for the privacy officer',
+                            kind: 'textarea',
+                            required: 'Add notes for the privacy officer.',
+                            placeholder: 'What needs their attention',
+                        },
+                    ]}
+                    submitLabel="Request review"
+                    variant="default"
+                    url={`/privacy/pia/${dpia.id}/review`}
+                />
             </PageLayout>
         </AppLayout>
     );

@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import HeadingSmall from '@/components/heading-small';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -741,10 +742,21 @@ function BoardGovernanceTab({
         });
     };
 
-    const handleRemove = (id: number) => {
-        if (confirm('Remove this board member?')) {
-            form.delete(`/settings/board-members/${id}`);
-        }
+    // Remove only opens the confirmation; the request is sent from its
+    // confirm button.
+    const [memberToRemove, setMemberToRemove] = useState<BoardMember | null>(
+        null,
+    );
+    const [removingMember, setRemovingMember] = useState(false);
+    const handleRemove = () => {
+        if (memberToRemove === null) return;
+        form.delete(`/settings/board-members/${memberToRemove.id}`, {
+            onStart: () => setRemovingMember(true),
+            onFinish: () => {
+                setRemovingMember(false);
+                setMemberToRemove(null);
+            },
+        });
     };
 
     const openEdit = (member: BoardMember) => {
@@ -1019,7 +1031,7 @@ function BoardGovernanceTab({
                                                 variant="ghost"
                                                 className="text-status-critical hover:text-status-critical"
                                                 onClick={() =>
-                                                    handleRemove(member.id)
+                                                    setMemberToRemove(member)
                                                 }
                                                 disabled={form.processing}
                                             >
@@ -1141,6 +1153,31 @@ function BoardGovernanceTab({
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                open={memberToRemove !== null}
+                onClose={() => {
+                    if (!removingMember) setMemberToRemove(null);
+                }}
+                onConfirm={handleRemove}
+                title="Remove this board member?"
+                description={
+                    memberToRemove ? (
+                        <p>
+                            <span className="font-medium text-foreground">
+                                {memberToRemove.user.name}
+                            </span>{' '}
+                            comes off the board, and their board roles are
+                            removed along with the access those roles give.
+                            Their user account and other roles stay as they
+                            are.
+                        </p>
+                    ) : null
+                }
+                confirmText="Remove board member"
+                variant="destructive"
+                processing={removingMember}
+            />
         </div>
     );
 }
