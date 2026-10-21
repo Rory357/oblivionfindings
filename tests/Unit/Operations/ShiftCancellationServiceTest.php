@@ -55,8 +55,9 @@ class ShiftCancellationServiceTest extends TestCase
             'shift_id' => $shift->id,
             'medication_round_id' => $round->id,
             'administered_by' => $actor->id,
-            'status' => 'pending',
+            'status' => 'given',
             'scheduled_for' => now(),
+            'administered_at' => now(),
         ]);
 
         $asset = Asset::factory()->vehicle()->create();
@@ -93,10 +94,15 @@ class ShiftCancellationServiceTest extends TestCase
             'id' => $timesheet->id,
             'status' => 'returned',
         ]);
-        $this->assertDatabaseHas('client_medication_administrations', [
+        // eMAR C5 (EA-071): the dose record is not rewritten; a lead reviews it.
+        $this->assertDatabaseMissing('client_medication_administrations', [
             'id' => $administration->id,
             'review_required' => true,
-            'review_reason' => ShiftCancellationService::MEDICATION_REVIEW_REASON,
+        ]);
+        $this->assertDatabaseHas('medication_followups', [
+            'administration_id' => $administration->id,
+            'type' => 'shift_cancelled',
+            'source_key' => 'shift-cancelled:'.$shift->id.'-'.$administration->id,
         ]);
         $this->assertDatabaseHas('medication_rounds', [
             'id' => $round->id,

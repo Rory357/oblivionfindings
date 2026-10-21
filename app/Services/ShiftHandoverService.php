@@ -416,6 +416,8 @@ class ShiftHandoverService
                         'replacement_verification' => $cdResolution['verification'],
                     ],
                 );
+                // eMAR C5 (EA-034): a count that didn't match reaches the register's lead.
+                app(\App\Services\Emar\HandoverControlledCountFollowup::class)->afterCount($freshHandover, $client, $cdResolution['verification']);
             }
             AuditLogger::logOrFail($isFirstSave ? 'shift.handover.created' : 'shift.handover.updated', $freshHandover, [
                 'shift_id' => $outgoingShift->id,
@@ -1431,6 +1433,8 @@ class ShiftHandoverService
                         'replacement_verification' => $cdResolution['verification'],
                     ],
                 );
+                // eMAR C5 (EA-034): a count that didn't match reaches the register's lead.
+                app(\App\Services\Emar\HandoverControlledCountFollowup::class)->afterCount($fresh, $client, $cdResolution['verification']);
             }
             AuditLogger::logOrFail('shift.handover.updated', $fresh, [
                 'shift_id' => $fresh->outgoing_shift_id,

@@ -11,6 +11,7 @@ use App\Models\ShiftHandover;
 use App\Models\ShiftOpenPosition;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Medication\Followups\CancelledShiftDoseReview;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -129,6 +130,11 @@ class ShiftCancellationService
 
             $this->notifyIncomingHandoverStaff($shift, $freshShift, $actor);
 
+            // eMAR C5 (EA-070/071/165/167): each dose recorded on the shift gets
+            // a lead review follow-up and a P09 event. Last: its head lock is
+            // the final lock of this transaction.
+            app(CancelledShiftDoseReview::class)->raise($freshShift, $actor);
+
             return [
                 'shift' => $freshShift,
                 'already_cancelled' => false,
@@ -188,15 +194,9 @@ class ShiftCancellationService
             ->whereKey($administrationIds)
             ->get();
 
-        foreach ($administrations as $administration) {
-            $administration->forceFill([
-                'review_required' => true,
-                'review_reason' => self::MEDICATION_REVIEW_REASON,
-                'review_flagged_at' => now(),
-                'review_flagged_by' => $actor?->id,
-                'notes' => $this->appendReason($administration->notes, self::MEDICATION_REVIEW_REASON),
-            ])->saveQuietly();
-        }
+        // eMAR C5 (EA-071): dose records are clinical evidence and are not
+        // rewritten here (no notes, flags or flagger changed). cancel() asks a
+        // lead to review each recorded dose (CancelledShiftDoseReview).
 
         $roundIds = $administrations
             ->pluck('medication_round_id')
