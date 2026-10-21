@@ -598,3 +598,17 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Follow-up (Lane A, `claude/emar-c5b`):
     - the stale architecture test line;
     - ShiftSeriesController::cancelFuture and RespiteShiftSync bypass the review and use a UTC day boundary.
+- **21 Oct: 1440 walk pass LIVE, `4b8b9c01b`.**
+  - P08b: errors header and empty state.
+  - P11: the Can-witness caption.
+  - P06 stock hub to the approved mockup:
+    - EncryptHistory and the captured-by guard;
+    - the EA-138 chip;
+    - meters, rail and table;
+    - the Receive picker;
+    - the Show filter;
+    - the Deliveries, Counts, Expiring and Removals views;
+    - whole-number quantities.
+  - /emar/stock is kept as the Stock overview companion.
+  - Gates: Pest 122 + 136, vitest red then green, eslint clean, tsc only shows main's known errors.
+  - Notes: `emar-1440-walk-notes-2026-10-21.md` lists the deviations and the items not built.
