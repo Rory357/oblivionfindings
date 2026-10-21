@@ -14,6 +14,7 @@ use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
+use App\Services\Emar\HandoverControlledCountFollowup;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventFingerprint;
 use App\Services\Medication\Audit\MedicationEventRecorder;
@@ -58,11 +59,16 @@ final class MedicationFollowupService
         'duplicate_supply' => 'Check for a duplicate supply',
         // eMAR audit Lane A8 (D6): away past the cap with no recorded return.
         'away_return' => 'Record the return',
+        // eMAR audit Lane C5: a dose recorded on a shift that was then cancelled
+        // (CancelledShiftDoseReview), and a handover controlled-drug count that
+        // didn't match (HandoverControlledCountFollowup).
+        'shift_cancelled' => 'Review a dose from a cancelled shift',
+        'cd_handover_discrepancy' => 'Controlled-drug count didn’t match at handover',
     ];
 
     public const LEAD_TYPES = ['unconfirmed', 'partial', 'disputed', 'override', 'countersign', 'handover', 'reconciliation',
         'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review',
-        'offline_review', 'duplicate_supply', 'away_return'];
+        'offline_review', 'duplicate_supply', 'away_return', 'shift_cancelled', 'cd_handover_discrepancy'];
 
     public const SOURCE_OWNED_TYPES = ['confirm', 'override', 'countersign', 'reconciliation',
         'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review', 'away_return'];
@@ -73,6 +79,7 @@ final class MedicationFollowupService
         'reconciliation-query' => 'reconciliation_query', 'review-watch' => 'review_watch',
         'stock-discrepancy' => 'stock_discrepancy', 'confirm' => 'confirm', 'witness-override' => 'override',
         'covert-review' => 'covert_review', 'duplicate-supply' => 'duplicate_supply',
+        'shift-cancelled' => 'shift_cancelled',
     ];
 
     public function __construct(
@@ -270,6 +277,8 @@ final class MedicationFollowupService
         if (! $includeControlled && ! $actor->canDo('medications.controlled.view')) {
             $query->where(fn (Builder $q) => $q->whereNull('client_medication_id')
                 ->orWhereHas('medication', fn (Builder $m) => $m->where('controlled_drug', false)->orWhereNull('controlled_drug')));
+            // C5 (EA-034): the handover's controlled-drug count is controlled-drug work.
+            $query->where('type', '!=', HandoverControlledCountFollowup::TYPE);
         }
 
         return $query;
@@ -359,7 +368,7 @@ final class MedicationFollowupService
             : ($lead ? $manage : (($shift !== null || (int) $row->owner_id === (int) $actor->id)
                 && $this->clinicalScope->hasOrdinaryPersonAccess($actor, $row->client, $shift)
                 || $this->clinicalScope->hasCurrentGrant($actor, $row->client)) && $actor->canDo('medications.administer.record'));
-        if ($row->medication?->controlled_drug && ! $actor->canDo('medications.controlled.record')) {
+        if (($row->medication?->controlled_drug || $row->type === HandoverControlledCountFollowup::TYPE) && ! $actor->canDo('medications.controlled.record')) {
             $canComplete = false;
         }
         if ($actor->approved_at === null || ! $this->staff->isCurrent($actor)) {
@@ -470,7 +479,7 @@ final class MedicationFollowupService
                 || (! $lead && $snapshot->type !== 'confirm' && ! $ordinaryWorker);
             $usedGrant = $requiresGrant ? $this->clinicalScope->assertGrant($lockedActor, $client, $grant, $users) : null;
             $this->records->assertReadable($lockedActor, $client);
-            if ($medication?->controlled_drug) {
+            if ($medication?->controlled_drug || $snapshot->type === HandoverControlledCountFollowup::TYPE) {
                 abort_unless($lockedActor->canDo('medications.controlled.view') && $lockedActor->canDo('medications.controlled.record'), 404);
             }
             $row = MedicationFollowup::query()->whereKey($snapshot->id)->where('client_id', $client->id)
@@ -852,6 +861,16 @@ final class MedicationFollowupService
                 && (! $row->medication?->controlled_drug || ($u->canDo('medications.controlled.view') && $u->canDo('medications.controlled.record')))
                 && in_array((int) $row->client_id, $this->records->readableClientIds($u, [$row->client_id]), true))
             ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values()->all();
+    }
+
+    /**
+     * When a lead should have reviewed a dose record: the end of the next
+     * shift at the person's house after the dose's own shift (the dose-review
+     * rule). C5: also used for doses from a cancelled shift.
+     */
+    public function doseReviewDueAt(Client $client, ClientMedicationAdministration $administration): ?CarbonImmutable
+    {
+        return $this->nextShiftEnd($client, $administration);
     }
 
     private function nextShiftEnd(Client $client, ClientMedicationAdministration $administration): ?CarbonImmutable
