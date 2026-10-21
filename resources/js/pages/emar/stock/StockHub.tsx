@@ -7,11 +7,10 @@ import {
 import { type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
     PageHeaderStatusChip,
@@ -26,15 +25,19 @@ import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
 import { medicationReturnParams } from '@/lib/medication-navigation';
 import { Head, router } from '@inertiajs/react';
 import {
     ArrowLeftRight,
+    CalendarClock,
     Camera,
     ClipboardCheck,
+    Clock,
     Eye,
     Package,
+    PackageCheck,
+    PackageMinus,
     Pill,
     ShieldCheck,
     Truck,
@@ -43,6 +46,7 @@ import {
 import { useEffect, useState } from 'react';
 import { MedicinePicture } from '../catalogue/_medicine-picture';
 import { ConnectedServicesMenu } from '../connected/_entry-points';
+import { CountsView } from './_counts-view';
 import {
     CountReview,
     CountWizard,
@@ -50,13 +54,21 @@ import {
     NewSupplyOrder,
     SupplyOrderDialog,
 } from './_dialogs';
+import { ExpiringView } from './_expiring-view';
+import { StockMeters, type StockMetrics } from './_meters';
 import { ControlledOpeningDialog } from './_opening';
+import { OrdersView } from './_orders-view';
 import { PackPhotoDialog } from './_photo';
 import { ReceiveWizard } from './_receive';
+import { ReceivePicker, receiveBlockedReason } from './_receive-picker';
+import { RecentMovements } from './_recent-movements';
+import { RemovalsView } from './_removals-view';
 import { useStockCommand } from './_requests';
+import { stockCaption, stockColumns } from './_stock-columns';
 import { TableList } from './_table-list';
 import type {
     Capabilities,
+    ExpiryPack,
     ItemDetail,
     Movement,
     Pager,
@@ -95,15 +107,30 @@ function State({ value }: { value: string }) {
         </StatusBadge>
     );
 }
+// The approved P06 Show filter (README §2, 1440-02/-04; Main, 21 Oct).
+const SHOW_OPTIONS = [
+    { value: 'all', label: 'All medicines' },
+    { value: 'attention', label: 'Needs attention' },
+    { value: 'low', label: 'Running low or out' },
+    { value: 'self', label: 'Self-managed' },
+];
+const SHOW_TITLES: Record<string, string> = {
+    all: 'Medicines held',
+    attention: 'Needs attention',
+    low: 'Running low or out',
+    self: 'Self-managed',
+    out: 'Out of stock',
+};
 const moveLabels: Record<string, string> = {
     opening: 'Recorded balance',
     received: 'Received',
-    given: 'Given',
-    going_out: 'Went out',
-    coming_back: 'Came back',
-    returned_pharmacy: 'Returned to pharmacy',
-    removed_expired: 'Expired pack removed',
-    damaged: 'Damaged stock removed',
+    // The approved P06 words (data.ts MOVE_LABEL).
+    given: 'Doses given',
+    going_out: 'Went out with the person',
+    coming_back: 'Came back with the person',
+    returned_pharmacy: 'Returned to the pharmacy',
+    removed_expired: 'Expired — removed',
+    damaged: 'Damaged or dropped',
     quarantined: 'Pack taken out of use',
     count_correction: 'Count correction',
     controlled_receipt: 'Controlled receipt',
@@ -131,13 +158,14 @@ type Props = {
         lot_id?: number | null;
         medication_id?: number | null;
     };
-    metrics: {
-        tracked: number;
-        out: number;
-        expiring: number;
-        orders: number;
-        counts: number;
-    };
+    /** The approved P06 meters, in the list’s scope (Main, 20 Oct). */
+    metrics: StockMetrics;
+    /** No controlled-medicine view: the counts and list cover visible medicines. */
+    controlled_left_out?: boolean;
+    /** People across the whole stock list, for "n shown · n people". */
+    item_people?: number;
+    /** Approved P06 Expiring and Removals: packs past or near their expiry. */
+    expiry_packs?: { data: ExpiryPack[]; more: boolean };
     can: Capabilities;
     lots_enabled: boolean;
     selected_client?: { id: number; name: string } | null;
@@ -158,6 +186,7 @@ type Modal =
       }
     | { kind: 'order'; order: SupplyOrder }
     | { kind: 'count'; record: StockCount }
+    | { kind: 'receive_pick' }
     | null;
 
 export default function StockHub({
@@ -173,11 +202,27 @@ export default function StockHub({
     lots_enabled,
     selected_client = null,
     focused_count = null,
+    controlled_left_out = false,
+    item_people,
+    expiry_packs = { data: [], more: false },
 }: Props) {
     // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
     const breadcrumbs = useEmarBreadcrumbs();
     const [search, setSearch] = useState(filters.search);
     const [modal, setModal] = useState<Modal>(null);
+    // The approved P06 header: the houses in view (the House filter narrows
+    // them to one), and when the stock was read.
+    const [asAt, setAsAt] = useState(() => new Date().toISOString());
+    const sitesInView = filters.site_id
+        ? sites.filter((site) => site.id === filters.site_id)
+        : sites;
+    const houseNames = sitesInView.map((site) => site.name);
+    const houses =
+        houseNames.length > 3
+            ? `${houseNames.slice(0, 3).join(', ')} and ${houseNames.length - 3} more`
+            : houseNames.length > 1
+              ? `${houseNames.slice(0, -1).join(', ')} and ${houseNames[houseNames.length - 1]}`
+              : (houseNames[0] ?? 'your houses');
     useEffect(() => {
         if (filters.medication_id)
             setModal({ kind: 'item', id: filters.medication_id });
@@ -193,6 +238,8 @@ export default function StockHub({
                 'counts',
                 'movements',
                 'metrics',
+                'item_people',
+                'expiry_packs',
                 'pharmacies',
             ],
             preserveScroll: true,
@@ -229,12 +276,7 @@ export default function StockHub({
                       label: 'Receive a delivery',
                       icon: Truck,
                       onClick: () => openItem(item, 'receive'),
-                      disabled:
-                          !item.lots_started && item.stock_id !== null
-                              ? 'Pack tracking has not been set up.'
-                              : !(item.receivable ?? item.active)
-                                ? 'This medicine has been stopped.'
-                                : undefined,
+                      disabled: receiveBlockedReason(item),
                   },
                   {
                       label: 'Count it',
@@ -334,18 +376,17 @@ export default function StockHub({
             key: 'orders' as const,
             label: 'Deliveries & orders',
             icon: Truck,
-            count: metrics.orders,
+            // Approved P06: deliveries to receive and counts to sign off; no zeros.
+            count: metrics.to_receive || undefined,
         },
         {
             key: 'counts' as const,
             label: 'Counts',
             icon: ClipboardCheck,
-            count: metrics.counts,
-            alert: metrics.counts > 0,
+            count: metrics.counts || undefined,
         },
-        { key: 'expiring' as const, label: 'Expiring', icon: Package },
-        { key: 'removals' as const, label: 'Removals', icon: Package },
-        { key: 'movements' as const, label: 'Movements', icon: ArrowLeftRight },
+        { key: 'expiring' as const, label: 'Expiring', icon: CalendarClock },
+        { key: 'removals' as const, label: 'Removals', icon: PackageMinus },
         ...(can.controlled
             ? [
                   {
@@ -366,10 +407,11 @@ export default function StockHub({
                     icon={Package}
                     titleChip={
                         <PageHeaderStatusChip variant="neutral">
-                            Supply and pack records
+                            {houseNames.length}{' '}
+                            {houseNames.length === 1 ? 'house' : 'houses'}
                         </PageHeaderStatusChip>
                     }
-                    subline="Person-owned medicines, deliveries and counts"
+                    subline={`Medicines held for people at ${houses} · times in Pacific/Auckland`}
                     actions={
                         <>
                             <MedicationJourneyReturn />
@@ -408,73 +450,19 @@ export default function StockHub({
                             >
                                 Stock overview
                             </PageHeaderGlassButton>
+                            {can.receive && (
+                                <PageHeaderPrimaryButton
+                                    icon={PackageCheck}
+                                    onClick={() =>
+                                        setModal({ kind: 'receive_pick' })
+                                    }
+                                >
+                                    Receive a delivery
+                                </PageHeaderPrimaryButton>
+                            )}
                         </>
                     }
-                    meters={
-                        <>
-                            <PageHeaderMeterBlock
-                                label="Tracked"
-                                onClick={() =>
-                                    visit({ view: 'stock', show: 'all' })
-                                }
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.tracked}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Stock records
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Out of stock"
-                                tone={metrics.out ? 'critical' : 'brand'}
-                                onClick={() =>
-                                    visit({ view: 'stock', show: 'out' })
-                                }
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.out}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Check supply
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="To receive"
-                                onClick={() => visit({ view: 'orders' })}
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.orders}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Open supply records
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Expiring"
-                                onClick={() => visit({ view: 'expiring' })}
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.expiring}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Packs within 30 days
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Counts to sign off"
-                                tone={metrics.counts ? 'warning' : 'brand'}
-                                onClick={() => visit({ view: 'counts' })}
-                            >
-                                <PageHeaderMeterBig>
-                                    {metrics.counts}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Lead review needed
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                        </>
-                    }
+                    meters={<StockMeters metrics={metrics} open={visit} />}
                     filters={
                         <>
                             <PageHeaderFilterSelect
@@ -527,19 +515,48 @@ export default function StockHub({
                                     label="Show"
                                     value={filters.show ?? 'all'}
                                     options={[
-                                        { value: 'all', label: 'All stock' },
-                                        { value: 'out', label: 'Out of stock' },
-                                        { value: 'low', label: 'Running low' },
+                                        ...SHOW_OPTIONS,
+                                        // An older ?show=out link still shows what it filters.
+                                        ...(filters.show === 'out'
+                                            ? [
+                                                  {
+                                                      value: 'out',
+                                                      label: SHOW_TITLES.out,
+                                                  },
+                                              ]
+                                            : []),
                                     ]}
-                                    onChange={(value) => visit({ show: value })}
+                                    onChange={(value) =>
+                                        visit({
+                                            show:
+                                                value === 'all' ? null : value,
+                                        })
+                                    }
                                 />
                             )}
+                            <PageHeaderFilterButton
+                                icon={Clock}
+                                onClick={() =>
+                                    router.reload({
+                                        onSuccess: () =>
+                                            setAsAt(new Date().toISOString()),
+                                    })
+                                }
+                            >
+                                As at {formatTime(asAt)} · Pacific/Auckland
+                            </PageHeaderFilterButton>
                         </>
                     }
                     rail={
                         <PageHeaderRail
                             items={rail}
-                            value={filters.view}
+                            // All movements (?view=movements) sits under Stock.
+                            value={
+                                filters.view === 'movements'
+                                    ? 'stock'
+                                    : filters.view
+                            }
+                            ariaLabel="Stock views"
                             onSelect={(view) =>
                                 view === 'controlled'
                                     ? router.visit('/emar/controlled')
@@ -548,178 +565,128 @@ export default function StockHub({
                         />
                     }
                 />
-                {['stock', 'expiring'].includes(filters.view) && (
+                {controlled_left_out && (
+                    <p className="text-caption text-muted-foreground">
+                        Controlled medicines are left out of these counts and
+                        this list. The counts cover visible medicines.
+                    </p>
+                )}
+                {filters.view === 'expiring' && (
+                    <ExpiringView
+                        packs={expiry_packs.data}
+                        more={expiry_packs.more}
+                        can={can}
+                        open={(pack) =>
+                            setModal({ kind: 'item', id: pack.medication_id })
+                        }
+                        remove={(pack) =>
+                            setModal({
+                                kind: 'item',
+                                id: pack.medication_id,
+                                action: 'move',
+                            })
+                        }
+                    />
+                )}
+                {filters.view === 'stock' && (
                     <TableList
                         title={
-                            filters.view === 'expiring'
-                                ? 'Packs needing an expiry check'
-                                : 'Stock'
+                            SHOW_TITLES[filters.show ?? 'all'] ??
+                            'Medicines held'
                         }
+                        caption={stockCaption(
+                            items,
+                            item_people ??
+                                new Set(
+                                    items.data.map((item) => item.client_id),
+                                ).size,
+                            metrics.controlled_hidden,
+                        )}
+                        identityLabel="Medicine"
+                        identityWidth="1.25fr"
                         pager={items}
                         name={(item) => item.name}
                         subline={(item) =>
-                            `${item.client_name} · ${item.site_name ?? 'House not available'}`
+                            [
+                                item.site_name,
+                                item.controlled ? 'controlled' : null,
+                                item.held ? 'on hold' : null,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ')
                         }
                         open={openItem}
                         actions={itemActions}
-                        columns={[
-                            {
-                                key: 'quantity',
-                                label: 'Stock available',
-                                width: '1fr',
-                                cell: (item) => (
-                                    <div>
-                                        {item.usable_on_hand == null
-                                            ? 'Unknown'
-                                            : `${item.usable_on_hand} ${item.unit ?? ''} usable`}
-                                        {item.physical_on_hand != null && (
-                                            <p className="text-caption">
-                                                {item.physical_on_hand}{' '}
-                                                physically held
-                                            </p>
-                                        )}
-                                    </div>
-                                ),
-                            },
-                            {
-                                key: 'next',
-                                label: 'Use first',
-                                width: '1.5fr',
-                                cell: (item) => (
-                                    <div>
-                                        <span>
-                                            {item.next_batch ??
-                                                (item.lots_started
-                                                    ? 'Batch unknown'
-                                                    : 'Packs not set up')}
-                                        </span>
-                                        <p className="text-caption">
-                                            {item.next_expiry
-                                                ? formatDateOnly(
-                                                      item.next_expiry,
-                                                  )
-                                                : 'Expiry unknown'}
-                                        </p>
-                                    </div>
-                                ),
-                            },
-                            {
-                                key: 'state',
-                                label: 'Supply status',
-                                width: '1.2fr',
-                                cell: (item) => (
-                                    <div>
-                                        <State value={item.state} />
-                                        {item.expired_packs > 0 && (
-                                            <p className="text-caption">
-                                                {item.expired_packs} expired{' '}
-                                                {item.expired_packs === 1
-                                                    ? 'pack'
-                                                    : 'packs'}{' '}
-                                                — take out of use
-                                            </p>
-                                        )}
-                                    </div>
-                                ),
-                            },
-                        ]}
+                        columns={stockColumns(can, {
+                            receive: (item, order) =>
+                                setModal({
+                                    kind: 'item',
+                                    id: item.id,
+                                    action: 'receive',
+                                    order,
+                                }),
+                            remove: (item) => openItem(item, 'move'),
+                            signOff: (countId) => visit({ count_id: countId }),
+                            order: (item) => openItem(item, 'order'),
+                            sendOrder: (order) =>
+                                setModal({ kind: 'order', order }),
+                        })}
+                    />
+                )}
+                {filters.view === 'stock' && (
+                    <RecentMovements
+                        moves={movements.data}
+                        label={(move) =>
+                            moveLabels[move.kind] ??
+                            move.kind.replaceAll('_', ' ')
+                        }
+                        open={(move) =>
+                            setModal({ kind: 'item', id: move.medication_id })
+                        }
+                        viewAll={() => visit({ view: 'movements' })}
                     />
                 )}
                 {filters.view === 'orders' && (
-                    <TableList
-                        title="Deliveries and pharmacy orders"
+                    <OrdersView
                         pager={orders}
-                        name={(order) => order.medication_name}
-                        subline={(order) =>
-                            `${order.client_name} · Order #${order.id}`
-                        }
+                        can={can}
                         open={orderOpen}
+                        receive={(order) =>
+                            setModal({
+                                kind: 'item',
+                                id: order.client_medication_id,
+                                action: 'receive',
+                                order,
+                            })
+                        }
                         actions={orderActions}
-                        columns={[
-                            {
-                                key: 'pharmacy',
-                                label: 'Pharmacy',
-                                width: '1.3fr',
-                                cell: (order) => order.pharmacy_name,
-                            },
-                            {
-                                key: 'qty',
-                                label: 'Received / ordered',
-                                width: '1fr',
-                                cell: (order) =>
-                                    `${Number(order.quantity_received ?? 0)} / ${order.quantity_ordered}`,
-                            },
-                            {
-                                key: 'due',
-                                label: 'Due to arrive',
-                                width: '1fr',
-                                cell: (order) =>
-                                    order.expected_delivery
-                                        ? formatDateOnly(
-                                              order.expected_delivery,
-                                          )
-                                        : 'Not recorded',
-                            },
-                            {
-                                key: 'status',
-                                label: 'Status',
-                                width: '1.1fr',
-                                cell: (order) => <State value={order.status} />,
-                            },
-                        ]}
                     />
                 )}
                 {filters.view === 'counts' && (
-                    <TableList
-                        title="Recent counts"
-                        pager={counts}
-                        name={(record) => record.medication_name}
-                        subline={(record) => record.client_name}
-                        open={countOpen}
-                        actions={(record) => [
-                            {
-                                label:
-                                    record.state === 'needs_review' &&
-                                    can.manage
-                                        ? 'Review this count'
-                                        : 'Open the count',
-                                icon: ClipboardCheck,
-                                onClick: () => countOpen(record),
-                            },
-                        ]}
-                        columns={[
-                            {
-                                key: 'counted',
-                                label: 'Counted',
-                                width: '1.2fr',
-                                cell: (record) =>
-                                    formatDateTime(record.counted_at),
-                            },
-                            {
-                                key: 'person',
-                                label: 'Counted by',
-                                width: '1fr',
-                                cell: (record) =>
-                                    record.counted_by_name ?? 'Unknown',
-                            },
-                            {
-                                key: 'status',
-                                label: 'Result',
-                                width: '1fr',
-                                cell: (record) => (
-                                    <State value={record.state} />
-                                ),
-                            },
-                        ]}
+                    <CountsView pager={counts} can={can} open={countOpen} />
+                )}
+                {filters.view === 'removals' && (
+                    <RemovalsView
+                        packs={expiry_packs.data}
+                        moves={movements}
+                        can={can}
+                        label={(move) =>
+                            moveLabels[move.kind] ??
+                            move.kind.replaceAll('_', ' ')
+                        }
+                        openMedicine={(id) => setModal({ kind: 'item', id })}
+                        remove={(pack) =>
+                            setModal({
+                                kind: 'item',
+                                id: pack.medication_id,
+                                action: 'move',
+                            })
+                        }
                     />
                 )}
-                {['movements', 'removals'].includes(filters.view) && (
+                {filters.view === 'movements' && (
                     <TableList
-                        title={
-                            filters.view === 'removals'
-                                ? 'Removed or taken out of use'
-                                : 'Recent movements'
-                        }
+                        title="All movements"
                         pager={movements}
                         name={(move) => move.medication_name}
                         subline={(move) => move.client_name}
@@ -750,7 +717,8 @@ export default function StockHub({
                                 key: 'qty',
                                 label: 'Quantity',
                                 width: '0.7fr',
-                                cell: (move) => move.quantity,
+                                cell: (move) =>
+                                    move.quantity_display ?? move.quantity,
                             },
                             {
                                 key: 'why',
@@ -784,6 +752,21 @@ export default function StockHub({
                     lotsEnabled={lots_enabled}
                     onClose={() => setModal(null)}
                     onSaved={refresh}
+                />
+            )}
+            {modal?.kind === 'receive_pick' && (
+                <ReceivePicker
+                    sites={sites}
+                    siteId={filters.site_id}
+                    onPick={({ medicationId, order }) =>
+                        setModal({
+                            kind: 'item',
+                            id: medicationId,
+                            action: 'receive',
+                            order,
+                        })
+                    }
+                    onClose={() => setModal(null)}
                 />
             )}
             {modal?.kind === 'order' && (

@@ -12,16 +12,20 @@ use App\Models\FleetMedicationTransitLog;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
+use App\Models\Shift;
 use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationSignalService;
-use Carbon\Carbon;
+use App\Support\WorkerClock;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Throwable;
 
 class MedicationIncidentIntegrationService
 {
@@ -69,17 +73,20 @@ class MedicationIncidentIntegrationService
                     $incident->status = 'draft';
                     $incident->occurred_at = $locked->scheduled_for ?? now();
                     $incident->reported_by = $createdBy;
+                    // EA-036: the shift's clock-out check and shift filter find it.
+                    $incident->shift_id = $locked->shift_id;
                     $this->assignIncidentServiceContext($incident, $locked->service_context_id);
                     $this->stampMedicationIncidentSource($incident, $locked, 'missed_dose');
                     $incident->save();
                     $this->linkToMedication($incident, $medication);
+                    $this->announceDoseDraft($incident, $medication, 'missed_dose');
                 }
 
                 MedicationDashboardAlert::createOrUpdateAlert(
                     $client->id,
                     'missed_dose',
                     'warning',
-                    "Missed dose: {$medication->name} scheduled for ".($locked->scheduled_for?->format('H:i') ?? 'unknown time'),
+                    "Missed dose: {$medication->name} scheduled for ".($this->nzTime($locked->scheduled_for, 'H:i') ?? 'unknown time'),
                     $medication->id
                 );
 
@@ -88,7 +95,7 @@ class MedicationIncidentIntegrationService
                     MedicationSignalService::TYPE_MISSED_DOSE,
                     $client->id,
                     $severity,
-                    "Missed dose: {$medication->unrestrictedName()} scheduled for ".($locked->scheduled_for?->format('H:i') ?? 'unknown time'),
+                    "Missed dose: {$medication->unrestrictedName()} scheduled for ".($this->nzTime($locked->scheduled_for, 'H:i') ?? 'unknown time'),
                     [
                         'incident_id' => $incident->id,
                         'client_medication_id' => $medication->id,
@@ -339,7 +346,7 @@ class MedicationIncidentIntegrationService
                     $incident->client_id = $client->id;
                     $incident->site_id = $client->site_id;
                     $incident->title = "Medication correction after {$hoursSince}h: {$medication->unrestrictedName()}";
-                    $incident->description = $this->buildCorrectionDescription($lockedOriginal, $correctionData, $hoursSince);
+                    $incident->description = $this->buildCorrectionDescription($lockedOriginal, $correctionData, $hoursSince, $medication);
                     $incident->category = 'medication';
                     $incident->severity = $hoursSince > 24 ? 'high' : 'medium';
                     $incident->status = 'draft';
@@ -411,18 +418,21 @@ class MedicationIncidentIntegrationService
                     $incident->site_id = $client->site_id;
                     $incident->title = "Late medication: {$medication->unrestrictedName()} ({$hoursLate}h late)";
                     $incident->description = "Medication {$medication->unrestrictedName()} was administered {$hoursLate} hours after scheduled time.\n\n".
-                        'Scheduled: '.($locked->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n".
-                        'Given: '.($locked->administered_at?->format('d/m/Y H:i') ?? 'Unknown')."\n".
+                        'Scheduled: '.($this->nzTime($locked->scheduled_for) ?? 'Unknown')."\n".
+                        'Given: '.($this->nzTime($locked->administered_at) ?? 'Unknown')."\n".
                         'Reason: '.($locked->reason ?? 'Not provided');
                     $incident->category = 'medication';
                     $incident->severity = $hoursLate > 4 ? 'high' : 'medium';
                     $incident->status = 'draft';
                     $incident->occurred_at = $locked->administered_at ?? now();
                     $incident->reported_by = $locked->administered_by;
+                    // EA-036: the shift's clock-out check and shift filter find it.
+                    $incident->shift_id = $locked->shift_id;
                     $this->assignIncidentServiceContext($incident, $locked->service_context_id);
                     $this->stampMedicationIncidentSource($incident, $locked, 'late_dose');
                     $incident->save();
                     $this->linkToMedication($incident, $medication);
+                    $this->announceDoseDraft($incident, $medication, 'late_dose');
                 }
 
                 MedicationDashboardAlert::createOrUpdateAlert(
@@ -492,10 +502,13 @@ class MedicationIncidentIntegrationService
                     $incident->status = 'draft';
                     $incident->occurred_at = $locked->administered_at ?? now();
                     $incident->reported_by = $locked->administered_by;
+                    // EA-036: the shift's clock-out check and shift filter find it.
+                    $incident->shift_id = $locked->shift_id;
                     $this->assignIncidentServiceContext($incident, $locked->service_context_id);
                     $this->stampMedicationIncidentSource($incident, $locked, 'refused_dose');
                     $incident->save();
                     $this->linkToMedication($incident, $medication);
+                    $this->announceDoseDraft($incident, $medication, 'refused_dose');
                 }
 
                 MedicationDashboardAlert::createOrUpdateAlert(
@@ -940,8 +953,9 @@ class MedicationIncidentIntegrationService
     ): string {
         $description = "Scheduled medication was not administered.\n\n";
         $description .= "Medication: {$medication->unrestrictedName()}\n";
-        $description .= 'Dosage: '.($medication->formatted_dose ?? 'N/A')."\n";
-        $description .= 'Scheduled time: '.($administration->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n";
+        // A controlled medicine's dose stays on the restricted register entry.
+        $description .= 'Dosage: '.($medication->controlled_drug ? self::CONTROLLED_MEDICATION_DETAIL : ($medication->formatted_dose ?? 'N/A'))."\n";
+        $description .= 'Scheduled time: '.($this->nzTime($administration->scheduled_for) ?? 'Unknown')."\n";
         $description .= 'Classification: ';
 
         if ($medication->controlled_drug) {
@@ -983,19 +997,25 @@ class MedicationIncidentIntegrationService
     private function buildCorrectionDescription(
         ClientMedicationAdministration $original,
         array $correctionData,
-        int $hoursSince
+        int $hoursSince,
+        ?ClientMedication $medication = null,
     ): string {
+        // A controlled medicine's doses stay on the restricted register entry.
+        $dose = fn (mixed $value): string => $medication?->controlled_drug
+            ? self::CONTROLLED_MEDICATION_DETAIL
+            : (string) ($value ?? 'N/A');
         $description = "Medication administration was corrected after {$hoursSince} hours.\n\n";
         $description .= "Original record:\n";
         $description .= "- Status: {$original->status}\n";
-        $description .= '- Dose: '.($original->dose_given ?? 'N/A')."\n";
-        $description .= '- Time: '.($original->administered_at?->format('d/m/Y H:i') ?? 'Unknown')."\n\n";
+        $description .= '- Dose: '.$dose($original->dose_given)."\n";
+        $description .= '- Time: '.($this->nzTime($original->administered_at) ?? 'Unknown')."\n\n";
 
         $description .= "Correction:\n";
         $description .= '- Status: '.($correctionData['status'] ?? 'Unknown')."\n";
-        $description .= '- Dose: '.($correctionData['dose_given'] ?? 'N/A')."\n";
-        $description .= '- Time: '.(isset($correctionData['administered_at'])
-            ? (new Carbon($correctionData['administered_at']))->format('d/m/Y H:i')
+        $description .= '- Dose: '.$dose($correctionData['dose_given'] ?? null)."\n";
+        // A time entered without a zone is the worker's own clock time.
+        $description .= '- Time: '.(filled($correctionData['administered_at'] ?? null)
+            ? $this->nzTime(app(MarScheduleService::class)->parseWorkerDateTime((string) $correctionData['administered_at']))
             : 'Unknown')."\n";
         $description .= '- Reason: '.($correctionData['correction_reason'] ?? 'Not provided')."\n\n";
 
@@ -1018,9 +1038,62 @@ class MedicationIncidentIntegrationService
         $description .= 'Detailed reason: '.($followup->detailed_reason ?: 'Not provided')."\n";
         $description .= "Capacity at time: {$followup->client_capacity_at_time}\n";
         $description .= 'GP notification required: '.($followup->gp_notification_required ? 'Yes' : 'No')."\n";
-        $description .= 'Follow-up due: '.($followup->follow_up_due_at?->format('d/m/Y H:i') ?? 'Not set');
+        $description .= 'Follow-up due: '.($this->nzTime($followup->follow_up_due_at) ?? 'Not set');
 
         return $description;
+    }
+
+    /** EA-035: a stored UTC time as the worker reads it, e.g. "09/10/2026 08:00 NZDT". */
+    private function nzTime(?DateTimeInterface $at, string $format = 'd/m/Y H:i T'): ?string
+    {
+        return $at === null ? null : WorkerClock::display($at, $format);
+    }
+
+    /**
+     * EA-036: a dose's new draft incident is put in front of someone who can
+     * submit it — the shift's owner, or the house lead when the dose has no
+     * shift (or its owner can't open the person) — only people who can open
+     * the person (EA-015). Medication Settings › Alerts then tells whoever it
+     * chooses ("Missed, late or refused dose — incident to submit").
+     */
+    private function announceDoseDraft(ClientIncident $incident, ClientMedication $medication, string $kind): void
+    {
+        $incidentId = (int) $incident->id;
+        DB::afterCommit(function () use ($incidentId): void {
+            try {
+                $incident = ClientIncident::query()->with('client')->find($incidentId);
+                $client = $incident?->client;
+                if (! $client instanceof Client) {
+                    return;
+                }
+                $opens = fn (User $user): bool => Gate::forUser($user)->allows('viewMedications', $client);
+                $ownerId = $incident->shift_id !== null ? Shift::query()->whereKey($incident->shift_id)->value('user_id') : null;
+                $targets = $ownerId === null ? collect()
+                    : User::query()->whereKey($ownerId)->whereNotNull('approved_at')->get()->filter($opens);
+                if ($targets->isEmpty()) {
+                    $targets = User::query()->whereNotNull('approved_at')
+                        ->whereHas('roles', fn ($roles) => $roles->where('name', 'team_lead'))
+                        ->get()->filter($opens);
+                }
+                if ($targets->isEmpty()) {
+                    return;
+                }
+                app(NotificationService::class)->notifyCrud(null, 'created', 'incident', $incident, $client, [
+                    'event_key' => 'incidents.draft_created',
+                    'title' => 'Draft incident to submit',
+                    'body' => (string) $incident->title,
+                    'url' => url('/incidents/'.$incident->id),
+                    'target_user_ids' => $targets->pluck('id')->all(),
+                    'include_managers' => false,
+                    'include_assigned_workers' => false,
+                    'include_entity_user' => false,
+                ]);
+            } catch (Throwable $exception) {
+                // A notice never undoes the dose record that raised it.
+                report($exception);
+            }
+        });
+        app(MedicationAlertSources::class)->doseIncident($incident, $medication, $kind);
     }
 
     private function buildControlledLossDescription(ControlledDrugLossReport $report): string

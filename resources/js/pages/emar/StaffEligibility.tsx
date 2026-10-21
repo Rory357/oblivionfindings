@@ -468,14 +468,13 @@ export default function StaffEligibility(props: Props) {
                             {witnesses.length} of {scoped.length}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {noWitnessNow.length
-                                ? `${noWitnessNow
-                                      .slice(0, 2)
-                                      .map((h) => h.name)
-                                      .join(
-                                          ', ',
-                                      )}${noWitnessNow.length > 2 ? ` and ${noWitnessNow.length - 2} more` : ''}: nobody on shift now`
-                                : 'Someone on shift can witness at each house'}
+                            {/* One house is named (as P11 v5); several are
+                                counted, so the caption fits the meter. */}
+                            {noWitnessNow.length === 1
+                                ? `${noWitnessNow[0].name}: nobody on shift now`
+                                : noWitnessNow.length
+                                  ? `${noWitnessNow.length} houses: nobody on shift now`
+                                  : 'Someone on shift can witness at each house'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>

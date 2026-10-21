@@ -1039,6 +1039,12 @@ class SignalProcessingService
      */
     public function isInMaintenanceWindow(Signal $signal): bool
     {
+        // D8 (eMAR audit, decided under Stephan's delegation): a maintenance
+        // window never silences a medication alert.
+        if (str_starts_with((string) $signal->signal_type_code, 'medication_')) {
+            return false;
+        }
+
         return MaintenanceWindow::query()
             ->where('status', 'active')
             ->where('starts_at', '<=', now())

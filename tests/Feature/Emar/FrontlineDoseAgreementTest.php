@@ -121,11 +121,12 @@ class FrontlineDoseAgreementTest extends TestCase
             array_intersect_key($snapshot['counts'], array_flip(['due', 'given', 'missed', 'omissions'])),
         );
 
-        // Clock-out: the same four doses still need a MAR entry.
-        $this->assertSame(4, $this->unsignedDoses());
+        // Clock-out (C5, EA-019): the doses Meds today shows as due or
+        // overdue still need a MAR entry; the 12:00 Calcium isn't due yet.
+        $this->assertSame(3, $this->unsignedDoses());
         $unrecorded = collect($board->inertiaProps('schedule'))
             ->whereNull('recorded')
-            ->where('status', '!=', 'pending_check')
+            ->whereIn('status', ['due', 'overdue'])
             ->count();
         $this->assertSame($unrecorded, $this->unsignedDoses());
     }
@@ -306,7 +307,9 @@ class FrontlineDoseAgreementTest extends TestCase
             ['due' => 4, 'given' => 1, 'missed' => 0, 'omissions' => 4],
             array_intersect_key($snapshot['counts'], array_flip(['due', 'given', 'missed', 'omissions'])),
         );
-        $this->assertSame(4, $this->unsignedDoses());
+        // Clock-out (C5, EA-019): the 08:00 doses at the shift's scheduled end
+        // belong to the day shift; Thyroxine and Metformin are this shift's.
+        $this->assertSame(2, $this->unsignedDoses());
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────

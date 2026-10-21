@@ -12,6 +12,7 @@ use App\Models\ShiftTask;
 use App\Models\SiteCoverageRequirement;
 use App\Models\User;
 use App\Services\CoverageReservationService;
+use App\Services\Medication\Followups\CancelledShiftDoseReview;
 use App\Services\NotificationService;
 use App\Services\Operations\ShiftSeriesPresenter;
 use App\Services\ShiftConflictService;
@@ -21,6 +22,7 @@ use App\Services\ShiftTimelineService;
 use App\Services\Sites\SiteChecklistScheduler;
 use App\Services\UserSiteAccessService;
 use App\Support\ShiftTaskSupport;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -142,7 +144,8 @@ class ShiftSeriesController extends Controller
         $futureShifts = Shift::query()
             ->where('shift_series_id', $series->id)
             ->whereNotIn('status', ['completed', 'cancelled'])
-            ->where('starts_at', '>=', now()->startOfDay())
+            // eMAR C5b: "from today" is today in New Zealand, not the UTC day.
+            ->where('starts_at', '>=', WorkerClock::today()->utc())
             ->orderBy('starts_at')
             ->get();
 
@@ -163,6 +166,10 @@ class ShiftSeriesController extends Controller
             }
 
             $series->update(['status' => 'cancelled']);
+
+            // eMAR C5b: each dose recorded on a cancelled occurrence gets one
+            // lead review (as ShiftCancellationService). Last: P09 head lock.
+            app(CancelledShiftDoseReview::class)->raiseMany($futureShifts, $auth);
         });
 
         return redirect()->route('operations.shifts.series.show', $series)->with(

@@ -1558,7 +1558,7 @@ class AttendanceService
             ];
         }
 
-        $unsignedMeds = $this->countUnsignedMedicationDoses($shift);
+        $unsignedMeds = $this->countUnsignedMedicationDoses($shift, $session);
         if ($unsignedMeds > 0) {
             $blockers[] = [
                 'key' => 'meds_unsigned',
@@ -1917,7 +1917,10 @@ class AttendanceService
         }
 
         $notes = trim((string) ($handover['handover_notes'] ?? ''));
-        $medsCompleted = (bool) ($handover['meds_completed'] ?? true);
+        // eMAR C5 (EA-019): doses still owed at clock-out are handed over,
+        // whatever the wizard's "completed" tick says.
+        $medsCompleted = (bool) ($handover['meds_completed'] ?? true)
+            && $this->countUnsignedMedicationDoses($shift, $session) === 0;
         $followUpNeeded = (bool) ($handover['follow_up_needed'] ?? false);
 
         if ($notes === '') {
@@ -1988,77 +1991,19 @@ class AttendanceService
         };
     }
 
-    protected function countUnsignedMedicationDoses(Shift $shift): int
+    /**
+     * eMAR C5 (EA-019): the doses the worker leaving now still owes an
+     * outcome for — due by now or late, inside the shift and before its
+     * scheduled end, staff's to give, for people and medicines they may
+     * record — from the same projection as Meds today (ClockOutDoseCheck).
+     */
+    protected function countUnsignedMedicationDoses(Shift $shift, ?HrAttendanceSession $session = null): int
     {
-        if (! $shift->client_id || ! $shift->starts_at || ! $shift->ends_at) {
+        $worker = $session?->user ?? ($session?->user_id ? User::query()->find($session->user_id) : null) ?? $shift->staff;
+        if (! $worker instanceof User) {
             return 0;
         }
 
-        $medications = ClientMedication::query()
-            ->where('client_id', $shift->client_id)
-            ->active()
-            ->where('is_prn', false)
-            ->where(function ($query) {
-                $query->whereNotNull('dose_times')
-                    ->orWhereNotNull('frequency');
-            })
-            ->get();
-
-        if ($medications->isEmpty()) {
-            return 0;
-        }
-
-        $scheduleService = app(MarScheduleService::class);
-        $start = $shift->starts_at->copy()->timezone($scheduleService->workerTimezone());
-        $end = $shift->ends_at->copy()->timezone($scheduleService->workerTimezone());
-
-        $signedKeys = ClientMedicationAdministration::query()
-            ->effectiveClinicalEvidence()
-            ->where('client_id', $shift->client_id)
-            ->whereIn('status', ['given', 'refused', 'withheld', 'missed'])
-            ->whereNotNull('scheduled_for')
-            ->whereBetween('scheduled_for', [
-                $start->copy()->utc(),
-                $end->copy()->utc(),
-            ])
-            ->get(['client_medication_id', 'scheduled_for'])
-            ->mapWithKeys(function (ClientMedicationAdministration $administration) {
-                $rawScheduledFor = $administration->getRawOriginal('scheduled_for');
-                $scheduledKey = $rawScheduledFor
-                    ? Carbon::parse((string) $rawScheduledFor, 'UTC')->format('Y-m-d H:i')
-                    : '';
-
-                return [$administration->client_medication_id.'|'.$scheduledKey => true];
-            });
-
-        // The shift's doses as Meds today, My Day and the handover read them
-        // (dose-slot projection, C6e): the slot's due time, nothing before the
-        // order's entry. A dose waiting for the order check can't be signed,
-        // so it isn't counted; a self-managed dose isn't staff's to sign.
-        $doses = app(ScheduledDoseStates::class)->dosesBetween(
-            $medications,
-            $start,
-            $end,
-            Carbon::now($scheduleService->workerTimezone()),
-        );
-        $unsigned = 0;
-
-        foreach ($medications as $medication) {
-            foreach ($doses[(int) $medication->id] ?? [] as $dose) {
-                $scheduled = $dose['due_at'];
-                if (! $scheduled->betweenIncluded($start, $end)
-                    || $dose['outcome'] !== null
-                    || in_array($dose['state'], [DoseSlotProjection::STATE_PENDING_CHECK, DoseSlotProjection::STATE_SELF_MANAGED, DoseSlotProjection::STATE_AWAY], true)) {
-                    continue;
-                }
-
-                $key = $medication->id.'|'.$scheduled->copy()->utc()->format('Y-m-d H:i');
-                if (! $signedKeys->has($key)) {
-                    $unsigned++;
-                }
-            }
-        }
-
-        return $unsigned;
+        return app(\App\Services\Medication\Recording\ClockOutDoseCheck::class)->outstanding($worker, $shift, now());
     }
 }

@@ -389,7 +389,7 @@ class EnhancedMarService
             'away_reason' => $scheduleState === 'away' ? $dose['away_reason'] : null,
             'window_start' => $windowStart->toIso8601String(),
             'window_end' => $windowEnd->toIso8601String(),
-            'can_record' => $scheduleState !== 'completed' && $scheduleState !== 'future' && $medication->isAdministrable(),
+            'can_record' => ! in_array($scheduleState, ['completed', 'future', 'self_managed', 'pending_check'], true) && $medication->isAdministrable(),
             'is_overdue' => $scheduleState === 'missed_auto' || $scheduleState === 'late',
             'requires_witness' => $medication->requiresWitness() || $adminRules['requires_countersign'],
             'administration' => $existing ? $this->formatAdministration($existing) : null,
@@ -547,8 +547,10 @@ class EnhancedMarService
             DoseSlotProjection::STATE_LATE => 'late',
             DoseSlotProjection::STATE_NOT_RECORDED => 'missed_auto',
             DoseSlotProjection::STATE_NOT_DUE => ! $isToday ? 'future' : ($dose['due_soon'] ? 'due_soon' : 'upcoming'),
-            // Self-managed, or waiting for the order check (only orders that
-            // can be given are listed here): not chased.
+            // C5 (EA-105): the person gives it themselves, or it waits for
+            // the order check — shown as such, never due, never recordable.
+            DoseSlotProjection::STATE_SELF_MANAGED => 'self_managed',
+            DoseSlotProjection::STATE_PENDING_CHECK => 'pending_check',
             default => $isToday || $dose['due_at']->lt($now) ? 'upcoming' : 'future',
         };
     }
@@ -568,6 +570,8 @@ class EnhancedMarService
             'missed_auto' => ['label' => 'Not recorded', 'color' => 'red', 'icon' => 'x-circle'],
             'completed' => ['label' => 'Given', 'color' => 'green', 'icon' => 'check'],
             'future' => ['label' => 'Future', 'color' => 'slate', 'icon' => 'calendar'],
+            'self_managed' => ['label' => 'Self-managed', 'color' => 'slate', 'icon' => 'user'],
+            'pending_check' => ['label' => 'Waiting for the order check', 'color' => 'slate', 'icon' => 'clock'],
             default => ['label' => $state, 'color' => 'gray', 'icon' => 'help-circle'],
         };
     }

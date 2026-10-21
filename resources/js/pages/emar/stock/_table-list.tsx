@@ -11,7 +11,7 @@ import { ListCaption } from '@/components/lists/list-caption';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { Package } from 'lucide-react';
-import { useState, type MouseEvent } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import type { Pager } from './_types';
 
 /** One set of facts and actions for phone cards and the desktop stock table. */
@@ -23,6 +23,9 @@ export function TableList<T extends { id: number }>({
     columns,
     actions,
     open,
+    caption,
+    identityLabel,
+    identityWidth,
 }: {
     title: string;
     pager: Pager<T>;
@@ -31,6 +34,10 @@ export function TableList<T extends { id: number }>({
     columns: EntityTableColumn<T>[];
     actions: (row: T) => MenuItem[];
     open: (row: T) => void;
+    /** Replaces the default "n of total shown" caption. */
+    caption?: ReactNode;
+    identityLabel?: string;
+    identityWidth?: string;
 }) {
     const [context, setContext] = useState<{
         x: number;
@@ -45,7 +52,10 @@ export function TableList<T extends { id: number }>({
         <div className="grid min-w-0 gap-5">
             <ListCaption
                 title={title}
-                caption={pager.data.length + ' of ' + pager.total + ' shown'}
+                caption={
+                    caption ??
+                    pager.data.length + ' of ' + pager.total + ' shown'
+                }
             />
             {pager.data.length ? (
                 <>
@@ -97,6 +107,8 @@ export function TableList<T extends { id: number }>({
                                 subline: subline(row),
                                 icon: Package,
                             })}
+                            identityLabel={identityLabel}
+                            identityWidth={identityWidth}
                             columns={columns}
                             actionsFor={actions}
                             onOpen={open}

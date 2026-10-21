@@ -33,4 +33,9 @@ class MedicationStockCountRecord extends Model
     {
         return $this->belongsTo(User::class, 'counted_by');
     }
+
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
 }
