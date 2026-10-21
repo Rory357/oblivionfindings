@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { useChatCalling } from '@/components/chat/chat-calling';
 import {
     SheetContent,
     SheetDescription,
@@ -480,19 +481,19 @@ function buildPortalNavItems(
             {
                 id: 'calendar',
                 icon: CalendarDays,
-                label: 'Calendar & Visits',
+                label: 'Calendar & visits',
                 href: `/portal/clients/${cid}/calendar`,
             },
             {
                 id: 'family-notes',
                 icon: CalendarDays,
-                label: 'Notes & To-Dos',
+                label: 'Notes & to-dos',
                 href: `/portal/clients/${cid}/family-notes`,
             },
             {
                 id: 'messages',
                 icon: MessageSquareText,
-                label: 'Messages',
+                label: 'Chat',
                 href: `/portal/clients/${cid}/messages`,
                 dividerAfter: true,
                 badge: unreadMessageCount || undefined,
@@ -500,7 +501,7 @@ function buildPortalNavItems(
             {
                 id: 'health',
                 icon: Heart,
-                label: 'Health & Care',
+                label: 'Health & care',
                 href: `/portal/clients/${cid}/health`,
             },
             {
@@ -518,7 +519,7 @@ function buildPortalNavItems(
             {
                 id: 'photos',
                 icon: Clipboard,
-                label: 'Photo Gallery',
+                label: 'Photo gallery',
                 href: `/portal/clients/${cid}/photos`,
                 dividerAfter: true,
             },
@@ -611,6 +612,9 @@ function buildIconNavItems({
             label: 'My Day',
             href: '/my-day',
         },
+        ...(can?.chat?.use || can?.messages?.viewAny || can?.shifts?.viewAny
+            ? [{ id: 'chat', icon: MessageSquareText, label: 'Chat', href: can?.chat?.use ? '/chat' : '/operations/messages', badge: unreadMessageCount } as IconNavItem]
+            : []),
         {
             id: 'my-calendar',
             icon: CalendarDays,
@@ -1228,16 +1232,6 @@ function buildOperationsSubPanelGroups({
         groups.push({ label: `${clientLabel} Management`, items: clientMgmt });
 
     // Communications
-    const comms: NavItem[] = [];
-    if (can?.messages?.viewAny || can?.shifts?.viewAny)
-        comms.push({
-            title: 'Messages',
-            href: '/operations/messages',
-            icon: MessageSquareText,
-        });
-    if (comms.length > 0)
-        groups.push({ label: 'Communications', items: comms });
-
     // Tools
     const tools: NavItem[] = [];
     if (can?.mileage?.viewAny || can?.mileage?.viewOwn)
@@ -2430,7 +2424,8 @@ export function AppSidebar({
     const can = useStableValue(auth?.can);
     const portalClients = useStableValue(auth?.portalClients ?? null);
     const labels = useStableValue(labelsProp);
-    const unreadMessageCount = (auth as any)?.unreadMessageCount ?? 0;
+    const chatUnread = useChatCalling()?.unreadCount;
+    const unreadMessageCount = chatUnread ?? (auth as any)?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
     const { collapsed: fallbackCollapsed, setExpanded: setFallbackExpanded } =
         useAppSidebarState((page.props as any)?.sidebarOpen ?? true);
@@ -2854,7 +2849,8 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     const can = useStableValue(auth?.can);
     const portalClients = useStableValue(auth?.portalClients ?? null);
     const labels = useStableValue(labelsProp);
-    const unreadMessageCount = auth?.unreadMessageCount ?? 0;
+    const chatUnread = useChatCalling()?.unreadCount;
+    const unreadMessageCount = chatUnread ?? auth?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
 
     const iconNavItems = useMemo(

@@ -1,4 +1,5 @@
 import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
+import { ChatLauncher } from '@/components/chat/chat-launcher';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -553,6 +554,9 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                     </a>
                                                 )}
                                             </div>
+                                            {activeThread.type === 'direct' && activeThread.user_id && (
+                                                <ChatLauncher key={activeThread.user_id} personId={activeThread.user_id} label="Open staff Chat" outline />
+                                            )}
                                         </div>
 
                                         {/* Messages Area */}

@@ -107,6 +107,9 @@ final class MedicationAlertCatalogue
 
     public const REVIEW_DUE = 'reviewDue';
 
+    /** C6 (EA-036): a dose's draft incident waits to be submitted. */
+    public const DOSE_INCIDENT = 'doseIncident';
+
     /** B10 (EA-138): offered only while the pharmacy bridge runs. */
     public const PHARMACY_ORDER = 'pharmacyOrder';
 
@@ -290,6 +293,20 @@ final class MedicationAlertCatalogue
             'controlled' => false,
             'follow_up' => false,
             'until' => 'Until reviewed',
+            'built' => true,
+        ],
+        // C6 (EA-036): a missed dose, a dose given late enough to need an
+        // incident, or a refused high-risk or controlled dose opens a draft
+        // incident. Control Room keeps its queue; this says who is told (P11 Q3).
+        self::DOSE_INCIDENT => [
+            'label' => 'Missed, late or refused dose — incident to submit',
+            'subline' => 'A dose recorded as missed, given late enough to need an incident, or a refused high-risk or controlled dose opens a draft incident',
+            'groups' => [self::HOUSE_LEAD, self::CLINICAL_LEAD, self::ON_CALL, self::PROVIDER_MANAGER, self::ROSTERED],
+            'default' => [self::HOUSE_LEAD],
+            'locked' => [],
+            'controlled' => false,
+            'follow_up' => false,
+            'until' => 'Until someone acknowledges',
             'built' => true,
         ],
         // B10 (EA-138): a connected pharmacy rejected an order, or a send's result

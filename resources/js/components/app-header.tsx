@@ -3,6 +3,7 @@ import {
     resolveWordmarkName,
 } from '@/components/event-horizon-wordmark';
 import GlobalNavSearch from '@/components/global-nav-search';
+import { useChatCalling } from '@/components/chat/chat-calling';
 import GlobalQueryBar from '@/components/global-query-bar';
 import InboxMenus from '@/components/inbox-menus';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
@@ -59,7 +60,8 @@ export function AppHeader({
     const branding = (page.props as any)?.branding as
         | { name?: string; logoUrl?: string | null }
         | undefined;
-    const unreadMessages = Number((auth as any)?.unreadMessageCount ?? 0);
+    const chatUnread = useChatCalling()?.unreadCount;
+    const unreadMessages = Number(chatUnread ?? (auth as any)?.unreadMessageCount ?? 0);
     const getInitials = useInitials();
 
     const canReportIncident = !!can?.incidents?.create;
@@ -69,7 +71,7 @@ export function AppHeader({
         can?.shifts?.viewAssigned ||
         can?.shifts?.manageAny
     );
-    const canMessages = !!(can?.messages?.viewAny || can?.shifts?.viewAny);
+    const canMessages = !!(can?.chat?.use || can?.messages?.viewAny || can?.shifts?.viewAny);
 
     const handleStopImpersonating = () => {
         router.post('/system/users/stop-impersonating');
@@ -220,8 +222,8 @@ export function AppHeader({
                             prefetch
                             aria-label={
                                 unreadMessages > 0
-                                    ? `Messages — ${unreadMessages} unread`
-                                    : 'Messages'
+                                    ? `Chat — ${unreadMessages} unread`
+                                    : 'Chat'
                             }
                             className={cn(
                                 INK_ICON_BUTTON,

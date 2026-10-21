@@ -16,6 +16,7 @@ use App\Services\UserSiteAccessService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -468,7 +469,15 @@ class UsersController extends Controller
             AuditLogger::log('user.deleted', $lockedTarget, [
                 'deleted_by' => $lockedActor->id,
             ]);
-            $lockedTarget->delete();
+            try {
+                $lockedTarget->delete();
+            } catch (QueryException $exception) {
+                // Care communication (Chat messages, calls, callbacks) references its author and must be retained.
+                throw_unless(($exception->errorInfo[1] ?? null) === 1451, $exception);
+                throw ValidationException::withMessages([
+                    'user' => 'This account is linked to retained care communication records, so it cannot be deleted. Remove their portal access instead.',
+                ]);
+            }
         });
 
         return redirect()->route('system.users.index')

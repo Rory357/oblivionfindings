@@ -23,6 +23,7 @@ class PortalFamilyNoteController extends Controller
 
         $notes = FamilyNote::forClient($client->id)
             ->with([
+                'assignedUser:id,name',
                 'creator:id,name',
                 'completer:id,name',
                 'staffResponder:id,name',
@@ -48,6 +49,8 @@ class PortalFamilyNoteController extends Controller
                 'staff_responded_by_name' => $n->staffResponder?->name,
                 'staff_responded_at' => $n->staff_responded_at?->toISOString(),
                 'assigned_shift_date' => $n->shift?->starts_at?->format('j M'),
+                'assigned_to_user_id' => $n->assigned_to_user_id,
+                'assigned_user_name' => $n->assignedUser?->name,
                 'assigned_shift' => $n->shift ? [
                     'id' => $n->shift->id,
                     'starts_at' => $n->shift->starts_at?->toISOString(),

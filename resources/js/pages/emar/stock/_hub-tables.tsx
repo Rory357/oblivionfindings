@@ -127,22 +127,33 @@ export const pharmacyColumns: EntityTableColumn<PharmacyOrderRow>[] = [
                     {pharmacyStatus(row.status)}
                 </EntityStatusChip>
                 {row.dispatch ? (
-                    <span
-                        title={row.dispatch.note ?? row.dispatch.label}
-                        data-testid="pharmacy-dispatch-state"
-                    >
-                        <EntityStatusChip variant={row.dispatch.tone}>
-                            {row.dispatch.short_label}
-                        </EntityStatusChip>
-                        <span className="sr-only">
-                            {` ${row.dispatch.label}. ${row.dispatch.note ?? ''}`}
-                        </span>
-                    </span>
+                    <PharmacyDispatchChip dispatch={row.dispatch} />
                 ) : null}
             </div>
         ),
     },
 ];
+
+/** EA-138: where a connected pharmacy send stands, on an order row. */
+export function PharmacyDispatchChip({
+    dispatch,
+}: {
+    dispatch: NonNullable<PharmacyOrderRow['dispatch']>;
+}) {
+    return (
+        <span
+            title={dispatch.note ?? dispatch.label}
+            data-testid="pharmacy-dispatch-state"
+        >
+            <EntityStatusChip variant={dispatch.tone}>
+                {dispatch.short_label}
+            </EntityStatusChip>
+            <span className="sr-only">
+                {` ${dispatch.label}. ${dispatch.note ?? ''}`}
+            </span>
+        </span>
+    );
+}
 
 export const controlledColumns: EntityTableColumn<ControlledRegisterRow>[] = [
     {

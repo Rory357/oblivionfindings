@@ -28,6 +28,9 @@ class OpsMessage extends Model
         'meta',
         'client_id',
         'shift_id',
+        'mutation_id',
+        'reply_to_id',
+        'edited_at',
     ];
 
     protected $casts = [
@@ -36,6 +39,7 @@ class OpsMessage extends Model
         'is_pinned' => 'boolean',
         'read_at' => 'datetime',
         'meta' => 'array',
+        'edited_at' => 'datetime',
     ];
 
     public function conversation(): BelongsTo

@@ -19,6 +19,7 @@ import {
     type StockPackLine,
 } from '@/components/medications/stock-pack-fields';
 import { SettingsModal } from '@/components/settings/settings-modal';
+import { ChatLauncher } from '@/components/chat/chat-launcher';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -1964,12 +1965,7 @@ function RecordDoseForm({
         }
         if (block.copy.action === 'message-lead' && req.house_lead) {
             return (
-                <Button asChild variant="outline">
-                    <a href="/operations/messages">
-                        <MessageSquare className="size-4" /> Message{' '}
-                        {req.house_lead.name}
-                    </a>
-                </Button>
+                <ChatLauncher personId={req.house_lead.id} label={`Message ${req.house_lead.name}`} outline />
             );
         }
         return null;

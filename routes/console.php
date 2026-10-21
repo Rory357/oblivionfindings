@@ -1036,3 +1036,5 @@ Artisan::command('referrals:prune-intake-drafts', function () {
     $this->info((string) \App\Domain\Referrals\Models\ReferralIntakeDraft::query()->where('expires_at', '<=', now())->delete());
 })->purpose('Remove unfinished referral intake drafts once their seven-day expiry has passed');
 app(Schedule::class)->command('referrals:prune-intake-drafts')->dailyAt('02:20')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
+app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();

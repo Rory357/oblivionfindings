@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -163,6 +164,7 @@ export default function Api() {
         null,
     );
     const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
+    const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null);
 
     useEffect(() => {
         setApiKeys(api_keys);
@@ -279,6 +281,7 @@ export default function Api() {
             });
         } finally {
             setRevokingKeyId(null);
+            setKeyToRevoke(null);
         }
     }
 
@@ -503,8 +506,8 @@ export default function Api() {
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() =>
-                                                                revokeKey(
-                                                                    key.id,
+                                                                setKeyToRevoke(
+                                                                    key,
                                                                 )
                                                             }
                                                             disabled={
@@ -930,6 +933,30 @@ export default function Api() {
                         )}
                     </DialogContent>
                 </Dialog>
+
+                <ConfirmDialog
+                    open={keyToRevoke !== null}
+                    onClose={() => {
+                        if (revokingKeyId === null) setKeyToRevoke(null);
+                    }}
+                    onConfirm={() => {
+                        if (keyToRevoke) void revokeKey(keyToRevoke.id);
+                    }}
+                    title="Revoke this API key?"
+                    description={
+                        <>
+                            <span className="font-medium text-foreground">
+                                {keyToRevoke?.name}
+                            </span>{' '}
+                            stops working straight away. Any system still using
+                            it will be refused until it is given a new key. This
+                            cannot be undone.
+                        </>
+                    }
+                    confirmText="Revoke key"
+                    variant="destructive"
+                    processing={revokingKeyId !== null}
+                />
             </SettingsLayout>
         </AppLayout>
     );

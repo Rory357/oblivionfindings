@@ -25,6 +25,8 @@ class ClientFamilyChatController extends Controller
 
     public function show(Request $request, Client $client)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $this->authorize('view', $client);
         $user = $request->user();
         abort_unless($this->familyCommunicationAccess->canView($user, $client), 403);
@@ -105,6 +107,8 @@ class ClientFamilyChatController extends Controller
 
     public function store(Request $request, Client $client)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $this->authorize('view', $client);
         $user = $request->user();
         abort_unless($this->familyCommunicationAccess->canManage($user, $client), 403);
@@ -151,6 +155,9 @@ class ClientFamilyChatController extends Controller
             ->orderByDesc('updated_at')
             ->first();
 
+        if ($conversation) {
+            abort_if($conversation->participants()->where('user_id', $user->id)->first()?->history_after_id !== null, 403);
+        }
         if ($conversation || ! $createIfMissing) {
             return $conversation;
         }

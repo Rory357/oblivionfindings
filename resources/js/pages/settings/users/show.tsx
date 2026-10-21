@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -239,6 +240,15 @@ export default function UserShow({
     const assignedIds = new Set(roles.map((r: Role) => r.id));
     const availableRoles = allRoles.filter((r) => !assignedIds.has(r.id));
     const [eventFilter, setEventFilter] = useState('all');
+    // Which session(s) the admin asked to end, pending confirmation.
+    const [sessionsToEnd, setSessionsToEnd] = useState<
+        Session | 'others' | null
+    >(null);
+    const [endingSessions, setEndingSessions] = useState(false);
+    const [confirmSuspend, setConfirmSuspend] = useState(false);
+    const [suspending, setSuspending] = useState(false);
+    const [roleToRemove, setRoleToRemove] = useState<Role | null>(null);
+    const [removingRole, setRemovingRole] = useState(false);
     const stats = login_stats ?? {
         this_month: 0,
         last_ip: undefined,
@@ -319,13 +329,7 @@ export default function UserShow({
                                     variant="outline"
                                     dusk="user-suspend-action"
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    onClick={() =>
-                                        router.post(
-                                            `${usersBasePath}/${u.id}/suspend`,
-                                            {},
-                                            { preserveScroll: true },
-                                        )
-                                    }
+                                    onClick={() => setConfirmSuspend(true)}
                                 >
                                     <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />{' '}
                                     Suspend
@@ -591,28 +595,14 @@ export default function UserShow({
                                                         variant="ghost"
                                                         size="icon"
                                                         dusk={`user-role-remove-${role.id}`}
-                                                        onClick={() => {
-                                                            const newIds =
-                                                                Array.from(
-                                                                    assignedIds,
-                                                                ).filter(
-                                                                    (id) =>
-                                                                        id !==
-                                                                        role.id,
-                                                                );
-                                                            router.put(
-                                                                `${usersBasePath}/${u.id}`,
-                                                                {
-                                                                    role_ids:
-                                                                        newIds,
-                                                                },
-                                                                {
-                                                                    preserveScroll: true,
-                                                                },
-                                                            );
-                                                        }}
+                                                        onClick={() =>
+                                                            setRoleToRemove(
+                                                                role,
+                                                            )
+                                                        }
                                                         className="h-7 w-7 rounded text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical"
                                                         title="Remove role"
+                                                        aria-label={`Remove role ${role.label || role.name}`}
                                                     >
                                                         <X className="h-3.5 w-3.5" />
                                                     </Button>
@@ -788,12 +778,7 @@ export default function UserShow({
                             <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() =>
-                                    router.delete(
-                                        `${usersBasePath}/${u.id}/sessions`,
-                                        { preserveScroll: true },
-                                    )
-                                }
+                                onClick={() => setSessionsToEnd('others')}
                             >
                                 <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                                 Terminate All Other Sessions
@@ -875,11 +860,8 @@ export default function UserShow({
                                                     variant="outline"
                                                     className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
                                                     onClick={() =>
-                                                        router.delete(
-                                                            `${usersBasePath}/${u.id}/sessions/${session.id}`,
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
+                                                        setSessionsToEnd(
+                                                            session,
                                                         )
                                                     }
                                                 >
@@ -1068,10 +1050,126 @@ export default function UserShow({
         </PageLayout>
     );
 
+    const endSessions = () => {
+        if (sessionsToEnd === null) return;
+        const url =
+            sessionsToEnd === 'others'
+                ? `${usersBasePath}/${u.id}/sessions`
+                : `${usersBasePath}/${u.id}/sessions/${sessionsToEnd.id}`;
+        router.delete(url, {
+            preserveScroll: true,
+            onStart: () => setEndingSessions(true),
+            onFinish: () => {
+                setEndingSessions(false);
+                setSessionsToEnd(null);
+            },
+        });
+    };
+    const suspendUser = () =>
+        router.post(
+            `${usersBasePath}/${u.id}/suspend`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setSuspending(true),
+                onFinish: () => {
+                    setSuspending(false);
+                    setConfirmSuspend(false);
+                },
+            },
+        );
+    const removeRole = () => {
+        if (roleToRemove === null) return;
+        router.put(
+            `${usersBasePath}/${u.id}`,
+            {
+                role_ids: Array.from(assignedIds).filter(
+                    (id) => id !== roleToRemove.id,
+                ),
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setRemovingRole(true),
+                onFinish: () => {
+                    setRemovingRole(false);
+                    setRoleToRemove(null);
+                },
+            },
+        );
+    };
+    const sessionDevice =
+        sessionsToEnd !== null && sessionsToEnd !== 'others'
+            ? parseBrowser(sessionsToEnd.user_agent)
+            : null;
+    const who = isSelf ? 'You' : (u.name ?? 'This user');
+    // The server keeps only the admin's own current session, so ending
+    // "other" sessions for someone else signs them out everywhere.
+    const endSessionsCopy =
+        sessionsToEnd === 'others'
+            ? {
+                  title: isSelf
+                      ? 'End all your other sessions?'
+                      : `End all sessions for ${who}?`,
+                  description: isSelf
+                      ? 'You will be signed out on every other device straight away and will need to sign in again there. This device stays signed in.'
+                      : `${who} will be signed out on every device straight away and will need to sign in again. Anything not yet saved may be lost.`,
+                  confirmText: isSelf ? 'End other sessions' : 'End all sessions',
+              }
+            : {
+                  title: 'End this session?',
+                  description: `${who} will be signed out of ${sessionDevice?.browser ?? 'this browser'} on ${sessionDevice?.os ?? 'this device'} straight away and will need to sign in again there. Anything not yet saved on that device may be lost.`,
+                  confirmText: 'End session',
+              };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${u.name ?? 'User'} - System`} />
             {content}
+            <ConfirmDialog
+                open={sessionsToEnd !== null}
+                onClose={() => {
+                    if (!endingSessions) setSessionsToEnd(null);
+                }}
+                onConfirm={endSessions}
+                title={endSessionsCopy.title}
+                description={endSessionsCopy.description}
+                confirmText={endSessionsCopy.confirmText}
+                variant="destructive"
+                processing={endingSessions}
+            />
+            <ConfirmDialog
+                open={confirmSuspend}
+                onClose={() => {
+                    if (!suspending) setConfirmSuspend(false);
+                }}
+                onConfirm={suspendUser}
+                title={`Suspend ${u.name ?? 'this user'}?`}
+                description={`${u.name ?? 'This user'} will be signed out the next time they use the app and can't sign in again until someone approves their account. Their records and roles are kept.`}
+                confirmText="Suspend user"
+                variant="destructive"
+                processing={suspending}
+            />
+            <ConfirmDialog
+                open={roleToRemove !== null}
+                onClose={() => {
+                    if (!removingRole) setRoleToRemove(null);
+                }}
+                onConfirm={removeRole}
+                title="Remove this role?"
+                description={
+                    <>
+                        {u.name ?? 'This user'} loses the access that comes with{' '}
+                        <span className="font-medium text-foreground">
+                            {roleToRemove?.label || roleToRemove?.name}
+                        </span>{' '}
+                        straight away, unless another of their roles also gives
+                        it. You can add the role back at any time.
+                    </>
+                }
+                confirmText="Remove role"
+                variant="destructive"
+                processing={removingRole}
+            />
         </AppLayout>
     );
 }

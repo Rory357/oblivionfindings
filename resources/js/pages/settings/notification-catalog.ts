@@ -19,6 +19,31 @@ export const NOTIFICATION_META: Record<string, NotificationMeta> = {
         description:
             'When a draft service agreement is made from a referral’s approved proposal and needs review. Sent to Finance.',
     },
+    'chat.call.missed': {
+        name: 'Missed Chat calls',
+        description:
+            'Calls you were invited to but did not answer. Quiet time and conversation mute still apply. Opening a notice does not call anyone.',
+    },
+    'chat.family.assigned': {
+        name: 'Family work assigned to you',
+        description:
+            'New ownership or handover of an unresolved family conversation. Quiet time and conversation mute still apply; notices contain no care details.',
+    },
+    'chat.message.received': {
+        name: 'New Chat messages',
+        description:
+            'New messages in conversations you can access. Muted or already-read messages do not create a notice.',
+    },
+    'chat.mentioned': {
+        name: 'Mentions in Chat',
+        description:
+            'When someone mentions you in a conversation you can access. Conversation mute and quiet time still apply.',
+    },
+    'chat.family.reply': {
+        name: 'Replies from the care team',
+        description:
+            'Replies in your approved family conversations. Notices keep client names and message content private.',
+    },
     'hr.calendar.reminder': {
         name: 'Company event reminders',
         description:
@@ -100,6 +125,17 @@ export const NOTIFICATION_META: Record<string, NotificationMeta> = {
 };
 
 export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
+    chat: {
+        label: 'Chat',
+        colour: 'violet',
+        keys: [
+            'chat.message.received',
+            'chat.mentioned',
+            'chat.family.reply',
+            'chat.family.assigned',
+            'chat.call.missed',
+        ],
+    },
     company: {
         label: 'Company Hub',
         colour: 'violet',
@@ -155,6 +191,10 @@ export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
         ],
     },
 };
+
+export function isChatNotificationKey(key: string): boolean {
+    return NOTIFICATION_MODULES.chat.keys.includes(key);
+}
 
 export function friendlyNotificationName(key: string): string {
     return (

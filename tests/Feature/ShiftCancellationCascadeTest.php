@@ -10,6 +10,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetVehicleBooking;
+use App\Models\MedicationFollowup;
 use App\Models\MedicationRound;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -19,6 +20,7 @@ use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Medication\Followups\CancelledShiftDoseReview;
 use App\Services\ShiftCancellationService;
 use App\Services\ShiftHandoverService;
 use App\Services\ShiftTimelineService;
@@ -129,7 +131,8 @@ class ShiftCancellationCascadeTest extends TestCase
         ]);
     }
 
-    public function test_cancelling_shift_flags_linked_medication_records_for_review(): void
+    /** eMAR C5 (EA-071): the dose record is left as recorded; a lead is asked to review it. */
+    public function test_cancelling_shift_asks_a_lead_to_review_linked_dose_records_and_flags_the_round(): void
     {
         $shift = $this->makeShift();
         $medication = ClientMedication::factory()->create([
@@ -152,8 +155,9 @@ class ShiftCancellationCascadeTest extends TestCase
             'shift_id' => $shift->id,
             'medication_round_id' => $round->id,
             'administered_by' => $this->staff->id,
-            'status' => 'pending',
+            'status' => 'given',
             'scheduled_for' => now(),
+            'administered_at' => now(),
             'notes' => 'Created before cancellation',
         ]);
 
@@ -162,9 +166,11 @@ class ShiftCancellationCascadeTest extends TestCase
         $administration->refresh();
         $round->refresh();
 
-        $this->assertTrue((bool) $administration->review_required);
-        $this->assertSame(ShiftCancellationService::MEDICATION_REVIEW_REASON, $administration->review_reason);
-        $this->assertStringContainsString(ShiftCancellationService::MEDICATION_REVIEW_REASON, (string) $administration->notes);
+        $this->assertFalse((bool) $administration->review_required);
+        $this->assertSame('Created before cancellation', $administration->notes);
+        $review = MedicationFollowup::query()->where('administration_id', $administration->id)
+            ->where('type', CancelledShiftDoseReview::TYPE)->sole();
+        $this->assertSame(ShiftCancellationService::MEDICATION_REVIEW_REASON, $review->context['reason']);
 
         $this->assertTrue((bool) $round->review_required);
         $this->assertSame(ShiftCancellationService::MEDICATION_ROUND_REVIEW_REASON, $round->review_reason);

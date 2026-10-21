@@ -473,6 +473,7 @@ require __DIR__.'/compliance.php';
 require __DIR__.'/reports.php';
 require __DIR__.'/integrations.php';
 require __DIR__.'/settings.php';
+require __DIR__.'/chat.php';
 require __DIR__.'/respite.php';
 
 // Compliance module routes

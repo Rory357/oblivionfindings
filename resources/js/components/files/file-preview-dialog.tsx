@@ -20,7 +20,8 @@ import {
 } from 'lucide-react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { AudioPreview } from './audio-preview';
 
 export type PreviewFile = {
     id: string | number;
@@ -28,6 +29,7 @@ export type PreviewFile = {
     filename?: string | null;
     mime?: string | null;
     bytes?: number | null;
+    durationMs?: number | null;
     version?: string | number | null;
     source?: string | null;
     previewUrl: string | null;
@@ -42,7 +44,27 @@ const IMAGE_TYPES = new Set([
     'image/gif',
     'image/webp',
 ]);
+const AUDIO_TYPES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4']);
 const MAX_BYTES = 25 * 1024 * 1024;
+const FILE_LABELS: Record<string, string> = {
+    'audio/webm': 'Voice message',
+    'audio/ogg': 'Voice message',
+    'audio/mp4': 'Voice message',
+    'application/pdf': 'PDF',
+    'image/png': 'PNG image',
+    'image/jpeg': 'JPEG image',
+    'image/gif': 'GIF image',
+    'image/webp': 'WebP image',
+    'application/msword': 'Word document',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        'Word document',
+    'application/vnd.ms-excel': 'Excel spreadsheet',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+        'Excel spreadsheet',
+    'text/csv': 'CSV spreadsheet',
+    'text/plain': 'Text file',
+    'application/rtf': 'Text document',
+};
 
 /** Authenticated source URLs only; never send a private file to an external viewer. */
 export function permittedFileUrl(
@@ -65,9 +87,20 @@ export function permittedFileUrl(
 export function FilePreviewDialog({
     file,
     onClose,
+    compact = false,
+    actions,
+    headerActions,
+    onReturnFocus,
+    localFile,
 }: {
     file: PreviewFile | null;
     onClose: () => void;
+    compact?: boolean;
+    actions?: ReactNode;
+    headerActions?: ReactNode;
+    onReturnFocus?: () => void;
+    /** Explicit user-selected bytes; never populated from server metadata. */
+    localFile?: File;
 }) {
     return (
         <Dialog
@@ -78,16 +111,30 @@ export function FilePreviewDialog({
         >
             {file && (
                 <DialogContent
-                    className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0"
+                    className={`flex flex-col gap-0 overflow-hidden p-0 ${compact ? 'max-h-[85dvh] [&_a]:min-h-[44px] [&_button]:min-h-[44px] [&_button]:min-w-[44px] [&_summary]:min-h-[44px]' : 'max-h-[92vh]'}`}
                     style={{
-                        width: 'min(92vw, 900px)',
-                        maxWidth: 'min(92vw, 900px)',
+                        width: compact
+                            ? 'min(calc(100vw - 40px), 440px)'
+                            : 'min(92vw, 900px)',
+                        maxWidth: compact
+                            ? 'min(calc(100vw - 40px), 440px)'
+                            : 'min(92vw, 900px)',
                     }}
+                    onCloseAutoFocus={
+                        onReturnFocus
+                            ? (event) => {
+                                  event.preventDefault();
+                                  onReturnFocus();
+                              }
+                            : undefined
+                    }
                 >
                     <DialogHeader className="shrink-0 border-b p-5 pr-12">
                         <DialogTitle className="flex min-w-0 items-center gap-3">
                             <FileText className="size-5 shrink-0 text-primary" />
-                            <span className="break-words">{file.name}</span>
+                            <span className="min-w-0 [overflow-wrap:anywhere]">
+                                {file.name}
+                            </span>
                         </DialogTitle>
                         <DialogDescription className="break-words">
                             {[
@@ -98,11 +145,14 @@ export function FilePreviewDialog({
                                 .filter(Boolean)
                                 .join(' · ') || 'Original document'}
                         </DialogDescription>
+                        {headerActions}
                     </DialogHeader>
                     <FilePreviewBody
                         key={`${file.id}:${file.version}:${file.previewUrl}`}
                         file={file}
                         onClose={onClose}
+                        actions={actions}
+                        localFile={localFile}
                     />
                 </DialogContent>
             )}
@@ -113,15 +163,20 @@ export function FilePreviewDialog({
 function FilePreviewBody({
     file,
     onClose,
+    actions,
+    localFile,
 }: {
     file: PreviewFile;
     onClose: () => void;
+    actions?: ReactNode;
+    localFile?: File;
 }) {
     const [attempt, setAttempt] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [accessEnded, setAccessEnded] = useState(false);
     const [image, setImage] = useState<string | null>(null);
+    const [audio, setAudio] = useState<string | null>(null);
     const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
     const [page, setPage] = useState(1);
     const [zoom, setZoom] = useState(100);
@@ -131,9 +186,11 @@ function FilePreviewBody({
     const canvas = useRef<HTMLCanvasElement>(null);
     const viewport = useRef<HTMLDivElement>(null);
     const source = permittedFileUrl(file.previewUrl);
-    const download = permittedFileUrl(file.downloadUrl);
+    const download = localFile ? null : permittedFileUrl(file.downloadUrl);
     const supported =
-        file.mime === 'application/pdf' || IMAGE_TYPES.has(file.mime ?? '');
+        file.mime === 'application/pdf' ||
+        IMAGE_TYPES.has(file.mime ?? '') ||
+        AUDIO_TYPES.has(file.mime ?? '');
 
     useEffect(() => {
         const controller = new AbortController();
@@ -144,22 +201,38 @@ function FilePreviewBody({
             | undefined;
         setPdf(null);
         setImage(null);
+        setAudio(null);
         setPage(1);
         setPageText('');
         setError('');
         setAccessEnded(false);
-        if (!source || !supported) return () => controller.abort();
+        if ((!source && !localFile) || !supported)
+            return () => controller.abort();
         setLoading(true);
         void (async () => {
             try {
-                const response = await fetch(source, {
-                    credentials: 'same-origin',
-                    signal: controller.signal,
-                    headers: {
-                        Accept: file.mime ?? 'application/octet-stream',
-                    },
-                    cache: 'no-store',
-                });
+                if (localFile && localFile.size > MAX_BYTES)
+                    throw new Error(
+                        'This file is too large for the in-app preview. Open the original on your device.',
+                    );
+                const response = localFile
+                    ? new Response(await localFile.arrayBuffer(), {
+                          headers: {
+                              'content-type': localFile.type,
+                              'content-length': String(localFile.size),
+                          },
+                      })
+                    : await fetch(source!, {
+                          credentials: 'same-origin',
+                          signal: AbortSignal.any([
+                              controller.signal,
+                              AbortSignal.timeout(30000),
+                          ]),
+                          headers: {
+                              Accept: file.mime ?? 'application/octet-stream',
+                          },
+                          cache: 'no-store',
+                      });
                 if ([401, 403, 404, 409, 410].includes(response.status)) {
                     if (alive) setAccessEnded(true);
                     throw new Error(
@@ -168,6 +241,14 @@ function FilePreviewBody({
                             : 'This file is no longer available to open. Refresh the source record.',
                     );
                 }
+                if (response.status === 413)
+                    throw new Error(
+                        'This file is too large for the in-app preview. Download the original to read it.',
+                    );
+                if (response.status === 415)
+                    throw new Error(
+                        'This file cannot be safely previewed in its recorded format. Download the original if needed.',
+                    );
                 if (!response.ok)
                     throw new Error(
                         'The file could not be retrieved. Retry when ready.',
@@ -208,7 +289,8 @@ function FilePreviewBody({
                     objectUrl = URL.createObjectURL(
                         new Blob([bytes], { type: mime }),
                     );
-                    setImage(objectUrl);
+                    if (AUDIO_TYPES.has(mime ?? '')) setAudio(objectUrl);
+                    else setImage(objectUrl);
                 }
             } catch (failure) {
                 if (alive && !controller.signal.aborted)
@@ -216,9 +298,12 @@ function FilePreviewBody({
                         failure instanceof Error &&
                             failure.name === 'PasswordException'
                             ? 'This PDF is password-protected. Download it to open with your document reader.'
-                            : failure instanceof Error
-                              ? failure.message
-                              : 'The preview could not load. Retry or download the original.',
+                            : failure instanceof Error &&
+                                failure.name === 'TimeoutError'
+                              ? 'The preview took too long to load. Retry or download the original.'
+                              : failure instanceof Error
+                                ? failure.message
+                                : 'The preview could not load. Retry or download the original.',
                     );
             } finally {
                 if (alive) setLoading(false);
@@ -230,7 +315,7 @@ function FilePreviewBody({
             if (objectUrl) URL.revokeObjectURL(objectUrl);
             void task?.destroy();
         };
-    }, [source, supported, file.mime, attempt]);
+    }, [source, supported, file.mime, attempt, localFile]);
 
     useEffect(() => {
         if (!pdf || !viewport.current) return;
@@ -302,10 +387,11 @@ function FilePreviewBody({
         };
     }, [pdf, page, zoom, viewportWidth, loading]);
 
-    const unavailable = !source
-        ? file.unavailableReason ||
-          'This file is unavailable. Its source record retains the details.'
-        : null;
+    const unavailable =
+        !source && !localFile
+            ? file.unavailableReason ||
+              'This file is unavailable. Its source record retains the details.'
+            : null;
     return (
         <>
             <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
@@ -319,7 +405,7 @@ function FilePreviewBody({
                     aria-label="File viewer controls"
                 >
                     <span className="text-caption text-muted-foreground">
-                        {file.mime || 'File'}
+                        {FILE_LABELS[file.mime ?? ''] || 'File'}
                         {file.bytes != null
                             ? ` · ${Math.ceil(file.bytes / 1024)} KB`
                             : ''}
@@ -389,7 +475,9 @@ function FilePreviewBody({
                         Loading file…
                     </p>
                 )}
-                {(unavailable || error || (source && !supported)) && (
+                {(unavailable ||
+                    error ||
+                    ((source || localFile) && !supported)) && (
                     <div
                         className="space-y-3 p-6"
                         role={error ? 'alert' : 'status'}
@@ -398,7 +486,9 @@ function FilePreviewBody({
                         <p>
                             {unavailable ||
                                 error ||
-                                'This file format cannot be previewed here. Download the original to open it in a compatible application.'}
+                                (localFile
+                                    ? 'This file format cannot be previewed here. Open the original on your device before sending.'
+                                    : 'This file format cannot be previewed here. Download the original to open it in a compatible application.')}
                         </p>
                         {error && (
                             <Button
@@ -409,6 +499,16 @@ function FilePreviewBody({
                                 Retry preview
                             </Button>
                         )}
+                    </div>
+                )}
+                {!loading && !error && audio && (
+                    <div className="p-4">
+                        <AudioPreview
+                            key={audio}
+                            url={audio}
+                            duration={(file.durationMs ?? 0) / 1000}
+                            label={file.name}
+                        />
                     </div>
                 )}
                 {!loading && !error && (pdf || image) && (
@@ -458,6 +558,7 @@ function FilePreviewBody({
                 <Button variant="outline" onClick={onClose}>
                     Close viewer
                 </Button>
+                {actions}
                 {download && !accessEnded && (
                     <Button asChild>
                         <a

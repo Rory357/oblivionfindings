@@ -1,3 +1,5 @@
+import type { PharmacyOrderRow } from './_hub-types';
+
 export type Pager<T> = {
     data: T[];
     total: number;
@@ -30,6 +32,25 @@ export type StockItem = {
     expired_packs: number;
     state: string;
     days_supply: number | null;
+    /** Approved P06 row (Main, 20 Oct): MedicationStockQuantity::display — "68", "2.5", "0". */
+    usable_display?: string | null;
+    physical_display?: string | null;
+    reorder_display?: string | null;
+    /** Open packs past their expiry, still held: take out of use. */
+    expired_lots?: {
+        batch_number: string | null;
+        expiry_date: string;
+        quantity: string;
+    }[];
+    /** Open, unexpired packs; the next one to use and how far off its expiry is. */
+    usable_packs?: number;
+    next_quantity?: string | null;
+    next_expiry_in_days?: number | null;
+    /** The order the row follows: a due delivery, then a sent order, then a draft. */
+    open_order?: SupplyOrder | null;
+    count_to_sign_off?: { id: number; counted_at: string | null } | null;
+    /** P03 support: the person manages this medicine themselves. */
+    self_managed?: boolean;
 };
 export type PackPhoto = {
     id: number;
@@ -102,6 +123,21 @@ export type SupplyOrder = {
     closure_reason: string | null;
     batch_number: string | null;
     batch_expiry: string | null;
+    /** EA-138: the connected pharmacy send, while the connection runs. */
+    dispatch?: PharmacyOrderRow['dispatch'];
+    /** A part delivery: what is still to come (MedicationStockQuantity::display). */
+    still_to_come?: string | null;
+    /** Past its expected delivery, or (undated) the date it was needed by. */
+    overdue?: boolean;
+    /** Approved P06 rows: the unit, whole-number quantities and the dates the state lines read. */
+    unit?: string | null;
+    received_display?: string;
+    dispensed_display?: string | null;
+    created_at?: string | null;
+    submitted_at?: string | null;
+    dispensed_at?: string | null;
+    delivered_at?: string | null;
+    closed_at?: string | null;
 };
 export type StockCount = {
     id: number;
@@ -119,6 +155,11 @@ export type StockCount = {
         counted: string;
         revision: number;
     }[];
+    /** Approved P06 Counts: totals as whole numbers, and who signed a difference off. */
+    counted_total?: string;
+    expected_total?: string;
+    reviewed_at?: string | null;
+    reviewed_by_name?: string | null;
 };
 export type Movement = {
     id: number;
@@ -127,6 +168,11 @@ export type Movement = {
     client_name: string;
     kind: string;
     quantity: string;
+    /** MedicationStockQuantity::display: whole when whole. */
+    quantity_display?: string;
+    /** Approved P06: the stock unit, and the signed change ("-6", "+20"). */
+    unit?: string | null;
+    change_display?: string;
     balance_before: string;
     balance_after: string;
     reason: string;
@@ -172,4 +218,19 @@ export type LatestPackPhoto = {
     pack_changed?: boolean;
     now_pack?: string | null;
     source?: string | null;
+};
+/** Approved P06 Expiring and Removals: an open pack past, or within 30 days of, its expiry. */
+export type ExpiryPack = {
+    id: number;
+    medication_id: number;
+    medication_name: string;
+    client_name: string;
+    controlled: boolean;
+    batch_number: string | null;
+    expiry_date: string;
+    /** Days from today (NZ) to the expiry; negative once expired. */
+    days: number;
+    /** MedicationStockQuantity::display. */
+    quantity: string;
+    unit: string | null;
 };

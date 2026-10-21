@@ -10,6 +10,7 @@ import axios from 'axios';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import StockHub from './StockHub';
+import { stockMeters } from './__fixtures__/meters';
 import type { ItemDetail, StockItem } from './_types';
 
 vi.mock('@/layouts/app-layout', () => ({
@@ -59,7 +60,7 @@ function showStock(view: 'stock' | 'expiring' = 'stock') {
             sites={[]}
             pharmacies={[]}
             filters={{ view, search: '', site_id: null }}
-            metrics={{ tracked: 25, out: 0, expiring: 0, orders: 0, counts: 0 }}
+            metrics={stockMeters({ tracked: 25 })}
             can={{ manage: false, receive: false, controlled: false }}
             lots_enabled
         />,
@@ -106,7 +107,8 @@ afterEach(() => {
 });
 
 describe('Stock pictures load for the opened medicine', () => {
-    it.each(['stock', 'expiring'] as const)(
+    // The approved Expiring view lists packs, not medicines (P06 1440-15).
+    it.each(['stock'] as const)(
         '%s keeps 25 rows compact and fetches only the opened medicine picture',
         async (view) => {
             showStock(view);

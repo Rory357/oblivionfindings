@@ -4,6 +4,7 @@ namespace App\Services\Medication\Alerts;
 
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
+use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
 use App\Models\ControlledDrugLossReport;
@@ -618,6 +619,43 @@ class MedicationAlertSources
                 MedicationAlertCatalogue::PRN_LIMIT,
                 $this->prnSubject($client, $order, 'prn:'.$order->id, $this->house($client), $this->person($client)),
             );
+        }));
+    }
+
+    /**
+     * C6 (EA-036): a missed, late or refused dose opened a draft incident
+     * that someone has to submit. Raised once per draft, after the record
+     * commits; a controlled medicine's alert reaches only controlled readers.
+     */
+    public function doseIncident(ClientIncident $incident, ClientMedication $order, string $kind): void
+    {
+        $incidentId = (int) $incident->id;
+        $orderId = (int) $order->id;
+        DB::afterCommit(fn () => $this->safely(MedicationAlertCatalogue::DOSE_INCIDENT, function () use ($incidentId, $orderId, $kind): void {
+            $incident = ClientIncident::query()->with('client.site:id,name')->find($incidentId);
+            $order = ClientMedication::query()->find($orderId);
+            $client = $incident?->client;
+            if (! $client instanceof Client || $client->site_id === null || $order === null) {
+                return;
+            }
+            $house = $this->house($client);
+            $what = match ($kind) {
+                'missed_dose' => 'was recorded as missed',
+                'late_dose' => 'was given late',
+                default => 'was refused',
+            };
+            $this->alerts->raise(MedicationAlertCatalogue::DOSE_INCIDENT, new MedicationAlertSubject(
+                key: 'dose-incident:'.$incident->id,
+                siteId: (int) $client->site_id,
+                title: 'Dose incident to submit',
+                message: "{$this->person($client)} — a dose of {$order->name} {$what}. Its draft incident waits to be submitted. {$house}.",
+                shortMessage: "A dose incident at {$house} waits to be submitted.",
+                actionUrl: '/incidents/'.$incident->id,
+                severity: 'warning',
+                clientId: (int) $client->id,
+                controlled: (bool) $order->controlled_drug,
+                context: ['client_id' => (int) $client->id, 'client_medication_id' => (int) $order->id, 'incident_id' => (int) $incident->id],
+            ));
         }));
     }
 

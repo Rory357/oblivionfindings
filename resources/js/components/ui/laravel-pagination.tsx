@@ -18,6 +18,11 @@ interface LaravelPaginationProps {
     preserveScroll?: boolean;
     /** Same-page partial visits preserve an owning settings draft. */
     only?: string[];
+    /**
+     * A list loaded as JSON (not a page visit) pages through this with the
+     * link's `?page=N` instead of an Inertia visit.
+     */
+    onPage?: (page: number) => void;
 }
 
 function stripHtml(html: string): string {
@@ -41,6 +46,7 @@ export function LaravelPagination({
     preserveState = true,
     preserveScroll = false,
     only,
+    onPage,
 }: LaravelPaginationProps) {
     if (!links || links.length <= 3) return null;
     if (lastPage !== undefined && lastPage <= 1) return null;
@@ -48,6 +54,19 @@ export function LaravelPagination({
         preserveState,
         ...(only ? { only } : {}),
         ...(preserveScroll ? { preserveScroll: true } : {}),
+    };
+    const open = (url: string | null) => {
+        if (!url) return;
+        if (onPage) {
+            const page = Number(
+                new URL(url, 'https://pagination.invalid').searchParams.get(
+                    'page',
+                ),
+            );
+            if (page > 0) onPage(page);
+            return;
+        }
+        router.get(url, {}, visitOptions);
     };
 
     // The buttons keep the compact sm size; frontline-hit gives each a 44 px
@@ -71,10 +90,7 @@ export function LaravelPagination({
                             variant="outline"
                             size="sm"
                             disabled={!link.url}
-                            onClick={() =>
-                                link.url &&
-                                router.get(link.url, {}, visitOptions)
-                            }
+                            onClick={() => open(link.url)}
                             aria-label="Previous page"
                             className="frontline-hit min-w-[36px]"
                         >
@@ -90,10 +106,7 @@ export function LaravelPagination({
                             variant="outline"
                             size="sm"
                             disabled={!link.url}
-                            onClick={() =>
-                                link.url &&
-                                router.get(link.url, {}, visitOptions)
-                            }
+                            onClick={() => open(link.url)}
                             aria-label="Next page"
                             className="frontline-hit min-w-[36px]"
                         >
@@ -108,9 +121,7 @@ export function LaravelPagination({
                         variant={link.active ? 'default' : 'outline'}
                         size="sm"
                         disabled={!link.url}
-                        onClick={() =>
-                            link.url && router.get(link.url, {}, visitOptions)
-                        }
+                        onClick={() => open(link.url)}
                         aria-current={link.active ? 'page' : undefined}
                         className="frontline-hit min-w-[36px]"
                     >

@@ -1,3 +1,7 @@
+import {
+    ChatNoticeCard,
+    ChatNoticePreviews,
+} from '@/components/chat/chat-notice-card';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,7 +21,7 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowRight,
     Bell,
@@ -181,6 +185,9 @@ export default function NotificationsIndex({
     filters = null,
     announcements = null,
 }: Props) {
+    const actorId =
+        usePage<{ auth?: { user?: { id: number } } }>().props.auth?.user?.id ??
+        null;
     const notifData = useMemo(
         () => notifications?.data ?? [],
         [notifications?.data],
@@ -285,650 +292,706 @@ export default function NotificationsIndex({
     const hasActiveFilters = currentFilter !== 'all' || currentType !== 'all';
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Notification Centre" />
+        <ChatNoticePreviews
+            actorId={actorId}
+            notificationIds={notifData
+                .filter((item) => item.data?.kind === 'chat')
+                .map((item) => item.id)}
+        >
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Notification Centre" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={Bell}
-                        title="Notification Centre"
-                        description="Stay on top of what matters"
-                        stats={[
-                            { label: 'Total', value: totalNotifs },
-                            { label: 'Unread', value: unread },
-                            { label: 'Acknowledged', value: acknowledged },
-                            { label: 'Action required', value: requiresAction },
-                        ]}
-                        actions={
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={!unread}
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                onClick={markAllRead}
-                            >
-                                <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                                Mark All Read
-                            </Button>
-                        }
-                    />
-                }
-            >
-                {/* Stats Row */}
-                <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <Card className="border-primary dark:border-primary/30">
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
-                                <Inbox className="h-5 w-5 text-primary dark:text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-primary dark:text-primary">
-                                    {totalNotifs}
-                                </p>
-                                <p className="text-xs font-medium text-muted-foreground">
-                                    Total
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-primary dark:border-primary/30">
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
-                                <BellRing className="h-5 w-5 text-primary dark:text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-primary dark:text-primary">
-                                    {unread}
-                                </p>
-                                <p className="text-xs font-medium text-muted-foreground">
-                                    Unread
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-success/30 dark:border-status-success/30">
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success-bg">
-                                <CheckCircle2 className="h-5 w-5 text-status-success dark:text-status-success" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-status-success dark:text-status-success">
-                                    {acknowledged}
-                                </p>
-                                <p className="text-xs font-medium text-muted-foreground">
-                                    Acknowledged
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-warning/30 dark:border-status-warning/30">
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg">
-                                <TriangleAlert className="h-5 w-5 text-status-warning dark:text-status-warning" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-status-warning dark:text-status-warning">
-                                    {requiresAction}
-                                </p>
-                                <p className="text-xs font-medium text-muted-foreground">
-                                    Requires Action
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <PageLayout
+                    hero={
+                        <PageHero
+                            icon={Bell}
+                            title="Notification Centre"
+                            description="Stay on top of what matters"
+                            stats={[
+                                { label: 'Total', value: totalNotifs },
+                                { label: 'Unread', value: unread },
+                                { label: 'Acknowledged', value: acknowledged },
+                                {
+                                    label: 'Action required',
+                                    value: requiresAction,
+                                },
+                            ]}
+                            actions={
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!unread}
+                                    className="frontline-tap border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    onClick={markAllRead}
+                                >
+                                    <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                                    Mark All Read
+                                </Button>
+                            }
+                        />
+                    }
+                >
+                    {/* Stats Row */}
+                    <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        <Card className="border-primary dark:border-primary/30">
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                    <Inbox className="h-5 w-5 text-primary dark:text-primary" />
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-primary dark:text-primary">
+                                        {totalNotifs}
+                                    </p>
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Total
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-primary dark:border-primary/30">
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                    <BellRing className="h-5 w-5 text-primary dark:text-primary" />
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-primary dark:text-primary">
+                                        {unread}
+                                    </p>
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Unread
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-status-success/30 dark:border-status-success/30">
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success-bg">
+                                    <CheckCircle2 className="h-5 w-5 text-status-success dark:text-status-success" />
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-status-success dark:text-status-success">
+                                        {acknowledged}
+                                    </p>
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Acknowledged
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-status-warning/30 dark:border-status-warning/30">
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg">
+                                    <TriangleAlert className="h-5 w-5 text-status-warning dark:text-status-warning" />
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-status-warning dark:text-status-warning">
+                                        {requiresAction}
+                                    </p>
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Requires Action
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                {/* Main layout: content + sidebar */}
-                <div className="flex gap-6">
-                    {/* Main content area */}
-                    <div className="min-w-0 flex-1">
-                        <TabsRoot defaultValue="notifications">
-                            <TabsList>
-                                <TabsTrigger value="notifications">
-                                    <Bell className="mr-1.5 h-4 w-4" />
-                                    Notifications
-                                    {totalNotifs > 0 && (
-                                        <Badge
-                                            variant="secondary"
-                                            className="ml-2 bg-primary/10 text-xs text-primary dark:bg-primary/30 dark:text-primary/70"
-                                        >
-                                            {totalNotifs}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                                <TabsTrigger value="announcements">
-                                    <Megaphone className="mr-1.5 h-4 w-4" />
-                                    Announcements
-                                    {announcementList.length > 0 && (
-                                        <Badge
-                                            variant="secondary"
-                                            className="ml-2 bg-status-info-bg text-xs text-status-info dark:bg-status-info-bg dark:text-status-info"
-                                        >
-                                            {announcementList.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                            </TabsList>
-
-                            {/* ========== NOTIFICATIONS TAB ========== */}
-                            <TabsContent value="notifications" className="mt-6">
-                                {/* Filter bar */}
-                                <Card className="mb-4">
-                                    <CardContent className="flex flex-wrap items-center gap-3 p-3">
-                                        <div className="flex items-center gap-2">
-                                            <Filter className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-xs font-medium text-muted-foreground">
-                                                Filters
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center gap-1.5">
-                                            <label className="text-xs text-muted-foreground">
-                                                Status:
-                                            </label>
-                                            <Select
-                                                value={currentFilter}
-                                                onValueChange={(v) =>
-                                                    applyFilter('filter', v)
-                                                }
+                    {/* Main layout: content + sidebar */}
+                    <div className="flex gap-6">
+                        {/* Main content area */}
+                        <div className="min-w-0 flex-1">
+                            <TabsRoot defaultValue="notifications">
+                                <TabsList className="h-auto flex-wrap">
+                                    <TabsTrigger
+                                        className="frontline-tap"
+                                        value="notifications"
+                                    >
+                                        <Bell className="mr-1.5 h-4 w-4" />
+                                        Notifications
+                                        {totalNotifs > 0 && (
+                                            <Badge
+                                                variant="secondary"
+                                                className="ml-2 bg-primary/10 text-xs text-primary dark:bg-primary/30 dark:text-primary/70"
                                             >
-                                                <SelectTrigger className="h-8 w-32 text-xs">
-                                                    <SelectValue placeholder="Read status" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="all">
-                                                        All
-                                                    </SelectItem>
-                                                    <SelectItem value="unread">
-                                                        Unread
-                                                    </SelectItem>
-                                                    <SelectItem value="read">
-                                                        Read
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="flex items-center gap-1.5">
-                                            <label className="text-xs text-muted-foreground">
-                                                Module:
-                                            </label>
-                                            <Select
-                                                value={currentType}
-                                                onValueChange={(v) =>
-                                                    applyFilter('type', v)
-                                                }
-                                            >
-                                                <SelectTrigger className="h-8 w-36 text-xs">
-                                                    <SelectValue placeholder="Type" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="all">
-                                                        All Modules
-                                                    </SelectItem>
-                                                    <SelectItem value="operations">
-                                                        Operations
-                                                    </SelectItem>
-                                                    <SelectItem value="hr">
-                                                        HR
-                                                    </SelectItem>
-                                                    <SelectItem value="governance">
-                                                        Governance
-                                                    </SelectItem>
-                                                    <SelectItem value="sites">
-                                                        Sites
-                                                    </SelectItem>
-                                                    <SelectItem value="incidents">
-                                                        Incidents
-                                                    </SelectItem>
-                                                    <SelectItem value="system">
-                                                        System
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="relative ml-auto flex-1 sm:max-w-xs">
-                                            <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                                            <input
-                                                type="text"
-                                                placeholder="Search notifications..."
-                                                value={searchText}
-                                                onChange={(e) =>
-                                                    setSearchText(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className="h-8 w-full rounded-md border bg-background pr-3 pl-8 text-xs placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-ring focus:outline-none"
-                                            />
-                                        </div>
-
-                                        {(hasActiveFilters || searchText) && (
-                                            <Button
-                                                type="button"
-                                                variant="link"
-                                                size="sm"
-                                                onClick={clearFilters}
-                                                className="h-auto p-0 text-xs font-medium text-primary dark:text-primary"
-                                            >
-                                                Clear all
-                                            </Button>
+                                                {totalNotifs}
+                                            </Badge>
                                         )}
-                                    </CardContent>
-                                </Card>
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        className="frontline-tap"
+                                        value="announcements"
+                                    >
+                                        <Megaphone className="mr-1.5 h-4 w-4" />
+                                        Announcements
+                                        {announcementList.length > 0 && (
+                                            <Badge
+                                                variant="secondary"
+                                                className="ml-2 bg-status-info-bg text-xs text-status-info dark:bg-status-info-bg dark:text-status-info"
+                                            >
+                                                {announcementList.length}
+                                            </Badge>
+                                        )}
+                                    </TabsTrigger>
+                                </TabsList>
 
-                                {/* Notification cards */}
-                                {filteredNotifData.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
-                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 dark:from-primary/30 dark:to-primary/30">
-                                            <BellOff className="h-10 w-10 text-primary dark:text-primary" />
-                                        </div>
-                                        <h3 className="text-xl font-semibold text-foreground">
-                                            All caught up!
-                                        </h3>
-                                        <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
-                                            No new notifications. We'll let you
-                                            know when something needs your
-                                            attention.
-                                        </p>
-                                        <Link
-                                            href="/settings/notifications"
-                                            className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary dark:text-primary dark:hover:text-primary/70"
-                                        >
-                                            Manage notification preferences
-                                            <ArrowRight className="h-4 w-4" />
-                                        </Link>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {filteredNotifData.map((n) => {
-                                            const isUnread = !n.read_at;
-                                            const module = getModuleStyle(
-                                                n.data?.module,
-                                            );
-                                            const Icon = module.icon;
-                                            const title = notificationTitle(n);
-                                            const body = notificationBody(n);
-                                            const url =
-                                                n.data?.url ||
-                                                n.data?.action_url;
-                                            const needsAck =
-                                                !!n.data?.ack_required &&
-                                                !n.acknowledged_at;
+                                {/* ========== NOTIFICATIONS TAB ========== */}
+                                <TabsContent
+                                    value="notifications"
+                                    className="mt-6"
+                                >
+                                    {/* Filter bar */}
+                                    <Card className="mb-4">
+                                        <CardContent className="flex flex-wrap items-center gap-3 p-3">
+                                            <div className="flex items-center gap-2">
+                                                <Filter className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-xs font-medium text-muted-foreground">
+                                                    Filters
+                                                </span>
+                                            </div>
 
-                                            return (
-                                                <div
-                                                    key={n.id}
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    className={`flex items-start gap-3 rounded-lg border-l-4 p-4 transition-colors hover:bg-accent/50 ${
-                                                        isUnread
-                                                            ? `bg-white dark:bg-card ${module.border} shadow-sm`
-                                                            : `bg-muted/40 ${module.border} opacity-80`
-                                                    }`}
-                                                    onClick={() => {
-                                                        if (isUnread)
-                                                            markRead(n.id);
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        if (
-                                                            e.key === 'Enter' &&
-                                                            isUnread
-                                                        )
-                                                            markRead(n.id);
-                                                    }}
+                                            <div className="flex items-center gap-1.5">
+                                                <label className="text-xs text-muted-foreground">
+                                                    Status:
+                                                </label>
+                                                <Select
+                                                    value={currentFilter}
+                                                    onValueChange={(v) =>
+                                                        applyFilter('filter', v)
+                                                    }
                                                 >
-                                                    {/* Icon */}
-                                                    <div
-                                                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${module.bg}`}
+                                                    <SelectTrigger
+                                                        aria-label="Notification status"
+                                                        className="frontline-tap w-32 text-xs"
                                                     >
-                                                        <Icon
-                                                            className={`h-4 w-4 ${module.text}`}
-                                                        />
-                                                    </div>
+                                                        <SelectValue placeholder="Read status" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="all">
+                                                            All
+                                                        </SelectItem>
+                                                        <SelectItem value="unread">
+                                                            Unread
+                                                        </SelectItem>
+                                                        <SelectItem value="read">
+                                                            Read
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
 
-                                                    {/* Content */}
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="min-w-0 flex-1">
-                                                                <p
-                                                                    className={`text-sm ${isUnread ? 'font-semibold' : 'font-normal text-muted-foreground'}`}
-                                                                >
-                                                                    {title}
-                                                                </p>
-                                                                {body && (
-                                                                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                                                                        {body}
-                                                                    </p>
-                                                                )}
-                                                                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className={`text-[10px] ${module.text}`}
+                                            <div className="flex items-center gap-1.5">
+                                                <label className="text-xs text-muted-foreground">
+                                                    Module:
+                                                </label>
+                                                <Select
+                                                    value={currentType}
+                                                    onValueChange={(v) =>
+                                                        applyFilter('type', v)
+                                                    }
+                                                >
+                                                    <SelectTrigger
+                                                        aria-label="Notification module"
+                                                        className="frontline-tap w-36 text-xs"
+                                                    >
+                                                        <SelectValue placeholder="Type" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="all">
+                                                            All Modules
+                                                        </SelectItem>
+                                                        <SelectItem value="operations">
+                                                            Operations
+                                                        </SelectItem>
+                                                        <SelectItem value="hr">
+                                                            HR
+                                                        </SelectItem>
+                                                        <SelectItem value="governance">
+                                                            Governance
+                                                        </SelectItem>
+                                                        <SelectItem value="sites">
+                                                            Sites
+                                                        </SelectItem>
+                                                        <SelectItem value="incidents">
+                                                            Incidents
+                                                        </SelectItem>
+                                                        <SelectItem value="system">
+                                                            System
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="relative min-w-0 basis-full sm:ml-auto sm:max-w-xs sm:flex-1 sm:basis-auto">
+                                                <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                                <input
+                                                    type="text"
+                                                    aria-label="Search notifications"
+                                                    placeholder="Search notifications..."
+                                                    value={searchText}
+                                                    onChange={(e) =>
+                                                        setSearchText(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className="frontline-tap w-full rounded-md border bg-background pr-3 pl-8 text-xs placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-ring focus:outline-none"
+                                                />
+                                            </div>
+
+                                            {(hasActiveFilters ||
+                                                searchText) && (
+                                                <Button
+                                                    type="button"
+                                                    variant="link"
+                                                    size="sm"
+                                                    onClick={clearFilters}
+                                                    className="frontline-tap px-2 text-xs font-medium text-primary dark:text-primary"
+                                                >
+                                                    Clear all
+                                                </Button>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Notification cards */}
+                                    {filteredNotifData.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
+                                            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 dark:from-primary/30 dark:to-primary/30">
+                                                <BellOff className="h-10 w-10 text-primary dark:text-primary" />
+                                            </div>
+                                            <h3 className="text-xl font-semibold text-foreground">
+                                                All caught up!
+                                            </h3>
+                                            <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
+                                                No new notifications. We'll let
+                                                you know when something needs
+                                                your attention.
+                                            </p>
+                                            <Link
+                                                href="/settings/notifications"
+                                                className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary dark:text-primary dark:hover:text-primary/70"
+                                            >
+                                                Manage notification preferences
+                                                <ArrowRight className="h-4 w-4" />
+                                            </Link>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {filteredNotifData.map((n) => {
+                                                if (n.data?.kind === 'chat')
+                                                    return (
+                                                        <ChatNoticeCard
+                                                            key={n.id}
+                                                            id={n.id}
+                                                            eventKey={
+                                                                n.data.event_key
+                                                            }
+                                                            createdAt={
+                                                                n.created_at
+                                                            }
+                                                            unread={!n.read_at}
+                                                            onMarkRead={() =>
+                                                                markRead(n.id)
+                                                            }
+                                                        />
+                                                    );
+                                                const isUnread = !n.read_at;
+                                                const module = getModuleStyle(
+                                                    n.data?.module,
+                                                );
+                                                const Icon = module.icon;
+                                                const title =
+                                                    notificationTitle(n);
+                                                const body =
+                                                    notificationBody(n);
+                                                const url =
+                                                    n.data?.url ||
+                                                    n.data?.action_url;
+                                                const needsAck =
+                                                    !!n.data?.ack_required &&
+                                                    !n.acknowledged_at;
+
+                                                return (
+                                                    <div
+                                                        key={n.id}
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        className={`flex items-start gap-3 rounded-lg border-l-4 p-4 transition-colors hover:bg-accent/50 ${
+                                                            isUnread
+                                                                ? `bg-white dark:bg-card ${module.border} shadow-sm`
+                                                                : `bg-muted/40 ${module.border} opacity-80`
+                                                        }`}
+                                                        onClick={() => {
+                                                            if (isUnread)
+                                                                markRead(n.id);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (
+                                                                e.key ===
+                                                                    'Enter' &&
+                                                                isUnread
+                                                            )
+                                                                markRead(n.id);
+                                                        }}
+                                                    >
+                                                        {/* Icon */}
+                                                        <div
+                                                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${module.bg}`}
+                                                        >
+                                                            <Icon
+                                                                className={`h-4 w-4 ${module.text}`}
+                                                            />
+                                                        </div>
+
+                                                        {/* Content */}
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p
+                                                                        className={`text-sm ${isUnread ? 'font-semibold' : 'font-normal text-muted-foreground'}`}
                                                                     >
-                                                                        {(
-                                                                            n
-                                                                                .data
-                                                                                ?.module ??
-                                                                            'system'
-                                                                        )
-                                                                            .charAt(
-                                                                                0,
-                                                                            )
-                                                                            .toUpperCase() +
-                                                                            (
+                                                                        {title}
+                                                                    </p>
+                                                                    {body && (
+                                                                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                                                            {
+                                                                                body
+                                                                            }
+                                                                        </p>
+                                                                    )}
+                                                                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className={`text-[10px] ${module.text}`}
+                                                                        >
+                                                                            {(
                                                                                 n
                                                                                     .data
                                                                                     ?.module ??
                                                                                 'system'
-                                                                            ).slice(
-                                                                                1,
-                                                                            )}
-                                                                    </Badge>
-                                                                    {needsAck && (
-                                                                        <Badge className="bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
-                                                                            Acknowledge
-                                                                            Required
+                                                                            )
+                                                                                .charAt(
+                                                                                    0,
+                                                                                )
+                                                                                .toUpperCase() +
+                                                                                (
+                                                                                    n
+                                                                                        .data
+                                                                                        ?.module ??
+                                                                                    'system'
+                                                                                ).slice(
+                                                                                    1,
+                                                                                )}
                                                                         </Badge>
-                                                                    )}
-                                                                    {isUnread && (
-                                                                        <span className="inline-block h-2 w-2 rounded-full bg-primary" />
-                                                                    )}
+                                                                        {needsAck && (
+                                                                            <Badge className="bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
+                                                                                Acknowledge
+                                                                                Required
+                                                                            </Badge>
+                                                                        )}
+                                                                        {isUnread && (
+                                                                            <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
 
-                                                            {/* Right side */}
-                                                            <div className="flex shrink-0 flex-col items-end gap-1.5">
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {relativeTime(
-                                                                        n.created_at,
-                                                                    )}
-                                                                </span>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    {needsAck && (
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="h-7 border-status-warning/30 px-2 text-xs text-status-warning hover:bg-status-warning-bg"
-                                                                            onClick={(
-                                                                                e,
-                                                                            ) => {
-                                                                                e.stopPropagation();
-                                                                                acknowledge(
-                                                                                    n.id,
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            Acknowledge
-                                                                        </Button>
-                                                                    )}
-                                                                    {url && (
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            className="h-7 px-2 text-xs"
-                                                                            asChild
-                                                                            onClick={(
-                                                                                e,
-                                                                            ) =>
-                                                                                e.stopPropagation()
-                                                                            }
-                                                                        >
-                                                                            <Link
-                                                                                href={
-                                                                                    url
+                                                                {/* Right side */}
+                                                                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        {relativeTime(
+                                                                            n.created_at,
+                                                                        )}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        {needsAck && (
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="h-7 border-status-warning/30 px-2 text-xs text-status-warning hover:bg-status-warning-bg"
+                                                                                onClick={(
+                                                                                    e,
+                                                                                ) => {
+                                                                                    e.stopPropagation();
+                                                                                    acknowledge(
+                                                                                        n.id,
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                Acknowledge
+                                                                            </Button>
+                                                                        )}
+                                                                        {url && (
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                className="h-7 px-2 text-xs"
+                                                                                asChild
+                                                                                onClick={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    e.stopPropagation()
                                                                                 }
                                                                             >
-                                                                                View
-                                                                                <ExternalLink className="ml-1 h-3 w-3" />
-                                                                            </Link>
-                                                                        </Button>
-                                                                    )}
+                                                                                <Link
+                                                                                    href={
+                                                                                        url
+                                                                                    }
+                                                                                >
+                                                                                    View
+                                                                                    <ExternalLink className="ml-1 h-3 w-3" />
+                                                                                </Link>
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                {/* Pagination */}
-                                {lastPage > 1 && (
-                                    <div className="mt-6 flex items-center justify-center gap-1">
-                                        {notifLinks.map((link, idx) => (
-                                            <Button
-                                                key={idx}
-                                                variant={
-                                                    link.active
-                                                        ? 'default'
-                                                        : 'outline'
-                                                }
-                                                size="sm"
-                                                disabled={!link.url}
-                                                asChild={!!link.url}
-                                            >
-                                                {link.url ? (
-                                                    <Link
-                                                        href={link.url}
-                                                        preserveScroll
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: link.label,
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <span
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: link.label,
-                                                        }}
-                                                    />
-                                                )}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
-                            </TabsContent>
-
-                            {/* ========== ANNOUNCEMENTS TAB ========== */}
-                            <TabsContent value="announcements" className="mt-6">
-                                {announcementList.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
-                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 dark:from-status-info/30 dark:to-primary/30">
-                                            <Megaphone className="h-10 w-10 text-status-info dark:text-status-info" />
+                                                );
+                                            })}
                                         </div>
-                                        <h3 className="text-xl font-semibold text-foreground">
-                                            No announcements
-                                        </h3>
-                                        <p className="mt-2 text-sm text-muted-foreground">
-                                            Check back later for updates.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {announcementList.map((a) => {
-                                            const isExpanded =
-                                                expandedAnnouncement === a.id;
-                                            return (
-                                                <Card
-                                                    key={a.id}
-                                                    className="p-4"
+                                    )}
+
+                                    {/* Pagination */}
+                                    {lastPage > 1 && (
+                                        <div className="mt-6 flex items-center justify-center gap-1">
+                                            {notifLinks.map((link, idx) => (
+                                                <Button
+                                                    key={idx}
+                                                    variant={
+                                                        link.active
+                                                            ? 'default'
+                                                            : 'outline'
+                                                    }
+                                                    size="sm"
+                                                    disabled={!link.url}
+                                                    asChild={!!link.url}
                                                 >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0 flex-1">
-                                                            <p className="font-semibold">
-                                                                {a.title}
-                                                            </p>
-                                                            {a.body && (
-                                                                <div className="mt-1.5">
-                                                                    <p
-                                                                        className={`text-sm text-muted-foreground ${isExpanded ? '' : 'line-clamp-2'}`}
-                                                                    >
-                                                                        {a.body}
-                                                                    </p>
-                                                                    {a.body
-                                                                        .length >
-                                                                        150 && (
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="link"
-                                                                            size="sm"
-                                                                            onClick={() =>
-                                                                                setExpandedAnnouncement(
-                                                                                    isExpanded
-                                                                                        ? null
-                                                                                        : a.id,
-                                                                                )
-                                                                            }
-                                                                            className="mt-1 h-auto p-0 text-xs text-primary dark:text-primary"
+                                                    {link.url ? (
+                                                        <Link
+                                                            href={link.url}
+                                                            preserveScroll
+                                                            dangerouslySetInnerHTML={{
+                                                                __html: link.label,
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            dangerouslySetInnerHTML={{
+                                                                __html: link.label,
+                                                            }}
+                                                        />
+                                                    )}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </TabsContent>
+
+                                {/* ========== ANNOUNCEMENTS TAB ========== */}
+                                <TabsContent
+                                    value="announcements"
+                                    className="mt-6"
+                                >
+                                    {announcementList.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
+                                            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 dark:from-status-info/30 dark:to-primary/30">
+                                                <Megaphone className="h-10 w-10 text-status-info dark:text-status-info" />
+                                            </div>
+                                            <h3 className="text-xl font-semibold text-foreground">
+                                                No announcements
+                                            </h3>
+                                            <p className="mt-2 text-sm text-muted-foreground">
+                                                Check back later for updates.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {announcementList.map((a) => {
+                                                const isExpanded =
+                                                    expandedAnnouncement ===
+                                                    a.id;
+                                                return (
+                                                    <Card
+                                                        key={a.id}
+                                                        className="p-4"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="font-semibold">
+                                                                    {a.title}
+                                                                </p>
+                                                                {a.body && (
+                                                                    <div className="mt-1.5">
+                                                                        <p
+                                                                            className={`text-sm text-muted-foreground ${isExpanded ? '' : 'line-clamp-2'}`}
                                                                         >
-                                                                            {isExpanded
-                                                                                ? 'Show less'
-                                                                                : 'Read more'}
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                                                {a.author_name && (
-                                                                    <span>
-                                                                        By{' '}
-                                                                        {
-                                                                            a.author_name
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                                {a.starts_at &&
-                                                                    a.ends_at && (
-                                                                        <span>
-                                                                            {new Date(
-                                                                                a.starts_at,
-                                                                            ).toLocaleDateString()}{' '}
-                                                                            &ndash;{' '}
-                                                                            {new Date(
-                                                                                a.ends_at,
-                                                                            ).toLocaleDateString()}
-                                                                        </span>
-                                                                    )}
-                                                                {a.created_at &&
-                                                                    !a.starts_at && (
-                                                                        <span>
-                                                                            {new Date(
-                                                                                a.created_at,
-                                                                            ).toLocaleDateString()}
-                                                                        </span>
-                                                                    )}
-                                                            </div>
-                                                            {Array.isArray(
-                                                                a.roles,
-                                                            ) &&
-                                                                a.roles.length >
-                                                                    0 && (
-                                                                    <div className="mt-2 flex flex-wrap gap-1">
-                                                                        {a.roles.map(
-                                                                            (
-                                                                                role,
-                                                                            ) => (
-                                                                                <Badge
-                                                                                    key={
-                                                                                        role
-                                                                                    }
-                                                                                    variant="outline"
-                                                                                    className="text-[10px]"
-                                                                                >
-                                                                                    {
-                                                                                        role
-                                                                                    }
-                                                                                </Badge>
-                                                                            ),
+                                                                            {
+                                                                                a.body
+                                                                            }
+                                                                        </p>
+                                                                        {a.body
+                                                                            .length >
+                                                                            150 && (
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="link"
+                                                                                size="sm"
+                                                                                onClick={() =>
+                                                                                    setExpandedAnnouncement(
+                                                                                        isExpanded
+                                                                                            ? null
+                                                                                            : a.id,
+                                                                                    )
+                                                                                }
+                                                                                className="mt-1 h-auto p-0 text-xs text-primary dark:text-primary"
+                                                                            >
+                                                                                {isExpanded
+                                                                                    ? 'Show less'
+                                                                                    : 'Read more'}
+                                                                            </Button>
                                                                         )}
                                                                     </div>
                                                                 )}
+                                                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                                    {a.author_name && (
+                                                                        <span>
+                                                                            By{' '}
+                                                                            {
+                                                                                a.author_name
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                    {a.starts_at &&
+                                                                        a.ends_at && (
+                                                                            <span>
+                                                                                {new Date(
+                                                                                    a.starts_at,
+                                                                                ).toLocaleDateString()}{' '}
+                                                                                &ndash;{' '}
+                                                                                {new Date(
+                                                                                    a.ends_at,
+                                                                                ).toLocaleDateString()}
+                                                                            </span>
+                                                                        )}
+                                                                    {a.created_at &&
+                                                                        !a.starts_at && (
+                                                                            <span>
+                                                                                {new Date(
+                                                                                    a.created_at,
+                                                                                ).toLocaleDateString()}
+                                                                            </span>
+                                                                        )}
+                                                                </div>
+                                                                {Array.isArray(
+                                                                    a.roles,
+                                                                ) &&
+                                                                    a.roles
+                                                                        .length >
+                                                                        0 && (
+                                                                        <div className="mt-2 flex flex-wrap gap-1">
+                                                                            {a.roles.map(
+                                                                                (
+                                                                                    role,
+                                                                                ) => (
+                                                                                    <Badge
+                                                                                        key={
+                                                                                            role
+                                                                                        }
+                                                                                        variant="outline"
+                                                                                        className="text-[10px]"
+                                                                                    >
+                                                                                        {
+                                                                                            role
+                                                                                        }
+                                                                                    </Badge>
+                                                                                ),
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </Card>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </TabsContent>
-                        </TabsRoot>
-                    </div>
+                                                    </Card>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </TabsContent>
+                            </TabsRoot>
+                        </div>
 
-                    {/* Right sidebar - desktop only */}
-                    <div className="hidden w-72 shrink-0 space-y-4 lg:block">
-                        {/* Quick Settings */}
-                        <Card>
-                            <CardContent className="p-4">
-                                <div className="mb-3 flex items-center gap-2">
-                                    <Settings className="h-4 w-4 text-muted-foreground" />
-                                    <h3 className="text-sm font-semibold">
-                                        Quick Settings
+                        {/* Right sidebar - desktop only */}
+                        <div className="hidden w-72 shrink-0 space-y-4 lg:block">
+                            {/* Quick Settings */}
+                            <Card>
+                                <CardContent className="p-4">
+                                    <div className="mb-3 flex items-center gap-2">
+                                        <Settings className="h-4 w-4 text-muted-foreground" />
+                                        <h3 className="text-sm font-semibold">
+                                            Quick Settings
+                                        </h3>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <BellOff className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-xs font-medium">
+                                                Do Not Disturb
+                                            </span>
+                                        </div>
+                                        <Switch
+                                            checked={doNotDisturb}
+                                            onCheckedChange={setDoNotDisturb}
+                                        />
+                                    </div>
+                                    <Link
+                                        href="/settings/notifications"
+                                        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary dark:text-primary"
+                                    >
+                                        All notification settings
+                                        <ArrowRight className="h-3 w-3" />
+                                    </Link>
+                                </CardContent>
+                            </Card>
+
+                            {/* Recent Activity by Module */}
+                            <Card>
+                                <CardContent className="p-4">
+                                    <h3 className="mb-3 text-sm font-semibold">
+                                        Activity by Module
                                     </h3>
-                                </div>
-                                <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
-                                    <div className="flex items-center gap-2">
-                                        <BellOff className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-xs font-medium">
-                                            Do Not Disturb
-                                        </span>
-                                    </div>
-                                    <Switch
-                                        checked={doNotDisturb}
-                                        onCheckedChange={setDoNotDisturb}
-                                    />
-                                </div>
-                                <Link
-                                    href="/settings/notifications"
-                                    className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary dark:text-primary"
-                                >
-                                    All notification settings
-                                    <ArrowRight className="h-3 w-3" />
-                                </Link>
-                            </CardContent>
-                        </Card>
-
-                        {/* Recent Activity by Module */}
-                        <Card>
-                            <CardContent className="p-4">
-                                <h3 className="mb-3 text-sm font-semibold">
-                                    Activity by Module
-                                </h3>
-                                <div className="space-y-2">
-                                    {Object.entries(MODULE_COLOURS).map(
-                                        ([mod, style]) => {
-                                            const ModIcon = style.icon;
-                                            const count =
-                                                moduleCounts[mod] ?? 0;
-                                            return (
-                                                <div
-                                                    key={mod}
-                                                    className="flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-colors hover:bg-muted/50"
-                                                >
-                                                    <div className="flex items-center gap-2">
+                                    <div className="space-y-2">
+                                        {Object.entries(MODULE_COLOURS).map(
+                                            ([mod, style]) => {
+                                                const ModIcon = style.icon;
+                                                const count =
+                                                    moduleCounts[mod] ?? 0;
+                                                return (
+                                                    <div
+                                                        key={mod}
+                                                        className="flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-colors hover:bg-muted/50"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <span
+                                                                className={`inline-block h-2 w-2 rounded-full ${style.dot}`}
+                                                            />
+                                                            <span className="text-xs font-medium capitalize">
+                                                                {mod}
+                                                            </span>
+                                                        </div>
                                                         <span
-                                                            className={`inline-block h-2 w-2 rounded-full ${style.dot}`}
-                                                        />
-                                                        <span className="text-xs font-medium capitalize">
-                                                            {mod}
+                                                            className={`text-xs font-semibold ${count > 0 ? style.text : 'text-muted-foreground'}`}
+                                                        >
+                                                            {count}
                                                         </span>
                                                     </div>
-                                                    <span
-                                                        className={`text-xs font-semibold ${count > 0 ? style.text : 'text-muted-foreground'}`}
-                                                    >
-                                                        {count}
-                                                    </span>
-                                                </div>
-                                            );
-                                        },
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                                );
+                                            },
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
-                </div>
-            </PageLayout>
-        </AppLayout>
+                </PageLayout>
+            </AppLayout>
+        </ChatNoticePreviews>
     );
 }

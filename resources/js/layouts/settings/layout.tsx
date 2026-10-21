@@ -21,6 +21,7 @@ import {
     Mail,
     MailCheck,
     Menu,
+    MessageSquareText,
     Paintbrush,
     Palette,
     Plug,
@@ -58,7 +59,31 @@ const navSections: NavSection[] = [
     {
         label: 'Referrals',
         permission: 'referrals.settings.view',
-        items: [{ icon: Inbox, title: 'Referral settings', href: '/settings/referrals' }],
+        items: [
+            {
+                icon: Inbox,
+                title: 'Referral settings',
+                href: '/settings/referrals',
+            },
+        ],
+    },
+    {
+        label: 'Chat',
+        permission: 'settings.manageAccess',
+        items: [
+            {
+                icon: MessageSquareText,
+                title: 'Chat settings',
+                href: '/settings/chat',
+            },
+            // Restricted investigators only; settings access alone does not show it.
+            {
+                icon: ShieldCheck,
+                title: 'Chat investigations',
+                href: '/settings/chat/investigations',
+                permission: 'settings.chatInvestigate',
+            },
+        ],
     },
     {
         label: 'General',
@@ -160,7 +185,12 @@ const navSections: NavSection[] = [
     {
         label: 'Integrations',
         items: [
-            { icon: KeyRound, title: 'Obli', href: '/settings/obli', permission: 'integrations.manageObli' },
+            {
+                icon: KeyRound,
+                title: 'Obli',
+                href: '/settings/obli',
+                permission: 'integrations.manageObli',
+            },
             {
                 icon: CalendarSync,
                 title: 'Calendar Sync',

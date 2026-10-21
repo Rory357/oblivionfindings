@@ -8,6 +8,7 @@ use App\Models\RoleNotificationPreference;
 use App\Models\User;
 use App\Models\UserNotificationPreference;
 use App\Services\AuditLogger;
+use App\Services\Chat\ChatNotificationPreferences;
 use App\Services\Fleet\FleetNotificationPreferences;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,7 +46,7 @@ class NotificationPreferencesController extends Controller
                 'notification_sounds_enabled' => (bool) ($user->notification_sounds_enabled ?? true),
                 'email_digest_frequency' => $user->email_digest_frequency ?? 'instant',
             ],
-            'userPrefs' => $userPrefs->toBase()->map(fn ($p) => [
+            'userPrefs' => $userPrefs->toBase()->map(fn ($p) => ChatNotificationPreferences::supports($p->key) ? ChatNotificationPreferences::resolve($p, []) : [
                 'enabled' => (bool) $p->enabled,
                 'inapp' => (bool) $p->channel_inapp,
                 'email' => (bool) $p->channel_email,
@@ -55,6 +56,9 @@ class NotificationPreferencesController extends Controller
                 ...$event['effective'], 'push' => false,
             ]]))->all(),
             'roleDefaults' => $rolePrefs->toBase()->groupBy('key')->map(function ($items, $key) {
+                if (ChatNotificationPreferences::supports($key)) {
+                    return ChatNotificationPreferences::resolve(null, $items);
+                }
                 if ($key === 'hr.calendar.reminder') {
                     return ['enabled' => $items->contains(fn ($p) => $p->enabled),
                         'inapp' => $items->contains(fn ($p) => $p->enabled && $p->channel_inapp),
@@ -93,7 +97,13 @@ class NotificationPreferencesController extends Controller
             $fleetService = app(FleetNotificationPreferences::class);
             $before = $fleetService->snapshot($user);
             foreach ($prefs as $key => $channels) {
+                if ($channels === null && ChatNotificationPreferences::supports((string) $key)) {
+                    UserNotificationPreference::where('user_id', $user->id)->where('key', $key)->delete();
+
+                    continue;
+                }
                 $channels = $this->normalizeChannels($channels, 'prefs.'.$key);
+                $this->validateChatChannels((string) $key, $channels, 'prefs.'.$key);
 
                 UserNotificationPreference::updateOrCreate([
                     'user_id' => $user->id,
@@ -163,7 +173,7 @@ class NotificationPreferencesController extends Controller
             foreach ($allKeys as $key) {
                 $pref = $existing->firstWhere(fn ($p) => (int) $p->role_id === (int) $role->id && $p->key === $key);
                 // Default true/inapp if unset.
-                $row[$key] = $pref ? [
+                $row[$key] = ChatNotificationPreferences::supports($key) ? ChatNotificationPreferences::resolve($pref, []) : ($pref ? [
                     'enabled' => (bool) $pref->enabled,
                     'inapp' => (bool) $pref->channel_inapp,
                     'email' => (bool) $pref->channel_email,
@@ -173,7 +183,7 @@ class NotificationPreferencesController extends Controller
                     'inapp' => true,
                     'email' => FleetNotificationPreferences::EVENTS[$key]['email'] ?? false,
                     'push' => false,
-                ];
+                ]);
             }
             $matrix[$role->id] = $row;
         }
@@ -196,24 +206,28 @@ class NotificationPreferencesController extends Controller
 
         $matrix = (array) $data['matrix'];
 
-        foreach ($matrix as $roleId => $prefs) {
-            if (! is_array($prefs)) {
-                continue;
-            }
-            foreach ($prefs as $key => $channels) {
-                $channels = $this->normalizeChannels($channels, 'matrix.'.$roleId.'.'.$key);
+        DB::transaction(function () use ($matrix) {
+            foreach ($matrix as $roleId => $prefs) {
+                if (! is_array($prefs)) {
+                    continue;
+                }
+                foreach ($prefs as $key => $channels) {
+                    $channels = $this->normalizeChannels($channels, 'matrix.'.$roleId.'.'.$key);
+                    $this->validateChatChannels((string) $key, $channels, 'matrix.'.$roleId.'.'.$key);
 
-                RoleNotificationPreference::updateOrCreate([
-                    'role_id' => (int) $roleId,
-                    'key' => (string) $key,
-                ], [
-                    'enabled' => $channels['enabled'],
-                    'channel_inapp' => $channels['inapp'],
-                    'channel_email' => $channels['email'],
-                    'channel_push' => $channels['push'],
-                ]);
+                    RoleNotificationPreference::updateOrCreate([
+                        'role_id' => (int) $roleId,
+                        'key' => (string) $key,
+                    ], [
+                        'enabled' => $channels['enabled'],
+                        'channel_inapp' => $channels['inapp'],
+                        'channel_email' => $channels['email'],
+                        'channel_push' => $channels['push'],
+                    ]);
+                }
             }
-        }
+
+        });
 
         return redirect()->back()->with('success', 'Role notification defaults updated.');
     }
@@ -265,5 +279,18 @@ class NotificationPreferencesController extends Controller
     private function toBoolean(mixed $value): bool
     {
         return (bool) filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    }
+
+    private function validateChatChannels(string $key, array $channels, string $errorKey): void
+    {
+        if (! str_starts_with($key, 'chat.')) {
+            return;
+        }
+        if (! ChatNotificationPreferences::supports($key)) {
+            throw ValidationException::withMessages([$errorKey => 'This Chat notification is not available.']);
+        }
+        if ($channels['email'] || $channels['push']) {
+            throw ValidationException::withMessages([$errorKey => 'Chat email and push delivery are not available yet. Use in-app notifications.']);
+        }
     }
 }

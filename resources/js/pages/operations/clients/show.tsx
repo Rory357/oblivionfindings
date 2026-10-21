@@ -30,6 +30,7 @@ import {
 import { BehaviourAbcTab } from '@/components/clients/profile/tabs/behaviour-abc';
 import { type HealthSummary } from '@/components/clinical/health-summary-card';
 import { AllergyRecord } from '@/components/emar/record/allergy-record';
+import { FamilyNoteOwner } from '@/components/family-notes/family-note-owner';
 import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
 import type {
     RaPickers,
@@ -1052,6 +1053,50 @@ export default function ClientShow({
         [pageProps.client_agreements],
     );
     const familyNotes = pageProps.family_notes ?? [];
+    useEffect(() => {
+        const refreshPublishedMedia = (event: Event) => {
+            const detail = (
+                event as CustomEvent<{ clientId: number; destination: string }>
+            ).detail;
+            if (
+                detail?.clientId !== client.id ||
+                !['documents', 'photos'].includes(detail.destination)
+            )
+                return;
+            router.reload({ only: [detail.destination], preserveScroll: true });
+        };
+        window.addEventListener(
+            'oblivion:chat-attachment-published',
+            refreshPublishedMedia,
+        );
+        return () =>
+            window.removeEventListener(
+                'oblivion:chat-attachment-published',
+                refreshPublishedMedia,
+            );
+    }, [client.id]);
+    useEffect(() => {
+        const refreshFamilyNotes = (event: Event) => {
+            if (
+                (event as CustomEvent<{ clientId?: number }>).detail
+                    ?.clientId !== client.id
+            )
+                return;
+            router.reload({
+                only: ['family_notes', 'family_notes_open_count'],
+                preserveScroll: true,
+            });
+        };
+        window.addEventListener(
+            'oblivion:family-followup-created',
+            refreshFamilyNotes,
+        );
+        return () =>
+            window.removeEventListener(
+                'oblivion:family-followup-created',
+                refreshFamilyNotes,
+            );
+    }, [client.id]);
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
@@ -5377,6 +5422,11 @@ export default function ClientShow({
                                                                                         : ''}
                                                                                 </p>
                                                                             )}
+                                                                            <FamilyNoteOwner
+                                                                                name={
+                                                                                    note.assigned_user_name
+                                                                                }
+                                                                            />
                                                                             {note.description && (
                                                                                 <p className="mt-1.5 text-sm text-muted-foreground">
                                                                                     {note

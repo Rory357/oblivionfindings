@@ -201,6 +201,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'chatSharedExperience' => (bool) config('chat.shared_experience'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
 
             // Per-user calendar subscribe (.ics) URL, shared so any calendar surface
@@ -261,15 +262,12 @@ class HandleInertiaRequests extends Middleware
                         'relation' => $c->pivot->relation ?? null,
                     ])->values()->all()
                     : null,
-                // Cached briefly: the batched count is cheap but still runs
-                // on every request. Busted by the user's own writes and by
-                // profile changes (see handle() / forgetNavigationBadges).
+                // Cached briefly (20 s with shared chat, else 60 s): the batched
+                // count is cheap but still runs on every request. Busted by the
+                // user's own writes, by profile changes (see handle() /
+                // forgetNavigationBadges) and when a chat message reaches them.
                 'unreadMessageCount' => $user && $hasOpsMessagingTables
-                    ? (int) Cache::remember(
-                        "user:{$user->id}:ops-unread:v1",
-                        60,
-                        fn (): int => app(OpsMessageVisibilityService::class)->unreadCount($user),
-                    )
+                    ? app(OpsMessageVisibilityService::class)->cachedUnreadCount($user)
                     : 0,
             ],
 
@@ -905,6 +903,7 @@ class HandleInertiaRequests extends Middleware
 
             'settings' => [
                 'manageAccess' => $user->canDo('settings.access.manage'),
+                'chatInvestigate' => $user->canDo('chat.investigate'),
                 'manageTerminology' => $user->canDo('settings.terminology.manage'),
                 'manageBranding' => $user->canDo('settings.branding.manage'),
                 'manageServiceContexts' => $user->canDo('settings.service_contexts.manage'),
@@ -1299,6 +1298,11 @@ class HandleInertiaRequests extends Middleware
             'messages' => [
                 'viewAny' => $user->canDo('messages.viewAny'),
                 'send' => $user->canDo('messages.send'),
+            ],
+            // Shared Chat is open to every current staff member (ChatController::index), not
+            // only to holders of messages.viewAny, so its navigation follows the same rule.
+            'chat' => [
+                'use' => config('chat.shared_experience') && app(OpsMessageVisibilityService::class)->isCurrentStaff($user),
             ],
             'handovers' => [
                 'viewAny' => $user->canDo('handovers.viewAny'),

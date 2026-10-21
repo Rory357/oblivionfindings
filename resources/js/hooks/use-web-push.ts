@@ -1,5 +1,6 @@
+import { verifyChatBrowserWorker } from '@/lib/chat-browser-capability';
 import { usePage } from '@inertiajs/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     destroy as destroyPushSubscription,
@@ -11,6 +12,7 @@ type WebPushState = {
     configured: boolean;
     permission: NotificationPermission | 'unsupported';
     enabled: boolean;
+    needsUpgrade: boolean;
     processing: boolean;
     error: string | null;
     subscribe: () => Promise<void>;
@@ -19,6 +21,7 @@ type WebPushState = {
 
 type WebPushPageProps = {
     webpush_public_key?: string | null;
+    auth?: { user?: { id: number | string } | null };
 };
 
 function csrfToken(): string {
@@ -69,16 +72,78 @@ async function postJson(url: string, method: string, body: object) {
             'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify(body),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
+        if ([401, 409, 419].includes(response.status)) {
+            throw new Error(
+                'Your sign-in or browser subscription has changed. Refresh this page.',
+            );
+        }
         throw new Error('Push subscription could not be saved.');
     }
+
+    return response.status === 204 ? null : response.json();
+}
+
+function devicePayload(subscription: PushSubscription, actorId: string) {
+    return {
+        actor_id: actorId,
+        provider: 'webpush',
+        token: subscription.endpoint,
+        keys: {
+            p256dh: arrayBufferToBase64Url(subscription.getKey('p256dh')),
+            auth: arrayBufferToBase64Url(subscription.getKey('auth')),
+        },
+    };
+}
+
+async function activeRegistration(registration: ServiceWorkerRegistration) {
+    if (registration.active?.state === 'activated') return registration;
+    const worker =
+        registration.installing ?? registration.waiting ?? registration.active;
+    if (!worker)
+        throw new Error(
+            'Browser notifications are not ready. Please try again.',
+        );
+    await new Promise<void>((resolve, reject) => {
+        const finish = (error?: Error) => {
+            clearTimeout(timer);
+            worker.removeEventListener('statechange', check);
+            if (error) reject(error);
+            else resolve();
+        };
+        const check = () => {
+            if (worker.state === 'activated') finish();
+            else if (worker.state === 'redundant')
+                finish(
+                    new Error(
+                        'Browser notifications could not start. Please try again.',
+                    ),
+                );
+        };
+        const timer = setTimeout(
+            () =>
+                finish(
+                    new Error(
+                        'Browser notifications are taking too long to start. Please try again.',
+                    ),
+                ),
+            10000,
+        );
+        worker.addEventListener('statechange', check);
+        check();
+    });
+    return registration;
 }
 
 export function useWebPush(): WebPushState {
-    const publicKey =
-        usePage<WebPushPageProps>().props.webpush_public_key ?? null;
+    const props = usePage<WebPushPageProps>().props;
+    const publicKey = props.webpush_public_key ?? null;
+    const actorId =
+        props.auth?.user?.id == null ? null : String(props.auth.user.id);
     const supported = useMemo(
         () =>
             typeof window !== 'undefined' &&
@@ -91,22 +156,83 @@ export function useWebPush(): WebPushState {
         NotificationPermission | 'unsupported'
     >(supported ? Notification.permission : 'unsupported');
     const [enabled, setEnabled] = useState(false);
+    const [needsUpgrade, setNeedsUpgrade] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const generation = useRef(0);
+    const busy = useRef(false);
+    const invalidatePending = useCallback(() => {
+        generation.current++;
+    }, []);
 
     const configured = Boolean(publicKey);
 
     useEffect(() => {
-        if (!supported) return;
-
-        navigator.serviceWorker.ready
-            .then((registration) => registration.pushManager.getSubscription())
-            .then((subscription) => setEnabled(Boolean(subscription)))
-            .catch(() => setEnabled(false));
-    }, [supported]);
+        setEnabled(false);
+        setNeedsUpgrade(false);
+        setProcessing(false);
+        setError(null);
+        busy.current = false;
+        let disposed = false;
+        const refresh = async () => {
+            if (!supported || !actorId || busy.current || disposed) return;
+            const attempt = ++generation.current;
+            const current = () => !disposed && attempt === generation.current;
+            setEnabled(false);
+            setNeedsUpgrade(false);
+            setProcessing(true);
+            setPermission(Notification.permission);
+            try {
+                // Reading status must never register, request permission or transfer ownership.
+                const registration =
+                    await navigator.serviceWorker.getRegistration('/');
+                const subscription =
+                    await registration?.pushManager.getSubscription();
+                if (!current()) return;
+                if (subscription && Notification.permission === 'granted') {
+                    const status = await postJson(
+                        `${storePushSubscription.url()}/status`,
+                        'POST',
+                        devicePayload(subscription, actorId),
+                    );
+                    if (current()) {
+                        setEnabled(status?.enabled === true);
+                        setNeedsUpgrade(
+                            status?.enabled === true &&
+                                status?.chat_ready === false,
+                        );
+                    }
+                }
+                if (current()) setError(null);
+            } catch {
+                if (current())
+                    setError(
+                        'Could not check notifications for this account. Refresh this page to try again.',
+                    );
+            } finally {
+                if (current()) setProcessing(false);
+            }
+        };
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') void refresh();
+        };
+        void refresh();
+        window.addEventListener('focus', refresh);
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            disposed = true;
+            invalidatePending();
+            window.removeEventListener('focus', refresh);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, [supported, actorId, invalidatePending]);
 
     const subscribe = useCallback(async () => {
-        if (!supported || !publicKey) return;
+        if (!supported || !publicKey || !actorId || busy.current) return;
+
+        busy.current = true;
+        const attempt = ++generation.current;
+        const current = () => attempt === generation.current;
 
         setProcessing(true);
         setError(null);
@@ -116,82 +242,107 @@ export function useWebPush(): WebPushState {
                 Notification.permission === 'granted'
                     ? 'granted'
                     : await Notification.requestPermission();
+            if (!current()) return;
             setPermission(nextPermission);
 
             if (nextPermission !== 'granted') {
                 throw new Error('Browser notifications are not allowed.');
             }
 
-            const registration =
-                await navigator.serviceWorker.register('/sw.js');
+            const registration = await activeRegistration(
+                await navigator.serviceWorker.register('/sw.js'),
+            );
+            if (!current()) return;
+            const chatProtocolVersion =
+                await verifyChatBrowserWorker(registration);
+            if (!current()) return;
+            const existing = await registration.pushManager.getSubscription();
+            if (!current()) return;
             const subscription =
-                (await registration.pushManager.getSubscription()) ??
+                existing ??
                 (await registration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: urlBase64ToArrayBuffer(publicKey),
                 }));
-
-            const key = subscription.getKey('p256dh');
-            const auth = subscription.getKey('auth');
+            if (!current()) return;
 
             await postJson(storePushSubscription.url(), 'POST', {
-                provider: 'webpush',
-                token: subscription.endpoint,
-                keys: {
-                    p256dh: arrayBufferToBase64Url(key),
-                    auth: arrayBufferToBase64Url(auth),
-                },
+                ...devicePayload(subscription, actorId),
                 platform: 'web',
+                chat_protocol_version: chatProtocolVersion,
             });
 
-            setEnabled(true);
+            if (current()) {
+                setEnabled(true);
+                setNeedsUpgrade(false);
+            }
         } catch (exception) {
-            setError(
-                exception instanceof Error
-                    ? exception.message
-                    : 'Push subscription failed.',
-            );
+            if (current())
+                setError(
+                    exception instanceof Error
+                        ? exception.message
+                        : 'Push subscription failed.',
+                );
         } finally {
-            setProcessing(false);
+            if (current()) {
+                busy.current = false;
+                setProcessing(false);
+            }
         }
-    }, [publicKey, supported]);
+    }, [publicKey, supported, actorId]);
 
     const unsubscribe = useCallback(async () => {
-        if (!supported) return;
+        if (!supported || !actorId || busy.current) return;
+
+        busy.current = true;
+        const attempt = ++generation.current;
+        const current = () => attempt === generation.current;
 
         setProcessing(true);
         setError(null);
 
         try {
-            const registration = await navigator.serviceWorker.ready;
+            const registration =
+                await navigator.serviceWorker.getRegistration('/');
             const subscription =
-                await registration.pushManager.getSubscription();
+                await registration?.pushManager.getSubscription();
+            if (!current()) return;
 
             if (subscription) {
-                await postJson(destroyPushSubscription.url(), 'DELETE', {
-                    provider: 'webpush',
-                    token: subscription.endpoint,
-                });
-                await subscription.unsubscribe();
+                await postJson(
+                    destroyPushSubscription.url(),
+                    'DELETE',
+                    devicePayload(subscription, actorId),
+                );
+                // Disable only this account's server binding. Removing the shared
+                // browser subscription could destroy a newer binding in another tab.
             }
 
-            setEnabled(false);
+            if (current()) {
+                setEnabled(false);
+                setNeedsUpgrade(false);
+            }
         } catch (exception) {
-            setError(
-                exception instanceof Error
-                    ? exception.message
-                    : 'Push subscription could not be disabled.',
-            );
+            if (current())
+                setError(
+                    exception instanceof Error
+                        ? exception.message
+                        : 'Push subscription could not be disabled.',
+                );
         } finally {
-            setProcessing(false);
+            if (current()) {
+                busy.current = false;
+                setProcessing(false);
+            }
         }
-    }, [supported]);
+    }, [supported, actorId]);
 
     return {
         supported,
         configured,
         permission,
         enabled,
+        needsUpgrade,
         processing,
         error,
         subscribe,

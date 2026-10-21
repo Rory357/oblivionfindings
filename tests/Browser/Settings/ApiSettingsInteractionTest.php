@@ -48,7 +48,11 @@ test('api settings persist generated keys and revoked status', function () {
                 return $createdKeyId !== null;
             });
 
+        // Revoking asks first: nothing changes until the confirm button is pressed.
         $browser->click(sprintf('[dusk="api-key-revoke-%s"]', $createdKeyId))
+            ->waitForText('Revoke this API key?', 10)
+            ->assertSeeIn(sprintf('[dusk="api-key-row-%s"]', $createdKeyId), 'active')
+            ->press('Revoke key')
             ->waitUsing(10, 250, function () use (&$createdKeyId) {
                 $keys = AppSetting::query()->where('key', 'settings.api.keys')->value('value');
                 $record = collect(is_array($keys) ? $keys : [])->firstWhere('id', $createdKeyId);

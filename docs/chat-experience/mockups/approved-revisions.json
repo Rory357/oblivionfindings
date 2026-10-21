@@ -1,0 +1,313 @@
+{
+  "scope": "All mockup refinements and web implementation approved by the user on 16 October 2026. Native mobile apps remain deferred.",
+  "status": "All 51 design refinements approved. Product implementation and verification are tracked separately in IMPLEMENTATION-STATUS.md.",
+  "latest": "Revision 2 completed with two additional review-and-fix passes, 191 final scenario renders, 100 responsive checks and 29 passing interaction checks.",
+  "items": [
+    {
+      "id": 1,
+      "description": "Correct selected recipient across chat, details and calls.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M03, M18; named-lead-to-Rohan call journey"
+    },
+    {
+      "id": 2,
+      "description": "Keep staff and family navigation, preferences and call actions within their role.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M10–M12, M19, M23; family role, isolated client switch and no staff record action after a family call"
+    },
+    {
+      "id": 3,
+      "description": "Give the worker family inbox its own mobile list, filters and back action.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M13; mobile queue → thread → back journey; four-width review"
+    },
+    {
+      "id": 4,
+      "description": "Keep the same conversation during calls.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M18, M25; existing draft and sent message shared with original thread during a call"
+    },
+    {
+      "id": 5,
+      "description": "Filter real missed-call history.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M18/history, M19/history; All calls / Missed / Callbacks filter actual preview entries"
+    },
+    {
+      "id": 6,
+      "description": "Show accurate conversation members, owners and permissions.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M03/details, M04/membership, M05/manage, M11/details; members and owner come from selected thread"
+    },
+    {
+      "id": 7,
+      "description": "Show the real settings scope and affected people.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M21/override; explicit affected service and unchanged Tōtara policy in scope-isolation journey"
+    },
+    {
+      "id": 8,
+      "description": "Preserve drafts, attachments, replies, searches and reading position.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M03, M06, M14, M16; per-actor/thread drafts, uploads, reply, search and scroll state; draft-return journeys"
+    },
+    {
+      "id": 9,
+      "description": "Support direct/group creation, duplicate detection and validation.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M04/direct, group, error; existing direct reuse, new direct creation, named group, empty-name guard and retry"
+    },
+    {
+      "id": 10,
+      "description": "Add conversation favourite, unread, mute, rename, archive, leave and transfer actions.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M03/details → Manage conversation; favourite, unread, mute, archive/unarchive, owner rename, leave and transfer"
+    },
+    {
+      "id": 11,
+      "description": "Make selected-message actions permission-aware.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M06/actions; selected sender determines edit/remove; unavailable access blocks membership inspection"
+    },
+    {
+      "id": 12,
+      "description": "Complete reply navigation, editing and unavailable-quote states.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M06/reply, edit, deleted; quoted-message navigation, edit cancellation and removed-original placeholder"
+    },
+    {
+      "id": 13,
+      "description": "Add eligible mentions and a Mentions view.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M03 composer @ picker; thread members only; Mentions inbox filter"
+    },
+    {
+      "id": 14,
+      "description": "Make reactions, saved messages and pins stateful.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M06/actions; reaction, save and pin; saved selected-message journey"
+    },
+    {
+      "id": 15,
+      "description": "Show sending, sent, failed and unconfirmed outcomes on individual outgoing messages.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M09/sending, sent, failed, checking; message-level progress, retry and outcome check"
+    },
+    {
+      "id": 16,
+      "description": "Keep badges, unread state and care-team receipt language consistent.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M01, M11, M13; common unread count; per-role care-team/family receipt wording"
+    },
+    {
+      "id": 17,
+      "description": "Search people, conversations, messages and files with exact-result navigation.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M08; messages/files/people/conversations, sender/date/thread filters, exact message highlight and return"
+    },
+    {
+      "id": 18,
+      "description": "Preserve reading position while loading history and receiving new messages.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M03/history, typing; per-thread reading position, prepend offset and explicit jump to new activity"
+    },
+    {
+      "id": 19,
+      "description": "Provide a permission-aware shared media library.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M07/library; media scoped to eligible conversation membership; unavailable media state"
+    },
+    {
+      "id": 20,
+      "description": "Complete attachment previews, queues, validation and recovery.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M07/attachments, uploading, failed, publish; file queue, captions, limits, scan, retry, remove and separate publication review"
+    },
+    {
+      "id": 21,
+      "description": "Complete voice-note recording, preview and recovery states.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M07/record, preview, play, permission, limit; pause/resume/discard, 2-minute proposed limit and visual playback"
+    },
+    {
+      "id": 22,
+      "description": "Demonstrate isolated client and relative conversations.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M10/multi and M11; Sam/Elliot switch and separate Jo/Nina threads; tested family isolation"
+    },
+    {
+      "id": 23,
+      "description": "Show first-send disclosure and invitation lifecycle/history permissions.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M11/empty; M12/pending, accepted, declined, expired, removed; first-send disclosure, explicit history choice"
+    },
+    {
+      "id": 24,
+      "description": "Make family inbox ownership and queue counts consistent.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M13 filters, claim, assignment, resolved/reopened; tested ownership/count and mobile queue changes"
+    },
+    {
+      "id": 25,
+      "description": "Show configured response hours and due/overdue states.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M10/unconfigured and M13; working-hours configuration, due/overdue examples, no promise for unconfigured service"
+    },
+    {
+      "id": 26,
+      "description": "Support shift-end handoff without blocking clock-out.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M13/handoff, M16/clock; review ownership and handover without blocking finish/clock-out"
+    },
+    {
+      "id": 27,
+      "description": "Provide a separate staff coordination composer and history.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M13/internal; dedicated staff composer/history; verified absence from family thread"
+    },
+    {
+      "id": 28,
+      "description": "Complete callback ownership, scheduling, attempts and duplicate handling.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M13/callback, M19 callback lifecycle; preferred/agreed times, owner, attempts, complete/cancel and duplicate reuse"
+    },
+    {
+      "id": 29,
+      "description": "Show urgent routes and managed inappropriate-contact handling.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M10 urgent contact, conversation concern review; configured service route and retained managed care contact"
+    },
+    {
+      "id": 30,
+      "description": "Show staff/family declined, cancelled, no-answer and ended outcomes.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M18 and M19 declined, cancelled/no-answer, ended; recovery and callback actions"
+    },
+    {
+      "id": 31,
+      "description": "Show incoming calls over work, busy state and answered-elsewhere state.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M25 all seven variants; global incoming card, busy-call switch, missed and answered elsewhere"
+    },
+    {
+      "id": 32,
+      "description": "Show group invitations, participation and host/leave rules.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M18/group, invite, end; M19/group; eligible participants, ringing invite, host removal and leave/end distinction"
+    },
+    {
+      "id": 33,
+      "description": "Keep call controls available across pages without covering critical controls.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M25 card plus persistent controls; work-space reservation; cross-page call journey and four-width checks"
+    },
+    {
+      "id": 34,
+      "description": "Show device checks, changes, quality and interruptions.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M18/preflight; M20 recovery variants; audio-device controls and truthful visual-only microphone test"
+    },
+    {
+      "id": 35,
+      "description": "Provide reviewed post-call communication and callback actions.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M25/family Review record; compact two-step Communication Record / optional shared Family Note; required wording and audience acknowledgement verified"
+    },
+    {
+      "id": 36,
+      "description": "Complete global rollout, policy and effective-access controls.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M21 general/access, M22 calls/files/privacy; effective-access review, eligibility and rollout settings"
+    },
+    {
+      "id": 37,
+      "description": "Show defaults, overrides, effective values and reset inheritance.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M21/override; inherited/overridden values, field-level override merge and reviewed reset"
+    },
+    {
+      "id": 38,
+      "description": "Show change review, impact, validation, save failure and conflicts.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M21/conflict, failed and M22/validation; diff, scope impact, preserved failure draft and explicit concurrent-change review"
+    },
+    {
+      "id": 39,
+      "description": "Separate investigation access and settings audits, holds and offboarding.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M22/investigator, audit, holds, offboarding; case/reason gate, separate audit domains, preservation and access expiry"
+    },
+    {
+      "id": 40,
+      "description": "Connect portal administration to approved relationships and effective policy.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M22/relationships; approved relatives, named workers/cover, effective Chat policy link"
+    },
+    {
+      "id": 41,
+      "description": "Make personal preferences visibly affect the preview.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M23; visible text size, spacing, theme, sending behaviour, availability, quiet/sound and preview examples"
+    },
+    {
+      "id": 42,
+      "description": "Show service health with ownership and freshness.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M22/health; messaging, realtime, push, uploads and voice with owner, timestamp and trend"
+    },
+    {
+      "id": 43,
+      "description": "Improve shared typography, contrast, spacing and timestamps.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "Shared v2.css; readable bubble typography, grouped senders, local dates, spacing and light/dark palette"
+    },
+    {
+      "id": 44,
+      "description": "Clarify person, client, audience and availability hierarchy.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M03, M10, M11, M13, M18; person/client/audience/availability in consistent headers and cards"
+    },
+    {
+      "id": 45,
+      "description": "Make family ownership and next actions easy to scan.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M13; owner, due state and next action on each queue card; overdue styling"
+    },
+    {
+      "id": 46,
+      "description": "Use consistent controls and feedback.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "Shared Thread, modal, buttons, disclosure and status primitives; same actions across full, embedded and call views"
+    },
+    {
+      "id": 47,
+      "description": "Complete responsive list, thread, details, keyboard and safe-area layouts.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "100 four-width checks; M02 list/thread/details, M13 mobile queue and M24 illustrative keyboard; safe-area spacing"
+    },
+    {
+      "id": 48,
+      "description": "Verify keyboard, focus, status announcements, zoom and reduced motion.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "Keyboard trap, Escape and focus return verified; 320px large-text/dark reflow and reduced-motion styles. Full zoom/device/assistive-technology acceptance remains implementation work"
+    },
+    {
+      "id": 49,
+      "description": "Preserve intended people, sources and unfinished context work.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "M14–M17; original work and intended recipient retained; tested medication return, ticket public/internal draft separation and restricted source denial"
+    },
+    {
+      "id": 50,
+      "description": "Cover every remaining inventory entry point explicitly.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "S01–S24 mapped by registry; M17 explicitly includes roster, recognition, services, legacy and technician; original source review/audience preserved"
+    },
+    {
+      "id": 51,
+      "description": "Add guided review journeys and scenario feedback.",
+      "status": "Design approved; product verification remains separate",
+      "evidence": "Five guided review journeys; per-scenario review status and feedback export, independent from implementation approval"
+    }
+  ]
+}

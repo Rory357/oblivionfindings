@@ -149,6 +149,9 @@ Route::middleware('auth')->group(function () {
         ->name('settings.notifications.delivery.update');
     Route::post('settings/notifications/push-subscriptions', [PushSubscriptionController::class, 'store'])
         ->name('settings.notifications.push-subscriptions.store');
+    Route::post('settings/notifications/push-subscriptions/status', [PushSubscriptionController::class, 'status'])
+        ->middleware('throttle:60,1')
+        ->name('settings.notifications.push-subscriptions.status');
     Route::delete('settings/notifications/push-subscriptions', [PushSubscriptionController::class, 'destroy'])
         ->name('settings.notifications.push-subscriptions.destroy');
 

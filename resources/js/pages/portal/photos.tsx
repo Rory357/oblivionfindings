@@ -149,13 +149,18 @@ export default function Photos({
                                     <DialogTrigger asChild>
                                         <Button>
                                             <Upload className="mr-2 h-4 w-4" />
-                                            Upload Photo
+                                            Upload photo
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent>
+                                    <DialogContent
+                                        style={{
+                                            maxWidth: 'min(92vw, 480px)',
+                                            width: 'min(92vw, 480px)',
+                                        }}
+                                    >
                                         <DialogHeader>
                                             <DialogTitle>
-                                                Upload Photo
+                                                Upload photo
                                             </DialogTitle>
                                             {requiresApproval && (
                                                 <DialogDescription>
@@ -367,7 +372,12 @@ export default function Photos({
                     open={!!lightboxPhoto}
                     onOpenChange={() => setLightboxPhoto(null)}
                 >
-                    <DialogContent className="max-w-3xl">
+                    <DialogContent
+                        style={{
+                            maxWidth: 'min(92vw, 900px)',
+                            width: 'min(92vw, 900px)',
+                        }}
+                    >
                         {lightboxPhoto && (
                             <>
                                 <DialogHeader>

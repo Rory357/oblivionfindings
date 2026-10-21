@@ -2,6 +2,7 @@
  * simple-dialog layout (SettingsModal): "Why can't I record this?" (NF-07)
  * and "Recorded and reported" (more than ordered was given). */
 import { PersonDisc } from '@/components/lists/entity-cells';
+import { ChatLauncher } from '@/components/chat/chat-launcher';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
 import {
@@ -198,12 +199,7 @@ export function WhyDialog({
                             <UserCheck className="size-4" /> View my eligibility
                         </Button>
                     ) : action === 'message-lead' && req.house_lead ? (
-                        <Button asChild>
-                            <a href="/operations/messages">
-                                <MessageSquare className="size-4" /> Message{' '}
-                                {req.house_lead.name}
-                            </a>
-                        </Button>
+                        <ChatLauncher personId={req.house_lead.id} label={`Message ${req.house_lead.name}`} />
                     ) : null}
                 </>
             }

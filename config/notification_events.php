@@ -1,9 +1,12 @@
 <?php
 
+use App\Services\Chat\ChatNotificationPreferences;
+
 return [
     // Used for preferences UI + routing defaults.
     // Keys should remain stable (audit/readability).
     'groups' => [
+        'Chat' => ChatNotificationPreferences::EVENTS,
         'Fleet & Assets' => [
             'fleet.booking_decisions',
             'fleet.maintenance_reminders',

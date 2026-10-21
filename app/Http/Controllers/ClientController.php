@@ -1586,6 +1586,7 @@ class ClientController extends Controller
             'family_notes' => $sectionAccess['family_notes']
                 ? FamilyNote::where('client_id', $client->id)
                     ->with([
+                        'assignedUser:id,name',
                         'creator:id,name',
                         'completer:id,name',
                         'staffResponder:id,name',
@@ -1613,6 +1614,8 @@ class ClientController extends Controller
                         'staff_responded_at' => $n->staff_responded_at?->toISOString(),
                         'assigned_shift_date' => $n->shift?->starts_at?->format('j M'),
                         'assigned_to_shift_id' => $n->assigned_to_shift_id,
+                        'assigned_to_user_id' => $n->assigned_to_user_id,
+                        'assigned_user_name' => $n->assignedUser?->name,
                         'assigned_shift' => $n->shift ? [
                             'id' => $n->shift->id,
                             'starts_at' => $n->shift->starts_at?->toISOString(),

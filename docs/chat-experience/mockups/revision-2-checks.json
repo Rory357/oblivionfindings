@@ -1,0 +1,4167 @@
+{
+  "scope": "Isolated mockup only. No production, real audio, backend authorization, delivery, native/background calling or full assistive-technology verification.",
+  "date": "2026-10-15",
+  "reviewPasses": [
+    {
+      "name": "First additional review and fixes",
+      "scenarioSweep": [
+        {
+          "group": "M01",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M01",
+          "text": 953
+        },
+        {
+          "group": "M01",
+          "variant": "empty",
+          "overflow": false,
+          "scenario": "empty",
+          "screen": "M01",
+          "text": 711
+        },
+        {
+          "group": "M01",
+          "variant": "restricted",
+          "overflow": false,
+          "scenario": "restricted",
+          "screen": "M01",
+          "text": 751
+        },
+        {
+          "group": "M01",
+          "variant": "collapsed",
+          "overflow": false,
+          "scenario": "collapsed",
+          "screen": "M01",
+          "text": 711
+        },
+        {
+          "group": "M02",
+          "variant": "list",
+          "overflow": false,
+          "scenario": "list",
+          "screen": "M02",
+          "text": 420
+        },
+        {
+          "group": "M02",
+          "variant": "thread",
+          "overflow": false,
+          "scenario": "thread",
+          "screen": "M02",
+          "text": 515
+        },
+        {
+          "group": "M02",
+          "variant": "more",
+          "overflow": false,
+          "scenario": "more",
+          "screen": "M02",
+          "text": 515
+        },
+        {
+          "group": "M03",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M03",
+          "text": 953
+        },
+        {
+          "group": "M03",
+          "variant": "details",
+          "overflow": false,
+          "scenario": "details",
+          "screen": "M03",
+          "text": 1165
+        },
+        {
+          "group": "M03",
+          "variant": "history",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M03",
+          "text": 1039
+        },
+        {
+          "group": "M03",
+          "variant": "typing",
+          "overflow": false,
+          "scenario": "typing",
+          "screen": "M03",
+          "text": 1082
+        },
+        {
+          "group": "M04",
+          "variant": "direct",
+          "dialog": "Start a chat",
+          "overflow": false,
+          "scenario": "direct",
+          "screen": "M04",
+          "text": 953
+        },
+        {
+          "group": "M04",
+          "variant": "group",
+          "dialog": "Create private group",
+          "overflow": false,
+          "scenario": "group",
+          "screen": "M04",
+          "text": 953
+        },
+        {
+          "group": "M04",
+          "variant": "details",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "details",
+          "screen": "M04",
+          "text": 1252
+        },
+        {
+          "group": "M04",
+          "variant": "invite",
+          "dialog": "Invite eligible colleagues",
+          "overflow": false,
+          "scenario": "invite",
+          "screen": "M04",
+          "text": 967
+        },
+        {
+          "group": "M04",
+          "variant": "remove",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "remove",
+          "screen": "M04",
+          "text": 967
+        },
+        {
+          "group": "M04",
+          "variant": "leave",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "leave",
+          "screen": "M04",
+          "text": 967
+        },
+        {
+          "group": "M04",
+          "variant": "transfer",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "transfer",
+          "screen": "M04",
+          "text": 967
+        },
+        {
+          "group": "M04",
+          "variant": "error",
+          "dialog": "Create private group",
+          "overflow": false,
+          "scenario": "error",
+          "screen": "M04",
+          "text": 967
+        },
+        {
+          "group": "M05",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M05",
+          "text": 954
+        },
+        {
+          "group": "M05",
+          "variant": "manage",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "manage",
+          "screen": "M05",
+          "text": 954
+        },
+        {
+          "group": "M05",
+          "variant": "archived",
+          "overflow": false,
+          "scenario": "archived",
+          "screen": "M05",
+          "text": 994
+        },
+        {
+          "group": "M05",
+          "variant": "denied",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M05",
+          "text": 672
+        },
+        {
+          "group": "M06",
+          "variant": "reply",
+          "overflow": false,
+          "scenario": "reply",
+          "screen": "M06",
+          "text": 1043
+        },
+        {
+          "group": "M06",
+          "variant": "actions",
+          "dialog": "Message actions",
+          "overflow": false,
+          "scenario": "actions",
+          "screen": "M06",
+          "text": 1043
+        },
+        {
+          "group": "M06",
+          "variant": "edit",
+          "overflow": false,
+          "scenario": "edit",
+          "screen": "M06",
+          "text": 1056
+        },
+        {
+          "group": "M06",
+          "variant": "deleted",
+          "overflow": false,
+          "scenario": "deleted",
+          "screen": "M06",
+          "text": 1042
+        },
+        {
+          "group": "M06",
+          "variant": "draft",
+          "overflow": false,
+          "scenario": "draft",
+          "screen": "M06",
+          "text": 1042
+        },
+        {
+          "group": "M06",
+          "variant": "unknown",
+          "overflow": false,
+          "scenario": "unknown",
+          "screen": "M06",
+          "text": 1087
+        },
+        {
+          "group": "M07",
+          "variant": "attachments",
+          "dialog": "Add photos or documents",
+          "overflow": false,
+          "scenario": "attachments",
+          "screen": "M07",
+          "text": 953
+        },
+        {
+          "group": "M07",
+          "variant": "uploading",
+          "dialog": "Add photos or documents",
+          "overflow": false,
+          "scenario": "uploading",
+          "screen": "M07",
+          "text": 980
+        },
+        {
+          "group": "M07",
+          "variant": "failed",
+          "dialog": "Add photos or documents",
+          "overflow": false,
+          "scenario": "failed",
+          "screen": "M07",
+          "text": 977
+        },
+        {
+          "group": "M07",
+          "variant": "record",
+          "dialog": "Voice note",
+          "overflow": false,
+          "scenario": "record",
+          "screen": "M07",
+          "text": 977
+        },
+        {
+          "group": "M07",
+          "variant": "preview",
+          "dialog": "Voice note",
+          "overflow": false,
+          "scenario": "preview",
+          "screen": "M07",
+          "text": 977
+        },
+        {
+          "group": "M07",
+          "variant": "play",
+          "overflow": false,
+          "scenario": "play",
+          "screen": "M07",
+          "text": 997
+        },
+        {
+          "group": "M07",
+          "variant": "publish",
+          "dialog": "Review publication",
+          "overflow": false,
+          "scenario": "publish",
+          "screen": "M07",
+          "text": 997
+        },
+        {
+          "group": "M07",
+          "variant": "restricted",
+          "dialog": "This item is unavailable",
+          "overflow": false,
+          "scenario": "restricted",
+          "screen": "M07",
+          "text": 1013
+        },
+        {
+          "group": "M07",
+          "variant": "library",
+          "dialog": "Shared media",
+          "overflow": false,
+          "scenario": "library",
+          "screen": "M07",
+          "text": 997
+        },
+        {
+          "group": "M07",
+          "variant": "permission",
+          "dialog": "Voice note",
+          "overflow": false,
+          "scenario": "permission",
+          "screen": "M07",
+          "text": 997
+        },
+        {
+          "group": "M07",
+          "variant": "limit",
+          "dialog": "Voice note",
+          "overflow": false,
+          "scenario": "limit",
+          "screen": "M07",
+          "text": 997
+        },
+        {
+          "group": "M08",
+          "variant": "results",
+          "overflow": false,
+          "scenario": "results",
+          "screen": "M08",
+          "text": 1908
+        },
+        {
+          "group": "M08",
+          "variant": "empty",
+          "overflow": false,
+          "scenario": "empty",
+          "screen": "M08",
+          "text": 490
+        },
+        {
+          "group": "M08",
+          "variant": "error",
+          "dialog": "This item is unavailable",
+          "overflow": false,
+          "scenario": "error",
+          "screen": "M08",
+          "text": 1908
+        },
+        {
+          "group": "M08",
+          "variant": "saved",
+          "dialog": "Saved for me",
+          "overflow": false,
+          "scenario": "saved",
+          "screen": "M08",
+          "text": 1908
+        },
+        {
+          "group": "M08",
+          "variant": "history",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M08",
+          "text": 711
+        },
+        {
+          "group": "M08",
+          "variant": "denied",
+          "dialog": "This item is unavailable",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M08",
+          "text": 1908
+        },
+        {
+          "group": "M09",
+          "variant": "notification",
+          "dialog": "Notifications",
+          "overflow": false,
+          "scenario": "notification",
+          "screen": "M09",
+          "text": 953
+        },
+        {
+          "group": "M09",
+          "variant": "offline",
+          "overflow": false,
+          "scenario": "offline",
+          "screen": "M09",
+          "text": 1015
+        },
+        {
+          "group": "M09",
+          "variant": "reconnect",
+          "overflow": false,
+          "scenario": "reconnect",
+          "screen": "M09",
+          "text": 1003
+        },
+        {
+          "group": "M09",
+          "variant": "failed",
+          "overflow": false,
+          "scenario": "failed",
+          "screen": "M09",
+          "text": 1002
+        },
+        {
+          "group": "M09",
+          "variant": "checking",
+          "overflow": false,
+          "scenario": "checking",
+          "screen": "M09",
+          "text": 1067
+        },
+        {
+          "group": "M09",
+          "variant": "expired",
+          "overflow": false,
+          "scenario": "expired",
+          "screen": "M09",
+          "text": 1146
+        },
+        {
+          "group": "M09",
+          "variant": "denied",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M09",
+          "text": 651
+        },
+        {
+          "group": "M10",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M10",
+          "text": 823
+        },
+        {
+          "group": "M10",
+          "variant": "unavailable",
+          "overflow": false,
+          "scenario": "unavailable",
+          "screen": "M10",
+          "text": 845
+        },
+        {
+          "group": "M10",
+          "variant": "unconfigured",
+          "overflow": false,
+          "scenario": "unconfigured",
+          "screen": "M10",
+          "text": 816
+        },
+        {
+          "group": "M10",
+          "variant": "multi",
+          "overflow": false,
+          "scenario": "multi",
+          "screen": "M10",
+          "text": 823
+        },
+        {
+          "group": "M11",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M11",
+          "text": 882
+        },
+        {
+          "group": "M11",
+          "variant": "named",
+          "overflow": false,
+          "scenario": "named",
+          "screen": "M11",
+          "text": 878
+        },
+        {
+          "group": "M11",
+          "variant": "details",
+          "overflow": false,
+          "scenario": "details",
+          "screen": "M11",
+          "text": 1316
+        },
+        {
+          "group": "M11",
+          "variant": "empty",
+          "overflow": false,
+          "scenario": "empty",
+          "screen": "M11",
+          "text": 608
+        },
+        {
+          "group": "M11",
+          "variant": "readonly",
+          "overflow": false,
+          "scenario": "readonly",
+          "screen": "M11",
+          "text": 632
+        },
+        {
+          "group": "M11",
+          "variant": "revoked",
+          "overflow": false,
+          "scenario": "revoked",
+          "screen": "M11",
+          "text": 612
+        },
+        {
+          "group": "M12",
+          "variant": "team",
+          "dialog": "Choose an approved contact",
+          "overflow": false,
+          "scenario": "team",
+          "screen": "M12",
+          "text": 882
+        },
+        {
+          "group": "M12",
+          "variant": "worker",
+          "dialog": "Choose an approved contact",
+          "overflow": false,
+          "scenario": "worker",
+          "screen": "M12",
+          "text": 882
+        },
+        {
+          "group": "M12",
+          "variant": "invite",
+          "dialog": "Invite approved relative",
+          "overflow": false,
+          "scenario": "invite",
+          "screen": "M12",
+          "text": 882
+        },
+        {
+          "group": "M12",
+          "variant": "history",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M12",
+          "text": 882
+        },
+        {
+          "group": "M12",
+          "variant": "removed",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "removed",
+          "screen": "M12",
+          "text": 882
+        },
+        {
+          "group": "M12",
+          "variant": "pending",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "pending",
+          "screen": "M12",
+          "text": 882
+        },
+        {
+          "group": "M12",
+          "variant": "accepted",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "accepted",
+          "screen": "M12",
+          "text": 882
+        },
+        {
+          "group": "M12",
+          "variant": "declined",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "declined",
+          "screen": "M12",
+          "text": 882
+        },
+        {
+          "group": "M12",
+          "variant": "expired",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "expired",
+          "screen": "M12",
+          "text": 961
+        },
+        {
+          "group": "M13",
+          "variant": "needs",
+          "overflow": false,
+          "scenario": "needs",
+          "screen": "M13",
+          "text": 1204
+        },
+        {
+          "group": "M13",
+          "variant": "assigned",
+          "overflow": false,
+          "scenario": "assigned",
+          "screen": "M13",
+          "text": 997
+        },
+        {
+          "group": "M13",
+          "variant": "waiting",
+          "overflow": false,
+          "scenario": "waiting",
+          "screen": "M13",
+          "text": 1010
+        },
+        {
+          "group": "M13",
+          "variant": "callback",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "callback",
+          "screen": "M13",
+          "text": 1010
+        },
+        {
+          "group": "M13",
+          "variant": "resolved",
+          "overflow": false,
+          "scenario": "resolved",
+          "screen": "M13",
+          "text": 993
+        },
+        {
+          "group": "M13",
+          "variant": "conflict",
+          "dialog": "Take ownership",
+          "overflow": false,
+          "scenario": "conflict",
+          "screen": "M13",
+          "text": 1104
+        },
+        {
+          "group": "M13",
+          "variant": "handoff",
+          "dialog": "Hand over family work",
+          "overflow": false,
+          "scenario": "handoff",
+          "screen": "M13",
+          "text": 1104
+        },
+        {
+          "group": "M13",
+          "variant": "unrouted",
+          "overflow": false,
+          "scenario": "unrouted",
+          "screen": "M13",
+          "text": 1086
+        },
+        {
+          "group": "M13",
+          "variant": "followup",
+          "dialog": "Create a family follow-up",
+          "overflow": false,
+          "scenario": "followup",
+          "screen": "M13",
+          "text": 1086
+        },
+        {
+          "group": "M13",
+          "variant": "internal",
+          "dialog": "Staff-only coordination",
+          "overflow": false,
+          "scenario": "internal",
+          "screen": "M13",
+          "text": 1086
+        },
+        {
+          "group": "M13",
+          "variant": "reopened",
+          "overflow": false,
+          "scenario": "reopened",
+          "screen": "M13",
+          "text": 1191
+        },
+        {
+          "group": "M14",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M14",
+          "text": 396
+        },
+        {
+          "group": "M14",
+          "variant": "selector",
+          "dialog": "Choose a family conversation",
+          "overflow": false,
+          "scenario": "selector",
+          "screen": "M14",
+          "text": 396
+        },
+        {
+          "group": "M14",
+          "variant": "readonly",
+          "overflow": false,
+          "scenario": "readonly",
+          "screen": "M14",
+          "text": 396
+        },
+        {
+          "group": "M14",
+          "variant": "error",
+          "overflow": false,
+          "scenario": "error",
+          "screen": "M14",
+          "text": 396
+        },
+        {
+          "group": "M15",
+          "variant": "direct",
+          "overflow": false,
+          "scenario": "direct",
+          "screen": "M15",
+          "text": 366
+        },
+        {
+          "group": "M15",
+          "variant": "alert",
+          "overflow": false,
+          "scenario": "alert",
+          "screen": "M15",
+          "text": 361
+        },
+        {
+          "group": "M15",
+          "variant": "discussion",
+          "overflow": false,
+          "scenario": "discussion",
+          "screen": "M15",
+          "text": 374
+        },
+        {
+          "group": "M15",
+          "variant": "denied",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M15",
+          "text": 299
+        },
+        {
+          "group": "M15",
+          "variant": "broadcast",
+          "overflow": false,
+          "scenario": "broadcast",
+          "screen": "M15",
+          "text": 421
+        },
+        {
+          "group": "M16",
+          "variant": "myday",
+          "overflow": false,
+          "scenario": "myday",
+          "screen": "M16",
+          "text": 434
+        },
+        {
+          "group": "M16",
+          "variant": "medication",
+          "overflow": false,
+          "scenario": "medication",
+          "screen": "M16",
+          "text": 387
+        },
+        {
+          "group": "M16",
+          "variant": "handover",
+          "overflow": false,
+          "scenario": "handover",
+          "screen": "M16",
+          "text": 407
+        },
+        {
+          "group": "M16",
+          "variant": "communication",
+          "overflow": false,
+          "scenario": "communication",
+          "screen": "M16",
+          "text": 389
+        },
+        {
+          "group": "M16",
+          "variant": "respite",
+          "overflow": false,
+          "scenario": "respite",
+          "screen": "M16",
+          "text": 392
+        },
+        {
+          "group": "M16",
+          "variant": "followup",
+          "overflow": false,
+          "scenario": "followup",
+          "screen": "M16",
+          "text": 411
+        },
+        {
+          "group": "M16",
+          "variant": "clock",
+          "overflow": false,
+          "scenario": "clock",
+          "screen": "M16",
+          "text": 393
+        },
+        {
+          "group": "M16",
+          "variant": "report",
+          "overflow": false,
+          "scenario": "report",
+          "screen": "M16",
+          "text": 394
+        },
+        {
+          "group": "M17",
+          "variant": "it",
+          "overflow": false,
+          "scenario": "it",
+          "screen": "M17",
+          "text": 378
+        },
+        {
+          "group": "M17",
+          "variant": "hub",
+          "overflow": false,
+          "scenario": "hub",
+          "screen": "M17",
+          "text": 393
+        },
+        {
+          "group": "M17",
+          "variant": "timeline",
+          "overflow": false,
+          "scenario": "timeline",
+          "screen": "M17",
+          "text": 408
+        },
+        {
+          "group": "M17",
+          "variant": "announcement",
+          "overflow": false,
+          "scenario": "announcement",
+          "screen": "M17",
+          "text": 430
+        },
+        {
+          "group": "M17",
+          "variant": "obli",
+          "overflow": false,
+          "scenario": "obli",
+          "screen": "M17",
+          "text": 514
+        },
+        {
+          "group": "M17",
+          "variant": "restricted",
+          "overflow": false,
+          "scenario": "restricted",
+          "screen": "M17",
+          "text": 305
+        },
+        {
+          "group": "M17",
+          "variant": "roster",
+          "overflow": false,
+          "scenario": "roster",
+          "screen": "M17",
+          "text": 426
+        },
+        {
+          "group": "M17",
+          "variant": "recognition",
+          "overflow": false,
+          "scenario": "recognition",
+          "screen": "M17",
+          "text": 400
+        },
+        {
+          "group": "M17",
+          "variant": "services",
+          "overflow": false,
+          "scenario": "services",
+          "screen": "M17",
+          "text": 441
+        },
+        {
+          "group": "M17",
+          "variant": "legacy",
+          "overflow": false,
+          "scenario": "legacy",
+          "screen": "M17",
+          "text": 426
+        },
+        {
+          "group": "M17",
+          "variant": "technician",
+          "overflow": false,
+          "scenario": "technician",
+          "screen": "M17",
+          "text": 515
+        },
+        {
+          "group": "M17",
+          "variant": "schedule",
+          "overflow": false,
+          "scenario": "schedule",
+          "screen": "M17",
+          "text": 344
+        },
+        {
+          "group": "M18",
+          "variant": "history",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M18",
+          "text": 423
+        },
+        {
+          "group": "M18",
+          "variant": "preflight",
+          "overflow": false,
+          "scenario": "preflight",
+          "screen": "M18",
+          "text": 521
+        },
+        {
+          "group": "M18",
+          "variant": "ringing",
+          "overflow": false,
+          "scenario": "ringing",
+          "screen": "M18",
+          "text": 243
+        },
+        {
+          "group": "M18",
+          "variant": "incoming",
+          "overflow": false,
+          "scenario": "incoming",
+          "screen": "M18",
+          "text": 777
+        },
+        {
+          "group": "M18",
+          "variant": "connecting",
+          "overflow": false,
+          "scenario": "connecting",
+          "screen": "M18",
+          "text": 762
+        },
+        {
+          "group": "M18",
+          "variant": "active",
+          "overflow": false,
+          "scenario": "active",
+          "screen": "M18",
+          "text": 716
+        },
+        {
+          "group": "M18",
+          "variant": "group",
+          "overflow": false,
+          "scenario": "group",
+          "screen": "M18",
+          "text": 782
+        },
+        {
+          "group": "M18",
+          "variant": "invite",
+          "dialog": "Invite to this call",
+          "overflow": false,
+          "scenario": "invite",
+          "screen": "M18",
+          "text": 782
+        },
+        {
+          "group": "M18",
+          "variant": "end",
+          "dialog": "Leave the call?",
+          "overflow": false,
+          "scenario": "end",
+          "screen": "M18",
+          "text": 782
+        },
+        {
+          "group": "M18",
+          "variant": "mini",
+          "overflow": false,
+          "scenario": "mini",
+          "screen": "M18",
+          "text": 750
+        },
+        {
+          "group": "M18",
+          "variant": "declined",
+          "overflow": false,
+          "scenario": "declined",
+          "screen": "M18",
+          "text": 630
+        },
+        {
+          "group": "M18",
+          "variant": "cancelled",
+          "overflow": false,
+          "scenario": "cancelled",
+          "screen": "M18",
+          "text": 631
+        },
+        {
+          "group": "M18",
+          "variant": "noanswer",
+          "overflow": false,
+          "scenario": "noanswer",
+          "screen": "M18",
+          "text": 626
+        },
+        {
+          "group": "M18",
+          "variant": "ended",
+          "overflow": false,
+          "scenario": "ended",
+          "screen": "M18",
+          "text": 627
+        },
+        {
+          "group": "M19",
+          "variant": "preflight",
+          "overflow": false,
+          "scenario": "preflight",
+          "screen": "M19",
+          "text": 531
+        },
+        {
+          "group": "M19",
+          "variant": "ringing",
+          "overflow": false,
+          "scenario": "ringing",
+          "screen": "M19",
+          "text": 253
+        },
+        {
+          "group": "M19",
+          "variant": "incoming",
+          "overflow": false,
+          "scenario": "incoming",
+          "screen": "M19",
+          "text": 748
+        },
+        {
+          "group": "M19",
+          "variant": "active",
+          "overflow": false,
+          "scenario": "active",
+          "screen": "M19",
+          "text": 764
+        },
+        {
+          "group": "M19",
+          "variant": "group",
+          "overflow": false,
+          "scenario": "group",
+          "screen": "M19",
+          "text": 796
+        },
+        {
+          "group": "M19",
+          "variant": "noanswer",
+          "overflow": false,
+          "scenario": "noanswer",
+          "screen": "M19",
+          "text": 658
+        },
+        {
+          "group": "M19",
+          "variant": "callback",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "callback",
+          "screen": "M19",
+          "text": 658
+        },
+        {
+          "group": "M19",
+          "variant": "assigned",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "assigned",
+          "screen": "M19",
+          "text": 658
+        },
+        {
+          "group": "M19",
+          "variant": "attempted",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "attempted",
+          "screen": "M19",
+          "text": 658
+        },
+        {
+          "group": "M19",
+          "variant": "completed",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "completed",
+          "screen": "M19",
+          "text": 658
+        },
+        {
+          "group": "M19",
+          "variant": "cancelled",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "cancelled",
+          "screen": "M19",
+          "text": 658
+        },
+        {
+          "group": "M20",
+          "variant": "permission",
+          "overflow": false,
+          "scenario": "permission",
+          "screen": "M20",
+          "text": 216
+        },
+        {
+          "group": "M20",
+          "variant": "ignored",
+          "overflow": false,
+          "scenario": "ignored",
+          "screen": "M20",
+          "text": 258
+        },
+        {
+          "group": "M20",
+          "variant": "missing",
+          "overflow": false,
+          "scenario": "missing",
+          "screen": "M20",
+          "text": 206
+        },
+        {
+          "group": "M20",
+          "variant": "unsupported",
+          "overflow": false,
+          "scenario": "unsupported",
+          "screen": "M20",
+          "text": 244
+        },
+        {
+          "group": "M20",
+          "variant": "busy",
+          "overflow": false,
+          "scenario": "busy",
+          "screen": "M20",
+          "text": 214
+        },
+        {
+          "group": "M20",
+          "variant": "elsewhere",
+          "overflow": false,
+          "scenario": "elsewhere",
+          "screen": "M20",
+          "text": 191
+        },
+        {
+          "group": "M20",
+          "variant": "expired",
+          "overflow": false,
+          "scenario": "expired",
+          "screen": "M20",
+          "text": 204
+        },
+        {
+          "group": "M20",
+          "variant": "network",
+          "overflow": false,
+          "scenario": "network",
+          "screen": "M20",
+          "text": 196
+        },
+        {
+          "group": "M20",
+          "variant": "reconnect",
+          "overflow": false,
+          "scenario": "reconnect",
+          "screen": "M20",
+          "text": 229
+        },
+        {
+          "group": "M20",
+          "variant": "device",
+          "overflow": false,
+          "scenario": "device",
+          "screen": "M20",
+          "text": 218
+        },
+        {
+          "group": "M20",
+          "variant": "revoked",
+          "overflow": false,
+          "scenario": "revoked",
+          "screen": "M20",
+          "text": 200
+        },
+        {
+          "group": "M20",
+          "variant": "missed",
+          "overflow": false,
+          "scenario": "missed",
+          "screen": "M20",
+          "text": 204
+        },
+        {
+          "group": "M21",
+          "variant": "general",
+          "overflow": false,
+          "scenario": "general",
+          "screen": "M21",
+          "text": 690
+        },
+        {
+          "group": "M21",
+          "variant": "family",
+          "overflow": false,
+          "scenario": "family",
+          "screen": "M21",
+          "text": 910
+        },
+        {
+          "group": "M21",
+          "variant": "notifications",
+          "overflow": false,
+          "scenario": "notifications",
+          "screen": "M21",
+          "text": 674
+        },
+        {
+          "group": "M21",
+          "variant": "access",
+          "overflow": false,
+          "scenario": "access",
+          "screen": "M21",
+          "text": 688
+        },
+        {
+          "group": "M21",
+          "variant": "channels",
+          "overflow": false,
+          "scenario": "channels",
+          "screen": "M21",
+          "text": 688
+        },
+        {
+          "group": "M21",
+          "variant": "override",
+          "overflow": false,
+          "scenario": "override",
+          "screen": "M21",
+          "text": 988
+        },
+        {
+          "group": "M21",
+          "variant": "conflict",
+          "dialog": "Review Chat settings",
+          "overflow": false,
+          "scenario": "conflict",
+          "screen": "M21",
+          "text": 726
+        },
+        {
+          "group": "M21",
+          "variant": "denied",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M21",
+          "text": 206
+        },
+        {
+          "group": "M21",
+          "variant": "failed",
+          "dialog": "Review Chat settings",
+          "overflow": false,
+          "scenario": "failed",
+          "screen": "M21",
+          "text": 726
+        },
+        {
+          "group": "M22",
+          "variant": "calls",
+          "overflow": false,
+          "scenario": "calls",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "files",
+          "overflow": false,
+          "scenario": "files",
+          "screen": "M22",
+          "text": 991
+        },
+        {
+          "group": "M22",
+          "variant": "privacy",
+          "overflow": false,
+          "scenario": "privacy",
+          "screen": "M22",
+          "text": 872
+        },
+        {
+          "group": "M22",
+          "variant": "health",
+          "overflow": false,
+          "scenario": "health",
+          "screen": "M22",
+          "text": 1203
+        },
+        {
+          "group": "M22",
+          "variant": "validation",
+          "dialog": "Review Chat settings",
+          "overflow": false,
+          "scenario": "validation",
+          "screen": "M22",
+          "text": 970
+        },
+        {
+          "group": "M22",
+          "variant": "investigator",
+          "dialog": "Authorised investigation access",
+          "overflow": false,
+          "scenario": "investigator",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "relationships",
+          "dialog": "Client portal relationships",
+          "overflow": false,
+          "scenario": "relationships",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "audit",
+          "dialog": "Settings audit",
+          "overflow": false,
+          "scenario": "audit",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "holds",
+          "dialog": "Exports and preservation",
+          "overflow": false,
+          "scenario": "holds",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "offboarding",
+          "dialog": "Offboarding and expired relationships",
+          "overflow": false,
+          "scenario": "offboarding",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M23",
+          "variant": "availability",
+          "overflow": false,
+          "scenario": "availability",
+          "screen": "M23",
+          "text": 725
+        },
+        {
+          "group": "M23",
+          "variant": "notifications",
+          "overflow": false,
+          "scenario": "notifications",
+          "screen": "M23",
+          "text": 725
+        },
+        {
+          "group": "M23",
+          "variant": "sound",
+          "overflow": false,
+          "scenario": "sound",
+          "screen": "M23",
+          "text": 725
+        },
+        {
+          "group": "M23",
+          "variant": "display",
+          "overflow": false,
+          "scenario": "display",
+          "screen": "M23",
+          "text": 725
+        },
+        {
+          "group": "M23",
+          "variant": "mandatory",
+          "overflow": false,
+          "scenario": "mandatory",
+          "screen": "M23",
+          "text": 725
+        },
+        {
+          "group": "M24",
+          "variant": "legacy",
+          "overflow": false,
+          "scenario": "legacy",
+          "screen": "M24",
+          "text": 953
+        },
+        {
+          "group": "M24",
+          "variant": "missing",
+          "overflow": false,
+          "scenario": "missing",
+          "screen": "M24",
+          "text": 671
+        },
+        {
+          "group": "M24",
+          "variant": "large",
+          "overflow": false,
+          "scenario": "large",
+          "screen": "M24",
+          "text": 953
+        },
+        {
+          "group": "M24",
+          "variant": "keyboard",
+          "overflow": false,
+          "scenario": "keyboard",
+          "screen": "M24",
+          "text": 953
+        },
+        {
+          "group": "M24",
+          "variant": "reduced",
+          "overflow": false,
+          "scenario": "reduced",
+          "screen": "M24",
+          "text": 953
+        },
+        {
+          "group": "M24",
+          "variant": "long",
+          "overflow": false,
+          "scenario": "long",
+          "screen": "M24",
+          "text": 1411
+        },
+        {
+          "group": "M25",
+          "variant": "staff",
+          "overflow": false,
+          "scenario": "staff",
+          "screen": "M25",
+          "text": 777
+        },
+        {
+          "group": "M25",
+          "variant": "family",
+          "overflow": false,
+          "scenario": "family",
+          "screen": "M25",
+          "text": 788
+        },
+        {
+          "group": "M25",
+          "variant": "portal",
+          "overflow": false,
+          "scenario": "portal",
+          "screen": "M25",
+          "text": 748
+        },
+        {
+          "group": "M25",
+          "variant": "group",
+          "overflow": false,
+          "scenario": "group",
+          "screen": "M25",
+          "text": 807
+        },
+        {
+          "group": "M25",
+          "variant": "busy",
+          "overflow": false,
+          "scenario": "busy",
+          "screen": "M25",
+          "text": 914
+        },
+        {
+          "group": "M25",
+          "variant": "missed",
+          "overflow": false,
+          "scenario": "missed",
+          "screen": "M25",
+          "text": 609
+        },
+        {
+          "group": "M25",
+          "variant": "elsewhere",
+          "overflow": false,
+          "scenario": "elsewhere",
+          "screen": "M25",
+          "text": 614
+        }
+      ]
+    },
+    {
+      "name": "Second additional review and fixes",
+      "responsive": [
+        {
+          "group": "M01",
+          "width": "desktop",
+          "content": 981,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M01",
+          "width": "tablet",
+          "content": 901,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M01",
+          "width": "phone",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M01",
+          "width": "narrow",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M02",
+          "width": "desktop",
+          "content": 448,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M02",
+          "width": "tablet",
+          "content": 448,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M02",
+          "width": "phone",
+          "content": 448,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M02",
+          "width": "narrow",
+          "content": 448,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M03",
+          "width": "desktop",
+          "content": 981,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M03",
+          "width": "tablet",
+          "content": 901,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M03",
+          "width": "phone",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M03",
+          "width": "narrow",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M04",
+          "width": "desktop",
+          "content": 981,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M04",
+          "width": "tablet",
+          "content": 901,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M04",
+          "width": "phone",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M04",
+          "width": "narrow",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M05",
+          "width": "desktop",
+          "content": 982,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M05",
+          "width": "tablet",
+          "content": 902,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M05",
+          "width": "phone",
+          "content": 519,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M05",
+          "width": "narrow",
+          "content": 519,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M06",
+          "width": "desktop",
+          "content": 1071,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M06",
+          "width": "tablet",
+          "content": 991,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M06",
+          "width": "phone",
+          "content": 605,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M06",
+          "width": "narrow",
+          "content": 605,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M07",
+          "width": "desktop",
+          "content": 981,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M07",
+          "width": "tablet",
+          "content": 901,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M07",
+          "width": "phone",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M07",
+          "width": "narrow",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M08",
+          "width": "desktop",
+          "content": 1908,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M08",
+          "width": "tablet",
+          "content": 1828,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M08",
+          "width": "phone",
+          "content": 1846,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M08",
+          "width": "narrow",
+          "content": 1846,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M09",
+          "width": "desktop",
+          "content": 981,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M09",
+          "width": "tablet",
+          "content": 901,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M09",
+          "width": "phone",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M09",
+          "width": "narrow",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M10",
+          "width": "desktop",
+          "content": 823,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M10",
+          "width": "tablet",
+          "content": 746,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M10",
+          "width": "phone",
+          "content": 734,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M10",
+          "width": "narrow",
+          "content": 734,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M11",
+          "width": "desktop",
+          "content": 899,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M11",
+          "width": "tablet",
+          "content": 822,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M11",
+          "width": "phone",
+          "content": 529,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M11",
+          "width": "narrow",
+          "content": 529,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M12",
+          "width": "desktop",
+          "content": 899,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M12",
+          "width": "tablet",
+          "content": 822,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M12",
+          "width": "phone",
+          "content": 529,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M12",
+          "width": "narrow",
+          "content": 529,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M13",
+          "width": "desktop",
+          "content": 1204,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M13",
+          "width": "tablet",
+          "content": 1124,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M13",
+          "width": "phone",
+          "content": 465,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M13",
+          "width": "narrow",
+          "content": 465,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M14",
+          "width": "desktop",
+          "content": 929,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M14",
+          "width": "tablet",
+          "content": 849,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M14",
+          "width": "phone",
+          "content": 580,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M14",
+          "width": "narrow",
+          "content": 580,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M15",
+          "width": "desktop",
+          "content": 366,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M15",
+          "width": "tablet",
+          "content": 286,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M15",
+          "width": "phone",
+          "content": 304,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M15",
+          "width": "narrow",
+          "content": 304,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M16",
+          "width": "desktop",
+          "content": 434,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M16",
+          "width": "tablet",
+          "content": 354,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M16",
+          "width": "phone",
+          "content": 372,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M16",
+          "width": "narrow",
+          "content": 372,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M17",
+          "width": "desktop",
+          "content": 378,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M17",
+          "width": "tablet",
+          "content": 298,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M17",
+          "width": "phone",
+          "content": 316,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M17",
+          "width": "narrow",
+          "content": 316,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M18",
+          "width": "desktop",
+          "content": 423,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M18",
+          "width": "tablet",
+          "content": 343,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M18",
+          "width": "phone",
+          "content": 361,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M18",
+          "width": "narrow",
+          "content": 361,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M19",
+          "width": "desktop",
+          "content": 268,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M19",
+          "width": "tablet",
+          "content": 191,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M19",
+          "width": "phone",
+          "content": 179,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M19",
+          "width": "narrow",
+          "content": 179,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M20",
+          "width": "desktop",
+          "content": 216,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M20",
+          "width": "tablet",
+          "content": 136,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M20",
+          "width": "phone",
+          "content": 154,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M20",
+          "width": "narrow",
+          "content": 154,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M21",
+          "width": "desktop",
+          "content": 690,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M21",
+          "width": "tablet",
+          "content": 610,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M21",
+          "width": "phone",
+          "content": 603,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M21",
+          "width": "narrow",
+          "content": 603,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M22",
+          "width": "desktop",
+          "content": 973,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M22",
+          "width": "tablet",
+          "content": 893,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M22",
+          "width": "phone",
+          "content": 886,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M22",
+          "width": "narrow",
+          "content": 886,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M23",
+          "width": "desktop",
+          "content": 814,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M23",
+          "width": "tablet",
+          "content": 734,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M23",
+          "width": "phone",
+          "content": 752,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M23",
+          "width": "narrow",
+          "content": 752,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M24",
+          "width": "desktop",
+          "content": 981,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M24",
+          "width": "tablet",
+          "content": 901,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M24",
+          "width": "phone",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M24",
+          "width": "narrow",
+          "content": 515,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        },
+        {
+          "group": "M25",
+          "width": "desktop",
+          "content": 777,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 1388
+        },
+        {
+          "group": "M25",
+          "width": "tablet",
+          "content": 697,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 820
+        },
+        {
+          "group": "M25",
+          "width": "phone",
+          "content": 715,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 390
+        },
+        {
+          "group": "M25",
+          "width": "narrow",
+          "content": 715,
+          "modalFits": true,
+          "pageOverflow": false,
+          "stageOverflow": false,
+          "stageWidth": 320
+        }
+      ],
+      "finalScenarioSweep": [
+        {
+          "group": "M01",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M01",
+          "text": 981
+        },
+        {
+          "group": "M01",
+          "variant": "empty",
+          "overflow": false,
+          "scenario": "empty",
+          "screen": "M01",
+          "text": 739
+        },
+        {
+          "group": "M01",
+          "variant": "restricted",
+          "overflow": false,
+          "scenario": "restricted",
+          "screen": "M01",
+          "text": 1021
+        },
+        {
+          "group": "M01",
+          "variant": "collapsed",
+          "overflow": false,
+          "scenario": "collapsed",
+          "screen": "M01",
+          "text": 901
+        },
+        {
+          "group": "M02",
+          "variant": "list",
+          "overflow": false,
+          "scenario": "list",
+          "screen": "M02",
+          "text": 448
+        },
+        {
+          "group": "M02",
+          "variant": "thread",
+          "overflow": false,
+          "scenario": "thread",
+          "screen": "M02",
+          "text": 515
+        },
+        {
+          "group": "M02",
+          "variant": "more",
+          "dialog": "Chat shortcuts",
+          "overflow": false,
+          "scenario": "more",
+          "screen": "M02",
+          "text": 515
+        },
+        {
+          "group": "M03",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M03",
+          "text": 981
+        },
+        {
+          "group": "M03",
+          "variant": "details",
+          "overflow": false,
+          "scenario": "details",
+          "screen": "M03",
+          "text": 1193
+        },
+        {
+          "group": "M03",
+          "variant": "history",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M03",
+          "text": 1067
+        },
+        {
+          "group": "M03",
+          "variant": "typing",
+          "overflow": false,
+          "scenario": "typing",
+          "screen": "M03",
+          "text": 1110
+        },
+        {
+          "group": "M04",
+          "variant": "direct",
+          "dialog": "Start a chat",
+          "overflow": false,
+          "scenario": "direct",
+          "screen": "M04",
+          "text": 981
+        },
+        {
+          "group": "M04",
+          "variant": "group",
+          "dialog": "Create private group",
+          "overflow": false,
+          "scenario": "group",
+          "screen": "M04",
+          "text": 981
+        },
+        {
+          "group": "M04",
+          "variant": "details",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "details",
+          "screen": "M04",
+          "text": 1280
+        },
+        {
+          "group": "M04",
+          "variant": "invite",
+          "dialog": "Invite eligible colleagues",
+          "overflow": false,
+          "scenario": "invite",
+          "screen": "M04",
+          "text": 995
+        },
+        {
+          "group": "M04",
+          "variant": "remove",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "remove",
+          "screen": "M04",
+          "text": 995
+        },
+        {
+          "group": "M04",
+          "variant": "leave",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "leave",
+          "screen": "M04",
+          "text": 995
+        },
+        {
+          "group": "M04",
+          "variant": "transfer",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "transfer",
+          "screen": "M04",
+          "text": 995
+        },
+        {
+          "group": "M04",
+          "variant": "error",
+          "dialog": "Create private group",
+          "overflow": false,
+          "scenario": "error",
+          "screen": "M04",
+          "text": 995
+        },
+        {
+          "group": "M05",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M05",
+          "text": 982
+        },
+        {
+          "group": "M05",
+          "variant": "manage",
+          "dialog": "Membership and ownership",
+          "overflow": false,
+          "scenario": "manage",
+          "screen": "M05",
+          "text": 982
+        },
+        {
+          "group": "M05",
+          "variant": "archived",
+          "overflow": false,
+          "scenario": "archived",
+          "screen": "M05",
+          "text": 1022
+        },
+        {
+          "group": "M05",
+          "variant": "denied",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M05",
+          "text": 700
+        },
+        {
+          "group": "M06",
+          "variant": "reply",
+          "overflow": false,
+          "scenario": "reply",
+          "screen": "M06",
+          "text": 1071
+        },
+        {
+          "group": "M06",
+          "variant": "actions",
+          "dialog": "Message actions",
+          "overflow": false,
+          "scenario": "actions",
+          "screen": "M06",
+          "text": 1071
+        },
+        {
+          "group": "M06",
+          "variant": "edit",
+          "overflow": false,
+          "scenario": "edit",
+          "screen": "M06",
+          "text": 1084
+        },
+        {
+          "group": "M06",
+          "variant": "deleted",
+          "overflow": false,
+          "scenario": "deleted",
+          "screen": "M06",
+          "text": 1070
+        },
+        {
+          "group": "M06",
+          "variant": "draft",
+          "overflow": false,
+          "scenario": "draft",
+          "screen": "M06",
+          "text": 1070
+        },
+        {
+          "group": "M06",
+          "variant": "unknown",
+          "overflow": false,
+          "scenario": "unknown",
+          "screen": "M06",
+          "text": 1115
+        },
+        {
+          "group": "M07",
+          "variant": "attachments",
+          "dialog": "Add photos or documents",
+          "overflow": false,
+          "scenario": "attachments",
+          "screen": "M07",
+          "text": 981
+        },
+        {
+          "group": "M07",
+          "variant": "uploading",
+          "dialog": "Add photos or documents",
+          "overflow": false,
+          "scenario": "uploading",
+          "screen": "M07",
+          "text": 1008
+        },
+        {
+          "group": "M07",
+          "variant": "failed",
+          "dialog": "Add photos or documents",
+          "overflow": false,
+          "scenario": "failed",
+          "screen": "M07",
+          "text": 1005
+        },
+        {
+          "group": "M07",
+          "variant": "record",
+          "dialog": "Voice note",
+          "overflow": false,
+          "scenario": "record",
+          "screen": "M07",
+          "text": 1005
+        },
+        {
+          "group": "M07",
+          "variant": "preview",
+          "dialog": "Voice note",
+          "overflow": false,
+          "scenario": "preview",
+          "screen": "M07",
+          "text": 1005
+        },
+        {
+          "group": "M07",
+          "variant": "play",
+          "overflow": false,
+          "scenario": "play",
+          "screen": "M07",
+          "text": 1025
+        },
+        {
+          "group": "M07",
+          "variant": "publish",
+          "dialog": "Review publication",
+          "overflow": false,
+          "scenario": "publish",
+          "screen": "M07",
+          "text": 1025
+        },
+        {
+          "group": "M07",
+          "variant": "restricted",
+          "dialog": "This item is unavailable",
+          "overflow": false,
+          "scenario": "restricted",
+          "screen": "M07",
+          "text": 1041
+        },
+        {
+          "group": "M07",
+          "variant": "library",
+          "dialog": "Shared media",
+          "overflow": false,
+          "scenario": "library",
+          "screen": "M07",
+          "text": 1025
+        },
+        {
+          "group": "M07",
+          "variant": "permission",
+          "dialog": "Voice note",
+          "overflow": false,
+          "scenario": "permission",
+          "screen": "M07",
+          "text": 1025
+        },
+        {
+          "group": "M07",
+          "variant": "limit",
+          "dialog": "Voice note",
+          "overflow": false,
+          "scenario": "limit",
+          "screen": "M07",
+          "text": 1025
+        },
+        {
+          "group": "M08",
+          "variant": "results",
+          "overflow": false,
+          "scenario": "results",
+          "screen": "M08",
+          "text": 1908
+        },
+        {
+          "group": "M08",
+          "variant": "empty",
+          "overflow": false,
+          "scenario": "empty",
+          "screen": "M08",
+          "text": 490
+        },
+        {
+          "group": "M08",
+          "variant": "error",
+          "dialog": "This item is unavailable",
+          "overflow": false,
+          "scenario": "error",
+          "screen": "M08",
+          "text": 1908
+        },
+        {
+          "group": "M08",
+          "variant": "saved",
+          "dialog": "Saved for me",
+          "overflow": false,
+          "scenario": "saved",
+          "screen": "M08",
+          "text": 1908
+        },
+        {
+          "group": "M08",
+          "variant": "history",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M08",
+          "text": 739
+        },
+        {
+          "group": "M08",
+          "variant": "denied",
+          "dialog": "This item is unavailable",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M08",
+          "text": 1908
+        },
+        {
+          "group": "M09",
+          "variant": "notification",
+          "dialog": "Notifications",
+          "overflow": false,
+          "scenario": "notification",
+          "screen": "M09",
+          "text": 981
+        },
+        {
+          "group": "M09",
+          "variant": "offline",
+          "overflow": false,
+          "scenario": "offline",
+          "screen": "M09",
+          "text": 1043
+        },
+        {
+          "group": "M09",
+          "variant": "reconnect",
+          "overflow": false,
+          "scenario": "reconnect",
+          "screen": "M09",
+          "text": 1031
+        },
+        {
+          "group": "M09",
+          "variant": "failed",
+          "overflow": false,
+          "scenario": "failed",
+          "screen": "M09",
+          "text": 1030
+        },
+        {
+          "group": "M09",
+          "variant": "checking",
+          "overflow": false,
+          "scenario": "checking",
+          "screen": "M09",
+          "text": 1095
+        },
+        {
+          "group": "M09",
+          "variant": "sending",
+          "overflow": false,
+          "scenario": "sending",
+          "screen": "M09",
+          "text": 1162
+        },
+        {
+          "group": "M09",
+          "variant": "sent",
+          "overflow": false,
+          "scenario": "sent",
+          "screen": "M09",
+          "text": 1209
+        },
+        {
+          "group": "M09",
+          "variant": "expired",
+          "overflow": false,
+          "scenario": "expired",
+          "screen": "M09",
+          "text": 1288
+        },
+        {
+          "group": "M09",
+          "variant": "denied",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M09",
+          "text": 679
+        },
+        {
+          "group": "M10",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M10",
+          "text": 823
+        },
+        {
+          "group": "M10",
+          "variant": "unavailable",
+          "overflow": false,
+          "scenario": "unavailable",
+          "screen": "M10",
+          "text": 845
+        },
+        {
+          "group": "M10",
+          "variant": "unconfigured",
+          "overflow": false,
+          "scenario": "unconfigured",
+          "screen": "M10",
+          "text": 816
+        },
+        {
+          "group": "M10",
+          "variant": "multi",
+          "overflow": false,
+          "scenario": "multi",
+          "screen": "M10",
+          "text": 823
+        },
+        {
+          "group": "M11",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M11",
+          "text": 899
+        },
+        {
+          "group": "M11",
+          "variant": "named",
+          "overflow": false,
+          "scenario": "named",
+          "screen": "M11",
+          "text": 895
+        },
+        {
+          "group": "M11",
+          "variant": "details",
+          "overflow": false,
+          "scenario": "details",
+          "screen": "M11",
+          "text": 1333
+        },
+        {
+          "group": "M11",
+          "variant": "empty",
+          "overflow": false,
+          "scenario": "empty",
+          "screen": "M11",
+          "text": 623
+        },
+        {
+          "group": "M11",
+          "variant": "readonly",
+          "overflow": false,
+          "scenario": "readonly",
+          "screen": "M11",
+          "text": 647
+        },
+        {
+          "group": "M11",
+          "variant": "revoked",
+          "overflow": false,
+          "scenario": "revoked",
+          "screen": "M11",
+          "text": 627
+        },
+        {
+          "group": "M12",
+          "variant": "team",
+          "dialog": "Choose an approved contact",
+          "overflow": false,
+          "scenario": "team",
+          "screen": "M12",
+          "text": 899
+        },
+        {
+          "group": "M12",
+          "variant": "worker",
+          "dialog": "Choose an approved contact",
+          "overflow": false,
+          "scenario": "worker",
+          "screen": "M12",
+          "text": 899
+        },
+        {
+          "group": "M12",
+          "variant": "invite",
+          "dialog": "Invite approved relative",
+          "overflow": false,
+          "scenario": "invite",
+          "screen": "M12",
+          "text": 899
+        },
+        {
+          "group": "M12",
+          "variant": "history",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M12",
+          "text": 899
+        },
+        {
+          "group": "M12",
+          "variant": "removed",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "removed",
+          "screen": "M12",
+          "text": 899
+        },
+        {
+          "group": "M12",
+          "variant": "pending",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "pending",
+          "screen": "M12",
+          "text": 899
+        },
+        {
+          "group": "M12",
+          "variant": "accepted",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "accepted",
+          "screen": "M12",
+          "text": 899
+        },
+        {
+          "group": "M12",
+          "variant": "declined",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "declined",
+          "screen": "M12",
+          "text": 899
+        },
+        {
+          "group": "M12",
+          "variant": "expired",
+          "dialog": "Family invitations",
+          "overflow": false,
+          "scenario": "expired",
+          "screen": "M12",
+          "text": 978
+        },
+        {
+          "group": "M13",
+          "variant": "needs",
+          "overflow": false,
+          "scenario": "needs",
+          "screen": "M13",
+          "text": 1204
+        },
+        {
+          "group": "M13",
+          "variant": "assigned",
+          "overflow": false,
+          "scenario": "assigned",
+          "screen": "M13",
+          "text": 997
+        },
+        {
+          "group": "M13",
+          "variant": "waiting",
+          "overflow": false,
+          "scenario": "waiting",
+          "screen": "M13",
+          "text": 1010
+        },
+        {
+          "group": "M13",
+          "variant": "callback",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "callback",
+          "screen": "M13",
+          "text": 1010
+        },
+        {
+          "group": "M13",
+          "variant": "resolved",
+          "overflow": false,
+          "scenario": "resolved",
+          "screen": "M13",
+          "text": 993
+        },
+        {
+          "group": "M13",
+          "variant": "conflict",
+          "dialog": "Take ownership",
+          "overflow": false,
+          "scenario": "conflict",
+          "screen": "M13",
+          "text": 1104
+        },
+        {
+          "group": "M13",
+          "variant": "handoff",
+          "dialog": "Hand over family work",
+          "overflow": false,
+          "scenario": "handoff",
+          "screen": "M13",
+          "text": 1104
+        },
+        {
+          "group": "M13",
+          "variant": "unrouted",
+          "overflow": false,
+          "scenario": "unrouted",
+          "screen": "M13",
+          "text": 1086
+        },
+        {
+          "group": "M13",
+          "variant": "followup",
+          "dialog": "Create a family follow-up",
+          "overflow": false,
+          "scenario": "followup",
+          "screen": "M13",
+          "text": 1086
+        },
+        {
+          "group": "M13",
+          "variant": "internal",
+          "dialog": "Staff-only coordination",
+          "overflow": false,
+          "scenario": "internal",
+          "screen": "M13",
+          "text": 1086
+        },
+        {
+          "group": "M13",
+          "variant": "reopened",
+          "overflow": false,
+          "scenario": "reopened",
+          "screen": "M13",
+          "text": 1191
+        },
+        {
+          "group": "M14",
+          "variant": "default",
+          "overflow": false,
+          "scenario": "default",
+          "screen": "M14",
+          "text": 929
+        },
+        {
+          "group": "M14",
+          "variant": "selector",
+          "dialog": "Choose a family conversation",
+          "overflow": false,
+          "scenario": "selector",
+          "screen": "M14",
+          "text": 929
+        },
+        {
+          "group": "M14",
+          "variant": "readonly",
+          "overflow": false,
+          "scenario": "readonly",
+          "screen": "M14",
+          "text": 953
+        },
+        {
+          "group": "M14",
+          "variant": "error",
+          "overflow": false,
+          "scenario": "error",
+          "screen": "M14",
+          "text": 812
+        },
+        {
+          "group": "M15",
+          "variant": "direct",
+          "overflow": false,
+          "scenario": "direct",
+          "screen": "M15",
+          "text": 366
+        },
+        {
+          "group": "M15",
+          "variant": "alert",
+          "overflow": false,
+          "scenario": "alert",
+          "screen": "M15",
+          "text": 361
+        },
+        {
+          "group": "M15",
+          "variant": "discussion",
+          "overflow": false,
+          "scenario": "discussion",
+          "screen": "M15",
+          "text": 374
+        },
+        {
+          "group": "M15",
+          "variant": "denied",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M15",
+          "text": 299
+        },
+        {
+          "group": "M15",
+          "variant": "broadcast",
+          "overflow": false,
+          "scenario": "broadcast",
+          "screen": "M15",
+          "text": 421
+        },
+        {
+          "group": "M16",
+          "variant": "myday",
+          "overflow": false,
+          "scenario": "myday",
+          "screen": "M16",
+          "text": 434
+        },
+        {
+          "group": "M16",
+          "variant": "medication",
+          "overflow": false,
+          "scenario": "medication",
+          "screen": "M16",
+          "text": 387
+        },
+        {
+          "group": "M16",
+          "variant": "handover",
+          "overflow": false,
+          "scenario": "handover",
+          "screen": "M16",
+          "text": 407
+        },
+        {
+          "group": "M16",
+          "variant": "communication",
+          "overflow": false,
+          "scenario": "communication",
+          "screen": "M16",
+          "text": 389
+        },
+        {
+          "group": "M16",
+          "variant": "respite",
+          "overflow": false,
+          "scenario": "respite",
+          "screen": "M16",
+          "text": 392
+        },
+        {
+          "group": "M16",
+          "variant": "followup",
+          "overflow": false,
+          "scenario": "followup",
+          "screen": "M16",
+          "text": 411
+        },
+        {
+          "group": "M16",
+          "variant": "clock",
+          "overflow": false,
+          "scenario": "clock",
+          "screen": "M16",
+          "text": 393
+        },
+        {
+          "group": "M16",
+          "variant": "report",
+          "overflow": false,
+          "scenario": "report",
+          "screen": "M16",
+          "text": 394
+        },
+        {
+          "group": "M17",
+          "variant": "it",
+          "overflow": false,
+          "scenario": "it",
+          "screen": "M17",
+          "text": 378
+        },
+        {
+          "group": "M17",
+          "variant": "hub",
+          "overflow": false,
+          "scenario": "hub",
+          "screen": "M17",
+          "text": 393
+        },
+        {
+          "group": "M17",
+          "variant": "timeline",
+          "overflow": false,
+          "scenario": "timeline",
+          "screen": "M17",
+          "text": 408
+        },
+        {
+          "group": "M17",
+          "variant": "announcement",
+          "overflow": false,
+          "scenario": "announcement",
+          "screen": "M17",
+          "text": 430
+        },
+        {
+          "group": "M17",
+          "variant": "obli",
+          "overflow": false,
+          "scenario": "obli",
+          "screen": "M17",
+          "text": 514
+        },
+        {
+          "group": "M17",
+          "variant": "restricted",
+          "overflow": false,
+          "scenario": "restricted",
+          "screen": "M17",
+          "text": 305
+        },
+        {
+          "group": "M17",
+          "variant": "roster",
+          "overflow": false,
+          "scenario": "roster",
+          "screen": "M17",
+          "text": 426
+        },
+        {
+          "group": "M17",
+          "variant": "recognition",
+          "overflow": false,
+          "scenario": "recognition",
+          "screen": "M17",
+          "text": 400
+        },
+        {
+          "group": "M17",
+          "variant": "services",
+          "overflow": false,
+          "scenario": "services",
+          "screen": "M17",
+          "text": 441
+        },
+        {
+          "group": "M17",
+          "variant": "legacy",
+          "overflow": false,
+          "scenario": "legacy",
+          "screen": "M17",
+          "text": 417
+        },
+        {
+          "group": "M17",
+          "variant": "technician",
+          "overflow": false,
+          "scenario": "technician",
+          "screen": "M17",
+          "text": 515
+        },
+        {
+          "group": "M17",
+          "variant": "schedule",
+          "overflow": false,
+          "scenario": "schedule",
+          "screen": "M17",
+          "text": 344
+        },
+        {
+          "group": "M18",
+          "variant": "history",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M18",
+          "text": 423
+        },
+        {
+          "group": "M18",
+          "variant": "preflight",
+          "overflow": false,
+          "scenario": "preflight",
+          "screen": "M18",
+          "text": 521
+        },
+        {
+          "group": "M18",
+          "variant": "ringing",
+          "overflow": false,
+          "scenario": "ringing",
+          "screen": "M18",
+          "text": 243
+        },
+        {
+          "group": "M18",
+          "variant": "incoming",
+          "overflow": false,
+          "scenario": "incoming",
+          "screen": "M18",
+          "text": 777
+        },
+        {
+          "group": "M18",
+          "variant": "connecting",
+          "overflow": false,
+          "scenario": "connecting",
+          "screen": "M18",
+          "text": 521
+        },
+        {
+          "group": "M18",
+          "variant": "active",
+          "overflow": false,
+          "scenario": "active",
+          "screen": "M18",
+          "text": 389
+        },
+        {
+          "group": "M18",
+          "variant": "group",
+          "overflow": false,
+          "scenario": "group",
+          "screen": "M18",
+          "text": 447
+        },
+        {
+          "group": "M18",
+          "variant": "invite",
+          "dialog": "Invite to this call",
+          "overflow": false,
+          "scenario": "invite",
+          "screen": "M18",
+          "text": 447
+        },
+        {
+          "group": "M18",
+          "variant": "end",
+          "dialog": "Leave the call?",
+          "overflow": false,
+          "scenario": "end",
+          "screen": "M18",
+          "text": 447
+        },
+        {
+          "group": "M18",
+          "variant": "mini",
+          "overflow": false,
+          "scenario": "mini",
+          "screen": "M18",
+          "text": 413
+        },
+        {
+          "group": "M18",
+          "variant": "declined",
+          "overflow": false,
+          "scenario": "declined",
+          "screen": "M18",
+          "text": 235
+        },
+        {
+          "group": "M18",
+          "variant": "cancelled",
+          "overflow": false,
+          "scenario": "cancelled",
+          "screen": "M18",
+          "text": 236
+        },
+        {
+          "group": "M18",
+          "variant": "noanswer",
+          "overflow": false,
+          "scenario": "noanswer",
+          "screen": "M18",
+          "text": 231
+        },
+        {
+          "group": "M18",
+          "variant": "ended",
+          "overflow": false,
+          "scenario": "ended",
+          "screen": "M18",
+          "text": 232
+        },
+        {
+          "group": "M19",
+          "variant": "history",
+          "overflow": false,
+          "scenario": "history",
+          "screen": "M19",
+          "text": 268
+        },
+        {
+          "group": "M19",
+          "variant": "preflight",
+          "overflow": false,
+          "scenario": "preflight",
+          "screen": "M19",
+          "text": 531
+        },
+        {
+          "group": "M19",
+          "variant": "ringing",
+          "overflow": false,
+          "scenario": "ringing",
+          "screen": "M19",
+          "text": 253
+        },
+        {
+          "group": "M19",
+          "variant": "incoming",
+          "overflow": false,
+          "scenario": "incoming",
+          "screen": "M19",
+          "text": 748
+        },
+        {
+          "group": "M19",
+          "variant": "active",
+          "overflow": false,
+          "scenario": "active",
+          "screen": "M19",
+          "text": 399
+        },
+        {
+          "group": "M19",
+          "variant": "group",
+          "overflow": false,
+          "scenario": "group",
+          "screen": "M19",
+          "text": 465
+        },
+        {
+          "group": "M19",
+          "variant": "noanswer",
+          "overflow": false,
+          "scenario": "noanswer",
+          "screen": "M19",
+          "text": 238
+        },
+        {
+          "group": "M19",
+          "variant": "callback",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "callback",
+          "screen": "M19",
+          "text": 238
+        },
+        {
+          "group": "M19",
+          "variant": "assigned",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "assigned",
+          "screen": "M19",
+          "text": 238
+        },
+        {
+          "group": "M19",
+          "variant": "attempted",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "attempted",
+          "screen": "M19",
+          "text": 238
+        },
+        {
+          "group": "M19",
+          "variant": "completed",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "completed",
+          "screen": "M19",
+          "text": 238
+        },
+        {
+          "group": "M19",
+          "variant": "cancelled",
+          "dialog": "Callback request",
+          "overflow": false,
+          "scenario": "cancelled",
+          "screen": "M19",
+          "text": 238
+        },
+        {
+          "group": "M19",
+          "variant": "declined",
+          "overflow": false,
+          "scenario": "declined",
+          "screen": "M19",
+          "text": 242
+        },
+        {
+          "group": "M19",
+          "variant": "ended",
+          "overflow": false,
+          "scenario": "ended",
+          "screen": "M19",
+          "text": 239
+        },
+        {
+          "group": "M20",
+          "variant": "permission",
+          "overflow": false,
+          "scenario": "permission",
+          "screen": "M20",
+          "text": 216
+        },
+        {
+          "group": "M20",
+          "variant": "ignored",
+          "overflow": false,
+          "scenario": "ignored",
+          "screen": "M20",
+          "text": 258
+        },
+        {
+          "group": "M20",
+          "variant": "missing",
+          "overflow": false,
+          "scenario": "missing",
+          "screen": "M20",
+          "text": 206
+        },
+        {
+          "group": "M20",
+          "variant": "unsupported",
+          "overflow": false,
+          "scenario": "unsupported",
+          "screen": "M20",
+          "text": 244
+        },
+        {
+          "group": "M20",
+          "variant": "busy",
+          "overflow": false,
+          "scenario": "busy",
+          "screen": "M20",
+          "text": 214
+        },
+        {
+          "group": "M20",
+          "variant": "elsewhere",
+          "overflow": false,
+          "scenario": "elsewhere",
+          "screen": "M20",
+          "text": 191
+        },
+        {
+          "group": "M20",
+          "variant": "expired",
+          "overflow": false,
+          "scenario": "expired",
+          "screen": "M20",
+          "text": 204
+        },
+        {
+          "group": "M20",
+          "variant": "network",
+          "overflow": false,
+          "scenario": "network",
+          "screen": "M20",
+          "text": 196
+        },
+        {
+          "group": "M20",
+          "variant": "reconnect",
+          "overflow": false,
+          "scenario": "reconnect",
+          "screen": "M20",
+          "text": 229
+        },
+        {
+          "group": "M20",
+          "variant": "device",
+          "overflow": false,
+          "scenario": "device",
+          "screen": "M20",
+          "text": 218
+        },
+        {
+          "group": "M20",
+          "variant": "revoked",
+          "overflow": false,
+          "scenario": "revoked",
+          "screen": "M20",
+          "text": 200
+        },
+        {
+          "group": "M20",
+          "variant": "missed",
+          "overflow": false,
+          "scenario": "missed",
+          "screen": "M20",
+          "text": 204
+        },
+        {
+          "group": "M21",
+          "variant": "general",
+          "overflow": false,
+          "scenario": "general",
+          "screen": "M21",
+          "text": 690
+        },
+        {
+          "group": "M21",
+          "variant": "family",
+          "overflow": false,
+          "scenario": "family",
+          "screen": "M21",
+          "text": 910
+        },
+        {
+          "group": "M21",
+          "variant": "notifications",
+          "overflow": false,
+          "scenario": "notifications",
+          "screen": "M21",
+          "text": 674
+        },
+        {
+          "group": "M21",
+          "variant": "access",
+          "overflow": false,
+          "scenario": "access",
+          "screen": "M21",
+          "text": 688
+        },
+        {
+          "group": "M21",
+          "variant": "channels",
+          "overflow": false,
+          "scenario": "channels",
+          "screen": "M21",
+          "text": 688
+        },
+        {
+          "group": "M21",
+          "variant": "override",
+          "overflow": false,
+          "scenario": "override",
+          "screen": "M21",
+          "text": 980
+        },
+        {
+          "group": "M21",
+          "variant": "conflict",
+          "dialog": "Review Chat settings",
+          "overflow": false,
+          "scenario": "conflict",
+          "screen": "M21",
+          "text": 726
+        },
+        {
+          "group": "M21",
+          "variant": "denied",
+          "overflow": false,
+          "scenario": "denied",
+          "screen": "M21",
+          "text": 206
+        },
+        {
+          "group": "M21",
+          "variant": "failed",
+          "dialog": "Review Chat settings",
+          "overflow": false,
+          "scenario": "failed",
+          "screen": "M21",
+          "text": 726
+        },
+        {
+          "group": "M22",
+          "variant": "calls",
+          "overflow": false,
+          "scenario": "calls",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "files",
+          "overflow": false,
+          "scenario": "files",
+          "screen": "M22",
+          "text": 991
+        },
+        {
+          "group": "M22",
+          "variant": "privacy",
+          "overflow": false,
+          "scenario": "privacy",
+          "screen": "M22",
+          "text": 872
+        },
+        {
+          "group": "M22",
+          "variant": "health",
+          "overflow": false,
+          "scenario": "health",
+          "screen": "M22",
+          "text": 1203
+        },
+        {
+          "group": "M22",
+          "variant": "validation",
+          "dialog": "Review Chat settings",
+          "overflow": false,
+          "scenario": "validation",
+          "screen": "M22",
+          "text": 970
+        },
+        {
+          "group": "M22",
+          "variant": "investigator",
+          "dialog": "Authorised investigation access",
+          "overflow": false,
+          "scenario": "investigator",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "relationships",
+          "dialog": "Client portal relationships",
+          "overflow": false,
+          "scenario": "relationships",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "audit",
+          "dialog": "Settings audit",
+          "overflow": false,
+          "scenario": "audit",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "holds",
+          "dialog": "Exports and preservation",
+          "overflow": false,
+          "scenario": "holds",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M22",
+          "variant": "offboarding",
+          "dialog": "Offboarding and expired relationships",
+          "overflow": false,
+          "scenario": "offboarding",
+          "screen": "M22",
+          "text": 973
+        },
+        {
+          "group": "M23",
+          "variant": "availability",
+          "overflow": false,
+          "scenario": "availability",
+          "screen": "M23",
+          "text": 814
+        },
+        {
+          "group": "M23",
+          "variant": "notifications",
+          "overflow": false,
+          "scenario": "notifications",
+          "screen": "M23",
+          "text": 814
+        },
+        {
+          "group": "M23",
+          "variant": "sound",
+          "overflow": false,
+          "scenario": "sound",
+          "screen": "M23",
+          "text": 814
+        },
+        {
+          "group": "M23",
+          "variant": "display",
+          "overflow": false,
+          "scenario": "display",
+          "screen": "M23",
+          "text": 814
+        },
+        {
+          "group": "M23",
+          "variant": "mandatory",
+          "overflow": false,
+          "scenario": "mandatory",
+          "screen": "M23",
+          "text": 814
+        },
+        {
+          "group": "M24",
+          "variant": "legacy",
+          "overflow": false,
+          "scenario": "legacy",
+          "screen": "M24",
+          "text": 981
+        },
+        {
+          "group": "M24",
+          "variant": "missing",
+          "overflow": false,
+          "scenario": "missing",
+          "screen": "M24",
+          "text": 699
+        },
+        {
+          "group": "M24",
+          "variant": "large",
+          "overflow": false,
+          "scenario": "large",
+          "screen": "M24",
+          "text": 981
+        },
+        {
+          "group": "M24",
+          "variant": "keyboard",
+          "overflow": false,
+          "scenario": "keyboard",
+          "screen": "M24",
+          "text": 637
+        },
+        {
+          "group": "M24",
+          "variant": "reduced",
+          "overflow": false,
+          "scenario": "reduced",
+          "screen": "M24",
+          "text": 526
+        },
+        {
+          "group": "M24",
+          "variant": "long",
+          "overflow": false,
+          "scenario": "long",
+          "screen": "M24",
+          "text": 786
+        },
+        {
+          "group": "M25",
+          "variant": "staff",
+          "overflow": false,
+          "scenario": "staff",
+          "screen": "M25",
+          "text": 777
+        },
+        {
+          "group": "M25",
+          "variant": "family",
+          "overflow": false,
+          "scenario": "family",
+          "screen": "M25",
+          "text": 788
+        },
+        {
+          "group": "M25",
+          "variant": "portal",
+          "overflow": false,
+          "scenario": "portal",
+          "screen": "M25",
+          "text": 748
+        },
+        {
+          "group": "M25",
+          "variant": "group",
+          "overflow": false,
+          "scenario": "group",
+          "screen": "M25",
+          "text": 807
+        },
+        {
+          "group": "M25",
+          "variant": "busy",
+          "overflow": false,
+          "scenario": "busy",
+          "screen": "M25",
+          "text": 914
+        },
+        {
+          "group": "M25",
+          "variant": "missed",
+          "overflow": false,
+          "scenario": "missed",
+          "screen": "M25",
+          "text": 609
+        },
+        {
+          "group": "M25",
+          "variant": "elsewhere",
+          "overflow": false,
+          "scenario": "elsewhere",
+          "screen": "M25",
+          "text": 614
+        }
+      ]
+    }
+  ],
+  "journeys": [
+    {
+      "check": "Create private group opens created thread",
+      "pass": true
+    },
+    {
+      "check": "Separate drafts survive conversation switch",
+      "pass": true
+    },
+    {
+      "check": "Saved message retains selected text and conversation",
+      "pass": true
+    },
+    {
+      "check": "Family client switch isolates Elliot conversation",
+      "pass": true
+    },
+    {
+      "check": "Repeated callback uses existing request",
+      "pass": true
+    },
+    {
+      "check": "Claim updates family owner",
+      "pass": true
+    },
+    {
+      "check": "Staff coordination stays out of family thread",
+      "pass": true
+    },
+    {
+      "check": "Mobile family thread returns to queue",
+      "pass": true
+    },
+    {
+      "check": "Site override does not change another service",
+      "pass": true
+    },
+    {
+      "check": "Invalid settings remain unsaved with clear correction",
+      "pass": true
+    },
+    {
+      "check": "Medication lead remains Rohan through call preflight",
+      "pass": true
+    },
+    {
+      "check": "Ongoing call remains visible over conversation",
+      "pass": true
+    },
+    {
+      "check": "Call conversation uses existing Rohan draft",
+      "pass": true
+    },
+    {
+      "check": "Message sent in call appears in original thread",
+      "pass": true
+    },
+    {
+      "check": "Original medication draft survives full Chat and call",
+      "pass": true
+    },
+    {
+      "check": "Modal traps keyboard focus in both directions",
+      "pass": true
+    },
+    {
+      "check": "Escape closes modal and restores invoking control",
+      "pass": true
+    },
+    {
+      "check": "Large-text dark conversation reflows at 320px",
+      "pass": true
+    },
+    {
+      "check": "Concurrent policy change blocks save until reviewed",
+      "pass": true
+    },
+    {
+      "check": "Conflict resolution retains the other administrator’s change",
+      "pass": true
+    },
+    {
+      "check": "Family group includes explicitly approved relative",
+      "pass": true
+    },
+    {
+      "check": "Family call ending offers no staff record action",
+      "pass": true
+    },
+    {
+      "check": "Internal ticket note does not inherit public reply draft",
+      "pass": true
+    },
+    {
+      "check": "Public ticket reply does not inherit internal note",
+      "pass": true
+    },
+    {
+      "check": "Restricted source closes access to contextual drawer",
+      "pass": true
+    },
+    {
+      "check": "Compact record dialog fits a small browser viewport",
+      "pass": true
+    },
+    {
+      "check": "Family Note requires separate wording and audience acknowledgement",
+      "pass": true
+    },
+    {
+      "check": "Separate Communication Record and Family Note save confirmation",
+      "pass": true
+    },
+    {
+      "check": "Family preferences omit staff Off duty option",
+      "pass": true
+    }
+  ],
+  "capturedBrowserErrors": [],
+  "gallery": {
+    "groups": 25,
+    "images": 50,
+    "firstImageLoaded": true
+  }
+}

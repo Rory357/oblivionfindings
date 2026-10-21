@@ -1,3 +1,5 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,8 +12,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -109,14 +111,14 @@ const shiftTypeLabels: Record<string, string> = {
     travel: 'Travel',
 };
 
-const defaultVisitType = { label: 'In Person', icon: Users };
+const defaultVisitType = { label: 'In person', icon: Users };
 
 const visitTypeLabels: Record<
     string,
     { label: string; icon: typeof Calendar }
 > = {
     in_person: defaultVisitType,
-    video_call: { label: 'Video Call', icon: Video },
+    video_call: { label: 'Video call', icon: Video },
     outing: { label: 'Outing', icon: MapPin },
 };
 
@@ -184,6 +186,14 @@ export default function Schedule({
 
     const submitVisit = (e: React.FormEvent) => {
         e.preventDefault();
+        // The calendar picker has no `min`; keep the old "today or later" rule.
+        if (
+            form.data.requested_date &&
+            form.data.requested_date < new Date().toISOString().split('T')[0]
+        ) {
+            form.setError('requested_date', 'Choose today or a later date.');
+            return;
+        }
         form.post(`/portal/clients/${client.id}/visit-requests`, {
             preserveScroll: true,
             onSuccess: () => {
@@ -228,7 +238,7 @@ export default function Schedule({
                     <CardHeader className="flex flex-row items-center justify-between pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Clock className="h-4 w-4 text-primary" />
-                            Shift Schedule
+                            Shift schedule
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -363,7 +373,7 @@ export default function Schedule({
                                     Shift schedule is not enabled for your
                                     portal access
                                 </p>
-                                <p className="mt-1 text-xs text-muted-foreground/70">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     Contact the care team if you need access to
                                     shift information.
                                 </p>
@@ -377,7 +387,7 @@ export default function Schedule({
                     <CardHeader className="flex flex-row items-center justify-between pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Home className="h-4 w-4 text-primary" />
-                            Respite Stays
+                            Respite stays
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -458,7 +468,7 @@ export default function Schedule({
                                     Respite stays are not enabled for your
                                     portal access
                                 </p>
-                                <p className="mt-1 text-xs text-muted-foreground/70">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     Contact the care team if you need access to
                                     respite information.
                                 </p>
@@ -472,7 +482,7 @@ export default function Schedule({
                     <CardHeader className="flex flex-row items-center justify-between pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <CalendarPlus className="h-4 w-4 text-primary" />
-                            Visit Requests
+                            Visit requests
                         </CardTitle>
                         <Dialog
                             open={bookingOpen}
@@ -485,12 +495,17 @@ export default function Schedule({
                                     className="gap-1.5"
                                 >
                                     <CalendarPlus className="h-3.5 w-3.5" />
-                                    Book a Visit
+                                    Book a visit
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-md">
+                            <DialogContent
+                                style={{
+                                    maxWidth: 'min(92vw, 720px)',
+                                    width: 'min(92vw, 720px)',
+                                }}
+                            >
                                 <DialogHeader>
-                                    <DialogTitle>Request a Visit</DialogTitle>
+                                    <DialogTitle>Request a visit</DialogTitle>
                                     <DialogDescription>
                                         Submit a visit request to see{' '}
                                         {clientName}. The care team will review
@@ -505,21 +520,20 @@ export default function Schedule({
                                         <Label htmlFor="visit-date">
                                             Date *
                                         </Label>
-                                        <Input
+                                        <DatePicker
                                             id="visit-date"
-                                            type="date"
+                                            label="Visit date"
                                             value={form.data.requested_date}
-                                            onChange={(e) =>
+                                            onChange={(value) =>
                                                 form.setData(
                                                     'requested_date',
-                                                    e.target.value,
+                                                    value,
                                                 )
                                             }
-                                            min={
-                                                new Date()
-                                                    .toISOString()
-                                                    .split('T')[0]
+                                            invalid={
+                                                !!form.errors.requested_date
                                             }
+                                            compact
                                         />
                                         {form.errors.requested_date && (
                                             <p className="mt-1 text-xs text-status-critical">
@@ -532,40 +546,42 @@ export default function Schedule({
                                             <Label htmlFor="time-start">
                                                 From
                                             </Label>
-                                            <Input
+                                            <TimePicker
                                                 id="time-start"
-                                                type="time"
+                                                label="Preferred start time"
                                                 value={
                                                     form.data
                                                         .preferred_time_start
                                                 }
-                                                onChange={(e) =>
+                                                onChange={(value) =>
                                                     form.setData(
                                                         'preferred_time_start',
-                                                        e.target.value,
+                                                        value,
                                                     )
                                                 }
+                                                compact
                                             />
                                         </div>
                                         <div>
                                             <Label htmlFor="time-end">To</Label>
-                                            <Input
+                                            <TimePicker
                                                 id="time-end"
-                                                type="time"
+                                                label="Preferred end time"
                                                 value={
                                                     form.data.preferred_time_end
                                                 }
-                                                onChange={(e) =>
+                                                onChange={(value) =>
                                                     form.setData(
                                                         'preferred_time_end',
-                                                        e.target.value,
+                                                        value,
                                                     )
                                                 }
+                                                compact
                                             />
                                         </div>
                                     </div>
                                     <div>
-                                        <Label>Visit Type *</Label>
+                                        <Label>Visit type *</Label>
                                         <div className="mt-2 grid grid-cols-3 gap-2">
                                             {(
                                                 [
@@ -607,9 +623,9 @@ export default function Schedule({
                                         <Label htmlFor="visit-notes">
                                             Notes
                                         </Label>
-                                        <textarea
+                                        <Textarea
                                             id="visit-notes"
-                                            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                            className="mt-1"
                                             rows={3}
                                             placeholder="Any special requests or things to note..."
                                             value={form.data.notes}
@@ -640,7 +656,7 @@ export default function Schedule({
                                         >
                                             {form.processing
                                                 ? 'Submitting...'
-                                                : 'Submit Request'}
+                                                : 'Submit request'}
                                         </Button>
                                     </div>
                                 </form>
@@ -728,7 +744,7 @@ export default function Schedule({
                                     onClick={() => setBookingOpen(true)}
                                 >
                                     <CalendarPlus className="h-3.5 w-3.5" />
-                                    Book a Visit
+                                    Book a visit
                                 </Button>
                             </div>
                         )}

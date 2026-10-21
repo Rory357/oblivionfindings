@@ -92,6 +92,9 @@ test('system user detail can add and remove roles through the live update endpoi
             ->waitFor("@user-role-remove-{$managerRole->id}", 10)
             ->assertSee($managerRole->label ?? $managerRole->name)
             ->click("@user-role-remove-{$managerRole->id}")
+            // Removing a role asks first.
+            ->waitForText('Remove this role?', 10)
+            ->press('Remove role')
             ->waitUntilMissing("@user-role-remove-{$managerRole->id}", 10);
 
         expect($staff->fresh()->roles()->where('name', 'manager')->exists())->toBeFalse();

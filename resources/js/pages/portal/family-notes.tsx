@@ -1,3 +1,6 @@
+import { FamilyNoteOwner } from '@/components/family-notes/family-note-owner';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,12 +11,17 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    AlarmClock,
     AlertTriangle,
     Calendar,
     CheckCircle2,
+    ClipboardList,
+    FileText,
+    Hand,
     NotebookPen,
     Plus,
     Trash2,
+    type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -33,6 +41,7 @@ type FamilyNote = {
     staff_responded_by_name?: string | null;
     staff_responded_at?: string | null;
     assigned_shift_date?: string | null;
+    assigned_user_name?: string | null;
     assigned_shift?: {
         id: number;
         starts_at?: string | null;
@@ -54,29 +63,34 @@ type Props = {
     stats: { open: number; completed: number; overdue: number };
 };
 
-const NOTE_TYPES = [
+const NOTE_TYPES: {
+    key: string;
+    label: string;
+    icon: LucideIcon;
+    color: string;
+}[] = [
     {
         key: 'note',
         label: 'Note',
-        emoji: '📝',
+        icon: FileText,
         color: 'bg-status-info-bg text-status-info border-status-info/30',
     },
     {
         key: 'todo',
-        label: 'To-Do',
-        emoji: '✅',
+        label: 'To-do',
+        icon: CheckCircle2,
         color: 'bg-status-success-bg text-status-success border-status-success/30',
     },
     {
         key: 'request',
         label: 'Request',
-        emoji: '🙏',
+        icon: Hand,
         color: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     },
     {
         key: 'reminder',
         label: 'Reminder',
-        emoji: '⏰',
+        icon: AlarmClock,
         color: 'bg-primary/10 text-primary border-primary',
     },
 ];
@@ -162,18 +176,18 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                     href: `/portal/clients/${client.id}/dashboard`,
                 },
                 {
-                    title: 'Notes & To-Dos',
+                    title: 'Notes & to-dos',
                     href: `/portal/clients/${client.id}/family-notes`,
                 },
             ]}
         >
-            <Head title={`${clientName} - Notes & To-Dos`} />
+            <Head title={`${clientName} - Notes & to-dos`} />
 
             <PageLayout
                 hero={
                     <PageHero
                         icon={NotebookPen}
-                        title="Notes & To-Dos"
+                        title="Notes & to-dos"
                         description={`Share notes, requests, and reminders with ${client.first_name}'s care team`}
                         stats={[
                             { label: 'Open', value: stats.open },
@@ -187,7 +201,7 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                                 onClick={() => setShowForm(!showForm)}
                             >
                                 <Plus className="h-3.5 w-3.5" />
-                                {showForm ? 'Cancel' : 'Add Note'}
+                                {showForm ? 'Cancel' : 'Add note'}
                             </Button>
                         }
                     />
@@ -228,7 +242,10 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                                                 }
                                                 className={`h-auto gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-medium ${form.data.note_type === t.key ? `${t.color} scale-105 shadow-sm` : 'border-border bg-card text-muted-foreground hover:border-primary/30'}`}
                                             >
-                                                <span>{t.emoji}</span>
+                                                <t.icon
+                                                    className="size-3.5"
+                                                    aria-hidden
+                                                />
                                                 {t.label}
                                             </Button>
                                         ))}
@@ -259,33 +276,38 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <Label className="text-xs">
-                                            Due Date
+                                        <Label
+                                            htmlFor="family-note-due-date"
+                                            className="text-xs"
+                                        >
+                                            Due date
                                         </Label>
-                                        <Input
-                                            type="date"
+                                        <DatePicker
+                                            id="family-note-due-date"
+                                            label="Due date"
                                             value={form.data.due_date}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'due_date',
-                                                    e.target.value,
-                                                )
+                                            onChange={(value) =>
+                                                form.setData('due_date', value)
                                             }
+                                            allowClear
+                                            compact
                                         />
                                     </div>
                                     <div>
-                                        <Label className="text-xs">
-                                            Due Time
+                                        <Label
+                                            htmlFor="family-note-due-time"
+                                            className="text-xs"
+                                        >
+                                            Due time
                                         </Label>
-                                        <Input
-                                            type="time"
+                                        <TimePicker
+                                            id="family-note-due-time"
+                                            label="Due time"
                                             value={form.data.due_time}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'due_time',
-                                                    e.target.value,
-                                                )
+                                            onChange={(value) =>
+                                                form.setData('due_time', value)
                                             }
+                                            compact
                                         />
                                     </div>
                                 </div>
@@ -315,7 +337,7 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                                             !form.data.title.trim()
                                         }
                                     >
-                                        Create Note
+                                        Create note
                                     </Button>
                                 </div>
                             </form>
@@ -362,7 +384,10 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                 {notes.length === 0 && !showForm && (
                     <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-12">
-                            <span className="mb-3 text-4xl">📝</span>
+                            <FileText
+                                className="mb-3 size-10 text-muted-foreground"
+                                aria-hidden
+                            />
                             <p className="font-medium">No notes yet</p>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 Create a note or to-do for the care team.
@@ -373,7 +398,7 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                                 onClick={() => setShowForm(true)}
                             >
                                 <Plus className="h-3.5 w-3.5" />
-                                Add Your First Note
+                                Add your first note
                             </Button>
                         </CardContent>
                     </Card>
@@ -411,7 +436,8 @@ function NoteCard({
                             <span
                                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${typeInfo.color}`}
                             >
-                                {typeInfo.emoji} {typeInfo.label}
+                                <typeInfo.icon className="size-3" aria-hidden />
+                                {typeInfo.label}
                             </span>
                             {note.priority !== 'normal' && (
                                 <Badge
@@ -454,6 +480,7 @@ function NoteCard({
                             </p>
                         )}
 
+                        <FamilyNoteOwner name={note.assigned_user_name} />
                         {note.assigned_shift && (
                             <div className="mt-2 rounded-lg border border-primary bg-primary/10 p-2 text-xs text-primary">
                                 <p className="font-medium">
@@ -480,15 +507,15 @@ function NoteCard({
                         )}
 
                         {!note.assigned_shift && note.assigned_shift_date && (
-                            <p className="mt-1 text-xs text-primary">
-                                📋 Assigned to shift on{' '}
-                                {note.assigned_shift_date}
+                            <p className="mt-1 flex items-center gap-1 text-xs text-primary">
+                                <ClipboardList className="size-3" aria-hidden />
+                                Assigned to shift on {note.assigned_shift_date}
                             </p>
                         )}
 
                         {/* Staff Response */}
                         {note.staff_response && (
-                            <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-status-info-bg p-2">
+                            <div className="mt-2 rounded-lg border-l-2 border-l-status-info bg-status-info-bg p-2">
                                 <p className="text-xs">
                                     <span className="font-medium">
                                         {note.staff_responded_by_name}
@@ -540,9 +567,13 @@ function NoteCard({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => onDelete(note.id)}
-                                className="h-8 w-8 shrink-0 text-muted-foreground/50 hover:text-status-critical"
+                                aria-label={`Delete note: ${note.title}`}
+                                className="frontline-tap shrink-0 text-muted-foreground hover:text-status-critical"
                             >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                />
                             </Button>
                         )}
                 </div>

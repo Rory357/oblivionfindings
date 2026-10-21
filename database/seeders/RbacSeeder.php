@@ -24,6 +24,16 @@ class RbacSeeder extends Seeder
     ];
 
     /**
+     * The CFO role's finance grants: read-only, the same set auditors hold.
+     * The grant migration 2026_10_19_120000 gives existing sites the same set.
+     */
+    public const CFO_FINANCE_READ = [
+        'finance.dashboard', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites', 'finance.ledger.view',
+        'finance.ap.view', 'finance.ar.view', 'finance.bank.view', 'finance.tax.view', 'finance.assets.view',
+        'finance.petty_cash.view', 'finance.reports.view',
+    ];
+
+    /**
      * Independent safety/privacy decisions. Only the explicit product policy
      * in run() assigns them; broad administrator access does not imply them.
      * Every seeder that backfills the admin role must exclude these keys.
@@ -46,6 +56,9 @@ class RbacSeeder extends Seeder
         'medications.transfers.manage',
         'medications.catalogue.manage',
         'medications.backups.manage',
+        // Private staff chat inspection: named investigators only. Grant migration:
+        // 2026_10_20_101000_register_chat_investigation_permission (no role grants).
+        'chat.investigate',
     ];
 
     public function run(): void
@@ -159,6 +172,7 @@ class RbacSeeder extends Seeder
             ['key' => 'settings.access.edit_roles', 'description' => 'Edit role permissions', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.delete_roles', 'description' => 'Delete custom roles', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.impersonate', 'description' => 'Impersonate other users', 'group' => 'access_control', 'module' => 'System'],
+            ['key' => 'chat.investigate', 'description' => 'Inspect private staff chats for an authorised investigation and place preservation holds', 'group' => 'chat', 'module' => 'System'],
 
             // Sites
             ['key' => 'sites.viewAny', 'description' => 'View sites', 'group' => 'sites', 'module' => 'Operations'],
@@ -673,6 +687,9 @@ class RbacSeeder extends Seeder
             'staff.viewAny', 'staff.create', 'staff.update', 'staff.invite', 'staff.assignments.update',
             'staff.credentials.viewAny', 'staff.credentials.updateAny', 'staff.availability.updateAny',
             'workers.viewAny', 'reports.viewAny', 'rostering.viewAny',
+            // Own-site operations dashboard; OperationsPermissionsSeeder creates the key
+            // and grants it on a fresh install, this keeps it on a reseed (20 Oct 2026).
+            'operations.dashboard.view',
             'fleet.viewAny', 'fleet.manage', 'fleet.driverSessions.manage', 'fleet.signals.view', 'fleet.trips.manage',
             'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve', 'fleet.incidents.manage',
             'fleet.maintenance.manage', 'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',
@@ -982,8 +999,19 @@ class RbacSeeder extends Seeder
                         'safeguarding.viewAny',
                         'safeguarding.viewSensitive',
                         'safeguarding.declassification.approve',
+                        // Read the compliance dashboard their role is named for (19 Oct 2026).
+                        'compliance.view',
                     ])
                     ->pluck('id'),
+            );
+        }
+
+        // CFO: read every finance record (the auditor's view-only set). Approving,
+        // posting and paying stay with Finance until Stephan decides otherwise.
+        // Grant migration: 2026_10_19_120000_grant_back_office_read_access.
+        if ($cfo) {
+            $cfo->permissions()->syncWithoutDetaching(
+                Permission::query()->whereIn('key', self::CFO_FINANCE_READ)->pluck('id'),
             );
         }
 

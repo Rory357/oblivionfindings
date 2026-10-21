@@ -69,6 +69,8 @@ it('offers every alert that has a source, with v5’s defaults, not yet reviewed
     expect(array_keys($definitions))->toBe([
         'overdue', 'followups', 'stock', 'expiry', 'refusals', 'renewals', 'errors',
         'breakglass', 'cdDiscrepancy', 'prnLimit', 'outOfStock', 'cdCheck', 'reviewDue',
+        // C6 (EA-036).
+        'doseIncident',
     ]);
     expect($response->inertiaProps('settings.values.alerts.stock'))->toBe(b2AlertValue(['houseLead', 'stockStaff']))
         ->and($response->inertiaProps('settings.reviewed.alerts.stock'))->toBeNull()

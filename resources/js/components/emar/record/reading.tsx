@@ -268,7 +268,9 @@ function MedicineTable({
                         ? concealedIdentity
                         : {
                               icon: Pill,
-                              name: `${row.name} ${row.strength ?? ''}`.trim(),
+                              // The name only: the prescribed dose text has its
+                              // own place (amount and route, the detail drawer).
+                              name: row.name,
                               subline: (
                                   <Wrap>
                                       {row.controlled ? 'Controlled · ' : ''}
@@ -571,10 +573,14 @@ export function RecordMedicineDialog({
                 <WizardStepPane>
                     {section === 0 ? (
                         <>
-                            <ReviewRow
-                                label="Medicine"
-                                value={`${order.name} ${order.strength ?? ''}`}
-                            />
+                            <ReviewRow label="Medicine" value={order.name} />
+                            {order.strength &&
+                            order.strength !== order.amount ? (
+                                <ReviewRow
+                                    label="Prescribed as"
+                                    value={order.strength}
+                                />
+                            ) : null}
                             <ReviewRow label="Amount" value={order.amount} />
                             <ReviewRow label="Route" value={order.route} />
                             <ReviewRow label="When" value={order.when} />
@@ -653,7 +659,7 @@ export function RecordMedicineDialog({
                     ) : null}
                     {section === 2 ? (
                         <MedicinePackPhoto
-                            name={`${order.name} ${order.strength ?? ''}`.trim()}
+                            name={order.name}
                             photo={data.pack_photo ?? null}
                             onHistory={
                                 onPhotos ? () => onPhotos(order.id) : undefined

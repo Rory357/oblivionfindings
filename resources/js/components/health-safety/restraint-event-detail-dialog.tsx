@@ -6,6 +6,7 @@
  * exactly like drill-detail-dialog.tsx. The Review workflow replaces the body as a
  * pane (Add-Client idiom). Premium evidence upload (body maps, injury photos,
  * authorisation forms) lives in the Evidence section. NZ-only / least-restrictive. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Textarea } from '@/components/ui/textarea';
@@ -498,6 +499,27 @@ function InjurySection({ d }: { d: EventDetail }) {
 }
 
 function EvidenceSection({ d }: { d: EventDetail }) {
+    const [fileToRemove, setFileToRemove] = useState<
+        EventDetail['attachments'][number] | null
+    >(null);
+    const [removingFile, setRemovingFile] = useState(false);
+
+    const removeFile = () => {
+        if (!fileToRemove) return;
+        router.delete(
+            `/health-safety/restraints/events/${d.id}/attachments/${fileToRemove.id}`,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setRemovingFile(true),
+                onFinish: () => {
+                    setRemovingFile(false);
+                    setFileToRemove(null);
+                },
+            },
+        );
+    };
+
     return (
         <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
@@ -548,17 +570,10 @@ function EvidenceSection({ d }: { d: EventDetail }) {
                             {d.can.manage ? (
                                 <button
                                     type="button"
-                                    onClick={() =>
-                                        router.delete(
-                                            `/health-safety/restraints/events/${d.id}/attachments/${a.id}`,
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                            },
-                                        )
-                                    }
+                                    onClick={() => setFileToRemove(a)}
                                     className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical"
                                     title="Remove"
+                                    aria-label={`Remove ${a.name}`}
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </button>
@@ -580,6 +595,27 @@ function EvidenceSection({ d }: { d: EventDetail }) {
                     hint="Body maps, injury photos, forms — images, PDF or Word, up to 10 MB each"
                 />
             ) : null}
+
+            <ConfirmDialog
+                open={fileToRemove !== null}
+                onClose={() => {
+                    if (!removingFile) setFileToRemove(null);
+                }}
+                onConfirm={removeFile}
+                title="Remove this file?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {fileToRemove?.name}
+                        </span>{' '}
+                        will be permanently deleted from this restraint event.
+                        This cannot be undone.
+                    </>
+                }
+                confirmText="Remove file"
+                variant="destructive"
+                processing={removingFile}
+            />
         </div>
     );
 }
