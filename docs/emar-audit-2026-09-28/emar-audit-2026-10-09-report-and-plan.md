@@ -580,3 +580,13 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - **C6 → Lane B, branch `claude/emar-c6`:** NZ times in incident and CR text, auto-incidents get shift and owner routing, missed and late rules get recipients, and medication incidents get controlled concealment.
   - Both lanes keep edits minimal and list the changed workforce/CR methods for whoever later merges the uncommitted Codex and parent-checkout WIP.
   - **/emar/stock decision (Main):** redirect to the approved P06 hub if the hub offers every old action; otherwise Lane C sends the gap list.
+- **21 Oct: C6 LIVE, `fd0a0ffc0`** (fast-forward).
+  - NZ times in incident and Control Room text.
+  - Dose drafts carry shift_id and are routed to the shift owner or house lead, behind the person rule.
+  - New Medication Settings alert "Missed, late or refused dose — incident to submit".
+  - Controlled doses are concealed in incident text.
+  - EA-112 audit row and notices.
+  - D8: maintenance windows never silence medication signals.
+  - Gates: c6a 137, c6b 159.
+  - Deferred: outbox and retry for other Control Room delivery failures.
+- **21 Oct: heavy-lock floor.** The floor is now read from `~/.claude/heavy-lock-floor-mb`. It is temporarily 5120 MB (Stephan) while other sessions pause for eMAR; restore it to 5632 when eMAR is done.
