@@ -436,6 +436,18 @@ class Pkg02bVehicleWorkspaceTest extends TestCase
                 ->etc());
     }
 
+    public function test_maintenance_dashboard_counts_overdue_services_as_positive_days(): void
+    {
+        // Carbon 3's signed diffInDays() showed "-5d overdue".
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage']);
+        $late = FleetServiceSchedule::query()->create(['asset_id' => $this->vehicle($this->site)->id, 'name' => 'Late', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->subDays(5)]);
+
+        $this->actingAs($manager)->get('/fleet-assets/maintenance/dashboard')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overdue_services', fn ($rows) => collect($rows)->firstWhere('id', $late->id)['days_overdue'] === 5)
+                ->etc());
+    }
+
     public function test_catalogue_additions_are_deduplicated_and_need_management_access(): void
     {
         $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);

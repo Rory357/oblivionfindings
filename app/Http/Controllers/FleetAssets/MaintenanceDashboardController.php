@@ -162,7 +162,8 @@ class MaintenanceDashboardController extends Controller
                 'asset_name' => $s->asset?->name ?? 'Unknown',
                 'asset_tag' => $s->asset?->asset_tag,
                 'next_due_at' => optional($s->next_due_at)->toISOString(),
-                'days_overdue' => $s->next_due_at ? (int) now()->diffInDays($s->next_due_at) : 0,
+                // Due date → now; Carbon 3 signs diffInDays(), so the reverse was negative.
+                'days_overdue' => $s->next_due_at ? (int) $s->next_due_at->diffInDays(now()) : 0,
             ])
             ->values();
 

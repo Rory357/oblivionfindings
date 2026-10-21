@@ -1,22 +1,29 @@
 <?php
 
+use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinDonorFund;
+use App\Domain\Finance\Notifications\BillOverdueNotification;
 use App\Domain\Finance\Services\DonorFundService;
 use App\Domain\Governance\Models\AuditEvidencePack;
 use App\Domain\Governance\Models\ComplianceEvidence;
 use App\Domain\Governance\Models\EvidenceLibrary;
+use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\RiskAcceptance;
+use App\Domain\Governance\Notifications\PreReadReminderNotification;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\HrCalendarAggregator;
 use App\Domain\Hr\Services\LeaveReportService;
 use App\Domain\Hr\Services\WellbeingIndicatorService;
 use App\Http\Controllers\Hr\ComplianceCalendarController;
+use App\Http\Controllers\Sites\SiteReportingController;
 use App\Http\Controllers\SummaryController;
 use App\Http\Controllers\TimelineController;
 use App\Models\Asset;
 use App\Models\ClientPersonalAsset;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
+use App\Models\SiteHazard;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -132,6 +139,41 @@ it('starts a new Bradford spell only after a gap of more than one day', function
         ->firstWhere('user_id', $staff->id);
 
     expect($row['spells'])->toBe(2);
+});
+
+it('reports hazard time to close as positive days', function () {
+    $hazard = fn (string $status, int $daysOpen) => (new SiteHazard)->forceFill([
+        'status' => $status,
+        'created_at' => now()->subDays(10),
+        'closed_at' => now()->subDays(10 - $daysOpen),
+    ]);
+    $site = (new Site)->setRelation('hazards', collect([$hazard('closed', 2), $hazard('closed', 5), $hazard('mitigated', 9)]));
+    $average = new ReflectionMethod(SiteReportingController::class, 'calculateHazardAvgCloseDays');
+    $controller = app(SiteReportingController::class);
+
+    expect($average->invoke($controller, collect([$site])))->toBe(3.5)
+        ->and($average->invoke($controller, collect([(new Site)->setRelation('hazards', collect())])))->toBeNull();
+});
+
+it('states whole days in bill overdue and board pre-read notices', function () {
+    $bill = (new FinBill)->forceFill([
+        'bill_number' => 'BILL-1',
+        'due_date' => now()->subDays(3)->toDateString(),
+        'total_amount' => 100,
+        'amount_paid' => 0,
+    ]);
+    $notice = new BillOverdueNotification($bill);
+
+    expect($notice->toArray(new User)['days_overdue'])->toBe(3)
+        ->and($notice->toMail(new User)->subject)->toContain('— 3 days past due');
+
+    $meeting = (new GovernanceMeeting)->forceFill([
+        'title' => 'October board',
+        'scheduled_at' => now()->addDays(2)->addHours(11),
+    ]);
+
+    expect((new PreReadReminderNotification($meeting))->toMail(new User)->introLines[0])
+        ->toContain('is in 2 days.');
 });
 
 it('counts consecutive worked days for the wellbeing streak', function () {
