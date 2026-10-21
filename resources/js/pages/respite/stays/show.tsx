@@ -1,4 +1,8 @@
 import { PageHero, PageLayout } from '@/components/page';
+import {
+    RespiteCheckIn,
+    type RespitePreparation,
+} from '@/components/referrals/respite-check-in';
 import RespiteSubnav from '@/components/respite-subnav';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +24,8 @@ import { useState } from 'react';
 
 type Props = {
     stay: any;
+    serviceStartReviewUrl?: string | null;
+    supportPreparation?: RespitePreparation | null;
 };
 
 const statusColor: Record<string, string> = {
@@ -45,7 +51,11 @@ const riskStatusColor: Record<string, string> = {
     completed: 'bg-status-success-bg text-status-success',
 };
 
-export default function RespiteStayShow({ stay }: Props) {
+export default function RespiteStayShow({
+    stay,
+    serviceStartReviewUrl,
+    supportPreparation,
+}: Props) {
     const [extendOpen, setExtendOpen] = useState(false);
     const [dischargeOpen, setDischargeOpen] = useState(false);
     const [extendDate, setExtendDate] = useState('');
@@ -133,7 +143,7 @@ export default function RespiteStayShow({ stay }: Props) {
                                     {stay.status}
                                 </span>
                                 <span className="text-muted-foreground">
-                                    Admitted
+                                    Checked in
                                 </span>
                                 <span>
                                     {formatDateTimeLong(stay.actual_start) ||
@@ -390,24 +400,21 @@ export default function RespiteStayShow({ stay }: Props) {
                         </CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
                             {stay.status === 'admitted' && (
+                                <RespiteCheckIn
+                                    stayId={stay.id}
+                                    reviewUrl={serviceStartReviewUrl}
+                                    preparation={supportPreparation}
+                                />
+                            )}
+                            {['active', 'extended'].includes(stay.status) && (
                                 <Button
                                     size="sm"
-                                    onClick={() =>
-                                        router.post(
-                                            `/respite/stays/${stay.id}/check-in`,
-                                        )
-                                    }
+                                    variant="outline"
+                                    onClick={() => setExtendOpen(true)}
                                 >
-                                    Check In
+                                    Extend
                                 </Button>
                             )}
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setExtendOpen(true)}
-                            >
-                                Extend
-                            </Button>
                             <Button
                                 size="sm"
                                 variant="destructive"

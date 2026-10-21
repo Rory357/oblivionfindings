@@ -22,6 +22,7 @@ class PortalDocumentController extends Controller
 
         $documents = $canViewSharedDocuments
             ? ClientDocument::where('client_id', $client->id)
+                ->whereNull('source_referral_evidence_id')
                 ->where('portal_visible', true)
                 ->orderByDesc('created_at')
                 ->get()
@@ -40,6 +41,7 @@ class PortalDocumentController extends Controller
 
         // Family-uploaded documents (category = 'family_upload', always visible to portal)
         $familyUploads = ClientDocument::where('client_id', $client->id)
+            ->whereNull('source_referral_evidence_id')
             ->where('category', 'family_upload')
             ->where('uploaded_by_user_id', $user->id)
             ->orderByDesc('created_at')

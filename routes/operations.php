@@ -5,6 +5,7 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
 // Existing controllers (root namespace)
+use App\Http\Controllers\ClientContactPreferencesController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientIncidentController;
@@ -292,6 +293,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::put('/clients/{client}', [ClientController::class, 'update'])
             ->whereNumber('client')
             ->name('operations.clients.update');
+        Route::put('/clients/{client}/contact-preferences', [ClientContactPreferencesController::class, 'update'])
+            ->whereNumber('client')->name('operations.clients.contact-preferences.update');
         Route::patch('/clients/{client}/quick-update', [ClientController::class, 'quickUpdate'])->name('operations.clients.quick_update');
 
         // Archive (soft-delete) / restore — drives the index "Archive client" action

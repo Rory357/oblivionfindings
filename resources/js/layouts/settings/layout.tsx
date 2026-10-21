@@ -56,6 +56,11 @@ interface NavSection {
 
 const navSections: NavSection[] = [
     {
+        label: 'Referrals',
+        permission: 'referrals.settings.view',
+        items: [{ icon: Inbox, title: 'Referral settings', href: '/settings/referrals' }],
+    },
+    {
         label: 'General',
         items: [
             { icon: User, title: 'Profile', href: edit() },

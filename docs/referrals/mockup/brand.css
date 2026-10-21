@@ -1,0 +1,7 @@
+@import '../../../resources/css/app.css';
+
+/* The standalone Vite root is outside resources. Include shared component
+   utilities explicitly so clean builds never depend on an earlier dist. */
+@source '../../../resources/js/components';
+@source '../../../resources/js/pages/sites/calendar';
+@source './*.jsx';

@@ -49,6 +49,10 @@ class UpdateClientRequest extends FormRequest
 
             // Cultural identity.
             'ethnicity' => ['nullable', 'string', 'max:255'],
+            'iwi' => ['nullable', 'string', 'max:255'],
+            'hapu' => ['nullable', 'string', 'max:255'],
+            'marae' => ['nullable', 'string', 'max:255'],
+            'cultural_dietary_needs' => ['nullable', 'string', 'max:2000'],
             'languages' => ['nullable', 'array'],
             'languages.*' => ['string', 'max:100'],
             'religion' => ['nullable', 'string', 'max:255'],

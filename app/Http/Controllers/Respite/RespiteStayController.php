@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Respite;
 
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Domain\Referrals\Services\ReferralActivationGuard;
+use App\Domain\Referrals\Services\ReferralRespiteReview;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -79,7 +81,8 @@ class RespiteStayController extends Controller
                     ...$validated,
                     'status' => 'admitted',
                     'created_by' => auth()->id(),
-                    'actual_start' => now(),
+                    // Governed (referral-originated) stays record actual start only at reviewed check-in.
+                    'actual_start' => $booking->client && app(ReferralActivationGuard::class)->governsRespite($booking->client, $booking) ? null : now(),
                 ]);
             },
         );
@@ -115,6 +118,8 @@ class RespiteStayController extends Controller
 
         return Inertia::render('respite/stays/show', [
             'stay' => $stay,
+            'serviceStartReviewUrl' => app(ReferralRespiteReview::class)->url(request()->user(), $stay->client, $stay->booking),
+            'supportPreparation' => app(ReferralRespiteReview::class)->preparation(request()->user(), $stay->client, $stay->booking),
         ]);
     }
 
@@ -136,12 +141,16 @@ class RespiteStayController extends Controller
                 $booking = $stay->booking;
                 $this->states->assertStayCheckIn($stay->status, $booking->status);
 
+                $governed = app(ReferralActivationGuard::class)->governsRespite($stay->client, $booking);
+                app(ReferralActivationGuard::class)->assertRespitePermitted($stay->client, $booking);
+
                 $this->guardAnaphylaxisAcknowledgement($stay, $validated);
                 $this->guardAdmissionMedicationReconciliation($stay, $validated['med_rec_override_reason'] ?? null);
 
                 $stay->update([
                     'status' => 'active',
-                    'actual_start' => $stay->actual_start ?? now(),
+                    // A governed stay's actual start is the reviewed check-in, never an admission timestamp.
+                    'actual_start' => $governed ? now() : ($stay->actual_start ?? now()),
                     'updated_by' => auth()->id(),
                 ]);
                 $booking->update([
@@ -190,6 +199,10 @@ class RespiteStayController extends Controller
                         'new_end' => 'The new end must be after the current respite stay end.',
                     ]);
                 }
+
+                $extendedBooking = clone $booking;
+                $extendedBooking->end_at = $newEnd;
+                app(ReferralActivationGuard::class)->assertRespitePermitted($stay->client, $extendedBooking);
 
                 $stay->update([
                     'status' => 'extended',

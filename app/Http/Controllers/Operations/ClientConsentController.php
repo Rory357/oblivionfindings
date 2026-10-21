@@ -65,7 +65,7 @@ class ClientConsentController extends Controller
             'withdrawn' => $consents->where('status', 'withdrawn')->count(),
         ];
 
-        $consentTypes = ConsentType::active()->orderBy('name')->get(['id', 'name', 'category', 'is_mandatory', 'requires_capacity_assessment']);
+        $consentTypes = ConsentType::active()->orderBy('name')->get(['id', 'name', 'category', 'description', 'purpose', 'version', 'is_mandatory', 'requires_capacity_assessment']);
 
         return inertia('operations/clients/consents/Index', [
             'client' => $client,

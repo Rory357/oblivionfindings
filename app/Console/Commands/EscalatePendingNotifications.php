@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Referrals\Services\ReferralTaskNotifications;
 use App\Models\NotificationEscalationRule;
 use App\Models\Timesheet;
 use App\Models\User;
@@ -113,13 +114,14 @@ class EscalatePendingNotifications extends Command
                 ->orWhere('last_escalated_at', '<=', $now->copy()->subMinutes($rule->repeat_every_minutes));
         });
 
-        $pending = $q->limit(200)->get();
-        if ($pending->isEmpty()) {
-            return 0;
-        }
-
         $sent = 0;
-        foreach ($pending as $n) {
+        $processed = 0;
+        // Quiet-hour referral notices must not occupy the entire delivery batch
+        // and starve other due workflow reminders. Read in bounded pages.
+        foreach ($q->lazyById(200) as $n) {
+            if ($processed >= 200) {
+                break;
+            }
             if ($this->shouldStopBecauseEntityResolved($n)) {
                 $n->forceFill([
                     'last_escalated_at' => $now,
@@ -130,6 +132,12 @@ class EscalatePendingNotifications extends Command
             }
 
             $payload = is_array($n->data) ? $n->data : (array) $n->data;
+            if (($payload['recipient_scope'] ?? null) === 'referral_task'
+                && app(ReferralTaskNotifications::class)->waitingForOpeningHours($payload)) {
+                // Deferral is not delivery: retain the reminder budget for opening time.
+                continue;
+            }
+            $processed++;
             $payload['is_reminder'] = true;
             $payload['reminder_number'] = ((int) $n->escalation_count) + 1;
             $payload['title'] = 'Reminder: '.(string) ($payload['title'] ?? 'Notification');

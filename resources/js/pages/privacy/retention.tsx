@@ -1,4 +1,8 @@
 import { PageHero, PageLayout } from '@/components/page';
+import {
+    ReferralRetentionSettings,
+    type ReferralRetentionRow,
+} from '@/components/privacy/referral-retention-settings';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,12 +29,14 @@ type Props = {
         total: number;
         active: number;
     };
+    referralRetention?: ReferralRetentionRow[];
 };
 
 export default function DataRetentionPolicies({
     filters,
     policies,
     stats,
+    referralRetention,
 }: Props) {
     const ANY = '__any__';
     const { auth } = usePage().props as any;
@@ -103,6 +109,12 @@ export default function DataRetentionPolicies({
                     />
                 }
             >
+                {referralRetention?.length ? (
+                    <ReferralRetentionSettings
+                        rows={referralRetention}
+                        canManage={!!can.manageRetention}
+                    />
+                ) : null}
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>

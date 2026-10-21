@@ -14,6 +14,11 @@ export type NotificationModuleGroup = NotificationModule & {
 };
 
 export const NOTIFICATION_META: Record<string, NotificationMeta> = {
+    'service_agreements.referral_draft_created': {
+        name: 'Draft agreement from a referral',
+        description:
+            'When a draft service agreement is made from a referral’s approved proposal and needs review. Sent to Finance.',
+    },
     'hr.calendar.reminder': {
         name: 'Company event reminders',
         description:
@@ -111,6 +116,11 @@ export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
             'timesheets.rejected',
             'timesheets.returned',
         ],
+    },
+    agreements: {
+        label: 'Service agreements',
+        colour: 'violet',
+        keys: ['service_agreements.referral_draft_created'],
     },
     rostering: {
         label: 'Rostering',

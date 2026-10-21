@@ -1,3 +1,4 @@
+import { CareDocumentStatus } from '@/components/clients/care-document-status';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ListCaption } from '@/components/lists';
 import {
@@ -148,6 +149,11 @@ function isExpiringSoon(date?: string | null) {
 }
 
 const CATEGORIES = [
+    {
+        value: 'referral_handover',
+        label: 'Referral handover',
+        color: 'bg-muted text-muted-foreground',
+    },
     {
         value: 'care_plan',
         label: 'Care Plans',
@@ -704,7 +710,7 @@ export default function ClientDocuments({
                                         </Badge>
                                     </div>
                                 )}
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                                     {filesInCurrentView.map((d: any) => {
                                         const fi = getFileInfo(
                                             d.mime_type,
@@ -734,6 +740,9 @@ export default function ClientDocuments({
                                                 <h3 className="line-clamp-2 text-center text-xs leading-tight font-medium">
                                                     {d.title || d.original_name}
                                                 </h3>
+                                                <CareDocumentStatus
+                                                    release={d.care_release}
+                                                />
                                                 {/* Meta */}
                                                 <div className="mt-2 flex items-center justify-center gap-1">
                                                     {d.portal_visible && (
@@ -758,10 +767,21 @@ export default function ClientDocuments({
                                                     )}
                                                 </div>
                                                 {/* Hover actions */}
-                                                <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 rounded-b-xl bg-gradient-to-t from-card via-card to-transparent pt-6 pb-2 opacity-0 transition-opacity group-hover:opacity-100">
+                                                <div className="mt-3 flex flex-wrap items-center justify-center gap-6">
                                                     <a
-                                                        href={`/operations/clients/${client.id}/documents/${d.id}/download`}
-                                                        className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20"
+                                                        href={
+                                                            d.care_release
+                                                                ?.review_required
+                                                                ? undefined
+                                                                : `/operations/clients/${client.id}/documents/${d.id}/download`
+                                                        }
+                                                        aria-disabled={
+                                                            d.care_release
+                                                                ?.review_required ||
+                                                            undefined
+                                                        }
+                                                        aria-label={`Download ${d.title || d.original_name}`}
+                                                        className="frontline-hit flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20"
                                                     >
                                                         <Download className="h-3.5 w-3.5" />
                                                     </a>
@@ -775,7 +795,7 @@ export default function ClientDocuments({
                                                                 onClick={() =>
                                                                     openEdit(d)
                                                                 }
-                                                                className="h-7 w-7 rounded-full bg-muted text-muted-foreground hover:bg-muted"
+                                                                className="frontline-hit h-7 w-7 rounded-full bg-muted text-muted-foreground hover:bg-muted"
                                                             >
                                                                 <Pencil className="h-3.5 w-3.5" />
                                                             </Button>
@@ -789,7 +809,7 @@ export default function ClientDocuments({
                                                                         d,
                                                                     )
                                                                 }
-                                                                className="h-7 w-7 rounded-full bg-status-critical-bg text-status-critical hover:bg-status-critical-bg"
+                                                                className="frontline-hit h-7 w-7 rounded-full bg-status-critical-bg text-status-critical hover:bg-status-critical-bg"
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
@@ -972,10 +992,24 @@ export default function ClientDocuments({
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-2.5">
-                                                    <div className="flex items-center justify-end gap-1">
+                                                    <CareDocumentStatus
+                                                        release={d.care_release}
+                                                    />
+                                                    <div className="flex items-center justify-end gap-6">
                                                         <a
-                                                            href={`/operations/clients/${client.id}/documents/${d.id}/download`}
-                                                            className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted"
+                                                            href={
+                                                                d.care_release
+                                                                    ?.review_required
+                                                                    ? undefined
+                                                                    : `/operations/clients/${client.id}/documents/${d.id}/download`
+                                                            }
+                                                            aria-disabled={
+                                                                d.care_release
+                                                                    ?.review_required ||
+                                                                undefined
+                                                            }
+                                                            aria-label={`Download ${d.title || d.original_name}`}
+                                                            className="frontline-hit flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted"
                                                         >
                                                             <Download className="h-3.5 w-3.5 text-primary" />
                                                         </a>
@@ -991,7 +1025,7 @@ export default function ClientDocuments({
                                                                             d,
                                                                         )
                                                                     }
-                                                                    className="h-7 w-7 rounded-lg hover:bg-muted"
+                                                                    className="frontline-hit h-7 w-7 rounded-lg hover:bg-muted"
                                                                 >
                                                                     <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                                                                 </Button>
@@ -1005,7 +1039,7 @@ export default function ClientDocuments({
                                                                             d,
                                                                         )
                                                                     }
-                                                                    className="h-7 w-7 rounded-lg hover:bg-status-critical-bg"
+                                                                    className="frontline-hit h-7 w-7 rounded-lg hover:bg-status-critical-bg"
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5 text-status-critical" />
                                                                 </Button>
@@ -1225,6 +1259,14 @@ export default function ClientDocuments({
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Edit Document</DialogTitle>
+                        {editingDoc?.care_release && (
+                            <DialogDescription>
+                                Staff-only referral document. Its category,
+                                version and dates come from the reviewed source.
+                                Update the care handover to renew access; portal
+                                sharing is unavailable.
+                            </DialogDescription>
+                        )}
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -1285,6 +1327,7 @@ export default function ClientDocuments({
                                 <Label>Category</Label>
                                 <Select
                                     value={editForm.data.category}
+                                    disabled={!!editingDoc?.care_release}
                                     onValueChange={(v) =>
                                         editForm.setData('category', v)
                                     }
@@ -1308,6 +1351,7 @@ export default function ClientDocuments({
                                 <Label>Version</Label>
                                 <Input
                                     value={editForm.data.version}
+                                    readOnly={!!editingDoc?.care_release}
                                     onChange={(e) =>
                                         editForm.setData(
                                             'version',
@@ -1321,6 +1365,7 @@ export default function ClientDocuments({
                                 <Input
                                     type="date"
                                     value={editForm.data.expiry_date}
+                                    readOnly={!!editingDoc?.care_release}
                                     onChange={(e) =>
                                         editForm.setData(
                                             'expiry_date',
@@ -1333,6 +1378,7 @@ export default function ClientDocuments({
                         <div className="flex items-center gap-2">
                             <Checkbox
                                 checked={editForm.data.portal_visible}
+                                disabled={!!editingDoc?.care_release}
                                 onCheckedChange={(v) =>
                                     editForm.setData('portal_visible', !!v)
                                 }
@@ -1432,9 +1478,21 @@ export default function ClientDocuments({
                         );
                     }
                 }}
-                title="Delete document?"
-                description={`Permanently delete “${documentToDelete?.title ?? documentToDelete?.name ?? 'this document'}”? This action cannot be undone.`}
-                confirmText="Delete document"
+                title={
+                    documentToDelete?.care_release
+                        ? 'Remove care document link?'
+                        : 'Delete document?'
+                }
+                description={
+                    documentToDelete?.care_release
+                        ? `Remove “${documentToDelete.title}” from this person’s documents? The original referral evidence and its review history will be retained. A new reviewed handover can restore access.`
+                        : `Permanently delete “${documentToDelete?.title ?? documentToDelete?.name ?? 'this document'}”? This action cannot be undone.`
+                }
+                confirmText={
+                    documentToDelete?.care_release
+                        ? 'Remove link'
+                        : 'Delete document'
+                }
             />
         </AppLayout>
     );

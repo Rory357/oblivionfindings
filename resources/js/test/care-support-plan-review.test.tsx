@@ -13,6 +13,23 @@ const inertia = vi.hoisted(() => ({
 vi.mock('@inertiajs/react', () => ({
     router: inertia.router,
 }));
+vi.mock('@/components/fleet-assets/maintenance/date-picker', () => ({
+    DatePicker: ({
+        label,
+        value,
+        onChange,
+    }: {
+        label: string;
+        value: string;
+        onChange: (value: string) => void;
+    }) => (
+        <input
+            aria-label={label}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+        />
+    ),
+}));
 
 import { CareSupportPlanTab } from '@/pages/operations/clients/tabs/care-support-plan';
 
@@ -110,7 +127,7 @@ describe('CareSupportPlanTab review working version', () => {
         fireEvent.change(screen.getByPlaceholderText('Full name'), {
             target: { value: 'Fresh signatory' },
         });
-        fireEvent.change(document.querySelector('input[type="date"]')!, {
+        fireEvent.change(screen.getByLabelText('Agreed on'), {
             target: { value: '2026-07-11' },
         });
         fireEvent.click(screen.getByText('Record sign-off'));
@@ -120,6 +137,7 @@ describe('CareSupportPlanTab review working version', () => {
             expect.objectContaining({
                 party_name: 'Fresh signatory',
                 agreed_on: '2026-07-11',
+                attestation_state: 'recorded_proxy',
             }),
             expect.any(Object),
         );
@@ -130,9 +148,76 @@ describe('CareSupportPlanTab review working version', () => {
 
         expect(
             screen.getByText(
-                'Record at least one new sign-off on this review before completing it.',
+                'Record current eligible agreement evidence on this review before completing it. A recorded note alone is not enough.',
             ),
         ).toBeTruthy();
+        expect(screen.getByTestId('careplan-complete-review')).toBeDisabled();
+    });
+
+    it('requires evidence and a witness declaration before recording canonical person agreement', async () => {
+        renderReview();
+        fireEvent.click(screen.getByTestId('careplan-add-signoff'));
+        fireEvent.pointerDown(
+            screen.getByRole('combobox', { name: 'Agreement record' }),
+            { button: 0, ctrlKey: false, pointerType: 'mouse' },
+        );
+        fireEvent.click(
+            await screen.findByRole('option', {
+                name: 'I witnessed this person agree',
+            }),
+        );
+        fireEvent.change(screen.getByLabelText('Agreed on'), {
+            target: { value: '2026-07-11' },
+        });
+        fireEvent.click(screen.getByText('Record sign-off'));
+        expect(inertia.router.post).not.toHaveBeenCalled();
+        fireEvent.change(screen.getByLabelText('Evidence reference *'), {
+            target: { value: 'Fictional stored statement 42' },
+        });
+        fireEvent.click(screen.getByText('Record sign-off'));
+        expect(inertia.router.post).not.toHaveBeenCalled();
+        fireEvent.click(
+            screen.getByRole('checkbox', { name: /I identified this person/ }),
+        );
+        fireEvent.click(screen.getByText('Record sign-off'));
+        expect(inertia.router.post).toHaveBeenCalledWith(
+            '/operations/care-plans/20/sign-offs',
+            expect.objectContaining({
+                attestation_state: 'witnessed',
+                signer_client_id: 1,
+                party_role: 'client',
+                evidence_type: 'witness_statement',
+                evidence_reference: 'Fictional stored statement 42',
+                witness_declaration: true,
+            }),
+            expect.any(Object),
+        );
+    });
+
+    it('does not treat a recorded note as eligible review agreement', () => {
+        render(
+            <CareSupportPlanTab
+                client={{ id: 1, first_name: 'Aroha' }}
+                summary={{
+                    working_plan: {
+                        ...reviewPlan,
+                        sign_offs: [
+                            {
+                                ...activePlan.sign_offs[0],
+                                gate_satisfying: false,
+                            },
+                        ],
+                    },
+                    review_plan: reviewPlan,
+                }}
+                canEdit
+                canCreate
+                onCreatePlan={vi.fn()}
+                onEditPlan={vi.fn()}
+                onGoToGoals={vi.fn()}
+            />,
+        );
+        expect(screen.getByText('Recorded note only')).toBeInTheDocument();
         expect(screen.getByTestId('careplan-complete-review')).toBeDisabled();
     });
 });

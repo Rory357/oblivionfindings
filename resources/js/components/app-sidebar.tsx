@@ -359,6 +359,16 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     );
     if (emarActive !== undefined) return emarActive ? 2000 + item.length : -1;
 
+    // Referral reports is a dedicated destination, not an intake sub-view.
+    const referralReportsPath = '/operations/referrals/reports';
+    if (
+        normalizedItemPath === '/operations/referrals' &&
+        (normalizedCurrentPath === referralReportsPath ||
+            normalizedCurrentPath.startsWith(`${referralReportsPath}/`))
+    ) {
+        return -1;
+    }
+
     // The Conflict Queue has its own Workforce entry; select that destination.
     const conflictQueuePath = '/operations/rostering/conflicts';
     if (
@@ -645,6 +655,8 @@ function buildIconNavItems({
         !!can?.clients?.viewAssigned ||
         !!can?.onboarding?.viewAny ||
         !!can?.onboarding?.view ||
+        !!can?.referrals?.viewAny ||
+        !!can?.referrals?.viewAssigned ||
         !!can?.progress_notes?.viewAny ||
         !!can?.progress_notes?.create ||
         !!can?.progress_notes?.review ||
@@ -1149,6 +1161,14 @@ function buildOperationsSubPanelGroups({
     const clientLabel = labels?.['client.singular'] ?? 'Client';
     const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
     const clientMgmt: NavItem[] = [];
+    if (can?.referrals?.viewAny || can?.referrals?.viewAssigned)
+        clientMgmt.push({
+            title: 'Referrals',
+            href: '/operations/referrals',
+            icon: ClipboardList,
+        });
+    if ((can?.referrals?.viewAny || can?.referrals?.viewAssigned) && can?.referrals?.reports?.view)
+        clientMgmt.push({ title: 'Referral reports', href: '/operations/referrals/reports', icon: BarChart3 });
     if (
         can?.assets?.telemetryView &&
         (can?.clients?.viewAny ||

@@ -9,6 +9,7 @@ use App\Models\ConsentRequest;
 use App\Models\NextOfKin;
 use App\Models\StaffCredential;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Timeline\TimelineEmitter;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
@@ -400,12 +401,12 @@ final class CarePlanAttestationService
         }, 3);
     }
 
-    public function currentDigest(CarePlan $carePlan): string
+    public function currentDigest(CarePlan $carePlan, ?CurrentAuthorizationReads $reads = null): string
     {
         $carePlan->unsetRelation('goals');
         $carePlan->load([
-            'goals' => fn ($query) => $query->orderBy('id'),
-            'goals.steps' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
+            'goals' => fn ($query) => ($reads ? $reads->query($query->getQuery()) : $query)->orderBy('id'),
+            'goals.steps' => fn ($query) => ($reads ? $reads->query($query->getQuery()) : $query)->orderBy('sort_order')->orderBy('id'),
         ]);
 
         $content = $carePlan->content ?? [];

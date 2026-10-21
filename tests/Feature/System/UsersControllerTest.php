@@ -127,6 +127,7 @@ class UsersControllerTest extends TestCase
         $created = User::query()->where('email', 'portal.resident@example.test')->sole();
 
         $this->assertNull($created->email_verified_at);
+        $this->assertDatabaseHas('clients', ['user_id' => $created->id, 'status' => 'onboarding']);
         Notification::assertSentToTimes($created, VerifyEmail::class, 1);
     }
 
