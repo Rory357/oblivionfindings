@@ -786,7 +786,10 @@ class DonorFundService
             'total_available' => $funds->sum('available_balance'),
             'restricted_balance' => $funds->where('is_restricted', true)->sum('available_balance'),
             'unrestricted_balance' => $funds->where('is_restricted', false)->sum('available_balance'),
-            'expiring_soon' => $funds->filter(fn ($f) => $f->end_date && Carbon::parse($f->end_date)->diffInDays(now()) <= 90)->count(),
+            // Same window as FinDonorFund::scopeExpiringSoon. Carbon 3's
+            // diffInDays() is signed, so `diffInDays(now()) <= 90` counted
+            // every fund with a future end date.
+            'expiring_soon' => $funds->filter(fn ($f) => $f->end_date && Carbon::parse($f->end_date)->between(now(), now()->addDays(90)))->count(),
         ];
     }
 }

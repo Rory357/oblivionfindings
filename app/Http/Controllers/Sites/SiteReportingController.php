@@ -351,7 +351,7 @@ class SiteReportingController extends Controller
                 'status' => $status,
                 'count' => $group->count(),
                 'warranty_expired' => $group->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isPast())->count(),
-                'warranty_expiring_soon' => $group->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isFuture() && $a->warranty_expires_at->diffInDays(now()) <= 30)->count(),
+                'warranty_expiring_soon' => $group->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isFuture() && $a->warranty_expires_at->lte(now()->addDays(30)))->count(),
                 'assets' => $group->map(fn($a) => [
                     'id' => $a->id,
                     'name' => $a->name,
@@ -375,7 +375,7 @@ class SiteReportingController extends Controller
             'summary' => [
                 'total_assets' => $assets->count(),
                 'warranty_expired' => $assets->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isPast())->count(),
-                'warranty_expiring_soon' => $assets->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isFuture() && $a->warranty_expires_at->diffInDays(now()) <= 30)->count(),
+                'warranty_expiring_soon' => $assets->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isFuture() && $a->warranty_expires_at->lte(now()->addDays(30)))->count(),
             ],
         ]);
     }
