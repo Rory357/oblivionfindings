@@ -1,0 +1,1029 @@
+{
+  "scenarios": [
+    {
+      "group": "M01",
+      "hasContent": true,
+      "scenario": "default"
+    },
+    {
+      "group": "M01",
+      "hasContent": true,
+      "scenario": "empty"
+    },
+    {
+      "group": "M01",
+      "hasContent": true,
+      "scenario": "restricted"
+    },
+    {
+      "group": "M01",
+      "hasContent": true,
+      "scenario": "collapsed"
+    },
+    {
+      "group": "M02",
+      "hasContent": true,
+      "scenario": "list"
+    },
+    {
+      "group": "M02",
+      "hasContent": true,
+      "scenario": "thread"
+    },
+    {
+      "group": "M02",
+      "hasContent": true,
+      "scenario": "more"
+    },
+    {
+      "group": "M03",
+      "hasContent": true,
+      "scenario": "default"
+    },
+    {
+      "group": "M03",
+      "hasContent": true,
+      "scenario": "details"
+    },
+    {
+      "group": "M03",
+      "hasContent": true,
+      "scenario": "history"
+    },
+    {
+      "group": "M03",
+      "hasContent": true,
+      "scenario": "typing"
+    },
+    {
+      "group": "M04",
+      "hasContent": true,
+      "scenario": "direct"
+    },
+    {
+      "group": "M04",
+      "hasContent": true,
+      "scenario": "group"
+    },
+    {
+      "group": "M04",
+      "hasContent": true,
+      "scenario": "details"
+    },
+    {
+      "group": "M04",
+      "hasContent": true,
+      "scenario": "invite"
+    },
+    {
+      "group": "M04",
+      "hasContent": true,
+      "scenario": "remove"
+    },
+    {
+      "group": "M04",
+      "hasContent": true,
+      "scenario": "leave"
+    },
+    {
+      "group": "M04",
+      "hasContent": true,
+      "scenario": "transfer"
+    },
+    {
+      "group": "M04",
+      "hasContent": true,
+      "scenario": "error"
+    },
+    {
+      "group": "M05",
+      "hasContent": true,
+      "scenario": "default"
+    },
+    {
+      "group": "M05",
+      "hasContent": true,
+      "scenario": "manage"
+    },
+    {
+      "group": "M05",
+      "hasContent": true,
+      "scenario": "archived"
+    },
+    {
+      "group": "M05",
+      "hasContent": true,
+      "scenario": "denied"
+    },
+    {
+      "group": "M06",
+      "hasContent": true,
+      "scenario": "reply"
+    },
+    {
+      "group": "M06",
+      "hasContent": true,
+      "scenario": "actions"
+    },
+    {
+      "group": "M06",
+      "hasContent": true,
+      "scenario": "edit"
+    },
+    {
+      "group": "M06",
+      "hasContent": true,
+      "scenario": "deleted"
+    },
+    {
+      "group": "M06",
+      "hasContent": true,
+      "scenario": "draft"
+    },
+    {
+      "group": "M06",
+      "hasContent": true,
+      "scenario": "unknown"
+    },
+    {
+      "group": "M07",
+      "hasContent": true,
+      "scenario": "attachments"
+    },
+    {
+      "group": "M07",
+      "hasContent": true,
+      "scenario": "uploading"
+    },
+    {
+      "group": "M07",
+      "hasContent": true,
+      "scenario": "failed"
+    },
+    {
+      "group": "M07",
+      "hasContent": true,
+      "scenario": "record"
+    },
+    {
+      "group": "M07",
+      "hasContent": true,
+      "scenario": "preview"
+    },
+    {
+      "group": "M07",
+      "hasContent": true,
+      "scenario": "play"
+    },
+    {
+      "group": "M07",
+      "hasContent": true,
+      "scenario": "publish"
+    },
+    {
+      "group": "M07",
+      "hasContent": true,
+      "scenario": "restricted"
+    },
+    {
+      "group": "M08",
+      "hasContent": true,
+      "scenario": "results"
+    },
+    {
+      "group": "M08",
+      "hasContent": true,
+      "scenario": "empty"
+    },
+    {
+      "group": "M08",
+      "hasContent": true,
+      "scenario": "error"
+    },
+    {
+      "group": "M08",
+      "hasContent": true,
+      "scenario": "saved"
+    },
+    {
+      "group": "M08",
+      "hasContent": true,
+      "scenario": "history"
+    },
+    {
+      "group": "M08",
+      "hasContent": true,
+      "scenario": "denied"
+    },
+    {
+      "group": "M09",
+      "hasContent": true,
+      "scenario": "notification"
+    },
+    {
+      "group": "M09",
+      "hasContent": true,
+      "scenario": "offline"
+    },
+    {
+      "group": "M09",
+      "hasContent": true,
+      "scenario": "reconnect"
+    },
+    {
+      "group": "M09",
+      "hasContent": true,
+      "scenario": "failed"
+    },
+    {
+      "group": "M09",
+      "hasContent": true,
+      "scenario": "checking"
+    },
+    {
+      "group": "M09",
+      "hasContent": true,
+      "scenario": "expired"
+    },
+    {
+      "group": "M09",
+      "hasContent": true,
+      "scenario": "denied"
+    },
+    {
+      "group": "M10",
+      "hasContent": true,
+      "scenario": "default"
+    },
+    {
+      "group": "M10",
+      "hasContent": true,
+      "scenario": "unavailable"
+    },
+    {
+      "group": "M10",
+      "hasContent": true,
+      "scenario": "unconfigured"
+    },
+    {
+      "group": "M10",
+      "hasContent": true,
+      "scenario": "multi"
+    },
+    {
+      "group": "M11",
+      "hasContent": true,
+      "scenario": "default"
+    },
+    {
+      "group": "M11",
+      "hasContent": true,
+      "scenario": "named"
+    },
+    {
+      "group": "M11",
+      "hasContent": true,
+      "scenario": "details"
+    },
+    {
+      "group": "M11",
+      "hasContent": true,
+      "scenario": "empty"
+    },
+    {
+      "group": "M11",
+      "hasContent": true,
+      "scenario": "readonly"
+    },
+    {
+      "group": "M11",
+      "hasContent": true,
+      "scenario": "revoked"
+    },
+    {
+      "group": "M12",
+      "hasContent": true,
+      "scenario": "team"
+    },
+    {
+      "group": "M12",
+      "hasContent": true,
+      "scenario": "worker"
+    },
+    {
+      "group": "M12",
+      "hasContent": true,
+      "scenario": "invite"
+    },
+    {
+      "group": "M12",
+      "hasContent": true,
+      "scenario": "history"
+    },
+    {
+      "group": "M12",
+      "hasContent": true,
+      "scenario": "removed"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "needs"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "assigned"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "waiting"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "callback"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "resolved"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "conflict"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "handoff"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "unrouted"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "followup"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "internal"
+    },
+    {
+      "group": "M13",
+      "hasContent": true,
+      "scenario": "reopened"
+    },
+    {
+      "group": "M14",
+      "hasContent": true,
+      "scenario": "default"
+    },
+    {
+      "group": "M14",
+      "hasContent": true,
+      "scenario": "selector"
+    },
+    {
+      "group": "M14",
+      "hasContent": true,
+      "scenario": "readonly"
+    },
+    {
+      "group": "M14",
+      "hasContent": true,
+      "scenario": "error"
+    },
+    {
+      "group": "M15",
+      "hasContent": true,
+      "scenario": "direct"
+    },
+    {
+      "group": "M15",
+      "hasContent": true,
+      "scenario": "alert"
+    },
+    {
+      "group": "M15",
+      "hasContent": true,
+      "scenario": "discussion"
+    },
+    {
+      "group": "M15",
+      "hasContent": true,
+      "scenario": "denied"
+    },
+    {
+      "group": "M15",
+      "hasContent": true,
+      "scenario": "broadcast"
+    },
+    {
+      "group": "M16",
+      "hasContent": true,
+      "scenario": "myday"
+    },
+    {
+      "group": "M16",
+      "hasContent": true,
+      "scenario": "medication"
+    },
+    {
+      "group": "M16",
+      "hasContent": true,
+      "scenario": "handover"
+    },
+    {
+      "group": "M16",
+      "hasContent": true,
+      "scenario": "communication"
+    },
+    {
+      "group": "M16",
+      "hasContent": true,
+      "scenario": "respite"
+    },
+    {
+      "group": "M16",
+      "hasContent": true,
+      "scenario": "followup"
+    },
+    {
+      "group": "M17",
+      "hasContent": true,
+      "scenario": "it"
+    },
+    {
+      "group": "M17",
+      "hasContent": true,
+      "scenario": "hub"
+    },
+    {
+      "group": "M17",
+      "hasContent": true,
+      "scenario": "timeline"
+    },
+    {
+      "group": "M17",
+      "hasContent": true,
+      "scenario": "announcement"
+    },
+    {
+      "group": "M17",
+      "hasContent": true,
+      "scenario": "obli"
+    },
+    {
+      "group": "M17",
+      "hasContent": true,
+      "scenario": "restricted"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "history"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "preflight"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "ringing"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "incoming"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "connecting"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "active"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "group"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "invite"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "end"
+    },
+    {
+      "group": "M18",
+      "hasContent": true,
+      "scenario": "mini"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "preflight"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "ringing"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "incoming"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "active"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "group"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "noanswer"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "callback"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "assigned"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "attempted"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "completed"
+    },
+    {
+      "group": "M19",
+      "hasContent": true,
+      "scenario": "cancelled"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "permission"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "ignored"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "missing"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "unsupported"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "busy"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "elsewhere"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "expired"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "network"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "reconnect"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "device"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "revoked"
+    },
+    {
+      "group": "M20",
+      "hasContent": true,
+      "scenario": "missed"
+    },
+    {
+      "group": "M21",
+      "hasContent": true,
+      "scenario": "general"
+    },
+    {
+      "group": "M21",
+      "hasContent": true,
+      "scenario": "family"
+    },
+    {
+      "group": "M21",
+      "hasContent": true,
+      "scenario": "notifications"
+    },
+    {
+      "group": "M21",
+      "hasContent": true,
+      "scenario": "access"
+    },
+    {
+      "group": "M21",
+      "hasContent": true,
+      "scenario": "channels"
+    },
+    {
+      "group": "M21",
+      "hasContent": true,
+      "scenario": "override"
+    },
+    {
+      "group": "M21",
+      "hasContent": true,
+      "scenario": "conflict"
+    },
+    {
+      "group": "M21",
+      "hasContent": true,
+      "scenario": "denied"
+    },
+    {
+      "group": "M22",
+      "hasContent": true,
+      "scenario": "calls"
+    },
+    {
+      "group": "M22",
+      "hasContent": true,
+      "scenario": "files"
+    },
+    {
+      "group": "M22",
+      "hasContent": true,
+      "scenario": "privacy"
+    },
+    {
+      "group": "M22",
+      "hasContent": true,
+      "scenario": "health"
+    },
+    {
+      "group": "M22",
+      "hasContent": true,
+      "scenario": "validation"
+    },
+    {
+      "group": "M22",
+      "hasContent": true,
+      "scenario": "investigator"
+    },
+    {
+      "group": "M23",
+      "hasContent": true,
+      "scenario": "availability"
+    },
+    {
+      "group": "M23",
+      "hasContent": true,
+      "scenario": "notifications"
+    },
+    {
+      "group": "M23",
+      "hasContent": true,
+      "scenario": "sound"
+    },
+    {
+      "group": "M23",
+      "hasContent": true,
+      "scenario": "display"
+    },
+    {
+      "group": "M23",
+      "hasContent": true,
+      "scenario": "mandatory"
+    },
+    {
+      "group": "M24",
+      "hasContent": true,
+      "scenario": "legacy"
+    },
+    {
+      "group": "M24",
+      "hasContent": true,
+      "scenario": "missing"
+    },
+    {
+      "group": "M24",
+      "hasContent": true,
+      "scenario": "large"
+    },
+    {
+      "group": "M24",
+      "hasContent": true,
+      "scenario": "keyboard"
+    },
+    {
+      "group": "M24",
+      "hasContent": true,
+      "scenario": "reduced"
+    },
+    {
+      "group": "M24",
+      "hasContent": true,
+      "scenario": "long"
+    }
+  ],
+  "responsive": [
+    {
+      "id": "M03",
+      "overflow": 1388,
+      "title": "Chat",
+      "width": 1388
+    },
+    {
+      "id": "M10",
+      "overflow": 1388,
+      "title": "Hello, Jo",
+      "width": 1388
+    },
+    {
+      "id": "M11",
+      "overflow": 1388,
+      "title": "Chat",
+      "width": 1388
+    },
+    {
+      "id": "M13",
+      "overflow": 1388,
+      "title": "Family",
+      "width": 1388
+    },
+    {
+      "id": "M14",
+      "overflow": 1388,
+      "title": "Sam Taylor",
+      "width": 1388
+    },
+    {
+      "id": "M18",
+      "overflow": 1388,
+      "title": "Calls",
+      "width": 1388
+    },
+    {
+      "id": "M19",
+      "overflow": 1388,
+      "title": "Sam’s care team",
+      "width": 1388
+    },
+    {
+      "id": "M21",
+      "overflow": 1388,
+      "title": "General",
+      "width": 1388
+    },
+    {
+      "id": "M22",
+      "overflow": 1388,
+      "title": "Voice calls",
+      "width": 1388
+    },
+    {
+      "id": "M23",
+      "overflow": 1388,
+      "title": "Availability",
+      "width": 1388
+    },
+    {
+      "id": "M03",
+      "overflow": 820,
+      "title": "Chat",
+      "width": 820
+    },
+    {
+      "id": "M10",
+      "overflow": 820,
+      "title": "Hello, Jo",
+      "width": 820
+    },
+    {
+      "id": "M11",
+      "overflow": 820,
+      "title": "Chat",
+      "width": 820
+    },
+    {
+      "id": "M13",
+      "overflow": 820,
+      "title": "Family",
+      "width": 820
+    },
+    {
+      "id": "M14",
+      "overflow": 820,
+      "title": "Sam Taylor",
+      "width": 820
+    },
+    {
+      "id": "M18",
+      "overflow": 820,
+      "title": "Calls",
+      "width": 820
+    },
+    {
+      "id": "M19",
+      "overflow": 820,
+      "title": "Sam’s care team",
+      "width": 820
+    },
+    {
+      "id": "M21",
+      "overflow": 820,
+      "title": "General",
+      "width": 820
+    },
+    {
+      "id": "M22",
+      "overflow": 820,
+      "title": "Voice calls",
+      "width": 820
+    },
+    {
+      "id": "M23",
+      "overflow": 820,
+      "title": "Availability",
+      "width": 820
+    },
+    {
+      "id": "M03",
+      "overflow": 390,
+      "title": "Chat",
+      "width": 390
+    },
+    {
+      "id": "M10",
+      "overflow": 390,
+      "title": "Hello, Jo",
+      "width": 390
+    },
+    {
+      "id": "M11",
+      "overflow": 390,
+      "title": "Chat",
+      "width": 390
+    },
+    {
+      "id": "M13",
+      "overflow": 390,
+      "title": "Family",
+      "width": 390
+    },
+    {
+      "id": "M14",
+      "overflow": 390,
+      "title": "Sam Taylor",
+      "width": 390
+    },
+    {
+      "id": "M18",
+      "overflow": 390,
+      "title": "Calls",
+      "width": 390
+    },
+    {
+      "id": "M19",
+      "overflow": 390,
+      "title": "Sam’s care team",
+      "width": 390
+    },
+    {
+      "id": "M21",
+      "overflow": 390,
+      "title": "General",
+      "width": 390
+    },
+    {
+      "id": "M22",
+      "overflow": 390,
+      "title": "Voice calls",
+      "width": 390
+    },
+    {
+      "id": "M23",
+      "overflow": 390,
+      "title": "Availability",
+      "width": 390
+    },
+    {
+      "id": "M03",
+      "overflow": 320,
+      "title": "Chat",
+      "width": 320
+    },
+    {
+      "id": "M10",
+      "overflow": 320,
+      "title": "Hello, Jo",
+      "width": 320
+    },
+    {
+      "id": "M11",
+      "overflow": 320,
+      "title": "Chat",
+      "width": 320
+    },
+    {
+      "id": "M13",
+      "overflow": 320,
+      "title": "Family",
+      "width": 320
+    },
+    {
+      "id": "M14",
+      "overflow": 320,
+      "title": "Sam Taylor",
+      "width": 320
+    },
+    {
+      "id": "M18",
+      "overflow": 320,
+      "title": "Calls",
+      "width": 320
+    },
+    {
+      "id": "M19",
+      "overflow": 320,
+      "title": "Sam’s care team",
+      "width": 320
+    },
+    {
+      "id": "M21",
+      "overflow": 320,
+      "title": "General",
+      "width": 320
+    },
+    {
+      "id": "M22",
+      "overflow": 320,
+      "title": "Voice calls",
+      "width": 320
+    },
+    {
+      "id": "M23",
+      "overflow": 320,
+      "title": "Availability",
+      "width": 320
+    }
+  ],
+  "interactionResults": {
+    "sampleSend": true,
+    "draftAcrossConversations": true,
+    "drawerPreservesForm": true,
+    "discardRestoresSettings": true,
+    "inviteHistoryAcknowledgement": true,
+    "muteControl": true
+  }
+}

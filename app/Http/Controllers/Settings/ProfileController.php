@@ -10,6 +10,7 @@ use App\Services\AuditLogger;
 use App\Services\SsoConfigurationService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -340,9 +341,17 @@ class ProfileController extends Controller
             ]);
         }
 
-        Auth::logout();
+        try {
+            $user->delete();
+        } catch (QueryException $exception) {
+            // Care communication (Chat messages, calls, callbacks) references its author and must be retained.
+            throw_unless(($exception->errorInfo[1] ?? null) === 1451, $exception);
+            throw ValidationException::withMessages([
+                'password' => 'This account is linked to retained care communication records, so it cannot be deleted here. Ask the care team to close your portal access instead.',
+            ]);
+        }
 
-        $user->delete();
+        Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

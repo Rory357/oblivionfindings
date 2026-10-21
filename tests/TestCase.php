@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Support\SecurityPolicy;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -50,6 +51,10 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // SecurityPolicy keeps a static copy of its settings. A session timeout one test
+        // sets must not sign the next test's requests out once its rows are rolled back.
+        SecurityPolicy::flushCache();
 
         $this->withoutVite();
     }

@@ -51,6 +51,51 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('FilePreviewDialog', () => {
+    it('previews explicitly selected local PDF bytes without fetching or offering a download', async () => {
+        const local = new File(['%PDF-local'], 'selected.pdf', {
+            type: 'application/pdf',
+        });
+        Object.defineProperty(local, 'arrayBuffer', {
+            value: async () => new Uint8Array([37, 80, 68, 70]).buffer,
+        });
+        const view = render(
+            <FilePreviewDialog
+                file={{ ...file, previewUrl: null, downloadUrl: null }}
+                localFile={local}
+                onClose={vi.fn()}
+            />,
+        );
+        await screen.findByText('Original page 1');
+        expect(fetch).not.toHaveBeenCalled();
+        expect(
+            screen.queryByRole('link', { name: /Download/ }),
+        ).not.toBeInTheDocument();
+        expect(engine.getDocument).toHaveBeenCalledWith(
+            expect.objectContaining({ data: new Uint8Array([37, 80, 68, 70]) }),
+        );
+        view.unmount();
+        expect(destroy).toHaveBeenCalled();
+    });
+
+    it('does not read oversized local bytes or send them to a remote preview', async () => {
+        const local = new File([], 'large.pdf', { type: 'application/pdf' });
+        const read = vi.fn();
+        Object.defineProperty(local, 'size', { value: 26 * 1024 * 1024 });
+        Object.defineProperty(local, 'arrayBuffer', { value: read });
+        render(
+            <FilePreviewDialog
+                file={{ ...file, previewUrl: null }}
+                localFile={local}
+                onClose={vi.fn()}
+            />,
+        );
+        await screen.findByText(
+            'This file is too large for the in-app preview. Open the original on your device.',
+        );
+        expect(read).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
     it('renders original PDF pages, bounds navigation and exposes readable text and exact download', async () => {
         render(<FilePreviewDialog file={file} onClose={vi.fn()} />);
         await screen.findByText('Original page 1');

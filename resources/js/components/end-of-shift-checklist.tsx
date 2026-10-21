@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { ChatShiftHandover } from '@/components/chat/chat-shift-handover';
 import DictateButton from '@/components/dictate-button';
 import HandoverWriteForm, {
     type HandoverWriteValue,
@@ -370,6 +371,7 @@ export default function EndOfShiftChecklist({
 }) {
     const page = usePage().props as {
         auth?: { user?: { id?: number } };
+        chatSharedExperience?: boolean;
         flash?: { clock_out_blockers?: EndOfShiftBlocker[] | null };
     };
     const flashedClockOutBlockers = page.flash?.clock_out_blockers ?? null;
@@ -535,6 +537,11 @@ export default function EndOfShiftChecklist({
                     {submitError}
                 </p>
             )}
+            <ChatShiftHandover
+                actorId={page.auth?.user?.id}
+                enabled={page.chatSharedExperience === true}
+                active={open}
+            />
             <ChecklistBody
                 session={session}
                 blockers={blockers}
@@ -581,7 +588,7 @@ export default function EndOfShiftChecklist({
             <Sheet open={open} onOpenChange={onOpenChange}>
                 <SheetContent
                     side="bottom"
-                    className="max-h-[92vh] overflow-y-auto rounded-t-2xl"
+                    className="max-h-[92vh] overflow-x-hidden overflow-y-auto rounded-t-2xl"
                 >
                     <SheetHeader className="pr-12">
                         <SheetTitle>{title}</SheetTitle>
@@ -612,7 +619,7 @@ export default function EndOfShiftChecklist({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
-                className="max-h-[90vh] overflow-y-auto"
+                className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
                 style={{
                     maxWidth: 'min(92vw, 900px)',
                     width: 'min(92vw, 900px)',

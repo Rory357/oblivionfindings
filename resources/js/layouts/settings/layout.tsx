@@ -21,6 +21,7 @@ import {
     Mail,
     MailCheck,
     Menu,
+    MessageSquareText,
     Paintbrush,
     Palette,
     Plug,
@@ -55,6 +56,24 @@ interface NavSection {
 }
 
 const navSections: NavSection[] = [
+    {
+        label: 'Chat',
+        permission: 'settings.manageAccess',
+        items: [
+            {
+                icon: MessageSquareText,
+                title: 'Chat settings',
+                href: '/settings/chat',
+            },
+            // Restricted investigators only; settings access alone does not show it.
+            {
+                icon: ShieldCheck,
+                title: 'Chat investigations',
+                href: '/settings/chat/investigations',
+                permission: 'settings.chatInvestigate',
+            },
+        ],
+    },
     {
         label: 'General',
         items: [

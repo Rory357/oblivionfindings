@@ -1,9 +1,14 @@
+import {
+    ChatNoticeCard,
+    ChatNoticePreviews,
+} from '@/components/chat/chat-notice-card';
 import { PageHero, PageLayout } from '@/components/page';
+import { PageHeaderGlassButton } from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Bell, CheckCheck } from 'lucide-react';
 
 type Notification = {
@@ -56,6 +61,9 @@ export default function Notifications({
     filter,
     unreadCount,
 }: Props) {
+    const actorId =
+        usePage<{ auth?: { user?: { id: number } } }>().props.auth?.user?.id ??
+        null;
     const activeFilter = filter || 'all';
 
     const setFilter = (filter: string) => {
@@ -95,152 +103,181 @@ export default function Notifications({
     };
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Portal', href: '/portal' },
-                { title: 'Notifications', href: '/portal/notifications' },
-            ]}
+        <ChatNoticePreviews
+            actorId={actorId}
+            notificationIds={notifications.data
+                .filter((item) => item.data?.kind === 'chat')
+                .map((item) => item.id)}
         >
-            <Head title="Notifications" />
-
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={Bell}
-                        title="Notifications"
-                        description="Latest updates from the care team."
-                        stats={[
-                            {
-                                label: 'Total',
-                                value: notifications.data.length,
-                            },
-                            { label: 'Unread', value: unreadCount },
-                        ]}
-                        actions={
-                            unreadCount > 0 ? (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={markAllRead}
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <CheckCheck className="mr-2 h-4 w-4" />
-                                    Mark all read
-                                </Button>
-                            ) : undefined
-                        }
-                    />
-                }
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Portal', href: '/portal' },
+                    { title: 'Notifications', href: '/portal/notifications' },
+                ]}
             >
-                {/* Filter tabs */}
-                <div className="flex gap-2">
-                    <Button
-                        variant={activeFilter === 'all' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('all')}
-                    >
-                        All
-                    </Button>
-                    <Button
-                        variant={
-                            activeFilter === 'unread' ? 'default' : 'outline'
-                        }
-                        size="sm"
-                        onClick={() => setFilter('unread')}
-                        className="gap-2"
-                    >
-                        Unread
-                        {unreadCount > 0 && (
-                            <Badge
-                                variant="secondary"
-                                className="ml-1 px-1.5 py-0 text-xs"
-                            >
-                                {unreadCount}
-                            </Badge>
-                        )}
-                    </Button>
-                </div>
+                <Head title="Notifications" />
 
-                {notifications.data.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16">
-                            <Bell className="mb-4 h-12 w-12 text-muted-foreground" />
-                            <p className="text-lg font-medium text-muted-foreground">
-                                You're all caught up!
-                            </p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="space-y-2">
-                        {notifications.data.map((notification) => {
-                            const isUnread = !notification.read_at;
-                            const title = notificationTitle(notification);
-                            const body = notificationBody(notification);
-
-                            return (
-                                <Card
-                                    key={notification.id}
-                                    className={`cursor-pointer border-l-4 transition-shadow hover:shadow-md ${
-                                        isUnread
-                                            ? 'border-l-blue-500'
-                                            : 'border-l-transparent'
-                                    }`}
-                                    onClick={() => markAsRead(notification)}
+                <PageLayout
+                    hero={
+                        <PageHero
+                            icon={Bell}
+                            title="Notifications"
+                            description="Latest updates from the care team."
+                            stats={[
+                                {
+                                    label: 'Total',
+                                    value: notifications.data.length,
+                                },
+                                { label: 'Unread', value: unreadCount },
+                            ]}
+                            actions={
+                                unreadCount > 0 ? (
+                                    <PageHeaderGlassButton
+                                        icon={CheckCheck}
+                                        onClick={markAllRead}
+                                        className="frontline-tap"
+                                    >
+                                        Mark all read
+                                    </PageHeaderGlassButton>
+                                ) : undefined
+                            }
+                        />
+                    }
+                >
+                    {/* Filter tabs */}
+                    <div className="flex gap-2">
+                        <Button
+                            variant={
+                                activeFilter === 'all' ? 'default' : 'outline'
+                            }
+                            size="sm"
+                            onClick={() => setFilter('all')}
+                            className="frontline-tap"
+                        >
+                            All
+                        </Button>
+                        <Button
+                            variant={
+                                activeFilter === 'unread'
+                                    ? 'default'
+                                    : 'outline'
+                            }
+                            size="sm"
+                            onClick={() => setFilter('unread')}
+                            className="frontline-tap gap-2"
+                        >
+                            Unread
+                            {unreadCount > 0 && (
+                                <Badge
+                                    variant="secondary"
+                                    className="ml-1 px-1.5 py-0 text-xs"
                                 >
-                                    <CardContent className="flex items-start gap-3 p-4">
-                                        <div
-                                            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                                                isUnread
-                                                    ? 'bg-status-info-bg'
-                                                    : 'bg-muted'
-                                            }`}
-                                        >
-                                            <Bell
-                                                className={`h-4 w-4 ${
-                                                    isUnread
-                                                        ? 'text-status-info dark:text-status-info'
-                                                        : 'text-muted-foreground'
-                                                }`}
-                                            />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <h3
-                                                    className={`text-sm ${
-                                                        isUnread
-                                                            ? 'font-semibold'
-                                                            : 'font-medium'
-                                                    }`}
-                                                >
-                                                    {title}
-                                                </h3>
-                                                <span className="shrink-0 text-xs text-muted-foreground">
-                                                    {timeAgo(
-                                                        notification.created_at,
-                                                    )}
-                                                </span>
-                                            </div>
-                                            {body && (
-                                                <p className="mt-0.5 text-sm text-muted-foreground">
-                                                    {body}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {notifications.links?.next && (
-                    <div className="flex justify-center">
-                        <Button variant="outline" onClick={loadMore}>
-                            Load more
+                                    {unreadCount}
+                                </Badge>
+                            )}
                         </Button>
                     </div>
-                )}
-            </PageLayout>
-        </AppLayout>
+
+                    {notifications.data.length === 0 ? (
+                        <Card>
+                            <CardContent className="flex flex-col items-center justify-center py-16">
+                                <Bell className="mb-4 h-12 w-12 text-muted-foreground" />
+                                <p className="text-lg font-medium text-muted-foreground">
+                                    You're all caught up!
+                                </p>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="space-y-2">
+                            {notifications.data.map((notification) => {
+                                if (notification.data?.kind === 'chat')
+                                    return (
+                                        <ChatNoticeCard
+                                            key={notification.id}
+                                            id={notification.id}
+                                            eventKey={
+                                                notification.data.event_key
+                                            }
+                                            createdAt={notification.created_at}
+                                            unread={!notification.read_at}
+                                            onMarkRead={() =>
+                                                markAsRead(notification)
+                                            }
+                                        />
+                                    );
+                                const isUnread = !notification.read_at;
+                                const title = notificationTitle(notification);
+                                const body = notificationBody(notification);
+
+                                return (
+                                    <Card
+                                        key={notification.id}
+                                        className={`cursor-pointer border-l-4 transition-shadow hover:shadow-md ${
+                                            isUnread
+                                                ? 'border-l-status-info'
+                                                : 'border-l-transparent'
+                                        }`}
+                                        onClick={() => markAsRead(notification)}
+                                    >
+                                        <CardContent className="flex items-start gap-3 p-4">
+                                            <div
+                                                className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                                                    isUnread
+                                                        ? 'bg-status-info-bg'
+                                                        : 'bg-muted'
+                                                }`}
+                                            >
+                                                <Bell
+                                                    className={`h-4 w-4 ${
+                                                        isUnread
+                                                            ? 'text-status-info'
+                                                            : 'text-muted-foreground'
+                                                    }`}
+                                                />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <h3
+                                                        className={`text-sm ${
+                                                            isUnread
+                                                                ? 'font-semibold'
+                                                                : 'font-medium'
+                                                        }`}
+                                                    >
+                                                        {title}
+                                                    </h3>
+                                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                                        {timeAgo(
+                                                            notification.created_at,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                {body && (
+                                                    <p className="mt-0.5 text-sm text-muted-foreground">
+                                                        {body}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {notifications.links?.next && (
+                        <div className="flex justify-center">
+                            <Button
+                                variant="outline"
+                                className="frontline-tap"
+                                onClick={loadMore}
+                            >
+                                Load more
+                            </Button>
+                        </div>
+                    )}
+                </PageLayout>
+            </AppLayout>
+        </ChatNoticePreviews>
     );
 }

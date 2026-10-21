@@ -98,7 +98,7 @@ export default function PortalIndex({ clients }: Props) {
                                             )}
                                             {c.status?.toLowerCase() ===
                                                 'active' && (
-                                                <Badge className="bg-status-success-bg text-status-success hover:bg-status-success-bg dark:bg-status-success-bg dark:text-status-success">
+                                                <Badge className="bg-status-success-bg text-status-success hover:bg-status-success-bg">
                                                     Active
                                                 </Badge>
                                             )}
@@ -120,7 +120,7 @@ export default function PortalIndex({ clients }: Props) {
                                         <Link
                                             href={`/portal/clients/${c.id}/dashboard`}
                                         >
-                                            View Dashboard
+                                            View dashboard
                                         </Link>
                                     </Button>
                                 </CardContent>

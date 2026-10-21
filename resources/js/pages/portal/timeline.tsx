@@ -11,7 +11,30 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Filter } from 'lucide-react';
+import {
+    AlertCircle,
+    AlertTriangle,
+    Angry,
+    Annoyed,
+    Ban,
+    BedDouble,
+    Calendar,
+    CheckCircle2,
+    CircleDot,
+    FileText,
+    Filter,
+    Flower2,
+    Frown,
+    Hand,
+    Laugh,
+    Leaf,
+    Newspaper,
+    Pill,
+    Pin,
+    RefreshCw,
+    Smile,
+    type LucideIcon,
+} from 'lucide-react';
 
 type EventItem = {
     id: number;
@@ -78,20 +101,31 @@ const filterPills = [
     { label: 'Other', value: 'other' },
 ] as const;
 
-const eventTypeEmojis: Record<string, string> = {
-    shift: '🗓️',
-    shift_started: '🟢',
-    shift_completed: '✅',
-    shift_cancelled: '⚠️',
-    care: '💊',
-    visits: '👋',
-    other: '📌',
-    progress_note: '📝',
-    shift_note: '📝',
-    handover: '🔄',
-    visit_requested: '👋',
-    visit_approved: '✅',
-    visit_cancelled: '🚫',
+const eventTypeIcons: Record<string, LucideIcon> = {
+    shift: Calendar,
+    shift_started: CircleDot,
+    shift_completed: CheckCircle2,
+    shift_cancelled: AlertTriangle,
+    care: Pill,
+    visits: Hand,
+    other: Pin,
+    progress_note: FileText,
+    shift_note: FileText,
+    handover: RefreshCw,
+    visit_requested: Hand,
+    visit_approved: CheckCircle2,
+    visit_cancelled: Ban,
+};
+
+const emotionIcons: Record<string, LucideIcon> = {
+    happy: Smile,
+    calm: Leaf,
+    excited: Laugh,
+    tired: BedDouble,
+    anxious: AlertCircle,
+    sad: Frown,
+    frustrated: Angry,
+    confused: Annoyed,
 };
 
 const eventTypeLabels: Record<string, string> = {
@@ -187,16 +221,19 @@ export default function Timeline({
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <span>📰</span>
-                            Activity Timeline
+                            <Newspaper
+                                className="size-4 text-primary"
+                                aria-hidden
+                            />
+                            Activity timeline
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {events.data.length > 0 ? (
                             <div className="relative space-y-0">
                                 {events.data.map((event, idx) => {
-                                    const typeEmoji =
-                                        eventTypeEmojis[event.type] ?? '📌';
+                                    const TypeIcon =
+                                        eventTypeIcons[event.type] ?? Pin;
                                     return (
                                         <div
                                             key={event.id}
@@ -211,9 +248,10 @@ export default function Timeline({
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-start justify-between gap-2">
                                                     <p className="text-sm leading-tight font-medium">
-                                                        <span className="mr-1">
-                                                            {typeEmoji}
-                                                        </span>
+                                                        <TypeIcon
+                                                            className="mr-1.5 inline size-4 align-text-bottom text-muted-foreground"
+                                                            aria-hidden
+                                                        />
                                                         {event.subject ||
                                                             event.type}
                                                     </p>
@@ -234,7 +272,7 @@ export default function Timeline({
                                                 />
                                                 <div className="mt-1 flex items-center gap-2">
                                                     {event.actor_name && (
-                                                        <p className="text-xs text-muted-foreground/70">
+                                                        <p className="text-xs text-muted-foreground">
                                                             By{' '}
                                                             {event.actor_name}
                                                         </p>
@@ -275,23 +313,10 @@ export default function Timeline({
                                                                 (
                                                                     em: string,
                                                                 ) => {
-                                                                    const emojiMap: Record<
-                                                                        string,
-                                                                        string
-                                                                    > = {
-                                                                        happy: '😊',
-                                                                        calm: '😌',
-                                                                        excited:
-                                                                            '🤩',
-                                                                        tired: '😴',
-                                                                        anxious:
-                                                                            '😰',
-                                                                        sad: '😢',
-                                                                        frustrated:
-                                                                            '😤',
-                                                                        confused:
-                                                                            '😕',
-                                                                    };
+                                                                    const EmotionIcon =
+                                                                        emotionIcons[
+                                                                            em
+                                                                        ];
                                                                     const colorMap: Record<
                                                                         string,
                                                                         string
@@ -316,10 +341,12 @@ export default function Timeline({
                                                                             }
                                                                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${colorMap[em] ?? 'bg-muted'}`}
                                                                         >
-                                                                            {emojiMap[
-                                                                                em
-                                                                            ] ??
-                                                                                em}{' '}
+                                                                            {EmotionIcon && (
+                                                                                <EmotionIcon
+                                                                                    className="size-3"
+                                                                                    aria-hidden
+                                                                                />
+                                                                            )}
                                                                             {em}
                                                                         </span>
                                                                     );
@@ -350,7 +377,10 @@ export default function Timeline({
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <span className="mb-2 text-3xl">🌻</span>
+                                <Flower2
+                                    className="mb-2 size-8 text-muted-foreground"
+                                    aria-hidden
+                                />
                                 <p className="text-sm text-muted-foreground">
                                     Nothing to show here yet &mdash; check back
                                     soon!

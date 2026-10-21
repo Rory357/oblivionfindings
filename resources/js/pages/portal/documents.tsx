@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import {
@@ -173,13 +174,18 @@ export default function Documents({ client, documents }: Props) {
                                 <DialogTrigger asChild>
                                     <Button className="gap-2">
                                         <Upload className="h-4 w-4" />
-                                        Upload Document
+                                        Upload document
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-lg">
+                                <DialogContent
+                                    style={{
+                                        maxWidth: 'min(92vw, 720px)',
+                                        width: 'min(92vw, 720px)',
+                                    }}
+                                >
                                     <DialogHeader>
                                         <DialogTitle>
-                                            Upload a Document
+                                            Upload a document
                                         </DialogTitle>
                                         <DialogDescription>
                                             Share a document with the care team
@@ -226,7 +232,7 @@ export default function Documents({ client, documents }: Props) {
                                                     </span>{' '}
                                                     to choose
                                                 </p>
-                                                <p className="mt-2 text-[11px] text-muted-foreground/60">
+                                                <p className="mt-2 text-[11px] text-muted-foreground">
                                                     PDF, Word, images, or text
                                                     files up to 20 MB
                                                 </p>
@@ -320,9 +326,9 @@ export default function Documents({ client, documents }: Props) {
                                             <Label htmlFor="doc-notes">
                                                 Notes
                                             </Label>
-                                            <textarea
+                                            <Textarea
                                                 id="doc-notes"
-                                                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                className="mt-1"
                                                 rows={2}
                                                 placeholder="Optional notes for the care team..."
                                                 value={form.data.notes}
@@ -467,7 +473,7 @@ export default function Documents({ client, documents }: Props) {
                             <p className="text-sm font-medium text-muted-foreground">
                                 No documents have been shared yet
                             </p>
-                            <p className="mt-1 text-xs text-muted-foreground/70">
+                            <p className="mt-1 text-xs text-muted-foreground">
                                 Documents shared by the care team will appear
                                 here.
                             </p>

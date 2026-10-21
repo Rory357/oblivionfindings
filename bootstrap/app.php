@@ -50,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/monitoring-collector.php'));
             Route::middleware('api')->prefix('api')->group(base_path('routes/endpoint-agent.php'));
             Route::middleware('api')->prefix('api')->group(base_path('routes/obli-api.php'));
+            Route::middleware('api')->prefix('api')->group(base_path('routes/chat-media.php'));
         },
     )
     ->withBroadcasting(
@@ -57,6 +58,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ['middleware' => ['web', 'auth']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Mention ranges refer to the submitted text. Chat normalises text and
+        // adjusts those ranges together after authorisation, rather than losing
+        // leading whitespace in the global string-trimming middleware.
+        $middleware->trimStrings(except: [fn (Request $request) => ($request->isMethod('POST') && $request->is('chat/api/conversations/*/messages')) || ($request->isMethod('PATCH') && $request->is('chat/api/messages/*')) || ($request->isMethod('PUT') && $request->is('chat/api/conversations/*/draft'))]);
         $middleware->prepend(ProtectObliResponses::class);
         $middleware->prepend(ProtectRemoteSupportResponses::class);
         // SDP is a wire protocol: retain exact CRLF and fingerprint bytes.

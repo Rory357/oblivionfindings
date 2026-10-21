@@ -1,0 +1,270 @@
+{
+  "scope": "Local mockup only; not production or browser calling acceptance",
+  "layoutChecks": [
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "staff",
+      "screen": "M25",
+      "stageHeight": 973,
+      "width": "stage desktop has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "family",
+      "screen": "M25",
+      "stageHeight": 973,
+      "width": "stage desktop has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "portal",
+      "screen": "M25",
+      "stageHeight": 973,
+      "width": "stage desktop has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "group",
+      "screen": "M25",
+      "stageHeight": 973,
+      "width": "stage desktop has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "busy",
+      "screen": "M25",
+      "stageHeight": 973,
+      "width": "stage desktop has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "missed",
+      "screen": "M25",
+      "stageHeight": 973,
+      "width": "stage desktop has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "elsewhere",
+      "screen": "M25",
+      "stageHeight": 973,
+      "width": "stage desktop has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "staff",
+      "screen": "M25",
+      "stageHeight": 1196,
+      "width": "stage tablet has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "family",
+      "screen": "M25",
+      "stageHeight": 1196,
+      "width": "stage tablet has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "portal",
+      "screen": "M25",
+      "stageHeight": 1196,
+      "width": "stage tablet has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "group",
+      "screen": "M25",
+      "stageHeight": 1196,
+      "width": "stage tablet has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "busy",
+      "screen": "M25",
+      "stageHeight": 1429,
+      "width": "stage tablet has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "missed",
+      "screen": "M25",
+      "stageHeight": 971,
+      "width": "stage tablet has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "elsewhere",
+      "screen": "M25",
+      "stageHeight": 971,
+      "width": "stage tablet has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "staff",
+      "screen": "M25",
+      "stageHeight": 1178,
+      "width": "stage phone has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "family",
+      "screen": "M25",
+      "stageHeight": 1178,
+      "width": "stage phone has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "portal",
+      "screen": "M25",
+      "stageHeight": 1178,
+      "width": "stage phone has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "group",
+      "screen": "M25",
+      "stageHeight": 1178,
+      "width": "stage phone has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "busy",
+      "screen": "M25",
+      "stageHeight": 1178,
+      "width": "stage phone has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "missed",
+      "screen": "M25",
+      "stageHeight": 957,
+      "width": "stage phone has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "elsewhere",
+      "screen": "M25",
+      "stageHeight": 957,
+      "width": "stage phone has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "staff",
+      "screen": "M25",
+      "stageHeight": 1178,
+      "width": "stage narrow has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "family",
+      "screen": "M25",
+      "stageHeight": 1178,
+      "width": "stage narrow has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "portal",
+      "screen": "M25",
+      "stageHeight": 1178,
+      "width": "stage narrow has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "group",
+      "screen": "M25",
+      "stageHeight": 1193,
+      "width": "stage narrow has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "busy",
+      "screen": "M25",
+      "stageHeight": 1430,
+      "width": "stage narrow has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "missed",
+      "screen": "M25",
+      "stageHeight": 957,
+      "width": "stage narrow has-call-dock"
+    },
+    {
+      "callVisible": true,
+      "hasWork": true,
+      "horizontalOverflow": false,
+      "scenario": "elsewhere",
+      "screen": "M25",
+      "stageHeight": 957,
+      "width": "stage narrow has-call-dock"
+    }
+  ],
+  "journeys": [
+    "Answer preserved the unfinished staff draft.",
+    "Mute changed the current call state.",
+    "Call conversation preserved the selected caller.",
+    "Declining a second call left the call with Rohan active.",
+    "End-and-answer required confirmation.",
+    "Call controls persisted from M25 to global settings.",
+    "Family call end offered Record communication.",
+    "Sharing a Family Note required separate text and audience review.",
+    "Family Note text survived closing and reopening review.",
+    "Reviewed save showed separate Communication Record and Family Note outcome."
+  ],
+  "capturedJavaScriptErrors": []
+}
