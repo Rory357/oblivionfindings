@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Chat\ChatMessageEditing;
 use App\Services\Chat\ChatPreservation;
 use App\Services\Chat\ChatSettings;
+use App\Support\SecurityPolicy;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -21,6 +22,8 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     config(['chat.shared_experience' => true]);
+    // SecurityPolicy keeps a static copy; a timeout set by an earlier test must not sign this one out.
+    SecurityPolicy::flushCache();
     Bus::fake();
     AppSetting::updateOrCreate(['key' => ChatSettings::KEY], ['value' => ['message_change_window_minutes' => 15]]);
 });

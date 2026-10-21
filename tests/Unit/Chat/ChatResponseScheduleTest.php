@@ -3,7 +3,7 @@
 use App\Services\Chat\ChatResponseSchedule;
 use Carbon\CarbonImmutable;
 use Illuminate\Container\Container;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Facade;
 use Illuminate\Translation\ArrayLoader;
 use Illuminate\Translation\Translator;
 use Illuminate\Validation\Factory;
@@ -12,33 +12,29 @@ use PHPUnit\Framework\TestCase;
 
 abstract class ChatResponseScheduleUnitTestCase extends TestCase
 {
-    private mixed $previousValidator = null;
+    private ?Container $previousContainer = null;
 
-    private mixed $previousContainerValidator = null;
+    private mixed $previousFacadeApplication = null;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->previousValidator = Validator::getFacadeRoot();
-        $factory = new Factory(new Translator(new ArrayLoader, 'en'));
-        Validator::swap($factory);
-        // ValidationException::withMessages() resolves the validator from the container.
-        $this->previousContainerValidator = Container::getInstance()->bound('validator') ? Container::getInstance()->make('validator') : null;
-        Container::getInstance()->instance('validator', $factory);
+        // Use a fresh container for the test: a previous feature test may leave a flushed
+        // application behind that still reports "validator" as bound but cannot build it.
+        $this->previousContainer = Container::getInstance();
+        $this->previousFacadeApplication = Facade::getFacadeApplication();
+        $container = new Container;
+        $container->instance('validator', new Factory(new Translator(new ArrayLoader, 'en')));
+        Container::setInstance($container);
+        Facade::setFacadeApplication($container);
+        Facade::clearResolvedInstances();
     }
 
     protected function tearDown(): void
     {
-        if ($this->previousContainerValidator) {
-            Container::getInstance()->instance('validator', $this->previousContainerValidator);
-        } else {
-            Container::getInstance()->forgetInstance('validator');
-        }
-        if ($this->previousValidator) {
-            Validator::swap($this->previousValidator);
-        } else {
-            Validator::clearResolvedInstance('validator');
-        }
+        Facade::clearResolvedInstances();
+        Facade::setFacadeApplication($this->previousFacadeApplication);
+        Container::setInstance($this->previousContainer);
         parent::tearDown();
     }
 }
