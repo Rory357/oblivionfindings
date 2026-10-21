@@ -859,6 +859,21 @@ final class PharmacyConnectionTest extends TestCase
     }
 
     /** EA-136 + EA-138 (UI): a pharmacy answer after a manual check is flagged on the row. */
+    /** EA-138 (Lane C, 20 Oct): the P06 hub's Deliveries & orders rows carry the same send state, only while the bridge runs. */
+    public function test_ea138_hub_order_rows_show_the_connected_send_state_while_the_bridge_runs(): void
+    {
+        $dispatch = $this->queue();
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        $this->ack($dispatch, 'rejected')->assertOk();
+        $row = fn () => collect($this->actingAs($this->fixture['actor'])->get('/emar/stock/packs?view=orders')->assertOk()
+            ->inertiaProps('orders.data'))->firstWhere('id', $this->fixture['order']->id);
+        $state = $row()['dispatch'];
+        $this->assertSame(['rejected', 'critical', 'Pharmacy declined'], [$state['state'], $state['tone'], $state['short_label']]);
+
+        config(['emar-pharmacy-connect.enabled' => false]);
+        $this->assertNull($row()['dispatch']);
+    }
+
     public function test_ea138_a_contradicting_acceptance_is_flagged_on_the_order_row(): void
     {
         Http::fake(fn () => throw new ConnectionException('Synthetic uncertain transport'));
