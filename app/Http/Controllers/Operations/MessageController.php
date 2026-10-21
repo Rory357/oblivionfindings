@@ -27,6 +27,10 @@ class MessageController extends Controller
     {
         $auth = $this->staffUser($request);
 
+        if (config('chat.shared_experience')) {
+            return inertia('chat/index', ['chatFamily' => false]);
+        }
+
         $conversationIds = OpsConversationParticipant::query()
             ->where('user_id', $auth->id)
             ->pluck('conversation_id');
@@ -86,6 +90,8 @@ class MessageController extends Controller
 
     public function createConversation(Request $request)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $auth = $this->staffUser($request);
 
         $data = $request->validate([
@@ -170,6 +176,10 @@ class MessageController extends Controller
         $this->assertConversationAccess($auth, $conversation);
         $this->filterVisibleParticipants($conversation);
 
+        if (config('chat.shared_experience')) {
+            return inertia('chat/index', ['chatFamily' => false, 'initialConversation' => $conversation->id]);
+        }
+
         $messages = $this->visibleMessages($conversation, withTrashed: true)
             ->with(['sender:id,name', 'reactions.user:id,name'])
             ->orderByDesc('created_at')
@@ -217,6 +227,8 @@ class MessageController extends Controller
 
     public function store(Request $request, $conversation)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $auth = $this->staffUser($request);
 
         $conversation = OpsConversation::query()
@@ -253,6 +265,8 @@ class MessageController extends Controller
 
     public function toggleReaction(Request $request, OpsMessage $message)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $auth = $this->staffUser($request);
         $this->assertMessageParticipant($message, $auth, manage: true);
 
@@ -272,6 +286,8 @@ class MessageController extends Controller
 
     public function togglePin(Request $request, OpsMessage $message)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $auth = $this->staffUser($request);
         $this->assertMessageParticipant($message, $auth, manage: true);
         $message->update(['is_pinned' => ! $message->is_pinned]);
@@ -281,9 +297,12 @@ class MessageController extends Controller
 
     public function archiveMessage(Request $request, OpsMessage $message)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $auth = $this->staffUser($request);
         $this->assertMessageParticipant($message, $auth, manage: true);
         abort_unless($message->sender_id === $auth->id, 403);
+        abort_if(app(\App\Services\Chat\ChatPreservation::class)->isHeld((int) $message->conversation_id), 409, 'This conversation is preserved for a case. Messages cannot be removed.');
 
         $message->delete();
 
@@ -292,6 +311,8 @@ class MessageController extends Controller
 
     public function searchMessages(Request $request)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $auth = $this->staffUser($request);
 
         $q = $request->query('q', '');
@@ -360,6 +381,8 @@ class MessageController extends Controller
 
     public function markRead(Request $request, $conversation)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $auth = $this->staffUser($request);
 
         $participant = OpsConversationParticipant::query()

@@ -1,0 +1,38 @@
+# Deployment template: replace every REPLACE value before starting.
+port: 7880
+rtc:
+    tcp_port: 7881
+    udp_port: 7882
+    use_external_ip: false
+    node_ip: REPLACE_WITH_VOICE_SERVER_PUBLIC_IP
+    stun_servers:
+        - turn.example.invalid:3478
+keys:
+    REPLACE_WITH_GENERATED_API_KEY: REPLACE_WITH_GENERATED_SECRET_AT_LEAST_32_CHARACTERS
+room:
+    auto_create: true
+    empty_timeout: 60
+    departure_timeout: 20
+    max_participants: 8
+    enabled_codecs:
+        - mime: audio/opus
+    enable_remote_unmute: false
+turn:
+    enabled: true
+    domain: turn.example.invalid
+    # This is the externally advertised port; Compose maps it to the local proxy upstream.
+    tls_port: 443
+    udp_port: 3478
+    cert_file: /etc/voice-certificates/turn/fullchain.pem
+    key_file: /etc/voice-certificates/turn/privkey.pem
+    proxy_protocol: true
+    proxy_protocol_trusted_cidrs:
+        - 172.29.244.1/32
+webhook:
+    api_key: REPLACE_WITH_GENERATED_API_KEY
+    urls:
+        - https://oblivion.example.invalid/api/chat/calling/events
+logging:
+    level: warn
+    pion_level: error
+    json: true

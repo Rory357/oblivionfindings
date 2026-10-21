@@ -1,0 +1,142 @@
+<?php
+
+use App\Http\Controllers\Chat\ChatAttachmentController;
+use App\Http\Controllers\Chat\ChatAttachmentPublicationController;
+use App\Http\Controllers\Chat\ChatCallbackController;
+use App\Http\Controllers\Chat\ChatCallController;
+use App\Http\Controllers\Chat\ChatCallPeopleController;
+use App\Http\Controllers\Chat\ChatCallRecordController;
+use App\Http\Controllers\Chat\ChatCollectionController;
+use App\Http\Controllers\Chat\ChatController;
+use App\Http\Controllers\Chat\ChatConversationManagementController;
+use App\Http\Controllers\Chat\ChatFamilyFollowupController;
+use App\Http\Controllers\Chat\ChatFamilyHomeController;
+use App\Http\Controllers\Chat\ChatFamilyInboxController;
+use App\Http\Controllers\Chat\ChatFamilyWorkController;
+use App\Http\Controllers\Chat\ChatMessageAlertController;
+use App\Http\Controllers\Chat\ChatMessageEditController;
+use App\Http\Controllers\Chat\ChatNotificationController;
+use App\Http\Controllers\Chat\ChatParticipantController;
+use App\Http\Controllers\Chat\ChatPersonalPreferencesController;
+use App\Http\Controllers\Chat\ChatPrivateDraftController;
+use App\Http\Controllers\Chat\ChatRealtimeController;
+use App\Http\Controllers\Chat\ChatSearchController;
+use App\Http\Controllers\Chat\ChatSendAttemptController;
+use App\Http\Controllers\Chat\ChatUploadController;
+use App\Http\Controllers\Chat\ChatUrgentContactController;
+use App\Http\Controllers\Settings\ChatAdministrationController;
+use App\Http\Controllers\Settings\ChatInvestigationController;
+use App\Http\Controllers\Settings\ChatSettingsController;
+use App\Http\Middleware\EnsureChatActor;
+use App\Http\Middleware\EnsureSharedChatEnabled;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['auth'])->group(function (): void {
+    Route::get('/settings/chat', [ChatSettingsController::class, 'index'])->name('settings.chat');
+    Route::get('/settings/chat/configuration', [ChatSettingsController::class, 'configuration'])->middleware(EnsureChatActor::class)->name('settings.chat.configuration');
+    Route::post('/settings/chat/service-health', [ChatSettingsController::class, 'serviceHealth'])->middleware('throttle:6,1,chat-health:')->middleware(EnsureChatActor::class)->name('settings.chat.service-health');
+    Route::post('/settings/chat/calling-health', [ChatSettingsController::class, 'callingHealth'])->middleware('throttle:6,1,chat-health:')->middleware(EnsureChatActor::class)->name('settings.chat.calling-health');
+    Route::put('/settings/chat', [ChatSettingsController::class, 'update'])->middleware('throttle:20,1,chat-settings:')->middleware(EnsureChatActor::class)->name('settings.chat.update');
+    // Settings audit, offboarding and client relationships (settings administrators; never private content).
+    Route::prefix('settings/chat/administration')->name('settings.chat.administration.')->middleware([EnsureChatActor::class, 'throttle:60,1,chat-administration:'])->group(function (): void {
+        Route::get('/audit', [ChatAdministrationController::class, 'audit'])->name('audit');
+        Route::get('/offboarding', [ChatAdministrationController::class, 'offboardingSearch'])->name('offboarding.search');
+        Route::get('/offboarding/{person}', [ChatAdministrationController::class, 'offboardingPreview'])->whereNumber('person')->name('offboarding.preview');
+        Route::post('/offboarding/{person}', [ChatAdministrationController::class, 'offboardingComplete'])->whereNumber('person')->name('offboarding.complete');
+        Route::get('/relationships', [ChatAdministrationController::class, 'relationshipSearch'])->name('relationships.search');
+        Route::get('/relationships/{client}', [ChatAdministrationController::class, 'relationships'])->whereNumber('client')->name('relationships.show');
+    });
+    // Restricted investigator workspace (chat.investigate only; a separate audit domain).
+    Route::get('/settings/chat/investigations', [ChatInvestigationController::class, 'index'])->name('settings.chat.investigations');
+    Route::get('/settings/chat/investigations/{grant}', [ChatInvestigationController::class, 'show'])->whereNumber('grant')->name('settings.chat.investigations.show');
+    Route::prefix('settings/chat/investigations/api')->name('settings.chat.investigations.')->middleware([EnsureChatActor::class, 'throttle:60,1,chat-investigation:'])->group(function (): void {
+        Route::get('/overview', [ChatInvestigationController::class, 'overview'])->name('overview');
+        Route::get('/conversations', [ChatInvestigationController::class, 'lookup'])->name('lookup');
+        Route::post('/grants', [ChatInvestigationController::class, 'store'])->name('store');
+        Route::get('/grants/{grant}/messages', [ChatInvestigationController::class, 'messages'])->whereNumber('grant')->name('messages');
+        Route::post('/grants/{grant}/end', [ChatInvestigationController::class, 'end'])->whereNumber('grant')->name('end');
+        Route::post('/holds', [ChatInvestigationController::class, 'placeHold'])->name('holds.store');
+        Route::post('/holds/{hold}/release', [ChatInvestigationController::class, 'releaseHold'])->whereNumber('hold')->name('holds.release');
+    });
+    Route::get('/chat', [ChatController::class, 'index'])->middleware(EnsureSharedChatEnabled::class)->name('chat.index');
+    Route::get('/chat/preferences', [ChatPersonalPreferencesController::class, 'page'])->middleware(EnsureSharedChatEnabled::class)->name('chat.preferences.page');
+    Route::get('/chat/notifications/{notification}', [ChatNotificationController::class, 'open'])
+        ->whereUuid('notification')->middleware(EnsureSharedChatEnabled::class)->name('chat.notifications.open');
+    Route::get('/chat/notifications/{notification}/display', [ChatNotificationController::class, 'display'])
+        ->whereUuid('notification')->middleware('throttle:120,1,chat-notification-display:')->name('chat.notifications.display');
+    // Background pollers (calls, message alerts) use their own limits so several open tabs cannot exhaust sending.
+    Route::prefix('chat/api')->name('chat.')->middleware([EnsureSharedChatEnabled::class, 'throttle:120,1,chat-api:'])->group(function (): void {
+        Route::get('/message-alerts', ChatMessageAlertController::class)->withoutMiddleware('throttle:120,1,chat-api:')->middleware(['throttle:120,1,chat-poll-alerts:', EnsureChatActor::class])->name('message-alerts');
+        Route::get('/notification-previews', [ChatNotificationController::class, 'previews'])->middleware(EnsureChatActor::class)->name('notifications.previews');
+        Route::get('/personal-preferences', [ChatPersonalPreferencesController::class, 'show'])->middleware(EnsureChatActor::class)->name('preferences.show');
+        Route::patch('/personal-preferences', [ChatPersonalPreferencesController::class, 'update'])->middleware(EnsureChatActor::class)->name('preferences.update');
+        Route::get('/clients/{client}/urgent-contact', ChatUrgentContactController::class)->whereNumber('client')->middleware(EnsureChatActor::class)->name('urgent-contact');
+        Route::get('/clients/{client}/home', ChatFamilyHomeController::class)->whereNumber('client')->middleware(EnsureChatActor::class)->name('family-home');
+        Route::get('/clients/{client}/home/conversations/{conversation}', [ChatFamilyHomeController::class, 'conversation'])->whereNumber(['client', 'conversation'])->middleware(EnsureChatActor::class)->name('family-home.conversation');
+        Route::get('/realtime', [ChatRealtimeController::class, 'configuration'])->middleware(EnsureChatActor::class)->name('realtime');
+        Route::post('/realtime/auth', [ChatRealtimeController::class, 'authorizeChannel'])->middleware(EnsureChatActor::class)->name('realtime.auth');
+        Route::get('/calls', [ChatCallController::class, 'status'])->withoutMiddleware('throttle:120,1,chat-api:')->middleware(['throttle:180,1,chat-poll-calls:', EnsureChatActor::class])->name('calls.status');
+        Route::get('/conversations/{conversation}/draft', [ChatPrivateDraftController::class, 'show'])->middleware(EnsureChatActor::class)->name('draft.show');
+        Route::put('/conversations/{conversation}/draft', [ChatPrivateDraftController::class, 'update'])->middleware(EnsureChatActor::class)->name('draft.update');
+        Route::post('/conversations/{conversation}/draft/send-attempts', [ChatSendAttemptController::class, 'store'])->middleware(EnsureChatActor::class)->name('send-attempts.store');
+        Route::get('/conversations/{conversation}/draft/send-attempts/{mutation}', [ChatSendAttemptController::class, 'show'])->whereUuid('mutation')->middleware(EnsureChatActor::class)->name('send-attempts.show');
+        Route::post('/conversations/{conversation}/draft/send-attempts/{mutation}/cancel', [ChatSendAttemptController::class, 'cancel'])->whereUuid('mutation')->middleware(EnsureChatActor::class)->name('send-attempts.cancel');
+        Route::get('/conversations/{conversation}/callbacks', [ChatCallbackController::class, 'index'])->middleware(EnsureChatActor::class)->name('callbacks.index');
+        Route::post('/conversations/{conversation}/callbacks', [ChatCallbackController::class, 'store'])->middleware(EnsureChatActor::class)->name('callbacks.store');
+        Route::patch('/callbacks/{callback}', [ChatCallbackController::class, 'update'])->whereNumber('callback')->middleware(EnsureChatActor::class)->name('callbacks.update');
+        Route::patch('/availability', [ChatCallController::class, 'preference'])->middleware(EnsureChatActor::class)->name('availability');
+        Route::post('/conversations/{conversation}/calls', [ChatCallController::class, 'start'])->middleware(EnsureChatActor::class)->name('calls.start');
+        Route::get('/conversations/{conversation}/call-options', [ChatCallController::class, 'options'])->middleware(EnsureChatActor::class)->name('calls.options');
+        Route::get('/conversations/{conversation}/calls', [ChatCallController::class, 'history'])->middleware(EnsureChatActor::class)->name('calls.history');
+        Route::post('/calls/{call}/join', [ChatCallController::class, 'join'])->whereUuid('call')->middleware(EnsureChatActor::class)->name('calls.join');
+        Route::get('/calls/{call}/outcome', [ChatCallController::class, 'outcome'])->whereUuid('call')->middleware(EnsureChatActor::class)->name('calls.outcome');
+        Route::get('/conversations/{conversation}/call-attempts/{mutation}', [ChatCallController::class, 'startOutcome'])->whereUuid('mutation')->middleware(EnsureChatActor::class)->name('calls.start-outcome');
+        Route::post('/conversations/{conversation}/call-attempts/{mutation}/cancel', [ChatCallController::class, 'cancelStart'])->whereUuid('mutation')->middleware(EnsureChatActor::class)->name('calls.cancel-start');
+        Route::post('/calls/{call}/connected', [ChatCallController::class, 'connected'])->whereUuid('call')->middleware(EnsureChatActor::class)->name('calls.connected');
+        Route::post('/calls/{call}/leave', [ChatCallController::class, 'leave'])->whereUuid('call')->middleware(EnsureChatActor::class)->name('calls.leave');
+        Route::post('/calls/{call}/record', [ChatCallRecordController::class, 'store'])->whereUuid('call')->middleware(EnsureChatActor::class)->name('calls.record');
+        Route::get('/calls/{call}/people', [ChatCallPeopleController::class, 'options'])->whereUuid('call')->middleware(EnsureChatActor::class)->name('calls.people');
+        Route::post('/calls/{call}/invite', [ChatCallPeopleController::class, 'invite'])->whereUuid('call')->middleware(EnsureChatActor::class)->name('calls.invite');
+        Route::post('/calls/{call}/remove', [ChatCallPeopleController::class, 'remove'])->whereUuid('call')->middleware(EnsureChatActor::class)->name('calls.remove');
+        Route::get('/conversations', [ChatController::class, 'conversations'])->middleware(EnsureChatActor::class)->name('conversations');
+        Route::get('/family-inbox', ChatFamilyInboxController::class)->middleware(EnsureChatActor::class)->name('family-inbox');
+        Route::get('/invitations', [ChatParticipantController::class, 'invitations'])->middleware(EnsureChatActor::class)->name('invitations');
+        Route::post('/invitations/{invitation}', [ChatParticipantController::class, 'respond'])->whereUuid('invitation')->middleware(EnsureChatActor::class)->name('invitations.respond');
+        Route::get('/collections', [ChatCollectionController::class, 'index'])->middleware(EnsureChatActor::class)->name('collections');
+        Route::get('/search', [ChatSearchController::class, 'index'])->middleware(EnsureChatActor::class)->name('search');
+        // Invitation review reuses the normal history projection, bound to its rendered actor.
+        Route::get('/conversations/{conversation}/people/history', [ChatController::class, 'messages'])->middleware(EnsureChatActor::class)->name('people.history');
+        Route::get('/conversations/{conversation}/people', [ChatParticipantController::class, 'options'])->middleware(EnsureChatActor::class)->name('people.options');
+        Route::post('/conversations/{conversation}/people', [ChatParticipantController::class, 'store'])->middleware(EnsureChatActor::class)->name('people.store');
+        Route::get('/conversations/{conversation}/invitations', [ChatParticipantController::class, 'history'])->middleware(EnsureChatActor::class)->name('invitations.history');
+        Route::post('/conversations', [ChatController::class, 'create'])->middleware(EnsureChatActor::class)->name('create');
+        Route::get('/conversations/{conversation}/messages', [ChatController::class, 'messages'])->middleware(EnsureChatActor::class)->name('messages');
+        Route::post('/conversations/{conversation}/changes', [ChatController::class, 'changes'])->middleware(EnsureChatActor::class)->name('changes');
+        Route::post('/conversations/{conversation}/messages', [ChatController::class, 'send'])->middleware(EnsureChatActor::class)->name('send');
+        Route::get('/conversations/{conversation}/send-outcomes/{mutation}', [ChatController::class, 'sendOutcome'])->whereUuid('mutation')->middleware(EnsureChatActor::class)->name('send.outcome');
+        Route::get('/conversations/{conversation}/uploads', [ChatUploadController::class, 'index'])->middleware(EnsureChatActor::class)->name('uploads.index');
+        Route::get('/conversations/{conversation}/uploads/{upload}', [ChatUploadController::class, 'show'])->whereUuid('upload')->middleware(EnsureChatActor::class)->name('uploads.show');
+        Route::get('/conversations/{conversation}/uploads/{upload}/preview', [ChatUploadController::class, 'preview'])->whereUuid('upload')->middleware(EnsureChatActor::class.':file')->name('uploads.preview');
+        Route::get('/conversations/{conversation}/uploads/{upload}/download', [ChatUploadController::class, 'download'])->whereUuid('upload')->middleware(EnsureChatActor::class.':file')->name('uploads.download');
+        Route::post('/conversations/{conversation}/uploads/{upload}', [ChatUploadController::class, 'store'])->whereUuid('upload')->middleware('throttle:30,1,chat-upload:')->middleware(EnsureChatActor::class)->name('uploads.store');
+        Route::post('/conversations/{conversation}/uploads/{upload}/retry', [ChatUploadController::class, 'retry'])->whereUuid('upload')->middleware('throttle:12,1,chat-scan:')->middleware(EnsureChatActor::class)->name('uploads.retry');
+        Route::delete('/conversations/{conversation}/uploads/{upload}', [ChatUploadController::class, 'destroy'])->whereUuid('upload')->middleware(EnsureChatActor::class)->name('uploads.destroy');
+        Route::post('/conversations/{conversation}/audience-review', [ChatController::class, 'reviewAudience'])->middleware(EnsureChatActor::class)->name('audience-review');
+        Route::post('/conversations/{conversation}/read', [ChatController::class, 'read'])->middleware(EnsureChatActor::class)->name('read');
+        Route::patch('/conversations/{conversation}/preferences', [ChatController::class, 'preferences'])->middleware(EnsureChatActor::class)->name('preferences');
+        Route::patch('/conversations/{conversation}/management', [ChatConversationManagementController::class, 'update'])->middleware(EnsureChatActor::class)->name('management');
+        Route::patch('/conversations/{conversation}/queue', [ChatFamilyWorkController::class, 'update'])->middleware(EnsureChatActor::class)->name('queue');
+        Route::get('/conversations/{conversation}/family-work', [ChatFamilyWorkController::class, 'index'])->middleware(EnsureChatActor::class)->name('family-work.index');
+        Route::get('/conversations/{conversation}/followups', [ChatFamilyFollowupController::class, 'review'])->middleware(EnsureChatActor::class)->name('followups.review');
+        Route::post('/conversations/{conversation}/followups', [ChatFamilyFollowupController::class, 'store'])->middleware(EnsureChatActor::class)->name('followups.store');
+        Route::patch('/conversations/{conversation}/family-work', [ChatFamilyWorkController::class, 'update'])->middleware(EnsureChatActor::class)->name('family-work.update');
+        Route::post('/messages/{message}/action', [ChatController::class, 'action'])->withTrashed()->middleware(EnsureChatActor::class)->name('action');
+        Route::patch('/messages/{message}', [ChatMessageEditController::class, 'update'])->middleware(EnsureChatActor::class)->name('messages.edit');
+        Route::get('/attachments/{attachment}', [ChatController::class, 'attachment'])->whereNumber('attachment')->middleware(EnsureChatActor::class.':file')->name('attachment');
+        Route::get('/attachments/{attachment}/metadata', [ChatAttachmentController::class, 'metadata'])->whereNumber('attachment')->middleware(EnsureChatActor::class)->name('attachment.metadata');
+        Route::get('/attachments/{attachment}/preview', [ChatAttachmentController::class, 'preview'])->whereNumber('attachment')->middleware(EnsureChatActor::class.':file')->name('attachment.preview');
+        Route::get('/attachments/{attachment}/publication', [ChatAttachmentPublicationController::class, 'options'])->whereNumber('attachment')->middleware(EnsureChatActor::class)->name('attachment.publication.options');
+        Route::post('/attachments/{attachment}/publication/review', [ChatAttachmentPublicationController::class, 'review'])->whereNumber('attachment')->middleware(EnsureChatActor::class)->name('attachment.publication.review');
+        Route::post('/attachments/{attachment}/publication', [ChatAttachmentPublicationController::class, 'store'])->whereNumber('attachment')->middleware(EnsureChatActor::class)->name('attachment.publication.store');
+    });
+});

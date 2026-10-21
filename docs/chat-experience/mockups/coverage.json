@@ -1,0 +1,1371 @@
+{
+  "status": "Complete revised mockup set approved on 16 October 2026; web implementation authorised, with product acceptance still pending",
+  "groups": [
+    {
+      "id": "M01",
+      "section": "Staff Chat",
+      "title": "Chat home",
+      "layout": "chat",
+      "variants": [
+        {
+          "id": "default",
+          "label": "Populated inbox"
+        },
+        {
+          "id": "empty",
+          "label": "First visit"
+        },
+        {
+          "id": "restricted",
+          "label": "Limited role"
+        },
+        {
+          "id": "collapsed",
+          "label": "Collapsed navigation"
+        }
+      ],
+      "surfaces": [
+        "S01",
+        "S02",
+        "S03"
+      ],
+      "checks": [
+        "A01",
+        "A17"
+      ],
+      "note": "A main navigation destination and one familiar inbox.",
+      "url": "http://127.0.0.1:8879/review.html#M01/default",
+      "screenshots": {
+        "desktop": "screenshots/M01-desktop.jpg",
+        "phoneWeb": "screenshots/M01-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M02",
+      "section": "Staff Chat",
+      "title": "Mobile browser",
+      "layout": "chat",
+      "variants": [
+        {
+          "id": "list",
+          "label": "Conversation list"
+        },
+        {
+          "id": "thread",
+          "label": "Active conversation"
+        },
+        {
+          "id": "more",
+          "label": "More navigation"
+        }
+      ],
+      "surfaces": [
+        "S01",
+        "S09"
+      ],
+      "checks": [
+        "A01",
+        "A17"
+      ],
+      "note": "Responsive web screens. The native mobile app comes later.",
+      "url": "http://127.0.0.1:8879/review.html#M02/list",
+      "screenshots": {
+        "desktop": "screenshots/M02-desktop.jpg",
+        "phoneWeb": "screenshots/M02-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M03",
+      "section": "Staff Chat",
+      "title": "Direct conversation",
+      "layout": "chat",
+      "variants": [
+        {
+          "id": "default",
+          "label": "Conversation"
+        },
+        {
+          "id": "details",
+          "label": "Conversation details"
+        },
+        {
+          "id": "history",
+          "label": "Older messages"
+        },
+        {
+          "id": "typing",
+          "label": "Typing and new activity"
+        }
+      ],
+      "surfaces": [
+        "S03"
+      ],
+      "checks": [
+        "A02",
+        "A04",
+        "A05"
+      ],
+      "note": "A calm thread with truthful status and predictable scrolling.",
+      "url": "http://127.0.0.1:8879/review.html#M03/default",
+      "screenshots": {
+        "desktop": "screenshots/M03-desktop.jpg",
+        "phoneWeb": "screenshots/M03-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M04",
+      "section": "Staff Chat",
+      "title": "People and private groups",
+      "layout": "people",
+      "variants": [
+        {
+          "id": "direct",
+          "label": "Start a chat"
+        },
+        {
+          "id": "group",
+          "label": "Create private group"
+        },
+        {
+          "id": "details",
+          "label": "Group details"
+        },
+        {
+          "id": "invite",
+          "label": "Invite members"
+        },
+        {
+          "id": "remove",
+          "label": "Remove member"
+        },
+        {
+          "id": "leave",
+          "label": "Leave group"
+        },
+        {
+          "id": "transfer",
+          "label": "Transfer ownership"
+        },
+        {
+          "id": "error",
+          "label": "Creation failed"
+        }
+      ],
+      "surfaces": [
+        "S03"
+      ],
+      "checks": [
+        "A03",
+        "A07",
+        "A08"
+      ],
+      "note": "Choose eligible people and make history access explicit.",
+      "url": "http://127.0.0.1:8879/review.html#M04/direct",
+      "screenshots": {
+        "desktop": "screenshots/M04-desktop.jpg",
+        "phoneWeb": "screenshots/M04-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M05",
+      "section": "Staff Chat",
+      "title": "Managed team channels",
+      "layout": "teams",
+      "variants": [
+        {
+          "id": "default",
+          "label": "Site channel"
+        },
+        {
+          "id": "manage",
+          "label": "Channel management"
+        },
+        {
+          "id": "archived",
+          "label": "Archived channel"
+        },
+        {
+          "id": "denied",
+          "label": "Access unavailable"
+        }
+      ],
+      "surfaces": [
+        "S03",
+        "S14"
+      ],
+      "checks": [
+        "A07",
+        "A08",
+        "A14"
+      ],
+      "note": "Governed team spaces with an owner and clear membership.",
+      "url": "http://127.0.0.1:8879/review.html#M05/default",
+      "screenshots": {
+        "desktop": "screenshots/M05-desktop.jpg",
+        "phoneWeb": "screenshots/M05-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M06",
+      "section": "Staff Chat",
+      "title": "Composer and message actions",
+      "layout": "chat",
+      "variants": [
+        {
+          "id": "reply",
+          "label": "Reply"
+        },
+        {
+          "id": "actions",
+          "label": "Message actions"
+        },
+        {
+          "id": "edit",
+          "label": "Edit a message"
+        },
+        {
+          "id": "deleted",
+          "label": "Removed message"
+        },
+        {
+          "id": "draft",
+          "label": "Resume draft"
+        },
+        {
+          "id": "unknown",
+          "label": "Unconfirmed send"
+        }
+      ],
+      "surfaces": [
+        "S03",
+        "S04",
+        "S05"
+      ],
+      "checks": [
+        "A02",
+        "A03",
+        "A17"
+      ],
+      "note": "The same composer and action language on every chat surface.",
+      "url": "http://127.0.0.1:8879/review.html#M06/reply",
+      "screenshots": {
+        "desktop": "screenshots/M06-desktop.jpg",
+        "phoneWeb": "screenshots/M06-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M07",
+      "section": "Staff Chat",
+      "title": "Files and voice notes",
+      "layout": "media",
+      "variants": [
+        {
+          "id": "attachments",
+          "label": "Attachments"
+        },
+        {
+          "id": "uploading",
+          "label": "Uploading"
+        },
+        {
+          "id": "failed",
+          "label": "Upload failed"
+        },
+        {
+          "id": "record",
+          "label": "Record voice note"
+        },
+        {
+          "id": "preview",
+          "label": "Preview voice note"
+        },
+        {
+          "id": "play",
+          "label": "Voice playback"
+        },
+        {
+          "id": "publish",
+          "label": "Add to client documents"
+        },
+        {
+          "id": "restricted",
+          "label": "File unavailable"
+        },
+        {
+          "id": "library",
+          "label": "Shared media library"
+        },
+        {
+          "id": "permission",
+          "label": "Voice permission blocked"
+        },
+        {
+          "id": "limit",
+          "label": "Voice duration limit"
+        }
+      ],
+      "surfaces": [
+        "S03",
+        "S04",
+        "S18"
+      ],
+      "checks": [
+        "A06",
+        "A07"
+      ],
+      "note": "Preview before sending. Publishing to the client record is a separate action.",
+      "url": "http://127.0.0.1:8879/review.html#M07/attachments",
+      "screenshots": {
+        "desktop": "screenshots/M07-desktop.jpg",
+        "phoneWeb": "screenshots/M07-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M08",
+      "section": "Staff Chat",
+      "title": "Search and saved messages",
+      "layout": "search",
+      "variants": [
+        {
+          "id": "results",
+          "label": "Search results"
+        },
+        {
+          "id": "empty",
+          "label": "No matches"
+        },
+        {
+          "id": "error",
+          "label": "Search unavailable"
+        },
+        {
+          "id": "saved",
+          "label": "Saved for me"
+        },
+        {
+          "id": "history",
+          "label": "Message in context"
+        },
+        {
+          "id": "denied",
+          "label": "Result no longer available"
+        }
+      ],
+      "surfaces": [
+        "S03",
+        "S04"
+      ],
+      "checks": [
+        "A04",
+        "A07"
+      ],
+      "note": "Find the exact message and return to its conversation.",
+      "url": "http://127.0.0.1:8879/review.html#M08/results",
+      "screenshots": {
+        "desktop": "screenshots/M08-desktop.jpg",
+        "phoneWeb": "screenshots/M08-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M09",
+      "section": "Staff Chat",
+      "title": "Notifications and recovery",
+      "layout": "chat",
+      "variants": [
+        {
+          "id": "notification",
+          "label": "Notifications"
+        },
+        {
+          "id": "offline",
+          "label": "Offline draft"
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnecting"
+        },
+        {
+          "id": "failed",
+          "label": "Send failed"
+        },
+        {
+          "id": "checking",
+          "label": "Checking send outcome"
+        },
+        {
+          "id": "sending",
+          "label": "Sending message"
+        },
+        {
+          "id": "sent",
+          "label": "Sent message"
+        },
+        {
+          "id": "expired",
+          "label": "Session expired"
+        },
+        {
+          "id": "denied",
+          "label": "Notifications blocked"
+        }
+      ],
+      "surfaces": [
+        "S02",
+        "S13"
+      ],
+      "checks": [
+        "A03",
+        "A05",
+        "A15"
+      ],
+      "note": "No lost drafts, false read receipts or repeated alerts.",
+      "url": "http://127.0.0.1:8879/review.html#M09/notification",
+      "screenshots": {
+        "desktop": "screenshots/M09-desktop.jpg",
+        "phoneWeb": "screenshots/M09-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M10",
+      "section": "Family",
+      "title": "Family home and contacts",
+      "layout": "familyHome",
+      "variants": [
+        {
+          "id": "default",
+          "label": "Family home"
+        },
+        {
+          "id": "unavailable",
+          "label": "Team unavailable"
+        },
+        {
+          "id": "unconfigured",
+          "label": "No response promise"
+        },
+        {
+          "id": "multi",
+          "label": "Switch client"
+        }
+      ],
+      "surfaces": [
+        "S06",
+        "S07"
+      ],
+      "checks": [
+        "A01",
+        "A07",
+        "A09"
+      ],
+      "note": "An approachable starting point for contact with the care team.",
+      "url": "http://127.0.0.1:8879/review.html#M10/default",
+      "screenshots": {
+        "desktop": "screenshots/M10-desktop.jpg",
+        "phoneWeb": "screenshots/M10-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M11",
+      "section": "Family",
+      "title": "Family conversation",
+      "layout": "familyChat",
+      "variants": [
+        {
+          "id": "default",
+          "label": "Care-team conversation"
+        },
+        {
+          "id": "named",
+          "label": "Named worker conversation"
+        },
+        {
+          "id": "details",
+          "label": "Who can see this"
+        },
+        {
+          "id": "empty",
+          "label": "New conversation"
+        },
+        {
+          "id": "readonly",
+          "label": "Read-only access"
+        },
+        {
+          "id": "revoked",
+          "label": "Access removed"
+        }
+      ],
+      "surfaces": [
+        "S04",
+        "S07"
+      ],
+      "checks": [
+        "A02",
+        "A07",
+        "A08"
+      ],
+      "note": "Clear client context, warm replies and disclosed team cover.",
+      "url": "http://127.0.0.1:8879/review.html#M11/default",
+      "screenshots": {
+        "desktop": "screenshots/M11-desktop.jpg",
+        "phoneWeb": "screenshots/M11-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M12",
+      "section": "Family",
+      "title": "Recipients and invitations",
+      "layout": "familyPeople",
+      "variants": [
+        {
+          "id": "team",
+          "label": "Choose care team"
+        },
+        {
+          "id": "worker",
+          "label": "Named worker"
+        },
+        {
+          "id": "invite",
+          "label": "Invite approved relative"
+        },
+        {
+          "id": "history",
+          "label": "History disclosure"
+        },
+        {
+          "id": "removed",
+          "label": "Invitation removed"
+        },
+        {
+          "id": "pending",
+          "label": "Invitation pending"
+        },
+        {
+          "id": "accepted",
+          "label": "Invitation accepted"
+        },
+        {
+          "id": "declined",
+          "label": "Invitation declined"
+        },
+        {
+          "id": "expired",
+          "label": "Invitation expired"
+        }
+      ],
+      "surfaces": [
+        "S04",
+        "S06"
+      ],
+      "checks": [
+        "A07",
+        "A08"
+      ],
+      "note": "Separate conversations by default; invite only approved people.",
+      "url": "http://127.0.0.1:8879/review.html#M12/team",
+      "screenshots": {
+        "desktop": "screenshots/M12-desktop.jpg",
+        "phoneWeb": "screenshots/M12-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M13",
+      "section": "Family",
+      "title": "Worker family inbox",
+      "layout": "familyInbox",
+      "variants": [
+        {
+          "id": "needs",
+          "label": "Needs reply"
+        },
+        {
+          "id": "assigned",
+          "label": "Assigned to me"
+        },
+        {
+          "id": "waiting",
+          "label": "Waiting on family"
+        },
+        {
+          "id": "callback",
+          "label": "Callbacks"
+        },
+        {
+          "id": "resolved",
+          "label": "Resolved"
+        },
+        {
+          "id": "conflict",
+          "label": "Claim conflict"
+        },
+        {
+          "id": "handoff",
+          "label": "Transfer to cover"
+        },
+        {
+          "id": "unrouted",
+          "label": "Needs routing"
+        },
+        {
+          "id": "followup",
+          "label": "Create follow-up"
+        },
+        {
+          "id": "internal",
+          "label": "Staff-only coordination"
+        },
+        {
+          "id": "reopened",
+          "label": "New message reopens work"
+        }
+      ],
+      "surfaces": [
+        "S04",
+        "S15",
+        "S18"
+      ],
+      "checks": [
+        "A09",
+        "A10",
+        "A16"
+      ],
+      "note": "A clear owner and next action for every family request.",
+      "url": "http://127.0.0.1:8879/review.html#M13/needs",
+      "screenshots": {
+        "desktop": "screenshots/M13-desktop.jpg",
+        "phoneWeb": "screenshots/M13-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M14",
+      "section": "Embedded",
+      "title": "Client-profile drawer",
+      "layout": "embedded",
+      "variants": [
+        {
+          "id": "default",
+          "label": "Family chat drawer"
+        },
+        {
+          "id": "selector",
+          "label": "Choose conversation"
+        },
+        {
+          "id": "readonly",
+          "label": "Read-only"
+        },
+        {
+          "id": "error",
+          "label": "Could not load history"
+        }
+      ],
+      "surfaces": [
+        "S05"
+      ],
+      "checks": [
+        "A02",
+        "A04",
+        "A16"
+      ],
+      "note": "The same conversation without losing the work underneath.",
+      "url": "http://127.0.0.1:8879/review.html#M14/default",
+      "screenshots": {
+        "desktop": "screenshots/M14-desktop.jpg",
+        "phoneWeb": "screenshots/M14-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M15",
+      "section": "Embedded",
+      "title": "Control Room",
+      "layout": "control",
+      "variants": [
+        {
+          "id": "direct",
+          "label": "Direct conversation"
+        },
+        {
+          "id": "alert",
+          "label": "Alert conversation"
+        },
+        {
+          "id": "discussion",
+          "label": "Internal discussion"
+        },
+        {
+          "id": "denied",
+          "label": "Alert unavailable"
+        },
+        {
+          "id": "broadcast",
+          "label": "Broadcast acknowledgement"
+        }
+      ],
+      "surfaces": [
+        "S11",
+        "S12",
+        "S22"
+      ],
+      "checks": [
+        "A07",
+        "A16"
+      ],
+      "note": "Keep operational context, permissions and evidence intact.",
+      "url": "http://127.0.0.1:8879/review.html#M15/direct",
+      "screenshots": {
+        "desktop": "screenshots/M15-desktop.jpg",
+        "phoneWeb": "screenshots/M15-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M16",
+      "section": "Embedded",
+      "title": "Worker workflow entry points",
+      "layout": "context",
+      "variants": [
+        {
+          "id": "myday",
+          "label": "My Day"
+        },
+        {
+          "id": "medication",
+          "label": "Message named lead"
+        },
+        {
+          "id": "handover",
+          "label": "Shift handover"
+        },
+        {
+          "id": "communication",
+          "label": "Record communication"
+        },
+        {
+          "id": "respite",
+          "label": "Respite communication"
+        },
+        {
+          "id": "followup",
+          "label": "Family follow-up"
+        },
+        {
+          "id": "clock",
+          "label": "Clock out with unresolved work"
+        },
+        {
+          "id": "report",
+          "label": "Incident reporting"
+        }
+      ],
+      "surfaces": [
+        "S09",
+        "S10",
+        "S15",
+        "S16",
+        "S17",
+        "S23"
+      ],
+      "checks": [
+        "A07",
+        "A16"
+      ],
+      "note": "Chat opens in context and returns to unfinished work.",
+      "url": "http://127.0.0.1:8879/review.html#M16/myday",
+      "screenshots": {
+        "desktop": "screenshots/M16-desktop.jpg",
+        "phoneWeb": "screenshots/M16-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M17",
+      "section": "Embedded",
+      "title": "Related conversations",
+      "layout": "adjacent",
+      "variants": [
+        {
+          "id": "it",
+          "label": "IT ticket"
+        },
+        {
+          "id": "hub",
+          "label": "Company Hub"
+        },
+        {
+          "id": "timeline",
+          "label": "Client timeline"
+        },
+        {
+          "id": "announcement",
+          "label": "Required acknowledgement"
+        },
+        {
+          "id": "obli",
+          "label": "Obli AI boundary"
+        },
+        {
+          "id": "restricted",
+          "label": "Restricted record"
+        },
+        {
+          "id": "roster",
+          "label": "Roster broadcast"
+        },
+        {
+          "id": "recognition",
+          "label": "Recognition comments"
+        },
+        {
+          "id": "services",
+          "label": "Staff service request"
+        },
+        {
+          "id": "legacy",
+          "label": "Existing family link"
+        },
+        {
+          "id": "technician",
+          "label": "Technician assistant"
+        },
+        {
+          "id": "schedule",
+          "label": "Family schedule"
+        }
+      ],
+      "surfaces": [
+        "S18",
+        "S19",
+        "S20",
+        "S21",
+        "S22",
+        "S23"
+      ],
+      "checks": [
+        "A07",
+        "A16",
+        "A20"
+      ],
+      "note": "Shared presentation with the original workflow and audience preserved.",
+      "url": "http://127.0.0.1:8879/review.html#M17/it",
+      "screenshots": {
+        "desktop": "screenshots/M17-desktop.jpg",
+        "phoneWeb": "screenshots/M17-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M18",
+      "section": "Voice calls",
+      "title": "Staff calls",
+      "layout": "call",
+      "variants": [
+        {
+          "id": "history",
+          "label": "Call history"
+        },
+        {
+          "id": "preflight",
+          "label": "Before calling"
+        },
+        {
+          "id": "ringing",
+          "label": "Outgoing call"
+        },
+        {
+          "id": "incoming",
+          "label": "Incoming call"
+        },
+        {
+          "id": "connecting",
+          "label": "Connecting"
+        },
+        {
+          "id": "active",
+          "label": "Connected call"
+        },
+        {
+          "id": "group",
+          "label": "Group call"
+        },
+        {
+          "id": "invite",
+          "label": "Invite to call"
+        },
+        {
+          "id": "end",
+          "label": "Leave or end"
+        },
+        {
+          "id": "mini",
+          "label": "Call while working"
+        },
+        {
+          "id": "declined",
+          "label": "Call declined"
+        },
+        {
+          "id": "cancelled",
+          "label": "Call cancelled"
+        },
+        {
+          "id": "noanswer",
+          "label": "No answer"
+        },
+        {
+          "id": "ended",
+          "label": "Call ended"
+        }
+      ],
+      "surfaces": [
+        "S03"
+      ],
+      "checks": [
+        "A11",
+        "A12"
+      ],
+      "note": "Voice-only calling with simple controls and clear participant identity.",
+      "url": "http://127.0.0.1:8879/review.html#M18/history",
+      "screenshots": {
+        "desktop": "screenshots/M18-desktop.jpg",
+        "phoneWeb": "screenshots/M18-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M19",
+      "section": "Voice calls",
+      "title": "Family calls and callbacks",
+      "layout": "familyCall",
+      "variants": [
+        {
+          "id": "history",
+          "label": "Family call history"
+        },
+        {
+          "id": "preflight",
+          "label": "Before calling"
+        },
+        {
+          "id": "ringing",
+          "label": "Outgoing family call"
+        },
+        {
+          "id": "incoming",
+          "label": "Incoming family call"
+        },
+        {
+          "id": "active",
+          "label": "Care-team call"
+        },
+        {
+          "id": "group",
+          "label": "Family group call"
+        },
+        {
+          "id": "noanswer",
+          "label": "Nobody available"
+        },
+        {
+          "id": "callback",
+          "label": "Request callback"
+        },
+        {
+          "id": "assigned",
+          "label": "Callback assigned"
+        },
+        {
+          "id": "attempted",
+          "label": "Unable to reach"
+        },
+        {
+          "id": "completed",
+          "label": "Callback completed"
+        },
+        {
+          "id": "cancelled",
+          "label": "Cancelled request"
+        },
+        {
+          "id": "declined",
+          "label": "Call declined"
+        },
+        {
+          "id": "ended",
+          "label": "Call ended"
+        }
+      ],
+      "surfaces": [
+        "S04",
+        "S06"
+      ],
+      "checks": [
+        "A09",
+        "A10",
+        "A11",
+        "A12"
+      ],
+      "note": "Available care-team contact, approved invitations and owned callbacks.",
+      "url": "http://127.0.0.1:8879/review.html#M19/history",
+      "screenshots": {
+        "desktop": "screenshots/M19-desktop.jpg",
+        "phoneWeb": "screenshots/M19-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M20",
+      "section": "Voice calls",
+      "title": "Call and device recovery",
+      "layout": "callError",
+      "variants": [
+        {
+          "id": "permission",
+          "label": "Microphone blocked"
+        },
+        {
+          "id": "ignored",
+          "label": "Permission waiting"
+        },
+        {
+          "id": "missing",
+          "label": "No microphone"
+        },
+        {
+          "id": "unsupported",
+          "label": "Unsupported browser"
+        },
+        {
+          "id": "busy",
+          "label": "Already on a call"
+        },
+        {
+          "id": "elsewhere",
+          "label": "Answered elsewhere"
+        },
+        {
+          "id": "expired",
+          "label": "Invitation expired"
+        },
+        {
+          "id": "network",
+          "label": "Connection failed"
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnecting"
+        },
+        {
+          "id": "device",
+          "label": "Audio device changed"
+        },
+        {
+          "id": "revoked",
+          "label": "Access removed"
+        },
+        {
+          "id": "missed",
+          "label": "Missed call"
+        }
+      ],
+      "surfaces": [
+        "S13",
+        "S24"
+      ],
+      "checks": [
+        "A11",
+        "A12",
+        "A13"
+      ],
+      "note": "Every failure offers an honest next step, with text as a fallback.",
+      "url": "http://127.0.0.1:8879/review.html#M20/permission",
+      "screenshots": {
+        "desktop": "screenshots/M20-desktop.jpg",
+        "phoneWeb": "screenshots/M20-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M21",
+      "section": "Settings",
+      "title": "Global Chat settings",
+      "layout": "settings",
+      "variants": [
+        {
+          "id": "general",
+          "label": "General"
+        },
+        {
+          "id": "family",
+          "label": "Family contact"
+        },
+        {
+          "id": "notifications",
+          "label": "Notification defaults"
+        },
+        {
+          "id": "access",
+          "label": "Channels and access"
+        },
+        {
+          "id": "channels",
+          "label": "Channel owners"
+        },
+        {
+          "id": "override",
+          "label": "Site/service override"
+        },
+        {
+          "id": "conflict",
+          "label": "Concurrent change"
+        },
+        {
+          "id": "denied",
+          "label": "No settings access"
+        },
+        {
+          "id": "failed",
+          "label": "Save failed"
+        }
+      ],
+      "surfaces": [
+        "S14"
+      ],
+      "checks": [
+        "A14"
+      ],
+      "note": "One organisation, clear policy defaults and narrower site/service overrides.",
+      "url": "http://127.0.0.1:8879/review.html#M21/general",
+      "screenshots": {
+        "desktop": "screenshots/M21-desktop.jpg",
+        "phoneWeb": "screenshots/M21-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M22",
+      "section": "Settings",
+      "title": "Calls, files and privacy",
+      "layout": "settings",
+      "variants": [
+        {
+          "id": "calls",
+          "label": "Voice calls"
+        },
+        {
+          "id": "files",
+          "label": "Messages and files"
+        },
+        {
+          "id": "privacy",
+          "label": "Privacy and records"
+        },
+        {
+          "id": "health",
+          "label": "Service health"
+        },
+        {
+          "id": "validation",
+          "label": "Fix invalid settings"
+        },
+        {
+          "id": "investigator",
+          "label": "Investigation access"
+        },
+        {
+          "id": "relationships",
+          "label": "Portal relationships"
+        },
+        {
+          "id": "audit",
+          "label": "Policy audit"
+        },
+        {
+          "id": "holds",
+          "label": "Exports and preservation"
+        },
+        {
+          "id": "offboarding",
+          "label": "Expired access"
+        }
+      ],
+      "surfaces": [
+        "S14"
+      ],
+      "checks": [
+        "A06",
+        "A14",
+        "A19"
+      ],
+      "note": "Central controls without enabling unsupported features or inventing retention policy.",
+      "url": "http://127.0.0.1:8879/review.html#M22/calls",
+      "screenshots": {
+        "desktop": "screenshots/M22-desktop.jpg",
+        "phoneWeb": "screenshots/M22-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M23",
+      "section": "Settings",
+      "title": "My Chat preferences",
+      "layout": "preferences",
+      "variants": [
+        {
+          "id": "availability",
+          "label": "Availability"
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications"
+        },
+        {
+          "id": "sound",
+          "label": "Sound and sending"
+        },
+        {
+          "id": "display",
+          "label": "Reading preferences"
+        },
+        {
+          "id": "mandatory",
+          "label": "Organisation policy"
+        }
+      ],
+      "surfaces": [
+        "S13",
+        "S14"
+      ],
+      "checks": [
+        "A14",
+        "A15",
+        "A17"
+      ],
+      "note": "Personal choices stay within organisation privacy and access rules.",
+      "url": "http://127.0.0.1:8879/review.html#M23/availability",
+      "screenshots": {
+        "desktop": "screenshots/M23-desktop.jpg",
+        "phoneWeb": "screenshots/M23-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M24",
+      "section": "Review",
+      "title": "Responsive and legacy states",
+      "layout": "chat",
+      "variants": [
+        {
+          "id": "legacy",
+          "label": "Old Messages link"
+        },
+        {
+          "id": "missing",
+          "label": "Conversation unavailable"
+        },
+        {
+          "id": "large",
+          "label": "Large text"
+        },
+        {
+          "id": "keyboard",
+          "label": "Mobile keyboard"
+        },
+        {
+          "id": "reduced",
+          "label": "Reduced motion"
+        },
+        {
+          "id": "long",
+          "label": "Long names and messages"
+        }
+      ],
+      "surfaces": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13",
+        "S14",
+        "S15",
+        "S16",
+        "S17",
+        "S18",
+        "S19",
+        "S20",
+        "S21",
+        "S22",
+        "S23"
+      ],
+      "checks": [
+        "A01",
+        "A17",
+        "A18",
+        "A20"
+      ],
+      "note": "Cross-surface checks, old links and accessible presentation.",
+      "url": "http://127.0.0.1:8879/review.html#M24/legacy",
+      "screenshots": {
+        "desktop": "screenshots/M24-desktop.jpg",
+        "phoneWeb": "screenshots/M24-phone-web.jpg"
+      }
+    },
+    {
+      "id": "M25",
+      "section": "Voice calls",
+      "title": "Incoming calls while working",
+      "layout": "incoming",
+      "variants": [
+        {
+          "id": "staff",
+          "label": "Staff call over unfinished work"
+        },
+        {
+          "id": "family",
+          "label": "Family calling the care team"
+        },
+        {
+          "id": "portal",
+          "label": "Care team calling family"
+        },
+        {
+          "id": "group",
+          "label": "Group invitation"
+        },
+        {
+          "id": "busy",
+          "label": "Already speaking to someone"
+        },
+        {
+          "id": "missed",
+          "label": "Missed call notice"
+        },
+        {
+          "id": "elsewhere",
+          "label": "Answered on another device"
+        }
+      ],
+      "surfaces": [
+        "S01",
+        "S02",
+        "S04",
+        "S06",
+        "S09",
+        "S13",
+        "S24"
+      ],
+      "checks": [
+        "A11",
+        "A12",
+        "A13",
+        "A17"
+      ],
+      "note": "A shared call card above any page, with unfinished work preserved.",
+      "url": "http://127.0.0.1:8879/review.html#M25/staff",
+      "screenshots": {
+        "desktop": "screenshots/M25-desktop.jpg",
+        "phoneWeb": "screenshots/M25-phone-web.jpg"
+      }
+    }
+  ],
+  "scenarios": 191
+}

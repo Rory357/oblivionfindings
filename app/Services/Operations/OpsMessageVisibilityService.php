@@ -10,6 +10,7 @@ use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class OpsMessageVisibilityService
@@ -33,6 +34,12 @@ class OpsMessageVisibilityService
 
     public function canViewConversation(User $user, OpsConversation $conversation): bool
     {
+        if (! config('chat.shared_experience') && $conversation->participants()->where('user_id', $user->id)->first()?->history_after_id !== null) {
+            return false;
+        }
+        if ($conversation->channel_site_id && ! in_array((int) $conversation->channel_site_id, $this->siteAccess->accessibleSiteIds($user), true)) {
+            return false;
+        }
         if ($conversation->conversation_type === 'family') {
             $client = $conversation->relationLoaded('client')
                 ? $conversation->client
@@ -74,26 +81,54 @@ class OpsMessageVisibilityService
     }
 
     /**
+     * Short-lived per-user badge copy for every-request callers (Inertia
+     * share, call status polling). Busted after the user's own writes
+     * (HandleInertiaRequests::handle, chat read/preferences) and after commit
+     * for every recipient of a new chat message (ChatMessageDelivery).
+     */
+    public function cachedUnreadCount(User $user): int
+    {
+        return (int) Cache::remember(self::unreadCacheKey((int) $user->id), config('chat.shared_experience') ? 20 : 60,
+            fn (): int => $this->unreadCount($user));
+    }
+
+    public static function unreadCacheKey(int $userId): string
+    {
+        return "user:{$userId}:ops-unread:v1";
+    }
+
+    public static function forgetUnreadCount(int $userId): void
+    {
+        Cache::forget(self::unreadCacheKey($userId));
+    }
+
+    /**
      * Always computed fresh — the Inertia middleware caches its own copy
      * for the per-request badge (see HandleInertiaRequests), so direct
      * callers (controllers, tests) never see a stale count.
      */
     public function unreadCount(User $user): int
     {
+        // Cover conversations are narrowed in SQL to clients canView() could accept;
+        // visibleConversationIds() still applies canView() once per client.
         $conversations = OpsConversation::query()
-            ->whereHas('participants', fn (Builder $participants) => $participants
-                ->where('user_id', $user->id))
+            ->where(fn (Builder $audience) => $audience->whereHas('participants', fn (Builder $participants) => $participants->where('user_id', $user->id))
+                ->when(config('chat.shared_experience') && $this->isCurrentStaff($user), fn (Builder $cover) => $cover->orWhere(fn (Builder $family) => $family->where('conversation_type', 'family')->where('care_team_cover', true)
+                    ->whereHas('client', fn (Builder $clients) => $this->familyCommunicationAccess->scopeViewableClients($clients, $user)))))
             ->with('client:id,site_id')
-            ->get(['id', 'conversation_type', 'client_id']);
+            ->get(config('chat.shared_experience') ? ['id', 'conversation_type', 'client_id', 'channel_site_id'] : ['id', 'conversation_type', 'client_id']);
 
+        if (! config('chat.shared_experience')) {
+            $conversations = $conversations->filter(fn ($conversation) => $conversation->participants()->where('user_id', $user->id)->first()?->history_after_id === null);
+        }
         $conversationIds = $this->visibleConversationIds($user, $conversations);
 
         if ($conversationIds->isEmpty()) {
             return 0;
         }
 
-        return OpsMessage::query()
-            ->join('ops_conversation_participants as unread_participant', function ($join) use ($user): void {
+        $unreadMessages = OpsMessage::query()
+            ->leftJoin('ops_conversation_participants as unread_participant', function ($join) use ($user): void {
                 $join->on(
                     'unread_participant.conversation_id',
                     '=',
@@ -101,8 +136,25 @@ class OpsMessageVisibilityService
                 )->where('unread_participant.user_id', $user->id);
             })
             ->whereIn('ops_messages.conversation_id', $conversationIds)
+            ->when(config('chat.shared_experience'), fn (Builder $query) => $query->where(fn (Builder $history) => $history
+                ->whereNull('unread_participant.history_after_id')
+                ->orWhereColumn('ops_messages.id', '>', 'unread_participant.history_after_id')
+                ->orWhereExists(fn ($grant) => $grant->selectRaw('1')->from('chat_history_grants')
+                    ->whereColumn('message_id', 'ops_messages.id')->whereColumn('participant_id', 'unread_participant.id'))))
             ->where('ops_messages.sender_id', '!=', $user->id)
             ->where(function (Builder $unread): void {
+                if (config('chat.shared_experience')) {
+                    $unread->where(function (Builder $cursor): void {
+                        $cursor->whereNotNull('unread_participant.last_read_message_id')
+                            ->whereColumn('ops_messages.id', '>', 'unread_participant.last_read_message_id');
+                    })->orWhere(function (Builder $legacy): void {
+                        $legacy->whereNull('unread_participant.last_read_message_id')
+                            ->where(fn (Builder $timestamp) => $timestamp->whereNull('unread_participant.last_read_at')
+                                ->orWhereColumn('ops_messages.created_at', '>', 'unread_participant.last_read_at'));
+                    });
+
+                    return;
+                }
                 $unread->whereNull('unread_participant.last_read_at')
                     ->orWhereColumn(
                         'ops_messages.created_at',
@@ -125,8 +177,19 @@ class OpsMessageVisibilityService
                                 ->whereIn('conversation_type', ['direct', 'group'])
                                 ->whereNull('ops_conversations.client_id'));
                     });
-            })
-            ->count();
+            });
+
+        $count = (clone $unreadMessages)->count();
+        if (config('chat.shared_experience')) {
+            $unreadConversations = (clone $unreadMessages)->distinct()->pluck('ops_messages.conversation_id');
+            // Personal reminders add one only when there is no actual unread message.
+            // The delivery/read cursor is never moved backwards.
+            $count += DB::table('ops_conversation_participants')->where('user_id', $user->id)
+                ->whereIn('conversation_id', $conversationIds)->whereNotIn('conversation_id', $unreadConversations)
+                ->whereNotNull('unread_marker')->count();
+        }
+
+        return $count;
     }
 
     /**
@@ -145,9 +208,11 @@ class OpsMessageVisibilityService
 
         $isCurrent = $this->currentStaff->isCurrent($user);
         $visible = new Collection;
+        $siteIds = $isCurrent ? $this->siteAccess->accessibleSiteIds($user) : [];
 
         $staff = $conversations->filter(fn (OpsConversation $conversation) => in_array($conversation->conversation_type, ['direct', 'group'], true)
-            && $conversation->client_id === null);
+            && $conversation->client_id === null
+            && (! $conversation->channel_site_id || in_array((int) $conversation->channel_site_id, $siteIds, true)));
 
         if ($isCurrent && $staff->isNotEmpty()) {
             $participantsByConversation = DB::table('ops_conversation_participants')

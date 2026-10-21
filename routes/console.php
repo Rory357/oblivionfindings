@@ -1028,3 +1028,6 @@ Artisan::command('company-hub:prune-search-insights', function () {
     $this->info((string) app(\App\Domain\CompanyHub\Services\HubSearchInsights::class)->prune());
 })->purpose('Remove Company Hub search topic totals older than 90 calendar days');
 app(Schedule::class)->command('company-hub:prune-search-insights')->dailyAt('02:10')->timezone('Pacific/Auckland')->withoutOverlapping();
+
+app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
+app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();

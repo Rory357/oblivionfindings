@@ -57,6 +57,9 @@ jobs:
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Build Assets
+        # The bundle (incl. the Chat voice client) needs more than Node's default ~4 GB heap.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run build
 
       - name: Prepare Environment

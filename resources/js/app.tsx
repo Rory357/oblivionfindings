@@ -4,6 +4,11 @@ import { createInertiaApp } from '@inertiajs/react';
 import { createElement, StrictMode, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
+import { ChatCallingProvider } from './components/chat/chat-calling';
+import { ChatMessageSounds } from './components/chat/chat-message-sounds';
+import { ChatNotificationLifecycle } from './components/chat/chat-notification-lifecycle';
+import { ChatPreferencesProvider } from './components/chat/chat-personal-preferences';
+import { ChatRealtimeProvider } from './components/chat/chat-realtime';
 import FlashToaster from './components/flash-toaster';
 import OfflineStatusBanner from './components/offline-status-banner';
 import { initializeAppearance } from './hooks/use-appearance';
@@ -64,21 +69,83 @@ createInertiaApp({
                         setOfflineQueueActor(auth?.user?.id);
 
                         return (
-                            <>
-                                <OfflineStatusBanner />
-                                {renderInertiaPage(Component, pageProps, key)}
-                                <FlashToaster />
-                                <Toaster
-                                    richColors
-                                    position="top-right"
-                                    style={
-                                        {
-                                            '--success-text':
-                                                'hsl(140, 100%, 18%)',
-                                        } as CSSProperties
+                            <ChatPreferencesProvider
+                                actorId={
+                                    auth?.user?.id ? Number(auth.user.id) : null
+                                }
+                                enabled={Boolean(
+                                    (
+                                        pageProps as {
+                                            chatSharedExperience?: boolean;
+                                        }
+                                    ).chatSharedExperience,
+                                )}
+                            >
+                                <ChatRealtimeProvider
+                                    actorId={
+                                        auth?.user?.id
+                                            ? Number(auth.user.id)
+                                            : null
                                     }
-                                />
-                            </>
+                                    enabled={Boolean(
+                                        (
+                                            pageProps as {
+                                                chatSharedExperience?: boolean;
+                                            }
+                                        ).chatSharedExperience,
+                                    )}
+                                >
+                                    <ChatCallingProvider
+                                        actorId={
+                                            auth?.user?.id
+                                                ? Number(auth.user.id)
+                                                : null
+                                        }
+                                        enabled={Boolean(
+                                            (
+                                                pageProps as {
+                                                    chatSharedExperience?: boolean;
+                                                }
+                                            ).chatSharedExperience,
+                                        )}
+                                    >
+                                        <ChatMessageSounds
+                                            actorId={
+                                                auth?.user?.id
+                                                    ? Number(auth.user.id)
+                                                    : null
+                                            }
+                                            enabled={Boolean(
+                                                (
+                                                    pageProps as {
+                                                        chatSharedExperience?: boolean;
+                                                    }
+                                                ).chatSharedExperience,
+                                            )}
+                                        />
+                                        <ChatNotificationLifecycle
+                                            actorId={auth?.user?.id}
+                                        />
+                                        <OfflineStatusBanner />
+                                        {renderInertiaPage(
+                                            Component,
+                                            pageProps,
+                                            key,
+                                        )}
+                                        <FlashToaster />
+                                        <Toaster
+                                            richColors
+                                            position="top-right"
+                                            style={
+                                                {
+                                                    '--success-text':
+                                                        'hsl(140, 100%, 18%)',
+                                                } as CSSProperties
+                                            }
+                                        />
+                                    </ChatCallingProvider>
+                                </ChatRealtimeProvider>
+                            </ChatPreferencesProvider>
                         );
                     }}
                 </App>

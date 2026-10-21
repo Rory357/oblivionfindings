@@ -38,9 +38,11 @@ import {
     Smartphone,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { ChatNotificationFields } from './chat-notification-fields';
 import {
     friendlyNotificationName,
     groupNotificationKeysByModule,
+    isChatNotificationKey,
     NOTIFICATION_MODULES,
     type NotificationModuleGroup,
 } from './notification-catalog';
@@ -118,7 +120,7 @@ function ChannelDot({
 
 export default function NotificationDefaults({ groups, roles, matrix }: Props) {
     const allKeys = Object.values(groups).flat();
-    const { data, setData, put, processing } = useForm({
+    const { data, setData, put, processing, errors } = useForm({
         matrix: matrix,
     });
 
@@ -186,8 +188,8 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
         next[roleId][key] = {
             enabled: value,
             inapp: value,
-            email: value,
-            push: value,
+            email: isChatNotificationKey(key) ? false : value,
+            push: isChatNotificationKey(key) ? false : value,
         };
         setData('matrix', next);
     };
@@ -199,8 +201,8 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
             next[roleId][k] = {
                 enabled: true,
                 inapp: true,
-                email: true,
-                push: true,
+                email: !isChatNotificationKey(k),
+                push: !isChatNotificationKey(k),
             };
         });
         setData('matrix', next);
@@ -253,13 +255,15 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                 onClick={() => {
                                     const next: any = { ...data.matrix };
                                     roles.forEach((r) => {
-                                        next[r.id] = next[r.id] || {};
+                                        next[r.id] = { ...(next[r.id] || {}) };
                                         allKeys.forEach((k) => {
                                             next[r.id][k] = {
                                                 enabled: true,
                                                 inapp: true,
-                                                email: true,
-                                                push: true,
+                                                email: !isChatNotificationKey(
+                                                    k,
+                                                ),
+                                                push: !isChatNotificationKey(k),
                                             };
                                         });
                                     });
@@ -275,7 +279,7 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                 onClick={() => {
                                     const next: any = { ...data.matrix };
                                     roles.forEach((r) => {
-                                        next[r.id] = next[r.id] || {};
+                                        next[r.id] = { ...(next[r.id] || {}) };
                                         allKeys.forEach((k) => {
                                             next[r.id][k] = {
                                                 enabled: false,
@@ -311,7 +315,7 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                     </Card>
 
                     {/* Legend */}
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                         <span className="font-medium">Channel dots:</span>
                         <div className="flex items-center gap-1.5">
                             <div className="h-2 w-2 rounded-full bg-status-success" />
@@ -371,8 +375,11 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                 }
                             >
                                 <Card>
-                                    <CollapsibleTrigger asChild>
-                                        <CardHeader className="cursor-pointer select-none">
+                                    <CardHeader>
+                                        <CollapsibleTrigger
+                                            className="min-h-[44px] cursor-pointer text-left select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                                            aria-label={`${mod.label} notification defaults`}
+                                        >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
@@ -397,8 +404,8 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                                 )}
                                             </div>
-                                        </CardHeader>
-                                    </CollapsibleTrigger>
+                                        </CollapsibleTrigger>
+                                    </CardHeader>
                                     <CollapsibleContent>
                                         <CardContent className="space-y-4 pt-0">
                                             <div className="overflow-x-auto">
@@ -478,9 +485,15 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                                             key,
                                                                         )}
                                                                     </div>
-                                                                    <div className="text-[11px] text-muted-foreground">
-                                                                        {key}
-                                                                    </div>
+                                                                    {!isChatNotificationKey(
+                                                                        key,
+                                                                    ) && (
+                                                                        <div className="text-[11px] text-muted-foreground">
+                                                                            {
+                                                                                key
+                                                                            }
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                                 {roles.map(
                                                                     (role) => {
@@ -503,8 +516,19 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                                                     >
                                                                                         <button
                                                                                             type="button"
-                                                                                            className="mx-auto flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/80"
+                                                                                            aria-label={`${role.label}: ${friendlyNotificationName(key)}`}
+                                                                                            className="mx-auto flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/80"
                                                                                         >
+                                                                                            {isChatNotificationKey(
+                                                                                                key,
+                                                                                            ) && (
+                                                                                                <span className="text-xs">
+                                                                                                    {pref.enabled &&
+                                                                                                    pref.inapp
+                                                                                                        ? 'In-app on'
+                                                                                                        : 'In-app off'}
+                                                                                                </span>
+                                                                                            )}
                                                                                             <ChannelDot
                                                                                                 active={
                                                                                                     pref.enabled &&
@@ -532,140 +556,167 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                                                         className="w-56 p-3"
                                                                                         align="center"
                                                                                     >
-                                                                                        <div className="space-y-3">
-                                                                                            <div className="flex items-center justify-between">
-                                                                                                <span className="text-xs font-semibold">
-                                                                                                    {friendlyNotificationName(
+                                                                                        {isChatNotificationKey(
+                                                                                            key,
+                                                                                        ) ? (
+                                                                                            <ChatNotificationFields
+                                                                                                eventKey={
+                                                                                                    key
+                                                                                                }
+                                                                                                value={
+                                                                                                    pref
+                                                                                                }
+                                                                                                disabled={
+                                                                                                    processing
+                                                                                                }
+                                                                                                onChange={(
+                                                                                                    field,
+                                                                                                    value,
+                                                                                                ) =>
+                                                                                                    setCellPref(
+                                                                                                        role.id,
                                                                                                         key,
-                                                                                                    )}
-                                                                                                </span>
-                                                                                                <Switch
-                                                                                                    checked={
-                                                                                                        pref.enabled
-                                                                                                    }
-                                                                                                    onCheckedChange={(
-                                                                                                        v,
-                                                                                                    ) =>
-                                                                                                        setCellPref(
-                                                                                                            role.id,
+                                                                                                        field,
+                                                                                                        value,
+                                                                                                    )
+                                                                                                }
+                                                                                            />
+                                                                                        ) : (
+                                                                                            <div className="space-y-3">
+                                                                                                <div className="flex items-center justify-between">
+                                                                                                    <span className="text-xs font-semibold">
+                                                                                                        {friendlyNotificationName(
                                                                                                             key,
-                                                                                                            'enabled',
-                                                                                                            Boolean(
+                                                                                                        )}
+                                                                                                    </span>
+                                                                                                    <Switch
+                                                                                                        checked={
+                                                                                                            pref.enabled
+                                                                                                        }
+                                                                                                        onCheckedChange={(
+                                                                                                            v,
+                                                                                                        ) =>
+                                                                                                            setCellPref(
+                                                                                                                role.id,
+                                                                                                                key,
+                                                                                                                'enabled',
+                                                                                                                Boolean(
+                                                                                                                    v,
+                                                                                                                ),
+                                                                                                            )
+                                                                                                        }
+                                                                                                    />
+                                                                                                </div>
+                                                                                                <div className="space-y-2">
+                                                                                                    <label className="flex items-center gap-2 text-xs">
+                                                                                                        <Checkbox
+                                                                                                            checked={
+                                                                                                                pref.inapp
+                                                                                                            }
+                                                                                                            disabled={
+                                                                                                                !pref.enabled
+                                                                                                            }
+                                                                                                            onCheckedChange={(
                                                                                                                 v,
-                                                                                                            ),
-                                                                                                        )
-                                                                                                    }
-                                                                                                />
-                                                                                            </div>
-                                                                                            <div className="space-y-2">
-                                                                                                <label className="flex items-center gap-2 text-xs">
-                                                                                                    <Checkbox
-                                                                                                        checked={
-                                                                                                            pref.inapp
-                                                                                                        }
-                                                                                                        disabled={
-                                                                                                            !pref.enabled
-                                                                                                        }
-                                                                                                        onCheckedChange={(
-                                                                                                            v,
-                                                                                                        ) =>
-                                                                                                            setCellPref(
+                                                                                                            ) =>
+                                                                                                                setCellPref(
+                                                                                                                    role.id,
+                                                                                                                    key,
+                                                                                                                    'inapp',
+                                                                                                                    Boolean(
+                                                                                                                        v,
+                                                                                                                    ),
+                                                                                                                )
+                                                                                                            }
+                                                                                                        />
+                                                                                                        <Monitor className="h-3 w-3" />
+                                                                                                        In-App
+                                                                                                    </label>
+                                                                                                    <label className="flex items-center gap-2 text-xs">
+                                                                                                        <Checkbox
+                                                                                                            checked={
+                                                                                                                pref.email
+                                                                                                            }
+                                                                                                            disabled={
+                                                                                                                !pref.enabled
+                                                                                                            }
+                                                                                                            onCheckedChange={(
+                                                                                                                v,
+                                                                                                            ) =>
+                                                                                                                setCellPref(
+                                                                                                                    role.id,
+                                                                                                                    key,
+                                                                                                                    'email',
+                                                                                                                    Boolean(
+                                                                                                                        v,
+                                                                                                                    ),
+                                                                                                                )
+                                                                                                            }
+                                                                                                        />
+                                                                                                        <Mail className="h-3 w-3" />
+                                                                                                        Email
+                                                                                                    </label>
+                                                                                                    <label className="flex items-center gap-2 text-xs opacity-60">
+                                                                                                        <Checkbox
+                                                                                                            checked={
+                                                                                                                pref.push
+                                                                                                            }
+                                                                                                            disabled={
+                                                                                                                !pref.enabled
+                                                                                                            }
+                                                                                                            onCheckedChange={(
+                                                                                                                v,
+                                                                                                            ) =>
+                                                                                                                setCellPref(
+                                                                                                                    role.id,
+                                                                                                                    key,
+                                                                                                                    'push',
+                                                                                                                    Boolean(
+                                                                                                                        v,
+                                                                                                                    ),
+                                                                                                                )
+                                                                                                            }
+                                                                                                        />
+                                                                                                        <Smartphone className="h-3 w-3" />
+                                                                                                        Push
+                                                                                                    </label>
+                                                                                                </div>
+                                                                                                <div className="flex gap-1 border-t pt-2">
+                                                                                                    <Button
+                                                                                                        type="button"
+                                                                                                        variant="ghost"
+                                                                                                        size="sm"
+                                                                                                        className="h-6 text-[10px]"
+                                                                                                        onClick={() =>
+                                                                                                            setCellAllChannels(
                                                                                                                 role.id,
                                                                                                                 key,
-                                                                                                                'inapp',
-                                                                                                                Boolean(
-                                                                                                                    v,
-                                                                                                                ),
+                                                                                                                true,
                                                                                                             )
                                                                                                         }
-                                                                                                    />
-                                                                                                    <Monitor className="h-3 w-3" />
-                                                                                                    In-App
-                                                                                                </label>
-                                                                                                <label className="flex items-center gap-2 text-xs">
-                                                                                                    <Checkbox
-                                                                                                        checked={
-                                                                                                            pref.email
-                                                                                                        }
-                                                                                                        disabled={
-                                                                                                            !pref.enabled
-                                                                                                        }
-                                                                                                        onCheckedChange={(
-                                                                                                            v,
-                                                                                                        ) =>
-                                                                                                            setCellPref(
+                                                                                                    >
+                                                                                                        All
+                                                                                                        On
+                                                                                                    </Button>
+                                                                                                    <Button
+                                                                                                        type="button"
+                                                                                                        variant="ghost"
+                                                                                                        size="sm"
+                                                                                                        className="h-6 text-[10px]"
+                                                                                                        onClick={() =>
+                                                                                                            setCellAllChannels(
                                                                                                                 role.id,
                                                                                                                 key,
-                                                                                                                'email',
-                                                                                                                Boolean(
-                                                                                                                    v,
-                                                                                                                ),
+                                                                                                                false,
                                                                                                             )
                                                                                                         }
-                                                                                                    />
-                                                                                                    <Mail className="h-3 w-3" />
-                                                                                                    Email
-                                                                                                </label>
-                                                                                                <label className="flex items-center gap-2 text-xs opacity-60">
-                                                                                                    <Checkbox
-                                                                                                        checked={
-                                                                                                            pref.push
-                                                                                                        }
-                                                                                                        disabled={
-                                                                                                            !pref.enabled
-                                                                                                        }
-                                                                                                        onCheckedChange={(
-                                                                                                            v,
-                                                                                                        ) =>
-                                                                                                            setCellPref(
-                                                                                                                role.id,
-                                                                                                                key,
-                                                                                                                'push',
-                                                                                                                Boolean(
-                                                                                                                    v,
-                                                                                                                ),
-                                                                                                            )
-                                                                                                        }
-                                                                                                    />
-                                                                                                    <Smartphone className="h-3 w-3" />
-                                                                                                    Push
-                                                                                                </label>
+                                                                                                    >
+                                                                                                        All
+                                                                                                        Off
+                                                                                                    </Button>
+                                                                                                </div>
                                                                                             </div>
-                                                                                            <div className="flex gap-1 border-t pt-2">
-                                                                                                <Button
-                                                                                                    type="button"
-                                                                                                    variant="ghost"
-                                                                                                    size="sm"
-                                                                                                    className="h-6 text-[10px]"
-                                                                                                    onClick={() =>
-                                                                                                        setCellAllChannels(
-                                                                                                            role.id,
-                                                                                                            key,
-                                                                                                            true,
-                                                                                                        )
-                                                                                                    }
-                                                                                                >
-                                                                                                    All
-                                                                                                    On
-                                                                                                </Button>
-                                                                                                <Button
-                                                                                                    type="button"
-                                                                                                    variant="ghost"
-                                                                                                    size="sm"
-                                                                                                    className="h-6 text-[10px]"
-                                                                                                    onClick={() =>
-                                                                                                        setCellAllChannels(
-                                                                                                            role.id,
-                                                                                                            key,
-                                                                                                            false,
-                                                                                                        )
-                                                                                                    }
-                                                                                                >
-                                                                                                    All
-                                                                                                    Off
-                                                                                                </Button>
-                                                                                            </div>
-                                                                                        </div>
+                                                                                        )}
                                                                                     </PopoverContent>
                                                                                 </Popover>
                                                                             </td>
@@ -685,14 +736,24 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                     })}
 
                     {/* Save */}
+                    {Object.keys(errors).length > 0 && (
+                        <p role="alert" className="text-sm text-destructive">
+                            Defaults were not saved.{' '}
+                            {Object.values(errors).join(' ')}
+                        </p>
+                    )}
                     <div className="flex justify-end gap-2">
                         <Button variant="outline" asChild>
                             <a href="/settings/notifications">Back</a>
                         </Button>
                         <Button
                             disabled={processing}
-                            onClick={() => put('/settings/notifications/roles')}
-                            className="bg-primary hover:bg-primary"
+                            onClick={() =>
+                                put('/settings/notifications/roles', {
+                                    preserveScroll: true,
+                                })
+                            }
+                            className="min-h-[44px] bg-primary hover:bg-primary"
                         >
                             Save Defaults
                         </Button>

@@ -1,0 +1,45 @@
+.chat-call-dock {
+    position: fixed;
+    top: 76px;
+    right: 20px;
+    z-index: 70;
+    width: 364px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 17px;
+    box-shadow: 0 12px 40px
+        color-mix(in oklab, var(--foreground) 15%, transparent);
+}
+
+/* Only shell content is reserved: headers, navigation and the user's draft stay mounted. */
+@media (min-width: 1201px) {
+    html[data-chat-call-dock='visible'] [data-chat-workspace] {
+        padding-inline-end: 420px;
+    }
+    html[data-chat-call-dock='visible']
+        [data-sonner-toaster][data-x-position='right'] {
+        right: 400px;
+    }
+}
+@media (max-width: 1200px) {
+    html[data-chat-call-dock='visible'] [data-chat-workspace] {
+        padding-block-start: calc(var(--chat-call-dock-height, 0px) + 32px);
+    }
+}
+@media (max-width: 600px) {
+    .chat-call-dock {
+        top: 64px;
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chat-call-dock * {
+        animation: none !important;
+        transition: none !important;
+    }
+}

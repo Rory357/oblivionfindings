@@ -11,11 +11,12 @@ export function AppContent({
     ...props
 }: AppContentProps) {
     if (variant === 'sidebar') {
-        return <SidebarInset {...props}>{children}</SidebarInset>;
+        return <SidebarInset data-chat-workspace {...props}>{children}</SidebarInset>;
     }
 
     return (
         <main
+            data-chat-workspace
             className="mx-auto flex h-full w-full max-w-7xl flex-1 flex-col gap-4 rounded-xl"
             {...props}
         >

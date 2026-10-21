@@ -23,6 +23,7 @@ class FamilyNote extends Model
         'completed_at',
         'completed_by',
         'assigned_to_shift_id',
+        'assigned_to_user_id',
         'staff_response',
         'staff_responded_by',
         'staff_responded_at',
@@ -33,6 +34,7 @@ class FamilyNote extends Model
     ];
 
     protected $casts = [
+        'assigned_to_user_id' => 'integer',
         'due_date' => 'date',
         'completed_at' => 'datetime',
         'staff_responded_at' => 'datetime',
@@ -58,6 +60,11 @@ class FamilyNote extends Model
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class, 'assigned_to_shift_id');
+    }
+
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
     public function staffResponder(): BelongsTo

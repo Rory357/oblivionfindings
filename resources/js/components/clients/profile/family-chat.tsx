@@ -4,6 +4,8 @@
  * OpsConversation records the family portal messaging uses, resolved via
  * /operations/clients/{id}/family-chat. */
 import { Button } from '@/components/ui/button';
+import { FamilyChatDrawer } from '@/components/chat/family-chat-drawer';
+import { usePage } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
 import { Info, Loader2, MessageCircle, Send, Users, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -42,7 +44,12 @@ function timeLabel(iso: string | null): string {
     });
 }
 
-export function FamilyChatPopup({
+export function FamilyChatPopup(props: { open: boolean; onClose: () => void; clientId: number; clientName: string; canSend: boolean }) {
+    const { chatSharedExperience } = usePage<{ chatSharedExperience?: boolean }>().props;
+    return chatSharedExperience ? <FamilyChatDrawer {...props} /> : <LegacyFamilyChatPopup {...props} />;
+}
+
+function LegacyFamilyChatPopup({
     open,
     onClose,
     clientId,

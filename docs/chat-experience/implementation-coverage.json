@@ -1,0 +1,365 @@
+{
+  "updated": "2026-10-18",
+  "approval": "All 51 refinements and web implementation approved; native mobile deferred",
+  "overall_status": "In progress; rollout disabled; local synthetic group audio verified, integrated and external-network calling acceptance outstanding",
+  "evidence": "IMPLEMENTATION-STATUS.md",
+  "items": [
+    {
+      "id": 1,
+      "description": "Correct selected recipient across chat, details and calls.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding",
+      "mockup_evidence": "M03, M18; named-lead-to-Rohan call journey"
+    },
+    {
+      "id": 2,
+      "description": "Keep staff and family navigation, preferences and call actions within their role.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding Conversation lists now bind the rendered actor and reset on account/client/role replacement, aborting stale reads and clearing denied content.10 workspace UI checks pass; integration guard case queued (18 October22:08). 18 October22:52: actor-bound bounded fresh-message arrival feed added; shared Chat/global sound policy now also governs push dispatch and current browser display.37 middleware checks pass; arrival/push integration queued10435. Actual in-app audio and cross-channel/tab dedupe remain unfinished. 18 October23:03: arrival/push backend43 tests295 assertions passed. Shared app/worker sound receipt with atomic browser storage added;34 loader/worker checks and real simultaneous/cross-tab/reload/expiry checks pass. Worker suppresses repeated sounds but keeps visual notices. Actual app player/mount, open-thread/call suppression and full audio acceptance still pending. 18 October23:22: shared in-app message player is mounted for staff/family web. Trusted gesture, silent baseline/reconnect, account cleanup, bounded feed and shared committed sound receipts implemented. Temporary cross-tab context suppresses open-conversation/active-call app and OS sounds.56 focused client checks,40 browser-push feature tests/230 assertions, types/lint and real two-tab silent-audio fixture pass. Physical audio, OS/browser matrix and full authenticated acceptance remain.",
+      "mockup_evidence": "M10–M12, M19, M23; family role, isolated client switch and no staff record action after a family call"
+    },
+    {
+      "id": 3,
+      "description": "Give the worker family inbox its own mobile list, filters and back action.",
+      "design_status": "approved",
+      "implementation_status": "Partial: dedicated family inbox now has the approved five queues, horizontal narrow filters, list/thread/back flow, current relative/client/owner summaries and footer handover. Desktop/narrow component checks passed, with measured 44px targets and no document overflow. Authenticated multi-user and final responsive acceptance remain.",
+      "mockup_evidence": "M13; mobile queue → thread → back journey; four-width review"
+    },
+    {
+      "id": 4,
+      "description": "Keep the same conversation during calls.",
+      "design_status": "approved",
+      "implementation_status": "Partial: Message/Expand reuse the authorised shared thread without page navigation. One composer owns the draft, captions and pending send reference; closing restores the original surface before the modal exit animation finishes. Desktop/narrow browser handoff and simulated pending-send/upload tests verify late-response isolation, original-reference recovery and no duplicate upload/send. A page-local microphone lease prevents overlapping voice-note and call capture. Authenticated server/network concurrency and end-to-end acceptance remain.",
+      "mockup_evidence": "M18, M25; existing draft and sent message shared with original thread during a call"
+    },
+    {
+      "id": 5,
+      "description": "Filter real missed-call history.",
+      "design_status": "approved",
+      "implementation_status": "Partial: server-filtered missed history, pagination and participant outcomes implemented; callback integration and database/browser acceptance outstanding",
+      "mockup_evidence": "M18/history, M19/history; All calls / Missed / Callbacks filter actual preview entries"
+    },
+    {
+      "id": 6,
+      "description": "Show accurate conversation members, owners and permissions.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding",
+      "mockup_evidence": "M03/details, M04/membership, M05/manage, M11/details; members and owner come from selected thread"
+    },
+    {
+      "id": 7,
+      "description": "Show the real settings scope and affected people.",
+      "design_status": "approved",
+      "implementation_status": "Partial: organisation/site scope, per-field inherited values, affected-site review, section-only inheritance reset and unsaved-navigation protection now implemented for eleven supported fields. Canonical client/channel sites determine policy; private staff conversations use organisation defaults. Settings UI checkpoint 143 tests passes; full authenticated acceptance remains.",
+      "mockup_evidence": "M21/override; explicit affected service and unchanged Tōtara policy in scope-isolation journey"
+    },
+    {
+      "id": 8,
+      "description": "Preserve drafts, attachments, replies, searches and reading position.",
+      "design_status": "approved",
+      "implementation_status": "Partial: existing actor/client/thread memory retains text, files, reply, search and reading anchor. Protected private drafts and durable send recovery are now integrated into the shared composer behind CHAT_DRAFT_RECOVERY (default off), with explicit Resume/Discard, conflict choices, debounced saves, exact reservation/check/stop, same-page call handoff ownership, flush-before-send and audience-change masking. Server references restore staged files without fake File bytes/re-upload; missing files remain visible. New server upload cases3/31 passed, main client regression112/seven files passed, final composer/thread54/two files passed; focused types/lint and desktop1440/narrow320 actual-component fictional browser checks passed. Full authenticated multi-device/parallel requests, browser-process restart/crash, pending-detail/conflict review, retention and final acceptance remain. Application migrations and enablement are still pending. See18 October18:06 checkpoint. Follow-up18 October18:13: compact conflict comparison, preserved local files/focus and Stop during live preparation/send now implemented;90-test regression and desktop/narrow fictional browser checks passed. Authenticated concurrency/restart and complete acceptance remain open. Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04). 18 October22:41: shared file JSON requests and native binary links now bind the rendered account; keyed previews/publication and expired-session cleanup have37 middleware tests,106 UI checks plus22 targeted expiry checks and desktop/320px fictional-browser evidence.30-scenario database batch21532 pending; full acceptance remains outstanding.",
+      "mockup_evidence": "M03, M06, M14, M16; per-actor/thread drafts, uploads, reply, search and scroll state; draft-return journeys"
+    },
+    {
+      "id": 9,
+      "description": "Support direct/group creation, duplicate detection and validation.",
+      "design_status": "approved",
+      "implementation_status": "Partial: explicit direct/private-group/channel/family creation, two-person private groups, names/capacity and exact request ledger (including reused direct chats) implemented. 31 database tests and 51 interface tests pass; desktop/narrow component preview verified. Pending requests survive dialog close and same-account navigation without changing the reviewed selection. Authenticated end-to-end, concurrent request and full restart/cross-device acceptance remain.",
+      "mockup_evidence": "M04/direct, group, error; existing direct reuse, new direct creation, named group, empty-name guard and retry"
+    },
+    {
+      "id": 10,
+      "description": "Add conversation favourite, unread, mute, rename, archive, leave and transfer actions.",
+      "design_status": "approved",
+      "implementation_status": "Partial: compact management dialog, personal archive/unarchive and unread reminders without receipt rollback; staff-group rename, removal, transfer and transfer-before-leave with audited version checks. Combined 26-test database suite verifies channel permissions and media-failure rollback/retry; 41 interface tests pass. Family membership lifecycle, membership events, legacy ownership reconciliation and full end-to-end acceptance remain. Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04).",
+      "mockup_evidence": "M03/details → Manage conversation; favourite, unread, mute, archive/unarchive, owner rename, leave and transfer"
+    },
+    {
+      "id": 11,
+      "description": "Make selected-message actions permission-aware.",
+      "design_status": "approved",
+      "implementation_status": "Partial: own-message editing and removal use reviewed versions, exact mutation receipts and encrypted revision storage. Removal now requires fresh review after a conflict and retains uncertain requests across navigation, separately from composer drafts. Full UI suite 148 tests and final focused checks pass; backend suite 32094 passed 78 tests including the new removal/settings cases, with one outdated revision-count assertion corrected. Focused window verification 2880 passed one test / 11 assertions, exit0. Desktop/narrow component checks verify compact confirmation, latest-text review and retained draft. Report-concern, investigation/retention and authenticated multi-user acceptance remain. Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04).",
+      "mockup_evidence": "M06/actions; selected sender determines edit/remove; unavailable access blocks membership inspection"
+    },
+    {
+      "id": 12,
+      "description": "Complete reply navigation, editing and unavailable-quote states.",
+      "design_status": "approved",
+      "implementation_status": "Partial: shared inline editing restores the separate draft/files/reply on cancel or save; conflicts require explicit current-text review; current-authority quote recovery includes edited and removed originals. Database and interface regression pass, with desktop/narrow component evidence. Authenticated multi-user, full quote/publication lifecycle and remaining acceptance remain outstanding. Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04).",
+      "mockup_evidence": "M06/reply, edit, deleted; quoted-message navigation, edit cancellation and removed-original placeholder"
+    },
+    {
+      "id": 13,
+      "description": "Add eligible mentions and a Mentions view.",
+      "design_status": "approved",
+      "implementation_status": "Partial: eligible-member identities, Unicode text spans, recoverable mention drafts, highlighting and staff Mentions navigation implemented. Durable in-app mention notices now recheck access/preferences, deduplicate retries and open the authorised target message. Current checkpoint: 38 database tests/452 assertions and 58 interface tests pass. Realtime delivery, other notification channels and full cross-device acceptance remain outstanding.",
+      "mockup_evidence": "M03 composer @ picker; thread members only; Mentions inbox filter"
+    },
+    {
+      "id": 14,
+      "description": "Make reactions, saved messages and pins stateful.",
+      "design_status": "approved",
+      "implementation_status": "Partial: personal saves, pins and reactions use current-authority mutations. Open Saved/Pinned/Media collections refresh their complete loaded range, preserve reading position/focus, remove unavailable items and distinguish refresh from paging retries. 95 interface tests plus 14 focused final checks pass; desktop/narrow fictional-response browser evidence verifies refresh and revoked-access clearing. The full database rerun after numeric cursor correction passes 54 tests/607 assertions. Authenticated multi-user, scale and full acceptance remain. Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04).",
+      "mockup_evidence": "M06/actions; reaction, save and pin; saved selected-message journey"
+    },
+    {
+      "id": 15,
+      "description": "Show sending, sent, failed and unconfirmed outcomes on individual outgoing messages.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04).",
+      "mockup_evidence": "M09/sending, sent, failed, checking; message-level progress, retry and outcome check"
+    },
+    {
+      "id": 16,
+      "description": "Keep badges, unread state and care-team receipt language consistent.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04).",
+      "mockup_evidence": "M01, M11, M13; common unread count; per-role care-team/family receipt wording"
+    },
+    {
+      "id": 17,
+      "description": "Search people, conversations, messages and files with exact-result navigation.",
+      "design_status": "approved",
+      "implementation_status": "Partial: shared M08 Search Chat now has messages/files/people/conversations modes, sender/date/conversation filters, complete loaded-range refresh, older paging, exact-message highlight and return to query/focused result. Current-authority API isolates family/client/history and filter metadata; stale queries are discarded and denial clears results. 103 interface tests pass; desktop/narrow fictional-response checks verify the approved grid, 44-pixel controls, exact opening/return, recovery and redaction. The corrected search database suite passes 57 tests/658 assertions. Both message and file modes now match attachment names, and revoked relatives are excluded from people/options; final eligibility rerun is active. Authenticated multi-user, scale and final acceptance remain. 18 October21:50: discovery routes and all refresh/pagination pages now require the rendered actor; context-keyed search/collection sessions prevent stale account/client display and clear denied/expired responses.30 UI tests,12 guard tests151 assertions, scoped types/lint and actual desktop/narrow component checks pass. Collection controls meet44px targets and compact close hit area is unclipped. Eleven discovery server cases queued79285 behind live realtime run74330; authenticated full acceptance remains.",
+      "mockup_evidence": "M08; messages/files/people/conversations, sender/date/thread filters, exact message highlight and return"
+    },
+    {
+      "id": 18,
+      "description": "Preserve reading position while loading history and receiving new messages.",
+      "design_status": "approved",
+      "implementation_status": "Partial: prepend offset and restored authorised reading anchor implemented; realtime arrival and full browser acceptance outstanding Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04).",
+      "mockup_evidence": "M03/history, typing; per-thread reading position, prepend offset and explicit jump to new activity"
+    },
+    {
+      "id": 19,
+      "description": "Provide a permission-aware shared media library.",
+      "design_status": "approved",
+      "implementation_status": "Partial: existing permission-aware shared collection is the approved M07 compact list opening the original conversation/message. Voice-note labels/duration, unavailable legacy-file labels and correct media empty-state wording now added without introducing a gallery. Keyboard selection focuses the highlighted original message and preserves the composer.62 client tests/three files, focused types/lint and actual-component fictional desktop1440/family320 checks passed18 October19:20;440px/280px dialogs,44px close hit target, no document overflow. Existing server access/history/collection evidence remains recorded. Authenticated staff/family access changes, protected-file failures and complete integrated media acceptance remain. 18 October21:50: discovery routes and all refresh/pagination pages now require the rendered actor; context-keyed search/collection sessions prevent stale account/client display and clear denied/expired responses.30 UI tests,12 guard tests151 assertions, scoped types/lint and actual desktop/narrow component checks pass. Collection controls meet44px targets and compact close hit area is unclipped. Eleven discovery server cases queued79285 behind live realtime run74330; authenticated full acceptance remains.",
+      "mockup_evidence": "M07/library; media scoped to eligible conversation membership; unavailable media state"
+    },
+    {
+      "id": 20,
+      "description": "Complete attachment previews, queues, validation and recovery.",
+      "design_status": "approved",
+      "implementation_status": "Partial: shared compact private photo/PDF preview now connected to attachment rows across all shared threads. Current-authority metadata refresh clears media/downloads on revocation or offline state; PDF pages/text, zoom, unsupported-file download guidance and focus/draft recovery verified in component browser checks. Full UI159 tests plus final thread25 pass. Backend media38221 passed3 tests/44assertions. Final type66957 has no Chat/viewer errors and the seven unrelated baseline errors; final viewer11 tests pass. Explicit client-record publication now uses a compact audience review, independent private copy and exact retry receipt; backend4 tests/61assertions, full UI168 tests and final focused14 tests pass. Desktop/narrow component checks confirm review, uncertainty recovery and retained reply. The shared compact attachment queue now provides local photo previews, captions, inline limits/removal, native upload progress and exact retry with account isolation; UI179 checkpoint and final focused42 tests pass. Caption backend40887 passed2 tests/17assertions. Stable-reference outcome lookup now checks before retransmission; read-only check cannot resend, invalid results retain the request, and the approved pending bubble remains until confirmation without duplicating accepted history. Full UI189 tests/33files pass; desktop/narrow component checks verify checking status and actual44px thread controls. Backend98795 passed90 tests/1232assertions; type31110 completed with seven unrelated errors and no Chat errors. Send-time safety now rejects blocked/unavailable/changed scans and verifies the saved bytes; scanner unit19 tests/100assertions pass. Local PDF/photo preview uses the existing compact viewer before upload, with explicit unsupported-format guidance and focus/caption recovery; UI193 full and final52 focused tests pass, and desktop/narrow browser checks pass. Scanner/interleaving backend80054 passed94 tests/1261assertions. Private staged-upload backend now supports owner/current-context receipts, hash-bound scan states, explicit retry/removal including cancellation before late upload, and atomic message consumption. The shared thread now uses staged references, measured per-file progress, scan/retry states and confirmed removal with retained captions and explicit removal retry. New sends use ready IDs; uncertain lookup cannot retransmit, late account results are ignored, and async removal preserves newer files/captions. Full UI211 tests/35files pass; final lifecycle61 and retry/recovery22 checks pass. Desktop/narrow fictional component checks verify scan retry, uncertain removal, separate Send, compact layout and44px controls. Staging44705 passed6 tests/63assertions; final65483 passed8 tests/77assertions including rollback/family provenance. Final type74147 has no Chat/viewer errors and seven unrelated errors. Actual scanner setup/health, operational cleanup/retention, broader document previews, metadata policy, voice notes, restart/cross-device and authenticated acceptance remain. 18 October22:41: shared file JSON requests and native binary links now bind the rendered account; keyed previews/publication and expired-session cleanup have37 middleware tests,106 UI checks plus22 targeted expiry checks and desktop/320px fictional-browser evidence.30-scenario database batch21532 pending; full acceptance remains outstanding.",
+      "mockup_evidence": "M07/attachments, uploading, failed, publish; file queue, captions, limits, scan, retry, remove and separate publication review"
+    },
+    {
+      "id": 21,
+      "description": "Complete voice-note recording, preview and recovery states.",
+      "design_status": "approved",
+      "implementation_status": "Partial: shared staff/family recording, pause/resume, two-minute cap, permission/interruption recovery, compact local preview, staged safety checking, captions and inline seek/speed playback implemented. Starting another player pauses the first. Backend inspection checks audio-only bytes, duration and hashes; policy and private download/preview authority are enforced. Unit, interface and backend tests plus desktop/narrow synthetic-audio browser checks pass. Configured scanner/probe health, physical-device/cross-browser checks and authenticated end-to-end acceptance remain.",
+      "mockup_evidence": "M07/record, preview, play, permission, limit; pause/resume/discard, 2-minute proposed limit and visual playback"
+    },
+    {
+      "id": 22,
+      "description": "Demonstrate isolated client and relative conversations.",
+      "design_status": "approved",
+      "implementation_status": "Partial: approved M10 shared family-home section now integrated into the actual dashboard, with linked-client selector, care-team/contact actions, conversation/callback summaries and shared call/invitation/urgent workflows. Explicit private-contact reuse preserves original recipient and separate named topics; old dashboard worker links now use that same review/reuse while New conversation resets the contact. Home/metadata reads bind actor/client; older mutation transport binding remains incomplete. Home GET server tests2/31 passed; fresh reuse/topic/metadata run40909 active. Initial89 UI cases and final23 home/workspace/creation/invitation regression pass, focused types/lint/format and actual-component fictional desktop1440/narrow320 review pass. Root14px touch-target issue corrected with shared frontline-tap; measured44px. Migration173000 pending. Authenticated navigation, concurrency, pagination/performance, Off duty and complete acceptance remain open. See20:18 checkpoint. Update20:33: family-home run40909 passed5/59, exit0; all seven intended home server cases have passing evidence. Strict contact actor middleware/client binding and context-reset/recovery now implemented; broader28-case actor-contract database regression20141 active. Authenticated account switching and remaining Chat transport binding are not complete. Conversation lists now bind the rendered actor and reset on account/client/role replacement, aborting stale reads and clearing denied content.10 workspace UI checks pass; integration guard case queued (18 October22:08).",
+      "mockup_evidence": "M10/multi and M11; Sam/Elliot switch and separate Jo/Nina threads; tested family isolation"
+    },
+    {
+      "id": 23,
+      "description": "Show first-send disclosure and invitation lifecycle/history permissions.",
+      "design_status": "approved",
+      "implementation_status": "Partial: reviewed family invitations, from-joining/selected history, expiry, status history, renewal and authorised removal/leave implemented. First-send audience review covers family conversations for relatives and staff cover, preserves drafts without sending, rejects changed audiences and invalidates removal/rejoin reviews. 33 database tests/401 assertions and 57 UI tests pass; desktop/narrow component checks verify disclosure and explicit refreshed review. Membership timeline events, notifications, operational reconciliation and authenticated end-to-end acceptance remain. Update18 October20:33: shared creation/callback/invitation/management transport actor binding, context replacement and private-detail clearing on denial added. Middleware12/130, interface47/nine files and final recovery13/two files pass; actual desktop/narrow invitation rejection reviewed. Broader28-case database regression20141 active. Full authenticated and overall module acceptance remain unfinished. Thread reads/writes now bind the rendered account; account replacement isolates content and late actions, with exact retry bodies retained.75 UI checks and12 route/account unit checks pass;65-scenario database regression is queued, so integrated acceptance remains partial (18 October22:04).",
+      "mockup_evidence": "M11/empty; M12/pending, accepted, declined, expired, removed; first-send disclosure, explicit history choice"
+    },
+    {
+      "id": 24,
+      "description": "Make family inbox ownership and queue counts consistent.",
+      "design_status": "approved",
+      "implementation_status": "Partial: dedicated inbox reads authoritative queue counts after current client/site/conversation checks; active callback counts apply membership history boundaries. Includes paging, loaded-range refresh, denial clearing and selection persistence across queue changes. 122 shared UI tests pass; focused backend inbox suite passed 3 tests/42 assertions under session 55425. Ownership backend passed 65 tests/849 assertions and final focused lock check passed 3/116. Authenticated, concurrency/load and final inbox acceptance remain. Follow-up18 October18:30: inbox now preserves server response priority across identity-anchored pages, validates queue revisions and atomically refreshes loaded rows. Oldest visible unanswered requests use configured service-hour deadlines or actual request time without inventing a response promise. Three window unit tests/12 assertions and13 inbox UI cases pass, with scoped types/lint and desktop1440/narrow320 fictional browser review. Combined feature run62634 finished with five pass and one guarded-timestamp fixture failure (58 reported assertions). Corrected only the hidden-history fixture; targeted run3419 passed one test/four assertions in408.43s. All six intended server scenarios now have passing evidence across the initial five and corrected targeted case. See18 October18:42 checkpoint. Family queue/history/ownership/coordination/follow-up requests now bind the rendered account, including shift handover; revoked or expired sessions clear private projections.38 family UI checks and12 actor/route unit checks pass; new guard and19 existing family scenarios queued with the broader regression batch (18 October22:13).",
+      "mockup_evidence": "M13 filters, claim, assignment, resolved/reopened; tested ownership/count and mobile queue changes"
+    },
+    {
+      "id": 25,
+      "description": "Show configured response hours and due/overdue states.",
+      "design_status": "approved",
+      "implementation_status": "Partial: structured organisation/site response schedules, holiday exclusions, first-unanswered-message clock and shared staff/family due/overdue display implemented. Explicit no-promise override is distinct from inheritance. Calendar tests pass 13/19; interface suite 126 tests passes, followed by 27 focused display tests and four settings conflict/page tests. Database lifecycle/settings/history passes 3/43 (9698 exit 0). Additional settings GET/empty wording assertions passed 1/16 (31218 exit 0). Full settings fidelity, authenticated acceptance, reminders and scale remain.",
+      "mockup_evidence": "M10/unconfigured and M13; working-hours configuration, due/overdue examples, no promise for unconfigured service"
+    },
+    {
+      "id": 26,
+      "description": "Support shift-end handoff without blocking clock-out.",
+      "design_status": "approved",
+      "implementation_status": "Partial: inbox footer and My Day EndOfShiftChecklist now reuse the shared assigned-family inbox and reviewed handover/release/private-note workflow. The advisory prompt preserves unfinished clock-out notes/breaks, handles missing/revoked/stale data and never gates legitimate clock-out on Chat or off-duty response.23 focused tests/three files, scoped types/lint and actual-component fictional desktop1440/narrow320 browser journeys passed. Existing ownership writes retain current-authority/version/exact-retry checks. Assignment/handover notifications, off-duty trigger and authenticated cross-user/end-to-end acceptance remain. See18 October18:42 checkpoint. Follow-up18 October18:55: durable private in-app assignment/handover notices, current authority/history/ownership revalidation, quiet-time/mute/preference handling, retry recovery and existing personal/role settings added. Seven preference UI tests and desktop/narrow fictional browser review passed. Initial seven-case backend run reported six passes and one incorrect site-access fixture (99 assertions). The fixture used explicit all-site family-management authority; corrected to an assigned site-restricted worker, with focused rerun45926 now passed:1 test23 assertions1741.91s, exit0. Full delivery acceptance remains unfinished. Migration172000 pending application use. Email/push and authenticated concurrency remain unfinished. 18 October20:50: explicit staff Off duty now offers the same optional handover in the main Chat inbox, with separate Busy/DND choices and shared non-essential delivery deferral.82 UI tests,13 unit assertions, scoped types/lint and desktop1440/narrow320 fictional browser checks pass. Server availability/notification transition cases queued behind active actor regression; full off-duty/delivery/concurrency acceptance remains. Family queue/history/ownership/coordination/follow-up requests now bind the rendered account, including shift handover; revoked or expired sessions clear private projections.38 family UI checks and12 actor/route unit checks pass; new guard and19 existing family scenarios queued with the broader regression batch (18 October22:13).",
+      "mockup_evidence": "M13/handoff, M16/clock; review ownership and handover without blocking finish/clock-out"
+    },
+    {
+      "id": 27,
+      "description": "Provide a separate staff coordination composer and history.",
+      "design_status": "approved",
+      "implementation_status": "Partial: separate encrypted staff coordination history/composer with current authority, membership history boundaries, exact retries, atomic paged refresh, draft and focus recovery. Final ownership backend suite passed 65 tests/849 assertions; final snapshot lock focused check passed 3 tests/116 assertions. Desktop/narrow fictional-response checks pass. Authenticated multi-user, retention and scale acceptance remain. Family queue/history/ownership/coordination/follow-up requests now bind the rendered account, including shift handover; revoked or expired sessions clear private projections.38 family UI checks and12 actor/route unit checks pass; new guard and19 existing family scenarios queued with the broader regression batch (18 October22:13).",
+      "mockup_evidence": "M13/internal; dedicated staff composer/history; verified absence from family thread"
+    },
+    {
+      "id": 28,
+      "description": "Complete callback ownership, scheduling, attempts and duplicate handling.",
+      "design_status": "approved",
+      "implementation_status": "Partial: shared compact callback dialog now supports preferred/agreed times, eligible owner reassignment/release, dated no-answer attempts, complete/cancel/unreachable outcomes, visible-open reuse and exact mutation retries after completion. Current open work stays visible independently of older paging. Invitation history boundaries, per-callback owner eligibility and account-scoped drafts protect privacy and recovery. 111 interface tests pass; final callback database suite passes 62 tests/733 assertions, including eligibility/discovery. Desktop/narrow fictional-response checks verify scheduling, attempts, conflict preservation, summary focus and family requests. Notifications, missed-call/post-call entry points, authenticated multi-user and scale acceptance remain. Update18 October20:33: shared creation/callback/invitation/management transport actor binding, context replacement and private-detail clearing on denial added. Middleware12/130, interface47/nine files and final recovery13/two files pass; actual desktop/narrow invitation rejection reviewed. Broader28-case database regression20141 active. Full authenticated and overall module acceptance remain unfinished.",
+      "mockup_evidence": "M13/callback, M19 callback lifecycle; preferred/agreed times, owner, attempts, complete/cancel and duplicate reuse"
+    },
+    {
+      "id": 29,
+      "description": "Show urgent routes and managed inappropriate-contact handling.",
+      "design_status": "approved",
+      "implementation_status": "Partial: shared urgent-help dialog in family dashboard and family conversations, explicit reviewed family-facing contact in global/site Chat settings, current-client/actor access checks, safe phone link, distinct failure/unconfigured states and private/no-store projection implemented.9 PHP unit cases/20 assertions,65 UI regression cases plus final9 component and5 policy cases, focused types/lint and fictional desktop/narrow browser journeys passed. Initial5694 terminal:settings case passed; access case hit a separate service-commencement fixture rule. Fixture corrected; focused access rerun included in70468; integrated authenticated acceptance and the managed inappropriate-contact workflow remain unfinished. See18 October19:42 checkpoint. Update18 October20:18: urgent settings scenario passed5694 and corrected urgent-access scenario passed70468. Both now have passing server evidence across those runs. Shared urgent entry is also in the new M10 family home. Managed inappropriate-contact handling and full acceptance remain unfinished.",
+      "mockup_evidence": "M10 urgent contact, conversation concern review; configured service route and retained managed care contact"
+    },
+    {
+      "id": 30,
+      "description": "Show staff/family declined, cancelled, no-answer and ended outcomes.",
+      "design_status": "approved",
+      "implementation_status": "Partial: server-confirmed result cards distinguish cancelled ringing, all-declined, missed/expired, ended and answered elsewhere. Current actor, participant, invitation and history authority protects the lookup; missing or denied results never guess. Shared message/callback follow-up preserves one composer and draft, Call again rechecks the audience, and staff record review is explicit. Eight server tests/143 assertions and101 interface tests pass; desktop/narrow fictional-component evidence confirms281px card/44px controls and focus/draft recovery. Authenticated staff/family journeys, busy/join-failure handling and integrated media acceptance remain.",
+      "mockup_evidence": "M18 and M19 declined, cancelled/no-answer, ended; recovery and callback actions"
+    },
+    {
+      "id": 31,
+      "description": "Show incoming calls over work, busy state and answered-elsewhere state.",
+      "design_status": "approved",
+      "implementation_status": "Partial: global incoming/active dock and workspace reservation implemented. Care-team calls serialize first acceptance, close other responder invitations and exclude them from missed history. Server-confirmed answered-elsewhere/other-device result cards now suppress duplicate calling and identify that audio is not connected here. Outcome feature checks passed8/143; final focused UI101/5files passed. Busy-call switching, unrelated-modal coordination and authenticated multi-device acceptance remain.",
+      "mockup_evidence": "M25 all seven variants; global incoming card, busy-call switch, missed and answered elsewhere"
+    },
+    {
+      "id": 32,
+      "description": "Show group invitations, participation and host/leave rules.",
+      "design_status": "approved",
+      "implementation_status": "Partial: staff-first host succession, expiring invitations, live invite/remove commands, capacity, current-authority options, rotating invitation identity and durable exact-action retries implemented. Removal denies reconnect before media teardown and supports retry/reconciliation. Shared roster/reviews show host, participation, capacity and SDK speaking state. 96 focused UI tests and desktop/narrow fictional-audio checks passed. Backend live-people rerun96369 is pending after fixing a masked media-failure test; prior host/expiry15-case suite passed. True concurrent commands, full authenticated media/network acceptance and remaining call controls/recovery are incomplete. Latest server rerun passed19 scenarios/258 assertions including outage teardown and care-team group conversion; isolated database cleanup confirmed. People-command timeout UI suite passed97 tests.",
+      "mockup_evidence": "M18/group, invite, end; M19/group; eligible participants, ringing invite, host removal and leave/end distinction"
+    },
+    {
+      "id": 33,
+      "description": "Keep call controls available across pages without covering critical controls.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding",
+      "mockup_evidence": "M25 card plus persistent controls; work-space reservation; cross-page call journey and four-width checks"
+    },
+    {
+      "id": 34,
+      "description": "Show device checks, changes, quality and interruptions.",
+      "design_status": "approved",
+      "implementation_status": "Partial: shared in-call Audio and connection dialog supports explicit microphone/speaker selection, mute preservation, stale-room/account teardown, device-list refresh, retry and browser fallback. Forty-two focused UI checks and desktop/narrow fictional-device checks passed. Incoming/outgoing microphone errors persist beside retry controls; confirmed join followed by audio failure retains audio-off cleanup until leaving is confirmed. Recovery UI56/4files and desktop/narrow fictional checks passed. Lost join responses now have bounded same-invitation recovery: readonly Check, explicit reconnect and persistent Stop intent, with actor/invitation/response guards. Final join UI62/4files, ordered server scenarios4/55 and desktop/narrow fictional checks passed. Global device-loss warnings now observe existing audio tracks and device inventory while settings are closed; Review audio reuses the dialog without changing mute or capture. Final UI73/4files and desktop/narrow fictional-device checks passed. Outgoing staff/family preflight now requires an explicit local microphone check with an actual sampled level meter,15-second capture bound, selected-output tone and lifecycle cleanup. Choices carry into initial/recovered connections without entering server bodies. Final85 UI tests/five files, focused types/lint and desktop/narrow synthetic browser checks passed. SDK-reported local connection quality now appears in the expanded call and Audio dialog, with weak/interrupted compact guidance; unknown/stale/remote reports are guarded. Final76 UI regressions,9 final readability checks, focused types/lint and desktop/narrow fictional-event browser verification passed. Real authenticated quality-report delivery, physical/acoustic/browser/network acceptance remain. Outgoing confirmation recovery has immutable start receipts, read-only outcome checks, exact-request retry and durable stop intent. Final history-boundary rerun passed7/132; UI50/4files and desktop/narrow fictional recovery checks passed. Account-bound reference-only browser recovery and exclusive Web Lock ownership now cover start/join/leave/end intent across page closure. Reconnect is explicit; restored start retries review current recipients; stop intent and exact invitation are guarded. Final81 control tests/six files, earlier94 audio regressions, focused types/lint and desktop/narrow fictional-API browser lock/page-close checks passed. Ringtone ownership now uses an abortable lock queue and ordered per-invitation silence snapshots;83 focused UI tests and real-browser two-tab silent-audio checks passed without changing the incoming card. Full browser-process restart/crash matrix, authenticated server/media concurrency and physical/network acceptance remain.",
+      "mockup_evidence": "M18/preflight; M20 recovery variants; audio-device controls and truthful visual-only microphone test"
+    },
+    {
+      "id": 35,
+      "description": "Provide reviewed post-call communication and callback actions.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding Family queue/history/ownership/coordination/follow-up requests now bind the rendered account, including shift handover; revoked or expired sessions clear private projections.38 family UI checks and12 actor/route unit checks pass; new guard and19 existing family scenarios queued with the broader regression batch (18 October22:13).",
+      "mockup_evidence": "M25/family Review record; compact two-step Communication Record / optional shared Family Note; required wording and audience acknowledgement verified"
+    },
+    {
+      "id": 36,
+      "description": "Complete global rollout, policy and effective-access controls.",
+      "design_status": "approved",
+      "implementation_status": "Partial: eight approved settings sections and effective site overrides for eleven existing fields, reviewed updates and concurrent-change rebase implemented. Authorised history remains readable when sending is disabled; active calls may finish while new calls use current policy. Final settings/calling refinements passed within the 78-passing backend run 32094; its sole failure was the separate outdated message revision-count assertion. Role/site rollout, personal availability, additional approved policy controls, effective-access administration, audit views and authenticated acceptance remain. Global settings saves/review and service-health requests now bind the rendered actor, reset on account change and provide focused expired-session recovery.16 settings UI tests and12 actor/route unit checks pass; desktop/narrow fictional browser recovery checked, integration batch31118 active (18 October22:25).",
+      "mockup_evidence": "M21 general/access, M22 calls/files/privacy; effective-access review, eligibility and rollout settings"
+    },
+    {
+      "id": 37,
+      "description": "Show defaults, overrides, effective values and reset inheritance.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding Global settings saves/review and service-health requests now bind the rendered actor, reset on account change and provide focused expired-session recovery.16 settings UI tests and12 actor/route unit checks pass; desktop/narrow fictional browser recovery checked, integration batch31118 active (18 October22:25).",
+      "mockup_evidence": "M21/override; inherited/overridden values, field-level override merge and reviewed reset"
+    },
+    {
+      "id": 38,
+      "description": "Show change review, impact, validation, save failure and conflicts.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding Global settings saves/review and service-health requests now bind the rendered actor, reset on account change and provide focused expired-session recovery.16 settings UI tests and12 actor/route unit checks pass; desktop/narrow fictional browser recovery checked, integration batch31118 active (18 October22:25).",
+      "mockup_evidence": "M21/conflict, failed and M22/validation; diff, scope impact, preserved failure draft and explicit concurrent-change review"
+    },
+    {
+      "id": 39,
+      "description": "Separate investigation access and settings audits, holds and offboarding.",
+      "design_status": "approved",
+      "implementation_status": "Partial: built 20 October (uncommitted) - chat.investigate restricted key (no role grants), case/reason/expiry-limited read-only investigation view with separate investigation audit, preservation holds blocking edit/removal/disposal, offboarding of expired access with ownership/work reassignment, settings audit. 21 Oct: 9 Pest tests/176 assertions and 15 vitest checks pass; full tsc ran out of memory (not a type error) and remains unverified; browser walk vs mockup outstanding.",
+      "mockup_evidence": "M22/investigator, audit, holds, offboarding; case/reason gate, separate audit domains, preservation and access expiry"
+    },
+    {
+      "id": 40,
+      "description": "Connect portal administration to approved relationships and effective policy.",
+      "design_status": "approved",
+      "implementation_status": "Partial: built 20 October (uncommitted) - read-only client relationship view (approved relatives, named workers, authorised cover, effective policy) for settings admins who can view the client, linking to portal-users and family-portal administration. 21 Oct: covered by the passing governance Pest/vitest runs; browser walk outstanding.",
+      "mockup_evidence": "M22/relationships; approved relatives, named workers/cover, effective Chat policy link"
+    },
+    {
+      "id": 41,
+      "description": "Make personal preferences visibly affect the preview.",
+      "design_status": "approved",
+      "implementation_status": "Partial: existing notification settings now expose Chat message/mention/family-reply controls with shared role/personal resolution, accurate default-source labels, explicit inheritance restore, unavailable-channel validation and failed-save recovery. Desktop/narrow/keyboard component checks passed; shared UI230 and final focused5 tests pass. Isolated preference/notification backend passed7 tests89 assertions, run44423 exit0. Full M23 appearance/availability preview fidelity, push/email dispatch, audit/concurrency and authenticated staff/family acceptance remain outstanding. 18 October21:12: approved M23 page and shared actor-bound per-person preferences added; live preview, theme, actual shared-thread text/spacing/sending, quiet routing/delivery deferral, inbox preview masking, shared sound preference and optional off-duty handover.137 UI tests plus final8 recovery tests,13 unit tests149 assertions, scoped app-entry types/lint and desktop1440/narrow320 fictional browser verification pass. Migration174000 pending application use; seven server cases queued in4447 behind95504. Message-arrival sound and complete in-app notification preview delivery, authenticated navigation/concurrency and full M23 acceptance remain unfinished. 18 October21:32: staff/family notification lists now reuse a shared card and actor-bound current preview projection, honouring personal privacy choices, hidden-tab revalidation and access loss, with canonical Open Chat links and explicit read controls.16 UI and12 guard-unit tests pass; focused server preview case prepared, not yet run. Earlier availability regression failed on one fixed boolean response and two wrong-site fixtures; fresh seven-case run4447 remains active. Message-arrival sounds and full authenticated/channel acceptance remain. 21:33 update:4447 finished4 pass/3 wrong-site fixture failures; fixtures corrected without changing authorisation. Fresh nine-case run81897 is active, including the new preview and off-duty family projection cases; no result claimed yet. 21:50 collected81897 PASS9 tests123 assertions1028.51s, exit0: corrected quiet-time delivery, saved preferences/versions/actor protection, sound boolean, current in-app preview privacy and explicit family Off duty/revocation verified. Full M23/notifications/cross-device acceptance remains partial. 18 October22:52: actor-bound bounded fresh-message arrival feed added; shared Chat/global sound policy now also governs push dispatch and current browser display.37 middleware checks pass; arrival/push integration queued10435. Actual in-app audio and cross-channel/tab dedupe remain unfinished. 18 October23:03: arrival/push backend43 tests295 assertions passed. Shared app/worker sound receipt with atomic browser storage added;34 loader/worker checks and real simultaneous/cross-tab/reload/expiry checks pass. Worker suppresses repeated sounds but keeps visual notices. Actual app player/mount, open-thread/call suppression and full audio acceptance still pending.",
+      "mockup_evidence": "M23; visible text size, spacing, theme, sending behaviour, availability, quiet/sound and preview examples"
+    },
+    {
+      "id": 42,
+      "description": "Show service health with ownership and freshness.",
+      "design_status": "approved",
+      "implementation_status": "Partial: approved five-card service health layout now has explicit checks, server-configured owner labels, per-service timestamps, stale-snapshot disclosure and comparison with the last observed status within one hour. Database/core-table, filtered realtime API, harmless scanner sample and recognised calling API checks are connected; unavailable push and incomplete operational verification are disclosed. No settings are changed or messages/calls started. Shared UI237 tests and final focused9 pass; health/calling unit15 tests55 assertions pass. Desktop/narrow component checks passed. Isolated route permission verification passed one test/eight assertions; real configured-service, scanner/signature/storage, worker delivery, push, media quality and authenticated acceptance remain. Global settings saves/review and service-health requests now bind the rendered actor, reset on account change and provide focused expired-session recovery.16 settings UI tests and12 actor/route unit checks pass; desktop/narrow fictional browser recovery checked, integration batch31118 active (18 October22:25).",
+      "mockup_evidence": "M22/health; messaging, realtime, push, uploads and voice with owner, timestamp and trend"
+    },
+    {
+      "id": 43,
+      "description": "Improve shared typography, contrast, spacing and timestamps.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding",
+      "mockup_evidence": "Shared v2.css; readable bubble typography, grouped senders, local dates, spacing and light/dark palette"
+    },
+    {
+      "id": 44,
+      "description": "Clarify person, client, audience and availability hierarchy.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding 18 October21:32: named family contacts now distinguish explicit Off duty while retaining messaging and cover disclosure; UI/browser checks passed. Current-authority/stale-presence/revocation server case prepared, not yet run. 21:33 update:4447 finished4 pass/3 wrong-site fixture failures; fixtures corrected without changing authorisation. Fresh nine-case run81897 is active, including the new preview and off-duty family projection cases; no result claimed yet. 21:50 collected81897 PASS9 tests123 assertions1028.51s, exit0: corrected quiet-time delivery, saved preferences/versions/actor protection, sound boolean, current in-app preview privacy and explicit family Off duty/revocation verified. Full M23/notifications/cross-device acceptance remains partial.",
+      "mockup_evidence": "M03, M10, M11, M13, M18; person/client/audience/availability in consistent headers and cards"
+    },
+    {
+      "id": 45,
+      "description": "Make family ownership and next actions easy to scan.",
+      "design_status": "approved",
+      "implementation_status": "Partial: shared inbox ownership, next-action and response-clock display are implemented. M13 Create follow-up now reviews the shared Family Notes audience and creates a canonical todo with owner/due date, preserving chat status and exact retry identity. Desktop/narrow component journeys passed; full UI suite 136 tests plus final seven focused follow-up checks pass. Backend full run 17728 had 73 pass / one fixture-default comparison failure; corrected focused verification 43113 passed 3 tests / 57 assertions. Named-task reassignment/offboarding, notifications, contextual entry and authenticated acceptance remain.",
+      "mockup_evidence": "M13; owner, due state and next action on each queue card; overdue styling"
+    },
+    {
+      "id": 46,
+      "description": "Use consistent controls and feedback.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding",
+      "mockup_evidence": "Shared Thread, modal, buttons, disclosure and status primitives; same actions across full, embedded and call views"
+    },
+    {
+      "id": 47,
+      "description": "Complete responsive list, thread, details, keyboard and safe-area layouts.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding",
+      "mockup_evidence": "100 four-width checks; M02 list/thread/details, M13 mobile queue and M24 illustrative keyboard; safe-area spacing"
+    },
+    {
+      "id": 48,
+      "description": "Verify keyboard, focus, status announcements, zoom and reduced motion.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding Global settings saves/review and service-health requests now bind the rendered actor, reset on account change and provide focused expired-session recovery.16 settings UI tests and12 actor/route unit checks pass; desktop/narrow fictional browser recovery checked, integration batch31118 active (18 October22:25).",
+      "mockup_evidence": "Keyboard trap, Escape and focus return verified; 320px large-text/dark reflow and reduced-motion styles. Full zoom/device/assistive-technology acceptance remains implementation work"
+    },
+    {
+      "id": 49,
+      "description": "Preserve intended people, sources and unfinished context work.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding",
+      "mockup_evidence": "M14–M17; original work and intended recipient retained; tested medication return, ticket public/internal draft separation and restricted source denial"
+    },
+    {
+      "id": 50,
+      "description": "Cover every remaining inventory entry point explicitly.",
+      "design_status": "approved",
+      "implementation_status": "Partial foundation; complete scenario verification outstanding",
+      "mockup_evidence": "S01–S24 mapped by registry; M17 explicitly includes roster, recognition, services, legacy and technician; original source review/audience preserved"
+    },
+    {
+      "id": 51,
+      "description": "Add guided review journeys and scenario feedback.",
+      "design_status": "approved",
+      "implementation_status": "Design review tooling complete; product verification separate",
+      "mockup_evidence": "Five guided review journeys; per-scenario review status and feedback export, independent from implementation approval"
+    }
+  ]
+}

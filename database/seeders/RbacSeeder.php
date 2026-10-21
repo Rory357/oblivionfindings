@@ -55,6 +55,9 @@ class RbacSeeder extends Seeder
         'medications.transfers.manage',
         'medications.catalogue.manage',
         'medications.backups.manage',
+        // Private staff chat inspection: named investigators only. Grant migration:
+        // 2026_10_20_101000_register_chat_investigation_permission (no role grants).
+        'chat.investigate',
     ];
 
     public function run(): void
@@ -168,6 +171,7 @@ class RbacSeeder extends Seeder
             ['key' => 'settings.access.edit_roles', 'description' => 'Edit role permissions', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.delete_roles', 'description' => 'Delete custom roles', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.impersonate', 'description' => 'Impersonate other users', 'group' => 'access_control', 'module' => 'System'],
+            ['key' => 'chat.investigate', 'description' => 'Inspect private staff chats for an authorised investigation and place preservation holds', 'group' => 'chat', 'module' => 'System'],
 
             // Sites
             ['key' => 'sites.viewAny', 'description' => 'View sites', 'group' => 'sites', 'module' => 'Operations'],
