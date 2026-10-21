@@ -10,8 +10,10 @@ use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
 use App\Domain\Governance\Notifications\PreReadReminderNotification;
 use App\Domain\Governance\Support\BoardPackContainedSources;
 use App\Models\User;
+use App\Services\Chat\ChatMessageDelivery;
 use App\Services\Medication\Alerts\MedicationNotificationVisibility;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Notifications\DatabaseNotification;
 
@@ -137,7 +139,7 @@ final class BoardPackAccessService
      * integers — never as manifest text — so id 2 cannot collide with 2999.
      *
      * @param  Builder<BoardPack>  $query
-     * @param  Builder<\Illuminate\Database\Eloquent\Model>|null  $visibleIds
+     * @param  Builder<Model>|null  $visibleIds
      */
     private function excludeHiddenSources(Builder $query, string $type, ?Builder $visibleIds): void
     {
@@ -218,6 +220,8 @@ final class BoardPackAccessService
         $query = $unreadOnly
             ? $viewer->unreadNotifications()
             : $viewer->notifications();
+
+        $query = app(ChatMessageDelivery::class)->filterNotifications($query, $viewer);
 
         return app(MedicationNotificationVisibility::class)->apply($query, $viewer)->where(function (Builder $notifications) use ($visiblePackIds, $visibleMeetingIds): void {
             $notifications

@@ -1,6 +1,7 @@
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Save, Settings } from 'lucide-react';
@@ -17,33 +18,6 @@ type PreferenceItem = {
 type Props = {
     preferences: PreferenceItem[];
 };
-
-function Toggle({
-    enabled,
-    onToggle,
-}: {
-    enabled: boolean;
-    onToggle: () => void;
-}) {
-    return (
-        // eslint-disable-next-line no-restricted-syntax -- Custom switch track/knob control, not a standard action button.
-        <button
-            type="button"
-            role="switch"
-            aria-checked={enabled}
-            onClick={onToggle}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none ${
-                enabled ? 'bg-primary' : 'bg-muted'
-            }`}
-        >
-            <span
-                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out ${
-                    enabled ? 'translate-x-5' : 'translate-x-0.5'
-                } mt-0.5`}
-            />
-        </button>
-    );
-}
 
 export default function Preferences({ preferences }: Props) {
     const [localPreferences, setLocalPreferences] =
@@ -87,13 +61,13 @@ export default function Preferences({ preferences }: Props) {
                 { title: 'Preferences', href: '/portal/preferences' },
             ]}
         >
-            <Head title="Notification Preferences" />
+            <Head title="Notification preferences" />
 
             <PageLayout
                 hero={
                     <PageHero
                         icon={Settings}
-                        title="Notification Preferences"
+                        title="Notification preferences"
                         description="Choose which notifications you'd like to receive."
                         stats={[
                             { label: 'Total', value: localPreferences.length },
@@ -121,9 +95,12 @@ export default function Preferences({ preferences }: Props) {
                                         {pref.description}
                                     </p>
                                 </div>
-                                <Toggle
-                                    enabled={pref.enabled}
-                                    onToggle={() => handleToggle(pref.key)}
+                                <Switch
+                                    checked={pref.enabled}
+                                    onCheckedChange={() =>
+                                        handleToggle(pref.key)
+                                    }
+                                    aria-label={pref.label}
                                 />
                             </CardContent>
                         </Card>
@@ -150,7 +127,7 @@ export default function Preferences({ preferences }: Props) {
                     <div className="flex justify-end">
                         <Button onClick={handleSave} disabled={saving}>
                             <Save className="mr-2 h-4 w-4" />
-                            {saving ? 'Saving...' : 'Save Preferences'}
+                            {saving ? 'Saving...' : 'Save preferences'}
                         </Button>
                     </div>
                 )}

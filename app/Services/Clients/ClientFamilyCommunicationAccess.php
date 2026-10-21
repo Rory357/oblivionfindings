@@ -6,6 +6,7 @@ use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\Client;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 
 class ClientFamilyCommunicationAccess
 {
@@ -45,6 +46,46 @@ class ClientFamilyCommunicationAccess
         return $this->isAssigned($user, $client)
             && $user->canDo('progress_notes.viewAny')
             && ($user->canDo('progress_notes.create') || $user->canDo('progress_notes.update'));
+    }
+
+    /**
+     * SQL shortlist of current staff who could pass canView()/canManage() for
+     * this client: holders of the family-portal permission (site checked
+     * later) or assigned workers. It is a superset, so callers must still
+     * apply canView()/canManage() to each row it returns.
+     *
+     * @return Builder<User>
+     */
+    public function candidateStaffQuery(Client $client, bool $manage = false): Builder
+    {
+        $keys = $manage ? ['family_portal.manage'] : ['family_portal.viewAny', 'family_portal.manage'];
+
+        return $this->currentStaff->currentUsersQuery()->where(fn (Builder $staff) => $staff
+            ->whereHas('roles.permissions', fn (Builder $permissions) => $permissions->whereIn('permissions.key', $keys))
+            ->orWhereHas('permissionOverrides', fn (Builder $permissions) => $permissions->whereIn('permissions.key', $keys)->where('permission_user.allowed', true))
+            ->orWhereExists(fn ($assigned) => $assigned->selectRaw('1')->from('client_user')
+                ->whereColumn('client_user.user_id', 'users.id')->where('client_user.client_id', $client->id)));
+    }
+
+    /**
+     * Narrows a clients query to a superset of the clients canView() can
+     * accept for this user, mirroring its permission/assignment branches.
+     * canView() remains the final check.
+     *
+     * @param  Builder<Client>  $clients
+     * @return Builder<Client>
+     */
+    public function scopeViewableClients(Builder $clients, User $user): Builder
+    {
+        if ($user->canDo('family_portal.viewAny') || $user->canDo('family_portal.manage')) {
+            return $clients->whereIn('clients.site_id', $this->siteAccess->accessibleSiteIds($user, [
+                'family_portal.viewAny',
+                'family_portal.manage',
+            ]));
+        }
+
+        return $clients->whereExists(fn ($assigned) => $assigned->selectRaw('1')->from('client_user')
+            ->whereColumn('client_user.client_id', 'clients.id')->where('client_user.user_id', $user->id));
     }
 
     /**

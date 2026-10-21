@@ -126,6 +126,7 @@ export default function AppSidebarLayout({
                               )
                             : header}
                         <div
+                            data-chat-workspace
                             className={cn(
                                 contentClassName ?? DEFAULT_CONTENT_CLASS,
                                 header === undefined &&

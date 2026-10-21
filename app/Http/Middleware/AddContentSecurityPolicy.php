@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Services\Chat\SelfHostedCalling;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Vite;
@@ -67,7 +68,7 @@ class AddContentSecurityPolicy
             ? 'Content-Security-Policy'
             : 'Content-Security-Policy-Report-Only';
 
-        $response->headers->set($header, $this->policy($nonce));
+        $response->headers->set($header, $this->policy($nonce, $request));
 
         return $response;
     }
@@ -75,12 +76,15 @@ class AddContentSecurityPolicy
     /**
      * Build the policy string for this request's nonce.
      */
-    private function policy(string $nonce): string
+    private function policy(string $nonce, Request $request): string
     {
         // The optional provider is never loaded without application configuration.
         // Keep OSM-only deployments on their existing policy; no unsafe script execution is added.
         $google = filled(config('fleet.maps.api_key'));
         $googleSources = $google ? ' https://*.googleapis.com https://*.gstatic.com https://*.google.com' : '';
+        $chatSocket = config('chat.shared_experience') && config('chat.realtime.enabled')
+            ? ' '.($request->isSecure() ? 'wss://' : 'ws://').$request->getHttpHost() : '';
+        $chatSocket .= $this->callingSources();
 
         return implode('; ', [
             "default-src 'self'",
@@ -100,7 +104,7 @@ class AddContentSecurityPolicy
             "media-src 'self'",
             // The document preconnects to Bunny Fonts before loading its stylesheet.
             // Browsers evaluate that connection hint against connect-src.
-            "connect-src 'self' https://fonts.bunny.net".$googleSources,
+            "connect-src 'self' https://fonts.bunny.net".$googleSources.$chatSocket,
             "worker-src 'self'".($google ? ' blob:' : ''),
             "frame-src 'self'".($google ? ' https://*.google.com' : ''),
             "object-src 'none'",
@@ -108,5 +112,25 @@ class AddContentSecurityPolicy
             "form-action 'self'",
             "frame-ancestors 'none'",
         ]);
+    }
+
+    /**
+     * The self-hosted voice server usually lives on its own host. Allow its
+     * signalling socket and HTTPS validation origin only once calling is ready.
+     */
+    private function callingSources(): string
+    {
+        if (! config('chat.shared_experience') || ! app(SelfHostedCalling::class)->ready()) {
+            return '';
+        }
+        $url = parse_url((string) config('chat.calling.url'));
+        $host = $url['host'] ?? null;
+        if (! is_string($host) || $host === '' || ! in_array($url['scheme'] ?? '', ['ws', 'wss', 'http', 'https'], true)) {
+            return '';
+        }
+        $authority = $host.(isset($url['port']) ? ':'.$url['port'] : '');
+        $secure = in_array($url['scheme'], ['wss', 'https'], true);
+
+        return ' '.($secure ? 'wss://' : 'ws://').$authority.' '.($secure ? 'https://' : 'http://').$authority;
     }
 }

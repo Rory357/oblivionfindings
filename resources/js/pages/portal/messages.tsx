@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { PresenceBadge, PresenceDot } from '@/components/presence-dot';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -24,6 +25,7 @@ import {
     Check,
     CheckCheck,
     FileText,
+    Hand,
     MessageSquare,
     MessageSquareText,
     Mic,
@@ -165,6 +167,7 @@ export default function PortalMessages({
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const [showPinned, setShowPinned] = useState(false);
+    const [deleteMessageId, setDeleteMessageId] = useState<number | null>(null);
     const [ctxMenu, setCtxMenu] = useState<{
         x: number;
         y: number;
@@ -572,7 +575,7 @@ export default function PortalMessages({
                             {(!hasConversations || showNewChat) && (
                                 <div className="border-b p-3">
                                     <p className="mb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                        Care Team
+                                        Care team
                                     </p>
                                     <div className="space-y-1">
                                         {supportWorkers.map((worker) => (
@@ -778,7 +781,7 @@ export default function PortalMessages({
                                         <div className="mb-1 flex items-center justify-between">
                                             <span className="text-[10px] font-semibold tracking-wider text-status-warning uppercase">
                                                 <Pin className="mr-1 inline h-3 w-3" />
-                                                Pinned Messages
+                                                Pinned messages
                                             </span>
                                             <Button
                                                 type="button"
@@ -795,7 +798,7 @@ export default function PortalMessages({
                                         {pinnedMsgs.map((pm) => (
                                             <div
                                                 key={pm.id}
-                                                className="mb-1 rounded-lg bg-white/60 p-2 text-xs dark:bg-card"
+                                                className="mb-1 rounded-lg bg-card p-2 text-xs"
                                             >
                                                 <p className="font-medium">
                                                     {pm.content.slice(0, 100)}
@@ -816,9 +819,10 @@ export default function PortalMessages({
                                 >
                                     {activeMessages.length === 0 && (
                                         <div className="flex h-full flex-col items-center justify-center text-center">
-                                            <span className="mb-2 text-4xl">
-                                                👋
-                                            </span>
+                                            <Hand
+                                                className="mb-2 size-10 text-muted-foreground"
+                                                aria-hidden
+                                            />
                                             <p className="text-sm text-muted-foreground">
                                                 Start the conversation!
                                             </p>
@@ -1027,7 +1031,7 @@ export default function PortalMessages({
                                                                             )}
                                                                             {quoteLine && (
                                                                                 <div
-                                                                                    className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${isMe ? 'border-l-white/40 bg-white/10' : 'border-l-primary/40 bg-primary/5'}`}
+                                                                                    className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${isMe ? 'border-l-primary-foreground/40 bg-primary-foreground/10' : 'border-l-primary/40 bg-primary/5'}`}
                                                                                 >
                                                                                     <p className="truncate opacity-70">
                                                                                         {
@@ -1104,7 +1108,7 @@ export default function PortalMessages({
                                                                 )}
                                                             {/* Time + read receipt */}
                                                             <div
-                                                                className={`mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground/60 ${isMe ? 'justify-end' : ''}`}
+                                                                className={`mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground ${isMe ? 'justify-end' : ''}`}
                                                             >
                                                                 <span>
                                                                     {formatMessageTime(
@@ -1251,9 +1255,13 @@ export default function PortalMessages({
                                             <Button
                                                 type="button"
                                                 variant="ghost"
-                                                className="mb-2 h-auto p-0 text-[10px] text-muted-foreground hover:bg-transparent hover:text-foreground"
+                                                className="mb-2 h-auto gap-1 p-0 text-[10px] text-muted-foreground hover:bg-transparent hover:text-foreground"
                                             >
-                                                💬 Quick replies
+                                                <MessageSquareText
+                                                    className="size-3"
+                                                    aria-hidden
+                                                />
+                                                Quick replies
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent
@@ -1304,7 +1312,7 @@ export default function PortalMessages({
                                                     ? stopRecording
                                                     : startRecording
                                             }
-                                            className={`h-9 w-9 shrink-0 rounded-full ${isRecording ? 'animate-pulse bg-status-critical text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                                            className={`h-9 w-9 shrink-0 rounded-full ${isRecording ? 'animate-pulse bg-destructive text-destructive-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                             title={
                                                 isRecording
                                                     ? 'Stop recording'
@@ -1531,21 +1539,12 @@ export default function PortalMessages({
                                         <Button
                                             type="button"
                                             variant="ghost"
-                                            className="h-auto w-full justify-start gap-3 rounded-lg px-3 py-2 text-sm text-status-critical hover:bg-status-critical-bg dark:hover:bg-status-critical"
+                                            className="h-auto w-full justify-start gap-3 rounded-lg px-3 py-2 text-sm text-status-critical hover:bg-status-critical-bg"
                                             onClick={() => {
-                                                if (
-                                                    ctxMenu.messageId &&
-                                                    confirm(
-                                                        'Delete this message? It will show as "deleted" but data is kept for auditing.',
-                                                    )
-                                                ) {
-                                                    router.delete(
-                                                        `/portal/clients/${client.id}/messages/archive/${ctxMenu.messageId}`,
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
+                                                if (ctxMenu.messageId)
+                                                    setDeleteMessageId(
+                                                        ctxMenu.messageId,
                                                     );
-                                                }
                                                 setCtxMenu(null);
                                             }}
                                         >
@@ -1586,14 +1585,36 @@ export default function PortalMessages({
                     </div>
                 )}
 
+                <ConfirmDialog
+                    open={deleteMessageId !== null}
+                    onClose={() => setDeleteMessageId(null)}
+                    onConfirm={() => {
+                        if (deleteMessageId === null) return;
+                        router.delete(
+                            `/portal/clients/${client.id}/messages/archive/${deleteMessageId}`,
+                            { preserveScroll: true },
+                        );
+                        setDeleteMessageId(null);
+                    }}
+                    title="Delete this message?"
+                    description='It will show as "deleted" but the data is kept for auditing.'
+                    confirmText="Delete message"
+                    variant="destructive"
+                />
+
                 {/* Upload Dialog */}
                 <Dialog
                     open={showUploadDialog}
                     onOpenChange={setShowUploadDialog}
                 >
-                    <DialogContent className="sm:max-w-md">
+                    <DialogContent
+                        style={{
+                            maxWidth: 'min(92vw, 480px)',
+                            width: 'min(92vw, 480px)',
+                        }}
+                    >
                         <DialogHeader>
-                            <DialogTitle>Share a File</DialogTitle>
+                            <DialogTitle>Share a file</DialogTitle>
                             <DialogDescription>
                                 Share a JPG, PNG, GIF, WEBP or supported
                                 document with the care team.
@@ -1727,8 +1748,8 @@ export default function PortalMessages({
                             <div className="flex items-center justify-between">
                                 <p className="text-[10px] text-muted-foreground">
                                     {uploadType === 'photo'
-                                        ? 'Saved to Photo Gallery'
-                                        : 'Saved to Documents'}
+                                        ? 'Saved to photo gallery'
+                                        : 'Saved to documents'}
                                 </p>
                                 <Button
                                     disabled={!uploadFile}

@@ -38,6 +38,14 @@ class PortalMessageController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
+        if (config('chat.shared_experience')) {
+            return inertia('chat/index', [
+                'chatFamily' => true,
+                'chatClient' => ['id' => $client->id, 'name' => $client->first_name.' '.$client->last_name],
+                'initialPerson' => $request->integer('worker') ?: null,
+            ]);
+        }
+
         $conversations = OpsConversation::where('client_id', $client->id)
             ->where('conversation_type', 'family')
             ->whereHas('participants', fn ($q) => $q->where('user_id', $user->id))
@@ -46,6 +54,7 @@ class PortalMessageController extends Controller
             ])
             ->orderByDesc('updated_at')
             ->get()
+            ->filter(fn ($conversation) => $this->legacyHistoryAllowed($user, $conversation))
             ->map(function (OpsConversation $conversation) use ($client): array {
                 $latestMessage = $this->latestVisibleMessage($conversation, $client);
 
@@ -94,6 +103,14 @@ class PortalMessageController extends Controller
         abort_unless($user->canAccessClientPortal($client), 403);
 
         $this->assertConversationAccess($user, $client, $conversation);
+
+        if (config('chat.shared_experience')) {
+            return inertia('chat/index', [
+                'chatFamily' => true,
+                'chatClient' => ['id' => $client->id, 'name' => $client->first_name.' '.$client->last_name],
+                'initialConversation' => $conversation->id,
+            ]);
+        }
 
         $messageRecords = $conversation->messages()->withTrashed()
             ->where('client_id', $client->id)
@@ -224,6 +241,8 @@ class PortalMessageController extends Controller
 
     public function toggleReaction(Request $request, Client $client, OpsMessage $message)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
@@ -261,6 +280,8 @@ class PortalMessageController extends Controller
 
     public function togglePin(Request $request, Client $client, OpsMessage $message)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
@@ -281,6 +302,8 @@ class PortalMessageController extends Controller
 
     public function archiveMessage(Request $request, Client $client, OpsMessage $message)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
@@ -305,6 +328,8 @@ class PortalMessageController extends Controller
 
     public function searchMessages(Request $request, Client $client)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
@@ -317,7 +342,7 @@ class PortalMessageController extends Controller
         $conversationIds = OpsConversation::where('client_id', $client->id)
             ->where('conversation_type', 'family')
             ->whereHas('participants', fn ($qb) => $qb->where('user_id', $user->id))
-            ->pluck('id');
+            ->get()->filter(fn ($conversation) => $this->legacyHistoryAllowed($user, $conversation))->pluck('id');
 
         $results = OpsMessage::whereIn('conversation_id', $conversationIds)
             ->where('client_id', $client->id)
@@ -339,6 +364,8 @@ class PortalMessageController extends Controller
 
     public function storeMessage(Request $request, Client $client, OpsConversation $conversation)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
@@ -480,6 +507,8 @@ class PortalMessageController extends Controller
 
     public function startConversation(Request $request, Client $client)
     {
+        abort_if(config('chat.shared_experience'), 409, 'Chat has been updated. Reload the page to continue in shared Chat.');
+
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
@@ -621,6 +650,7 @@ class PortalMessageController extends Controller
         Client $client,
         OpsConversation $conversation,
     ): void {
+        abort_unless($this->legacyHistoryAllowed($user, $conversation), 403);
         abort_unless(
             (int) $conversation->client_id === (int) $client->id
                 && $conversation->conversation_type === 'family'
@@ -629,6 +659,12 @@ class PortalMessageController extends Controller
                     ->exists(),
             403,
         );
+    }
+
+    private function legacyHistoryAllowed(User $user, OpsConversation $conversation): bool
+    {
+        // Legacy screens cannot represent reviewed, per-member history grants.
+        return config('chat.shared_experience') || $conversation->participants()->where('user_id', $user->id)->first()?->history_after_id === null;
     }
 
     private function assertMessageAccess(
