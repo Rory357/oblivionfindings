@@ -612,3 +612,12 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - /emar/stock is kept as the Stock overview companion.
   - Gates: Pest 122 + 136, vitest red then green, eslint clean, tsc only shows main's known errors.
   - Notes: `emar-1440-walk-notes-2026-10-21.md` lists the deviations and the items not built.
+- **21 Oct: C5b LIVE, `685463cd8`.**
+  - ShiftSeriesController::cancelFuture uses the NZ day, and series and respite cancellations raise the dose review.
+  - The stale architecture test is fixed.
+  - Gate: 66 passed.
+- **21 Oct: PROGRAMME COMPLETE.**
+  - GitHub main and local main are both at `685463cd8`. Local main was fast-forwarded and the parent checkout's uncommitted WIP was preserved. The two overlapping files (AttendanceService, ShiftHandoverService) were 3-way merged cleanly, with backups in `.claude/wip-backup-20261021/`.
+  - The heavy-lock floor is restored to 5632 MB, and the other sessions were told "eMAR done".
+  - **Remaining for Stephan:** the site actions in §8 (qpdf, saving the PIN rules once, the RbacSeeder reseed) and the optional product questions.
+  - **Logged, not built:** see the walk notes and the deferred items above (CR outbox and retry, team-lead forced clock-out, "Counts verified" as the register count, retiring /emar/stock).
