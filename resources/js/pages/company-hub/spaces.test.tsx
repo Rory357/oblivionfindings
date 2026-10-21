@@ -53,9 +53,7 @@ it('preserves the canonical follow state on failure and allows a retry after com
             })}
         />,
     );
-    fireEvent.click(
-        screen.getByRole('button', { name: 'Follow', exact: true }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Follow' }));
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
     const [url, payload, options] = post.mock.calls[0];
     expect(url).toBe('/company-hub/pages/50/follow');
@@ -65,12 +63,11 @@ it('preserves the canonical follow state on failure and allows a retry after com
         options.onFinish();
     });
     expect(screen.getByRole('alert')).toHaveTextContent('could not be saved');
-    expect(
-        screen.getByRole('button', { name: 'Follow', exact: true }),
-    ).toBeEnabled();
-    expect(
-        screen.getByRole('button', { name: 'Follow', exact: true }),
-    ).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Follow' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Follow' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+    );
 });
 
 it('opens the correct team template and hides authoring from readers', () => {
@@ -83,9 +80,7 @@ it('opens the correct team template and hides authoring from readers', () => {
             />
         </HubPageCreationContext.Provider>,
     );
-    fireEvent.click(
-        screen.getByRole('button', { name: 'Create team space', exact: true }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Create team space' }));
     expect(create).toHaveBeenCalledWith({
         initial: { title: '', kind: 'department', template: 'team' },
     });

@@ -104,6 +104,26 @@ describe('prescriber order governance contracts', () => {
         expect(dialogs).toContain("const form = useForm({ reason: '' });");
     });
 
+    it('asks before confirming an order (GOOD-CATCHES §3 row 27)', () => {
+        // The row action, context menu and any later caller only open the
+        // confirmation; the request goes from its confirm button.
+        expect(page).toMatch(
+            /const confirm = \(o: GovernedPrescriptionOrder\) => \{\s*if \(!canConfirmOrder\(o\)\) return;\s*setModal\(\{ type: 'confirm', order: o \}\);\s*\};/,
+        );
+        expect(page).toMatch(
+            /const submitConfirm = \(o: GovernedPrescriptionOrder\) => \{\s*if \(!canConfirmOrder\(o\)\) return;\s*router\.post\(\s*`\/emar\/prescriptions\/\$\{o\.id\}\/confirm`/,
+        );
+        expect(page).toContain(
+            "{modal?.type === 'confirm' && canConfirmOrder(modal.order) && (",
+        );
+        expect(page).toContain('onConfirm={() => submitConfirm(modal.order)}');
+        expect(page).toContain('title="Confirm this order?"');
+        // Not a destructive step, so it must not use ConfirmDialog's red default.
+        expect(page).toMatch(/confirmText="Confirm order"\s*variant="default"/);
+        expect(page).toContain('processing={confirmingOrder}');
+        expect(page.match(/router\.post\(\s*`\/emar\/prescriptions\/\$\{o\.id\}\/confirm`/g)).toHaveLength(1);
+    });
+
     it('requires an explicit reason in a dedicated covert revoke dialog', () => {
         expect(page).toContain(
             "setModal({ type: 'revoke', authorisation: c })",

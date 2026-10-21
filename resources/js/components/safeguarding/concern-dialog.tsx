@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -2607,6 +2608,23 @@ function fmtSize(b?: number | null): string {
 function EvidenceSection({ d }: { d: ConcernDetail }) {
     const atts = d.attachments ?? [];
     const canEdit = !!d.can?.update;
+    const [fileToRemove, setFileToRemove] = useState<
+        (typeof atts)[number] | null
+    >(null);
+    const [removingFile, setRemovingFile] = useState(false);
+
+    const removeFile = () => {
+        if (!fileToRemove) return;
+        router.delete(`/safeguarding/${d.id}/attachments/${fileToRemove.id}`, {
+            preserveScroll: true,
+            onStart: () => setRemovingFile(true),
+            onFinish: () => {
+                setRemovingFile(false);
+                setFileToRemove(null);
+            },
+        });
+    };
+
     return (
         <div className="flex flex-col gap-3">
             {canEdit ? (
@@ -2687,12 +2705,8 @@ function EvidenceSection({ d }: { d: ConcernDetail }) {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() =>
-                                            router.delete(
-                                                `/safeguarding/${d.id}/attachments/${a.id}`,
-                                                { preserveScroll: true },
-                                            )
-                                        }
+                                        onClick={() => setFileToRemove(a)}
+                                        aria-label={`Remove ${a.name ?? 'evidence file'}`}
                                         className="text-status-critical hover:text-status-critical"
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
@@ -2705,6 +2719,27 @@ function EvidenceSection({ d }: { d: ConcernDetail }) {
             ) : (
                 <EmptyState icon={Paperclip} text="No evidence attached." />
             )}
+
+            <ConfirmDialog
+                open={fileToRemove !== null}
+                onClose={() => {
+                    if (!removingFile) setFileToRemove(null);
+                }}
+                onConfirm={removeFile}
+                title="Remove this file?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {fileToRemove?.name ?? 'This evidence file'}
+                        </span>{' '}
+                        will be permanently deleted from this concern. This
+                        cannot be undone.
+                    </>
+                }
+                confirmText="Remove file"
+                variant="destructive"
+                processing={removingFile}
+            />
         </div>
     );
 }

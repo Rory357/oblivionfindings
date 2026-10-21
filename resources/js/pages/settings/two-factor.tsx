@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import TwoFactorRecoveryCodes from '@/components/two-factor-recovery-codes';
 import TwoFactorSetupModal from '@/components/two-factor-setup-modal';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { disable, enable, show } from '@/routes/two-factor';
 import { type BreadcrumbItem } from '@/types';
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, router } from '@inertiajs/react';
 import {
     AlertCircle,
     CheckCircle2,
@@ -50,6 +51,18 @@ export default function TwoFactor({
         errors,
     } = useTwoFactorAuth();
     const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
+    const [confirmDisable, setConfirmDisable] = useState(false);
+    const [disabling, setDisabling] = useState(false);
+
+    const disableTwoFactor = () =>
+        router.delete(disable.url(), {
+            preserveScroll: true,
+            onStart: () => setDisabling(true),
+            onFinish: () => {
+                setDisabling(false);
+                setConfirmDisable(false);
+            },
+        });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -113,18 +126,15 @@ export default function TwoFactor({
 
                                 {/* Disable button */}
                                 <div className="pt-2">
-                                    <Form action={disable()}>
-                                        {({ processing }) => (
-                                            <Button
-                                                variant="destructive"
-                                                type="submit"
-                                                disabled={processing}
-                                            >
-                                                <ShieldBan className="mr-1.5 h-4 w-4" />
-                                                Disable 2FA
-                                            </Button>
-                                        )}
-                                    </Form>
+                                    <Button
+                                        variant="destructive"
+                                        type="button"
+                                        disabled={disabling}
+                                        onClick={() => setConfirmDisable(true)}
+                                    >
+                                        <ShieldBan className="mr-1.5 h-4 w-4" />
+                                        Disable 2FA
+                                    </Button>
                                 </div>
                             </div>
                         ) : (
@@ -184,6 +194,19 @@ export default function TwoFactor({
                     clearSetupData={clearSetupData}
                     fetchSetupData={fetchSetupData}
                     errors={errors}
+                />
+
+                <ConfirmDialog
+                    open={confirmDisable}
+                    onClose={() => {
+                        if (!disabling) setConfirmDisable(false);
+                    }}
+                    onConfirm={disableTwoFactor}
+                    title="Turn off two-factor authentication?"
+                    description="Signing in will only need your password. The codes from your authenticator app and your recovery codes stop working, and turning it back on means setting it up again from the start."
+                    confirmText="Turn off two-factor"
+                    variant="destructive"
+                    processing={disabling}
                 />
             </SettingsLayout>
         </AppLayout>

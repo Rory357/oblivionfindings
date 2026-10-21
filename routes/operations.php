@@ -95,9 +95,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // PR 18 — the operations dashboard is scheduler/admin-first. Frontline
     // staff without any management capability are redirected to `/my-day`
-    // (their canonical home). Managers / admins still see the same dashboard.
+    // (their canonical home). Managers / admins still see the same dashboard,
+    // and so does anyone granted the dashboard itself (the CEO and COO).
     Route::get('/', DashboardController::class)
-        ->middleware('role_scope:my-day')
+        ->middleware('role_scope:my-day,operations.dashboard.view')
         ->name('operations.dashboard');
     Route::get('/activity', [ActivityFeedController::class, 'index'])->name('operations.activity.index');
 

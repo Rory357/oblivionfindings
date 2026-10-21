@@ -9,6 +9,8 @@ use App\Models\RespiteStay;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Models\User;
+use App\Services\Medication\Followups\CancelledShiftDoseReview;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -66,6 +68,7 @@ class RespiteShiftSync
 
             if ($booking->status === 'cancelled') {
                 $this->cancelShiftForBooking($booking, $shift);
+                $this->reviewCancelledShiftDoses($shift);
 
                 return;
             }
@@ -75,6 +78,7 @@ class RespiteShiftSync
                     'status' => 'cancelled',
                     'notes' => $this->appendNote($shift->notes, 'Respite booking recorded as no show.'),
                 ]);
+                $this->reviewCancelledShiftDoses($shift);
             }
         }, 3);
     }
@@ -341,6 +345,17 @@ class RespiteShiftSync
                 ? $this->appendNote($shift->notes, 'Respite booking cancelled: '.$reason)
                 : $shift->notes,
         ]);
+    }
+
+    /**
+     * eMAR C5b: each dose recorded on the cancelled respite shift gets one
+     * lead review (as ShiftCancellationService). The transaction's last
+     * write, so the P09 head lock stays last.
+     */
+    private function reviewCancelledShiftDoses(Shift $shift): void
+    {
+        $actor = auth()->user();
+        app(CancelledShiftDoseReview::class)->raise($shift, $actor instanceof User ? $actor : null);
     }
 
     private function appendNote(?string $notes, string $line): string

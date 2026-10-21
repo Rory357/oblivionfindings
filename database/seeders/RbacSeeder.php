@@ -686,6 +686,9 @@ class RbacSeeder extends Seeder
             'staff.viewAny', 'staff.create', 'staff.update', 'staff.invite', 'staff.assignments.update',
             'staff.credentials.viewAny', 'staff.credentials.updateAny', 'staff.availability.updateAny',
             'workers.viewAny', 'reports.viewAny', 'rostering.viewAny',
+            // Own-site operations dashboard; OperationsPermissionsSeeder creates the key
+            // and grants it on a fresh install, this keeps it on a reseed (20 Oct 2026).
+            'operations.dashboard.view',
             'fleet.viewAny', 'fleet.manage', 'fleet.driverSessions.manage', 'fleet.signals.view', 'fleet.trips.manage',
             'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve', 'fleet.incidents.manage',
             'fleet.maintenance.manage', 'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',

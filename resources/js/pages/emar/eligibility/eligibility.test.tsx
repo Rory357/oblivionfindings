@@ -326,6 +326,33 @@ describe('Assessment wizard', () => {
             ),
         ).toBeInTheDocument();
     });
+
+    it('names the house with nobody to witness, or counts houses when there are several (1440 walk)', () => {
+        const empty = (id: number, name: string) => ({
+            id,
+            name,
+            can_now: 0,
+            people: [],
+        });
+        const { rerender } = render(
+            <StaffEligibility
+                {...pageProps}
+                on_shift={[empty(3, 'Kōwhai House')]}
+            />,
+        );
+        expect(
+            screen.getByText('Kōwhai House: nobody on shift now'),
+        ).toBeInTheDocument();
+        rerender(
+            <StaffEligibility
+                {...pageProps}
+                on_shift={[empty(3, 'Kōwhai House'), empty(4, 'Rimu House')]}
+            />,
+        );
+        expect(
+            screen.getByText('2 houses: nobody on shift now'),
+        ).toBeInTheDocument();
+    });
 });
 
 describe('My eligibility', () => {

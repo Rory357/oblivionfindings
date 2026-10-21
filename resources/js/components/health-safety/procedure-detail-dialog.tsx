@@ -4,6 +4,7 @@
  * record-review / archive / restore) take over the body and post in-place. The Documents
  * section is the controlled-document library, reusing the shared AttachmentUploader.
  * Built on the Add-client modal chrome (WizardShell). Semantic tokens only. NZ-only, web-only. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import {
@@ -866,6 +867,27 @@ function AppliesSection({ detail }: { detail: ProcedureDetail }) {
 
 function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
     const canManage = detail.can.manage;
+    const [fileToRemove, setFileToRemove] = useState<
+        ProcedureDetail['attachments'][number] | null
+    >(null);
+    const [removingFile, setRemovingFile] = useState(false);
+
+    const removeFile = () => {
+        if (!fileToRemove) return;
+        router.delete(
+            `${PROCEDURES_URL}/${detail.id}/attachments/${fileToRemove.id}`,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setRemovingFile(true),
+                onFinish: () => {
+                    setRemovingFile(false);
+                    setFileToRemove(null);
+                },
+            },
+        );
+    };
+
     return (
         <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
@@ -919,15 +941,7 @@ function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
                                 <Button
                                     unstyled
                                     type="button"
-                                    onClick={() =>
-                                        router.delete(
-                                            `${PROCEDURES_URL}/${detail.id}/attachments/${a.id}`,
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                            },
-                                        )
-                                    }
+                                    onClick={() => setFileToRemove(a)}
                                     className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-status-critical-bg hover:text-status-critical"
                                     title="Remove"
                                     aria-label={`Remove ${a.original_name}`}
@@ -954,6 +968,27 @@ function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
                     />
                 </div>
             ) : null}
+
+            <ConfirmDialog
+                open={fileToRemove !== null}
+                onClose={() => {
+                    if (!removingFile) setFileToRemove(null);
+                }}
+                onConfirm={removeFile}
+                title="Remove this file?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {fileToRemove?.original_name}
+                        </span>{' '}
+                        will be permanently deleted from this procedure. This
+                        cannot be undone.
+                    </>
+                }
+                confirmText="Remove file"
+                variant="destructive"
+                processing={removingFile}
+            />
         </div>
     );
 }

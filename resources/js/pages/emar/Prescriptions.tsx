@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- the tab cards/tables are custom-layout
    bordered surfaces (not Card/Button), and the hero carries the white pill search
    on the dark band (native input/button); all colours are semantic tokens. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { OrderDetailDialog } from '@/components/emar/prescriptions/order-detail-dialog';
@@ -94,7 +95,13 @@ type Modal =
     | { type: 'order' }
     | { type: 'covert' }
     | {
-          type: 'detail' | 'countersign' | 'dispense' | 'link' | 'cancel';
+          type:
+              | 'detail'
+              | 'confirm'
+              | 'countersign'
+              | 'dispense'
+              | 'link'
+              | 'cancel';
           order: GovernedPrescriptionOrder;
       }
     | { type: 'revoke'; authorisation: GovernedCovertAuth }
@@ -275,6 +282,7 @@ export default function Prescriptions(props: Props) {
     );
     const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [modal, setModal] = useState<Modal>(null);
+    const [confirmingOrder, setConfirmingOrder] = useState(false);
     useEffect(() => {
         if (props.selected_prescriber_order)
             setModal({
@@ -454,13 +462,26 @@ export default function Prescriptions(props: Props) {
         { id: 'activity', label: 'Activity', icon: LineChart, tone: 'info' },
     ];
 
+    // Confirming moves the order on to dispensing, so it asks first.
     const confirm = (o: GovernedPrescriptionOrder) => {
+        if (!canConfirmOrder(o)) return;
+
+        setModal({ type: 'confirm', order: o });
+    };
+    const submitConfirm = (o: GovernedPrescriptionOrder) => {
         if (!canConfirmOrder(o)) return;
 
         router.post(
             `/emar/prescriptions/${o.id}/confirm`,
             {},
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onStart: () => setConfirmingOrder(true),
+                onFinish: () => {
+                    setConfirmingOrder(false);
+                    setModal(null);
+                },
+            },
         );
     };
     const openRevoke = (c: GovernedCovertAuth) => {
@@ -1483,6 +1504,35 @@ export default function Prescriptions(props: Props) {
                     onLink={() =>
                         setModal({ type: 'link', order: modal.order })
                     }
+                />
+            )}
+            {modal?.type === 'confirm' && canConfirmOrder(modal.order) && (
+                <ConfirmDialog
+                    open
+                    frontline
+                    onClose={() => {
+                        if (!confirmingOrder) setModal(null);
+                    }}
+                    onConfirm={() => submitConfirm(modal.order)}
+                    title="Confirm this order?"
+                    description={
+                        <>
+                            The order for{' '}
+                            <span className="font-medium text-foreground">
+                                {modal.order.medication_name ?? 'this medicine'}
+                            </span>{' '}
+                            for{' '}
+                            <span className="font-medium text-foreground">
+                                {modal.order.client_name}
+                            </span>{' '}
+                            is recorded as checked by you and moves to
+                            Dispensing, ready for the pharmacy supply to be
+                            recorded.
+                        </>
+                    }
+                    confirmText="Confirm order"
+                    variant="default"
+                    processing={confirmingOrder}
                 />
             )}
             {modal?.type === 'countersign' &&

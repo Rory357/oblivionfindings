@@ -1,6 +1,8 @@
 import { EntityTable } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, SelectInput } from '@/components/wizard/primitives';
@@ -63,6 +65,7 @@ type HistoryData = {
         total: number;
         from: number | null;
         to: number | null;
+        links?: { url: string | null; label: string; active: boolean }[];
     };
     can_correct?: boolean;
     actor_id?: number;
@@ -278,28 +281,30 @@ export function HistorySection({
                     onRowContextMenu={rowMenu.onRowContextMenu}
                 />
             ) : (
-                <p className="text-sm">No records in this view.</p>
+                <EmptyState
+                    icon={History}
+                    title={
+                        view === 'corrections'
+                            ? 'No corrections in this period'
+                            : view === 'changes'
+                              ? 'No changes in this period'
+                              : 'No doses in this period'
+                    }
+                    description={
+                        view === 'changes'
+                            ? 'Changes to this person’s medicines and doses appear here once recorded.'
+                            : 'Try a longer date range or clear the outcome filter.'
+                    }
+                />
             )}
             {rowMenu.menu}
-            <div className="flex items-center justify-between gap-3">
-                <Button
-                    variant="outline"
-                    disabled={data.page.current_page <= 1}
-                    onClick={() => onPage(page - 1)}
-                >
-                    Previous
-                </Button>
-                <span className="text-caption">
-                    Page {data.page.current_page} of {data.page.last_page}
-                </span>
-                <Button
-                    variant="outline"
-                    disabled={data.page.current_page >= data.page.last_page}
-                    onClick={() => onPage(page + 1)}
-                >
-                    Next
-                </Button>
-            </div>
+            {/* The shared paginator (hidden on one page); History loads as
+                JSON, so it pages through onPage, not a page visit. */}
+            <LaravelPagination
+                links={data.page.links ?? []}
+                lastPage={data.page.last_page}
+                onPage={onPage}
+            />
             {detail !== null && (
                 <DoseDetail
                     clientId={clientId}

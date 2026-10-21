@@ -163,7 +163,8 @@ class OverdueDoseAlertsTest extends TestCase
         ));
     }
 
-    public function test_a_spell_suppressed_by_a_maintenance_window_raises_one_alert_after_it(): void
+    /** D8 (eMAR audit): a Control Room maintenance window never holds back a medication alert. */
+    public function test_d8_a_maintenance_window_never_holds_back_an_overdue_dose(): void
     {
         MaintenanceWindow::query()->create([
             'name' => 'Network work',
@@ -172,35 +173,23 @@ class OverdueDoseAlertsTest extends TestCase
             'status' => 'active',
         ]);
 
-        // In the window: suppressed, and held there while it lasts.
+        // In the window: the 7:00 dose is raised as usual, once.
         $this->at('2026-06-15 08:30');
         $this->artisan('emar:send-alerts')->assertSuccessful();
         $this->at('2026-06-15 08:40');
         $this->artisan('emar:send-alerts')->assertSuccessful();
-        $this->assertSame(0, $this->overdueAlertCount());
-        $this->assertSame(['suppressed'], Signal::query()->pluck('status')->all());
-
-        // After it: the next run raises one alert, and no more.
-        $this->at('2026-06-15 08:50');
-        $this->artisan('emar:send-alerts')->assertSuccessful();
-        $this->at('2026-06-15 08:55');
-        $this->artisan('emar:send-alerts')->assertSuccessful();
         $this->assertSame(1, $this->overdueAlertCount());
-        $this->assertSame(2, Signal::query()->count());
+        $this->assertNotContains('suppressed', Signal::query()->pluck('status')->all());
     }
 
     public function test_a_failed_spell_doesnt_block_the_next_run(): void
     {
-        $window = MaintenanceWindow::query()->create([
-            'name' => 'Network work',
-            'starts_at' => $this->nz('2026-06-15 08:00'),
-            'ends_at' => $this->nz('2026-06-15 09:00'),
-            'status' => 'active',
-        ]);
+        // D8 leaves no maintenance window to hold a spell back, so the
+        // failure is made by hand: a spell whose delivery failed has no alert.
         $this->at('2026-06-15 08:30');
         $this->artisan('emar:send-alerts')->assertSuccessful();
-        Signal::query()->update(['status' => 'failed']);
-        $window->delete();
+        ControlRoomAlert::query()->delete();
+        Signal::query()->update(['status' => 'failed', 'alert_id' => null, 'correlated_alert_id' => null]);
 
         $this->at('2026-06-15 08:35');
         $this->artisan('emar:send-alerts')->assertSuccessful();

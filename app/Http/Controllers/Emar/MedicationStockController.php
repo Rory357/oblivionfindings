@@ -54,6 +54,11 @@ final class MedicationStockController extends Controller
         return response()->json($this->read->detail($request->user(), $medication))->header('Cache-Control', 'private, no-store');
     }
 
+    public function receiveChoices(Request $request)
+    {
+        return response()->json($this->read->receiveChoices($request))->header('Cache-Control', 'private, no-store');
+    }
+
     /**
      * Approved P06 Q5: the actions holders of medications.stock.receive
      * (house leads) may take. Everything else (supply orders, removals,

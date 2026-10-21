@@ -7,6 +7,7 @@ use App\Domain\Governance\Services\IncidentEscalationService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Jobs\Governance\RecoverIncidentGovernanceEscalationsJob;
 use App\Jobs\Governance\RegisterIncidentGovernanceEscalationJob;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
@@ -626,10 +627,10 @@ class MedicationErrorsTest extends TestCase
         $this->assertDatabaseCount('incident_governance_escalations', 0);
     }
 
-    public function test_required_medication_error_delivery_fails_closed_when_a_new_signal_is_suppressed(): void
+    /** D8 (eMAR audit): a Control Room maintenance window never silences a medication error. */
+    public function test_d8_a_maintenance_window_never_silences_a_medication_error(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
-        $timelineIdsBefore = TimelineEvent::query()->orderBy('id')->pluck('id')->all();
         MaintenanceWindow::query()->create([
             'name' => 'Suppress all operational signals',
             'starts_at' => now()->subMinute(),
@@ -637,29 +638,33 @@ class MedicationErrorsTest extends TestCase
             'status' => 'active',
             'created_by_user_id' => $user->id,
         ]);
-        $this->withoutExceptionHandling();
-        $exception = null;
 
-        try {
-            $this->actingAs($user)->post('/emar/errors', $this->majorIncidentPayload($client));
-        } catch (\Throwable $caught) {
-            $exception = $caught;
-        }
+        $this->actingAs($user)->post('/emar/errors', $this->majorIncidentPayload($client))->assertRedirect();
 
-        $this->assertNotNull($exception);
-        $this->assertSame(
-            'App\Exceptions\MedicationSignalDeliveryException',
-            $exception::class,
-        );
-        $this->assertSame('suppressed', $exception->reason());
-        $this->assertSame(MedicationSignalService::TYPE_ERROR, $exception->signalType());
-        $this->assertIsInt($exception->signalId());
-        $this->assertNoMedicationErrorJourneyRecords();
-        $this->assertSame(
-            $timelineIdsBefore,
-            TimelineEvent::query()->orderBy('id')->pluck('id')->all(),
-        );
-        $this->assertDatabaseCount('incident_governance_escalations', 0);
+        $this->assertOneCompleteMedicationErrorJourney();
+        $this->assertNotSame('suppressed', Signal::query()->sole()->status);
+    }
+
+    /**
+     * EA-112: an error's incident sends the notices an incident filed through
+     * Incidents sends ("submitted", and "high severity" for a high or critical
+     * one) and records its own creation in the audit log.
+     */
+    public function test_ea112_an_error_incident_sends_the_submitted_notices_and_records_its_creation(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $coordinator = $this->makeRoleUser('coordinator');
+        $manager = $this->makeRoleUser('provider_manager');
+
+        $this->actingAs($user)->post('/emar/errors', $this->majorIncidentPayload($client))->assertRedirect();
+
+        $incident = ClientIncident::query()->sole();
+        $events = fn (User $recipient): array => $recipient->notifications()->get()
+            ->map(fn ($notice) => $notice->data['event_key'] ?? null)->filter()->values()->all();
+        $this->assertContains('incidents.submitted', $events($coordinator));
+        $this->assertContains('incidents.high_severity_alert', $events($manager));
+        $this->assertSame(1, AuditLog::query()->where('auditable_type', $incident->getMorphClass())
+            ->where('auditable_id', $incident->id)->where('action', 'clientincident.create')->count());
     }
 
     public function test_required_delivery_rejects_a_retry_of_an_existing_suppressed_signal(): void

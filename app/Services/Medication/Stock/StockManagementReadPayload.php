@@ -8,7 +8,6 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
-use App\Models\MedicationPharmacyDispatch;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\Site;
 use App\Models\User;
@@ -22,7 +21,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 /** Query-bounded readers for the retained stock, pharmacy and CD workspace. */
@@ -328,43 +326,7 @@ final class StockManagementReadPayload
      */
     private function dispatchStates(array $orderIds): array
     {
-        if ($orderIds === [] || ! Schema::hasTable('medication_pharmacy_dispatches')) {
-            return [];
-        }
-
-        return MedicationPharmacyDispatch::query()->whereIn('pharmacy_order_id', $orderIds)
-            ->get(['id', 'pharmacy_order_id', 'state', 'result_code', 'acknowledgment_outcome', 'acknowledgment_applied', 'acknowledgment_code'])
-            ->mapWithKeys(fn (MedicationPharmacyDispatch $dispatch) => [(int) $dispatch->pharmacy_order_id => $this->dispatchState($dispatch)])->all();
-    }
-
-    /** @return array{state: string, label: string, short_label: string, tone: string, note: ?string} */
-    private function dispatchState(MedicationPharmacyDispatch $dispatch): array
-    {
-        $label = PharmacyDispatchPresentation::LABELS[$dispatch->state] ?? 'Check pharmacy delivery';
-        // EA-136: a pharmacy answer that arrived after staff settled the order
-        // by hand is kept as conflicting evidence and needs a person's check.
-        if ($dispatch->acknowledgment_code === 'contradicts_recorded_check') {
-            $accepted = $dispatch->acknowledgment_outcome === 'accepted';
-
-            return ['state' => $dispatch->state, 'tone' => 'warning',
-                'label' => $accepted ? 'Pharmacy accepted after a manual check' : 'Pharmacy declined after a manual check',
-                'short_label' => $accepted ? 'Accepted — check' : 'Declined — check',
-                'note' => $accepted ? 'Check the pharmacy is not now holding two orders for this medicine.' : 'Check the order with the pharmacy.'];
-        }
-        [$short, $tone, $note] = match (true) {
-            $dispatch->state === 'accepted' && ! $dispatch->acknowledgment_applied => ['Accepted — check', 'warning',
-                'The pharmacy accepted, but the order or connection changed after it was sent. Check the order with the pharmacy.'],
-            $dispatch->state === 'accepted' => ['Pharmacy accepted', 'success', null],
-            $dispatch->state === 'rejected' => ['Pharmacy declined', 'critical', 'Contact the pharmacy and arrange the supply another way.'],
-            $dispatch->state === 'unknown' => ['Delivery unknown', 'warning', 'The send may not have arrived. Check with the pharmacy before ordering again.'],
-            $dispatch->state === 'failed' && $dispatch->result_code === 'pharmacy_confirmed_not_received' => ['Not received', 'neutral', 'Staff confirmed the pharmacy did not receive it.'],
-            $dispatch->state === 'failed' => ['Not sent', 'warning', 'The send did not go through. Open the order to send again or contact the pharmacy another way.'],
-            $dispatch->state === 'cancelled' => ['Sending stopped', 'neutral', null],
-            $dispatch->state === 'sent' => ['Sent', 'info', 'Waiting for the pharmacy to respond.'],
-            default => [$label, 'info', null],
-        };
-
-        return ['state' => $dispatch->state, 'label' => $label, 'short_label' => $short, 'tone' => $tone, 'note' => $note];
+        return app(PharmacyDispatchPresentation::class)->rowStates($orderIds);
     }
 
     /** Clamp before fetching rows, so a changed result set never leaves a stale page number. */

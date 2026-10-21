@@ -17,6 +17,7 @@ import {
     PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderSearch,
+    PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -25,9 +26,9 @@ import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTime, formatTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, Eye, Plus, Siren } from 'lucide-react';
+import { AlertTriangle, Clock, Eye, Plus, Shield, Siren } from 'lucide-react';
 import { useState } from 'react';
 import { ReportErrorModal } from './components/report-error-modal';
 import { ErrorDetail } from './errors/_detail';
@@ -147,6 +148,17 @@ export default function MedicationErrors({
 }: Props) {
     const [report, setReport] = useState(false);
     const [query, setQuery] = useState(filters.q);
+    // The approved P08b "As at" chip: when this view was read; it refreshes it.
+    const [asAt, setAsAt] = useState(() => new Date().toISOString());
+    const houseNames = sites.map((site) => site.name);
+    const houses =
+        houseNames.length > 3
+            ? `${houseNames.slice(0, 3).join(', ')} and ${houseNames.length - 3} more`
+            : houseNames.length > 1
+              ? `${houseNames.slice(0, -1).join(', ')} and ${houseNames[houseNames.length - 1]}`
+              : (houseNames[0] ?? 'your houses');
+    // No error reported at all in this reader's scope (any status).
+    const noneReported = stats.total_open + stats.closed === 0;
     const ctx = useEntityContextMenu<ErrorRecord>();
     const crumbs = useEmarBreadcrumbs();
     const visit = (next: Partial<Filters>, error?: number | null) =>
@@ -213,6 +225,16 @@ export default function MedicationErrors({
                     visit({ site_id: site === 'all' ? null : Number(site) })
                 }
             />
+            <PageHeaderFilterButton
+                icon={Clock}
+                onClick={() =>
+                    router.reload({
+                        onSuccess: () => setAsAt(new Date().toISOString()),
+                    })
+                }
+            >
+                As at {formatTime(asAt)} · Pacific/Auckland
+            </PageHeaderFilterButton>
         </div>
     );
     const trend = filters.tab === 'trends';
@@ -222,9 +244,15 @@ export default function MedicationErrors({
             <Head title="Medication errors" />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    icon={AlertTriangle}
-                    title="Medication errors"
-                    subline="Safety & oversight · report, triage and look into errors and near misses"
+                    icon={Shield}
+                    title="Safety & oversight"
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            {sites.length}{' '}
+                            {sites.length === 1 ? 'house' : 'houses'}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={`Medication errors at ${houses} · times in Pacific/Auckland`}
                     rail={<EmarHubRail />}
                     filters={filtersNode}
                     actions={
@@ -235,7 +263,7 @@ export default function MedicationErrors({
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') visit({ q: query });
                                 }}
-                                placeholder="Search person or error reference"
+                                placeholder="Search people or MED number"
                             />
                             {can.export && (
                                 <MedicationExportButton
@@ -681,6 +709,20 @@ export default function MedicationErrors({
                                     lastPage={pagination.last_page}
                                 />
                             </>
+                        ) : noneReported ? (
+                            <EmptyState
+                                icon={AlertTriangle}
+                                title="No medication errors reported"
+                                description="Reports come from the dose, from a check that wasn’t right, from the person’s record and from here. Each one is triaged, looked into and closed, with the person told."
+                                action={
+                                    can.record ? (
+                                        <Button onClick={() => setReport(true)}>
+                                            <Plus />
+                                            Report an error
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         ) : (
                             <EmptyState
                                 icon={AlertTriangle}

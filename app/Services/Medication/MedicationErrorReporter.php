@@ -7,8 +7,10 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\MedicationError;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
+use App\Services\NotificationService;
 use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -90,6 +92,11 @@ final class MedicationErrorReporter
             },
             'status' => 'submitted', 'submitted_at' => now(), 'type' => 'medication_error',
         ]));
+        // EA-112: withoutEvents skips the model's own creation audit row; write it here.
+        AuditLogger::log('clientincident.create', $incident, [
+            'fields' => array_keys($incident->getAttributes()),
+            'medication_error_id' => (int) $error->id,
+        ]);
         $error->forceFill(['client_incident_id' => $incident->id])->save();
         $signals = app(MedicationSignalService::class);
         $existingAlert = $signals->attachExistingErrorSignalToIncident($error);
@@ -111,7 +118,51 @@ final class MedicationErrorReporter
                 ]);
             }
         });
+        $actorId = (int) $actor->id;
+        DB::afterCommit(fn () => $this->notifySubmitted($incidentId, $actorId));
 
         return $journey->incident;
+    }
+
+    /**
+     * EA-112: the notices an incident filed through Incidents sends
+     * (IncidentController::notifyIncidentSubmitted) — "submitted", and "high
+     * severity" for a high or critical one. A notice never undoes the report.
+     */
+    private function notifySubmitted(int $incidentId, int $actorId): void
+    {
+        try {
+            $incident = ClientIncident::query()->with('client:id,first_name,last_name')->find($incidentId);
+            $client = $incident?->client;
+            if (! $client instanceof Client) {
+                return;
+            }
+            $actor = User::query()->find($actorId);
+            $body = "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}";
+            $notices = app(NotificationService::class);
+            $notices->notifyCrud($actor, 'submitted', 'incident', $incident, $client, [
+                'event_key' => 'incidents.submitted',
+                'severity' => $incident->severity,
+                'title' => 'Incident submitted for review',
+                'body' => $body,
+                'url' => url("/incidents/{$incident->id}"),
+                'include_entity_user' => false,
+            ]);
+            if (! in_array($incident->severity, ['high', 'critical'], true)) {
+                return;
+            }
+            $notices->notifyCrud($actor, 'submitted', 'incident', $incident, $client, [
+                'event_key' => 'incidents.high_severity_alert',
+                'severity' => $incident->severity,
+                'title' => 'High severity incident submitted',
+                'body' => $body,
+                'url' => url("/incidents/{$incident->id}"),
+                'include_assigned_workers' => false,
+                'include_entity_user' => false,
+                'include_managers' => false,
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }

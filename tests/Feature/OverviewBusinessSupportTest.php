@@ -218,10 +218,49 @@ class OverviewBusinessSupportTest extends TestCase
     {
         $this->seed(GovernancePermissionsSeeder::class);
         $access = app(OverviewAccess::class);
-        $this->assertSame('governance', $access->defaultRole($this->actor('ceo')));
-        // With the operations dashboard the Manager overview is useful again.
-        $this->assertSame('manager', $access->defaultRole($this->actor('ceo', ['operations.dashboard.view' => true])));
+        // Seeded CEOs read the operations dashboard, so the Manager overview is useful.
+        $this->assertSame('manager', $access->defaultRole($this->actor('ceo')));
+        // If an admin removes it, the CEO opens on the board overview instead.
+        $this->assertSame('governance', $access->defaultRole($this->actor('ceo', ['operations.dashboard.view' => false])));
         // Without board access either, the CEO keeps the Manager overview.
-        $this->assertSame('manager', $access->defaultRole($this->actor('ceo', ['governance.view' => false])));
+        $this->assertSame('manager', $access->defaultRole($this->actor('ceo', ['operations.dashboard.view' => false, 'governance.view' => false])));
+    }
+
+    public function test_managers_and_executives_read_the_operations_dashboard_and_the_grant_migration_matches(): void
+    {
+        foreach (['provider_manager' => false, 'ceo' => true, 'coo' => true] as $role => $allSites) {
+            $user = $this->actor($role);
+            $this->assertTrue($user->canDo('operations.dashboard.view'), $role);
+            $this->assertSame($allSites, $user->canDo('operations.dashboard.viewAllSites'), $role);
+            $this->actingAs($user)->get('/operations')->assertOk();
+            // The Manager overview's shift summaries are no longer locked.
+            $this->getJson('/dashboard/data?role=manager')->assertOk()->assertJsonPath('blocks.trend.state', 'ready');
+        }
+        // Frontline roles still can't open it (sent to My Day, or refused).
+        $this->assertContains($this->actingAs($this->actor('support_worker'))->get('/operations')->status(), [302, 403]);
+
+        $migration = require database_path('migrations/2026_10_20_090000_grant_operations_dashboard_to_managers.php');
+        $migration->down();
+        $this->assertFalse($this->actor('coo')->canDo('operations.dashboard.view'));
+        $migration->up();
+        $migration->up();
+        $this->assertTrue($this->actor('coo')->canDo('operations.dashboard.viewAllSites'));
+        $this->assertTrue($this->actor('provider_manager')->canDo('operations.dashboard.view'));
+        $this->assertFalse($this->actor('provider_manager')->canDo('operations.dashboard.viewAllSites'));
+    }
+
+    public function test_sites_that_never_had_the_all_sites_dashboard_permission_get_it(): void
+    {
+        // Deploys skip seeders: a site set up before the key existed has no such permission.
+        DB::table('permissions')->where('key', 'operations.dashboard.viewAllSites')->delete();
+        $this->assertFalse($this->actor('ceo')->canDo('operations.dashboard.viewAllSites'));
+        $migration = require database_path('migrations/2026_10_20_100000_create_operations_dashboard_all_sites_permission.php');
+        $migration->up();
+        $migration->up();
+        $this->assertSame(1, DB::table('permissions')->where('key', 'operations.dashboard.viewAllSites')->count());
+        foreach (['admin', 'ceo', 'coo'] as $role) {
+            $this->assertTrue($this->actor($role)->canDo('operations.dashboard.viewAllSites'), $role);
+        }
+        $this->assertFalse($this->actor('provider_manager')->canDo('operations.dashboard.viewAllSites'));
     }
 }

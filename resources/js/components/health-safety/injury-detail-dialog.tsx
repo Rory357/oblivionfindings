@@ -7,6 +7,7 @@
  * lifecycle Options bar; in-body workflow panes host the feature-complete RTW /
  * capacity / modified-duty / ACC sub-modals; an Evidence section provides the
  * premium document upload. Supports a readOnly seam for embedding (HR profile). */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import {
     FileDropzone,
@@ -774,6 +775,26 @@ function EvidenceSection({ d, manage }: { d: InjuryDetail; manage: boolean }) {
     const [items, setItems] = useState<Staged[]>([]);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fileToRemove, setFileToRemove] = useState<
+        InjuryDetail['attachments'][number] | null
+    >(null);
+    const [removingFile, setRemovingFile] = useState(false);
+
+    const removeFile = () => {
+        if (!fileToRemove) return;
+        router.delete(
+            `/health-safety/injuries/${d.id}/attachments/${fileToRemove.id}`,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setRemovingFile(true),
+                onFinish: () => {
+                    setRemovingFile(false);
+                    setFileToRemove(null);
+                },
+            },
+        );
+    };
 
     const add = (files: File[]) => {
         setError(null);
@@ -876,16 +897,8 @@ function EvidenceSection({ d, manage }: { d: InjuryDetail; manage: boolean }) {
                             {manage ? (
                                 <button
                                     type="button"
-                                    aria-label="Remove document"
-                                    onClick={() =>
-                                        router.delete(
-                                            `/health-safety/injuries/${d.id}/attachments/${a.id}`,
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                            },
-                                        )
-                                    }
+                                    aria-label={`Remove ${a.original_name}`}
+                                    onClick={() => setFileToRemove(a)}
                                     className="shrink-0 text-muted-foreground hover:text-status-critical"
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -958,6 +971,27 @@ function EvidenceSection({ d, manage }: { d: InjuryDetail; manage: boolean }) {
                     ) : null}
                 </div>
             ) : null}
+
+            <ConfirmDialog
+                open={fileToRemove !== null}
+                onClose={() => {
+                    if (!removingFile) setFileToRemove(null);
+                }}
+                onConfirm={removeFile}
+                title="Remove this file?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {fileToRemove?.original_name}
+                        </span>{' '}
+                        will be permanently deleted from this injury record.
+                        This cannot be undone.
+                    </>
+                }
+                confirmText="Remove file"
+                variant="destructive"
+                processing={removingFile}
+            />
         </div>
     );
 }
