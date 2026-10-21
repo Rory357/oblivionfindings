@@ -206,7 +206,6 @@ it('persists administrations only through the recording service and the two corr
 
     expect(array_values(array_unique($creators)))->toBe(['app/Services/EnhancedMarService.php'])
         ->and($replicators)->toBe([
-            'app/Http/Controllers/Api/MedicationsApiController.php',
             'app/Http/Controllers/MedicationAdministrationCorrectionController.php',
         ])
         ->and($rawWrites)->toBe([]);

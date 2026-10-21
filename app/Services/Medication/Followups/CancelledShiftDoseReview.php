@@ -23,7 +23,8 @@ use Illuminate\Support\Facades\DB;
  * shift", due by the end of the next shift (the dose-review rule), and a P09
  * "dose.review_flagged" event.
  *
- * ShiftCancellationService::cancel() calls this LAST in its transaction:
+ * ShiftCancellationService::cancel(), ShiftSeriesController::cancelFuture()
+ * and RespiteShiftSync::syncBooking() (C5b) call this LAST in their transaction:
  * nothing here writes a dose record, so no medication row locks are taken,
  * and the P09 head lock is the transaction's final lock.
  */
@@ -41,12 +42,28 @@ final class CancelledShiftDoseReview
     /** @return int the follow-ups raised */
     public function raise(Shift $shift, ?User $actor): int
     {
+        return $this->raiseMany([$shift], $actor);
+    }
+
+    /**
+     * C5b: several shifts cancelled in one transaction (a series' future
+     * occurrences) — one P09 append for all of them, still the last lock.
+     *
+     * @param  iterable<Shift>  $shifts
+     * @return int the follow-ups raised
+     */
+    public function raiseMany(iterable $shifts, ?User $actor): int
+    {
         if (DB::transactionLevel() < 1) {
             throw new \LogicException('Raise cancelled-shift dose reviews inside the cancellation transaction.');
         }
+        $shiftIds = collect($shifts)->map(fn (Shift $shift): int => (int) $shift->id)->unique()->values()->all();
+        if ($shiftIds === []) {
+            return 0;
+        }
         $records = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
-            ->where('shift_id', $shift->id)
+            ->whereIn('shift_id', $shiftIds)
             ->whereIn('status', ScheduledDoseStates::RECORDED_STATUSES)
             ->whereNotNull('client_medication_id')
             ->orderBy('id')
@@ -60,11 +77,11 @@ final class CancelledShiftDoseReview
                 continue;
             }
             $row = $this->followups->ensureForSource(
-                self::SOURCE, $shift->id.'-'.$record->id, $client, $order, $record, null,
+                self::SOURCE, $record->shift_id.'-'.$record->id, $client, $order, $record, null,
                 $this->followups->doseReviewDueAt($client, $record),
                 [
                     'reason' => ShiftCancellationService::MEDICATION_REVIEW_REASON,
-                    'shift_id' => (int) $shift->id,
+                    'shift_id' => (int) $record->shift_id,
                     'cancelled_by' => $actor?->id,
                     'cancelled_at' => CarbonImmutable::now('UTC')->toIso8601String(),
                 ],
@@ -79,7 +96,7 @@ final class CancelledShiftDoseReview
                     subjectType: 'medication_administration', subjectId: (string) $record->id,
                     actorId: $actor?->id, occurredAt: CarbonImmutable::now('UTC'),
                     summary: 'Dose recorded on a cancelled shift flagged for review.',
-                    facts: ['reason' => 'shift_cancelled', 'shift_id' => (int) $shift->id, 'followup_id' => (int) $row->id],
+                    facts: ['reason' => 'shift_cancelled', 'shift_id' => (int) $record->shift_id, 'followup_id' => (int) $row->id],
                     clientId: (int) $client->id, controlled: (bool) $order->controlled_drug,
                 );
             }
