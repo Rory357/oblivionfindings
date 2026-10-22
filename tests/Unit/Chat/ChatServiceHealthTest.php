@@ -133,6 +133,7 @@ class ChatServiceHealthTest extends TestCase
         $row = $this->rows($this->service($scanner)->snapshot())['uploads'];
         self::assertSame('partial', $row['state']);
         self::assertStringContainsString('Signature freshness', $row['detail']);
+        self::assertStringContainsString('checked by Oblivion\'s own voice checker. The optional ffprobe second opinion is not set up.', $row['detail']);
         self::assertFileDoesNotExist($samplePath);
         self::assertStringNotContainsString($samplePath, json_encode($row));
     }

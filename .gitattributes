@@ -17,3 +17,8 @@ docs/fleet-assets-audit/evidence/PKG-06B/v8/qr-export-validation.cjs -whitespace
 CHANGELOG.md export-ignore
 README.md export-ignore
 .github/workflows/browser-tests.yml export-ignore
+
+# Voice-note recordings are byte-exact test inputs (their sizes and Ogg CRCs must not change).
+tests/fixtures/chat-voice/*.webm binary
+tests/fixtures/chat-voice/*.ogg binary
+tests/fixtures/chat-voice/*.m4a binary

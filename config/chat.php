@@ -20,7 +20,8 @@ return [
         'calling' => env('CHAT_HEALTH_CALLING_OWNER', ''),
     ]],
     'files' => [
-        // Server-only local ffprobe path. Never supplied through a client or settings form.
+        // Optional server-only ffprobe path, used as a second opinion on voice messages. Oblivion's own
+        // voice checker decides without it. Never supplied through a client or settings form.
         'voice_probe_binary' => env('CHAT_VOICE_PROBE_BINARY', ''),
         // Server configuration only. An unavailable scanner must never grant a clean verdict.
         'scanner' => [

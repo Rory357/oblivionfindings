@@ -113,7 +113,9 @@ class ChatServiceHealth
             fclose($sample);
         }
 
-        return ['state' => 'partial', 'detail' => 'The scanner accepted a harmless diagnostic file. Signature freshness, malware detection and private upload storage are not verified by this check. '.($this->voice->configured() ? 'The voice inspector is configured; decoding a recording still needs verification.' : 'The voice inspector is not configured; voice messages cannot pass inspection.')];
+        return ['state' => 'partial', 'detail' => 'The scanner accepted a harmless diagnostic file. Signature freshness, malware detection and private upload storage are not verified by this check. '.($this->voice->secondOpinionConfigured()
+            ? 'Voice messages are checked by Oblivion\'s own voice checker, with ffprobe as a second opinion: both must agree.'
+            : 'Voice messages are checked by Oblivion\'s own voice checker. The optional ffprobe second opinion is not set up.')];
     }
 
     protected function calling(): array

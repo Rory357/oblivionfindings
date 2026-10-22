@@ -2,20 +2,43 @@
 
 namespace App\Services\Chat;
 
+use App\Services\Chat\Voice\ChatVoiceChecker;
 use Illuminate\Contracts\Config\Repository;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Process\Process;
 use Throwable;
 
-/** Inspects only server-resolved private files; no remote URLs or client-reported duration. */
+/**
+ * Inspects only server-resolved private files; no remote URLs or client-reported duration.
+ *
+ * Oblivion's own voice-note checker decides every file. When ffprobe is configured it runs as well,
+ * as a second opinion: both must agree on the format and on the length (within AGREEMENT_MS), and a
+ * disagreement blocks the file and is logged for the service owner.
+ */
 class ChatVoiceInspector
 {
     public const MAX_SECONDS = 120;
 
     public const MAX_BYTES = 20 * 1024 * 1024;
 
-    public function __construct(private Repository $config) {}
+    /** The largest length difference allowed between the checker and the ffprobe second opinion. */
+    public const AGREEMENT_MS = 20;
 
+    private ChatVoiceChecker $checker;
+
+    public function __construct(private Repository $config, ?ChatVoiceChecker $checker = null, private ?LoggerInterface $logger = null)
+    {
+        $this->checker = $checker ?? new ChatVoiceChecker;
+    }
+
+    /** The checker is part of Oblivion, so voice notes no longer depend on an outside program. */
     public function configured(): bool
+    {
+        return true;
+    }
+
+    /** Whether the optional ffprobe second opinion is set up on this server. */
+    public function secondOpinionConfigured(): bool
     {
         $binary = trim((string) $this->config->get('chat.files.voice_probe_binary', ''));
 
@@ -24,12 +47,28 @@ class ChatVoiceInspector
 
     public function inspect(string $serverPath): ChatVoiceInspection
     {
-        if (! $this->configured()) {
-            return new ChatVoiceInspection('unavailable', errorCode: 'voice_check_unavailable');
+        $size = is_file($serverPath) && is_readable($serverPath) ? @filesize($serverPath) : false;
+        if ($size === false) {
+            return new ChatVoiceInspection('unavailable', errorCode: 'voice_check_failed');
         }
-        if (! is_file($serverPath) || ! is_readable($serverPath) || filesize($serverPath) <= 0 || filesize($serverPath) > self::MAX_BYTES) {
+        if ($size <= 0 || $size > self::MAX_BYTES) {
             return new ChatVoiceInspection('blocked', errorCode: 'voice_file_invalid');
         }
+        $bytes = @file_get_contents($serverPath, false, null, 0, self::MAX_BYTES + 1);
+        if ($bytes === false) {
+            return new ChatVoiceInspection('unavailable', errorCode: 'voice_check_failed');
+        }
+        $own = $this->checker->check($bytes);
+        if (! $this->secondOpinionConfigured()) {
+            return $own;
+        }
+
+        return $this->agree($own, $this->secondOpinion($serverPath));
+    }
+
+    /** Runs the configured ffprobe on the file. Only meaningful when secondOpinionConfigured() is true. */
+    public function secondOpinion(string $serverPath): ChatVoiceInspection
+    {
         $process = $this->makeProcess([
             trim((string) $this->config->get('chat.files.voice_probe_binary')), '-v', 'error',
             '-protocol_whitelist', 'file', '-format_whitelist', 'matroska,webm,ogg,mov',
@@ -59,6 +98,37 @@ class ChatVoiceInspector
 
             return new ChatVoiceInspection('unavailable', errorCode: 'voice_check_failed');
         }
+    }
+
+    /** Combines the checker's verdict with ffprobe's. Either one blocking blocks; a failed second opinion leaves the file to retry. */
+    public function agree(ChatVoiceInspection $own, ChatVoiceInspection $second): ChatVoiceInspection
+    {
+        $invalid = new ChatVoiceInspection('blocked', errorCode: 'voice_file_invalid');
+        if ($own->state === 'unavailable') {
+            return $own;
+        }
+        if ($own->state === 'blocked') {
+            if ($second->state === 'ready') {
+                $this->report($own, $second);
+            }
+
+            return $own;
+        }
+        if ($second->state === 'unavailable') {
+            return $second;
+        }
+        if ($second->state === 'blocked') {
+            $this->report($own, $second);
+
+            return $second->errorCode === 'voice_too_long' ? $second : $invalid;
+        }
+        if ($second->mime !== $own->mime || abs((int) $second->durationMs - (int) $own->durationMs) > self::AGREEMENT_MS) {
+            $this->report($own, $second);
+
+            return $invalid;
+        }
+
+        return new ChatVoiceInspection('ready', $own->mime, max((int) $own->durationMs, (int) $second->durationMs));
     }
 
     /** Derives duration from audio packets, including browser WebM without a duration header. */
@@ -125,6 +195,13 @@ class ChatVoiceInspector
     protected function makeProcess(array $command): Process
     {
         return new Process($command);
+    }
+
+    /** Logs a disagreement with verdicts only: no path, name or file content. */
+    private function report(ChatVoiceInspection $own, ChatVoiceInspection $second): void
+    {
+        $verdict = fn (ChatVoiceInspection $result) => ['state' => $result->state, 'mime' => $result->mime, 'duration_ms' => $result->durationMs, 'error_code' => $result->errorCode];
+        $this->logger?->warning('Chat voice checks disagreed; the voice message was blocked.', ['checker' => $verdict($own), 'ffprobe' => $verdict($second)]);
     }
 
     public static function storedBytesMatch(object $file, string $path): bool
