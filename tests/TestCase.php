@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use PDO;
 use Symfony\Component\Process\Process;
 use Tests\Support\FrozenClockTimezone;
+use Tests\Support\IsolatedDatabaseCleanup;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -19,7 +20,7 @@ abstract class TestCase extends BaseTestCase
 
     protected static bool $isolatedMysqlPrepared = false;
 
-    protected static bool $isolatedMysqlCleanupRegistered = false;
+    protected static ?IsolatedDatabaseCleanup $isolatedDatabaseCleanup = null;
 
     protected static bool $mysqlClientPathConfigured = false;
 
@@ -38,6 +39,9 @@ abstract class TestCase extends BaseTestCase
         $this->traitsUsedByTest = array_flip(class_uses_recursive(static::class));
 
         $app->make(Kernel::class)->bootstrap();
+
+        // The shutdown drop closes this application's connections first.
+        static::$isolatedDatabaseCleanup?->track($app['db']);
 
         if (static::$isolatedMysqlSchemaLoaded && ! static::$pendingMigrationsApplied) {
             $this->runPendingMigrationsAfterSchemaLoad($app);
@@ -214,6 +218,10 @@ abstract class TestCase extends BaseTestCase
      * The database name is per-process (suffixed with the PID / test token) and
      * is recreated from scratch on the next run, so dropping it at exit costs
      * nothing and stops hundreds of orphaned schemas piling up on the server.
+     *
+     * The handler first closes every connection of the test applications this
+     * process created, then drops on a fresh server connection with a bounded
+     * lock wait, so a leftover metadata lock can't hang the run at exit.
      */
     protected function registerIsolatedDatabaseCleanup(
         string $host,
@@ -222,26 +230,13 @@ abstract class TestCase extends BaseTestCase
         string $password,
         string $database,
     ): void {
-        if (static::$isolatedMysqlCleanupRegistered) {
+        if (static::$isolatedDatabaseCleanup !== null) {
             return;
         }
 
-        static::$isolatedMysqlCleanupRegistered = true;
+        static::$isolatedDatabaseCleanup = IsolatedDatabaseCleanup::forServer($host, $port, $username, $password, $database);
 
-        register_shutdown_function(static function () use ($host, $port, $username, $password, $database): void {
-            try {
-                $pdo = new PDO(
-                    sprintf('mysql:host=%s;port=%s', $host, $port),
-                    $username,
-                    $password,
-                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
-                );
-
-                $pdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $database));
-            } catch (\Throwable) {
-                // Best-effort teardown — never surface cleanup failures.
-            }
-        });
+        register_shutdown_function(static::$isolatedDatabaseCleanup->run(...));
     }
 
     /**
@@ -254,7 +249,8 @@ abstract class TestCase extends BaseTestCase
      * backlog drains gradually across successive runs instead of stalling any
      * single bootstrap — each of these schemas is expensive to drop (hundreds
      * of tables). The per-process shutdown handler is the primary cleanup; this
-     * is only a slow-drip backstop for processes that never got to run it.
+     * is only a slow-drip backstop for processes that never got to run it, or
+     * whose shutdown drop gave up waiting for a lock.
      */
     protected function pruneStaleIsolatedDatabases(PDO $pdo, string $baseName, string $currentDatabase): void
     {
