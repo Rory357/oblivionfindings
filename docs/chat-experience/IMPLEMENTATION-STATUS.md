@@ -286,7 +286,9 @@ Full scope remains open: authenticated multi-role server/media concurrency, full
 
 Implementation authorised by the user on 16 October 2026, after approval of the specification and complete mockup review set. Native iOS/Android implementation remains deferred. Calling must use a self-hosted service only (confirmed 16 October).
 
-Latest ownership decision: the user reconfirmed option 1 (self-hosted LiveKit with proprietary Oblivion application code) after considering a separately owned engine, conditional on following the applicable licences. No clean-room engine replacement is authorised by the final decision. Local-machine development is authorised; production-domain routing has not been changed.
+**Superseded 22 October 2026:** Stephan approved the Chat rebuild, which replaces every chat-specific outside engine (LiveKit, Reverb/Pusher, the web-push library, ffprobe) with Oblivion's own code through a clean room. See the 22 October decisions in the specification and [2026-10-22-rebuild-plan.html](2026-10-22-rebuild-plan.html).
+
+Earlier ownership decision (16 October, superseded): the user reconfirmed option 1 (self-hosted LiveKit with proprietary Oblivion application code) after considering a separately owned engine, conditional on following the applicable licences. No clean-room engine replacement was authorised by that decision. Local-machine development is authorised; production-domain routing has not been changed.
 
 The approved specification, surface inventory (S01–S24), acceptance criteria (A01–A20), and 51 entries in `mockups/approved-revisions.json` remain the scope. Mockup evidence is design evidence, not production verification.
 

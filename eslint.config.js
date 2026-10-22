@@ -158,6 +158,10 @@ export default [
                     'no-accent-active-state': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-blanket-descendant-size': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                    'no-emoji-icon': builtinRules.get('no-restricted-syntax'),
                 },
             },
         },
@@ -184,6 +188,43 @@ export default [
                         "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/])",
                     message:
                         'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Chat — the Chat v3 boards" and its anti-patterns (corrected
+        // 2026-10-22). Chat is rebuilt to the approved boards; these guard the
+        // rebuild. The ignored files predate the rule and are rebuilt in stage 4.
+        files: [
+            'resources/js/components/chat/**/*.{ts,tsx}',
+            'resources/js/pages/chat/**/*.{ts,tsx}',
+        ],
+        ignores: [
+            '**/*.test.tsx',
+            '**/*.test.ts',
+            'resources/js/components/chat/chat-attachment-publication.tsx',
+            'resources/js/components/chat/chat-attachment-queue.tsx',
+            'resources/js/components/chat/chat-voice-recorder.tsx',
+            'resources/js/components/chat/chat-thread.tsx',
+        ],
+        rules: {
+            'design/no-blanket-descendant-size': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/\\[&_[^\\]]+\\]:min-[hw]-/], TemplateElement[value.raw=/\\[&_[^\\]]+\\]:min-[hw]-/])',
+                    message:
+                        'Blanket descendant min-height/min-width rules also catch switches and compact controls. Give a control that needs a larger target .frontline-hit. See DESIGN.md non-negotiable 5 and "Chat — the Chat v3 boards".',
+                },
+            ],
+            'design/no-emoji-icon': [
+                'error',
+                {
+                    selector:
+                        'JSXText[value=/[\\uD83C-\\uD83E][\\uDC00-\\uDFFF]|[\\u2600-\\u27BF]/]',
+                    message:
+                        'Emoji are message content (messages, reactions, the emoji picker, stickers), never icons or labels in chat chrome. Use a lucide icon. See DESIGN.md "Icons" and "Chat — the Chat v3 boards".',
                 },
             ],
         },
