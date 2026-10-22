@@ -203,10 +203,7 @@ class SiteReportingController extends Controller
         $openHazards = $allHazards->whereIn('status', ['open', 'in_progress'])->count();
         $closedHazards = $allHazards->whereIn('status', ['mitigated', 'closed'])->count();
         $overdueHazards = $allHazards->filter(fn($h) => $h->isOverdue())->count();
-        $avgTimeToClose = $allHazards
-            ->where('status', 'closed')
-            ->filter(fn($h) => $h->closed_at !== null)
-            ->avg(fn($h) => $h->closed_at->diffInDays($h->created_at));
+        $avgTimeToClose = $this->calculateHazardAvgCloseDays(collect([$site]));
 
         // Checklist stats
         $allRuns = $site->checklistRuns;
@@ -351,7 +348,7 @@ class SiteReportingController extends Controller
                 'status' => $status,
                 'count' => $group->count(),
                 'warranty_expired' => $group->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isPast())->count(),
-                'warranty_expiring_soon' => $group->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isFuture() && $a->warranty_expires_at->diffInDays(now()) <= 30)->count(),
+                'warranty_expiring_soon' => $group->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isFuture() && $a->warranty_expires_at->lte(now()->addDays(30)))->count(),
                 'assets' => $group->map(fn($a) => [
                     'id' => $a->id,
                     'name' => $a->name,
@@ -375,7 +372,7 @@ class SiteReportingController extends Controller
             'summary' => [
                 'total_assets' => $assets->count(),
                 'warranty_expired' => $assets->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isPast())->count(),
-                'warranty_expiring_soon' => $assets->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isFuture() && $a->warranty_expires_at->diffInDays(now()) <= 30)->count(),
+                'warranty_expiring_soon' => $assets->filter(fn($a) => $a->warranty_expires_at && $a->warranty_expires_at->isFuture() && $a->warranty_expires_at->lte(now()->addDays(30)))->count(),
             ],
         ]);
     }
@@ -458,7 +455,8 @@ class SiteReportingController extends Controller
             return null;
         }
 
-        return round($allClosedHazards->avg(fn($h) => $h->closed_at->diffInDays($h->created_at)), 1);
+        // Created → closed; Carbon 3 signs diffInDays(), so the reverse was negative.
+        return round($allClosedHazards->avg(fn($h) => $h->created_at->diffInDays($h->closed_at)), 1);
     }
 
     private function calculateChecklistCompletionRate($houses, $dateFrom, $dateTo): float

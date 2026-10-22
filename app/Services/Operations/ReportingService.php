@@ -239,7 +239,8 @@ class ReportingService
                 'user_id' => $c->user_id,
                 'type' => $c->type,
                 'expires_at' => $c->expires_at->toDateString(),
-                'days_overdue' => $c->expires_at->diffInDays(now()),
+                // Whole days: Carbon 3's diffInDays() is a float.
+                'days_overdue' => (int) $c->expires_at->diffInDays(now()),
             ])->values(),
         ];
     }

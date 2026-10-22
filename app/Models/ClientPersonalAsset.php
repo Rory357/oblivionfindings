@@ -117,7 +117,8 @@ class ClientPersonalAsset extends Model
     {
         return $this->warranty_expires_at
             && ! $this->isWarrantyExpired()
-            && $this->warranty_expires_at->diffInDays(now()) <= $days;
+            // lte() rather than diffInDays(now()) <= $days, which Carbon 3 signs.
+            && $this->warranty_expires_at->lte(now()->addDays($days));
     }
 
     public function isReturnOverdue(): bool
