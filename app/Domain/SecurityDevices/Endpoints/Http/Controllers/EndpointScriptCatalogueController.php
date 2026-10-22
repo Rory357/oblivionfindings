@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Endpoints\Http\Controllers;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptContract;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointScripts;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,10 +14,36 @@ use stdClass;
 
 final class EndpointScriptCatalogueController extends Controller
 {
+    /**
+     * Catalogue reads and writes lock rows with NOWAIT. When two people act
+     * at once the loser gets MySQL 3572; answer that with a retryable 503
+     * (as the script policy service already does) instead of a 500.
+     */
+    public function callAction($method, $parameters)
+    {
+        try {
+            return parent::callAction($method, $parameters);
+        } catch (QueryException $error) {
+            if (! EndpointScripts::isLockContention($error)) {
+                throw $error;
+            }
+
+            return response()->json(['message' => 'Another change to this script is being saved. Try again in a moment.'], 503)
+                ->header('Retry-After', '2')
+                ->header('Cache-Control', 'private, no-store')
+                ->header('X-Content-Type-Options', 'nosniff');
+        }
+    }
+
     public function index(Request $request, EndpointScripts $scripts)
     {
         $query = $this->query($request, ['expected_actor_id', 'status', 'search', 'cursor'], false);
         $dto = $scripts->index($request->user(), $query);
+        if (! $request->wantsJson() || $request->header('X-Inertia')) {
+            // Script names, publishers and review notes must not come back
+            // through the browser's Back button after someone signs out.
+            Inertia::encryptHistory();
+        }
         $response = $request->wantsJson() && ! $request->header('X-Inertia')
             ? response()->json($dto) : Inertia::render('security-devices/scripts/index', $dto)->toResponse($request);
 

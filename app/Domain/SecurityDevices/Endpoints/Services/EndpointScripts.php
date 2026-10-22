@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\CurrentAuthorizationReads;
 use Closure;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -96,9 +97,19 @@ final class EndpointScripts
         });
     }
 
-    /** Navigation uses the same fresh account, role and approved-Site boundary as reads. */
+    /**
+     * Navigation uses the same fresh account, role and approved-Site boundary
+     * as reads. The fresh check takes row locks, so people who plainly hold no
+     * script permission are answered from the loaded user first: the Remote
+     * support page calls this on every load.
+     */
     public function canOpen(User $actor): bool
     {
+        if (! $actor->two_factor_confirmed_at || ! $actor->canDo('securityDevices.viewAny') || ! $actor->canDo('it.view')
+            || (! $actor->canDo(self::UPLOAD) && ! $actor->canDo(self::REVIEW))) {
+            return false;
+        }
+
         try {
             DB::transaction(fn () => $this->actor((int) $actor->id, (int) $actor->id));
 
@@ -109,7 +120,21 @@ final class EndpointScripts
             }
 
             return false;
+        } catch (QueryException $error) {
+            // A busy authority row only hides the link for this load; the
+            // catalogue itself re-checks on open. Anything else is a real error.
+            if (! self::isLockContention($error)) {
+                throw $error;
+            }
+
+            return false;
         }
+    }
+
+    /** MySQL lock-not-available (NOWAIT), lock-wait timeout or deadlock. */
+    public static function isLockContention(QueryException $error): bool
+    {
+        return in_array((int) ($error->errorInfo[1] ?? 0), [3572, 1205, 1213], true);
     }
 
     public function index(User $actor, array $query): array
