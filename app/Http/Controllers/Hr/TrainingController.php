@@ -298,9 +298,11 @@ class TrainingController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
-        $this->trainingService->setCourseActive($course, ! $course->is_active);
+        // Word the message from the saved state: setCourseActive() updates
+        // $course in place, so its is_active is already the new value.
+        $course = $this->trainingService->setCourseActive($course, ! $course->is_active);
 
-        return redirect()->back()->with('success', $course->is_active ? 'Course archived.' : 'Course activated.');
+        return redirect()->back()->with('success', $course->is_active ? 'Course activated.' : 'Course archived.');
     }
 
     public function bulkArchiveCourses(Request $request)

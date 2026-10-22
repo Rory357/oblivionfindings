@@ -118,6 +118,22 @@ test('a manager can update and archive a course', function () {
     expect($course->fresh()->is_active)->toBeFalse();
 });
 
+test('toggling a course says whether it was archived or activated', function () {
+    $course = HrCourse::factory()->create(['is_active' => true]);
+
+    $this->actingAs($this->manager)
+        ->patch("/hr/training/courses/{$course->id}/toggle")
+        ->assertRedirect()
+        ->assertSessionHas('success', 'Course archived.');
+    expect($course->fresh()->is_active)->toBeFalse();
+
+    $this->actingAs($this->manager)
+        ->patch("/hr/training/courses/{$course->id}/toggle")
+        ->assertRedirect()
+        ->assertSessionHas('success', 'Course activated.');
+    expect($course->fresh()->is_active)->toBeTrue();
+});
+
 test('sessions can be scheduled and cancelled', function () {
     $course = HrCourse::factory()->create();
 
