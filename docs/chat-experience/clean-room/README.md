@@ -60,3 +60,14 @@ Copy into `provenance/<engine>.md`.
 - Similarity check: <tool, threshold, result>, by <session>, <date>
 - Open questions:
 ```
+
+## Specs
+
+| Engine | Spec | Status |
+|---|---|---|
+| Oblivion Live (live updates, typing, presence, call signalling) and the Oblivion signer | [specs/oblivion-live.md](specs/oblivion-live.md) | Spec written 23 Oct 2026; ready for a builder session |
+| Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Spec written 23 Oct 2026; ready for a builder session |
+| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Spec written 23 Oct 2026; ready for a builder session |
+| Oblivion Calls | to write after Oblivion Live (stage 5) | — |
+
+The session that wrote these specs opened the built files of livekit-client and pusher-js to read their licence headers, so it does not build those replacements itself.
