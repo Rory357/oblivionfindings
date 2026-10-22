@@ -2577,7 +2577,7 @@ function SettingsWorkspaceBody({
             <section className="space-y-3">
                 <ListCaption
                     title="Command history"
-                    caption={`${commands.length} recorded commands shown`}
+                    caption={`${commands.length} recorded commands shown · new or repeated actions start from Device Management`}
                 />
                 {commands.length ? (
                     layout === 'table' ? (
