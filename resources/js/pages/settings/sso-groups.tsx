@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -105,9 +106,22 @@ export default function SsoGroups({
         });
     }
 
-    function handleDelete(id: number) {
-        if (!confirm('Remove this group mapping?')) return;
-        router.delete(`/settings/sso-groups/${id}`);
+    // The bin button only opens the confirmation; the request is sent from
+    // its confirm button.
+    const [mappingToRemove, setMappingToRemove] = useState<Mapping | null>(
+        null,
+    );
+    const [removingMapping, setRemovingMapping] = useState(false);
+
+    function handleDelete() {
+        if (mappingToRemove === null) return;
+        router.delete(`/settings/sso-groups/${mappingToRemove.id}`, {
+            onStart: () => setRemovingMapping(true),
+            onFinish: () => {
+                setRemovingMapping(false);
+                setMappingToRemove(null);
+            },
+        });
     }
 
     function handleFetchGroups() {
@@ -469,8 +483,9 @@ export default function SsoGroups({
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8 text-status-critical hover:text-status-critical"
+                                                    aria-label={`Remove mapping for ${m.external_group_name}`}
                                                     onClick={() =>
-                                                        handleDelete(m.id)
+                                                        setMappingToRemove(m)
                                                     }
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -483,6 +498,33 @@ export default function SsoGroups({
                         )}
                     </CardContent>
                 </Card>
+
+                <ConfirmDialog
+                    open={mappingToRemove !== null}
+                    onClose={() => {
+                        if (!removingMapping) setMappingToRemove(null);
+                    }}
+                    onConfirm={handleDelete}
+                    title="Remove this group mapping?"
+                    description={
+                        mappingToRemove ? (
+                            <p>
+                                <span className="font-medium text-foreground">
+                                    {mappingToRemove.external_group_name}
+                                </span>{' '}
+                                will no longer give people the{' '}
+                                {mappingToRemove.role?.label ||
+                                    mappingToRemove.role?.name ||
+                                    'mapped'}{' '}
+                                role when they sign in with single sign-on.
+                                Roles people already have aren&apos;t changed.
+                            </p>
+                        ) : null
+                    }
+                    confirmText="Remove mapping"
+                    variant="destructive"
+                    processing={removingMapping}
+                />
             </SettingsLayout>
         </AppLayout>
     );

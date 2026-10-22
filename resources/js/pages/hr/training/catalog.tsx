@@ -5,7 +5,19 @@ import {
     type WizardLookups,
     type WizardType,
 } from '@/components/hr/training/training-wizard-dialog';
+import InputError from '@/components/input-error';
+import { ReasonDialog } from '@/components/reason-dialog';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -16,6 +28,7 @@ import {
     ClipboardList,
     ExternalLink,
     LayoutDashboard,
+    Loader2,
     MoreVertical,
     Plus,
     Search,
@@ -228,6 +241,10 @@ interface SheetData {
         score: number | null;
     }[];
 }
+type SheetSession = SheetData['sessions'][number];
+
+/** TrainingController::cancelSession — reason nullable, max 500. */
+const SESSION_CANCEL_REASON_MAX = 500;
 
 export default function TrainingHub({
     summary,
@@ -259,6 +276,14 @@ export default function TrainingHub({
     } | null>(null);
     const [sheetId, setSheetId] = useState<number | null>(null);
     const [sheet, setSheet] = useState<SheetData | null>(null);
+    const [sessionToCancel, setSessionToCancel] = useState<SheetSession | null>(
+        null,
+    );
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelError, setCancelError] = useState<string | undefined>();
+    const [cancellingSession, setCancellingSession] = useState(false);
+    const [assignmentToWaive, setAssignmentToWaive] =
+        useState<Assignment | null>(null);
     const searchRef = useRef<HTMLInputElement>(null);
 
     /* localStorage tab prefs + deep-link */
@@ -297,6 +322,8 @@ export default function TrainingHub({
         const onKey = (e: KeyboardEvent) => {
             const t = (document.activeElement?.tagName ?? '') as string;
             if (e.key === 'Escape') {
+                // The cancel-session and waive dialogs handle their own Escape.
+                if (sessionToCancel || assignmentToWaive) return;
                 if (wizard) setWizard(null);
                 else if (ctx) setCtx(null);
                 else if (sheetId) setSheetId(null);
@@ -392,16 +419,38 @@ export default function TrainingHub({
             { preserveScroll: true, onSuccess: () => router.reload() },
         );
     };
-    const cancelSession = (sessionId: number) => {
-        const reason =
-            window.prompt('Reason for cancelling this session?') ?? undefined;
-        router.delete(`/hr/training/sessions/${sessionId}`, {
+    // "Cancel session" opens a dialog with an optional reason; the session is
+    // cancelled only from its destructive button.
+    const cancelSession = (session: SheetSession) => {
+        setCancelReason('');
+        setCancelError(undefined);
+        setSessionToCancel(session);
+    };
+    const submitCancelSession = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (sessionToCancel === null) return;
+        const reason = cancelReason.trim();
+        // Server rule: reason nullable|string|max:500.
+        if (reason.length > SESSION_CANCEL_REASON_MAX) {
+            setCancelError(
+                `Keep the reason to ${SESSION_CANCEL_REASON_MAX} characters or fewer.`,
+            );
+            return;
+        }
+        router.delete(`/hr/training/sessions/${sessionToCancel.id}`, {
             data: { reason },
             preserveScroll: true,
+            onStart: () => setCancellingSession(true),
             onSuccess: () => {
+                setSessionToCancel(null);
                 router.reload();
                 if (sheetId) refetchSheet();
             },
+            onError: (errors) =>
+                setCancelError(
+                    errors.reason ?? 'Could not cancel the session. Try again.',
+                ),
+            onFinish: () => setCancellingSession(false),
         });
     };
     const refetchSheet = () => {
@@ -420,15 +469,25 @@ export default function TrainingHub({
             { preserveScroll: true, onSuccess: () => router.reload() },
         );
     };
-    const waiveAssignment = (a: Assignment) => {
-        const reason = window.prompt(
-            `Waive ${a.course} for ${a.person} — reason?`,
-        );
-        if (!reason) return;
+    // "Waive" opens a reason dialog; the request is sent only from it.
+    const waiveAssignment = (a: Assignment) => setAssignmentToWaive(a);
+    const submitWaive = (reason: string, done: () => void) => {
+        if (assignmentToWaive === null) return;
         router.patch(
-            `/hr/training/assignments/${a.id}/waive`,
+            `/hr/training/assignments/${assignmentToWaive.id}/waive`,
             { reason },
-            { preserveScroll: true, onSuccess: () => router.reload() },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setAssignmentToWaive(null);
+                    router.reload();
+                },
+                onError: (errors) =>
+                    toast.error('Could not waive this training', {
+                        description: errors.reason,
+                    }),
+                onFinish: done,
+            },
         );
     };
     const doExport = (type: string) => {
@@ -1724,7 +1783,7 @@ export default function TrainingHub({
                                                             tone: 'danger',
                                                             onClick: () =>
                                                                 cancelSession(
-                                                                    s.id,
+                                                                    s,
                                                                 ),
                                                         },
                                                     ])
@@ -1800,6 +1859,91 @@ export default function TrainingHub({
                 courses={courses as unknown as WizardCourse[]}
                 onClose={() => setWizard(null)}
                 onSaved={onSaved}
+            />
+
+            {/* ───────── CANCEL SESSION ───────── */}
+            <Dialog
+                open={sessionToCancel !== null}
+                onOpenChange={(o) => {
+                    if (!o && !cancellingSession) setSessionToCancel(null);
+                }}
+            >
+                {/* Sits above the course sheet (z-[71]) it is opened from. */}
+                <DialogContent className="z-[95] max-w-md">
+                    <form onSubmit={submitCancelSession} className="grid gap-4">
+                        <DialogHeader>
+                            <DialogTitle>Cancel this session?</DialogTitle>
+                            <DialogDescription>
+                                The{' '}
+                                <span className="font-medium text-foreground">
+                                    {fmtDate(
+                                        sessionToCancel?.session_date ?? null,
+                                    )}
+                                </span>{' '}
+                                session
+                                {sheet?.title ? ` of ${sheet.title}` : ''} is
+                                marked cancelled and can&apos;t be reopened. No
+                                one is sent a message about it, so let the
+                                people enrolled know yourself.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="cancel-session-reason">
+                                Reason (optional)
+                            </Label>
+                            <Textarea
+                                id="cancel-session-reason"
+                                value={cancelReason}
+                                onChange={(e) => {
+                                    setCancelReason(e.target.value);
+                                    if (cancelError) setCancelError(undefined);
+                                }}
+                                maxLength={SESSION_CANCEL_REASON_MAX}
+                                rows={3}
+                                placeholder="e.g. Trainer unavailable"
+                                aria-invalid={Boolean(cancelError)}
+                            />
+                            <InputError message={cancelError} />
+                        </div>
+                        <DialogFooter>
+                            <GuardrailButton
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSessionToCancel(null)}
+                                disabled={cancellingSession}
+                            >
+                                Keep session
+                            </GuardrailButton>
+                            <GuardrailButton
+                                type="submit"
+                                variant="destructive"
+                                disabled={cancellingSession}
+                            >
+                                {cancellingSession ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : null}
+                                Cancel session
+                            </GuardrailButton>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* ───────── WAIVE ───────── */}
+            <ReasonDialog
+                open={assignmentToWaive !== null}
+                onClose={() => setAssignmentToWaive(null)}
+                title="Waive this training?"
+                description={
+                    assignmentToWaive
+                        ? `${assignmentToWaive.person} won't need to complete ${assignmentToWaive.course}. It stops showing as due or overdue, and assigning the course to them again won't reopen it.`
+                        : undefined
+                }
+                label="Reason"
+                placeholder="e.g. Already holds a current certificate"
+                confirmLabel="Waive training"
+                destructive
+                onConfirm={submitWaive}
             />
         </AppLayout>
     );

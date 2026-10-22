@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     PageHeader,
     PageHeaderGlassButton,
@@ -200,6 +201,27 @@ export default function ShiftSeriesShow({
     const visibleUpcoming = upcomingOccurrences.filter(occurrenceMatches);
     const visibleRecent = recentOccurrences.filter(occurrenceMatches);
 
+    // "Cancel future occurrences" only opens the confirmation; the request is
+    // sent from its confirm button.
+    const [confirmCancelFuture, setConfirmCancelFuture] = useState(false);
+    const [cancellingFuture, setCancellingFuture] = useState(false);
+    const cancelFutureOccurrences = () =>
+        router.patch(
+            `/operations/shifts/series/${series.id}/cancel-future`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setCancellingFuture(true),
+                onFinish: () => {
+                    setCancellingFuture(false);
+                    setConfirmCancelFuture(false);
+                },
+            },
+        );
+    const remainingShiftsLabel = `${stats.remaining_occurrences} upcoming ${
+        stats.remaining_occurrences === 1 ? 'shift' : 'shifts'
+    }`;
+
     const scrollToOccurrences = () =>
         document
             .getElementById('series-occurrences')
@@ -263,21 +285,7 @@ export default function ShiftSeriesShow({
                     ) : null}
                     {canManageAny && stats.remaining_occurrences > 0 ? (
                         <PageHeaderGlassButton
-                            onClick={() => {
-                                if (
-                                    !confirm(
-                                        'Cancel all future active occurrences in this recurring series?',
-                                    )
-                                ) {
-                                    return;
-                                }
-
-                                router.patch(
-                                    `/operations/shifts/series/${series.id}/cancel-future`,
-                                    {},
-                                    { preserveScroll: true },
-                                );
-                            }}
+                            onClick={() => setConfirmCancelFuture(true)}
                         >
                             Cancel future occurrences
                         </PageHeaderGlassButton>
@@ -987,6 +995,39 @@ export default function ShiftSeriesShow({
                     </div>
                 </div>
             </PageLayout>
+
+            <ConfirmDialog
+                open={confirmCancelFuture}
+                onClose={() => {
+                    if (!cancellingFuture) setConfirmCancelFuture(false);
+                }}
+                onConfirm={cancelFutureOccurrences}
+                title="Cancel the future shifts in this series?"
+                description={
+                    <div className="space-y-2">
+                        <p>
+                            The series is cancelled, along with up to{' '}
+                            <span className="font-medium text-foreground">
+                                {remainingShiftsLabel}
+                            </span>
+                            {series.client?.name
+                                ? ` for ${series.client.name}`
+                                : ''}
+                            .
+                        </p>
+                        <p>
+                            Any cover requests or open-shift offers for them
+                            are closed. Staff aren&apos;t sent a notification,
+                            so let them know. You can still reopen single
+                            shifts afterwards.
+                        </p>
+                    </div>
+                }
+                confirmText="Cancel future shifts"
+                cancelText="Keep shifts"
+                variant="destructive"
+                processing={cancellingFuture}
+            />
         </AppLayout>
     );
 }

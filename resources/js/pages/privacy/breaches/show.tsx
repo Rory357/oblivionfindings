@@ -1,9 +1,10 @@
 import { PageHero, PageLayout } from '@/components/page';
+import { PrivacyFieldDialog } from '@/components/privacy/privacy-field-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -11,12 +12,23 @@ import {
     Shield,
     User,
 } from 'lucide-react';
+import { useState } from 'react';
 
 type Props = {
     breach: any;
 };
 
+type BreachAction = 'notify-opc' | 'notify-subjects' | 'resolve';
+
+// Both "notified" actions run DataBreachController::notifyPrivacyTeam, which
+// emails and alerts everyone with privacy.reportBreaches plus the breach's
+// discoverer and creator. Nothing clears the notified date afterwards.
+const NOTIFIED_EFFECT =
+    "The breach is marked as notified with today's date. Everyone who manages breaches, plus whoever found and logged this one, gets an email and an in-app notification. This can't be undone.";
+
 export default function ShowDataBreach({ breach }: Props) {
+    const [action, setAction] = useState<BreachAction | null>(null);
+    const closeAction = () => setAction(null);
     const statusLabels: Record<string, string> = {
         discovered: 'discovered',
         under_investigation: 'under investigation',
@@ -296,18 +308,9 @@ export default function ShowDataBreach({ breach }: Props) {
                                         size="sm"
                                         variant="destructive"
                                         data-test="privacy-breach-notify-opc"
-                                        onClick={() => {
-                                            const reference = prompt(
-                                                'Enter OPC reference number (if available):',
-                                            );
-                                            router.post(
-                                                `/privacy/breaches/${breach.id}/notify-opc`,
-                                                {
-                                                    authority_reference:
-                                                        reference || '',
-                                                },
-                                            );
-                                        }}
+                                        onClick={() =>
+                                            setAction('notify-opc')
+                                        }
                                     >
                                         Record OPC Notification
                                     </Button>
@@ -317,20 +320,9 @@ export default function ShowDataBreach({ breach }: Props) {
                                     <Button
                                         size="sm"
                                         data-test="privacy-breach-notify-subjects"
-                                        onClick={() => {
-                                            const method = prompt(
-                                                'Enter notification method (e.g., email, letter):',
-                                            );
-                                            if (method) {
-                                                router.post(
-                                                    `/privacy/breaches/${breach.id}/notify-subjects`,
-                                                    {
-                                                        notification_method:
-                                                            method,
-                                                    },
-                                                );
-                                            }
-                                        }}
+                                        onClick={() =>
+                                            setAction('notify-subjects')
+                                        }
                                     >
                                         Record Subject Notification
                                     </Button>
@@ -339,25 +331,89 @@ export default function ShowDataBreach({ breach }: Props) {
                                 size="sm"
                                 variant="outline"
                                 data-test="privacy-breach-resolve"
-                                onClick={() => {
-                                    const notes = prompt(
-                                        'Enter resolution notes:',
-                                    );
-                                    if (notes) {
-                                        router.post(
-                                            `/privacy/breaches/${breach.id}/resolve`,
-                                            {
-                                                resolution_notes: notes,
-                                            },
-                                        );
-                                    }
-                                }}
+                                onClick={() => setAction('resolve')}
                             >
                                 Mark Resolved
                             </Button>
                         </CardContent>
                     </Card>
                 )}
+
+                <PrivacyFieldDialog
+                    open={action === 'notify-opc'}
+                    onClose={closeAction}
+                    title="Record that you've notified the Privacy Commissioner?"
+                    description={
+                        <>
+                            <p>
+                                Do this once you've reported the breach to the
+                                Office of the Privacy Commissioner, for example
+                                through NotifyUs. It doesn't send anything to
+                                the Commissioner for you.
+                            </p>
+                            <p>{NOTIFIED_EFFECT}</p>
+                        </>
+                    }
+                    fields={[
+                        {
+                            name: 'authority_reference',
+                            label: "Privacy Commissioner's reference",
+                            kind: 'text',
+                            maxLength: 255,
+                            hint: "Add it now if you have one. It can't be added later.",
+                            placeholder: 'For example, the NotifyUs reference',
+                        },
+                    ]}
+                    submitLabel="Record notification"
+                    variant="default"
+                    url={`/privacy/breaches/${breach.id}/notify-opc`}
+                />
+                <PrivacyFieldDialog
+                    open={action === 'notify-subjects'}
+                    onClose={closeAction}
+                    title="Record that the affected people were told?"
+                    description={
+                        <>
+                            <p>
+                                Do this once you've told the people affected by
+                                this breach. It doesn't contact them for you.
+                            </p>
+                            <p>{NOTIFIED_EFFECT}</p>
+                        </>
+                    }
+                    fields={[
+                        {
+                            name: 'notification_method',
+                            label: 'How you told them',
+                            kind: 'text',
+                            required: 'Say how you told the affected people.',
+                            maxLength: 255,
+                            placeholder: 'For example, letter and phone call',
+                        },
+                    ]}
+                    submitLabel="Record notification"
+                    variant="default"
+                    url={`/privacy/breaches/${breach.id}/notify-subjects`}
+                />
+                <PrivacyFieldDialog
+                    open={action === 'resolve'}
+                    onClose={closeAction}
+                    title="Mark this breach as resolved?"
+                    description="The breach is closed with today's date and your notes, and the actions on this page are removed. No one is notified."
+                    fields={[
+                        {
+                            name: 'resolution_notes',
+                            label: 'Resolution notes',
+                            kind: 'textarea',
+                            required: 'Add resolution notes.',
+                            placeholder:
+                                "How the breach was contained and what's changed so it doesn't happen again",
+                        },
+                    ]}
+                    submitLabel="Mark resolved"
+                    variant="default"
+                    url={`/privacy/breaches/${breach.id}/resolve`}
+                />
             </PageLayout>
         </AppLayout>
     );

@@ -158,6 +158,13 @@ describe('prescriber identity and person access authority', () => {
             fireEvent.click(
                 within(dialog).getByRole('button', { name: 'Revoke access' }),
             );
+            // The wizard's last button only asks; the confirm sends it.
+            expect(axios.request).not.toHaveBeenCalled();
+            const confirm = screen.getByRole('alertdialog');
+            expect(confirm).toHaveTextContent('Revoke Dr Example’s access?');
+            fireEvent.click(
+                within(confirm).getByRole('button', { name: 'Revoke access' }),
+            );
             await waitFor(() => expect(axios.request).toHaveBeenCalledTimes(1));
             expect(axios.request).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -196,6 +203,15 @@ describe('prescriber identity and person access authority', () => {
         expect(axios.request).not.toHaveBeenCalled();
         fireEvent.click(
             within(dialog).getByRole('button', { name: 'Withdraw identity' }),
+        );
+        // The wizard's last button only asks; the confirm sends it.
+        expect(axios.request).not.toHaveBeenCalled();
+        const confirm = screen.getByRole('alertdialog');
+        expect(confirm).toHaveTextContent(
+            'Withdraw Dr Example’s prescriber identity?',
+        );
+        fireEvent.click(
+            within(confirm).getByRole('button', { name: 'Withdraw identity' }),
         );
         await waitFor(() => expect(axios.request).toHaveBeenCalledTimes(1));
         expect(axios.request).toHaveBeenCalledWith(
