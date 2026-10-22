@@ -140,7 +140,8 @@ final class ChatBrowserPushDelivery
         }
 
         return DB::transaction(function () use ($id, $message): ?object {
-            OpsConversation::whereKey($message->conversation_id)->lockForUpdate()->first();
+            // Shared: writers still exclude the claim; claims no longer queue behind each other.
+            OpsConversation::whereKey($message->conversation_id)->sharedLock()->first();
             $row = DB::table('chat_browser_push_deliveries')->where('id', $id)->lockForUpdate()->first();
             if (! $row || ! in_array($row->status, ['pending', 'sending'], true)
                 || ($row->status === 'sending' ? $row->lease_until > now()->toDateTimeString() : ($row->available_at > now()->toDateTimeString() && $row->expires_at > now()->toDateTimeString()))) {

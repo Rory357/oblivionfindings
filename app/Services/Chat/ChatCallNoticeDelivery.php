@@ -105,7 +105,8 @@ final class ChatCallNoticeDelivery
         }
 
         return DB::transaction(function () use ($id, $person): int {
-            $conversation = OpsConversation::whereKey($person->call->conversation_id)->lockForUpdate()->first();
+            // Shared on the conversation (never updated here); the call rows below stay exclusive.
+            $conversation = OpsConversation::whereKey($person->call->conversation_id)->sharedLock()->first();
             $call = ChatCall::whereKey($person->call_id)->lockForUpdate()->first();
             $participant = ChatCallParticipant::whereKey($person->id)->lockForUpdate()->first();
             $row = DB::table('chat_call_notice_deliveries')->where('id', $id)->lockForUpdate()->first();

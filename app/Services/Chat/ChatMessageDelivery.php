@@ -88,7 +88,8 @@ final class ChatMessageDelivery
 
         return DB::transaction(function () use ($id, $message): int {
             // Use the same conversation-first lock order as message and membership commands.
-            $conversation = OpsConversation::whereKey($message->conversation_id)->lockForUpdate()->first();
+            // Shared: membership and message writers still exclude delivery; deliveries no longer queue behind each other.
+            $conversation = OpsConversation::whereKey($message->conversation_id)->sharedLock()->first();
             $row = DB::table('chat_message_deliveries')->where('id', $id)->lockForUpdate()->first();
             if (! $row || $row->status !== 'pending' || $row->available_at > now()->toDateTimeString()) {
                 return 0;

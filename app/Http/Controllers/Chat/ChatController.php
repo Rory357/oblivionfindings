@@ -445,7 +445,9 @@ final class ChatController extends Controller
         $data = $request->validate(['message_id' => ['required', 'integer', 'min:1'], 'unread_marker' => ['nullable', 'uuid']]);
 
         return DB::transaction(function () use ($request, $conversation, $data) {
-            $locked = OpsConversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            // Shared: only the reader's own row changes, so readers no longer queue behind each other;
+            // membership writers still hold the conversation exclusively.
+            $locked = OpsConversation::whereKey($conversation->id)->sharedLock()->firstOrFail();
             $this->access->authorize($request->user(), $locked);
             $message = $this->access->messages($locked, $request->user(), true)->findOrFail($data['message_id']);
             $member = $locked->participants()->firstOrCreate(['user_id' => $request->user()->id], ['role' => OpsConversationParticipant::COVER_READER]);
@@ -469,7 +471,8 @@ final class ChatController extends Controller
         $data = $request->validate(['is_muted' => ['sometimes', 'boolean'], 'is_favourite' => ['sometimes', 'boolean'], 'is_archived_for_user' => ['sometimes', 'boolean'], 'mark_unread' => ['sometimes', 'boolean']]);
 
         return DB::transaction(function () use ($request, $conversation, $data) {
-            $conversation = OpsConversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            // Shared: personal settings change only the person's own row.
+            $conversation = OpsConversation::whereKey($conversation->id)->sharedLock()->firstOrFail();
             $this->access->authorize($request->user(), $conversation);
             $member = $conversation->participants()->firstOrCreate(['user_id' => $request->user()->id], ['role' => OpsConversationParticipant::COVER_READER]);
             if (array_key_exists('mark_unread', $data)) {
