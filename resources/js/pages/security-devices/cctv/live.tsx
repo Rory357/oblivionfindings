@@ -227,18 +227,13 @@ export function CameraLiveWorkspace({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
                 {
                     title: camera.name,
                     href: '/security-devices/devices/' + camera.id,
                 },
-                {
-                    title: 'Live view',
-                    href: '/security-devices/devices/' + camera.id + '/live',
-                },
+                { title: 'Live view' },
             ]}
         >
             <Head title={camera.name + ' · Live view'} />

@@ -661,6 +661,30 @@ describe('UniFi current read and connected views', () => {
             screen.getByLabelText(/^Refresh interval \(minutes\)/),
         ).toHaveValue(30);
     });
+    it('shows saved quiet hours in the app time format while keeping the stored 24-hour values', () => {
+        render(
+            <UnifiIntegration
+                {...fixture}
+                providerConnection={{
+                    status: 'connected',
+                    defaults: {
+                        refresh_interval_minutes: 15,
+                        alert_motion_events: false,
+                        alert_device_offline: true,
+                        quiet_hours_start: '22:00',
+                        quiet_hours_end: '06:30',
+                    },
+                }}
+            />,
+        );
+        fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
+        expect(screen.getByText('10:00 pm')).toBeVisible();
+        expect(screen.getByText('6:30 am')).toBeVisible();
+        expect(screen.queryByText('22:00')).not.toBeInTheDocument();
+        expect(
+            screen.getByText(/Quiet hours use New Zealand time/),
+        ).toBeVisible();
+    });
     it('uses newly refreshed canonical room context without inventing an unsaved edit', () => {
         const { rerender } = render(<UnifiIntegration {...fixture} />);
         fireEvent.click(screen.getByRole('tab', { name: 'Devices' }));

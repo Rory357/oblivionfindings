@@ -8,8 +8,8 @@ import {
     within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { integrationsFixture } from './integrations-test-fixtures';
 import IntegrationsHub from './integrations';
+import { integrationsFixture } from './integrations-test-fixtures';
 const mocks = vi.hoisted(() => ({
     actor: 7,
     can: {} as Record<string, Record<string, boolean>>,
@@ -92,6 +92,10 @@ describe('Shared integration catalogue', () => {
 
     it('separates connected, old collection, unconfigured and unsupported/unavailable states', () => {
         render(<IntegrationsHub {...integrationsFixture()} />);
+        // The hub is titled with the sidebar's name for it.
+        expect(
+            screen.getByRole('heading', { level: 1, name: 'Integrations' }),
+        ).toBeInTheDocument();
         expect(
             within(card('UniFi')).getByText('Connected'),
         ).toBeInTheDocument();

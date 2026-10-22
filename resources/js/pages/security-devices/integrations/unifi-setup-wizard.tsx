@@ -26,7 +26,7 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { formatDateTimeLong, formatTime } from '@/lib/datetime';
 import {
     Bell,
     Building2,
@@ -192,6 +192,19 @@ function recordedTime(value: string | null | undefined) {
 }
 const validClock = (value: string | null) =>
     value === null || value === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+/**
+ * "10:00 pm" for a stored H:i quiet-hours time; the stored value and the
+ * picker keep H:i. Mid-January is always NZDT (+13:00) with no clock change,
+ * so the shared NZ formatter shows the wall-clock time exactly as saved.
+ */
+export function quietHoursTime(
+    value: string | null | undefined,
+    fallback: string,
+): string {
+    if (!value) return fallback;
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return value;
+    return formatTime(`2026-01-15T${value}:00+13:00`, value);
+}
 const connectionLabels: Record<string, string> = {
     connected: 'Connected',
     disconnected: 'Disconnected',
@@ -268,14 +281,14 @@ function SetupBody({
     const quietStart = values.quiet_hours_start || '',
         quietEnd = values.quiet_hours_end || '';
     const startError = !validClock(values.quiet_hours_start)
-        ? 'Choose a valid start time from 00:00 to 23:59.'
+        ? 'Choose a valid start time.'
         : !quietStart && quietEnd
           ? 'Set a start time as well as an end time, or clear both to turn quiet hours off.'
           : quietStart && quietStart === quietEnd
             ? 'Quiet hours must start and end at different times.'
             : '';
     const endError = !validClock(values.quiet_hours_end)
-        ? 'Choose a valid end time from 00:00 to 23:59.'
+        ? 'Choose a valid end time.'
         : quietStart && !quietEnd
           ? 'Set an end time as well as a start time, or clear both to turn quiet hours off.'
           : '';
@@ -598,13 +611,17 @@ function SetupBody({
                                 />
                                 <ReviewRow
                                     label="Quiet hours start"
-                                    value={
-                                        values.quiet_hours_start || 'Not set'
-                                    }
+                                    value={quietHoursTime(
+                                        values.quiet_hours_start,
+                                        'Not set',
+                                    )}
                                 />
                                 <ReviewRow
                                     label="Quiet hours end"
-                                    value={values.quiet_hours_end || 'Not set'}
+                                    value={quietHoursTime(
+                                        values.quiet_hours_end,
+                                        'Not set',
+                                    )}
                                 />
                                 <p className="text-caption mt-2">
                                     New Zealand time. Critical alerts are never

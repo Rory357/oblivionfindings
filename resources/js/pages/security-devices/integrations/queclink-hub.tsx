@@ -52,7 +52,7 @@ import {
     WizardStepPane,
 } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTimeLong, formatRelative } from '@/lib/datetime';
+import { formatDateTimeLong, formatRelative, formatTime } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
@@ -102,6 +102,7 @@ import {
     QueclinkSettingsWorkspace,
     REQUEST_FAILURE_MESSAGES,
     requestFailure,
+    sectionReadLabels,
     useQueclinkRequestLedger,
 } from './_queclink-settings';
 import {
@@ -358,7 +359,7 @@ function firstError(errors: Record<string, string | undefined>): string {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/dashboard' },
     { title: 'Security & Devices', href: '/security-devices' },
-    { title: 'APIs & Integrations', href: '/security-devices/integrations' },
+    { title: 'Integrations', href: '/security-devices/integrations' },
     { title: 'Queclink', href: '/security-devices/integrations/queclink' },
 ];
 
@@ -471,12 +472,12 @@ export default function QueclinkHub(data: Props) {
     if (!visible)
         return (
             <AppLayout breadcrumbs={breadcrumbs}>
-                <Head title="Queclink Integration" />
+                <Head title="Queclink integration" />
                 <PageLayout
                     hero={
                         <PageHeader
                             icon={Satellite}
-                            title="Queclink Integration"
+                            title="Queclink integration"
                             subline="Approved tracker intake and assignment"
                             titleChip={
                                 <PageHeaderStatusChip variant="neutral">
@@ -593,7 +594,7 @@ function QueclinkWorkspace({
     if (activeTab === 'settings' && !settingsOpened) setSettingsOpened(true);
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Queclink Integration" />
+            <Head title="Queclink integration" />
             <Tabs
                 value={activeTab}
                 onValueChange={(v) => setActiveTab(v as HubView)}
@@ -602,7 +603,7 @@ function QueclinkWorkspace({
                     hero={
                         <PageHeader
                             icon={Satellite}
-                            title="Queclink Integration"
+                            title="Queclink integration"
                             wrapTitle
                             subline="Tracker intake · vehicle, lone-worker and client assignments"
                             titleChip={
@@ -1065,10 +1066,9 @@ export function OverviewTab({
                 <CardHeader>
                     <CardTitle>Listener settings</CardTitle>
                     <CardDescription>
-                        These are the values devices dial into. Changing the
-                        port will rewrite the systemd unit and restart the
-                        listener — all paired devices must be reconfigured to
-                        match.
+                        These are the details trackers connect to. Changing the
+                        port restarts the listener, and every paired tracker
+                        must then be set to the new port.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1137,7 +1137,7 @@ export function OverviewTab({
                                 disabled={!can.manage}
                             />
                             <p className="text-xs text-muted-foreground">
-                                The address devices dial into. An existing
+                                The address trackers connect to. An existing
                                 hostname remains protected; enter a value only
                                 to set or replace it.
                             </p>
@@ -1300,7 +1300,7 @@ export function OverviewTab({
                             tracking: Vehicle, Staff (lone worker), or Client
                             (with consent record).
                         </Step>
-                        <Step n={6} title="Confirm in the Debug Console">
+                        <Step n={6} title="Confirm in the Debug console">
                             Open the <strong>Debug console</strong> tab and
                             confirm bounded heartbeat and location-report
                             states. Raw frame and device identifiers remain
@@ -1754,9 +1754,14 @@ function TrackerReader({
                                 />
                                 <ReviewRow
                                     label="Sections"
-                                    value={device.configuration?.sections.join(
-                                        ', ',
-                                    )}
+                                    value={
+                                        device.configuration
+                                            ? sectionReadLabels(
+                                                  device.configuration.sections,
+                                                  SECTION_READ_OPTIONS,
+                                              )
+                                            : undefined
+                                    }
                                 />
                             </ReviewCard>
                             <ListCaption
@@ -4055,9 +4060,7 @@ function FrameLine({ frame }: { frame: Frame }) {
     return (
         <div className="flex items-start gap-2 px-3 py-1.5">
             <div className="w-16 shrink-0 text-[10px] text-muted-foreground">
-                {frame.created_at
-                    ? new Date(frame.created_at).toLocaleTimeString()
-                    : ''}
+                {formatTime(frame.created_at, '')}
             </div>
             <div className="w-4 shrink-0">
                 {isIn ? (

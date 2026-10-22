@@ -168,7 +168,7 @@ const base = '/security-devices/integrations/milesight';
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/dashboard' },
     { title: 'Security & Devices', href: '/security-devices' },
-    { title: 'APIs & Integrations', href: '/security-devices/integrations' },
+    { title: 'Integrations', href: '/security-devices/integrations' },
     { title: 'Milesight', href: base },
 ];
 const views = [
@@ -594,7 +594,7 @@ function MilesightBody({
         ...(record.kind === 'mapping'
             ? [
                   {
-                      label: 'Sync Devices',
+                      label: 'Sync devices',
                       icon: RefreshCw,
                       disabled: !record.data.is_active
                           ? 'This mapping is inactive.'
@@ -680,11 +680,11 @@ function MilesightBody({
                 : null;
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Milesight Integration" />
+            <Head title="Milesight integration" />
             <PageLayout
                 hero={
                     <PageHeader
-                        title="Milesight Integration"
+                        title="Milesight integration"
                         icon={Plug}
                         wrapTitle
                         titleChip={

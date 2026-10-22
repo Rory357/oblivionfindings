@@ -255,7 +255,7 @@ function IntegrationsBody({
             <div className="space-y-5">
                 <PageHeader
                     icon={Plug}
-                    title="Provider integrations"
+                    title="Integrations"
                     subline="Connection, Site mapping, collected health and supported capabilities."
                     actions={
                         <>

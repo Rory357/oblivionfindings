@@ -68,10 +68,8 @@ export default function CctvSourcePage(
             <AppLayout
                 breadcrumbs={[
                     { title: 'Home', href: '/dashboard' },
-                    {
-                        title: 'Security & Devices',
-                        href: '/security-devices/security?tab=cctv',
-                    },
+                    { title: 'Security & Devices', href: '/security-devices' },
+                    { title: 'All devices', href: '/security-devices/devices' },
                 ]}
             >
                 <Alert>
@@ -96,12 +94,10 @@ export function CameraSourceWorkspace({ setup }: { setup: CctvSourceSetup }) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
                 { title: camera.name, href: base },
-                { title: 'Camera setup', href: base + '/live/source' },
+                { title: 'Camera setup' },
             ]}
         >
             <Head title={camera.name + ' · Camera setup'} />

@@ -53,6 +53,7 @@ import {
 } from './unifi-records';
 import { UnifiRoomDialog } from './unifi-room-dialog';
 import {
+    quietHoursTime,
     UnifiSetupWizard,
     type UnifiSetupChange,
     type UnifiSetupKind,
@@ -161,7 +162,7 @@ export type UnifiProps = {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/dashboard' },
     { title: 'Security & Devices', href: '/security-devices' },
-    { title: 'APIs & Integrations', href: '/security-devices/integrations' },
+    { title: 'Integrations', href: '/security-devices/integrations' },
     { title: 'UniFi', href: '/security-devices/integrations/unifi' },
 ];
 
@@ -1275,9 +1276,11 @@ function UnifiWorkspace({
                                 label="Quiet hours start"
                                 value={
                                     providerConnection?.defaults
-                                        ? providerConnection.defaults
-                                              .quiet_hours_start ||
-                                          'Not configured'
+                                        ? quietHoursTime(
+                                              providerConnection.defaults
+                                                  .quiet_hours_start,
+                                              'Not configured',
+                                          )
                                         : 'Not recorded'
                                 }
                             />
@@ -1285,9 +1288,11 @@ function UnifiWorkspace({
                                 label="Quiet hours end"
                                 value={
                                     providerConnection?.defaults
-                                        ? providerConnection.defaults
-                                              .quiet_hours_end ||
-                                          'Not configured'
+                                        ? quietHoursTime(
+                                              providerConnection.defaults
+                                                  .quiet_hours_end,
+                                              'Not configured',
+                                          )
                                         : 'Not recorded'
                                 }
                             />

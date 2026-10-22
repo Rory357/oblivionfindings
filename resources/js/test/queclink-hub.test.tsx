@@ -827,7 +827,7 @@ describe('QueclinkHub page chrome', () => {
 
         expect(screen.getByTestId('queclink-page-shell')).toHaveClass('w-full');
         expect(
-            screen.getByRole('heading', { name: 'Queclink Integration' }),
+            screen.getByRole('heading', { name: 'Queclink integration' }),
         ).toBeVisible();
         expect(
             screen.getByRole('button', { name: 'View paired devices' }),

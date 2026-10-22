@@ -254,6 +254,12 @@ describe('Queclink shared page and record views', () => {
                 screen.getByRole('navigation', { name: 'Breadcrumbs' }),
             ).getByRole('link', { name: 'Home' }),
         ).toHaveAttribute('href', '/dashboard');
+        // The hub crumb uses the sidebar's name for it.
+        expect(
+            within(
+                screen.getByRole('navigation', { name: 'Breadcrumbs' }),
+            ).getByRole('link', { name: 'Integrations' }),
+        ).toHaveAttribute('href', '/security-devices/integrations');
         expect(
             screen.getByText('30 of 32 matching trackers paired'),
         ).toBeVisible();
@@ -276,6 +282,13 @@ describe('Queclink shared page and record views', () => {
         expect(
             screen.getByText(/does not confirm a tracker location/),
         ).toBeVisible();
+        // Listener settings explain the port change in staff terms.
+        expect(
+            screen.getByText(
+                /Changing the port restarts the listener, and every paired tracker must then be set to the new port\./,
+            ),
+        ).toBeVisible();
+        expect(screen.queryByText(/systemd/)).not.toBeInTheDocument();
     });
     it('uses both shared list layouts and keeps release actions in both menus', async () => {
         render(<QueclinkHub {...fixture()} />);

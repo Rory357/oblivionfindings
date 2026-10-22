@@ -190,6 +190,18 @@ const presetSections = (sections: string[]) =>
     sections
         .map((section) => PRESET_SECTION_LABELS[section] ?? plainLabel(section))
         .join(', ');
+/** Names for the tracker section codes a configuration readback lists. */
+export function sectionReadLabels(
+    sections: string[],
+    options: SectionReadOption[],
+): string {
+    return sections
+        .map(
+            (code) =>
+                options.find((option) => option.code === code)?.label ?? code,
+        )
+        .join(', ');
+}
 const TARGET_CATEGORY_LABELS: Record<string, string> = {
     personal_tracker: 'Personal trackers',
     vehicle_tracker: 'Vehicle trackers',
@@ -1928,7 +1940,14 @@ function SettingsWorkspaceBody({
                             />
                             <ReviewRow
                                 label="Sections"
-                                value={config?.sections.join(', ')}
+                                value={
+                                    config
+                                        ? sectionReadLabels(
+                                              config.sections,
+                                              readOptions,
+                                          )
+                                        : undefined
+                                }
                             />
                             <p className="mt-3 text-sm text-muted-foreground">
                                 Values are protected. Request a readback in
@@ -2532,7 +2551,7 @@ function SettingsWorkspaceBody({
                 </Button>
                 <p className="text-sm text-muted-foreground">
                     {config?.state === 'observed'
-                        ? `Configuration observed. Sections: ${config.sections.join(', ') || 'none reported'}. Values are protected.`
+                        ? `Configuration observed. Sections: ${sectionReadLabels(config.sections, readOptions) || 'none reported'}. Values are protected.`
                         : 'No configuration readback has been received yet.'}
                 </p>
             </section>

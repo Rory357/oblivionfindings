@@ -244,8 +244,10 @@ describe('Controlled UniFi setup wizard', () => {
         );
         continueStep();
         expect(screen.getAllByText('Off')).toHaveLength(2);
-        expect(screen.getByText('23:59')).toBeInTheDocument();
-        expect(screen.getByText('06:30')).toBeInTheDocument();
+        // Shown in the app's time format; the stored values stay 24-hour.
+        expect(screen.getByText('11:59 pm')).toBeInTheDocument();
+        expect(screen.getByText('6:30 am')).toBeInTheDocument();
+        expect(screen.queryByText('23:59')).not.toBeInTheDocument();
         expect(
             screen.getByText(
                 'New Zealand time. Critical alerts are never held back.',
@@ -319,7 +321,7 @@ describe('Controlled UniFi setup wizard', () => {
         continueStep();
         continueStep();
         expect(
-            screen.getByText('Choose a valid start time from 00:00 to 23:59.'),
+            screen.getByText('Choose a valid start time.'),
         ).toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: 'Save defaults' }),

@@ -212,10 +212,14 @@ describe('Milesight shared integration workspace', () => {
             'href',
             '/dashboard',
         );
+        // The hub crumb uses the sidebar's name for it.
+        expect(
+            screen.getByRole('link', { name: 'Integrations' }),
+        ).toHaveAttribute('href', '/security-devices/integrations');
         expect(
             screen.getByRole('heading', {
                 level: 1,
-                name: 'Milesight Integration',
+                name: 'Milesight integration',
             }),
         ).toBeInTheDocument();
         expect(
@@ -512,7 +516,7 @@ describe('Milesight shared integration workspace', () => {
             expect.any(Object),
         );
         act(() => mocks.post.mock.calls.at(-1)![2].onFinish());
-        await action('North house', 'Sync Devices');
+        await action('North house', 'Sync devices');
         expect(mocks.post).toHaveBeenLastCalledWith(
             '/security-devices/integrations/milesight/devices/sync',
             { site_config_id: 42 },
@@ -641,7 +645,7 @@ describe('Milesight request and draft boundaries', () => {
     it('shows the server validation message for a refused device sync', async () => {
         render(<MilesightIntegration {...fixture()} />);
         tab('Applications & Sites');
-        await action('North house', 'Sync Devices');
+        await action('North house', 'Sync devices');
         const callbacks = mocks.post.mock.calls.at(-1)![2];
         act(() => {
             callbacks.onError({
@@ -685,7 +689,7 @@ describe('Milesight request and draft boundaries', () => {
             { key: 'Enter', code: 'Enter' },
         );
         const sync = await screen.findByRole('menuitem', {
-            name: 'Sync Devices',
+            name: 'Sync devices',
         });
         expect(sync).toHaveAttribute('aria-disabled', 'true');
         expect(
