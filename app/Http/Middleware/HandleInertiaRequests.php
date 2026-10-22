@@ -19,6 +19,7 @@ use App\Models\ShiftOpenPosition;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Assurance\NzsAssuranceResolver;
+use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\Fleet\FleetMapSettings;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\MedicationBellOrder;
@@ -450,32 +451,42 @@ class HandleInertiaRequests extends Middleware
             // Header inbox (notifications + announcements). Deferred so the
             // initial page render doesn't block on these queries — Inertia
             // fetches them in a follow-up request after mount.
-            'inbox' => Inertia::defer(fn () => $user ? [
-                'notifications' => [
-                    'unread_count' => $hasNotificationsTable
-                        ? $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true)->count()
-                        : 0,
-                    'items' => $hasNotificationsTable
-                        ? app(MedicationBellOrder::class)->apply($this->boardPackAccess->visibleNotificationQuery($user))
-                            ->latest()
-                            ->limit(8)
-                            ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
-                            ->map(fn ($n) => [
-                                'id' => $n->id,
-                                'type' => $n->type,
-                                'data' => $n->data,
-                                'read_at' => optional($n->read_at)->toISOString(),
-                                'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
-                                'escalation_count' => (int) ($n->escalation_count ?? 0),
-                                'created_at' => optional($n->created_at)->toISOString(),
-                            ])
-                            ->values()
-                        : collect(),
-                ],
-                'announcements' => $hasAnnouncementsTables
-                    ? Announcement::inboxFor($user)
-                    : ['unread_count' => 0, 'items' => []],
-            ] : null),
+            'inbox' => Inertia::defer(function () use ($user, $hasNotificationsTable, $hasAnnouncementsTables) {
+                if (! $user) {
+                    return null;
+                }
+                // Staff broadcast notices appear here only when a broadcast reader is
+                // already active for this request; otherwise they stay excluded.
+                $broadcastContext = BroadcastRecipientReadService::current($user);
+
+                return [
+                    'broadcast_reader' => $broadcastContext?->envelope(),
+                    'notifications' => [
+                        'unread_count' => $hasNotificationsTable
+                            ? $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, broadcastContext: $broadcastContext)->count()
+                            : 0,
+                        'items' => $hasNotificationsTable
+                            ? app(MedicationBellOrder::class)->apply($this->boardPackAccess->visibleNotificationQuery($user, broadcastContext: $broadcastContext))
+                                ->latest()
+                                ->limit(8)
+                                ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
+                                ->map(fn ($n) => $broadcastContext?->project($n) ?? [
+                                    'id' => $n->id,
+                                    'type' => $n->type,
+                                    'data' => $n->data,
+                                    'read_at' => optional($n->read_at)->toISOString(),
+                                    'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
+                                    'escalation_count' => (int) ($n->escalation_count ?? 0),
+                                    'created_at' => optional($n->created_at)->toISOString(),
+                                ])
+                                ->values()
+                            : collect(),
+                    ],
+                    'announcements' => $hasAnnouncementsTables
+                        ? Announcement::inboxFor($user)
+                        : ['unread_count' => 0, 'items' => []],
+                ];
+            }),
         ];
     }
 

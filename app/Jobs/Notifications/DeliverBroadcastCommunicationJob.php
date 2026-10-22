@@ -5,6 +5,8 @@ namespace App\Jobs\Notifications;
 use App\Mail\BroadcastMail;
 use App\Models\ControlRoom\Communication;
 use App\Models\UserNotificationPreference;
+use App\Services\ControlRoom\BroadcastRecipientAvailabilityService;
+use App\Services\ControlRoom\BroadcastRecipientLedger;
 use App\Services\Notifications\PushProvider;
 use App\Services\Notifications\SmsProvider;
 use Illuminate\Bus\Queueable;
@@ -23,7 +25,8 @@ use Throwable;
  * Fan-out happens at the controller level (one Communication per user per
  * channel). This job handles the transport for one row:
  *   - email → Mail::to()->send(new BroadcastMail(...))
- *   - in_app → mark delivered; inbox reads from Communications directly
+ *   - in_app → create the recipient's inbox notice (BroadcastRecipientNotice) and
+ *     mark delivered; rows sent before the broadcast ledger only mark delivered
  *   - sms / push → fail with a reason when no provider is configured, so an
  *     admin can see *why* it didn't go out rather than having the row sit
  *     pending forever (the previous behaviour).
@@ -58,6 +61,9 @@ class DeliverBroadcastCommunicationJob implements ShouldQueue
                 'status' => 'skipped',
                 'status_detail' => 'User has this channel disabled for broadcasts.',
             ])->save();
+            if ($comm->channel === 'in_app') {
+                app(BroadcastRecipientLedger::class)->settleWithoutAttempt((int) $comm->id, 'skipped', 'preference_disabled');
+            }
             return;
         }
 
@@ -107,8 +113,23 @@ class DeliverBroadcastCommunicationJob implements ShouldQueue
 
     private function markInApp(Communication $comm): void
     {
-        // The in-app inbox reads from control_room_communications directly,
-        // so marking delivered is sufficient here.
+        // Broadcasts recorded in the intent ledger become a real inbox notice
+        // (BroadcastRecipientNotice) for their recipient, read through
+        // BroadcastRecipientReadService. Rows sent before the ledger existed keep
+        // the old status-only behaviour: nothing is backfilled.
+        $token = app(BroadcastRecipientLedger::class)->claimInApp((int) $comm->id);
+        if ($token !== null) {
+            app(BroadcastRecipientAvailabilityService::class)->publish((int) $comm->id, $token);
+            if ($comm->fresh()?->broadcast_delivery_state === 'superseded') {
+                $comm->forceFill([
+                    'status' => 'skipped',
+                    'status_detail' => 'Recipient is no longer eligible for this broadcast.',
+                ])->save();
+
+                return;
+            }
+        }
+
         $comm->forceFill([
             'status' => 'delivered',
             'delivered_at' => now(),
