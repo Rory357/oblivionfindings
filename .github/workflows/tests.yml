@@ -26,8 +26,8 @@ jobs:
             shard_index: 0
             shard_count: 1
             batch_size: 30
-          # Run the complete medication gate files even when a broad feature
-          # shard stops earlier on an unrelated module's failing batch.
+          # Run the complete medication gate files as one named gate, apart
+          # from the broad feature shards and their unrelated failures.
           - suite: emar-release
             shard_index: 0
             shard_count: 1
