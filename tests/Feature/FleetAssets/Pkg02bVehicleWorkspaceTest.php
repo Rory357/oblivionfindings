@@ -12,6 +12,7 @@ use App\Models\FleetServiceSchedule;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleOdometerObservation;
 use App\Models\FleetVehicleReminder;
+use App\Models\FleetWorkOrder;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
@@ -445,6 +446,30 @@ class Pkg02bVehicleWorkspaceTest extends TestCase
         $this->actingAs($manager)->get('/fleet-assets/maintenance/dashboard')->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('overdue_services', fn ($rows) => collect($rows)->firstWhere('id', $late->id)['days_overdue'] === 5)
+                ->etc());
+    }
+
+    public function test_maintenance_dashboard_only_shows_the_viewers_sites(): void
+    {
+        // The dashboard read every Site; it now follows the work-order list's
+        // Site rule (MaintenanceAccessService).
+        $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+        $local = $this->vehicle($this->site);
+        $foreign = $this->vehicle($this->foreignSite);
+        $localLate = FleetServiceSchedule::query()->create(['asset_id' => $local->id, 'name' => 'Local late', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->subDays(3)]);
+        FleetServiceSchedule::query()->create(['asset_id' => $foreign->id, 'name' => 'Foreign late', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->subDays(3)]);
+        $localOrder = FleetWorkOrder::factory()->create(['asset_id' => $local->id, 'status' => 'open', 'actual_cost' => 100]);
+        FleetWorkOrder::factory()->create(['asset_id' => $foreign->id, 'status' => 'open', 'actual_cost' => 900]);
+
+        $this->actingAs($viewer)->get('/fleet-assets/maintenance/dashboard')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overdue_services', fn ($rows) => collect($rows)->pluck('id')->all() === [$localLate->id])
+                ->where('recent_work_orders', fn ($rows) => collect($rows)->pluck('id')->all() === [$localOrder->id])
+                ->where('cost_by_vehicle', fn ($rows) => collect($rows)->pluck('asset_id')->all() === [$local->id])
+                ->where('hero.wo_open', 1)
+                ->where('hero.service_overdue', 1)
+                ->where('stats.total_spend', 100)
+                ->where('fleet_health_pct', 0)
                 ->etc());
     }
 
