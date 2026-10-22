@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
+use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseAssignment;
 use App\Domain\Hr\Models\HrCourseEnrollment;
@@ -15,6 +16,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\StaffTrainingRecord;
 use App\Models\User;
+use App\Services\Assurance\NzsAssuranceResolver;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -83,6 +85,34 @@ test('the training hub renders with the expected tab payloads', function () {
             ->has('assignments')
             ->has('lookups.staff')
             ->where('can.manage', true));
+});
+
+test('the catalogue marks the courses whose certificates prove first-aid cover', function () {
+    $firstAid = HrComplianceRequirement::factory()->create([
+        'code' => NzsAssuranceResolver::FIRST_AID_REQUIREMENT_CODE,
+        'is_active' => true,
+    ]);
+    $other = HrComplianceRequirement::factory()->create([
+        'code' => 'TRAINING-HUB-OTHER',
+        'is_active' => true,
+    ]);
+    HrCourse::factory()->create(['title' => 'First aid level 2', 'code' => 'FA-2', 'compliance_requirement_id' => $firstAid->id]);
+    HrCourse::factory()->create(['title' => 'Fire safety', 'code' => 'FIRE-1', 'compliance_requirement_id' => $other->id]);
+    HrCourse::factory()->create(['title' => 'Manual handling', 'code' => 'MH-1', 'compliance_requirement_id' => null]);
+
+    $flags = fn () => $this->actingAs($this->manager)
+        ->get('/hr/training/catalog')
+        ->assertOk()
+        ->viewData('page')['props']['courses'];
+    $byCode = fn (iterable $courses) => collect($courses)
+        ->mapWithKeys(fn ($course) => [$course['code'] => $course['counts_for_first_aid']])
+        ->all();
+
+    expect($byCode($flags()))->toEqual(['FA-2' => true, 'FIRE-1' => false, 'MH-1' => false]);
+
+    // An inactive first-aid requirement proves nothing, so there is nothing to warn about.
+    $firstAid->update(['is_active' => false]);
+    expect($byCode($flags())['FA-2'])->toBeFalse();
 });
 
 test('a manager can create a course with rich metadata', function () {

@@ -76,7 +76,10 @@ const sheet = {
     enrollments: [],
 };
 
-const renderHub = ({ isActive = true }: { isActive?: boolean } = {}) =>
+const renderHub = ({
+    isActive = true,
+    countsForFirstAid = false,
+}: { isActive?: boolean; countsForFirstAid?: boolean } = {}) =>
     render(
         <TrainingHub
             summary={{
@@ -110,6 +113,7 @@ const renderHub = ({ isActive = true }: { isActive?: boolean } = {}) =>
                     cost: 180,
                     is_mandatory: true,
                     is_active: isActive,
+                    counts_for_first_aid: countsForFirstAid,
                     requires_renewal: true,
                     validity_period_months: 24,
                     cpd_points: null,
@@ -337,13 +341,16 @@ describe('Training › catalogue: archive a course', () => {
         options?.onFinish?.();
     };
 
-    const openCatalog = (isActive = true) => {
-        renderHub({ isActive });
+    const firstAidWarning =
+        "Certificates from this course stop counting towards first-aid cover, so Sites will show first-aid cover as needing action until it's active again.";
+
+    const openCatalog = (isActive = true, countsForFirstAid = false) => {
+        renderHub({ isActive, countsForFirstAid });
         fireEvent.click(screen.getByRole('tab', { name: /Catalog/ }));
     };
 
-    const openArchiveFromMenu = () => {
-        openCatalog();
+    const openArchiveFromMenu = (countsForFirstAid = false) => {
+        openCatalog(true, countsForFirstAid);
         fireEvent.click(
             screen.getByRole('button', {
                 name: 'Actions for First aid level 2',
@@ -365,6 +372,31 @@ describe('Training › catalogue: archive a course', () => {
         expect(archiveDialog()).toHaveTextContent(
             'New starters are no longer enrolled in it during induction.',
         );
+        expect(archiveDialog()).not.toHaveTextContent('first-aid cover');
+    });
+
+    it('warns that first-aid cover drops when the course proves first aid', () => {
+        openArchiveFromMenu(true);
+
+        expect(archiveDialog()).toHaveTextContent(firstAidWarning);
+        expect(archiveDialog()).toHaveTextContent(
+            'You can activate it again from its menu.',
+        );
+        expect(router.patch).not.toHaveBeenCalled();
+    });
+
+    it('gives the same first-aid warning when archiving it from the bulk bar', () => {
+        openCatalog(true, true);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Select First aid level 2' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+
+        expect(
+            within(archiveDialog()).getByText('Archive 1 course?'),
+        ).toBeInTheDocument();
+        expect(archiveDialog()).toHaveTextContent(firstAidWarning);
+        expect(router.post).not.toHaveBeenCalled();
     });
 
     it('Cancel archives nothing', async () => {
