@@ -41,6 +41,10 @@ class ClientConsentController extends Controller
             ->each(function (ClientConsent $consent) use ($request, $client): void {
                 $consent->setRelation('client', $client);
                 $consent->setAttribute('is_consumable', $consent->isValid());
+                // S14: the page's Expired / Expiring soon tabs and the Withdraw
+                // button read these; same rule as the stats below.
+                $consent->setAttribute('is_expired', $consent->isExpired());
+                $consent->setAttribute('is_expiring_soon', $consent->isValid() && $consent->isExpiringSoon());
 
                 if ($consent->hasDownloadableSignedDocument()
                     && Gate::forUser($request->user())->allows('downloadEvidence', $consent)) {

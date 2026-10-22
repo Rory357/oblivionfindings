@@ -131,7 +131,9 @@ class TimelineController extends Controller
         if ($to->lessThan($from)) {
             [$from, $to] = [$to, $from];
         }
-        if ($to->diffInDays($from) > 60) {
+        // $from->diffInDays($to): Carbon 3 signs it, and $to->diffInDays($from)
+        // is negative here, so the cap never applied.
+        if ($from->diffInDays($to) > 60) {
             $to = (clone $from)->addDays(60);
         }
 

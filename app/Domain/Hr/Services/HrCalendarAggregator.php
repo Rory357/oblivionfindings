@@ -521,13 +521,20 @@ class HrCalendarAggregator
 
     /* ── Compliance renewals (read-only; deep-link to Compliance) ────────── */
 
+    /**
+     * Expired or within 30 days is critical. Not diffInDays($now) <= 30:
+     * Carbon 3 signs it, so every future expiry read as critical.
+     */
+    private static function complianceUrgency(Carbon $expires, Carbon $now): string
+    {
+        return $expires->lte($now->copy()->addDays(30)) ? 'critical' : 'warning';
+    }
+
     private function compliance(Carbon $start, Carbon $end, array $filters, ?User $viewer): Collection
     {
         $now = now();
         $out = collect();
-        $urgency = function (Carbon $expires) use ($now): string {
-            return $expires->lt($now) || $expires->diffInDays($now) <= 30 ? 'critical' : 'warning';
-        };
+        $urgency = fn (Carbon $expires): string => self::complianceUrgency($expires, $now);
 
         $visibleUserIds = $viewer
             ? $this->access->visibleCurrentStaffQuery($viewer)->select('users.id')
