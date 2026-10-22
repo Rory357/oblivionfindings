@@ -74,7 +74,7 @@ test.describe('Security specialist workspace', () => {
         await expectNoPageOverflow(page);
 
         await tabs
-            .getByRole('link', { name: 'Access Control', exact: true })
+            .getByRole('link', { name: 'Access control', exact: true })
             .click();
         const door = page.getByRole('article', { name: fixture.doorName });
         await expect(door).toContainText('Door: Secured');

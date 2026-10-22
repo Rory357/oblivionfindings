@@ -137,7 +137,7 @@ class DeviceController extends Controller
             ],
             'scopeLabel' => $scopeLabel,
             'filterOptions' => [
-                'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
+                'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => self::domainLabel($d)]),
                 'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
                 'healthStatuses' => collect(HealthStatus::cases())->map(fn ($h) => ['value' => $h->value, 'label' => $h->label()]),
                 'providers' => $providers,
@@ -885,13 +885,25 @@ class DeviceController extends Controller
     // mapDeviceForList() and resolveAssignableName() are in MapsDevicesForList trait.
 
     /** @return array{taxonomy: array<string, mixed>, domains: Collection<int, array{value: string, label: string}>, statuses: Collection<int, array{value: string, label: string}>} */
+    /** Domains are named as the Security & Devices sidebar names their workspaces. */
+    private static function domainLabel(DeviceDomain $domain): string
+    {
+        return match ($domain) {
+            DeviceDomain::ItInfrastructure => 'Network & IT',
+            DeviceDomain::Security => 'Security',
+            DeviceDomain::IotHealthcare => 'Healthcare',
+            DeviceDomain::Tracking => 'Tracking',
+            DeviceDomain::Facilities => 'Facilities & IoT',
+        };
+    }
+
     private function deviceFormOptions(): array
     {
         return [
             'taxonomy' => DeviceTaxonomy::all(),
             'domains' => collect(DeviceDomain::cases())->map(fn ($domain) => [
                 'value' => $domain->value,
-                'label' => $domain->label(),
+                'label' => self::domainLabel($domain),
             ]),
             'statuses' => collect(DeviceStatus::cases())->map(fn ($status) => [
                 'value' => $status->value,

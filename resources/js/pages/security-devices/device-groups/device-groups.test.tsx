@@ -210,16 +210,16 @@ describe('Device group list', () => {
         expect(
             screen.getByRole('button', { name: 'View current group results' }),
         ).toHaveTextContent('45');
+        // Page-local membership counts live on the rail only, not as meters.
         expect(
-            screen.getByRole('button', {
+            screen.queryByRole('button', {
                 name: 'View with devices on this page',
             }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('tab', { name: /With devices/ }),
         ).toHaveTextContent('2');
-        fireEvent.click(
-            screen.getByRole('button', {
-                name: 'View empty groups on this page',
-            }),
-        );
+        fireEvent.click(screen.getByRole('tab', { name: /Empty groups/ }));
         expect(
             screen.getByRole('article', { name: 'Unconfigured group' }),
         ).toBeInTheDocument();

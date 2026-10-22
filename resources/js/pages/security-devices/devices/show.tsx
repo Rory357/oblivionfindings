@@ -276,7 +276,7 @@ export default function DeviceShow(data: Props) {
                 breadcrumbs={[
                     { title: 'Home', href: '/dashboard' },
                     { title: 'Security & Devices', href: '/security-devices' },
-                    { title: 'Devices', href: '/security-devices/devices' },
+                    { title: 'All devices', href: '/security-devices/devices' },
                 ]}
             >
                 <Head title="Device access required" />
@@ -306,11 +306,11 @@ export default function DeviceShow(data: Props) {
                         <EmptyState
                             icon={Cpu}
                             title="This device isn’t available to you"
-                            description="This device is not available in your current access. Return to Devices and reopen a permitted record."
+                            description="This device is not available in your current access. Return to All devices and reopen a permitted record."
                             action={
                                 <Button asChild variant="outline">
                                     <Link href="/security-devices/devices">
-                                        Back to Devices
+                                        Back to all devices
                                     </Link>
                                 </Button>
                             }
@@ -857,7 +857,7 @@ function DeviceShowBody({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
-                { title: 'Devices', href: '/security-devices/devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
                 { title: device.name },
             ]}
         >
@@ -874,6 +874,7 @@ function DeviceShowBody({
                             <CctvNavigationActions
                                 cameraId={device.id}
                                 navigation={profile.cctv}
+                                onDark
                             />
                             {endpoint_setup && (
                                 <PageHeaderGlassButton
@@ -1214,12 +1215,6 @@ function DeviceShowBody({
                                 </DialogContent>
                             </Dialog>
 
-                            {can.assign && (
-                                <Button size="sm" onClick={openAssignDialog}>
-                                    <Plus className="mr-1 h-3 w-3" />
-                                    Assign
-                                </Button>
-                            )}
                             <DeviceAssignmentRecords
                                 rows={assignmentHistory}
                                 view={recordsView}
@@ -1722,8 +1717,8 @@ function DeviceShowBody({
                         <DialogHeader>
                             <DialogTitle>
                                 {activeAssignment
-                                    ? 'Transfer Device'
-                                    : 'Assign Device'}
+                                    ? 'Transfer device'
+                                    : 'Assign device'}
                             </DialogTitle>
                             <DialogDescription>
                                 {activeAssignment
@@ -1903,7 +1898,7 @@ function DeviceShowBody({
                 <Dialog open={maintOpen} onOpenChange={setMaintOpen}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Schedule Maintenance</DialogTitle>
+                            <DialogTitle>Schedule maintenance</DialogTitle>
                             <DialogDescription>
                                 Create a maintenance record for {device.name}.
                             </DialogDescription>
@@ -1924,13 +1919,13 @@ function DeviceShowBody({
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="scheduled_service">
-                                            Scheduled Service
+                                            Scheduled service
                                         </SelectItem>
                                         <SelectItem value="repair">
                                             Repair
                                         </SelectItem>
                                         <SelectItem value="firmware_update">
-                                            Firmware Update
+                                            Firmware update
                                         </SelectItem>
                                         <SelectItem value="inspection">
                                             Inspection
@@ -1942,10 +1937,10 @@ function DeviceShowBody({
                                             Calibration
                                         </SelectItem>
                                         <SelectItem value="connectivity_check">
-                                            Connectivity Check
+                                            Connectivity check
                                         </SelectItem>
                                         <SelectItem value="battery_replacement">
-                                            Battery Replacement
+                                            Battery replacement
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>

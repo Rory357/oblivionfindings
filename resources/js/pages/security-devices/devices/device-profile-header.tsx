@@ -13,9 +13,90 @@ import {
     formatRelative,
 } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
-import { Activity, Cpu, Search } from 'lucide-react';
+import {
+    Activity,
+    BatteryCharging,
+    BedDouble,
+    BellRing,
+    Car,
+    Cctv,
+    Cog,
+    Cpu,
+    DoorOpen,
+    Droplets,
+    Fence,
+    Flame,
+    HardDrive,
+    HeartPulse,
+    KeyRound,
+    Laptop,
+    MapPin,
+    PersonStanding,
+    Phone,
+    Pill,
+    Plug,
+    Printer,
+    Router,
+    Search,
+    Server,
+    ShieldAlert,
+    Siren,
+    Snowflake,
+    Tag,
+    Thermometer,
+    Video,
+    type LucideIcon,
+} from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
+
+/** One fitting icon per stored taxonomy category; Cpu covers anything else. */
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+    // Security
+    alarm: Siren,
+    cctv: Cctv,
+    access_control: KeyRound,
+    perimeter: Fence,
+    // Tracking
+    vehicle_tracker: Car,
+    personal_tracker: MapPin,
+    asset_tracker: Tag,
+    telematics: Car,
+    // Healthcare
+    fall_detection: PersonStanding,
+    occupancy: Activity,
+    wandering: DoorOpen,
+    bed_sensor: BedDouble,
+    medication: Pill,
+    nurse_call: BellRing,
+    wellness: HeartPulse,
+    environmental: Thermometer,
+    appliance: Plug,
+    // Network & IT
+    server: Server,
+    storage: HardDrive,
+    network: Router,
+    power: BatteryCharging,
+    endpoint: Laptop,
+    voice: Phone,
+    recording: Video,
+    rack: Server,
+    it_environmental: Thermometer,
+    printer: Printer,
+    // Facilities & IoT
+    leak_detection: Droplets,
+    gas_detection: Flame,
+    cold_chain: Snowflake,
+    mechanical: Cog,
+    facility_access: DoorOpen,
+    building_safety: ShieldAlert,
+};
+
+export function deviceCategoryIcon(
+    category: string | null | undefined,
+): LucideIcon {
+    return (category && CATEGORY_ICONS[category]) || Cpu;
+}
 
 /** Tone for the recorded device state (DeviceStatus) shown in the title chip. */
 function deviceStateVariant(state: string | null): StatusVariant {
@@ -127,7 +208,7 @@ export function DeviceProfileHeader({
     return (
         <PageHeader
             variant="profile"
-            icon={Cpu}
+            icon={deviceCategoryIcon(header.identity.category)}
             title={header.identity.name}
             wrapTitle
             backHref="/security-devices/devices"

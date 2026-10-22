@@ -9,6 +9,7 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
+use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommands;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommands;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
@@ -167,7 +168,9 @@ class DeviceProfilePresenter
                 'id' => $device->id,
                 'name' => $device->name,
                 'uid' => $device->device_uid,
-                'type' => collect([$device->category, $device->subcategory])->filter()->join(' / '),
+                'type' => $this->deviceTypeLabel($device),
+                // Stored key, used only to choose the header icon.
+                'category' => $device->category,
                 'manufacturer' => $device->manufacturer,
                 'model' => $device->model,
             ],
@@ -532,6 +535,50 @@ class DeviceProfilePresenter
         ];
     }
 
+    /**
+     * The header's type line in words: the taxonomy subtype ("Card reader")
+     * when one is recorded, otherwise the category ("Access control").
+     */
+    private function deviceTypeLabel(Device $device): string
+    {
+        $category = (string) $device->category;
+        $subcategory = (string) $device->subcategory;
+
+        if ($subcategory !== '') {
+            $known = DeviceTaxonomy::subcategoriesFor((string) $device->domain, $category)[$subcategory] ?? null;
+
+            return is_string($known) ? $this->sentenceCase($known) : $this->taxonomyWords($subcategory);
+        }
+
+        return $category !== '' ? $this->taxonomyWords($category) : '';
+    }
+
+    /** "PIR Motion Sensor" → "PIR motion sensor"; words like NVR and LoRa keep their capitals. */
+    private function sentenceCase(string $label): string
+    {
+        return collect(explode(' ', $label))
+            ->map(fn (string $word, int $index): string => $index === 0 || preg_match('/[A-Z]/', mb_substr($word, 1)) === 1
+                ? $word
+                : mb_strtolower($word))
+            ->join(' ');
+    }
+
+    /** A stored key in words: "access_control" → "Access control", "cctv" → "CCTV". */
+    private function taxonomyWords(string $value): string
+    {
+        $acronyms = [
+            '5g' => '5G', 'can' => 'CAN', 'cctv' => 'CCTV', 'co' => 'CO', 'dvr' => 'DVR', 'gps' => 'GPS',
+            'hvac' => 'HVAC', 'it' => 'IT', 'iot' => 'IoT', 'lora' => 'LoRa', 'lpg' => 'LPG', 'lte' => 'LTE',
+            'mfp' => 'MFP', 'nas' => 'NAS', 'nvr' => 'NVR', 'obd' => 'OBD', 'pbx' => 'PBX', 'pdu' => 'PDU',
+            'pir' => 'PIR', 'ptz' => 'PTZ', 'san' => 'SAN', 'sip' => 'SIP', 'sos' => 'SOS', 'ups' => 'UPS',
+        ];
+        $words = preg_split('/[_\s-]+/', mb_strtolower($value), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return collect($words)
+            ->map(fn (string $word, int $index): string => $acronyms[$word] ?? ($index === 0 ? Str::ucfirst($word) : $word))
+            ->join(' ');
+    }
+
     private function monitorKindLabel(?MonitorKind $kind): string
     {
         return match ($kind) {
@@ -542,6 +589,8 @@ class DeviceProfilePresenter
             MonitorKind::Tls => 'TLS',
             MonitorKind::Snmp => 'SNMP',
             MonitorKind::SnmpInterface => 'SNMP interface',
+            MonitorKind::SshInventory => 'Read-only SSH inventory',
+            MonitorKind::WinRmInventory => 'Read-only WinRM inventory',
             MonitorKind::Provider => 'Provider check',
             MonitorKind::Collector => 'Collector health',
             default => 'Monitor',

@@ -91,20 +91,18 @@ $capabilities = [
         'content_hash' => ['type' => 'string', 'max_length' => 64],
         'policy_version' => ['type' => 'integer', 'min' => 1, 'max' => 4294967295],
         'inputs_json' => ['type' => 'string', 'max_length' => 8192],
-    ], ['script_uuid', 'script_version']), ['requires_mfa' => true, 'expires_after_seconds' => 900,
-        'impact' => 'Reviewed scripts run with privileged computer access. Approval applies only to the selected immutable script, inputs and computer policy.',
-        'expected_result' => 'An exact-attempt execution receipt can confirm completion. It cannot establish an unmeasured desired state or imply rollback.']),
+    ], ['script_uuid', 'script_version']), ['requires_mfa' => true, 'expires_after_seconds' => 900]),
     'endpoint.software.install' => array_replace($high('Install approved Windows software', 'network_it', 'endpoint_software_product', [
         'package_uuid' => ['type' => 'string', 'max_length' => 36],
-    ], ['package_uuid']), ['requires_mfa' => true, 'expires_after_seconds' => 900, 'impact' => 'Installing or updating approved machine software can interrupt computer features. A restart may be required afterward.', 'expected_result' => 'A known MSI receipt and fresh independent machine ProductCode/version observation confirm the reviewed release. Restart remains a separate governed action.']),
+    ], ['package_uuid']), ['requires_mfa' => true, 'expires_after_seconds' => 900]),
     'endpoint.computer.restart' => array_replace($high('Schedule Windows restart', 'network_it', 'endpoint_restart_boot', [
         'execute_at' => ['type' => 'date_time'],
         'warning_seconds' => ['type' => 'integer', 'min' => 60, 'max' => 3600],
-    ], ['execute_at', 'warning_seconds']), ['requires_mfa' => true, 'expires_after_seconds' => 86405, 'impact' => 'Restarting this computer interrupts active work. A visible warning is required and unsaved work may prevent the restart.', 'expected_result' => 'An accepted restart API receipt remains awaiting boot. Completion requires a fresh authenticated changed-boot observation for this exact attempt.']),
+    ], ['execute_at', 'warning_seconds']), ['requires_mfa' => true, 'expires_after_seconds' => 86405]),
     'endpoint.service.manage' => array_replace($high('Manage Windows service', 'network_it', 'endpoint_service_state', [
         'service_name' => ['type' => 'string', 'max_length' => 200],
         'operation' => ['type' => 'string', 'enum' => ['start', 'stop', 'restart']],
-    ], ['service_name', 'operation']), ['requires_mfa' => true, 'impact' => 'Starting, stopping or restarting this approved service can interrupt computer features and active work.', 'expected_result' => 'An execution receipt followed by a fresh agent observation confirms the service state. Restart completion also requires a successful execution receipt.']),
+    ], ['service_name', 'operation']), ['requires_mfa' => true]),
     'diagnostics.ping' => array_replace(
         $definition('Ping device', 'network_it', 'operate', 'low', false, false, false, false, 300, 'diagnostic_result'),
         ['requires_fresh_observation' => false],
@@ -345,6 +343,8 @@ $authorise(
     'facilities_control',
 );
 
+// The single source of each capability's impact and expected result; the
+// loop below writes them onto every capability definition.
 $guidance = [
     'endpoint.script.run' => ['Reviewed scripts run with privileged computer access. Approval applies only to the selected immutable script, inputs and computer policy.', 'An exact-attempt execution receipt can confirm completion. It cannot establish an unmeasured desired state or imply rollback.'],
     'endpoint.software.install' => ['Install the exact independently reviewed machine MSI release. Installation can interrupt computer features.', 'Completion needs the immutable MSI receipt and independent machine product observation. Exit3010 means a restart is required, never an automatic restart.'],

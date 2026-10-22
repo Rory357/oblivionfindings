@@ -205,40 +205,25 @@ function GroupList({
                                     setCreateOpen(true);
                                 }}
                             >
-                                Create group
+                                Add device group
                             </PageHeaderPrimaryButton>
                         </>
                     }
                     meters={
-                        <>
-                            <PageHeaderMeterBlock
-                                label="Matching groups"
-                                ariaLabel="View current group results"
-                                onClick={() => setView('all')}
-                            >
-                                <PageHeaderMeterBig>
-                                    {groups.meta.total}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Across all pages of this search
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            {headerViews.slice(1).map((item) => (
-                                <PageHeaderMeterBlock
-                                    key={item.key}
-                                    label={item.label}
-                                    ariaLabel={`View ${item.label.toLowerCase()} on this page`}
-                                    onClick={() => setView(item.key)}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {item.count}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        On the current page only
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            ))}
-                        </>
+                        // Membership counts live on the rail (this page only);
+                        // the header carries the one server total.
+                        <PageHeaderMeterBlock
+                            label="Matching groups"
+                            ariaLabel="View current group results"
+                            onClick={() => setView('all')}
+                        >
+                            <PageHeaderMeterBig>
+                                {groups.meta.total}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                Across all pages of this search
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
                     }
                     filters={
                         <>
@@ -301,8 +286,8 @@ function GroupList({
                                 setCreated(false);
                                 setCreateOpen(true);
                             }}
-                            createLabel="Create group"
-                            description="Create a group to organise your approved devices."
+                            createLabel="Add device group"
+                            description="Add a group to organise your approved devices."
                         />
                     ) : rows.length === 0 ? (
                         <EmptySearch

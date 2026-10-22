@@ -78,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('Device Group automatic membership builder', () => {
-    it('enables a plain-language condition and normalises comma-separated values', () => {
+    it('enables a plain-language condition, offers stored values and normalises comma-separated values', () => {
         render(<Harness />);
 
         fireEvent.click(
@@ -86,10 +86,14 @@ describe('Device Group automatic membership builder', () => {
         );
         fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
 
-        const valueInputs = screen.getAllByLabelText('Value');
-        fireEvent.change(valueInputs[1], {
-            target: { value: 'camera, nvr, camera' },
-        });
+        // Device types are picked from the stored values, not typed.
+        const many = screen.getByRole('group', { name: 'Value' });
+        expect(within(many).getByRole('combobox')).toHaveTextContent(
+            'Choose one or more values',
+        );
+        expect(
+            screen.queryByPlaceholderText('camera, nvr, door controller'),
+        ).not.toBeInTheDocument();
 
         expect(
             normaliseAutoRules({

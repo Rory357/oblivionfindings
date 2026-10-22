@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTime, formatTime } from '@/lib/datetime';
+import { rosterInstant } from '@/lib/roster-time';
 import { Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -18,6 +19,27 @@ import {
     XCircle,
 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
+
+const SCHEDULE_DAYS: Record<string, string> = {
+    monday: 'Mon',
+    tuesday: 'Tue',
+    wednesday: 'Wed',
+    thursday: 'Thu',
+    friday: 'Fri',
+    saturday: 'Sat',
+    sunday: 'Sun',
+};
+const scheduleDayLabel = (day: string) =>
+    SCHEDULE_DAYS[day.toLowerCase()] ?? day;
+
+/** Schedules keep wall-clock times ("08:00"); show them as "8:00 am". */
+function scheduleTimeLabel(value: string): string {
+    const match = /^(\d{2}):(\d{2})/.exec(value);
+    if (!match) return value;
+    // A fixed NZ day without a clock change turns the wall time into an
+    // instant, so the shared formatter writes it like every other time.
+    return formatTime(rosterInstant(`2026-01-15T${match[1]}:${match[2]}:00`));
+}
 
 export type AccessControlWorkspaceData = {
     restricted: boolean;
@@ -1230,9 +1252,10 @@ export function AccessControlWorkspace({
                                     </div>
                                     <p className="mt-2 text-sm">
                                         {schedule.days
-                                            .map((day) => day.slice(0, 3))
+                                            .map(scheduleDayLabel)
                                             .join(', ')}{' '}
-                                        • {schedule.startsAt}–{schedule.endsAt}
+                                        • {scheduleTimeLabel(schedule.startsAt)}{' '}
+                                        – {scheduleTimeLabel(schedule.endsAt)}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
                                         {schedule.timezone}

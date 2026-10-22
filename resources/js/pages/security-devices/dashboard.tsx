@@ -242,6 +242,8 @@ function DashboardBody({
         value: number | string;
         caption: string;
         view: EstateView;
+        /** The page that owns the number when it lives outside these views. */
+        owner?: { href: string; label: string };
     }> = [
         {
             label: 'Affected Sites',
@@ -268,6 +270,12 @@ function DashboardBody({
                 : 'Restricted',
             caption: 'Devices with an enabled monitor',
             view: 'overview',
+            owner: permission.events
+                ? {
+                      href: '/security-devices/monitoring?tab=coverage',
+                      label: 'Open monitoring coverage',
+                  }
+                : undefined,
         },
         {
             label: 'Open IT work',
@@ -276,6 +284,12 @@ function DashboardBody({
                 : 'Restricted',
             caption: 'Existing IT work queue',
             view: 'overview',
+            owner: permission.it
+                ? {
+                      href: '/it?tab=tickets&view=all_open',
+                      label: 'Open the IT open work queue',
+                  }
+                : undefined,
         },
         {
             label: 'Device records',
@@ -403,8 +417,15 @@ function DashboardBody({
                         <PageHeaderMeterBlock
                             key={meter.label}
                             label={meter.label}
-                            ariaLabel={`Open ${views.find((tab) => tab.key === meter.view)?.label.toLowerCase()} view`}
-                            onClick={() => select(meter.view)}
+                            {...(visible && meter.owner
+                                ? {
+                                      href: meter.owner.href,
+                                      ariaLabel: meter.owner.label,
+                                  }
+                                : {
+                                      ariaLabel: `Open ${views.find((tab) => tab.key === meter.view)?.label.toLowerCase()} view`,
+                                      onClick: () => select(meter.view),
+                                  })}
                         >
                             <PageHeaderMeterBig>
                                 {visible ? meter.value : 'Restricted'}
@@ -538,15 +559,15 @@ function DashboardBody({
                                 ) : null}
                                 {view === 'findings' && permission.events ? (
                                     <Button asChild variant="outline">
-                                        <Link href="/security-devices/alerts-events">
+                                        <Link href="/security-devices/monitoring?tab=findings">
                                             View all findings
                                         </Link>
                                     </Button>
                                 ) : null}
                                 {view === 'work' && permission.maintenance ? (
                                     <Button asChild variant="outline">
-                                        <Link href="/security-devices/maintenance-health">
-                                            View all maintenance & health
+                                        <Link href="/security-devices/maintenance?tab=due">
+                                            View due or overdue maintenance
                                         </Link>
                                     </Button>
                                 ) : null}

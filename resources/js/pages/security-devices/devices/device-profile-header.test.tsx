@@ -187,6 +187,23 @@ describe('Device profile shared header', () => {
             expect(chip).toHaveClass(tone);
         },
     );
+    it.each([
+        ['cctv', 'lucide-cctv'],
+        ['access_control', 'lucide-key-round'],
+        ['network', 'lucide-router'],
+        ['personal_tracker', 'lucide-map-pin'],
+        [null, 'lucide-cpu'],
+        ['unlisted_kind', 'lucide-cpu'],
+    ])('marks a %s device with a fitting icon', (category, icon) => {
+        header({
+            ...profile,
+            header: {
+                ...profile.header,
+                identity: { ...profile.header.identity, category },
+            },
+        });
+        expect(document.querySelector('.eh-mark-ring svg')).toHaveClass(icon);
+    });
     it('keeps the last observation relative time current and shows the exact time', () => {
         vi.useFakeTimers({ now: new Date('2026-10-12T00:00:30Z') });
         try {

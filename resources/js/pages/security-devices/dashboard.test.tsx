@@ -9,8 +9,8 @@ import {
     within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { estateFixture } from './estate-test-fixtures';
 import Dashboard from './dashboard';
+import { estateFixture } from './estate-test-fixtures';
 const mocks = vi.hoisted(() => ({
     actor: 7,
     can: {} as Record<string, Record<string, boolean>>,
@@ -223,12 +223,14 @@ describe('Estate shared records and authority', () => {
     it('retains attention identity/domain/category/battery/dates and domain/health distributions', async () => {
         render(<Dashboard {...estateFixture()} />);
         fireEvent.click(screen.getByRole('tab', { name: 'Devices & domains' }));
-        expect(card('IoT healthcare')).toBeInTheDocument();
+        // Domains use the sidebar's workspace names.
+        expect(card('Healthcare')).toBeInTheDocument();
+        expect(card('Network & IT')).toBeInTheDocument();
         expect(card('Recorded health: Unknown')).toBeInTheDocument();
         const dialog = await details('Synthetic pump');
         for (const value of [
             'DEV-2',
-            'IoT healthcare',
+            'Healthcare',
             'Medical device',
             'Offline',
             'Critical',
@@ -437,5 +439,39 @@ describe('dashboard same-account reads', () => {
         expect(mocks.visit).not.toHaveBeenCalled();
         rerender(<Dashboard {...original} as_of="2026-10-13T02:00:00Z" />);
         expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
+    });
+});
+
+describe('dashboard number owners', () => {
+    it('opens Monitoring, IT and Maintenance for numbers this page does not own', () => {
+        mocks.can.it = { view: true };
+        render(<Dashboard {...estateFixture()} />);
+        expect(
+            screen.getByRole('link', { name: 'Open monitoring coverage' }),
+        ).toHaveAttribute('href', '/security-devices/monitoring?tab=coverage');
+        expect(
+            screen.getByRole('link', { name: 'Open the IT open work queue' }),
+        ).toHaveAttribute('href', '/it?tab=tickets&view=all_open');
+        fireEvent.click(screen.getByRole('tab', { name: /Recent findings/ }));
+        expect(
+            screen.getByRole('link', { name: 'View all findings' }),
+        ).toHaveAttribute('href', '/security-devices/monitoring?tab=findings');
+        fireEvent.click(screen.getByRole('tab', { name: /Overdue work/ }));
+        expect(
+            screen.getByRole('link', {
+                name: 'View due or overdue maintenance',
+            }),
+        ).toHaveAttribute('href', '/security-devices/maintenance?tab=due');
+    });
+
+    it('keeps a restricted owner on the in-page overview instead of a link', () => {
+        render(<Dashboard {...estateFixture()} />);
+        expect(
+            screen.queryByRole('link', { name: 'Open the IT open work queue' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getAllByRole('button', { name: 'Open overview view' })
+                .length,
+        ).toBeGreaterThan(0);
     });
 });

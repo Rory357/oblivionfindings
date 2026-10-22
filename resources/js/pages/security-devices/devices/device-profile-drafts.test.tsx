@@ -313,7 +313,7 @@ async function assetDraft() {
 }
 async function assignmentDraft(type: string, target: string | RegExp) {
     fireEvent.click(screen.getAllByRole('button', { name: 'Assign' })[0]);
-    const dialog = screen.getByRole('dialog', { name: 'Assign Device' });
+    const dialog = screen.getByRole('dialog', { name: 'Assign device' });
     if (type !== 'Site')
         await choose(within(dialog).getAllByRole('combobox')[0], type);
     await choose(within(dialog).getAllByRole('combobox')[1], target);

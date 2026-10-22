@@ -68,11 +68,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
     DeviceCard,
     domainLabel,
+    taxonomyWords,
     type DeviceListItem,
     type Paginated,
 } from '../devices/shared';
 import { GroupWizard, groupTypeLabel } from './_dialogs';
 import type { AutoRuleCondition, AutoRules } from './auto-rule-builder';
+import { autoRuleValueLabel } from './auto-rule-values';
 import MaintenancePolicyPreview, {
     maintenanceMemberIdentity,
     strictPreviewUtc,
@@ -115,7 +117,7 @@ export type AutoRulePreview = {
 };
 type ProfileView = 'members' | 'rules' | 'details';
 const label = (value: string | null) =>
-    value ? value.replaceAll('_', ' ') : 'Not recorded';
+    value ? taxonomyWords(value) : 'Not recorded';
 const ruleFieldLabel = (field: AutoRuleCondition['field']) =>
     ({
         domain: 'Area',
@@ -710,7 +712,7 @@ function GroupProfile({
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Need attention"
+                                    label="Needs attention"
                                     ariaLabel="View members needing attention on this page"
                                     onClick={() => selectMembers(true)}
                                 >
@@ -887,13 +889,19 @@ function GroupProfile({
                                                     condition.op,
                                                 )}{' '}
                                                 <span className="font-medium">
-                                                    {Array.isArray(
+                                                    {(Array.isArray(
                                                         condition.value,
                                                     )
-                                                        ? condition.value.join(
-                                                              ', ',
-                                                          )
-                                                        : condition.value}
+                                                        ? condition.value
+                                                        : [condition.value]
+                                                    )
+                                                        .map((value) =>
+                                                            autoRuleValueLabel(
+                                                                condition.field,
+                                                                value,
+                                                            ),
+                                                        )
+                                                        .join(', ')}
                                                 </span>
                                             </li>
                                         ),
