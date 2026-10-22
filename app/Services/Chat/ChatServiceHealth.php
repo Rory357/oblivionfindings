@@ -67,6 +67,9 @@ class ChatServiceHealth
 
     protected function realtime(): array
     {
+        if ($this->config->get('chat.live.enabled')) {
+            return $this->live();
+        }
         if (! $this->config->get('chat.realtime.enabled')) {
             return ['state' => 'disabled', 'detail' => 'Realtime wake-ups are disabled. Chat uses its polling fallback when available.'];
         }
@@ -82,6 +85,24 @@ class ChatServiceHealth
         }
 
         return ['state' => 'passed', 'detail' => 'The realtime server accepted an authenticated read. Browser reconnect and background-worker delivery still require a real session check.'];
+    }
+
+    /** Oblivion Live: a signed read of each gateway node's health. Nothing is published. */
+    protected function live(): array
+    {
+        $live = app(OblivionLive::class);
+        if (! $live->enabled()) {
+            return ['state' => 'not_configured', 'detail' => 'Oblivion Live is switched on, but its secret, key ID or internal address is missing.'];
+        }
+        try {
+            $nodes = $live->health();
+        } catch (Throwable) {
+            return ['state' => 'unavailable', 'detail' => 'Oblivion Live did not answer its signed health check. Chat keeps working by polling until it is back.'];
+        }
+        $connections = array_sum(array_map(fn (array $node) => (int) ($node['connections'] ?? 0), $nodes));
+
+        return ['state' => 'passed', 'detail' => sprintf('Oblivion Live answered a signed health check: %d %s, %d open %s. Browser reconnect still needs a real session check.',
+            count($nodes), count($nodes) === 1 ? 'node' : 'nodes', $connections, $connections === 1 ? 'connection' : 'connections')];
     }
 
     protected function push(): array

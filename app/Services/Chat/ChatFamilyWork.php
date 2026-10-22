@@ -108,7 +108,7 @@ final class ChatFamilyWork
                 'encrypted_note' => trim($data['note'] ?? '') !== '' ? Crypt::encryptString(trim($data['note'])) : null, 'created_at' => now(),
             ]);
             AuditLog::create(['user_id' => $actor->id, 'client_id' => $conversation->client_id, 'action' => 'chat.family_work.'.$data['action'], 'meta' => ['conversation_id' => $conversation->id, 'event_id' => $id]]);
-            app(ChatRealtime::class)->queueConversation($conversation->id);
+            app(ChatRealtime::class)->queueConversation($conversation->id, kinds: 'family_work');
 
             return in_array($data['action'], ['assign', 'handoff'], true)
                 && app(ChatFamilyWorkDelivery::class)->enqueue($id, $conversation, (int) $actor->id, $previousOwner) ? $id : null;

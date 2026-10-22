@@ -85,10 +85,15 @@ final class ChatController extends Controller
                 ->when($staff, fn ($cover) => $cover->orWhere(fn ($family) => $family->where('conversation_type', 'family')->where('care_team_cover', true)
                     ->whereHas('client', fn ($clients) => $this->family->scopeViewableClients($clients, $user)))))
             ->when($client, fn ($query) => $query->where('client_id', $client->id)->where('conversation_type', 'family'))
+            // A live event names one conversation: refresh just its row (empty when no longer visible).
+            ->when($only = $request->integer('only') ?: null, fn ($query) => $query->whereKey($only))
             ->with(['client', 'participants.user'])
             ->orderByDesc('updated_at')->get();
         $conversations = $this->access->filterAllowed($user, $conversations)
             ->map(fn ($conversation) => $this->projection->conversation($conversation, $user, summary: true))->values();
+        if ($only) {
+            return response()->json(['conversations' => $conversations, 'only' => $only])->header('Cache-Control', 'private, no-store');
+        }
         $people = $staff ? $this->visibility->visibleCurrentStaffQuery($user)->where('users.id', '!=', $user->id)->get(['users.id', 'users.name']) : collect();
         if (! $staff && $client) {
             $people = app(ChatFamilyContacts::class)->namedPeople($client)
@@ -131,8 +136,11 @@ final class ChatController extends Controller
             $after = $this->access->messages($conversation, $request->user(), true)->where('id', '>=', $target->id)->orderBy('id')->limit(26)->get();
             $rows = $before->concat($after)->values();
 
+            $position = app(ChatMessageChanges::class)->latestId($conversation);
+
             return response()->json([
-                'sync_cursor' => app(ChatMessageChanges::class)->cursor($conversation, $request->user()),
+                'sync_cursor' => app(ChatMessageChanges::class)->cursor($conversation, $request->user(), $position),
+                'sync_change_id' => $position,
                 'conversation' => $this->projection->conversation($conversation, $request->user()),
                 'messages' => $this->projection->messages($rows, $request->user(), $conversation),
                 'has_more' => $this->access->messages($conversation, $request->user(), true)->where('id', '<', $rows->first()->id)->exists(),
@@ -143,8 +151,11 @@ final class ChatController extends Controller
             ->when($data['q'] ?? null, fn ($query, $q) => $query->whereNull('deleted_at')->where('content', 'like', '%'.addcslashes($q, '%_\\').'%'))
             ->with(['sender:id,name', 'reactions.user:id,name'])->orderByDesc('id')->limit(51)->get();
 
+        $position = app(ChatMessageChanges::class)->latestId($conversation);
+
         return response()->json([
-            'sync_cursor' => app(ChatMessageChanges::class)->cursor($conversation, $request->user()),
+            'sync_cursor' => app(ChatMessageChanges::class)->cursor($conversation, $request->user(), $position),
+            'sync_change_id' => $position,
             'conversation' => $this->projection->conversation($conversation, $request->user()),
             'messages' => $this->projection->messages($rows->take(50)->reverse()->values(), $request->user(), $conversation),
             'has_more' => $rows->count() > 50,
@@ -250,7 +261,7 @@ final class ChatController extends Controller
         $conversation = $client
             ? app(ClientPortalMembershipService::class)->withLockedMembership($client, $user, $create)
             : DB::transaction($create);
-        app(ChatRealtime::class)->queueConversation($conversation->id);
+        app(ChatRealtime::class)->queueConversation($conversation->id, inbox: 'added');
 
         return response()->json(['conversation' => $this->projection->conversation($conversation, $user)], 201);
     }
@@ -461,6 +472,11 @@ final class ChatController extends Controller
                 $member->update(['unread_marker' => null]);
             }
             Cache::forget('user:'.$request->user()->id.':ops-unread:v1');
+            // The reader's other tabs update their badge, bell and list row.
+            $realtime = app(ChatRealtime::class);
+            $realtime->unreadChanged([$request->user()->id]);
+            $realtime->noticeChanged([$request->user()->id], 'cleared');
+            $realtime->queueConversation($locked->id, $request->user()->id, 'read');
 
             return response()->noContent();
         });
@@ -481,6 +497,12 @@ final class ChatController extends Controller
             }
             $member->fill($data)->save();
             Cache::forget('user:'.$request->user()->id.':ops-unread:v1');
+            // The person's other tabs update their badge and list.
+            $realtime = app(ChatRealtime::class);
+            $realtime->unreadChanged([$request->user()->id]);
+            $member->wasChanged('is_archived_for_user')
+                ? $realtime->inboxChanged([$request->user()->id], 'archived')
+                : $realtime->queueConversation($conversation->id, $request->user()->id, 'preferences');
 
             return response()->noContent();
         });
@@ -534,7 +556,8 @@ final class ChatController extends Controller
                 }
             }
 
-            app(ChatMessageChanges::class)->record($message, $data['action'] === 'save' ? $request->user()->id : null);
+            app(ChatMessageChanges::class)->record($message, $data['action'] === 'save' ? $request->user()->id : null,
+                kind: ['pin' => 'pin', 'react' => 'reaction', 'save' => 'save'][$data['action']]);
 
             return response()->noContent();
         });

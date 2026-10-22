@@ -36,6 +36,22 @@ return [
         // Same-origin proxy; no managed WebSocket service or public fallback.
         'path' => '/chat-live',
     ],
+    // Oblivion Live, Chat's own live-update gateway (live/server.mjs). Spec:
+    // docs/chat-experience/clean-room/specs/oblivion-live.md. Secrets stay server-side.
+    'live' => [
+        'enabled' => env('CHAT_LIVE_ENABLED', false),
+        // Same-origin path the browser connects to; nginx proxies it to the gateway.
+        'path' => '/chat-live',
+        // The gateway's loopback API. Comma-separate several when more than one node runs.
+        'internal_url' => env('CHAT_LIVE_INTERNAL_URL', 'http://127.0.0.1:8092'),
+        'secret' => env('CHAT_LIVE_SECRET'),
+        'key_id' => env('CHAT_LIVE_KEY_ID'),
+        // Accepted alongside the current secret while a rotation is under way.
+        'previous_secret' => env('CHAT_LIVE_PREVIOUS_SECRET'),
+        'previous_key_id' => env('CHAT_LIVE_PREVIOUS_KEY_ID'),
+        // Exact browser origins; must match the gateway's LIVE_ALLOWED_ORIGINS.
+        'allowed_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_LIVE_ALLOWED_ORIGINS', ''))))),
+    ],
     'calling' => [
         'driver' => 'livekit-self-hosted',
         'url' => env('CHAT_LIVEKIT_URL'),

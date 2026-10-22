@@ -6,6 +6,7 @@ use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\Client;
 use App\Models\OpsConversationParticipant;
 use App\Models\User;
+use App\Services\Chat\ChatRealtime;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -55,6 +56,13 @@ class ClientPortalMembershipService
                     ->where('client_id', $client->id)
                     ->where('conversation_type', 'family'))
                 ->delete();
+
+            // Their open Chat tabs drop this client's conversations; with no client left, close them.
+            $realtime = app(ChatRealtime::class);
+            $realtime->inboxChanged([(int) $user->id], 'removed');
+            if (! $realtime->eligible($user)) {
+                $realtime->revoke([(int) $user->id]);
+            }
 
             return true;
         });

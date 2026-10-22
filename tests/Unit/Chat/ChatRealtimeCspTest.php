@@ -20,6 +20,20 @@ final class ChatRealtimeCspTest extends TestCase
         }
     }
 
+    public function test_oblivion_live_allows_only_the_current_websocket_origin(): void
+    {
+        config(['app.csp_enabled' => true, 'app.csp_enforce' => true, 'chat.shared_experience' => true, 'chat.realtime.enabled' => false, 'chat.live.enabled' => true]);
+
+        $response = (new AddContentSecurityPolicy)->handle(Request::create('https://care.example:8443/chat'), fn () => new Response('', 200, ['Content-Type' => 'text/html']));
+        $policy = $response->headers->get('Content-Security-Policy');
+        $this->assertStringContainsString(' wss://care.example:8443;', $policy);
+        $this->assertStringNotContainsString('wss://*', $policy);
+
+        config(['chat.shared_experience' => false]);
+        $response = (new AddContentSecurityPolicy)->handle(Request::create('https://care.example/chat'), fn () => new Response('', 200, ['Content-Type' => 'text/html']));
+        $this->assertStringNotContainsString('wss://', $response->headers->get('Content-Security-Policy'));
+    }
+
     public function test_disabled_rollout_or_transport_adds_no_socket_exception(): void
     {
         config(['app.csp_enabled' => true, 'app.csp_enforce' => true]);

@@ -188,5 +188,9 @@ final class ChatInvitations
             DB::table('chat_history_grants')->insert(['participant_id' => $member->id, 'message_id' => $id, 'created_at' => now()]);
         }
         Cache::forget("user:{$person->id}:ops-unread:v1");
+        $realtime = app(ChatRealtime::class);
+        $realtime->inboxChanged([(int) $person->id], 'added');
+        $realtime->unreadChanged([(int) $person->id]);
+        $realtime->queueConversation($conversation->id, kinds: 'people');
     }
 }

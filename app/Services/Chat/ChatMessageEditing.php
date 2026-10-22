@@ -81,7 +81,7 @@ final class ChatMessageEditing
                 DB::table('chat_message_mentions')->insert($mention + ['message_id' => $message->id, 'created_at' => now()]);
             }
             $message->forceFill(['content' => $content, 'edited_at' => now(), 'chat_edit_version' => (int) $message->chat_edit_version + 1])->save();
-            app(ChatMessageChanges::class)->record($message);
+            app(ChatMessageChanges::class)->record($message, kind: 'edit');
             AuditLog::create(['user_id' => $actor->id, 'client_id' => $conversation->client_id, 'action' => 'chat.message.edited',
                 'meta' => ['conversation_id' => $conversation->id, 'message_id' => $message->id, 'version' => $message->chat_edit_version]]);
 
@@ -119,7 +119,7 @@ final class ChatMessageEditing
             ]);
             $message->forceFill(['chat_edit_version' => (int) $message->chat_edit_version + 1])->save();
             $message->delete();
-            app(ChatMessageChanges::class)->record($message);
+            app(ChatMessageChanges::class)->record($message, kind: 'removal');
             AuditLog::create(['user_id' => $actor->id, 'client_id' => $conversation->client_id, 'action' => 'chat.message.removed',
                 'meta' => ['conversation_id' => $conversation->id, 'message_id' => $message->id, 'version' => $message->chat_edit_version]]);
         });

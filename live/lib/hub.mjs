@@ -320,6 +320,8 @@ export class Hub {
             connections: this.connections.size,
             users: this.users.size,
             calls: this.grants.size,
+            // Resident memory, for capacity checks (spec: 5,000 idle connections under 500 MB).
+            memory_mb: Math.round(process.memoryUsage().rss / 1048576),
         };
     }
 

@@ -13,6 +13,7 @@ use App\Http\Controllers\Chat\ChatFamilyFollowupController;
 use App\Http\Controllers\Chat\ChatFamilyHomeController;
 use App\Http\Controllers\Chat\ChatFamilyInboxController;
 use App\Http\Controllers\Chat\ChatFamilyWorkController;
+use App\Http\Controllers\Chat\ChatLiveController;
 use App\Http\Controllers\Chat\ChatMessageAlertController;
 use App\Http\Controllers\Chat\ChatMessageEditController;
 use App\Http\Controllers\Chat\ChatNotificationController;
@@ -75,6 +76,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/clients/{client}/home/conversations/{conversation}', [ChatFamilyHomeController::class, 'conversation'])->whereNumber(['client', 'conversation'])->middleware(EnsureChatActor::class)->name('family-home.conversation');
         Route::get('/realtime', [ChatRealtimeController::class, 'configuration'])->middleware(EnsureChatActor::class)->name('realtime');
         Route::post('/realtime/auth', [ChatRealtimeController::class, 'authorizeChannel'])->middleware(EnsureChatActor::class)->name('realtime.auth');
+        // Oblivion Live: a short-lived connection ticket, and typing signals (never stored).
+        Route::post('/live/ticket', [ChatLiveController::class, 'ticket'])->middleware(['throttle:30,1,chat-live-ticket:', EnsureChatActor::class])->name('live.ticket');
+        Route::post('/conversations/{conversation}/typing', [ChatLiveController::class, 'typing'])->middleware(['throttle:60,1,chat-typing:', EnsureChatActor::class])->name('typing');
         Route::get('/calls', [ChatCallController::class, 'status'])->withoutMiddleware('throttle:120,1,chat-api:')->middleware(['throttle:180,1,chat-poll-calls:', EnsureChatActor::class])->name('calls.status');
         Route::get('/conversations/{conversation}/draft', [ChatPrivateDraftController::class, 'show'])->middleware(EnsureChatActor::class)->name('draft.show');
         Route::put('/conversations/{conversation}/draft', [ChatPrivateDraftController::class, 'update'])->middleware(EnsureChatActor::class)->name('draft.update');

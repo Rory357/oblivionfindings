@@ -12,8 +12,14 @@ final class WakeChatClients implements ShouldQueue
 
     public int $tries = 3;
 
-    public function __construct(public readonly int $conversationId, public readonly ?int $onlyUserId = null)
-    {
+    /** @param  array<int, string>  $kinds */
+    public function __construct(
+        public readonly int $conversationId,
+        public readonly ?int $onlyUserId = null,
+        public readonly array $kinds = ['message'],
+        public readonly ?string $callId = null,
+        public readonly ?string $inbox = null,
+    ) {
         $this->afterCommit();
     }
 
@@ -24,6 +30,7 @@ final class WakeChatClients implements ShouldQueue
 
     public function handle(ChatRealtime $realtime): void
     {
-        $realtime->publish($this->conversationId, $this->onlyUserId);
+        // Jobs queued before kinds existed unserialise without them; treat those as a message change.
+        $realtime->publish($this->conversationId, $this->onlyUserId ?? null, $this->kinds ?? ['message'], $this->callId ?? null, $this->inbox ?? null);
     }
 }

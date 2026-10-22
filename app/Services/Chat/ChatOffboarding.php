@@ -150,6 +150,18 @@ final class ChatOffboarding
             foreach ($affected->unique() as $id) {
                 Cache::forget("user:{$id}:ops-unread:v1");
             }
+            $realtime = app(ChatRealtime::class);
+            foreach ($plan['memberships']->pluck('conversation_id')->unique() as $conversationId) {
+                $realtime->queueConversation((int) $conversationId, kinds: 'people');
+            }
+            if ($plan['memberships']->isNotEmpty()) {
+                $realtime->inboxChanged([(int) $person->id], 'removed');
+            }
+            // Offboarding someone who may no longer use Chat closes their live connections (spec
+            // requirement 7). Current staff who only lost old memberships keep theirs.
+            if (! $realtime->eligible($person)) {
+                $realtime->revoke([(int) $person->id]);
+            }
             AuditLog::create(['user_id' => $actor->id, 'action' => 'chat.offboarding.completed', 'meta' => [
                 'person_id' => $person->id, 'owner' => $owner ? 'person' : 'care_team', 'owner_id' => $owner?->id, ...$summary,
             ]]);

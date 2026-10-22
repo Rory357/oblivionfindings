@@ -20,13 +20,15 @@ class ChatCall extends Model
 
     protected static function booted(): void
     {
-        static::created(fn (self $call) => app(ChatRealtime::class)->queueConversation($call->conversation_id));
+        static::created(fn (self $call) => app(ChatRealtime::class)->queueConversation($call->conversation_id, kinds: 'call', callId: $call->id));
         static::updated(function (self $call): void {
             if ($call->wasChanged('ended_at') && $call->ended_at) {
                 app(ChatCallNoticeDelivery::class)->enqueue($call);
+                // Nobody may signal on a call that has ended.
+                app(ChatRealtime::class)->revokeCall($call->id, $call->participants()->pluck('user_id')->map(fn ($id) => (int) $id)->all());
             }
             if ($call->wasChanged(['status', 'host_id', 'connected_at', 'ended_at'])) {
-                app(ChatRealtime::class)->queueConversation($call->conversation_id);
+                app(ChatRealtime::class)->queueConversation($call->conversation_id, kinds: 'call', callId: $call->id);
             }
         });
     }

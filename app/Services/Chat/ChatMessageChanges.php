@@ -14,8 +14,11 @@ final class ChatMessageChanges
 {
     public function __construct(private readonly ChatAccess $access, private readonly ChatProjection $projection) {}
 
-    /** The caller must hold the conversation lock until its message transaction commits. */
-    public function record(OpsMessage $message, ?int $onlyUserId = null, bool $created = false): void
+    /**
+     * The caller must hold the conversation lock until its message transaction commits.
+     * $kind says what changed for live updates (message, edit, removal, reaction, pin, save).
+     */
+    public function record(OpsMessage $message, ?int $onlyUserId = null, bool $created = false, ?string $kind = null): void
     {
         if (DB::transactionLevel() < 1) {
             throw new \LogicException('Chat changes must commit with their message.');
@@ -25,7 +28,7 @@ final class ChatMessageChanges
             'kind' => $created ? 'created' : 'updated',
             'only_user_id' => $onlyUserId, 'created_at' => now(),
         ]);
-        app(ChatRealtime::class)->queueConversation($message->conversation_id, $onlyUserId);
+        app(ChatRealtime::class)->queueConversation($message->conversation_id, $onlyUserId, $kind ?? ($created ? 'message' : 'update'));
     }
 
     private function scope(OpsConversation $conversation, User $viewer): string
@@ -40,10 +43,16 @@ final class ChatMessageChanges
             $member?->id, $member?->history_after_id, $grants], JSON_THROW_ON_ERROR));
     }
 
+    /** The newest change ID; live events name it so a tab can skip what its cursor has passed. */
+    public function latestId(OpsConversation $conversation): int
+    {
+        return (int) DB::table('chat_message_changes')->where('conversation_id', $conversation->id)->max('id');
+    }
+
     /** Read under the same conversation lock as the initial message snapshot. */
     public function cursor(OpsConversation $conversation, User $viewer, ?int $after = null): string
     {
-        $after ??= (int) DB::table('chat_message_changes')->where('conversation_id', $conversation->id)->max('id');
+        $after ??= $this->latestId($conversation);
 
         return Crypt::encryptString(json_encode(['v' => 1, 'user' => $viewer->id, 'conversation' => $conversation->id,
             'scope' => $this->scope($conversation, $viewer), 'after' => $after], JSON_THROW_ON_ERROR));
@@ -78,11 +87,14 @@ final class ChatMessageChanges
             $messages = $this->access->messages($conversation, $viewer, true)->whereIn('id', $ids)
                 ->with(['sender:id,name', 'reactions.user:id,name'])->orderBy('id')->get();
 
+            $position = (int) ($page->last()?->id ?? $token['after']);
+
             return [
                 'conversation' => $this->projection->conversation($conversation, $viewer),
                 'messages' => $this->projection->messages($messages, $viewer, $conversation),
                 'new_message_ids' => $page->where('kind', 'created')->pluck('message_id')->intersect($messages->pluck('id'))->unique()->values(),
-                'sync_cursor' => $this->cursor($conversation, $viewer, (int) ($page->last()?->id ?? $token['after'])),
+                'sync_cursor' => $this->cursor($conversation, $viewer, $position),
+                'sync_change_id' => $position,
                 'has_more_changes' => $rows->count() > 100,
             ];
         });

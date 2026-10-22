@@ -120,6 +120,7 @@ final class ChatFamilyWorkDelivery
                 throw new \RuntimeException('Family assignment notice was not persisted.');
             }
             $this->finish($id, 'delivered');
+            app(ChatRealtime::class)->noticeChanged([(int) $user->id], 'family_work');
 
             return 1;
         });

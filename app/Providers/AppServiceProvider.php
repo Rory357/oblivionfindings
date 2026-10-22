@@ -642,6 +642,12 @@ class AppServiceProvider extends ServiceProvider
                 return Limit::perMinute(1000)->by('obli-surface:'.$request->ip());
             }
 
+            // Oblivion Live reports every connect and disconnect from one address; a restart
+            // reconnects everyone at once. Requests are signed and checked in the controller.
+            if ($request->is('chat/api/live/presence')) {
+                return Limit::perMinute(20000)->by('chat-live-presence:'.$request->ip());
+            }
+
             // Service identities have their configured per-identity limit in
             // AuthenticateItServiceIdentity. Keep a wider IP ceiling here so
             // invalid credentials are still throttled without silently
