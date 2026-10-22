@@ -399,8 +399,10 @@ Route::middleware([
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.show');
 
+    // Own throttle bucket (prefix) so this read never spends another route's limit.
     Route::get('/device-groups/{group}/maintenance-policy-preview', [DeviceGroupController::class, 'previewMaintenancePolicy'])
-        ->middleware(['permission:securityDevices.groups.manage', 'permission:securityDevices.monitoring.manage'])
+        ->middleware(['permission:securityDevices.groups.manage', 'permission:securityDevices.monitoring.manage', 'throttle:30,1,device-group-maintenance-preview'])
+        ->missing(static fn () => DeviceGroupController::previewUnavailable(404))
         ->name('security-devices.device-groups.maintenance-policy-preview');
 
     Route::get('/device-groups/{group}/edit', [DeviceGroupController::class, 'edit'])

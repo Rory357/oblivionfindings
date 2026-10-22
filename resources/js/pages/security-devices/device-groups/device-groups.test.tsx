@@ -109,6 +109,7 @@ const indexFixture = (): GroupIndexProps => ({
 const showFixture = (): GroupShowProps => ({
     actor_id: 7,
     as_of: '2026-10-14T03:00:00Z',
+    can_preview_maintenance: true,
     group: {
         id: 17,
         name: 'House devices',
@@ -477,6 +478,64 @@ describe('Device group profile', () => {
             { device_id: '43' },
         ]);
         expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
+    });
+    it('keeps an open add-device dialog and its selection through an ordinary page response', async () => {
+        const view = render(<DeviceGroupShow {...showFixture()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Add device' }));
+        fireEvent.click(screen.getByRole('combobox'));
+        fireEvent.click(
+            await screen.findByRole('option', { name: /Door sensor/ }),
+        );
+        // A validation error or reload returns fresh props for the same group and actor.
+        const next = showFixture();
+        next.as_of = '2026-10-14T03:05:00Z';
+        next.members = { ...next.members, data: [...next.members.data] };
+        view.rerender(<DeviceGroupShow {...next} />);
+        const dialog = screen.getByRole('dialog', {
+            name: 'Add device to group',
+        });
+        expect(within(dialog).getByRole('combobox')).toHaveTextContent(
+            /Door sensor/,
+        );
+        expect(
+            within(dialog).getByRole('button', { name: 'Add to group' }),
+        ).toBeEnabled();
+    });
+    it('offers the maintenance preview only when the server says the read is permitted', async () => {
+        const data = showFixture();
+        data.can_preview_maintenance = false;
+        render(<DeviceGroupShow {...data} />);
+        fireEvent.keyDown(
+            screen.getAllByRole('button', {
+                name: 'Actions for Lobby camera',
+            })[0],
+            { key: 'ArrowDown' },
+        );
+        expect(
+            await screen.findByRole('menuitem', { name: 'Open device' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('menuitem', {
+                name: 'Preview maintenance policy',
+            }),
+        ).not.toBeInTheDocument();
+    });
+    it('shows the unavailable group inside the shell with a Home trail and a full-read recovery', () => {
+        mocks.actor = 8;
+        render(<DeviceGroupShow {...showFixture()} />);
+        expect(
+            screen.getByRole('heading', { name: 'Group access unavailable' }),
+        ).toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent(
+            /isn’t available to you right now/,
+        );
+        expect(screen.queryByText('Lobby camera')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh group' }));
+        expect(mocks.get).toHaveBeenCalledWith(
+            '/security-devices/device-groups/17',
+            {},
+            { preserveState: false, preserveScroll: true },
+        );
     });
     it('returns keyboard focus to the exact member action after the maintenance reader closes', async () => {
         mocks.preview.mockResolvedValue({ data: {} });

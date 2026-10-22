@@ -385,13 +385,16 @@ const readers: Array<{
     name: string;
     element: ReactElement;
     labels: string[];
+    /** Identifiers and raw recorded values, inside the collapsed Technical details. */
+    technical?: string[];
     values: string[];
+    /** Developer values that must not appear anywhere in the reader. */
+    absent?: string[];
 }> = [
     {
         name: 'Harbour Site',
         element: <DeviceAssignmentRecords rows={[assignment]} view="table" />,
         labels: [
-            'Assignment ID',
             'Target type',
             'Assigned to',
             'Assignment type',
@@ -404,12 +407,14 @@ const readers: Array<{
             'Return overdue',
             'Notes',
         ],
+        technical: ['Assignment ID'],
         values: [
             'Alex Registrar',
             assignment.notes!,
-            assignment.assigned_at,
-            assignment.expected_return_at!,
+            formatDateTime(assignment.assigned_at),
+            formatDateTime(assignment.expected_return_at),
         ],
+        absent: [assignment.assigned_at, assignment.expected_return_at!],
     },
     {
         name: 'Gateway asset',
@@ -423,8 +428,6 @@ const readers: Array<{
             />
         ),
         labels: [
-            'Link ID',
-            'Asset ID',
             'Asset name',
             'Asset tag',
             'Asset destination',
@@ -433,7 +436,14 @@ const readers: Array<{
             'Linked at',
             'Notes',
         ],
-        values: ['ASSET-41', asset.notes!, asset.linked_at],
+        technical: ['Link ID', 'Asset ID'],
+        values: [
+            'ASSET-41',
+            asset.notes!,
+            formatDateTime(asset.linked_at),
+            asset.access.label,
+        ],
+        absent: [asset.linked_at, 'available ·'],
     },
     {
         name: 'Upstream switch',
@@ -447,14 +457,14 @@ const readers: Array<{
             />
         ),
         labels: [
-            'Relationship ID',
-            'Related device ID',
             'Related device name',
             'Relationship type',
             'Port',
             'Direction from this device',
         ],
-        values: ['PoE-04', 'Upstream', 'connected_to'],
+        technical: ['Relationship ID', 'Related device ID'],
+        values: ['PoE-04', 'Upstream', 'connected to'],
+        absent: ['connected_to'],
     },
     {
         name: 'Upstream switch',
@@ -473,13 +483,15 @@ const readers: Array<{
             'Port',
             'Direction from this device',
         ],
+        technical: ['Relationship ID', 'Related device ID'],
         values: [
             'Downstream',
             'Morgan Engineer',
             'Taylor Reviewer',
             historical.unlink_reason,
-            historical.created_at!,
+            formatDateTime(historical.created_at),
         ],
+        absent: [historical.created_at!],
     },
     {
         name: 'Gateway certificate',
@@ -494,7 +506,6 @@ const readers: Array<{
             />
         ),
         labels: [
-            'Document ID',
             'Title',
             'Category',
             'Version',
@@ -507,13 +518,17 @@ const readers: Array<{
             'Uploaded at',
             'Private download',
         ],
+        technical: ['Document ID'],
         values: [
             'application/pdf',
             '2345',
             document.notes!,
-            document.effective_date!,
-            document.uploaded_at!,
+            '1 Sep 2026',
+            '10 Oct 2026',
+            formatDateTime(document.uploaded_at),
+            'compliance cert',
         ],
+        absent: [document.uploaded_at!, 'compliance_cert'],
     },
     {
         name: 'Previous certificate',
@@ -521,7 +536,6 @@ const readers: Array<{
             <DeviceDocumentHistoryRecords rows={[lifecycle]} view="table" />
         ),
         labels: [
-            'Document ID',
             'Title',
             'Category',
             'Version',
@@ -529,40 +543,40 @@ const readers: Array<{
             'File size in bytes',
             'Uploaded at',
             'Uploaded by',
-            'Recorded lifecycle state',
-            'Lifecycle label',
+            'Lifecycle status',
             'Storage needs attention',
             'Storage verified at',
-            'Full SHA-256 fingerprint',
             'Removal requested at',
             'Removed at',
             'Removed by',
             'Removal reason',
             'Storage deleted at',
         ],
+        technical: [
+            'Document ID',
+            'Recorded lifecycle state',
+            'File checksum (SHA-256)',
+        ],
         values: [
             lifecycle.integrity_sha256!,
-            lifecycle.storage_verified_at!,
-            'removal_pending',
+            formatDateTime(lifecycle.storage_verified_at),
+            lifecycle.status_label,
             lifecycle.removal_reason!,
         ],
+        absent: ['fingerprint', lifecycle.storage_verified_at!],
     },
     {
         name: 'link observation',
         element: <DeviceEventRecords rows={[event]} view="table" />,
-        labels: [
-            'Event ID',
-            'Event type',
-            'Recorded severity',
-            'Occurred at',
-            'Source',
-        ],
+        labels: ['Event type', 'Recorded severity', 'Occurred at', 'Source'],
+        technical: ['Event ID'],
         values: [
-            'link_observation',
+            'link observation',
             'critical',
-            event.occurred_at,
+            formatDateTime(event.occurred_at),
             'device observation',
         ],
+        absent: ['link_observation', event.occurred_at],
     },
     {
         name: 'scheduled service',
@@ -576,25 +590,25 @@ const readers: Array<{
             />
         ),
         labels: [
-            'Maintenance ID',
             'Maintenance type',
             'Recorded status',
             'Description',
             'Scheduled for',
             'Completed at',
         ],
+        technical: ['Maintenance ID'],
         values: [
-            'scheduled_service',
+            'scheduled service',
             'scheduled',
             maintenance.description,
-            maintenance.scheduled_for!,
+            formatDateTime(maintenance.scheduled_for),
         ],
+        absent: ['scheduled_service', maintenance.scheduled_for!],
     },
     {
         name: 'AL-101',
         element: <DeviceControlRoomRecords rows={[alert]} view="table" />,
         labels: [
-            'Alert ID',
             'Reference',
             'Alert type',
             'Recorded severity',
@@ -603,19 +617,36 @@ const readers: Array<{
             'Control Room destination',
             'Destination access',
         ],
-        values: ['device.link', 'warning', 'open', alert.triggeredAt!],
+        technical: ['Alert ID'],
+        values: [
+            'device link',
+            'warning',
+            'open',
+            formatDateTime(alert.triggeredAt),
+            alert.access.label,
+        ],
+        absent: ['device.link', alert.triggeredAt!, 'available ·'],
     },
 ];
 describe('Device profile shared records', () => {
     it.each(readers)(
         'keeps all retained facts in the $name reader',
-        ({ element, name, labels, values }) => {
+        ({ element, name, labels, technical = [], values, absent = [] }) => {
             render(element);
             const reader = openEvidence(name);
             for (const field of labels)
                 expect(within(reader).getByText(field)).toBeVisible();
+            for (const field of technical) {
+                const fact = within(reader).getByText(field);
+                expect(fact).not.toBeVisible();
+                expect(fact.closest('details')).toHaveTextContent(
+                    'Technical details',
+                );
+            }
             for (const value of values)
                 expect(reader.textContent).toContain(value);
+            for (const value of absent)
+                expect(reader.textContent).not.toContain(value);
             expect(
                 within(reader).getAllByRole('button', { name: 'Close' })[0],
             ).toBeVisible();
@@ -691,8 +722,40 @@ describe('Device profile shared records', () => {
         expect(screen.getByText(denied.access.label)).toBeVisible();
         const reader = openEvidence('Gateway asset');
         expect(reader.textContent).not.toContain('/forged-private-destination');
-        expect(reader.textContent).toContain('restricted');
+        expect(reader.textContent).toContain(denied.access.label);
+        expect(reader.textContent).not.toContain('restricted ·');
     });
+    it.each([
+        // 2 pm NZ on the expiry day: the document is still current.
+        ['2026-10-10T01:00:00Z', false],
+        // 11:59 pm NZ on the expiry day.
+        ['2026-10-10T10:59:00Z', false],
+        // 12:30 am NZ the next day: the expiry date has now passed.
+        ['2026-10-10T11:30:00Z', true],
+    ])(
+        'treats a date-only expiry as a New Zealand calendar day (read at %s)',
+        (readAt, passed) => {
+            render(
+                <DeviceDocumentRecords
+                    rows={[document]}
+                    view="table"
+                    asOf={readAt}
+                    canUpdate={false}
+                    deletingId={null}
+                    onRemove={vi.fn()}
+                />,
+            );
+            expect(screen.getByText('10 Oct 2026')).toBeVisible();
+            if (passed)
+                expect(
+                    screen.getAllByText('Expiry date passed')[0],
+                ).toBeVisible();
+            else
+                expect(
+                    screen.queryByText('Expiry date passed'),
+                ).not.toBeInTheDocument();
+        },
+    );
     it('withholds restricted Control Room details and preserves permitted alert destinations', () => {
         render(
             <DeviceControlRoomRecords
@@ -870,7 +933,12 @@ describe('Device profile shared records', () => {
             screen.getByText(formatDateTime(lifecycle.uploaded_at!)),
         ).toBeVisible();
         const reader = openEvidence('Previous certificate');
-        expect(reader.textContent).toContain('removal_pending');
+        // The plain lifecycle wording is shown; the raw recorded state only
+        // appears inside the collapsed Technical details.
+        expect(within(reader).getByText(lifecycle.status_label)).toBeVisible();
+        const rawState = within(reader).getByText('removal_pending');
+        expect(rawState).not.toBeVisible();
+        expect(rawState.closest('details')).not.toHaveAttribute('open');
         const deletion =
             within(reader).getByText('Storage deleted at').parentElement;
         expect(deletion).toHaveTextContent('Not recorded');
@@ -983,7 +1051,7 @@ describe('DeviceShow records integration and preserved canonical actions', () =>
             screen.getByText('Removal pending storage verification'),
         ).toBeVisible();
     });
-    it('keeps maintenance completion payload and route separate from read observations', () => {
+    it('confirms maintenance completion before sending the unchanged payload and route', () => {
         render(<DeviceShow {...props('maintenance')} />);
         context(
             screen.getByRole('article', {
@@ -993,12 +1061,46 @@ describe('DeviceShow records integration and preserved canonical actions', () =>
         fireEvent.click(
             screen.getByRole('menuitem', { name: 'Complete maintenance' }),
         );
+        expect(router.post).not.toHaveBeenCalled();
+        const confirm = screen.getByRole('alertdialog', {
+            name: 'Mark maintenance as complete?',
+        });
+        expect(confirm).toHaveTextContent('Reception gateway');
+        fireEvent.click(
+            within(confirm).getByRole('button', {
+                name: 'Complete maintenance',
+            }),
+        );
         expect(router.post).toHaveBeenCalledWith(
             '/security-devices/maintenance/91/complete',
             {},
-            { preserveScroll: true },
+            expect.objectContaining({ preserveScroll: true }),
         );
+        expect(router.post).toHaveBeenCalledTimes(1);
+        expect(
+            within(confirm).getByRole('button', { name: 'Completing…' }),
+        ).toBeDisabled();
         expect(screen.getByText('scheduled')).toBeVisible();
+    });
+    it('cancels maintenance completion without sending anything', () => {
+        render(<DeviceShow {...props('maintenance')} />);
+        context(
+            screen.getByRole('article', {
+                name: 'Maintenance records: scheduled service',
+            }).firstElementChild as HTMLElement,
+        );
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: 'Complete maintenance' }),
+        );
+        fireEvent.click(
+            within(
+                screen.getByRole('alertdialog', {
+                    name: 'Mark maintenance as complete?',
+                }),
+            ).getByRole('button', { name: 'Cancel' }),
+        );
+        expect(router.post).not.toHaveBeenCalled();
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
     it('clears retained private readers on a paired actor-only partial replacement and uses full recovery', () => {
         const data = props('documents');
@@ -1143,7 +1245,7 @@ describe('Device record destinations and retained-context boundaries', () => {
     it('does not display supplied old event details without current event permission', () => {
         auth.can.securityDevices.eventsView = false;
         render(<DeviceShow {...props('events')} />);
-        expect(screen.getByText('Device event access required.')).toBeVisible();
+        expect(screen.getByText('Device event access required')).toBeVisible();
         expect(screen.queryByText('link observation')).not.toBeInTheDocument();
         expect(
             screen.queryByRole('link', { name: 'View all events' }),

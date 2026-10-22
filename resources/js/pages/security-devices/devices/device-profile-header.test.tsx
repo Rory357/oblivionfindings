@@ -1,5 +1,6 @@
+import { formatDateTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceProfile } from './device-profile';
 import { DeviceProfileHeader } from './device-profile-header';
@@ -157,6 +158,51 @@ describe('Device profile shared header', () => {
         expect(screen.getByText('Unavailable')).toBeVisible();
         expect(screen.getByText('Not recorded')).toBeVisible();
         expect(screen.getByText('Name not recorded')).toBeVisible();
+    });
+    it.each([
+        ['active', 'Active', 'bg-status-success-bg'],
+        ['degraded', 'Degraded', 'bg-status-warning-bg'],
+        ['offline', 'Offline', 'bg-status-critical-bg'],
+        ['maintenance', 'Maintenance', 'bg-status-info-bg'],
+        [null, 'Device state not recorded', 'bg-muted'],
+    ])(
+        'tones the title chip for the recorded %s device state',
+        (deviceState, text, tone) => {
+            header({
+                ...profile,
+                header: {
+                    ...profile.header,
+                    health: {
+                        ...profile.header.health,
+                        deviceState,
+                        deviceStateLabel: deviceState ? text : null,
+                    },
+                },
+            });
+            // The title chip carries the Activity icon; the meter caption repeats the words without it.
+            const chip = screen
+                .getAllByText(text)
+                .find((element) => element.querySelector('svg'));
+            expect(chip).toBeDefined();
+            expect(chip).toHaveClass(tone);
+        },
+    );
+    it('keeps the last observation relative time current and shows the exact time', () => {
+        vi.useFakeTimers({ now: new Date('2026-10-12T00:00:30Z') });
+        try {
+            header();
+            const meter = screen.getByRole('button', {
+                name: 'Open Health: Last observation',
+            });
+            expect(meter).toHaveTextContent('just now');
+            expect(meter).toHaveTextContent(
+                formatDateTime('2026-10-12T00:00:00Z'),
+            );
+            act(() => vi.advanceTimersByTime(5 * 60_000));
+            expect(meter).toHaveTextContent('5m ago');
+        } finally {
+            vi.useRealTimers();
+        }
     });
     it('withholds all device context for another actor and only performs a full read recovery', () => {
         const denied = {

@@ -271,25 +271,32 @@ describe('group maintenance preview read lifecycle', () => {
         expect(screen.queryByText(/Winning revision:/)).not.toBeInTheDocument();
     });
     it.each([42, [], {}, false])(
-        'withdraws a winning result with malformed recurrence %j',
+        'withholds a winning result with malformed recurrence %j as an unchecked read, not a denial',
         async (recurrence) => {
             const data = appliedPreview();
             data.resolution.winner!.snapshot.recurrence =
                 recurrence as unknown as string;
             mocks.get
                 .mockResolvedValueOnce({ data: choices() })
-                .mockResolvedValueOnce({ data });
+                .mockResolvedValueOnce({ data })
+                .mockResolvedValueOnce({ data: appliedPreview() });
             await ready();
             fireEvent.click(
                 screen.getByRole('button', { name: 'Preview policy' }),
             );
-            await screen.findByText(/unavailable for the current account/);
+            await screen.findByText(/couldn.t be checked/);
             expect(
                 screen.queryByText('Synthetic monitor one-off 101'),
             ).not.toBeInTheDocument();
+            expect(
+                screen.queryByRole('button', { name: 'Refresh group' }),
+            ).not.toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+            await screen.findByText('Applicable technical maintenance rule');
+            expect(mocks.get).toHaveBeenCalledTimes(3);
         },
     );
-    it('still withdraws an applied one-off result for another monitor', async () => {
+    it('still withholds an applied one-off result for another monitor', async () => {
         const data = appliedPreview();
         data.resolution.winner!.snapshot.monitor_id = 999;
         mocks.get
@@ -297,7 +304,7 @@ describe('group maintenance preview read lifecycle', () => {
             .mockResolvedValueOnce({ data });
         await ready();
         fireEvent.click(screen.getByRole('button', { name: 'Preview policy' }));
-        await screen.findByText(/unavailable for the current account/);
+        await screen.findByText(/couldn.t be checked/);
         expect(
             screen.queryByText('Synthetic monitor one-off 101'),
         ).not.toBeInTheDocument();
@@ -332,17 +339,29 @@ describe('group maintenance preview read lifecycle', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Read full records' }),
         );
-        expect(screen.getByText('Exact chosen instant')).toBeInTheDocument();
+        // Raw identifiers and UTC values stay in the collapsed technical details.
+        const technical = screen
+            .getByText('Exact chosen instant')
+            .closest('details')!;
+        expect(technical).not.toHaveAttribute('open');
+        expect(screen.getByText('Exact chosen instant')).not.toBeVisible();
         expect(screen.getAllByText('2026-10-20T10:00:00.000000Z')).toHaveLength(
             2,
         );
         expect(
             screen.getByText('Clock uncertainty seconds').parentElement,
         ).toHaveTextContent('Not recorded');
+        expect(screen.getByText('Time checked')).toBeVisible();
+        expect(screen.getByText('none')).not.toBeVisible();
+        expect(screen.queryByText(/Pacific\/Auckland/)).not.toBeInTheDocument();
     });
-    it.each([401, 403, 404])(
+    it.each([
+        [401, /signed out/],
+        [403, /access to maintenance previews has changed/],
+        [404, /no longer available/],
+    ])(
         'withdraws private results on a current %s denial and requires a full group read',
-        async (status) => {
+        async (status, message) => {
             await showResult();
             mocks.get.mockRejectedValueOnce({
                 response: { status },
@@ -351,7 +370,7 @@ describe('group maintenance preview read lifecycle', () => {
             fireEvent.click(
                 screen.getByRole('button', { name: 'Preview policy' }),
             );
-            await screen.findByText(/unavailable for the current account/);
+            await screen.findByText(message);
             expect(
                 screen.queryByText('No applicable maintenance'),
             ).not.toBeInTheDocument();
@@ -371,6 +390,16 @@ describe('group maintenance preview read lifecycle', () => {
             );
         },
     );
+    it('asks the person to wait when previews are rate limited, keeping the dated result', async () => {
+        await showResult();
+        mocks.get.mockRejectedValueOnce({ response: { status: 429 } });
+        fireEvent.click(screen.getByRole('button', { name: 'Preview policy' }));
+        await screen.findByText(/Too many previews/);
+        expect(screen.getByText('Previous preview for')).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Refresh group' }),
+        ).not.toBeInTheDocument();
+    });
     it.each([
         { response: { status: 503 }, message: 'PRIVATE BACKEND DETAIL' },
         { code: 'ECONNABORTED', message: 'PRIVATE BACKEND timeout' },
@@ -411,7 +440,7 @@ describe('group maintenance preview read lifecycle', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Preview policy' }));
         mocks.monitoring = false;
         view.rerender(<MaintenancePolicyPreview {...props()} />);
-        await screen.findByText(/unavailable for the current account/);
+        await screen.findByText(/access to maintenance previews has changed/);
         mocks.monitoring = true;
         view.rerender(<MaintenancePolicyPreview {...props()} />);
         await act(async () => late.resolve({ data: preview() }));
@@ -436,7 +465,7 @@ describe('group maintenance preview read lifecycle', () => {
             screen.queryByText('No applicable maintenance'),
         ).not.toBeInTheDocument();
         expect(
-            screen.getByText(/unavailable for the current account/),
+            screen.getByText(/access to maintenance previews has changed/),
         ).toBeInTheDocument();
     });
     it.each(['member', 'group'])(
@@ -451,9 +480,7 @@ describe('group maintenance preview read lifecycle', () => {
             expect(
                 screen.queryByText('No applicable maintenance'),
             ).not.toBeInTheDocument();
-            expect(
-                screen.getByText(/unavailable for the current account/),
-            ).toBeInTheDocument();
+            expect(screen.getByText(/no longer available/)).toBeInTheDocument();
         },
     );
     it('rejects a response for another selected instant without showing its contents', async () => {
@@ -464,7 +491,7 @@ describe('group maintenance preview read lifecycle', () => {
             .mockResolvedValueOnce({ data: wrong });
         await ready();
         fireEvent.click(screen.getByRole('button', { name: 'Preview policy' }));
-        await screen.findByText(/unavailable for the current account/);
+        await screen.findByText(/couldn.t be checked/);
         expect(
             screen.queryByText('No applicable maintenance'),
         ).not.toBeInTheDocument();
@@ -478,10 +505,39 @@ describe('group maintenance preview read lifecycle', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Refresh monitor choices' }),
         );
-        await screen.findByText(/unavailable for the current account/);
+        // A changed list is current, checked data — not a denial.
+        await screen.findByText(/monitor you chose is no longer listed/);
         expect(
             screen.queryByRole('combobox', { name: 'Monitor' }),
         ).not.toBeInTheDocument();
+        expect(
+            screen.getByText(/No current monitors are available/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Preview policy' }),
+        ).toBeDisabled();
+        expect(
+            screen.queryByRole('button', { name: 'Refresh group' }),
+        ).not.toBeInTheDocument();
+    });
+    it('drops monitors read for an old Site when a preview reports a changed Site', async () => {
+        const moved = preview();
+        moved.site = { id: 10, name: 'Another Site' };
+        mocks.get
+            .mockResolvedValueOnce({ data: choices() })
+            .mockResolvedValueOnce({ data: moved });
+        await ready();
+        fireEvent.click(screen.getByRole('button', { name: 'Preview policy' }));
+        await screen.findByText(
+            /Site has changed since the monitors were loaded/,
+        );
+        expect(
+            screen.queryByRole('combobox', { name: 'Monitor' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Load current monitors' }),
+        ).toBeVisible();
+        expect(screen.queryByText('Another Site')).not.toBeInTheDocument();
     });
     it('distinguishes no current monitors from a failed read', async () => {
         mocks.get.mockResolvedValueOnce({

@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
 use App\Domain\SecurityDevices\Services\DeviceGroupMaintenancePreview;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -107,6 +108,9 @@ class DeviceGroupController extends Controller
         return Inertia::render('security-devices/device-groups/show', [
             'actor_id' => (int) $user->id,
             'as_of' => $asOf->toISOString(),
+            // Same actor rule the preview read enforces, so the page never
+            // offers an action that can only return "unavailable".
+            'can_preview_maintenance' => $this->maintenancePreview->actorMayPreview($user),
             'group' => [
                 'id' => $group->id,
                 'name' => $group->name,
@@ -142,17 +146,29 @@ class DeviceGroupController extends Controller
             $data = $this->maintenancePreview->read(
                 $request->user(), (int) $group->id, $request->query(), (string) $request->server('QUERY_STRING', ''),
             );
+        } catch (ModelNotFoundException) {
+            // A Site, monitor or member removed part-way through the read
+            // (a firstOrFail() inside Monitoring's owner checks). Answer with
+            // the same private 404 as every other unavailable read rather than
+            // Laravel's default "No query results for model …" body.
+            return self::previewUnavailable(404);
         } catch (HttpExceptionInterface $error) {
             $status = $error->getStatusCode();
             if (! in_array($status, [404, 422, 503], true)) {
                 throw $error;
             }
 
-            return response()->json(['message' => $status === 422 ? 'invalid_request' : 'unavailable'], $status)
-                ->header('Cache-Control', 'private, no-store');
+            return self::previewUnavailable($status);
         }
 
         return response()->json($data)->header('Cache-Control', 'private, no-store');
+    }
+
+    /** The one uniform, uncached error body for the maintenance preview read. */
+    public static function previewUnavailable(int $status = 404): JsonResponse
+    {
+        return response()->json(['message' => $status === 422 ? 'invalid_request' : 'unavailable'], $status)
+            ->header('Cache-Control', 'private, no-store');
     }
 
     public function create(Request $request)

@@ -20,6 +20,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -311,9 +312,42 @@ final class DeviceGroupMaintenancePreviewTest extends TestCase
     public function test_current_group_soft_deletion_and_unauthenticated_reads_are_denied(): void
     {
         $this->group->delete();
-        $this->preview()->assertNotFound();
+        // Route model binding misses the trashed group; the reply is the same private body as every other denial.
+        $this->preview()->assertNotFound()->assertExactJson(['message' => 'unavailable'])->assertHeader('Cache-Control', 'no-store, private');
+        $this->bodyFreeGetJson('/security-devices/device-groups/999999999/maintenance-policy-preview?'.http_build_query($this->input(), '', '&', PHP_QUERY_RFC3986))
+            ->assertNotFound()->assertExactJson(['message' => 'unavailable'])->assertHeader('Cache-Control', 'no-store, private');
         $this->app['auth']->forgetGuards();
         $this->bodyFreeGetJson($this->url($this->input()))->assertUnauthorized();
+    }
+
+    public function test_a_site_removed_part_way_through_the_read_gets_the_same_private_denial(): void
+    {
+        // Soft-delete the Site straight after the canonical resolver confirms it is active, so the
+        // owner's own Site re-read (firstOrFail) throws ModelNotFoundException mid-request.
+        $stage = 'waiting_for_member_read';
+        DB::listen(function ($query) use (&$stage): void {
+            if ($stage === 'waiting_for_member_read' && str_contains($query->sql, 'device_group_members')) {
+                $stage = 'waiting_for_resolver_site_check';
+            } elseif ($stage === 'waiting_for_resolver_site_check' && preg_match('/exists\s*\(\s*select \* from [`"]?sites[`"]?\s/i', $query->sql) === 1) {
+                $stage = 'site_removed';
+                DB::table('sites')->where('id', $this->site->id)->update(['deleted_at' => now()]);
+            }
+        });
+        $response = $this->choices()->assertNotFound()->assertHeader('Cache-Control', 'no-store, private')->assertExactJson(['message' => 'unavailable']);
+        self::assertSame('site_removed', $stage, 'The mid-read removal was not simulated.');
+        $response->assertDontSee('No query results');
+    }
+
+    public function test_preview_reads_have_their_own_rate_limit(): void
+    {
+        $key = 'device-group-maintenance-preview'.sha1((string) $this->actor->getAuthIdentifier());
+        for ($attempt = 0; $attempt < 30; $attempt++) {
+            RateLimiter::hit($key, 60);
+        }
+        $this->choices()->assertStatus(429);
+        $this->preview()->assertStatus(429);
+        RateLimiter::clear($key);
+        $this->choices()->assertOk();
     }
 
     public function test_show_adds_current_actor_and_read_metadata_without_replacing_group_data(): void
@@ -321,6 +355,24 @@ final class DeviceGroupMaintenancePreviewTest extends TestCase
         $this->get('/security-devices/device-groups/'.$this->group->id)->assertOk()
             ->assertInertia(fn ($page) => $page->component('security-devices/device-groups/show')
                 ->where('actor_id', (int) $this->actor->id)->where('as_of', '2026-10-20T08:00:00.000000Z')
+                ->where('can_preview_maintenance', true)
                 ->where('group.id', (int) $this->group->id)->has('members.data', 1)->has('availableDevices'));
+    }
+
+    public function test_show_offers_the_preview_only_to_actors_the_read_would_serve(): void
+    {
+        $id = Permission::query()->where('key', 'securityDevices.monitoring.manage')->value('id');
+        DB::table('permission_user')->where('user_id', $this->actor->id)->where('permission_id', $id)->update(['allowed' => false]);
+        $this->actingAs($this->actor->fresh());
+        // The group page itself stays available (groups.manage + all Sites), but the read would only ever 404.
+        $this->get('/security-devices/device-groups/'.$this->group->id)->assertOk()
+            ->assertInertia(fn ($page) => $page->component('security-devices/device-groups/show')->where('can_preview_maintenance', false));
+        $this->choices()->assertForbidden();
+
+        DB::table('permission_user')->where('user_id', $this->actor->id)->where('permission_id', $id)->update(['allowed' => true]);
+        $this->actingAs($this->actor->fresh());
+        $this->get('/security-devices/device-groups/'.$this->group->id)
+            ->assertInertia(fn ($page) => $page->where('can_preview_maintenance', true));
+        $this->choices()->assertOk();
     }
 }

@@ -408,6 +408,48 @@ describe('Command batch profile and retained evidence', () => {
             '/security-devices/devices/103?section=management',
         );
     });
+    it('searches only the words shown for each target, never links or hidden fields', () => {
+        render(<CommandBatch batch={fixture()} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'All targets' }));
+        const search = screen.getByRole('searchbox', {
+            name: 'Search batch targets',
+        });
+        for (const hidden of [
+            'section=management',
+            '/security-devices/sites/4',
+            'retry_count',
+            'capability_unavailable',
+        ]) {
+            fireEvent.change(search, { target: { value: hidden } });
+            expect(
+                screen.getByText('No targets match this search'),
+            ).toBeInTheDocument();
+        }
+        for (const [shown, count] of [
+            ['DEVICE-UID-103', 1],
+            ['South House', 3],
+            ['does not support this command', 1],
+            ['child-retained-204', 1],
+            ['failed', 1],
+        ] as const) {
+            fireEvent.change(search, { target: { value: shown } });
+            expect(screen.getAllByRole('article')).toHaveLength(count);
+        }
+    });
+    it('limits the decision comment to the server maximum with a visible count', () => {
+        render(<CommandBatch batch={fixture()} />);
+        fireEvent.click(
+            screen.getAllByRole('button', { name: 'Review 1 requests' })[0],
+        );
+        const comment = screen.getByLabelText('Decision comment');
+        expect(comment).toHaveAttribute('maxLength', '1000');
+        fireEvent.change(comment, {
+            target: { value: 'Reviewed Site impact' },
+        });
+        expect(comment).toHaveAccessibleDescription(
+            'Minimum 10 characters. Maximum 1,000. 20 of 1,000 entered.',
+        );
+    });
     it('preserves the approval/rejection route and comment minimum, retains failed drafts and prevents duplicate decisions', () => {
         render(<CommandBatch batch={fixture()} />);
         fireEvent.click(

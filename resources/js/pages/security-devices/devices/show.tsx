@@ -1,5 +1,9 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { PageHeader, PageHeaderViewToggle } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderViewToggle,
+} from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { useGroupedProfileSearchShortcut } from '@/components/page/grouped-profile-nav';
 import { ReasonDialog } from '@/components/reason-dialog';
@@ -25,6 +29,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -44,6 +49,7 @@ import {
     MapPin,
     Minus,
     Plus,
+    RefreshCw,
     Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -275,8 +281,8 @@ export default function DeviceShow(data: Props) {
                 <div className="space-y-5">
                     <PageHeader
                         actions={
-                            <Button
-                                variant="outline"
+                            <PageHeaderGlassButton
+                                icon={RefreshCw}
                                 onClick={() =>
                                     router.visit(
                                         `/security-devices/devices/${data.device.id}`,
@@ -288,19 +294,26 @@ export default function DeviceShow(data: Props) {
                                 }
                             >
                                 Refresh current record
-                            </Button>
+                            </PageHeaderGlassButton>
                         }
                         icon={Cpu}
                         title="Device access required"
                         subline="Device records are restricted."
                     />
-                    <p
-                        role="status"
-                        className="rounded-xl border bg-card p-5 text-sm"
-                    >
-                        This device is not available in your current access.
-                        Return to Devices and reopen a permitted record.
-                    </p>
+                    <div role="status">
+                        <EmptyState
+                            icon={Cpu}
+                            title="This device isn’t available to you"
+                            description="This device is not available in your current access. Return to Devices and reopen a permitted record."
+                            action={
+                                <Button asChild variant="outline">
+                                    <Link href="/security-devices/devices">
+                                        Back to Devices
+                                    </Link>
+                                </Button>
+                            }
+                        />
+                    </div>
                 </div>
             </AppLayout>
         );
@@ -682,6 +695,23 @@ function DeviceShowBody({
     const [maintNotes, setMaintNotes] = useState('');
     const [maintSubmitting, setMaintSubmitting] = useState(false);
     const [maintError, setMaintError] = useState('');
+    const [pendingMaintenanceCompletion, setPendingMaintenanceCompletion] =
+        useState<MaintenanceItem | null>(null);
+    const [completingMaintenance, setCompletingMaintenance] = useState(false);
+
+    const completeMaintenance = () => {
+        if (!pendingMaintenanceCompletion || completingMaintenance) return;
+        setCompletingMaintenance(true);
+        router.post(
+            `/security-devices/maintenance/${pendingMaintenanceCompletion.id}/complete`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setPendingMaintenanceCompletion(null),
+                onFinish: () => setCompletingMaintenance(false),
+            },
+        );
+    };
 
     const submitMaintenance = () => {
         if (!maintDesc) {
@@ -844,35 +874,30 @@ function DeviceShowBody({
                                 navigation={profile.cctv}
                             />
                             {endpoint_setup && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
+                                <PageHeaderGlassButton
                                     onClick={() => setInstallationOpen(true)}
                                 >
                                     Set up Obli
-                                </Button>
+                                </PageHeaderGlassButton>
                             )}
                             {can.update && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
+                                <PageHeaderGlassButton
+                                    icon={Edit}
                                     onClick={editDeviceDialog.openDialog}
                                 >
-                                    <Edit className="mr-2 h-4 w-4" /> Edit
-                                </Button>
+                                    Edit
+                                </PageHeaderGlassButton>
                             )}
                             {can.delete &&
                                 device.status !== 'decommissioned' && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
+                                    <PageHeaderGlassButton
+                                        icon={Trash2}
                                         onClick={() =>
                                             setDecommissionOpen(true)
                                         }
                                     >
-                                        <Trash2 className="mr-2 h-4 w-4" />{' '}
                                         Decommission
-                                    </Button>
+                                    </PageHeaderGlassButton>
                                 )}
                         </div>
                     }
@@ -1222,12 +1247,12 @@ function DeviceShowBody({
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    role="note"
-                                    className="text-sm text-muted-foreground"
-                                >
-                                    Device event access required.
-                                </p>
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Cpu}
+                                    title="Device event access required"
+                                    description="Your current access doesn’t include device events. Ask an administrator if you need to review them."
+                                />
                             )}
                         </TabsContent>
 
@@ -1247,13 +1272,7 @@ function DeviceShowBody({
                                 view={recordsView}
                                 asOf={as_of}
                                 canManage={can.manageMaintenance}
-                                onComplete={(m) =>
-                                    router.post(
-                                        `/security-devices/maintenance/${m.id}/complete`,
-                                        {},
-                                        { preserveScroll: true },
-                                    )
-                                }
+                                onComplete={setPendingMaintenanceCompletion}
                             />
                         </TabsContent>
 
@@ -2057,6 +2076,28 @@ function DeviceShowBody({
                     label="Reason for removing this document"
                     placeholder="For example: superseded by a verified current certificate."
                     confirmLabel="Remove document"
+                />
+
+                <ConfirmDialog
+                    open={pendingMaintenanceCompletion !== null}
+                    onClose={() => {
+                        if (!completingMaintenance)
+                            setPendingMaintenanceCompletion(null);
+                    }}
+                    onConfirm={completeMaintenance}
+                    processing={completingMaintenance}
+                    title="Mark maintenance as complete?"
+                    description={
+                        pendingMaintenanceCompletion
+                            ? `Mark “${humanise(pendingMaintenanceCompletion.type)}” for ${device.name} as completed now? It moves out of scheduled maintenance and the completion time is recorded.`
+                            : ''
+                    }
+                    confirmText={
+                        completingMaintenance
+                            ? 'Completing…'
+                            : 'Complete maintenance'
+                    }
+                    variant="default"
                 />
 
                 <ConfirmDialog

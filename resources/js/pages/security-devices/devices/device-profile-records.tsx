@@ -13,7 +13,12 @@ import {
     FleetTechnologyAccessRequired,
 } from '@/components/security-devices/permission-destinations';
 import { ReviewRow } from '@/components/wizard/shell';
-import { formatDate, formatDateTime } from '@/lib/datetime';
+import {
+    formatDate,
+    formatDateOnly,
+    formatDateTime,
+    toDateInput,
+} from '@/lib/datetime';
 import {
     Activity,
     AlertTriangle,
@@ -45,59 +50,77 @@ type Alert = DeviceProfile['controlRoomAlerts'][number];
 type Directed<T> = T & { direction: 'Upstream' | 'Downstream' };
 
 type Facts<T> = {
+    /** Every retained field, each labelled once. */
     labels: Record<keyof T, string>;
+    /** Identifiers and raw recorded values, shown in the collapsed "Technical details". */
+    technical?: ReadonlyArray<keyof T>;
     dates?: Partial<Record<keyof T, 'date' | 'time'>>;
     render?: Partial<Record<keyof T, (row: T) => ReactNode>>;
 };
 
+function factRow(key: string, label: string, value: ReactNode) {
+    return (
+        <ReviewRow
+            key={key}
+            label={label}
+            value={
+                <span className="[overflow-wrap:anywhere] break-words whitespace-pre-wrap">
+                    {value}
+                </span>
+            }
+        />
+    );
+}
+
 function RecordFacts<T extends object>({
     row,
     labels,
+    technical = [],
     dates,
     render,
 }: Facts<T> & { row: T }) {
+    const entries = Object.entries(labels) as Array<[keyof T & string, string]>;
+    const plainEntries = entries.filter(([key]) => !technical.includes(key));
+    const technicalEntries = entries.filter(([key]) => technical.includes(key));
     return (
         <div className="min-w-0 space-y-1">
-            {Object.entries(labels).map(([key, label]) => {
-                const field = key as keyof T;
-                const raw = row[field];
-                const date = dates?.[field];
+            {plainEntries.map(([key, label]) => {
+                const raw = row[key];
+                const date = dates?.[key];
                 const value =
-                    render?.[field]?.(row) ??
-                    (raw == null || raw === '' ? (
-                        'Not recorded'
-                    ) : typeof raw === 'boolean' ? (
-                        raw ? (
-                            'Yes'
-                        ) : (
-                            'No'
-                        )
-                    ) : date && typeof raw === 'string' ? (
-                        <span className="block">
-                            <span className="block">
-                                {date === 'date'
-                                    ? formatDate(raw)
-                                    : formatDateTime(raw)}
-                            </span>
-                            <span className="text-caption block font-mono text-muted-foreground">
-                                {raw}
-                            </span>
-                        </span>
-                    ) : (
-                        String(raw)
-                    ));
-                return (
-                    <ReviewRow
-                        key={key}
-                        label={String(label)}
-                        value={
-                            <span className="[overflow-wrap:anywhere] break-words whitespace-pre-wrap">
-                                {value}
-                            </span>
-                        }
-                    />
-                );
+                    render?.[key]?.(row) ??
+                    (raw == null || raw === ''
+                        ? 'Not recorded'
+                        : typeof raw === 'boolean'
+                          ? raw
+                              ? 'Yes'
+                              : 'No'
+                          : date && typeof raw === 'string'
+                            ? date === 'date'
+                                ? recordedDate(raw)
+                                : formatDateTime(raw)
+                            : String(raw));
+                return factRow(key, label, value);
             })}
+            {technicalEntries.length > 0 && (
+                <details className="mt-3 min-w-0 rounded-lg border border-border p-3">
+                    <summary className="frontline-focus text-caption cursor-pointer font-medium">
+                        Technical details
+                    </summary>
+                    <div className="mt-3 min-w-0">
+                        {technicalEntries.map(([key, label]) => {
+                            const raw = row[key];
+                            return factRow(
+                                key,
+                                label,
+                                raw == null || raw === ''
+                                    ? 'Not recorded'
+                                    : String(raw),
+                            );
+                        })}
+                    </div>
+                </details>
+            )}
         </div>
     );
 }
@@ -194,14 +217,29 @@ function bytes(value: number) {
           ? `${(value / 1024).toFixed(1)} KB`
           : `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * Whether a recorded date or time had passed when the record was read.
+ * A date-only value (an expiry date, say) is a New Zealand calendar day,
+ * not UTC midnight: it passes only once the read's NZ day is after it, so
+ * nothing shows as passed during its own day.
+ */
 function beforeRead(value: string | null, at: string) {
-    return value != null && new Date(value).getTime() < new Date(at).getTime();
+    if (value == null) return false;
+    if (DATE_ONLY.test(value)) {
+        const readDay = toDateInput(at);
+        return readDay !== '' && value < readDay;
+    }
+    return new Date(value).getTime() < new Date(at).getTime();
 }
 function recordedTime(value: string | null) {
     return value ? formatDateTime(value) : 'Not recorded';
 }
 function recordedDate(value: string | null) {
-    return value ? formatDate(value) : 'Not recorded';
+    if (!value) return 'Not recorded';
+    return DATE_ONLY.test(value)
+        ? formatDateOnly(value, 'Not recorded')
+        : formatDate(value);
 }
 
 export function DeviceAssignmentRecords({
@@ -289,10 +327,15 @@ export function DeviceAssignmentRecords({
                     is_overdue: 'Return overdue',
                     notes: 'Notes',
                 },
+                technical: ['id'],
                 dates: {
                     assigned_at: 'time',
                     expected_return_at: 'time',
                     released_at: 'time',
+                },
+                render: {
+                    assignable_type: (row) => label(row.assignable_type),
+                    assignment_type: (row) => label(row.assignment_type),
                 },
             }}
         />
@@ -398,10 +441,11 @@ export function DeviceAssetRecords({
                     linked_at: 'Linked at',
                     notes: 'Notes',
                 },
+                technical: ['id', 'asset_id'],
                 dates: { linked_at: 'time' },
                 render: {
-                    access: (row) =>
-                        `${row.access.state} · ${row.access.label}`,
+                    access: (row) => row.access.label,
+                    link_type: (row) => label(row.link_type),
                     href: (row) =>
                         destination(row) ? (
                             <a
@@ -438,6 +482,7 @@ const relationshipLabels: Facts<Directed<Relationship>>['labels'] = {
     port: 'Port',
     direction: 'Direction from this device',
 };
+const relationshipTechnical = ['id', 'device_id'] as const;
 function relationshipName(row: Relationship) {
     return row.device_name ?? `Device #${row.device_id}`;
 }
@@ -511,7 +556,11 @@ export function DeviceRelationshipRecords({
                       ]
                     : []
             }
-            facts={{ labels: relationshipLabels }}
+            facts={{
+                labels: relationshipLabels,
+                technical: relationshipTechnical,
+                render: { type: (row) => label(row.type) },
+            }}
         />
     );
 }
@@ -568,7 +617,9 @@ export function DeviceRelationshipHistoryRecords({
                     unlinked_by: 'Removed by',
                     unlink_reason: 'Removal reason',
                 },
+                technical: relationshipTechnical,
                 dates: { created_at: 'time', unlinked_at: 'time' },
+                render: { type: (row) => label(row.type) },
             }}
         />
     );
@@ -692,12 +743,14 @@ export function DeviceDocumentRecords({
                     uploaded_at: 'Uploaded at',
                     download_url: 'Private download',
                 },
+                technical: ['id'],
                 dates: {
                     effective_date: 'date',
                     expiry_date: 'date',
                     uploaded_at: 'time',
                 },
                 render: {
+                    category: (row) => label(row.category),
                     download_url: (row) => (
                         <a
                             href={row.download_url}
@@ -783,16 +836,18 @@ export function DeviceDocumentHistoryRecords({
                     uploaded_at: 'Uploaded at',
                     uploaded_by: 'Uploaded by',
                     state: 'Recorded lifecycle state',
-                    status_label: 'Lifecycle label',
+                    status_label: 'Lifecycle status',
                     needs_attention: 'Storage needs attention',
                     storage_verified_at: 'Storage verified at',
-                    integrity_sha256: 'Full SHA-256 fingerprint',
+                    integrity_sha256: 'File checksum (SHA-256)',
                     removal_requested_at: 'Removal requested at',
                     removed_at: 'Removed at',
                     removed_by: 'Removed by',
                     removal_reason: 'Removal reason',
                     storage_deleted_at: 'Storage deleted at',
                 },
+                technical: ['id', 'state', 'integrity_sha256'],
+                render: { category: (row) => label(row.category) },
                 dates: {
                     uploaded_at: 'time',
                     storage_verified_at: 'time',
@@ -867,7 +922,12 @@ export function DeviceEventRecords({
                     occurred_at: 'Occurred at',
                     source: 'Source',
                 },
+                technical: ['id'],
                 dates: { occurred_at: 'time' },
+                render: {
+                    event_type: (row) => label(row.event_type),
+                    severity: (row) => label(row.severity),
+                },
             }}
         />
     );
@@ -956,7 +1016,12 @@ export function DeviceMaintenanceRecords({
                     scheduled_for: 'Scheduled for',
                     completed_at: 'Completed at',
                 },
+                technical: ['id'],
                 dates: { scheduled_for: 'time', completed_at: 'time' },
+                render: {
+                    type: (row) => label(row.type),
+                    status: (row) => label(row.status),
+                },
             }}
         />
     );
@@ -1055,8 +1120,15 @@ export function DeviceControlRoomRecords({
                         href: 'Control Room destination',
                         access: 'Destination access',
                     },
+                    technical: ['id'],
                     dates: { triggeredAt: 'time' },
                     render: {
+                        type: (row) =>
+                            row.type ? label(row.type) : 'Not recorded',
+                        severity: (row) =>
+                            row.severity ? label(row.severity) : 'Not recorded',
+                        status: (row) =>
+                            row.status ? label(row.status) : 'Not recorded',
                         href: (row) => (
                             <a
                                 href={row.href!}
@@ -1065,8 +1137,7 @@ export function DeviceControlRoomRecords({
                                 {row.href}
                             </a>
                         ),
-                        access: (row) =>
-                            `${row.access.state} · ${row.access.label}`,
+                        access: (row) => row.access.label,
                     },
                 }}
             />

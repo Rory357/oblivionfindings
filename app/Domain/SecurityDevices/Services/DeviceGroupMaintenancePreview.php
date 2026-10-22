@@ -35,6 +35,29 @@ final class DeviceGroupMaintenancePreview
         private readonly CanonicalDeviceSiteResolver $sites,
     ) {}
 
+    /**
+     * The actor-level rule read() enforces before any group, member or Site
+     * check. The group page uses it to decide whether to offer the preview,
+     * so the action is never shown to someone who would always get a 404.
+     * Mirrors MaintenancePolicyAccess::within()'s actor checks plus this
+     * adapter's own group and all-Sites requirements.
+     */
+    public function actorMayPreview(User $actor): bool
+    {
+        if (! $actor->approved_at || ! $actor->email_verified_at || $actor->external_clinical_account) {
+            return false;
+        }
+        foreach (['client', 'next_of_kin', 'external_clinician'] as $role) {
+            if ($actor->role === $role || $actor->hasRole($role)) {
+                return false;
+            }
+        }
+
+        return $actor->canDo('securityDevices.monitoring.manage')
+            && $actor->canDo('securityDevices.groups.manage')
+            && $this->deviceAccess->canViewAllSites($actor);
+    }
+
     public function read(User $claimed, int $groupId, array $query, string $rawQuery): array
     {
         $values = $this->input($query, $rawQuery);
@@ -53,8 +76,11 @@ final class DeviceGroupMaintenancePreview
 
                 return $this->policyAccess->within($claimed, $values['expected_actor_id'], null, $siteId, false,
                     function (User $actor, CurrentAuthorizationReads $current) use ($groupId, $values, $siteId): array {
+                        // actorMayPreview() is the page's offer rule; inside the read the
+                        // all-Sites grant is checked against the current locked evidence.
                         $access = $this->deviceAccess->forCurrentEvidence($current, $values['device_id']);
-                        abort_unless($actor->canDo('securityDevices.groups.manage') && $access->canViewAllSites($actor), 404, 'unavailable');
+                        abort_unless($this->actorMayPreview($actor)
+                            && $actor->canDo('securityDevices.groups.manage') && $access->canViewAllSites($actor), 404, 'unavailable');
                         $group = $current->query(DeviceGroup::query())->whereKey($groupId)->first();
                         abort_unless($group, 404, 'unavailable');
                         $member = $current->query($group->devices()->getQuery())->select('devices.*')->where('devices.id', $values['device_id'])->first();
@@ -75,6 +101,12 @@ final class DeviceGroupMaintenancePreview
                         $monitor = $current->query(Monitor::query())->whereKey($values['monitor_id'])->where('device_id', $member->id)->first();
                         abort_unless($monitor, 404, 'unavailable');
                         $this->policyAccess->scope($actor, ['site_id' => $siteId, 'monitor_id' => (int) $monitor->id], $current);
+                        // The 200-record / 256 KB cap is checked on the finished
+                        // resolution: MaintenanceHistory (Monitoring's owner read)
+                        // loads every revision for the Site first. Bounding that read
+                        // earlier would reject Sites whose result is small but whose
+                        // history is long, so it is left to Monitoring; the route is
+                        // throttled instead.
                         $resolution = $this->history->resolve($monitor, $values['instant']);
                         abort_if(count($resolution['matching']) + count($resolution['overridden']) > self::RESOLUTION_RECORD_LIMIT
                             || strlen(json_encode($resolution, JSON_THROW_ON_ERROR)) > self::RESOLUTION_BYTE_LIMIT, 503, 'unavailable');

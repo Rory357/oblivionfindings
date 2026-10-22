@@ -1,5 +1,8 @@
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
+import InputError from '@/components/input-error';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -9,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import {
     ReviewCard,
     ReviewRow,
@@ -16,18 +20,22 @@ import {
     WizardStepPane,
 } from '@/components/wizard/shell';
 import {
+    formatDateTimeInZone,
     formatDateTimeLong,
     timeOffsetsInZone,
     toDatetimeLocal,
+    WORKER_TIMEZONE,
 } from '@/lib/datetime';
 import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
+    AlertTriangle,
     CalendarClock,
     FileClock,
+    Info,
     ListChecks,
-    Loader2,
     Monitor,
+    ShieldAlert,
 } from 'lucide-react';
 import { type ComponentProps, useEffect, useRef, useState } from 'react';
 
@@ -147,19 +155,19 @@ const steps = [
     {
         key: 'choice',
         label: 'Monitor and time',
-        blurb: 'One current member and a chosen instant',
+        blurb: 'One device in this group and a time to check',
         icon: CalendarClock,
     },
     {
         key: 'result',
         label: 'Policy preview',
-        blurb: 'Rule precedence and availability',
+        blurb: 'Which maintenance rule applies',
         icon: ListChecks,
     },
     {
         key: 'records',
         label: 'Full records',
-        blurb: 'Revisions, schedules and assignment',
+        blurb: 'Rule history, schedules and Site assignment',
         icon: FileClock,
     },
 ];
@@ -381,26 +389,26 @@ function resolutionValid(
 }
 const reasons: Record<string, string> = {
     most_specific_occurrence_rule:
-        'The most specific recorded rule covers this instant.',
+        'The most specific recorded rule covers this time.',
     no_applicable_maintenance:
-        'No recorded maintenance rule applies at this instant.',
+        'No recorded maintenance rule applies at this time.',
     equal_priority_rules:
-        'More than one rule has the same highest priority. A single winner cannot be chosen.',
+        'More than one rule has the same highest priority, so a single rule can’t be chosen.',
     unsupported_maintenance_policy:
-        'The recorded policy is not supported by this preview.',
-    history_storage_unavailable: 'Maintenance history is unavailable.',
+        'The recorded policy isn’t supported by this preview.',
+    history_storage_unavailable: 'Maintenance history isn’t available.',
     observation_before_history_tracking:
-        'This instant is earlier than recorded history tracking.',
+        'This time is earlier than the start of recorded maintenance history.',
     occurrence_assignment_unverified:
-        'The device’s Site assignment cannot be verified for this instant.',
+        'The device’s Site assignment can’t be confirmed for this time.',
     legacy_rule_history_unavailable:
-        'An existing rule has no verified history.',
+        'An existing rule has no confirmed history.',
     revision_chain_unverified:
-        'The recorded revision sequence cannot be verified.',
+        'The rule’s recorded changes can’t be confirmed.',
     current_rule_history_diverged:
         'The current rule differs from its recorded history.',
     observation_before_reviewed_baseline:
-        'This instant is earlier than the reviewed rule baseline.',
+        'This time is earlier than the rule’s reviewed starting record.',
 };
 const states: Record<MaintenanceResolution['state'], string> = {
     applied: 'Applicable technical maintenance rule',
@@ -409,41 +417,165 @@ const states: Record<MaintenanceResolution['state'], string> = {
     unsupported: 'Policy unavailable for this preview',
     unavailable: 'Maintenance history unavailable',
 };
+type Denial = 'signed_out' | 'access' | 'unavailable';
+/** Genuine denials: private results are cleared and only a full group read recovers. */
+const denials: Record<Denial, string> = {
+    signed_out:
+        'You’ve been signed out. Sign in again, then reopen this group to preview maintenance.',
+    access: 'Your access to maintenance previews has changed. Refresh the group to see what you can do now.',
+    unavailable:
+        'This preview is no longer available. The device may have left the group, or its monitor or Site may have changed. Refresh the group to see what’s current.',
+};
+/** Failed reads: nothing changed and the person can simply try again. */
+const READ_FAILED =
+    'The preview couldn’t be loaded. Nothing has changed. Try again.';
+const READ_UNCHECKED =
+    'The preview couldn’t be checked, so it isn’t shown. Nothing has changed. Try again.';
+const READ_THROTTLED =
+    'Too many previews in a short time. Wait a minute, then try again.';
 const text = (v: unknown) =>
     v === null || v === undefined || v === '' ? 'Not recorded' : String(v);
-const detailLabels: Record<string, string> = {
-    dst_overlap: 'Repeated local time',
-    dst_gap: 'Skipped local time',
-    monitor_device_id: 'Monitor’s device ID',
-    policy: 'Technical notification and ticket policy',
-    snapshot_hash: 'Recorded fingerprint',
+const humanise = (v: string) =>
+    v.replace(/[._-]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
+const zoneLabel = (zone: string) =>
+    zone === WORKER_TIMEZONE ? 'New Zealand time' : zone;
+const nzTime = (v: string | null) =>
+    v ? formatDateTimeLong(v) + ' · New Zealand time' : 'Not recorded';
+const zonedTime = (v: string | null, zone: string) => {
+    if (!v) return 'Not recorded';
+    try {
+        return formatDateTimeInZone(v, zone) + ' · ' + zoneLabel(zone);
+    } catch {
+        return nzTime(v);
+    }
 };
-const detailLabel = (v: string) =>
-    detailLabels[v] ??
-    v.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase());
-function RuleRecord({ rule, label }: { rule: Rule; label: string }) {
+const plain = (labels: Record<string, string>) => (v: string | null) =>
+    v === null ? 'Not recorded' : (labels[v] ?? humanise(v));
+const ruleStateLabel = plain({ active: 'Active', cancelled: 'Cancelled' });
+const operationLabel = plain({
+    create: 'Rule created',
+    update: 'Rule changed',
+    baseline: 'Reviewed starting record',
+    cancel: 'Rule cancelled',
+});
+const policyLabel = plain({
+    suppress_notifications_and_ticketing:
+        'Pauses technical notifications and automatic tickets',
+});
+const overlapLabel = plain({
+    reject: 'Not allowed',
+    earlier: 'Use the first occurrence',
+    later: 'Use the second occurrence',
+});
+const gapLabel = plain({ reject: 'Not allowed', skip: 'Skip that time' });
+const recurrenceLabel = (v: string | null) =>
+    v === null
+        ? 'Does not repeat'
+        : plain({ daily: 'Every day', weekly: 'Every week' })(v);
+const scopeLabel = (s: Snapshot) =>
+    s.monitor_id !== null
+        ? 'This monitor'
+        : s.device_id !== null
+          ? 'This device'
+          : 'The whole Site';
+const monitorKindLabel = (kind: string | null) =>
+    kind ? humanise(kind) : 'Type not recorded';
+/** Identifiers and raw recorded values, kept out of the plain view (as on the device profile). */
+function TechnicalDetails({ rows }: { rows: Array<[string, unknown]> }) {
     return (
-        <ReviewCard title={label + ': ' + rule.snapshot.name} icon={FileClock}>
-            {Object.entries(rule)
-                .filter(([key]) => key !== 'snapshot')
-                .map(([key, value]) => (
-                    <ReviewRow
-                        key={key}
-                        label={detailLabel(key)}
-                        value={text(value)}
-                    />
+        <details className="mt-3 min-w-0 rounded-lg border border-border p-3">
+            <summary className="frontline-focus text-caption cursor-pointer font-medium">
+                Technical details
+            </summary>
+            <div className="mt-3 min-w-0 [overflow-wrap:anywhere]">
+                {rows.map(([label, value]) => (
+                    <ReviewRow key={label} label={label} value={text(value)} />
                 ))}
-            {Object.entries(rule.snapshot).map(([key, value]) => (
+            </div>
+        </details>
+    );
+}
+function RuleRecord({ rule, label }: { rule: Rule; label: string }) {
+    const s = rule.snapshot;
+    return (
+        <ReviewCard title={label + ': ' + s.name} icon={FileClock}>
+            <ReviewRow label="Applies to" value={scopeLabel(s)} />
+            <ReviewRow label="Status" value={ruleStateLabel(s.state)} />
+            <ReviewRow
+                label="Starts"
+                value={zonedTime(s.starts_at, s.timezone)}
+            />
+            <ReviewRow label="Ends" value={zonedTime(s.ends_at, s.timezone)} />
+            <ReviewRow label="Repeats" value={recurrenceLabel(s.recurrence)} />
+            {s.recurrence !== null && (
                 <ReviewRow
-                    key={key}
-                    label={detailLabel(key)}
+                    label="Repeats until"
                     value={
-                        key === 'recurrence' && value === null
-                            ? 'Does not repeat'
-                            : text(value)
+                        s.recurrence_until
+                            ? zonedTime(s.recurrence_until, s.timezone)
+                            : 'No end date'
                     }
                 />
-            ))}
+            )}
+            <ReviewRow
+                label="Schedule time zone"
+                value={zoneLabel(s.timezone)}
+            />
+            <ReviewRow
+                label="If a clock change repeats the time"
+                value={overlapLabel(s.dst_overlap)}
+            />
+            <ReviewRow
+                label="If a clock change skips the time"
+                value={gapLabel(s.dst_gap)}
+            />
+            <ReviewRow label="What it pauses" value={policyLabel(s.policy)} />
+            <ReviewRow label="Reason" value={text(s.reason)} />
+            <ReviewRow label="Version" value={rule.version} />
+            <ReviewRow
+                label="Recorded change"
+                value={operationLabel(rule.operation)}
+            />
+            <ReviewRow
+                label="In effect from"
+                value={nzTime(rule.effective_from)}
+            />
+            <ReviewRow label="Recorded" value={nzTime(rule.recorded_at)} />
+            {s.cancelled_at && (
+                <>
+                    <ReviewRow
+                        label="Cancelled"
+                        value={nzTime(s.cancelled_at)}
+                    />
+                    <ReviewRow
+                        label="Cancellation reason"
+                        value={text(s.cancellation_reason)}
+                    />
+                </>
+            )}
+            <TechnicalDetails
+                rows={[
+                    ['Revision ID', rule.revision_id],
+                    ['Rule ID', rule.window_id],
+                    ['Recorded by (user ID)', rule.actor_id],
+                    ['Created by (user ID)', s.created_by_user_id],
+                    ['Updated by (user ID)', s.updated_by_user_id],
+                    ['Cancelled by (user ID)', s.cancelled_by_user_id],
+                    ['Site ID', s.site_id],
+                    ['Device ID', s.device_id],
+                    ['Monitor ID', s.monitor_id],
+                    ['Monitor’s device ID', s.monitor_device_id],
+                    ['Recorded state', s.state],
+                    ['Recorded change type', rule.operation],
+                    ['Recorded policy', s.policy],
+                    ['Recorded start', s.starts_at],
+                    ['Recorded end', s.ends_at],
+                    ['Recorded repeat end', s.recurrence_until],
+                    ['Recorded effective from', rule.effective_from],
+                    ['Recorded at', rule.recorded_at],
+                    ['Record checksum (SHA-256)', rule.snapshot_hash],
+                ]}
+            />
         </ReviewCard>
     );
 }
@@ -470,18 +602,20 @@ export default function MaintenancePolicyPreview({
         member: maintenanceMemberIdentity(member),
         actor: sourceActor,
     }));
+    const identityChanged =
+        source.group !== group.id ||
+        source.member !== maintenanceMemberIdentity(member);
     const allowed =
         positive(source.actor) &&
         source.actor === actorId &&
         auth?.user?.id === source.actor &&
         auth.can?.securityDevices?.groupsManage === true &&
         auth.can.securityDevices.monitoringManage === true &&
-        source.group === group.id &&
-        source.member === maintenanceMemberIdentity(member) &&
+        !identityChanged &&
         strictPreviewUtc(asOf);
     const currentAllowed = useRef(allowed);
     currentAllowed.current = allowed;
-    const [denied, setDenied] = useState(false),
+    const [denied, setDenied] = useState<Denial | null>(null),
         [choices, setChoices] = useState<MaintenanceChoices | null>(null),
         [result, setResult] = useState<MaintenancePreview | null>(null),
         [monitorId, setMonitorId] = useState(''),
@@ -491,12 +625,15 @@ export default function MaintenancePolicyPreview({
         [step, setStep] = useState(0),
         [busy, setBusy] = useState(false),
         [error, setError] = useState<string | null>(null),
+        [notice, setNotice] = useState<string | null>(null),
         [timeError, setTimeError] = useState<string | null>(null);
     const initialLoad = useRef(false);
+    const lastRead = useRef<'choices' | 'preview'>('choices');
     const request = useRef<AbortController | null>(null),
         mounted = useRef(true);
-    const visible = allowed && !denied;
-    const clearPrivate = () => {
+    const visible = allowed && denied === null;
+    /** A genuine denial: abort, drop every private value, and require a full group read. */
+    const deny = (reason: Denial) => {
         request.current?.abort();
         request.current = null;
         setChoices(null);
@@ -505,8 +642,10 @@ export default function MaintenancePolicyPreview({
         setLocal('');
         setExact('');
         setOffset('');
+        setError(null);
+        setNotice(null);
         setBusy(false);
-        setDenied(true);
+        setDenied((current) => current ?? reason);
     };
     useEffect(() => {
         mounted.current = true;
@@ -517,18 +656,11 @@ export default function MaintenancePolicyPreview({
         };
     }, []);
     useEffect(() => {
-        if (!allowed) {
-            request.current?.abort();
-            setChoices(null);
-            setResult(null);
-            setMonitorId('');
-            setLocal('');
-            setExact('');
-            setOffset('');
-            setBusy(false);
-            setDenied(true);
-        }
-    }, [allowed]);
+        if (!allowed) deny(identityChanged ? 'unavailable' : 'access');
+        // Runs when authority is lost; `deny` is recreated each render but
+        // only aborts and clears state, so it is not a dependency.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allowed, identityChanged]);
     const path =
         '/security-devices/device-groups/' +
         group.id +
@@ -542,11 +674,13 @@ export default function MaintenancePolicyPreview({
             setError(monitor ? null : 'Choose a current monitor.');
             return;
         }
+        lastRead.current = mode;
         request.current?.abort();
         const active = new AbortController();
         request.current = active;
         setBusy(true);
         setError(null);
+        setNotice(null);
         setTimeError(null);
         const params = {
             mode,
@@ -569,10 +703,17 @@ export default function MaintenancePolicyPreview({
             });
             if (!owns()) return;
             const data = response.data;
-            if (!commonValid(data, mode, source.actor, source.group, member)) {
-                clearPrivate();
+            // An answer for another person is a denial, not a failed read.
+            if (
+                record(data) &&
+                positive(data.actor_id) &&
+                data.actor_id !== source.actor
+            ) {
+                deny('access');
                 return;
             }
+            if (!commonValid(data, mode, source.actor, source.group, member))
+                throw Error('unchecked');
             if (mode === 'choices') {
                 const value = data as MaintenanceChoices;
                 if (
@@ -588,24 +729,38 @@ export default function MaintenancePolicyPreview({
                         : value.state !== 'no_monitors' ||
                           value.monitors.length !== 0)
                 )
-                    throw Error('unverified choices');
-                if (
-                    choices &&
-                    (value.site.id !== choices.site.id ||
-                        (monitorId &&
-                            !value.monitors.some(
-                                (m) => String(m.id) === monitorId,
-                            )))
-                ) {
-                    clearPrivate();
-                    return;
+                    throw Error('unchecked');
+                const siteChanged =
+                    choices && value.site.id !== choices.site.id;
+                const monitorWithdrawn =
+                    monitorId &&
+                    !value.monitors.some((m) => String(m.id) === monitorId);
+                if (siteChanged || monitorWithdrawn) {
+                    // Current, checked choices replace the old ones; anything
+                    // read for the old Site or monitor is dropped.
+                    setMonitorId('');
+                    setResult(null);
+                    setStep(0);
+                    setNotice(
+                        siteChanged
+                            ? 'This device’s Site has changed. Choose a monitor again.'
+                            : 'The monitor you chose is no longer listed. Choose a current monitor.',
+                    );
                 }
                 setChoices(value);
             } else {
                 const value = data as MaintenancePreview;
+                if (!choices || value.site.id !== choices.site.id) {
+                    setChoices(null);
+                    setMonitorId('');
+                    setResult(null);
+                    setStep(0);
+                    setNotice(
+                        'This device’s Site has changed since the monitors were loaded. Load the current monitors and choose again.',
+                    );
+                    return;
+                }
                 if (
-                    !choices ||
-                    value.site.id !== choices.site.id ||
                     !monitorValid(value.monitor, member.id) ||
                     value.monitor.id !== monitor!.id ||
                     value.requested_at !== normalizedUtc(instant.at!) ||
@@ -616,10 +771,8 @@ export default function MaintenancePolicyPreview({
                         instant.at!,
                         value.monitor.id,
                     )
-                ) {
-                    clearPrivate();
-                    return;
-                }
+                )
+                    throw Error('unchecked');
                 setResult(value);
                 setStep(1);
             }
@@ -627,12 +780,19 @@ export default function MaintenancePolicyPreview({
             if (!owns()) return;
             const status = (failure as { response?: { status?: number } })
                 ?.response?.status;
-            if (status === 401 || status === 403 || status === 404)
-                clearPrivate();
-            else
-                setError(
-                    'The latest preview could not be loaded. Refresh the choices or try this read again.',
-                );
+            if (status === 401) deny('signed_out');
+            else if (status === 403) deny('access');
+            // The server answers every withdrawn member, monitor, Site or
+            // permission with the same private 404, so it is treated as a
+            // denial (and private data is cleared) without claiming which.
+            else if (status === 404) deny('unavailable');
+            else if (status === 429) setError(READ_THROTTLED);
+            else if (
+                failure instanceof Error &&
+                failure.message === 'unchecked'
+            )
+                setError(READ_UNCHECKED);
+            else setError(READ_FAILED);
         } finally {
             if (owns()) {
                 request.current = null;
@@ -653,16 +813,17 @@ export default function MaintenancePolicyPreview({
         onClose();
     };
     const r = result?.resolution;
+    const monitors = choices?.monitors ?? [];
     return (
         <WizardShell
             open
             onClose={close}
             onCloseAutoFocus={onCloseAutoFocus}
             title="Maintenance policy preview"
-            description="Review technical maintenance rules for one member and one instant."
+            description="Check which technical maintenance rule applies to one device at one time."
             railIcon={CalendarClock}
             railTitle="Maintenance preview"
-            railSub={visible ? member.name : 'Access unavailable'}
+            railSub={visible ? member.name : 'Preview not available'}
             steps={steps}
             stepIndex={step}
             onStepClick={(index) => {
@@ -679,14 +840,10 @@ export default function MaintenancePolicyPreview({
             footerEnd={
                 visible && (
                     <Button
-                        disabled={
-                            busy || !choices?.monitors.length || !monitorId
-                        }
+                        disabled={busy || !monitors.length || !monitorId}
                         onClick={() => void load('preview')}
                     >
-                        {busy && (
-                            <Loader2 className="mr-2 size-4 animate-spin" />
-                        )}
+                        {busy && <Spinner className="mr-2" />}
                         Preview policy
                     </Button>
                 )
@@ -694,12 +851,20 @@ export default function MaintenancePolicyPreview({
         >
             <WizardStepPane>
                 {!visible ? (
-                    <div role="alert" className="space-y-3">
-                        <p>
-                            This preview is unavailable for the current account,
-                            member or monitor. Refresh the group to review
-                            current access.
-                        </p>
+                    <div className="space-y-3">
+                        <Alert variant="warning">
+                            <ShieldAlert />
+                            <AlertDescription>
+                                {
+                                    denials[
+                                        denied ??
+                                            (identityChanged
+                                                ? 'unavailable'
+                                                : 'access')
+                                    ]
+                                }
+                            </AlertDescription>
+                        </Alert>
                         <Button
                             variant="outline"
                             onClick={() =>
@@ -721,22 +886,45 @@ export default function MaintenancePolicyPreview({
                     <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
                             Monitor rules take priority over device rules, then
-                            Site rules. Groups do not supply inherited
-                            maintenance policies.
+                            Site rules. Groups don’t pass maintenance rules on
+                            to their devices.
                         </p>
                         {busy && (
-                            <p role="status">
+                            <p role="status" className="text-sm">
                                 Reading current maintenance records…
                             </p>
                         )}
+                        {notice && (
+                            <Alert variant="info" role="status">
+                                <Info />
+                                <AlertDescription>{notice}</AlertDescription>
+                            </Alert>
+                        )}
                         {error && (
-                            <div role="alert" className="space-y-2">
-                                <p className="text-destructive">{error}</p>
-                                {result && (
-                                    <p>
-                                        The previous preview is retained with
-                                        its original time below.
-                                    </p>
+                            <div className="space-y-2">
+                                <Alert variant="destructive">
+                                    <AlertTriangle />
+                                    <AlertDescription>
+                                        <p>{error}</p>
+                                        {result && (
+                                            <p>
+                                                The previous preview is retained
+                                                with its original time below.
+                                            </p>
+                                        )}
+                                    </AlertDescription>
+                                </Alert>
+                                {error !== 'Choose a current monitor.' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            void load(lastRead.current)
+                                        }
+                                    >
+                                        Try again
+                                    </Button>
                                 )}
                             </div>
                         )}
@@ -761,12 +949,8 @@ export default function MaintenancePolicyPreview({
                                                 value={choices.site.name}
                                             />
                                             <ReviewRow
-                                                label="Choices read"
-                                                value={
-                                                    formatDateTimeLong(
-                                                        choices.as_of,
-                                                    ) + ' · Pacific/Auckland'
-                                                }
+                                                label="Monitors read"
+                                                value={nzTime(choices.as_of)}
                                             />
                                         </>
                                     )}
@@ -780,13 +964,28 @@ export default function MaintenancePolicyPreview({
                                     </Button>
                                 )}
                                 {choices?.state === 'no_monitors' && (
-                                    <p role="status">
-                                        No current monitors are available for
-                                        this member. Choose another member or
-                                        refresh the current choices.
-                                    </p>
+                                    <div role="status">
+                                        <EmptyState
+                                            variant="compact"
+                                            icon={Monitor}
+                                            title="No monitors to preview"
+                                            description="No current monitors are available for this member. Choose another member or refresh the current choices."
+                                            action={
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={busy}
+                                                    onClick={() =>
+                                                        void load('choices')
+                                                    }
+                                                >
+                                                    Refresh monitor choices
+                                                </Button>
+                                            }
+                                        />
+                                    </div>
                                 )}
-                                {choices && (
+                                {choices && monitors.length > 0 && (
                                     <>
                                         <div className="space-y-2">
                                             <Label htmlFor="maintenance-preview-monitor">
@@ -804,6 +1003,7 @@ export default function MaintenancePolicyPreview({
                                                     setMonitorId(value);
                                                     setResult(null);
                                                     setError(null);
+                                                    setNotice(null);
                                                 }}
                                             >
                                                 <SelectTrigger
@@ -813,24 +1013,21 @@ export default function MaintenancePolicyPreview({
                                                     <SelectValue placeholder="Choose a current monitor" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {choices.monitors.map(
-                                                        (m) => (
-                                                            <SelectItem
-                                                                key={m.id}
-                                                                value={String(
-                                                                    m.id,
-                                                                )}
-                                                            >
-                                                                {m.name} ·{' '}
-                                                                {m.is_enabled
-                                                                    ? 'Enabled'
-                                                                    : 'Disabled'}{' '}
-                                                                ·{' '}
-                                                                {m.kind ??
-                                                                    'Kind not recorded'}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
+                                                    {monitors.map((m) => (
+                                                        <SelectItem
+                                                            key={m.id}
+                                                            value={String(m.id)}
+                                                        >
+                                                            {m.name} ·{' '}
+                                                            {m.is_enabled
+                                                                ? 'On'
+                                                                : 'Off'}{' '}
+                                                            ·{' '}
+                                                            {monitorKindLabel(
+                                                                m.kind,
+                                                            )}
+                                                        </SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
                                             {choices.truncated && (
@@ -854,7 +1051,7 @@ export default function MaintenancePolicyPreview({
                                         </div>
                                         <DateTimeField
                                             id="maintenance-preview-at"
-                                            label="Preview instant"
+                                            label="Time to check"
                                             value={local}
                                             onChange={(value) => {
                                                 setLocal(value);
@@ -863,8 +1060,12 @@ export default function MaintenancePolicyPreview({
                                                 setTimeError(null);
                                             }}
                                             clearable={false}
-                                            error={timeError ?? undefined}
-                                            hint="Choose when to interpret the recorded maintenance rules."
+                                            error={
+                                                !exact
+                                                    ? (timeError ?? undefined)
+                                                    : undefined
+                                            }
+                                            hint="New Zealand time. Choose when to apply the recorded maintenance rules."
                                         />
                                         {!exact && offsets.length > 1 && (
                                             <div className="space-y-2">
@@ -894,34 +1095,32 @@ export default function MaintenancePolicyPreview({
                                                 </Select>
                                             </div>
                                         )}
-                                        {timeError && (
-                                            <p
-                                                role="alert"
-                                                className="text-sm text-destructive"
-                                            >
-                                                {timeError}
-                                            </p>
-                                        )}
                                         {chosen.at && (
                                             <p className="text-sm">
-                                                Chosen instant:{' '}
-                                                {formatDateTimeLong(chosen.at)}{' '}
-                                                · Pacific/Auckland
+                                                Chosen time: {nzTime(chosen.at)}
                                             </p>
                                         )}
-                                        <details className="rounded-lg border border-border p-3">
-                                            <summary className="cursor-pointer text-sm font-medium">
+                                        <details
+                                            className="rounded-lg border border-border p-3"
+                                            open={Boolean(exact) || undefined}
+                                        >
+                                            <summary className="frontline-focus cursor-pointer text-sm font-medium">
                                                 Exact UTC time
                                             </summary>
                                             <div className="mt-3 space-y-2">
                                                 <Label htmlFor="maintenance-preview-utc">
-                                                    UTC instant including
-                                                    seconds
+                                                    UTC time including seconds
                                                 </Label>
                                                 <Input
                                                     id="maintenance-preview-utc"
                                                     value={exact}
                                                     placeholder="2026-10-14T03:00:00Z"
+                                                    aria-invalid={
+                                                        Boolean(
+                                                            exact && timeError,
+                                                        ) || undefined
+                                                    }
+                                                    aria-describedby="maintenance-preview-utc-help"
                                                     onChange={(e) => {
                                                         setExact(
                                                             e.target.value,
@@ -929,7 +1128,19 @@ export default function MaintenancePolicyPreview({
                                                         setTimeError(null);
                                                     }}
                                                 />
-                                                <p className="text-caption">
+                                                <InputError
+                                                    role="alert"
+                                                    message={
+                                                        exact
+                                                            ? (timeError ??
+                                                              undefined)
+                                                            : undefined
+                                                    }
+                                                />
+                                                <p
+                                                    id="maintenance-preview-utc-help"
+                                                    className="text-caption"
+                                                >
                                                     Optional exact time. End
                                                     with Z; use up to six
                                                     fractional digits. This
@@ -958,33 +1169,18 @@ export default function MaintenancePolicyPreview({
                                                 ? 'Previous preview for'
                                                 : 'Preview for'
                                         }
-                                        value={
-                                            formatDateTimeLong(
-                                                result.requested_at,
-                                            ) + ' · Pacific/Auckland'
-                                        }
+                                        value={nzTime(result.requested_at)}
                                     />
                                     <ReviewRow
                                         label="Read at"
-                                        value={
-                                            formatDateTimeLong(result.as_of) +
-                                            ' · Pacific/Auckland'
-                                        }
-                                    />
-                                    <ReviewRow
-                                        label="Interpreted at"
-                                        value={
-                                            formatDateTimeLong(
-                                                r.interpreted_at,
-                                            ) + ' · Pacific/Auckland'
-                                        }
+                                        value={nzTime(result.as_of)}
                                     />
                                     <ReviewRow
                                         label="Monitor"
                                         value={result.monitor.name}
                                     />
                                     <ReviewRow
-                                        label="Monitor enabled"
+                                        label="Monitor on"
                                         value={
                                             result.monitor.is_enabled
                                                 ? 'Yes'
@@ -997,7 +1193,7 @@ export default function MaintenancePolicyPreview({
                                     />
                                     <p className="mt-3 text-sm">
                                         {reasons[r.reason_code ?? ''] ??
-                                            'The returned interpretation does not establish an applicable rule.'}
+                                            'This result doesn’t show an applicable rule.'}
                                     </p>
                                     {r.winner && (
                                         <>
@@ -1006,27 +1202,20 @@ export default function MaintenancePolicyPreview({
                                                 value={r.winner.snapshot.name}
                                             />
                                             <ReviewRow
-                                                label="Priority"
-                                                value={
-                                                    r.winner.snapshot
-                                                        .monitor_id !== null
-                                                        ? 'Monitor'
-                                                        : r.winner.snapshot
-                                                                .device_id !==
-                                                            null
-                                                          ? 'Device'
-                                                          : 'Site'
-                                                }
+                                                label="Applies to"
+                                                value={scopeLabel(
+                                                    r.winner.snapshot,
+                                                )}
                                             />
                                             <ReviewRow
-                                                label="Revision"
+                                                label="Version"
                                                 value={r.winner.version}
                                             />
                                             <ReviewRow
-                                                label="Schedule timezone"
-                                                value={
-                                                    r.winner.snapshot.timezone
-                                                }
+                                                label="Schedule time zone"
+                                                value={zoneLabel(
+                                                    r.winner.snapshot.timezone,
+                                                )}
                                             />
                                         </>
                                     )}
@@ -1059,62 +1248,152 @@ export default function MaintenancePolicyPreview({
                                     title="Preview context"
                                     icon={CalendarClock}
                                 >
-                                    {[
-                                        ['Group', result.group.name],
-                                        ['Group ID', result.group.id],
-                                        ['Device', result.device.name],
-                                        ['Device ID', result.device.id],
-                                        [
-                                            'Device UID',
-                                            result.device.device_uid,
-                                        ],
-                                        ['Site', result.site.name],
-                                        ['Site ID', result.site.id],
-                                        ['Monitor', result.monitor.name],
-                                        ['Monitor ID', result.monitor.id],
-                                        ['Monitor kind', result.monitor.kind],
-                                        [
-                                            'Monitor enabled',
+                                    <ReviewRow
+                                        label="Group"
+                                        value={result.group.name}
+                                    />
+                                    <ReviewRow
+                                        label="Device"
+                                        value={result.device.name}
+                                    />
+                                    <ReviewRow
+                                        label="Site"
+                                        value={result.site.name}
+                                    />
+                                    <ReviewRow
+                                        label="Monitor"
+                                        value={result.monitor.name}
+                                    />
+                                    <ReviewRow
+                                        label="Monitor type"
+                                        value={monitorKindLabel(
+                                            result.monitor.kind,
+                                        )}
+                                    />
+                                    <ReviewRow
+                                        label="Monitor on"
+                                        value={
                                             result.monitor.is_enabled
                                                 ? 'Yes'
-                                                : 'No',
-                                        ],
-                                        [
-                                            'Exact chosen instant',
-                                            result.requested_at,
-                                        ],
-                                        ['Read at', result.as_of],
-                                        ['Occurrence instant', r.observed_at],
-                                        ['Interpreted at', r.interpreted_at],
-                                        [
-                                            'Clock uncertainty seconds',
-                                            r.clock_uncertainty_seconds,
-                                        ],
-                                        ['Interpretation state', r.state],
-                                        ['Recorded reason', r.reason_code],
-                                        ['Recorded basis', r.basis],
-                                    ].map(([label, value]) => (
-                                        <ReviewRow
-                                            key={String(label)}
-                                            label={String(label)}
-                                            value={text(value)}
-                                        />
-                                    ))}
+                                                : 'No'
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Time checked"
+                                        value={nzTime(result.requested_at)}
+                                    />
+                                    <ReviewRow
+                                        label="Read at"
+                                        value={nzTime(result.as_of)}
+                                    />
+                                    <ReviewRow
+                                        label="Result"
+                                        value={states[r.state]}
+                                    />
+                                    <ReviewRow
+                                        label="Why"
+                                        value={
+                                            reasons[r.reason_code ?? ''] ??
+                                            'Not recorded'
+                                        }
+                                    />
+                                    <TechnicalDetails
+                                        rows={[
+                                            ['Group ID', result.group.id],
+                                            ['Device ID', result.device.id],
+                                            [
+                                                'Device identifier',
+                                                result.device.device_uid,
+                                            ],
+                                            ['Site ID', result.site.id],
+                                            ['Monitor ID', result.monitor.id],
+                                            [
+                                                'Recorded monitor type',
+                                                result.monitor.kind,
+                                            ],
+                                            [
+                                                'Exact chosen instant',
+                                                result.requested_at,
+                                            ],
+                                            ['Read at (UTC)', result.as_of],
+                                            [
+                                                'Occurrence instant',
+                                                r.observed_at,
+                                            ],
+                                            [
+                                                'Interpreted at (UTC)',
+                                                r.interpreted_at,
+                                            ],
+                                            [
+                                                'Clock uncertainty seconds',
+                                                r.clock_uncertainty_seconds,
+                                            ],
+                                            ['Recorded result', r.state],
+                                            ['Recorded reason', r.reason_code],
+                                            ['Recorded basis', r.basis],
+                                        ]}
+                                    />
                                 </ReviewCard>
                                 {r.assignment && (
                                     <ReviewCard
                                         title="Recorded Site assignment"
                                         icon={Monitor}
                                     >
-                                        {Object.entries(r.assignment).map(
-                                            ([key, value]) => (
-                                                <ReviewRow
-                                                    key={key}
-                                                    label={detailLabel(key)}
-                                                    value={text(value)}
-                                                />
-                                            ),
-                                        )}
+                                        <ReviewRow
+                                            label="Assigned"
+                                            value={nzTime(
+                                                r.assignment.assigned_at,
+                                            )}
+                                        />
+                                        <ReviewRow
+                                            label="Released"
+                                            value={
+                                                r.assignment.released_at
+                                                    ? nzTime(
+                                                          r.assignment
+                                                              .released_at,
+                                                      )
+                                                    : 'Still assigned'
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Recorded"
+                                            value={nzTime(
+                                                r.assignment.row_created_at,
+                                            )}
+                                        />
+                                        <TechnicalDetails
+                                            rows={[
+                                                [
+                                                    'Assignment ID',
+                                                    r.assignment.assignment_id,
+                                                ],
+                                                [
+                                                    'Site ID',
+                                                    r.assignment.site_id,
+                                                ],
+                                                [
+                                                    'Device ID',
+                                                    r.assignment.device_id,
+                                                ],
+                                                [
+                                                    'Recorded basis',
+                                                    r.assignment.basis,
+                                                ],
+                                                [
+                                                    'Recorded assigned at',
+                                                    r.assignment.assigned_at,
+                                                ],
+                                                [
+                                                    'Recorded released at',
+                                                    r.assignment.released_at,
+                                                ],
+                                                [
+                                                    'Recorded row created at',
+                                                    r.assignment.row_created_at,
+                                                ],
+                                            ]}
+                                        />
                                     </ReviewCard>
                                 )}
                                 {r.winner && (

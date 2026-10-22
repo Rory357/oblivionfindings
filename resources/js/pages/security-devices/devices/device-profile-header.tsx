@@ -6,11 +6,44 @@ import {
     PageHeaderMeterCaption,
     PageHeaderStatusChip,
 } from '@/components/page';
-import { formatDateTimeLong, formatRelative } from '@/lib/datetime';
+import type { StatusVariant } from '@/components/ui/status-badge';
+import {
+    formatDateTime,
+    formatDateTimeLong,
+    formatRelative,
+} from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import { Activity, Cpu, Search } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
+
+/** Tone for the recorded device state (DeviceStatus) shown in the title chip. */
+function deviceStateVariant(state: string | null): StatusVariant {
+    switch (state) {
+        case 'active':
+            return 'success';
+        case 'degraded':
+        case 'quarantined':
+            return 'warning';
+        case 'offline':
+        case 'lost':
+            return 'critical';
+        case 'maintenance':
+            return 'info';
+        default:
+            return 'neutral';
+    }
+}
+
+/** A clock for relative wording that keeps "5m ago" honest while the page stays open. */
+function useNow(intervalMs = 30_000): number {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
+        return () => window.clearInterval(timer);
+    }, [intervalMs]);
+    return now;
+}
 
 export function DeviceProfileHeader({
     profile,
@@ -31,6 +64,8 @@ export function DeviceProfileHeader({
 }) {
     const header = profile.header;
     const monitoring = profile.health.monitoring;
+    const now = useNow();
+    const observedAt = header.freshness.observedAt;
     const meters: Array<{
         label: string;
         value: ReactNode;
@@ -54,12 +89,19 @@ export function DeviceProfileHeader({
         },
         {
             label: 'Last observation',
-            value: formatRelative(
-                header.freshness.observedAt,
-                Date.now(),
-                'Not recorded',
+            value: (
+                <time
+                    dateTime={observedAt ?? undefined}
+                    title={
+                        observedAt ? formatDateTimeLong(observedAt) : undefined
+                    }
+                >
+                    {formatRelative(observedAt, now, 'Not recorded')}
+                </time>
             ),
-            caption: header.providerObservation.label,
+            caption: observedAt
+                ? `${formatDateTime(observedAt)} · ${header.providerObservation.label}`
+                : header.providerObservation.label,
             section: 'health',
         },
         {
@@ -90,7 +132,10 @@ export function DeviceProfileHeader({
             wrapTitle
             backHref="/security-devices/devices"
             titleChip={
-                <PageHeaderStatusChip variant="neutral" icon={Activity}>
+                <PageHeaderStatusChip
+                    variant={deviceStateVariant(header.health.deviceState)}
+                    icon={Activity}
+                >
                     {header.health.deviceStateLabel ??
                         'Device state not recorded'}
                 </PageHeaderStatusChip>

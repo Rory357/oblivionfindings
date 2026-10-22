@@ -16,6 +16,7 @@ import {
     PageHeaderStatusChip,
     PageHeaderViewToggle,
 } from '@/components/page';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -25,6 +26,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
@@ -34,6 +36,7 @@ import { formatReadableOperationalValue } from '@/lib/readable-operational-state
 import type { VisitOptions } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     ArrowLeft,
     Building2,
     Download,
@@ -180,6 +183,8 @@ const unsuccessful = [
     'cancelled',
 ];
 const readHeader = 'X-Command-Batch-Read';
+/** Server rule: DecideDeviceCommandRequest `comment` max:1000. */
+const COMMENT_MAX = 1000;
 
 function humanise(value: string): string {
     return value.replaceAll('_', ' ').replaceAll('.', ' ');
@@ -224,6 +229,29 @@ function SafeSummary({ value }: { value: unknown }) {
 }
 function targetStatus(target: BatchTarget): string {
     return target.command?.status ?? target.inclusionStatus;
+}
+/**
+ * The words a person can see on a target's card or row. Search matches only
+ * these — never links, internal tokens or other fields that are not shown.
+ */
+function searchableText(target: BatchTarget): string {
+    return [
+        target.device.name,
+        target.device.uid,
+        target.device.provider ?? 'Native',
+        target.site?.name ?? 'Site unavailable',
+        `target ${target.id}`,
+        humanise(targetStatus(target)),
+        humanise(target.inclusionStatus),
+        target.safeExclusionReason,
+        target.command?.safeFailureReason,
+        target.command?.nextAction ??
+            'Resolve the exclusion before creating a new request.',
+        target.command?.uuid ?? 'No child command',
+        target.command?.approvedBy ?? target.command?.requestedBy,
+    ]
+        .filter((part): part is string => Boolean(part))
+        .join(' ');
 }
 const evidenceColumns: EntityTableColumn<BatchTarget>[] = [
     {
@@ -646,13 +674,13 @@ export default function DeviceCommandBatchShow({
                             </PageHeaderGlassButton>
                         }
                     />
-                    <p
-                        role="status"
-                        className="rounded-xl border bg-card p-5 text-sm"
-                    >
-                        Command batch records are restricted. Restore access,
-                        then Refresh results.
-                    </p>
+                    <div role="status">
+                        <EmptyState
+                            icon={FileCheck2}
+                            title="Command batch records are restricted"
+                            description="Restore access, then use Refresh results to read the batch again."
+                        />
+                    </div>
                 </div>
             </AppLayout>
         );
@@ -828,9 +856,11 @@ function BatchWorkspace({
         return true;
     });
     const query = search.trim().toLocaleLowerCase();
-    const targets = scoped.filter((target) =>
-        JSON.stringify(target).toLocaleLowerCase().includes(query),
-    );
+    const targets = query
+        ? scoped.filter((target) =>
+              searchableText(target).toLocaleLowerCase().includes(query),
+          )
+        : scoped;
     const compact: EntityTableColumn<BatchTarget>[] = [
         {
             key: 'site',
@@ -1020,12 +1050,10 @@ function BatchWorkspace({
                     Retained results do not prove live Device state.
                 </p>
                 {notice && (
-                    <p
-                        role="status"
-                        className="rounded-xl border bg-card p-4 text-sm"
-                    >
-                        {notice}
-                    </p>
+                    <Alert variant="warning" role="status">
+                        <AlertTriangle />
+                        <AlertDescription>{notice}</AlertDescription>
+                    </Alert>
                 )}
                 {view === 'overview' ? (
                     <>
@@ -1278,6 +1306,7 @@ function BatchWorkspace({
                                     id="batch-decision-comment"
                                     aria-describedby="batch-decision-comment-help"
                                     rows={4}
+                                    maxLength={COMMENT_MAX}
                                     value={comment}
                                     onChange={(event) =>
                                         setComment(event.target.value)
@@ -1289,8 +1318,11 @@ function BatchWorkspace({
                                     id="batch-decision-comment-help"
                                     className="text-xs text-muted-foreground"
                                 >
-                                    Minimum 10 characters.{' '}
-                                    {comment.trim().length} entered.
+                                    Minimum 10 characters. Maximum{' '}
+                                    {COMMENT_MAX.toLocaleString('en-NZ')}.{' '}
+                                    {comment.trim().length} of{' '}
+                                    {COMMENT_MAX.toLocaleString('en-NZ')}{' '}
+                                    entered.
                                 </p>
                             </div>
                         </div>

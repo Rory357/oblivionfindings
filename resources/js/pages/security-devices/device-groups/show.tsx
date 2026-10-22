@@ -16,6 +16,7 @@ import {
     PageLayout,
 } from '@/components/page';
 import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -25,6 +26,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     rememberOverlayTrigger,
@@ -48,6 +50,7 @@ import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
+    AlertTriangle,
     CalendarClock,
     Cpu,
     Edit,
@@ -94,6 +97,8 @@ export type AvailableDevice = {
 export type GroupShowProps = {
     actor_id: number;
     as_of: string;
+    /** Server rule for the maintenance preview read (DeviceGroupMaintenancePreview::actorMayPreview). */
+    can_preview_maintenance: boolean;
     group: GroupDetail;
     members: Paginated<DeviceListItem>;
     availableDevices: AvailableDevice[];
@@ -169,36 +174,68 @@ export default function DeviceGroupShow(props: GroupShowProps) {
         strictPreviewUtc(props.as_of);
     if (!visible)
         return (
-            <AppLayout>
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
+                    { title: 'Security & Devices', href: '/security-devices' },
+                    {
+                        title: 'Device groups',
+                        href: '/security-devices/device-groups',
+                    },
+                    { title: 'Group access unavailable' },
+                ]}
+            >
                 <Head title="Group access unavailable" />
-                <PageLayout>
-                    <PageHeader
-                        title="Group access unavailable"
-                        icon={Cpu}
-                        subline="Refresh the group to review current access."
-                    />
-                    <Button
-                        variant="outline"
-                        onClick={() =>
-                            router.get(
-                                '/security-devices/device-groups/' +
-                                    props.group.id,
-                                {},
-                                { preserveState: false, preserveScroll: true },
-                            )
-                        }
-                    >
-                        Refresh group
-                    </Button>
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            title="Group access unavailable"
+                            icon={Cpu}
+                            backHref="/security-devices/device-groups"
+                            subline="Refresh the group to review current access."
+                            actions={
+                                <PageHeaderGlassButton
+                                    icon={RefreshCw}
+                                    onClick={() =>
+                                        router.get(
+                                            '/security-devices/device-groups/' +
+                                                props.group.id,
+                                            {},
+                                            {
+                                                preserveState: false,
+                                                preserveScroll: true,
+                                            },
+                                        )
+                                    }
+                                >
+                                    Refresh group
+                                </PageHeaderGlassButton>
+                            }
+                        />
+                    }
+                >
+                    <div role="status">
+                        <EmptyState
+                            icon={Cpu}
+                            title="This group isn’t available to you right now"
+                            description="Your access or the group may have changed since the page opened. Refresh the group to see what you can open now."
+                        />
+                    </div>
                 </PageLayout>
             </AppLayout>
         );
     return (
         <GroupProfile
-            key={JSON.stringify([auth?.user?.id, auth?.can, props])}
+            // Stable identity: remount only for another actor or group, so an
+            // open dialog survives ordinary responses (validation errors,
+            // reloads). Authority changes are handled by `visible` above.
+            key={`${sourceActor}:${props.group.id}`}
             {...props}
             sourceActor={sourceActor}
-            canPreview={auth.can?.securityDevices?.monitoringManage === true}
+            canPreview={
+                props.can_preview_maintenance === true &&
+                auth.can?.securityDevices?.monitoringManage === true
+            }
             layout={layout}
             setLayout={setLayout}
         />
@@ -968,12 +1005,10 @@ function GroupProfile({
                             </p>
                         ) : null}
                         {addError && (
-                            <p
-                                role="alert"
-                                className="text-sm text-destructive"
-                            >
-                                {addError}
-                            </p>
+                            <Alert variant="destructive">
+                                <AlertTriangle />
+                                <AlertDescription>{addError}</AlertDescription>
+                            </Alert>
                         )}
                         <DialogFooter>
                             <Button
@@ -1041,10 +1076,13 @@ function GroupProfile({
                             </p>
                         )}
                         {autoPreviewError && (
-                            <div role="alert" className="space-y-3">
-                                <p className="text-sm text-destructive">
-                                    {autoPreviewError}
-                                </p>
+                            <div className="space-y-3">
+                                <Alert variant="destructive">
+                                    <AlertTriangle />
+                                    <AlertDescription>
+                                        {autoPreviewError}
+                                    </AlertDescription>
+                                </Alert>
                                 <Button
                                     variant="outline"
                                     onClick={reviewAutoRules}
@@ -1167,12 +1205,12 @@ function GroupProfile({
                                 Device records are not deleted.
                             </p>
                             {mutationError && (
-                                <p
-                                    role="alert"
-                                    className="mt-2 text-destructive"
-                                >
-                                    {mutationError}
-                                </p>
+                                <Alert variant="destructive" className="mt-2">
+                                    <AlertTriangle />
+                                    <AlertDescription>
+                                        {mutationError}
+                                    </AlertDescription>
+                                </Alert>
                             )}
                         </>
                     }
@@ -1195,12 +1233,12 @@ function GroupProfile({
                                 again if it still matches the saved rule.
                             </p>
                             {mutationError && (
-                                <p
-                                    role="alert"
-                                    className="mt-2 text-destructive"
-                                >
-                                    {mutationError}
-                                </p>
+                                <Alert variant="destructive" className="mt-2">
+                                    <AlertTriangle />
+                                    <AlertDescription>
+                                        {mutationError}
+                                    </AlertDescription>
+                                </Alert>
                             )}
                         </>
                     }
