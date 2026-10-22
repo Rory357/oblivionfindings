@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { useChatCalling } from '@/components/chat/chat-calling';
+import { Button } from '@/components/ui/button';
 import {
     SheetContent,
     SheetDescription,
@@ -422,6 +422,15 @@ export function isIconActive(
     if (item.id === 'operations' && isWorkforceUrl(currentUrl)) {
         return false;
     }
+    // Approved scripts belongs to IT & Support › Remote support (see
+    // isSubItemActive), not to the Security & Devices group its URL sits in.
+    if (item.subPanel && subPanelGroups && isApprovedScriptsUrl(currentUrl)) {
+        return subPanelGroups.some((group) =>
+            (group?.items ?? []).some(
+                (sub) => resolveUrl(sub.href) === '/it/remote-support',
+            ),
+        );
+    }
     // For sub-panel items, check if any child is active
     if (item.subPanel && subPanelGroups) {
         return subPanelGroups.some((group) =>
@@ -441,7 +450,27 @@ export function isSubItemActive(
         const path = normalizePath(resolveUrl(currentUrl));
         return path === '/it' || path.startsWith('/it/tickets/');
     }
+    // Estate overview's address is the start of every Security & Devices
+    // page, so a prefix match lit it beside the real page. It is current only
+    // on itself (the module's own isSecurityDevicesDestinationActive rule).
+    if (resolveUrl(href) === '/security-devices') {
+        return normalizePath(resolveUrl(currentUrl)) === '/security-devices';
+    }
+    // Approved scripts lives under /security-devices but is reached only from
+    // IT & Support › Remote support, so that is the link that stays lit.
+    if (isApprovedScriptsUrl(currentUrl)) {
+        return resolveUrl(href) === '/it/remote-support';
+    }
     return matchScore(currentUrl, href) > 0;
+}
+
+function isApprovedScriptsUrl(url: string): boolean {
+    const path = normalizePath(resolveUrl(url));
+
+    return (
+        path === '/security-devices/scripts' ||
+        path.startsWith('/security-devices/scripts/')
+    );
 }
 
 // ── Build icon nav items ───────────────────────────────────────────────────
@@ -603,7 +632,15 @@ function buildIconNavItems({
             href: '/my-day',
         },
         ...(can?.chat?.use || can?.messages?.viewAny || can?.shifts?.viewAny
-            ? [{ id: 'chat', icon: MessageSquareText, label: 'Chat', href: can?.chat?.use ? '/chat' : '/operations/messages', badge: unreadMessageCount } as IconNavItem]
+            ? [
+                  {
+                      id: 'chat',
+                      icon: MessageSquareText,
+                      label: 'Chat',
+                      href: can?.chat?.use ? '/chat' : '/operations/messages',
+                      badge: unreadMessageCount,
+                  } as IconNavItem,
+              ]
             : []),
         {
             id: 'my-calendar',
@@ -932,10 +969,22 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                     ? [{ title: 'Service desk', href: '/it', icon: Server }]
                     : []),
                 ...(can?.it?.approved_software
-                    ? [{ title: 'Approved software', href: '/security-devices/software', icon: Package }]
+                    ? [
+                          {
+                              title: 'Approved software',
+                              href: '/security-devices/software',
+                              icon: Package,
+                          },
+                      ]
                     : []),
                 ...(can?.it?.remote_support
-                    ? [{ title: 'Remote support', href: '/it/remote-support', icon: Server }]
+                    ? [
+                          {
+                              title: 'Remote support',
+                              href: '/it/remote-support',
+                              icon: Server,
+                          },
+                      ]
                     : []),
                 ...(can?.it?.view ||
                 can?.it?.request ||
@@ -2405,7 +2454,8 @@ export function AppSidebar({
     const portalClients = useStableValue(auth?.portalClients ?? null);
     const labels = useStableValue(labelsProp);
     const chatUnread = useChatCalling()?.unreadCount;
-    const unreadMessageCount = chatUnread ?? (auth as any)?.unreadMessageCount ?? 0;
+    const unreadMessageCount =
+        chatUnread ?? (auth as any)?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
     const { collapsed: fallbackCollapsed, setExpanded: setFallbackExpanded } =
         useAppSidebarState((page.props as any)?.sidebarOpen ?? true);

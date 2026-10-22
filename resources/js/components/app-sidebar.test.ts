@@ -15,7 +15,9 @@ describe('app sidebar workforce navigation', () => {
             '/operations/rostering/conflicts/review/42',
         ]) {
             expect(isSubItemActive(url, '/operations/rostering')).toBe(false);
-            expect(isSubItemActive(url, '/operations/rostering/conflicts')).toBe(true);
+            expect(
+                isSubItemActive(url, '/operations/rostering/conflicts'),
+            ).toBe(true);
         }
         for (const url of [
             '/operations/rostering?tab=availability',
@@ -23,7 +25,9 @@ describe('app sidebar workforce navigation', () => {
             '/operations/rostering/conflicts-history',
         ]) {
             expect(isSubItemActive(url, '/operations/rostering')).toBe(true);
-            expect(isSubItemActive(url, '/operations/rostering/conflicts')).toBe(false);
+            expect(
+                isSubItemActive(url, '/operations/rostering/conflicts'),
+            ).toBe(false);
         }
     });
 
@@ -191,6 +195,7 @@ describe('app sidebar workforce navigation', () => {
             'Monitoring',
             'Maintenance',
             'Discovery & collectors',
+            'Agent downloads',
             'Integrations',
             'Settings & audit',
         ]);
@@ -692,3 +697,62 @@ it.each([
         }
     },
 );
+
+describe('app sidebar Security & Devices navigation', () => {
+    const securityItem = { id: 'security-devices', subPanel: true } as any;
+    const securityGroups = [
+        {
+            label: 'Estate',
+            items: [
+                { title: 'Estate overview', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
+                { title: 'Monitoring', href: '/security-devices/monitoring' },
+            ],
+        },
+    ] as any;
+    const itItem = { id: 'it', subPanel: true } as any;
+    const itGroups = [
+        {
+            label: 'Support',
+            items: [
+                { title: 'Tickets', href: '/it' },
+                { title: 'Remote support', href: '/it/remote-support' },
+            ],
+        },
+    ] as any;
+
+    it('lights Estate overview only on itself, not on every module page', () => {
+        expect(isSubItemActive('/security-devices', '/security-devices')).toBe(
+            true,
+        );
+        for (const url of [
+            '/security-devices/devices',
+            '/security-devices/devices/12',
+            '/security-devices/monitoring?view=findings',
+        ]) {
+            expect(isSubItemActive(url, '/security-devices')).toBe(false);
+            expect(isIconActive(url, securityItem, securityGroups)).toBe(true);
+        }
+        expect(
+            isSubItemActive(
+                '/security-devices/devices/12',
+                '/security-devices/devices',
+            ),
+        ).toBe(true);
+    });
+
+    it('keeps Approved scripts under IT & Support › Remote support', () => {
+        for (const url of [
+            '/security-devices/scripts',
+            '/security-devices/scripts?status=published',
+        ]) {
+            expect(isSubItemActive(url, '/it/remote-support')).toBe(true);
+            expect(isSubItemActive(url, '/security-devices')).toBe(false);
+            expect(isSubItemActive(url, '/security-devices/devices')).toBe(
+                false,
+            );
+            expect(isIconActive(url, itItem, itGroups)).toBe(true);
+            expect(isIconActive(url, securityItem, securityGroups)).toBe(false);
+        }
+    });
+});
