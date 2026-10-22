@@ -1029,5 +1029,10 @@ Artisan::command('company-hub:prune-search-insights', function () {
 })->purpose('Remove Company Hub search topic totals older than 90 calendar days');
 app(Schedule::class)->command('company-hub:prune-search-insights')->dailyAt('02:10')->timezone('Pacific/Auckland')->withoutOverlapping();
 
-app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
-app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
+// Chat's 10-second sweeps start only when they have work: the call sweep needs a configured voice
+// server, and delivery needs shared Chat switched on. Otherwise they cost ~17,000 process starts a day.
+app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground()
+    ->when(fn (): bool => app(\App\Services\Chat\SelfHostedCalling::class)->configured());
+app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground()
+    ->when(fn (): bool => (bool) config('chat.shared_experience'));
+app(Schedule::class)->command('chat:prune')->dailyAt('02:40')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
