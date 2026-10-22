@@ -153,3 +153,64 @@ it('honours shift task due notification channel preferences before push dispatch
 
     expect((new ShiftTaskDueNotification($task))->via($user))->toBe([]);
 });
+
+function webPushTestKeys(): array
+{
+    $vapid = App\Services\Push\VapidKeys::generate();
+    config([
+        'services.webpush.public_key' => $vapid->publicKey,
+        'services.webpush.private_key' => $vapid->privateKey,
+        'services.webpush.subject' => 'mailto:push@oblivion.example',
+        'chat.notifications.push_hosts' => ['fcm.googleapis.com'],
+    ]);
+
+    return ['p256dh' => App\Services\Push\VapidKeys::generate()->publicKey, 'auth' => rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=')];
+}
+
+it('sends notification pushes through Oblivion\'s sender to allowed push services only', function () {
+    $keys = webPushTestKeys();
+    $user = User::factory()->create();
+    $allowed = $user->pushSubscriptions()->create(['provider' => 'webpush', 'token' => 'https://fcm.googleapis.com/fcm/send/allowed', 'keys' => $keys, 'platform' => 'web', 'enabled' => true]);
+    $user->pushSubscriptions()->create(['provider' => 'webpush', 'token' => 'https://internal.example.test/fcm/send/x', 'keys' => $keys, 'platform' => 'web', 'enabled' => true]);
+    $user->pushSubscriptions()->create(['provider' => 'webpush', 'token' => 'https://fcm.googleapis.com/fcm/send/no-keys', 'keys' => [], 'platform' => 'web', 'enabled' => true]);
+    Illuminate\Support\Facades\Http::fake(['*' => Illuminate\Support\Facades\Http::response('', 201)]);
+
+    app(WebPushProvider::class)->sendToSubscriptions($user->pushSubscriptions()->get(), [
+        'title' => 'Medication due', 'body' => 'Open Oblivion to record the dose.', 'data' => ['url' => '/emar'],
+    ]);
+
+    Illuminate\Support\Facades\Http::assertSentCount(1);
+    Illuminate\Support\Facades\Http::assertSent(fn (Illuminate\Http\Client\Request $request) => $request->url() === $allowed->token
+        && $request->header('Content-Encoding') === ['aes128gcm']
+        && $request->header('TTL') === [(string) WebPushProvider::TTL_SECONDS]
+        && $request->header('Urgency') === [WebPushProvider::URGENCY]
+        && str_starts_with($request->header('Authorization')[0] ?? '', 'vapid t=')
+        && ! str_contains($request->body(), 'Medication'));
+});
+
+it('turns off a browser subscription once its push service says it has gone', function () {
+    $keys = webPushTestKeys();
+    $user = User::factory()->create();
+    $gone = $user->pushSubscriptions()->create(['provider' => 'webpush', 'token' => 'https://fcm.googleapis.com/fcm/send/gone', 'keys' => $keys, 'platform' => 'web', 'enabled' => true]);
+    $busy = $user->pushSubscriptions()->create(['provider' => 'webpush', 'token' => 'https://fcm.googleapis.com/fcm/send/busy', 'keys' => $keys, 'platform' => 'web', 'enabled' => true]);
+    Illuminate\Support\Facades\Http::fake([
+        'fcm.googleapis.com/fcm/send/gone' => Illuminate\Support\Facades\Http::response('', 410),
+        'fcm.googleapis.com/fcm/send/busy' => Illuminate\Support\Facades\Http::response('', 503),
+    ]);
+
+    app(WebPushProvider::class)->sendToSubscriptions($user->pushSubscriptions()->get(), ['title' => 'Task due', 'body' => 'Check the roster.', 'data' => []]);
+
+    expect($gone->fresh()->enabled)->toBeFalse()
+        ->and($busy->fresh()->enabled)->toBeTrue();
+});
+
+it('prints a fresh VAPID pair in the stored form with webpush:vapid --show', function () {
+    Illuminate\Support\Facades\Artisan::call('webpush:vapid', ['--show' => true]);
+    $output = Illuminate\Support\Facades\Artisan::output();
+
+    expect($output)->toMatch('/^VAPID_PUBLIC_KEY=[A-Za-z0-9_-]{87}$/m')
+        ->and($output)->toMatch('/^VAPID_PRIVATE_KEY=[A-Za-z0-9_-]{43}$/m');
+    preg_match('/^VAPID_PUBLIC_KEY=(\S+)$/m', $output, $public);
+    preg_match('/^VAPID_PRIVATE_KEY=(\S+)$/m', $output, $private);
+    expect(App\Services\Push\VapidKeys::fromStored($public[1], $private[1])->signingKey())->toBeInstanceOf(OpenSSLAsymmetricKey::class);
+});

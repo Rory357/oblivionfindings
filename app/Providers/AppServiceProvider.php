@@ -200,6 +200,7 @@ use App\Services\Notifications\PushProvider;
 use App\Services\Notifications\SmsProvider;
 use App\Services\Notifications\TwilioSmsProvider;
 use App\Services\Notifications\WebPushProvider;
+use App\Services\Push\WebPushSender;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
 use App\Support\SchemaCache;
@@ -424,6 +425,8 @@ class AppServiceProvider extends ServiceProvider
         ));
 
         $this->app->bind(WebPushProvider::class);
+        // One sender per process so its VAPID tokens are reused per push service (RFC 8292 section 5).
+        $this->app->singleton(WebPushSender::class);
 
         $this->app->singleton(DeliveryProviderManager::class);
         $this->app->scoped(UserSiteAccessService::class);
