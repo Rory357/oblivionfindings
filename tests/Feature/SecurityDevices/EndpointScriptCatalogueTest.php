@@ -1456,8 +1456,9 @@ function scriptOutputPost($test, string $path, string $credential, object $heade
 
 it('stores original native output privately with immutable HTTP recovery and audited separate read authority', function () {
     $this->travelTo(CarbonImmutable::now()->startOfSecond());
-    $path = getenv('OBLI_SCRIPT_NATIVE_OUTPUT');
-    expect($path)->not->toBeFalse();
+    // Written by the Go test TestScriptOutputNormalizationAndBudget with
+    // OBLI_SCRIPT_OUTPUT_EXPORT; set OBLI_SCRIPT_NATIVE_OUTPUT to use a fresh one.
+    $path = getenv('OBLI_SCRIPT_NATIVE_OUTPUT') ?: base_path('tests/fixtures/endpoint-script-native-output.json');
     $native = json_decode(file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
     $witnesses = [];
     foreach ($native as $case) {

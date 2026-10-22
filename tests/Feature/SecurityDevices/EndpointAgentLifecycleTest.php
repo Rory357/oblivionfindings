@@ -79,7 +79,7 @@ function endpointEnrolledFixture($test): array
 
 function endpointScriptReadinessWire(string $name): string
 {
-    $path = getenv('OBLI_SCRIPT_READINESS_CORPUS') ?: base_path('tests/Fixtures/endpoint-script-readiness-go.json');
+    $path = getenv('OBLI_SCRIPT_READINESS_CORPUS') ?: base_path('tests/fixtures/endpoint-script-readiness-go.json');
     $corpus = json_decode(file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
     foreach ($corpus['documents'] as $row) {
         if ($row['name'] === $name) {

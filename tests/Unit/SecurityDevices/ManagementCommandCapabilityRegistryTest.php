@@ -13,9 +13,10 @@ uses(TestCase::class);
 it('defines the complete provider-neutral management catalogue with safe policy defaults', function () {
     $capabilities = app(CommandCapabilityRegistry::class)->all();
 
-    expect($capabilities)->toHaveCount(35)
+    expect($capabilities)->toHaveCount(39)
         ->and($capabilities->keys()->all())->toContain(
             'diagnostics.ping',
+            'endpoint.script.run',
             'tracking.location_refresh',
             'configuration.refresh',
             'device.reboot',
