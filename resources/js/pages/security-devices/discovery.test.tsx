@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DiscoveryCollectors, {
     type DiscoveryPageProps,
@@ -342,7 +342,7 @@ describe('Discovery shared views and evidence', () => {
                 screen.getByRole('navigation', { name: 'Breadcrumbs' }),
             ).getByRole('link', { name: 'Home' }),
         ).toHaveAttribute('href', '/dashboard');
-        expect(screen.getByText(/Read started/)).toHaveTextContent(
+        expect(screen.getByText(/Records as at/)).toHaveTextContent(
             '13 October 2026',
         );
         expect(screen.getByText('3 direct · 4 remote')).toBeVisible();
@@ -380,7 +380,7 @@ describe('Discovery shared views and evidence', () => {
         expect(reviewField('Run status')).toHaveTextContent('Running');
         expect(reviewField('Completed at')).toHaveTextContent('Not completed');
         expect(
-            screen.getByText(/Pending targets await collector evidence/),
+            screen.getByText(/still waiting for the collector to report back/),
         ).toBeVisible();
         fireEvent.click(
             screen.getByRole('button', { name: /^Technical detail/ }),
@@ -396,14 +396,15 @@ describe('Discovery shared views and evidence', () => {
         render(<DiscoveryCollectors {...fixture()} />);
         view('Discovery scopes');
         openRow('Approved Harbour network');
-        expect(reviewField('Schedule')).toHaveTextContent('0 6 * * *');
-        expect(reviewField('Protocols')).toHaveTextContent('icmp, tcp');
+        expect(reviewField('Schedule')).toHaveTextContent('Runs on a schedule');
+        expect(reviewField('Protocols')).toHaveTextContent('ICMP, TCP');
         expect(
             screen.getByRole('link', { name: 'Open Site technology' }),
         ).toHaveAttribute('href', '/security-devices/sites/1');
         fireEvent.click(
             screen.getByRole('button', { name: /^Technical detail/ }),
         );
+        expect(reviewField('Schedule rule')).toHaveTextContent('0 6 * * *');
         expect(reviewField('Network ranges')).toHaveTextContent('2');
         expect(reviewField('Seed hosts')).toHaveTextContent('3');
         expect(reviewField('Exclusions')).toHaveTextContent('4');
@@ -445,16 +446,16 @@ describe('Discovery shared views and evidence', () => {
             />,
         );
         view('Candidates');
-        expect(screen.getByText('Proposed Device #72')).toBeVisible();
-        openRow('Proposed Device #72');
+        expect(screen.getByText('Possible new device #72')).toBeVisible();
+        openRow('Possible new device #72');
         expect(
             screen.getByRole('dialog', {
-                name: 'Discovery details · Proposed Device #72',
+                name: 'Discovery details · Possible new device #72',
             }),
         ).toBeVisible();
-        expect(reviewField('Canonical Device')).toHaveTextContent('—');
+        expect(reviewField('Matched device')).toHaveTextContent('—');
         expect(
-            screen.queryByRole('link', { name: 'Open canonical Device' }),
+            screen.queryByRole('link', { name: 'Open device' }),
         ).not.toBeInTheDocument();
     });
     it('keeps candidate reasons, review and canonical links separate from an approval', () => {
@@ -463,14 +464,14 @@ describe('Discovery shared views and evidence', () => {
         openRow('Private Harbour switch');
         expect(reviewField('Decision confidence')).toHaveTextContent('70%');
         expect(reviewField('Reasons')).toHaveTextContent(
-            'identity_changed, ambiguous_match',
+            'Identity changed, ambiguous match',
         );
         expect(reviewField('Review action')).toHaveTextContent('Not reviewed');
         expect(
-            screen.getByRole('link', { name: 'Open canonical Device' }),
+            screen.getByRole('link', { name: 'Open device' }),
         ).toHaveAttribute('href', '/security-devices/devices/9');
         expect(
-            screen.getByText(/do not approve a canonical Device change/),
+            screen.getByText(/do not change the device record/),
         ).toBeVisible();
     });
     it('shares operational actions between table and card menus without starting a run', () => {
@@ -503,7 +504,9 @@ describe('Discovery shared views and evidence', () => {
             screen.getByText('Matching loaded discovery records'),
         ).toBeVisible();
         expect(screen.getAllByText('Approved Harbour network')).toHaveLength(2);
-        expect(screen.getByText(/search covers loaded records/)).toBeVisible();
+        expect(
+            screen.getByText(/search covers the loaded records/),
+        ).toBeVisible();
         expect(mocks.reload).not.toHaveBeenCalled();
     });
     it('uses useful empty and unknown-capability states without inventing a live collector', () => {
@@ -537,8 +540,8 @@ describe('Discovery shared views and evidence', () => {
         ).toBeVisible();
         view('Runs');
         expect(screen.getByText('No runs in this Site view')).toBeVisible();
-        view('Limitations');
-        expect(screen.getByText('Not Assessed')).toBeVisible();
+        view('Overview');
+        expect(screen.getByText('Not assessed')).toBeVisible();
         expect(
             screen.getByText(workspace.limitations.unsupported_note),
         ).toBeVisible();
@@ -615,13 +618,13 @@ describe('Discovery current actor, permissions and Site scope', () => {
         mocks.auth.can.securityDevices.devicesView = false;
         render(<DiscoveryCollectors {...fixture()} />);
         view('Candidates');
-        expect(screen.getByText('Canonical Device unavailable')).toBeVisible();
+        expect(screen.getByText('Matched device hidden')).toBeVisible();
         expect(
             screen.queryByText('Private Harbour switch'),
         ).not.toBeInTheDocument();
-        openRow('Canonical Device unavailable');
+        openRow('Matched device hidden');
         expect(
-            screen.queryByRole('link', { name: 'Open canonical Device' }),
+            screen.queryByRole('link', { name: 'Open device' }),
         ).not.toBeInTheDocument();
     });
     it('clears a search containing an old canonical Device name when device visibility changes', () => {
@@ -644,7 +647,7 @@ describe('Discovery current actor, permissions and Site scope', () => {
         expect(
             screen.queryByText('Private Harbour switch'),
         ).not.toBeInTheDocument();
-        expect(screen.getByText('Canonical Device unavailable')).toBeVisible();
+        expect(screen.getByText('Matched device hidden')).toBeVisible();
     });
     it('clears an open scope draft when the canonical returned Site/record scope changes', () => {
         const data = fixture();
@@ -692,7 +695,7 @@ describe('Discovery current actor, permissions and Site scope', () => {
             }),
         );
         expect(screen.getByRole('alert')).toHaveTextContent(
-            'Previous observations retain their source times',
+            'from the last successful read',
         );
         act(() =>
             mocks.invalid?.({
@@ -831,6 +834,62 @@ describe('Discovery scope wizard draft and canonical payload', () => {
         expect(mocks.reload).not.toHaveBeenCalled();
         expect(mocks.post).toHaveBeenCalledTimes(1);
         expect(screen.getByText('10.44.0.0/16')).toBeVisible();
+        // The way out goes through the shared discard confirmation and
+        // re-reads the records, because the change may already be saved.
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Close and check saved scopes',
+            }),
+        );
+        expect(
+            screen.getByText(/Your last save may already have been saved/),
+        ).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+        expect(mocks.reload).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+        expect(mocks.reload).toHaveBeenCalledTimes(1);
+        expect(mocks.post).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    it('lets a hung save be closed through the discard confirmation, stopping it and re-reading the records', async () => {
+        let signal: AbortSignal | undefined;
+        mocks.post.mockImplementationOnce(
+            (
+                _url: string,
+                _payload: unknown,
+                config: { signal: AbortSignal },
+            ) => {
+                signal = config.signal;
+                return new Promise(() => {});
+            },
+        );
+        render(<DiscoveryCollectors {...fixture()} />);
+        beginCreate();
+        fillCreate();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Create direct scope' }),
+        );
+        expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByText(/Your save is still being sent/)).toBeVisible();
+        expect(signal?.aborted).toBe(false);
+        fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+        expect(signal?.aborted).toBe(true);
+        expect(mocks.reload).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(mocks.post).toHaveBeenCalledTimes(1);
+    });
+    it('reports completeness from the real required entries', () => {
+        render(<DiscoveryCollectors {...fixture()} />);
+        beginCreate();
+        // Site (only one), protocols, target limit and rate start complete;
+        // the name and approved networks are still missing.
+        expect(screen.getByText('4 of 6 required details')).toBeVisible();
+        fireEvent.change(screen.getByLabelText('Scope name'), {
+            target: { value: 'Approved outreach network' },
+        });
+        expect(screen.getByText('5 of 6 required details')).toBeVisible();
     });
     it('closes the draft and private view when a scope save denies current access', async () => {
         mocks.post.mockRejectedValueOnce({
@@ -850,5 +909,187 @@ describe('Discovery scope wizard draft and canonical payload', () => {
         expect(
             screen.queryByText('PRIVATE server data'),
         ).not.toBeInTheDocument();
+    });
+});
+
+const reEnrolWorkspace = (): Partial<DiscoveryWorkspace> => ({
+    collectors: [
+        {
+            ...workspace.collectors[0],
+            revoked_at: '2026-10-13T02:30:00Z',
+            actions: {
+                can_manage: true,
+                revoke_url: null,
+                re_enrol_url:
+                    '/security-devices/discovery/collectors/3/re-enrolment',
+            },
+        },
+    ],
+});
+/** Like Inertia: a reload replaces the props with a fresher read. */
+function LiveDiscovery({ initial }: { initial: DiscoveryPageProps }) {
+    const [props, setProps] = useState(initial);
+    useEffect(() => {
+        mocks.reload.mockImplementation(() =>
+            setProps((current) => ({
+                ...current,
+                as_of: '2026-10-13T03:11:00Z',
+                workspace: {
+                    ...current.workspace,
+                    collectors: current.workspace.collectors.map(
+                        (collector) => ({
+                            ...collector,
+                            heartbeat_lag_seconds:
+                                (collector.heartbeat_lag_seconds ?? 0) + 60,
+                            actions: collector.actions && {
+                                ...collector.actions,
+                                re_enrol_url: null,
+                            },
+                        }),
+                    ),
+                },
+            })),
+        );
+    }, []);
+    return <DiscoveryCollectors {...props} />;
+}
+
+describe('Discovery one-time token, search and filters', () => {
+    it('keeps a re-enrolment token on screen after the refresh that follows issuing it', async () => {
+        mocks.post.mockResolvedValueOnce({
+            data: {
+                enrollment: {
+                    id: 5,
+                    purpose: 'collector_re_enrolment',
+                    token: 'one-time-enrolment-token-5555',
+                    expires_at: '2026-10-13T04:00:00Z',
+                },
+            },
+        });
+        render(<LiveDiscovery initial={fixture(reEnrolWorkspace())} />);
+        view('Remote collectors');
+        rowMenu('Remote Harbour collector');
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: 'Re-enrol collector' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Issue one-time token' }),
+        );
+        expect(
+            await screen.findByDisplayValue('one-time-enrolment-token-5555'),
+        ).toBeVisible();
+        expect(mocks.post).toHaveBeenCalledWith(
+            '/security-devices/discovery/collectors/3/re-enrolment',
+            {},
+        );
+        // The refresh really changed the read (heartbeat lag, read time and
+        // the collector's actions) without closing the token.
+        expect(mocks.reload).toHaveBeenCalledTimes(1);
+        await act(async () => {});
+        expect(screen.getByText(/Records as at/)).toHaveTextContent('4:11');
+        expect(
+            screen.getByDisplayValue('one-time-enrolment-token-5555'),
+        ).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Close and clear token' }),
+        );
+        expect(
+            screen.queryByDisplayValue('one-time-enrolment-token-5555'),
+        ).not.toBeInTheDocument();
+    });
+    it('still clears a token when management permission is withdrawn', async () => {
+        mocks.post.mockResolvedValueOnce({
+            data: {
+                enrollment: {
+                    id: 6,
+                    purpose: 'collector_re_enrolment',
+                    token: 'withdrawn-token-6666',
+                    expires_at: '2026-10-13T04:00:00Z',
+                },
+            },
+        });
+        const data = fixture(reEnrolWorkspace());
+        const result = render(<DiscoveryCollectors {...data} />);
+        view('Remote collectors');
+        rowMenu('Remote Harbour collector');
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: 'Re-enrol collector' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Issue one-time token' }),
+        );
+        await screen.findByDisplayValue('withdrawn-token-6666');
+        mocks.auth.can.securityDevices.integrationsManage = false;
+        result.rerender(<DiscoveryCollectors {...data} />);
+        expect(
+            screen.queryByDisplayValue('withdrawn-token-6666'),
+        ).not.toBeInTheDocument();
+    });
+    it('searches only the text shown on a record, not its links or references', () => {
+        render(<DiscoveryCollectors {...fixture()} />);
+        view('Candidates');
+        const search = screen.getByRole('searchbox', {
+            name: 'Search loaded discovery records',
+        });
+        fireEvent.change(search, {
+            target: { value: '/security-devices/devices/9' },
+        });
+        expect(
+            screen.getByText('No loaded records match these filters'),
+        ).toBeVisible();
+        fireEvent.change(search, {
+            target: { value: workspace.candidates[0].candidate_uuid },
+        });
+        expect(
+            screen.getByText('No loaded records match these filters'),
+        ).toBeVisible();
+        fireEvent.change(search, { target: { value: 'harbour switch' } });
+        expect(screen.getByText('Private Harbour switch')).toBeVisible();
+    });
+    it('narrows each view by Site and by its own status', () => {
+        render(
+            <DiscoveryCollectors
+                {...fixture({
+                    scopes: [
+                        workspace.scopes[0],
+                        {
+                            ...workspace.scopes[0],
+                            id: 8,
+                            name: 'Retired Hill network',
+                            status: 'inactive',
+                            site: {
+                                id: 2,
+                                name: 'Hill House',
+                                href: '/security-devices/sites/2',
+                            },
+                        },
+                    ],
+                })}
+            />,
+        );
+        view('Discovery scopes');
+        expect(screen.getByText('Retired Hill network')).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Status' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Inactive' }));
+        expect(screen.getByText('Retired Hill network')).toBeVisible();
+        expect(
+            screen.queryByText('Approved Harbour network'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Clear Status' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Site' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Harbour House' }));
+        expect(screen.getByText('Approved Harbour network')).toBeVisible();
+        expect(
+            screen.queryByText('Retired Hill network'),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText('1 of 2 loaded')).toBeVisible();
+        // Every view keeps a real filter, including Overview.
+        view('Overview');
+        expect(
+            screen.getByRole('button', { name: 'Harbour House' }),
+        ).toBeVisible();
+        expect(
+            screen.getByText('Remote collection health · Harbour House'),
+        ).toBeVisible();
     });
 });

@@ -1,7 +1,6 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     PageHeader,
-    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -11,6 +10,7 @@ import {
     PageHeaderSearch,
     PageHeaderViewToggle,
 } from '@/components/page';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ReviewRow } from '@/components/wizard/shell';
@@ -32,7 +33,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Building2,
-    CheckCircle,
+    KeyRound,
     LayoutGrid,
     List,
     Plug,
@@ -43,7 +44,13 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SiteCredentialRow } from './site-credentials';
 import { useUnifiAction } from './unifi-actions';
-import { UnifiDiscoveredRecords, UnifiRecords } from './unifi-records';
+import {
+    UnifiDiscoveredRecords,
+    UnifiRecords,
+    unifiRowSearchText,
+    unifiRowState,
+    type UnifiListRow,
+} from './unifi-records';
 import { UnifiRoomDialog } from './unifi-room-dialog';
 import {
     UnifiSetupWizard,
@@ -136,7 +143,8 @@ export type UnifiProps = {
         request_id: string;
         method: string;
         path: string;
-        outcome: 'saved';
+        /** "unchanged": the request was accepted but nothing needed changing. */
+        outcome: 'saved' | 'unchanged';
     } | null;
     as_of: string;
     can: { manage: boolean };
@@ -157,34 +165,11 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'UniFi', href: '/security-devices/integrations/unifi' },
 ];
 
-const connectionStatusConfig: Record<
-    string,
-    { label: string; className: string; icon: typeof CheckCircle }
-> = {
-    connected: {
-        label: 'Connected',
-        className:
-            'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
-        icon: CheckCircle,
-    },
-    disconnected: {
-        label: 'Disconnected',
-        className:
-            'bg-muted text-foreground dark:bg-muted/50 dark:text-muted-foreground',
-        icon: XCircle,
-    },
-    error: {
-        label: 'Error',
-        className:
-            'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
-        icon: ShieldAlert,
-    },
-    disabled: {
-        label: 'Disabled',
-        className:
-            'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
-        icon: ShieldAlert,
-    },
+const connectionStatusLabels: Record<string, string> = {
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    error: 'Error',
+    disabled: 'Disabled',
 };
 
 const disableReasons: Array<{ value: DisableReason; label: string }> = [
@@ -335,11 +320,11 @@ export default function UnifiIntegration(data: UnifiProps) {
     if (!permitted || denied)
         return (
             <AppLayout breadcrumbs={breadcrumbs}>
-                <Head title="UniFi Integration" />
+                <Head title="UniFi integration" />
                 <div className="space-y-5">
                     <PageHeader
                         icon={Plug}
-                        title="UniFi Integration"
+                        title="UniFi integration"
                         subline="Connection management is restricted."
                         actions={
                             <PageHeaderGlassButton onClick={refresh}>
@@ -348,13 +333,13 @@ export default function UnifiIntegration(data: UnifiProps) {
                             </PageHeaderGlassButton>
                         }
                     />
-                    <p
-                        role="status"
-                        className="rounded-xl border bg-card p-5 text-sm"
-                    >
-                        UniFi records are restricted. Ask an administrator to
-                        restore access, then Refresh.
-                    </p>
+                    <div role="status">
+                        <EmptyState
+                            icon={ShieldAlert}
+                            title="UniFi records are restricted"
+                            description="You need permission to manage integrations. Ask an administrator to restore access, then Refresh."
+                        />
+                    </div>
                 </div>
             </AppLayout>
         );
@@ -392,6 +377,7 @@ function UnifiWorkspace({
     const [layout, setLayout] = useState<'cards' | 'table'>('table');
     const [search, setSearch] = useState('');
     const [deviceSiteFilter, setDeviceSiteFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [setupKind, setSetupKind] = useState<UnifiSetupKind | null>(null);
     const [setupSuccess, setSetupSuccess] = useState<{
         title: string;
@@ -489,22 +475,67 @@ function UnifiWorkspace({
     const collectionReady =
         providerConnection?.status === 'connected' && !connectionDisabled;
     const connStatus = providerConnection
-        ? (connectionStatusConfig[providerConnection.status] ??
-          connectionStatusConfig.disconnected)
+        ? (connectionStatusLabels[providerConnection.status] ??
+          connectionStatusLabels.disconnected)
         : null;
-    const matches = (record: unknown) =>
-        JSON.stringify(record)
-            .toLocaleLowerCase()
-            .includes(search.trim().toLocaleLowerCase());
-    const visibleMappings = siteConfigs.filter(matches),
-        visibleLogs = syncLogs.filter(matches),
-        visibleCredentials = siteCredentials.filter(matches),
-        visibleDiscovered = discoveredSites.filter(matches);
-    const filteredDevices = syncedDevices.filter(
-        (d) =>
-            (deviceSiteFilter === 'all' ||
-                d.site_id === Number(deviceSiteFilter)) &&
-            matches(d),
+    // Search covers the text shown on each record, never links or the
+    // opaque mapping tokens.
+    const query = search.trim().toLocaleLowerCase();
+    const matches = (row: UnifiListRow) =>
+        !query || unifiRowSearchText(row).includes(query);
+    // Each list view's own status filter, built from its loaded records.
+    const statusOptions = (rows: UnifiListRow[]) =>
+        [...new Set(rows.map(unifiRowState))]
+            .sort()
+            .map((value) => ({ value, label: value }));
+    const mappingRows: UnifiListRow[] = siteConfigs.map((record) => ({
+            kind: 'mapping',
+            record,
+        })),
+        deviceRows: UnifiListRow[] = syncedDevices.map((record) => ({
+            kind: 'device',
+            record,
+        })),
+        historyRows: UnifiListRow[] = syncLogs.map((record) => ({
+            kind: 'history',
+            record,
+        })),
+        credentialRows: UnifiListRow[] = siteCredentials.map((record) => ({
+            kind: 'credential',
+            record,
+        }));
+    const viewRows: UnifiListRow[] =
+        scope === 'mappings'
+            ? mappingRows
+            : scope === 'devices'
+              ? deviceRows
+              : scope === 'history'
+                ? historyRows
+                : scope === 'credentials'
+                  ? credentialRows
+                  : [];
+    const listView = scope !== 'connection' && scope !== 'defaults';
+    const viewStatusOptions = statusOptions(viewRows);
+    const status = viewStatusOptions.some(
+        (option) => option.value === statusFilter,
+    )
+        ? statusFilter
+        : 'all';
+    const visibleRows = viewRows.filter(
+        (row) =>
+            matches(row) &&
+            (status === 'all' || unifiRowState(row) === status) &&
+            (row.kind !== 'device' ||
+                deviceSiteFilter === 'all' ||
+                row.record.site_id === Number(deviceSiteFilter)),
+    );
+    const visibleDiscovered = discoveredSites.filter(
+        (site) =>
+            !query ||
+            [site.name, site.device_count ?? '']
+                .join(' ')
+                .toLocaleLowerCase()
+                .includes(query),
     );
     const selectedMapping =
         siteConfigs.find((c) => c.id === removeMappingId) ?? null;
@@ -518,6 +549,7 @@ function UnifiWorkspace({
             leave.request(() => {
                 setScope(view);
                 setSearch('');
+                setStatusFilter('all');
                 setRoomDeviceId(null);
             });
     };
@@ -570,15 +602,17 @@ function UnifiWorkspace({
     const submitSetup = () => {
         if (!setupKind || action.pending || action.uncertain) return;
         if (setupKind === 'key' || setupKind === 'rotate') {
+            // The server trims input before it stores the key and its last
+            // four characters, so compare (and send) the trimmed key.
             const form = setupKind === 'key' ? keyForm : rotateForm,
-                key = form.data.api_key,
+                key = form.data.api_key.trim(),
                 kind = setupKind;
-            if (!key.trim() || key.length > 4096) return;
+            if (!key || key.length > 4096) return;
             action.execute({
                 method: 'post',
                 path: unifiPath + (kind === 'key' ? '/key' : '/rotate'),
                 payload: { api_key: key },
-                label: kind === 'key' ? 'Key save' : 'Key replacement',
+                label: kind === 'key' ? 'Saving the key' : 'Replacing the key',
                 confirmed: (next) =>
                     !!next.providerConnection &&
                     next.providerConnection.secret_last4 === key.slice(-4) &&
@@ -613,7 +647,7 @@ function UnifiWorkspace({
                     site_id: mapForm.data.site_id,
                     mapping_token: mapForm.data.mapping_token,
                 },
-                label: 'Site mapping',
+                label: 'Mapping the location',
                 confirmed: (next) =>
                     next.siteConfigs?.some(
                         (c) =>
@@ -643,7 +677,7 @@ function UnifiWorkspace({
                 method: 'put',
                 path: unifiPath + '/defaults',
                 payload: { config },
-                label: 'Default settings',
+                label: 'Saving the defaults',
                 confirmed: (next) =>
                     !!next.providerConnection?.defaults &&
                     Object.entries(config).every(
@@ -689,7 +723,7 @@ function UnifiWorkspace({
             method: 'post',
             path: unifiPath + '/sync-devices',
             payload: { site_config_id: c.id },
-            label: 'Device sync',
+            label: 'Syncing devices',
         });
     };
     const saveRoom = () => {
@@ -707,7 +741,7 @@ function UnifiWorkspace({
             method: 'put',
             path: unifiPath + `/hardware/${d.id}/room`,
             payload: { room_id: roomId },
-            label: 'Room assignment',
+            label: 'Assigning the room',
             confirmed: (next) =>
                 next.syncedDevices?.some(
                     (device) =>
@@ -727,19 +761,25 @@ function UnifiWorkspace({
             method: 'post',
             path: unifiPath + '/disable',
             payload: { reason: disableReason },
-            label: 'Connection containment',
+            label: 'Disabling the connection',
+            unchangedNotice:
+                'The UniFi connection was already disabled, so nothing changed.',
             confirmed: (next) => next.providerConnection?.status === 'disabled',
             onConfirmed: () => setDisableOpen(false),
         });
     };
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="UniFi Integration" />
+            <Head title="UniFi integration" />
             <div className="min-w-0 space-y-5">
                 <PageHeader
                     icon={Plug}
-                    title="UniFi Integration"
-                    subline="Provider connection, approved Site mappings and device records."
+                    title="UniFi integration"
+                    subline={
+                        'Saved records as at ' +
+                        fmt(as_of) +
+                        ' · live status is not checked here'
+                    }
                     actions={
                         <>
                             {scope !== 'connection' && scope !== 'defaults' && (
@@ -758,9 +798,9 @@ function UnifiWorkspace({
                                     }
                                 >
                                     {connectionDisabled
-                                        ? 'Replace Key to Recover'
+                                        ? 'Replace key to recover'
                                         : hasKey
-                                          ? 'Rotate Key'
+                                          ? 'Rotate key'
                                           : 'Set up connection'}
                                 </PageHeaderGlassButton>
                             )}
@@ -769,7 +809,7 @@ function UnifiWorkspace({
                                     disabled={!!blocked || !hasKey}
                                     onClick={() => openSetup('defaults')}
                                 >
-                                    Edit Defaults
+                                    Edit defaults
                                 </PageHeaderGlassButton>
                             )}
                             {scope === 'mappings' && (
@@ -781,11 +821,11 @@ function UnifiWorkspace({
                                                 method: 'post',
                                                 path: unifiPath + '/sync-sites',
                                                 payload: {},
-                                                label: 'Provider Site discovery',
+                                                label: 'Syncing UniFi locations',
                                             })
                                         }
                                     >
-                                        Sync UniFi Locations
+                                        Sync UniFi locations
                                     </PageHeaderGlassButton>
                                     <PageHeaderGlassButton
                                         disabled={
@@ -795,7 +835,7 @@ function UnifiWorkspace({
                                         }
                                         onClick={() => openSetup('mapping')}
                                     >
-                                        Map Location
+                                        Map location
                                     </PageHeaderGlassButton>
                                 </>
                             )}
@@ -811,7 +851,7 @@ function UnifiWorkspace({
                     meters={[
                         {
                             label: 'Connection',
-                            value: connStatus?.label ?? 'Not configured',
+                            value: connStatus ?? 'Not configured',
                             caption:
                                 'Connection state; device health is separate',
                             view: 'connection',
@@ -865,19 +905,14 @@ function UnifiWorkspace({
                         </PageHeaderMeterBlock>
                     ))}
                     mobileSummary={
-                        (connStatus?.label ?? 'Not configured') +
+                        (connStatus ?? 'Not configured') +
                         ' · ' +
                         syncedDevices.length +
                         ' imported devices'
                     }
                     filters={
-                        <>
-                            {[
-                                'mappings',
-                                'devices',
-                                'history',
-                                'credentials',
-                            ].includes(scope) && (
+                        listView ? (
+                            <>
                                 <PageHeaderViewToggle
                                     value={layout}
                                     onChange={setLayout}
@@ -894,33 +929,40 @@ function UnifiWorkspace({
                                         },
                                     ]}
                                 />
-                            )}
-                            <PageHeaderFilterButton
-                                onClick={() => {
-                                    setSearch('');
-                                    setDeviceSiteFilter('all');
-                                }}
-                            >
-                                Reset filters
-                            </PageHeaderFilterButton>
-                            {scope === 'devices' && (
-                                <PageHeaderFilterSelect
-                                    label="Site"
-                                    value={deviceSiteFilter}
-                                    onChange={setDeviceSiteFilter}
-                                    options={[
-                                        {
-                                            value: 'all',
-                                            label: 'All approved Sites',
-                                        },
-                                        ...sites.map((site) => ({
-                                            value: String(site.id),
-                                            label: site.name,
-                                        })),
-                                    ]}
-                                />
-                            )}
-                        </>
+                                {scope === 'devices' && (
+                                    <PageHeaderFilterSelect
+                                        label="Site"
+                                        value={deviceSiteFilter}
+                                        onChange={setDeviceSiteFilter}
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'All approved Sites',
+                                            },
+                                            ...sites.map((site) => ({
+                                                value: String(site.id),
+                                                label: site.name,
+                                            })),
+                                        ]}
+                                    />
+                                )}
+                                {viewStatusOptions.length > 0 && (
+                                    <PageHeaderFilterSelect
+                                        label={
+                                            scope === 'history'
+                                                ? 'Result'
+                                                : 'Status'
+                                        }
+                                        value={status}
+                                        onChange={setStatusFilter}
+                                        options={[
+                                            { value: 'all', label: 'All' },
+                                            ...viewStatusOptions,
+                                        ]}
+                                    />
+                                )}
+                            </>
+                        ) : undefined
                     }
                     rail={
                         <PageHeaderRail
@@ -931,25 +973,21 @@ function UnifiWorkspace({
                         />
                     }
                 />
-                <p className="text-subtle">
-                    Read started {fmt(as_of)} · Latest saved records. Live
-                    status has not been checked here.
-                </p>
                 {(notice || action.notice) && (
-                    <p
-                        role="status"
-                        className="rounded-xl border bg-card p-4 text-sm"
-                    >
-                        {notice || action.notice}
-                    </p>
+                    <Alert variant="info" role="status">
+                        <AlertTitle>
+                            {notice ? 'Records not refreshed' : 'Please note'}
+                        </AlertTitle>
+                        <AlertDescription>
+                            {notice || action.notice}
+                        </AlertDescription>
+                    </Alert>
                 )}
                 {action.error && !setupKind && !selectedDevice && (
-                    <p
-                        role="alert"
-                        className="rounded-xl border bg-card p-4 text-sm"
-                    >
-                        {action.error}
-                    </p>
+                    <Alert variant="destructive">
+                        <AlertTitle>Not completed</AlertTitle>
+                        <AlertDescription>{action.error}</AlertDescription>
+                    </Alert>
                 )}
                 {scope === 'connection' && (
                     <Card>
@@ -961,9 +999,7 @@ function UnifiWorkspace({
                                 <>
                                     <ReviewRow
                                         label="Saved status"
-                                        value={
-                                            connStatus?.label ?? 'Not recorded'
-                                        }
+                                        value={connStatus ?? 'Not recorded'}
                                     />
                                     <ReviewRow
                                         label="Key ending in"
@@ -1005,39 +1041,39 @@ function UnifiWorkspace({
                                                 role="status"
                                                 className="text-subtle"
                                             >
-                                                The replacement key is saved.
-                                                Test Connection must pass before
+                                                The replacement key is saved. A
+                                                connection test must pass before
                                                 collection resumes.
                                             </p>
                                         )}
                                     {connectionDisabled && (
-                                        <div
-                                            role="status"
-                                            className="rounded-xl border border-status-warning/30 bg-status-warning-bg p-4"
-                                        >
-                                            <p className="font-semibold text-status-warning">
+                                        <Alert variant="warning" role="status">
+                                            <ShieldAlert />
+                                            <AlertTitle>
                                                 Provider traffic is disabled
-                                            </p>
-                                            <ReviewRow
-                                                label="Disabled at"
-                                                value={fmt(
-                                                    providerConnection?.disabled_at,
-                                                )}
-                                            />
-                                            <ReviewRow
-                                                label="Reason"
-                                                value={disableReasonLabel(
-                                                    providerConnection?.disabled_reason,
-                                                )}
-                                            />
-                                            <p className="text-subtle">
-                                                Replace the key and test the
-                                                connection before collection
-                                                resumes. Saved device records,
-                                                Site mappings and history remain
-                                                available.
-                                            </p>
-                                        </div>
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                <ReviewRow
+                                                    label="Disabled at"
+                                                    value={fmt(
+                                                        providerConnection?.disabled_at,
+                                                    )}
+                                                />
+                                                <ReviewRow
+                                                    label="Reason"
+                                                    value={disableReasonLabel(
+                                                        providerConnection?.disabled_reason,
+                                                    )}
+                                                />
+                                                <p className="text-subtle">
+                                                    Replace the key and test the
+                                                    connection before collection
+                                                    resumes. Saved device
+                                                    records, Site mappings and
+                                                    history remain available.
+                                                </p>
+                                            </AlertDescription>
+                                        </Alert>
                                     )}
                                     <div className="flex flex-wrap gap-3">
                                         <Button
@@ -1049,11 +1085,11 @@ function UnifiWorkspace({
                                                     method: 'post',
                                                     path: unifiPath + '/test',
                                                     payload: {},
-                                                    label: 'Connection test',
+                                                    label: 'Testing the connection',
                                                 })
                                             }
                                         >
-                                            Test Connection
+                                            Test connection
                                         </Button>
                                         {!connectionDisabled && (
                                             <Button
@@ -1070,11 +1106,11 @@ function UnifiWorkspace({
                                     </div>
                                 </>
                             ) : (
-                                <p role="status">
-                                    No provider key is saved. Set up the
-                                    connection, then test it before collecting
-                                    records.
-                                </p>
+                                <EmptyState
+                                    icon={KeyRound}
+                                    title="No provider key is saved"
+                                    description="Set up the connection, then test it before collecting records."
+                                />
                             )}
                         </CardContent>
                     </Card>
@@ -1082,14 +1118,14 @@ function UnifiWorkspace({
                 {scope === 'mappings' && (
                     <>
                         {!collectionReady && (
-                            <p
-                                role="status"
-                                className="rounded-xl border bg-card p-4"
-                            >
-                                Save and test the provider API key before
-                                discovering new locations. Saved locations
-                                remain available for mapping.
-                            </p>
+                            <Alert variant="info" role="status">
+                                <AlertTitle>Connection needed</AlertTitle>
+                                <AlertDescription>
+                                    Save and test the provider API key before
+                                    discovering new locations. Saved locations
+                                    remain available for mapping.
+                                </AlertDescription>
+                            </Alert>
                         )}
                         <UnifiDiscoveredRecords
                             rows={visibleDiscovered}
@@ -1105,17 +1141,14 @@ function UnifiWorkspace({
                         />
                         <UnifiRecords
                             kind="mapping"
-                            rows={visibleMappings.map((record) => ({
-                                kind: 'mapping',
-                                record,
-                            }))}
+                            rows={visibleRows}
                             view={layout}
                             total={siteConfigs.length}
                             actionsFor={(row) =>
                                 row.kind === 'mapping'
                                     ? [
                                           {
-                                              label: 'Sync Devices',
+                                              label: 'Sync devices',
                                               icon: RefreshCw,
                                               disabled: !row.record.is_active
                                                   ? 'This mapping is inactive. Remove it and map the location again before syncing devices.'
@@ -1146,10 +1179,7 @@ function UnifiWorkspace({
                 {scope === 'devices' && (
                     <UnifiRecords
                         kind="device"
-                        rows={filteredDevices.map((record) => ({
-                            kind: 'device',
-                            record,
-                        }))}
+                        rows={visibleRows}
                         view={layout}
                         total={syncedDevices.length}
                         canViewDevices={canViewDevices}
@@ -1185,10 +1215,7 @@ function UnifiWorkspace({
                 {scope === 'history' && (
                     <UnifiRecords
                         kind="history"
-                        rows={visibleLogs.map((record) => ({
-                            kind: 'history',
-                            record,
-                        }))}
+                        rows={visibleRows}
                         view={layout}
                         total={syncLogs.length}
                         actionsFor={() => []}
@@ -1197,10 +1224,7 @@ function UnifiWorkspace({
                 {scope === 'credentials' && (
                     <UnifiRecords
                         kind="credential"
-                        rows={visibleCredentials.map((record) => ({
-                            kind: 'credential',
-                            record,
-                        }))}
+                        rows={visibleRows}
                         view={layout}
                         total={siteCredentials.length}
                         actionsFor={() => []}
@@ -1268,8 +1292,9 @@ function UnifiWorkspace({
                                 }
                             />
                             <p className="text-subtle">
-                                Quiet-hour clock values have no time zone
-                                recorded in this response.
+                                Quiet hours use New Zealand time (NZST or NZDT,
+                                whichever applies on the day). Critical alerts
+                                are never held back.
                             </p>
                         </CardContent>
                     </Card>
@@ -1347,7 +1372,7 @@ function UnifiWorkspace({
                         action.execute({
                             method: 'delete',
                             path: unifiPath + `/map-site/${id}`,
-                            label: 'Mapping removal',
+                            label: 'Removing the mapping',
                             onUnconfirmed: () => setRemoveMappingId(null),
                             confirmed: (next) =>
                                 !next.siteConfigs?.some((c) => c.id === id),

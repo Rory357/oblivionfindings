@@ -1,12 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-    CollectorCard,
-    DiscoveryRunCard,
-    type Collector,
-    type DiscoveryRunRow,
-} from './discovery';
 import { MaintenanceCard, type MaintenanceRow } from './maintenance';
 import {
     MonitoringContent,
@@ -527,75 +521,6 @@ describe('Security & Devices operations workspaces', () => {
         ).toHaveAttribute('href', '/security-devices/sites/1');
         expect(screen.getByText('Work reference WO-42')).toBeInTheDocument();
         expect(screen.queryByText(/notes/i)).not.toBeInTheDocument();
-    });
-
-    it('shows exact collector load and uncertainty without inventing capacity', () => {
-        const collector: Collector = {
-            id: 3,
-            name: 'Remote collector',
-            site: {
-                id: 4,
-                name: 'Remote Site',
-                href: '/security-devices/sites/4',
-            },
-            reported_status: 'offline',
-            freshness_state: 'unavailable',
-            last_seen_at: '2026-07-19T08:00:00Z',
-            heartbeat_lag_seconds: 600,
-            monitor_load: 4,
-            device_load: 3,
-            affected_monitors: 4,
-            affected_devices: 3,
-            impact_note:
-                'Downstream monitor results are uncertain until this collection path reports again.',
-        };
-
-        render(<CollectorCard collector={collector} />);
-
-        expect(screen.getByText(/3 devices · 4 checks/)).toBeInTheDocument();
-        expect(screen.getByText(/results are uncertain/)).toBeInTheDocument();
-        expect(screen.queryByText(/%/)).not.toBeInTheDocument();
-    });
-
-    it('makes remote discovery handoff and returned progress explicit', () => {
-        const run: DiscoveryRunRow = {
-            id: 51,
-            run_uuid: '018f0000-0000-7000-8000-000000000951',
-            scope_id: 7,
-            scope_name: 'Remote clinical network',
-            status: 'running',
-            collection_mode: 'remote_collector',
-            collector: { id: 3, name: 'Remote collector', state: 'available' },
-            trigger: 'manual:user:7',
-            planned: 20,
-            returned: 12,
-            pending: 8,
-            found: 0,
-            matched: 0,
-            proposed: 0,
-            changed: 0,
-            excluded: 0,
-            failed: 0,
-            unresolved: 0,
-            started_at: '2026-07-27T08:00:00Z',
-            completed_at: null,
-        };
-
-        render(<DiscoveryRunCard run={run} />);
-
-        expect(screen.getByText('Remote clinical network')).toBeInTheDocument();
-        expect(
-            screen.getByText(/Remote path · Remote collector/),
-        ).toBeInTheDocument();
-        expect(screen.getByText('Collector Available')).toBeInTheDocument();
-        expect(screen.getByText('Running')).toBeInTheDocument();
-        expect(
-            screen.getByText('12 of 20 results returned'),
-        ).toBeInTheDocument();
-        expect(screen.getByText(/8 targets remain/)).toBeInTheDocument();
-        expect(
-            screen.getByText(/ordered encrypted buffer/),
-        ).toBeInTheDocument();
     });
 
     it('shows one evidence-backed root dependency and keeps the suppressed symptom inspectable', () => {

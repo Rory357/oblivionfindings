@@ -109,7 +109,7 @@ describe('Security & Devices canonical workflow links', () => {
         expect(discovery).toContain('title={w.direct_coverage.path_label}');
         expect(discovery).toContain('w.summary.runs_truncated');
         expect(discovery).toContain('w.summary.candidates_truncated');
-        expect(discovery).toContain('title(w.limitations.unsupported_state)');
+        expect(discovery).toContain('plain(w.limitations.unsupported_state)');
         expect(discovery).toContain('w.limitations.unsupported_note');
         expect(discovery).not.toContain('Not assessed');
         expect(discovery).not.toContain('result drill-down');

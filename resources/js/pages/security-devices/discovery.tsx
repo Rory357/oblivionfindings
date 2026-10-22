@@ -10,6 +10,7 @@ import {
 } from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -36,7 +37,6 @@ import {
 } from '@/components/security-devices/discovery-scope-dialogs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
@@ -227,10 +227,28 @@ export type DiscoveryWorkspace = {
     };
 };
 
-function title(value: string): string {
-    return value
-        .replace(/[_-]/g, ' ')
-        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+// Plain-language labels for returned codes (DESIGN.md: no raw enum values or
+// Title Case in the UI). Unknown codes fall back to sentence case.
+const knownLabels: Record<string, string> = {
+    remote_collector: 'Remote collector',
+    central: 'Main application',
+    central_direct: 'Direct from the main application',
+    direct: 'Direct from the main application',
+};
+
+function plain(value: string | null | undefined): string {
+    if (!value) return 'Not recorded';
+    const known = knownLabels[value];
+    if (known) return known;
+    const words = value.replace(/[_-]+/g, ' ').trim().toLocaleLowerCase();
+    return words.charAt(0).toLocaleUpperCase() + words.slice(1);
+}
+
+function triggerLabel(trigger: string): string {
+    const source = trigger.split(':')[0];
+    if (source === 'manual') return 'Run now by a staff member';
+    if (source === 'schedule' || source === 'scheduled') return 'Schedule';
+    return plain(source);
 }
 
 function tone(value: string): StatusVariant {
@@ -246,193 +264,22 @@ function when(value: string | null): string {
     return formatDateTimeLong(value, 'Not reported');
 }
 
-function Metric({
-    label,
-    value,
-    note,
-}: {
-    label: string;
-    value: number;
-    note: string;
-}) {
-    return (
-        <Card className="shadow-xs">
-            <CardContent className="p-4">
-                <p className="text-2xl font-semibold tabular-nums">{value}</p>
-                <p className="text-sm font-medium">{label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-            </CardContent>
-        </Card>
-    );
-}
-
-export function DiscoveryRunCard({ run }: { run: DiscoveryRunRow }) {
-    const active = ['queued', 'running'].includes(run.status);
-    const pendingLabel =
-        run.pending === 1
-            ? '1 target remains'
-            : `${run.pending} targets remain`;
-    const path =
-        run.collection_mode === 'remote_collector'
-            ? `Remote path${run.collector ? ` · ${run.collector.name}` : ''}`
-            : 'Main application';
-
-    return (
-        <article className="rounded-xl border p-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                    <strong>{run.scope_name ?? 'Discovery scope'}</strong>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                        {path}
-                    </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    {run.collector ? (
-                        <StatusBadge variant={tone(run.collector.state)}>
-                            Collector {title(run.collector.state)}
-                        </StatusBadge>
-                    ) : null}
-                    <StatusBadge variant={tone(run.status)}>
-                        {title(run.status)}
-                    </StatusBadge>
-                </div>
-            </div>
-
-            {active ? (
-                <div className="mt-3 rounded-lg bg-muted/45 p-3">
-                    <p className="text-sm font-medium">
-                        {run.returned} of {run.planned} results returned
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        {run.collection_mode === 'remote_collector'
-                            ? run.collector?.state === 'available'
-                                ? `${pendingLabel}. The collector returns evidence through the ordered encrypted buffer.`
-                                : `${pendingLabel}. Discovery will resume when this collector is available.`
-                            : `${pendingLabel} on the central discovery worker.`}
-                    </p>
-                </div>
-            ) : (
-                <>
-                    <p className="mt-3 text-sm">
-                        {run.found} found · {run.matched} matched ·{' '}
-                        {run.proposed} proposed · {run.unresolved} unresolved
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        {run.excluded} excluded · {run.failed} failed ·
-                        completed {when(run.completed_at)}
-                    </p>
-                </>
-            )}
-        </article>
-    );
-}
-
-export function CollectorCard({
-    collector,
-    onReEnroll,
-    onRevoke,
-}: {
-    collector: Collector;
-    onReEnroll?: (collector: Collector) => void;
-    onRevoke?: (collector: Collector) => void;
-}) {
-    return (
-        <article
-            aria-label={`Collector ${collector.name}`}
-            className="rounded-xl border p-4"
-        >
-            <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
-                <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold">{collector.name}</p>
-                        <StatusBadge variant={tone(collector.freshness_state)}>
-                            {title(collector.freshness_state)}
-                        </StatusBadge>
-                        <StatusBadge variant="neutral">
-                            Reported {title(collector.reported_status)}
-                        </StatusBadge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {collector.site ? (
-                            <Link
-                                href={collector.site.href}
-                                className="hover:underline"
-                            >
-                                {collector.site.name}
-                            </Link>
-                        ) : (
-                            'No site assigned'
-                        )}
-                        {' · '}
-                        {collector.device_load} devices ·{' '}
-                        {collector.monitor_load} checks
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                        {collector.impact_note}
-                    </p>
-                    {(collector.backlog_items ?? 0) > 0 ||
-                    (collector.gap_count ?? 0) > 0 ||
-                    (collector.corrupted_frames ?? 0) > 0 ? (
-                        <p className="mt-2 text-xs font-medium text-status-warning">
-                            {collector.backlog_items ?? 0} buffered ·{' '}
-                            {collector.gap_count ?? 0} sequence gaps ·{' '}
-                            {collector.corrupted_frames ?? 0} corrupt frames
-                        </p>
-                    ) : null}
-                    {collector.actions?.can_manage ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {collector.actions.re_enrol_url && onReEnroll ? (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => onReEnroll(collector)}
-                                >
-                                    <RotateCcw className="mr-2 h-4 w-4" />
-                                    Re-enrol collector
-                                </Button>
-                            ) : null}
-                            {collector.actions.revoke_url && onRevoke ? (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => onRevoke(collector)}
-                                >
-                                    <ShieldX className="mr-2 h-4 w-4" />
-                                    Revoke collector
-                                </Button>
-                            ) : null}
-                        </div>
-                    ) : null}
-                </div>
-                <div className="text-xs text-muted-foreground lg:text-right">
-                    <p>Last heartbeat {when(collector.last_seen_at)}</p>
-                    {collector.heartbeat_lag_seconds !== null ? (
-                        <p>
-                            {Math.round(collector.heartbeat_lag_seconds / 60)}{' '}
-                            minutes ago
-                        </p>
-                    ) : null}
-                </div>
-            </div>
-        </article>
-    );
-}
-
 export type DiscoveryPageProps = {
     workspace: DiscoveryWorkspace;
     actor_id: number;
     as_of: string;
 };
+// The returned "limitations" tab has no records to filter, so its notes are
+// shown on Overview instead (DESIGN.md "Filterless rail tabs"); a
+// ?tab=limitations link opens Overview.
 type DiscoveryView =
     | 'overview'
     | 'scopes'
     | 'runs'
     | 'candidates'
     | 'collectors'
-    | 'paths'
-    | 'limitations';
+    | 'paths';
+type DiscoveryRecordView = Exclude<DiscoveryView, 'overview'>;
 type DiscoveryLayout = 'cards' | 'table';
 type DiscoveryEntry = {
     key: string;
@@ -442,7 +289,6 @@ type DiscoveryEntry = {
     icon: LucideIcon;
     summary: string;
     site: Collector['site'];
-    source: unknown;
     actions: MenuItem[];
     facts: Array<{ label: string; value: ReactNode }>;
     technical: Array<{ label: string; value: ReactNode }>;
@@ -464,7 +310,6 @@ const viewIcons: Record<DiscoveryView, LucideIcon> = {
     candidates: SearchCheck,
     collectors: RadioTower,
     paths: Cable,
-    limitations: CircleHelp,
 };
 const viewLabels: Record<DiscoveryView, string> = {
     overview: 'Overview',
@@ -473,10 +318,46 @@ const viewLabels: Record<DiscoveryView, string> = {
     candidates: 'Candidates',
     collectors: 'Remote collectors',
     paths: 'Coverage & paths',
-    limitations: 'Limitations',
+};
+const stateFilterLabels: Record<DiscoveryRecordView, string> = {
+    scopes: 'Status',
+    runs: 'Status',
+    candidates: 'Decision',
+    collectors: 'Availability',
+    paths: 'Availability',
 };
 const knownView = (value: string): DiscoveryView =>
     value in viewLabels ? (value as DiscoveryView) : 'overview';
+/** Only the text a person can see on a row is searchable (not hrefs or references). */
+const searchText = (entry: DiscoveryEntry) =>
+    [
+        entry.name,
+        entry.subline,
+        entry.summary,
+        plain(entry.state),
+        entry.site?.name,
+    ]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase();
+/**
+ * Remount the page body (clearing drafts, readers, search and filters) only
+ * when the viewer or their Site authority changes. A reload that merely
+ * refreshes observations, such as a collector's heartbeat lag, must not
+ * remount it, or a one-time enrolment token closes before it can be copied.
+ */
+const authorityKey = (
+    data: DiscoveryPageProps,
+    canManage: boolean,
+    canViewDevices: boolean,
+) =>
+    JSON.stringify([
+        data.actor_id,
+        canManage,
+        canViewDevices,
+        (data.workspace.scope_management?.sites ?? []).map((site) => site.id),
+        data.workspace.collector_management.sites.map((site) => site.id),
+    ]);
 const safeSiteHref = (site: Collector['site']) =>
     site && site.href === '/security-devices/sites/' + site.id
         ? site.href
@@ -549,7 +430,7 @@ export default function DiscoveryCollectors(data: DiscoveryPageProps) {
                 } else if (response.config.method?.toLowerCase() === 'get') {
                     event.preventDefault();
                     setNotice(
-                        'The discovery read could not be refreshed. Previous observations retain their source times. Try Refresh again.',
+                        'The records could not be refreshed. What you see is from the last successful read, with its original times. Try Refresh again.',
                     );
                 }
             }),
@@ -616,12 +497,7 @@ export default function DiscoveryCollectors(data: DiscoveryPageProps) {
         );
     return (
         <DiscoveryBody
-            key={JSON.stringify([
-                data.actor_id,
-                data.workspace,
-                canManage,
-                canViewDevices,
-            ])}
+            key={authorityKey(data, canManage, canViewDevices)}
             data={data}
             canManage={canManage}
             canViewDevices={canViewDevices}
@@ -661,12 +537,19 @@ function DiscoveryBody({
 }) {
     const { workspace: w, actor_id, as_of } = data;
     const [search, setSearch] = useState('');
+    const [siteFilter, setSiteFilter] = useState('all');
+    const [stateFilter, setStateFilter] = useState('all');
     const select = (view: DiscoveryView) => {
         setSearch('');
+        setStateFilter('all');
         navigate(view);
     };
     const [installationOpen, setInstallationOpen] = useState(false);
-    const [replacementId, setReplacementId] = useState<number | null>(null);
+    // A snapshot, so a refreshed read (which follows issuing a token) cannot
+    // close the one-time token before it is copied. Authority changes still
+    // remount the body and clear it.
+    const [replacement, setReplacement] =
+        useState<CollectorLifecycleTarget | null>(null);
     const [revocationId, setRevocationId] = useState<number | null>(null);
     const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
@@ -713,7 +596,9 @@ function DiscoveryBody({
             '/re-enrolment',
         ),
     });
-    const collectorSitePermitted = (collector: Collector) =>
+    const collectorSitePermitted = (collector: {
+        site: Collector['site'] | CollectorLifecycleTarget['site'];
+    }) =>
         Boolean(
             collector.site &&
             w.collector_management.sites.some(
@@ -735,7 +620,8 @@ function DiscoveryBody({
                             {
                                 label: 'Re-enrol collector',
                                 icon: RotateCcw,
-                                onClick: () => setReplacementId(collector.id),
+                                onClick: () =>
+                                    setReplacement(lifecycleTarget(collector)),
                             },
                         ]
                       : []),
@@ -761,7 +647,6 @@ function DiscoveryBody({
         state: scope.status,
         icon: Network,
         site: scope.site,
-        source: scope,
         summary:
             scope.network_ranges +
             ' network ranges · ' +
@@ -820,20 +705,29 @@ function DiscoveryBody({
                   ],
         facts: [
             { label: 'Site', value: scope.site?.name },
-            { label: 'Status', value: title(scope.status) },
-            { label: 'Collection mode', value: title(scope.collection_mode) },
+            { label: 'Status', value: plain(scope.status) },
+            { label: 'Collection mode', value: plain(scope.collection_mode) },
             { label: 'Collector', value: scope.collector?.name },
             {
                 label: 'Collector availability',
                 value: scope.collector
-                    ? title(scope.collector.state)
+                    ? plain(scope.collector.state)
                     : 'No collector configured',
             },
-            { label: 'Protocols', value: scope.protocols.join(', ') },
-            { label: 'Schedule', value: scope.schedule ?? 'Not scheduled' },
+            {
+                label: 'Protocols',
+                value: scope.protocols
+                    .map((protocol) => protocol.toUpperCase())
+                    .join(', '),
+            },
+            {
+                label: 'Schedule',
+                value: scope.schedule ? 'Runs on a schedule' : 'Not scheduled',
+            },
         ],
         technical: [
             { label: 'Scope ID', value: scope.id },
+            { label: 'Schedule rule', value: scope.schedule ?? 'None' },
             { label: 'Network ranges', value: scope.network_ranges },
             { label: 'Seed hosts', value: scope.seed_hosts },
             { label: 'Exclusions', value: scope.exclusions },
@@ -844,7 +738,7 @@ function DiscoveryBody({
             },
             { label: 'Packets per second', value: scope.packets_per_second },
         ],
-        note: 'Scope configuration is separate from a queued run, returned evidence and supported device capabilities. Network addresses and credentials remain protected.',
+        note: 'Saving a scope does not start a scan; Run now is a separate step. Network addresses and sign-in details stay hidden on this page.',
     }));
     const runs: DiscoveryEntry[] = w.runs.map((run) => ({
         key: 'run:' + run.id,
@@ -857,7 +751,6 @@ function DiscoveryBody({
         state: run.status,
         icon: Activity,
         site: currentScope(run.scope_id)?.site ?? null,
-        source: run,
         summary:
             run.returned +
             ' of ' +
@@ -868,14 +761,14 @@ function DiscoveryBody({
         actions: [],
         progress: { returned: run.returned, planned: run.planned },
         facts: [
-            { label: 'Run status', value: title(run.status) },
+            { label: 'Run status', value: plain(run.status) },
             { label: 'Scope', value: run.scope_name },
-            { label: 'Collection mode', value: title(run.collection_mode) },
+            { label: 'Collection mode', value: plain(run.collection_mode) },
             { label: 'Collector', value: run.collector?.name },
             {
                 label: 'Collector availability',
                 value: run.collector
-                    ? title(run.collector.state)
+                    ? plain(run.collector.state)
                     : 'No collector configured',
             },
             { label: 'Started at', value: when(run.started_at) },
@@ -893,7 +786,7 @@ function DiscoveryBody({
             { label: 'Run ID', value: run.id },
             { label: 'Run reference', value: run.run_uuid },
             { label: 'Scope ID', value: run.scope_id },
-            { label: 'Trigger', value: run.trigger },
+            { label: 'Started by', value: triggerLabel(run.trigger) },
             { label: 'Found', value: run.found },
             { label: 'Matched', value: run.matched },
             { label: 'Proposed', value: run.proposed },
@@ -904,8 +797,8 @@ function DiscoveryBody({
         ],
         note:
             run.collection_mode === 'remote_collector' && run.pending > 0
-                ? 'Pending targets await collector evidence. A configured remote path does not establish that the run is complete.'
-                : 'An immutable run summary does not establish current network reachability or universal device support.',
+                ? 'Some addresses are still waiting for the collector to report back, so this run is not finished yet.'
+                : 'This is what the run found at the time. It does not show whether devices can be reached now.',
     }));
     const candidates: DiscoveryEntry[] = w.candidates.map((candidate) => ({
         key: 'candidate:' + candidate.id,
@@ -913,20 +806,14 @@ function DiscoveryBody({
             candidate.canonical_device && canViewDevices
                 ? candidate.canonical_device.name
                 : candidate.canonical_device
-                  ? 'Canonical Device unavailable'
-                  : 'Proposed Device #' + candidate.id,
+                  ? 'Matched device hidden'
+                  : 'Possible new device #' + candidate.id,
         subline: 'Run #' + candidate.run_id,
         state: candidate.decision,
         icon: SearchCheck,
         site: candidate.scope_id
             ? (currentScope(candidate.scope_id)?.site ?? null)
             : null,
-        source: {
-            ...candidate,
-            canonical_device: canViewDevices
-                ? candidate.canonical_device
-                : null,
-        },
         summary:
             candidate.confidence +
             '% decision confidence · ' +
@@ -941,24 +828,24 @@ function DiscoveryBody({
                 ? candidate.canonical_device.href
                 : undefined,
         facts: [
-            { label: 'Decision', value: title(candidate.decision) },
+            { label: 'Decision', value: plain(candidate.decision) },
             { label: 'Decision confidence', value: candidate.confidence + '%' },
             {
                 label: 'Reasons',
-                value:
-                    candidate.reasons.join(', ') ||
-                    'No decision reason recorded',
+                value: candidate.reasons.length
+                    ? plain(candidate.reasons.join(', '))
+                    : 'No decision reason recorded',
             },
             {
-                label: 'Canonical Device',
+                label: 'Matched device',
                 value: canViewDevices
                     ? candidate.canonical_device?.name
-                    : 'Device viewing permission required',
+                    : 'You need permission to view devices',
             },
             {
                 label: 'Review action',
                 value: candidate.review.action
-                    ? title(candidate.review.action)
+                    ? plain(candidate.review.action)
                     : 'Not reviewed',
             },
             {
@@ -974,7 +861,7 @@ function DiscoveryBody({
             { label: 'Run ID', value: candidate.run_id },
             { label: 'Scope ID', value: candidate.scope_id },
         ],
-        note: 'Discovery confidence and candidate reasons support review. They do not approve a canonical Device change or identify a person.',
+        note: 'Confidence and reasons help you review this match. They do not change the device record or identify a person.',
     }));
     const collectors: DiscoveryEntry[] = w.collectors.map((collector) => ({
         key: 'collector:' + collector.id,
@@ -983,7 +870,6 @@ function DiscoveryBody({
         state: collector.freshness_state,
         icon: RadioTower,
         site: collector.site,
-        source: collector,
         summary:
             collector.device_load +
             ' devices · ' +
@@ -992,10 +878,10 @@ function DiscoveryBody({
         actions: collectorActions(collector),
         facts: [
             { label: 'Site', value: collector.site?.name },
-            { label: 'Availability', value: title(collector.freshness_state) },
+            { label: 'Availability', value: plain(collector.freshness_state) },
             {
                 label: 'Reported status',
-                value: title(collector.reported_status),
+                value: plain(collector.reported_status),
             },
             { label: 'Last heartbeat', value: when(collector.last_seen_at) },
             {
@@ -1034,23 +920,22 @@ function DiscoveryBody({
         state: path.state,
         icon: Cable,
         site: path.site,
-        source: path,
         summary:
             path.device_load + ' devices · ' + path.monitor_load + ' checks',
         actions: [],
         facts: [
             { label: 'Site', value: path.site?.name },
-            { label: 'Availability', value: title(path.state) },
+            { label: 'Availability', value: plain(path.state) },
             { label: 'Device load', value: path.device_load },
             { label: 'Monitor load', value: path.monitor_load },
             { label: 'Affected devices', value: path.affected_devices },
         ],
         technical: [{ label: 'Collector ID', value: path.collector_id }],
-        note: 'Path availability is separate from individual monitor results. Unavailable downstream observations stay uncertain.',
+        note: 'This shows whether the collector can reach the Site. While it is unavailable, results from checks that rely on it cannot be trusted.',
     }));
     const rows = { scopes, runs, candidates, collectors, paths };
-    const recordView = activeTab !== 'overview' && activeTab !== 'limitations';
-    const loadedRows = recordView ? rows[activeTab as keyof typeof rows] : [];
+    const recordView = activeTab !== 'overview';
+    const loadedRows = recordView ? rows[activeTab] : [];
     const allRows = [
         ...scopes,
         ...runs,
@@ -1058,17 +943,41 @@ function DiscoveryBody({
         ...collectors,
         ...paths,
     ];
-    const globalMatches = allRows.filter((entry) =>
-        JSON.stringify(entry.source)
-            .toLocaleLowerCase()
-            .includes(search.trim().toLocaleLowerCase()),
+    // Site filter: every view's records are Site-scoped. Options also include
+    // the Sites the viewer manages, so the filter is there before any record.
+    const siteOptions = [
+        ...new Map(
+            [
+                ...allRows.flatMap((entry) => (entry.site ? [entry.site] : [])),
+                ...scopeManagement.sites,
+                ...w.collector_management.sites,
+            ].map((site) => [String(site.id), site.name]),
+        ).entries(),
+    ]
+        .map(([value, name]) => ({ value, label: name }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    const site = siteOptions.some((option) => option.value === siteFilter)
+        ? siteFilter
+        : 'all';
+    const siteName = siteOptions.find((option) => option.value === site)?.label;
+    const stateOptions = [...new Set(loadedRows.map((entry) => entry.state))]
+        .sort()
+        .map((value) => ({ value, label: plain(value) }));
+    const state = stateOptions.some((option) => option.value === stateFilter)
+        ? stateFilter
+        : 'all';
+    const query = search.trim().toLocaleLowerCase();
+    const inSite = (entry: DiscoveryEntry) =>
+        site === 'all' || String(entry.site?.id) === site;
+    const matches = (entry: DiscoveryEntry) =>
+        inSite(entry) && (!query || searchText(entry).includes(query));
+    const globalMatches = allRows.filter(matches);
+    const filtered = loadedRows.filter(
+        (entry) => matches(entry) && (state === 'all' || entry.state === state),
     );
-    const filtered = loadedRows.filter((entry) =>
-        JSON.stringify(entry.source)
-            .toLocaleLowerCase()
-            .includes(search.trim().toLocaleLowerCase()),
-    );
-    const counts = {
+    const narrowed = query !== '' || site !== 'all' || state !== 'all';
+    const siteCollectors = collectors.filter(inSite);
+    const counts: Record<DiscoveryRecordView, number> = {
         scopes: w.summary.scopes,
         runs: w.summary.runs,
         candidates: w.summary.candidates,
@@ -1077,8 +986,6 @@ function DiscoveryBody({
     };
     const selectedScope = editingId === null ? null : currentScope(editingId);
     const actionScope = scopeAction ? currentScope(scopeAction.id) : null;
-    const replacement =
-        replacementId === null ? null : currentCollector(replacementId);
     const revocation =
         revocationId === null ? null : currentCollector(revocationId);
     return (
@@ -1090,7 +997,12 @@ function DiscoveryBody({
                         icon={Radar}
                         title="Discovery & collectors"
                         wrapTitle
-                        subline="Approved Site scopes · immutable runs · collection paths"
+                        subline={
+                            (as_of
+                                ? 'Records as at ' + when(as_of) + ' NZ time'
+                                : 'Read time not returned') +
+                            ' · search covers the loaded records'
+                        }
                         titleChip={
                             <PageHeaderStatusChip variant="neutral">
                                 Configured collection
@@ -1155,7 +1067,7 @@ function DiscoveryBody({
                                         {w.summary.scopes}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        Governed bounds and protocols
+                                        Saved network ranges and protocols
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
@@ -1166,8 +1078,7 @@ function DiscoveryBody({
                                         {w.summary.runs}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        {w.summary.runs_shown} returned in this
-                                        read
+                                        {w.summary.runs_shown} shown here
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
@@ -1183,8 +1094,8 @@ function DiscoveryBody({
                                         {w.summary.candidates_requiring_review}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        {w.summary.candidates} candidates across
-                                        permitted scopes
+                                        Of {w.summary.candidates} found across
+                                        your Sites
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
@@ -1206,7 +1117,7 @@ function DiscoveryBody({
                                         }
                                     />
                                     <PageHeaderMeterCaption>
-                                        Within the returned heartbeat window
+                                        Sent a recent heartbeat
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
@@ -1230,7 +1141,7 @@ function DiscoveryBody({
                         }
                         filters={
                             <>
-                                {(recordView || search.trim() !== '') && (
+                                {(recordView || query !== '') && (
                                     <PageHeaderViewToggle
                                         value={layout}
                                         onChange={setLayout}
@@ -1249,14 +1160,26 @@ function DiscoveryBody({
                                         ]}
                                     />
                                 )}
-                                <span className="text-caption text-band-foreground/80">
-                                    {as_of
-                                        ? 'Read started ' +
-                                          when(as_of) +
-                                          ' · NZ time'
-                                        : 'Read time not returned'}{' '}
-                                    · search covers loaded records
-                                </span>
+                                <PageHeaderFilterSelect
+                                    label="Site"
+                                    value={site}
+                                    options={[
+                                        { value: 'all', label: 'All Sites' },
+                                        ...siteOptions,
+                                    ]}
+                                    onChange={setSiteFilter}
+                                />
+                                {recordView && stateOptions.length > 0 && (
+                                    <PageHeaderFilterSelect
+                                        label={stateFilterLabels[activeTab]}
+                                        value={state}
+                                        options={[
+                                            { value: 'all', label: 'All' },
+                                            ...stateOptions,
+                                        ]}
+                                        onChange={setStateFilter}
+                                    />
+                                )}
                             </>
                         }
                         rail={
@@ -1279,13 +1202,11 @@ function DiscoveryBody({
                 <div className="space-y-5">
                     {notice && (
                         <Alert>
-                            <AlertTitle>
-                                Discovery refresh unavailable
-                            </AlertTitle>
+                            <AlertTitle>Records not refreshed</AlertTitle>
                             <AlertDescription>{notice}</AlertDescription>
                         </Alert>
                     )}
-                    {!recordView && search.trim() !== '' && (
+                    {!recordView && query !== '' && (
                         <DiscoveryRecords
                             rows={globalMatches}
                             title="Matching loaded discovery records"
@@ -1293,6 +1214,7 @@ function DiscoveryBody({
                             total={allRows.length}
                             layout={layout}
                             empty="No loaded records match this search"
+                            narrowed
                         />
                     )}
                     {activeTab === 'overview' && (
@@ -1310,19 +1232,31 @@ function DiscoveryBody({
                             </ReviewCard>
                             <DirectCoverage workspace={w} />
                             <DiscoveryRecords
-                                rows={collectors.slice(0, 3)}
-                                title="Remote collection health"
-                                loaded={collectors.length}
-                                total={w.summary.collectors}
+                                rows={siteCollectors.slice(0, 3)}
+                                title={
+                                    'Remote collection health' +
+                                    (siteName ? ' · ' + siteName : '')
+                                }
+                                loaded={siteCollectors.length}
+                                total={
+                                    site === 'all'
+                                        ? w.summary.collectors
+                                        : undefined
+                                }
                                 layout="cards"
-                                empty="No remote collectors configured"
+                                empty={
+                                    site === 'all'
+                                        ? 'No remote collectors configured'
+                                        : 'No remote collectors at this Site'
+                                }
+                                narrowed={site !== 'all'}
                             />
                             <ReviewCard
                                 icon={Activity}
-                                title="Returned evidence window"
+                                title="How much history is shown"
                             >
                                 <ReviewRow
-                                    label="Run summaries shown"
+                                    label="Runs shown"
                                     value={
                                         w.summary.runs_shown +
                                         ' of ' +
@@ -1330,15 +1264,15 @@ function DiscoveryBody({
                                     }
                                 />
                                 <ReviewRow
-                                    label="Run window truncated"
+                                    label="Older runs left out"
                                     value={
                                         w.summary.runs_truncated
-                                            ? 'Yes · latest runs returned'
+                                            ? 'Yes · the latest runs are shown'
                                             : 'No'
                                     }
                                 />
                                 <ReviewRow
-                                    label="Candidate summaries shown"
+                                    label="Candidates shown"
                                     value={
                                         w.summary.candidates_shown +
                                         ' of ' +
@@ -1346,20 +1280,46 @@ function DiscoveryBody({
                                     }
                                 />
                                 <ReviewRow
-                                    label="Candidate window truncated"
+                                    label="Candidates left out"
                                     value={
                                         w.summary.candidates_truncated
-                                            ? 'Yes · review candidates prioritised'
+                                            ? 'Yes · candidates needing review are shown first'
                                             : 'No'
                                     }
                                 />
                                 <ReviewRow
-                                    label="Candidates requiring review"
+                                    label="Candidates needing review"
                                     value={
                                         w.summary.candidates_requiring_review
                                     }
                                 />
                             </ReviewCard>
+                            <div className="grid gap-5 lg:grid-cols-3">
+                                <ReviewCard
+                                    icon={CircleHelp}
+                                    title="Device capabilities"
+                                >
+                                    <StatusBadge variant="neutral">
+                                        {plain(w.limitations.unsupported_state)}
+                                    </StatusBadge>
+                                    <p className="text-subtle mt-3">
+                                        {w.limitations.unsupported_note}
+                                    </p>
+                                </ReviewCard>
+                                <ReviewCard icon={Radar} title="Not configured">
+                                    <p className="text-subtle">
+                                        {w.limitations.not_configured_note}
+                                    </p>
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={RadioTower}
+                                    title="Collector capacity"
+                                >
+                                    <p className="text-subtle">
+                                        {w.limitations.capacity_note}
+                                    </p>
+                                </ReviewCard>
+                            </div>
                         </>
                     )}
                     {activeTab === 'paths' && <DirectCoverage workspace={w} />}
@@ -1384,13 +1344,13 @@ function DiscoveryBody({
                                 w.summary.runs_truncated && (
                                     <Alert>
                                         <AlertTitle>
-                                            Bounded run history
+                                            Only recent runs are shown
                                         </AlertTitle>
                                         <AlertDescription>
                                             Showing the latest{' '}
                                             {w.summary.runs_shown} of{' '}
-                                            {w.summary.runs} runs. Search covers
-                                            the returned window.
+                                            {w.summary.runs} runs. Search and
+                                            filters cover the runs shown.
                                         </AlertDescription>
                                     </Alert>
                                 )}
@@ -1398,7 +1358,7 @@ function DiscoveryBody({
                                 w.summary.candidates_truncated && (
                                     <Alert>
                                         <AlertTitle>
-                                            Bounded candidate history
+                                            Not every candidate is shown
                                         </AlertTitle>
                                         <AlertDescription>
                                             Showing {w.summary.candidates_shown}{' '}
@@ -1412,47 +1372,24 @@ function DiscoveryBody({
                                 rows={filtered}
                                 title={viewLabels[activeTab]}
                                 loaded={loadedRows.length}
-                                total={counts[activeTab as keyof typeof counts]}
+                                total={
+                                    site === 'all'
+                                        ? counts[activeTab]
+                                        : undefined
+                                }
                                 layout={layout}
                                 empty={
-                                    search
-                                        ? 'No loaded records match this search'
+                                    narrowed
+                                        ? 'No loaded records match these filters'
                                         : 'No ' +
                                           viewLabels[
                                               activeTab
                                           ].toLocaleLowerCase() +
                                           ' in this Site view'
                                 }
+                                narrowed={narrowed}
                             />
                         </>
-                    )}
-                    {activeTab === 'limitations' && (
-                        <div className="grid gap-5 lg:grid-cols-3">
-                            <ReviewCard
-                                icon={CircleHelp}
-                                title="Capability evidence"
-                            >
-                                <StatusBadge variant="neutral">
-                                    {title(w.limitations.unsupported_state)}
-                                </StatusBadge>
-                                <p className="text-subtle mt-3">
-                                    {w.limitations.unsupported_note}
-                                </p>
-                            </ReviewCard>
-                            <ReviewCard icon={Radar} title="Not configured">
-                                <p className="text-subtle">
-                                    {w.limitations.not_configured_note}
-                                </p>
-                            </ReviewCard>
-                            <ReviewCard
-                                icon={Activity}
-                                title="Collector capacity"
-                            >
-                                <p className="text-subtle">
-                                    {w.limitations.capacity_note}
-                                </p>
-                            </ReviewCard>
-                        </div>
                     )}
                 </div>
             </PageLayout>
@@ -1470,11 +1407,11 @@ function DiscoveryBody({
                     <CollectorEnrollmentDialog
                         open
                         onOpenChange={(open) => {
-                            if (!open) setReplacementId(null);
+                            if (!open) setReplacement(null);
                         }}
                         issueUrl={w.collector_management.issue_url ?? ''}
                         sites={w.collector_management.sites}
-                        replacement={lifecycleTarget(replacement)}
+                        replacement={replacement}
                         onIssued={refresh}
                     />
                 )}
@@ -1544,13 +1481,16 @@ function DiscoveryRecords({
     title: label,
     layout,
     empty,
+    narrowed = false,
 }: {
     rows: DiscoveryEntry[];
     loaded: number;
-    total: number;
+    /** Server total for the view; omitted when a Site filter narrows it. */
+    total?: number;
     title: string;
     layout: DiscoveryLayout;
     empty: string;
+    narrowed?: boolean;
 }) {
     const [readingKey, setReadingKey] = useState<string | null>(null);
     const reading = rows.find((entry) => entry.key === readingKey);
@@ -1571,16 +1511,19 @@ function DiscoveryRecords({
                     rows.length +
                     ' of ' +
                     loaded +
-                    ' loaded · ' +
-                    total +
-                    ' in scope'
+                    ' loaded' +
+                    (total === undefined ? '' : ' · ' + total + ' in scope')
                 }
             />
             {rows.length === 0 ? (
                 <EmptyState
                     icon={Radar}
                     title={empty}
-                    description="Returned observations stay distinct from configured collection, running work and confirmed outcomes."
+                    description={
+                        narrowed
+                            ? 'Change or clear the search and filters to see more records.'
+                            : 'Records appear here once they have been set up or reported.'
+                    }
                 />
             ) : layout === 'cards' ? (
                 <EntityCardGrid>
@@ -1598,7 +1541,7 @@ function DiscoveryRecords({
                             }
                             chips={
                                 <StatusBadge variant={tone(entry.state)}>
-                                    {title(entry.state)}
+                                    {plain(entry.state)}
                                 </StatusBadge>
                             }
                             metric={
@@ -1649,7 +1592,7 @@ function DiscoveryRecords({
                             width: '1fr',
                             cell: (entry) => (
                                 <StatusBadge variant={tone(entry.state)}>
-                                    {title(entry.state)}
+                                    {plain(entry.state)}
                                 </StatusBadge>
                             ),
                         },
@@ -1700,7 +1643,7 @@ function DiscoveryReader({
             open
             onClose={onClose}
             title={'Discovery details · ' + entry.name}
-            description="Returned Site-scoped configuration and observations. Operational actions retain their canonical owner."
+            description="What was saved or reported for this record at its Site. Changes are made from the record's own page."
             railIcon={entry.icon}
             railTitle={entry.name}
             railSub={entry.subline}
@@ -1714,13 +1657,13 @@ function DiscoveryReader({
                 {
                     key: 'observations',
                     label: 'Record observations',
-                    blurb: 'Site, state and source times',
+                    blurb: 'Site, status and times',
                     icon: Eye,
                 },
                 {
                     key: 'technical',
                     label: 'Technical detail',
-                    blurb: 'Bounds, references and exact counts',
+                    blurb: 'References and exact counts',
                     icon: Activity,
                 },
             ]}
@@ -1760,14 +1703,12 @@ function DiscoveryReader({
                     )}
                     {section === 0 && entry.deviceHref && (
                         <Button asChild variant="outline">
-                            <Link href={entry.deviceHref}>
-                                Open canonical Device
-                            </Link>
+                            <Link href={entry.deviceHref}>Open device</Link>
                         </Button>
                     )}
                     <p className="text-caption">
-                        Source times are shown in NZ time. Read start does not
-                        establish that every source is current.
+                        Times are NZ time. Each one is when that item was last
+                        reported, which may be earlier than this read.
                     </p>
                 </div>
             </WizardStepPane>
@@ -1811,7 +1752,7 @@ function scopeFailureMessage(error: unknown): string {
         }
     }
 
-    return 'The discovery change could not be applied. Review the governed Site bounds and try again.';
+    return 'The scope was not saved. Check the entries and try again.';
 }
 
 export function DiscoveryScopeWizard({
@@ -1884,11 +1825,21 @@ export function DiscoveryScopeWizard({
     };
     const [baseline] = useState(values);
     const dirty = JSON.stringify(values) !== JSON.stringify(baseline);
+    // Close always works, even while a save is in flight or after an unknown
+    // outcome; those cases (and any unsaved entry) go through the shared
+    // discard confirmation first.
     const close = () => {
-        if (!submitting) {
-            if (dirty) setDiscardOpen(true);
-            else onClose();
-        }
+        if (submitting || uncertain || dirty) setDiscardOpen(true);
+        else onClose();
+    };
+    const discard = () => {
+        // The scope endpoints take no request key, so a save whose outcome is
+        // unknown is never resent: stop waiting for it and re-read the records
+        // so the viewer can see whether it was saved.
+        const unknownOutcome = pending.current || uncertain;
+        controller.current.abort();
+        if (unknownOutcome) onSaved();
+        onClose();
     };
     const toggleProtocol = (protocol: string, checked: boolean) =>
         setSelectedProtocols((current) =>
@@ -1896,26 +1847,40 @@ export function DiscoveryScopeWizard({
                 ? [...new Set([...current, protocol])]
                 : current.filter((item) => item !== protocol),
         );
-    const validIdentity =
-        name.trim().length >= 3 &&
-        (editing ||
-            management.sites.some((site) => String(site.id) === siteId));
+    const validSite =
+        editing || management.sites.some((site) => String(site.id) === siteId);
+    const validName = name.trim().length >= 3;
+    const validIdentity = validName && validSite;
     const validNetworks = editing || list(cidrs).length > 0;
-    const validProtocols =
+    const validProtocolChoice =
         selectedProtocols.length > 0 &&
         selectedProtocols.every((protocol) =>
             management.protocols.includes(protocol),
-        ) &&
+        );
+    const validTargets =
         Number.isInteger(Number(maxTargets)) &&
         Number(maxTargets) >= 1 &&
-        Number(maxTargets) <= 65536 &&
+        Number(maxTargets) <= 65536;
+    const validRate =
         Number.isInteger(Number(packetsPerSecond)) &&
         Number(packetsPerSecond) >= 1 &&
-        Number(packetsPerSecond) <= 1000 &&
-        (editing ||
-            !selectedProtocols.includes('snmp') ||
-            snmpReference.trim() !== '');
+        Number(packetsPerSecond) <= 1000;
+    const needsSnmpReference = !editing && selectedProtocols.includes('snmp');
+    const validSnmp = !needsSnmpReference || snmpReference.trim() !== '';
+    const validProtocols =
+        validProtocolChoice && validTargets && validRate && validSnmp;
     const ready = validIdentity && validNetworks && validProtocols;
+    // Completeness counts the actual required entries for this form.
+    const requirements = [
+        ...(editing ? [] : [validSite]),
+        validName,
+        ...(editing ? [] : [validNetworks]),
+        validProtocolChoice,
+        validTargets,
+        validRate,
+        ...(needsSnmpReference ? [validSnmp] : []),
+    ];
+    const requirementsMet = requirements.filter(Boolean).length;
     const next = () => {
         const valid =
             step === 0
@@ -1990,7 +1955,7 @@ export function DiscoveryScopeWizard({
             ) {
                 setUncertain(true);
                 setError(
-                    'The save response could not be verified. A change may already have been saved. Refresh the scope records before sending another change.',
+                    'The reply to this save could not be checked, so the change may already be saved. Saving again is blocked; use Close and check saved scopes to see the current records.',
                 );
                 return;
             }
@@ -2012,7 +1977,7 @@ export function DiscoveryScopeWizard({
             ) {
                 setUncertain(true);
                 setError(
-                    'Save status is unknown. Your draft remains here. Refresh the scope records before sending another change.',
+                    'Save status is unknown: the change may already be saved, so saving again is blocked. Use Close and check saved scopes to see the current records.',
                 );
             } else setError(scopeFailureMessage(requestError));
         } finally {
@@ -2040,7 +2005,7 @@ export function DiscoveryScopeWizard({
                         ? 'Update discovery scope'
                         : 'Create direct discovery scope'
                 }
-                description="Save a governed configuration for an approved Site. Creating or updating a scope does not start a network scan."
+                description="Save which networks discovery may check at one of your Sites. Saving does not start a scan."
                 railIcon={Network}
                 railTitle={editing ? 'Update scope' : 'Create direct scope'}
                 railSub={scope?.name ?? 'Approved Site discovery'}
@@ -2074,21 +2039,16 @@ export function DiscoveryScopeWizard({
                 onStepClick={(index) => {
                     if (!submitting) setStep(index);
                 }}
-                pct={
-                    ([validIdentity, validNetworks, validProtocols].filter(
-                        Boolean,
-                    ).length /
-                        3) *
-                    100
+                pct={Math.round((requirementsMet / requirements.length) * 100)}
+                pctLabel={
+                    requirementsMet +
+                    ' of ' +
+                    requirements.length +
+                    ' required details'
                 }
-                pctLabel="Required details"
                 footerStart={
                     <>
-                        <Button
-                            variant="ghost"
-                            disabled={submitting}
-                            onClick={close}
-                        >
+                        <Button variant="ghost" onClick={close}>
                             Cancel
                         </Button>
                         {step > 0 && (
@@ -2134,12 +2094,9 @@ export function DiscoveryScopeWizard({
                         {uncertain && (
                             <Button
                                 variant="outline"
-                                onClick={() => {
-                                    onSaved();
-                                    onClose();
-                                }}
+                                onClick={() => setDiscardOpen(true)}
                             >
-                                Refresh and close draft
+                                Close and check saved scopes
                             </Button>
                         )}
                         <fieldset disabled={submitting} className="space-y-5">
@@ -2540,9 +2497,15 @@ export function DiscoveryScopeWizard({
             <ConfirmDialog
                 open={discardOpen}
                 onClose={() => setDiscardOpen(false)}
-                onConfirm={onClose}
+                onConfirm={discard}
                 title="Discard this discovery draft?"
-                description="The unsent scope entries will be discarded. A change already sent may still have been saved."
+                description={
+                    submitting
+                        ? 'Your save is still being sent. Closing stops waiting for it, but the change may still be saved. The scope records will refresh so you can check.'
+                        : uncertain
+                          ? 'Your last save may already have been saved. Your entries will be discarded and the scope records refreshed so you can check before making another change.'
+                          : 'Your unsaved scope entries will be discarded.'
+                }
                 confirmText="Discard draft"
                 cancelText="Keep editing"
             />

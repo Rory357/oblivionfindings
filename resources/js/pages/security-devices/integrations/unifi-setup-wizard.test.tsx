@@ -103,7 +103,7 @@ describe('Controlled UniFi setup wizard', () => {
         ).toBeInTheDocument();
         expect(
             screen.getByText(
-                /Collection remains stopped until Test Connection succeeds/,
+                /Collection remains stopped until a connection test succeeds/,
             ),
         ).toBeInTheDocument();
         expect(document.body.textContent).not.toContain(secret);
@@ -126,12 +126,12 @@ describe('Controlled UniFi setup wizard', () => {
             const data = props({ values: { ...values, api_key: key } });
             render(<Controlled data={data} />);
             continueStep();
-            expect(screen.getByLabelText(/^API Key/)).toHaveValue(key);
+            expect(screen.getByLabelText(/^API key/)).toHaveValue(key);
             expect(
                 screen.queryByRole('button', { name: 'Save key' }),
             ).not.toBeInTheDocument();
             expect(data.onSubmit).not.toHaveBeenCalled();
-            fireEvent.change(screen.getByLabelText(/^API Key/), {
+            fireEvent.change(screen.getByLabelText(/^API key/), {
                 target: { value: 'x'.repeat(4096) },
             });
             continueStep();
@@ -167,10 +167,10 @@ describe('Controlled UniFi setup wizard', () => {
         );
         expect(data.onChange).toHaveBeenCalledWith('site_id', '4');
         fireEvent.click(
-            screen.getByRole('combobox', { name: 'UniFi Location' }),
+            screen.getByRole('combobox', { name: 'UniFi location' }),
         );
         fireEvent.change(
-            screen.getByRole('combobox', { name: 'Search UniFi Location' }),
+            screen.getByRole('combobox', { name: 'Search UniFi location' }),
             { target: { value: 'Harbour' } },
         );
         fireEvent.click(
@@ -219,8 +219,11 @@ describe('Controlled UniFi setup wizard', () => {
             expect(document.body.textContent).not.toContain(token);
         },
     );
-    it('preserves both false alert values, exact quiet minutes and a nullable quiet-hour endpoint through review', () => {
-        const data = props({ kind: 'defaults' });
+    it('preserves both false alert values and exact quiet minutes in New Zealand time through review', () => {
+        const data = props({
+            kind: 'defaults',
+            values: { ...values, quiet_hours_end: '06:30' },
+        });
         render(<Controlled data={data} />);
         continueStep();
         fireEvent.click(
@@ -242,12 +245,57 @@ describe('Controlled UniFi setup wizard', () => {
         continueStep();
         expect(screen.getAllByText('Off')).toHaveLength(2);
         expect(screen.getByText('23:59')).toBeInTheDocument();
-        expect(screen.getByText('Not set')).toBeInTheDocument();
+        expect(screen.getByText('06:30')).toBeInTheDocument();
         expect(
-            screen.getByText('Clock times only. Time zone not recorded.'),
+            screen.getByText(
+                'New Zealand time. Critical alerts are never held back.',
+            ),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Save defaults' }));
         expect(data.onSubmit).toHaveBeenCalledTimes(1);
+    });
+    it.each([
+        {
+            name: 'only a start',
+            start: '22:00',
+            end: null,
+            message:
+                'Set an end time as well as a start time, or clear both to turn quiet hours off.',
+        },
+        {
+            name: 'only an end',
+            start: null,
+            end: '06:00',
+            message:
+                'Set a start time as well as an end time, or clear both to turn quiet hours off.',
+        },
+        {
+            name: 'the same start and end',
+            start: '22:00',
+            end: '22:00',
+            message: 'Quiet hours must start and end at different times.',
+        },
+    ])('refuses quiet hours with $name', ({ start, end, message }) => {
+        const data = props({
+            kind: 'defaults',
+            values: {
+                ...values,
+                quiet_hours_start: start,
+                quiet_hours_end: end,
+            },
+        });
+        render(<Controlled data={data} />);
+        continueStep();
+        continueStep();
+        expect(screen.getByText(message)).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Save defaults' }),
+        ).not.toBeInTheDocument();
+        expect(data.onSubmit).not.toHaveBeenCalled();
+    });
+    it('shows no completeness meter for these short setup flows', () => {
+        render(<Controlled data={props()} />);
+        expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     });
     it('rejects invalid interval and clock values, and explicitly clears an optional time to null', () => {
         const data = props({
@@ -260,12 +308,12 @@ describe('Controlled UniFi setup wizard', () => {
         });
         render(<Controlled data={data} />);
         continueStep();
-        expect(screen.getByLabelText(/^Refresh Interval/)).toHaveAttribute(
+        expect(screen.getByLabelText(/^Refresh interval/)).toHaveAttribute(
             'aria-invalid',
             'true',
         );
         expect(data.onSubmit).not.toHaveBeenCalled();
-        fireEvent.change(screen.getByLabelText(/^Refresh Interval/), {
+        fireEvent.change(screen.getByLabelText(/^Refresh interval/), {
             target: { value: '1440' },
         });
         continueStep();
@@ -277,7 +325,7 @@ describe('Controlled UniFi setup wizard', () => {
             screen.queryByRole('button', { name: 'Save defaults' }),
         ).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Clear Quiet Hours Start' }),
+            screen.getByRole('button', { name: 'Clear quiet hours start' }),
         );
         expect(data.onChange).toHaveBeenCalledWith('quiet_hours_start', null);
         continueStep();
@@ -321,7 +369,7 @@ describe('Controlled UniFi setup wizard', () => {
         );
         expect(screen.getByRole('button', { name: 'Save key' })).toBeEnabled();
         fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-        expect(screen.getByLabelText(/^API Key/)).toHaveValue(secret);
+        expect(screen.getByLabelText(/^API key/)).toHaveValue(secret);
         expect(screen.getByRole('alert')).toHaveTextContent(
             'The secret manager is unavailable.',
         );

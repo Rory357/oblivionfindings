@@ -7,7 +7,36 @@ use Illuminate\Http\Request;
 /** A one-response acknowledgement of a completed local UniFi write, not a durable action receipt. */
 final class UnifiActionOutcome
 {
+    /** The request changed the saved record. */
+    public const SAVED = 'saved';
+
+    /** The request was accepted, but the saved record already matched it. */
+    public const UNCHANGED = 'unchanged';
+
     public static function flashSaved(Request $request): void
+    {
+        self::flash($request, self::SAVED);
+    }
+
+    public static function flashUnchanged(Request $request): void
+    {
+        self::flash($request, self::UNCHANGED);
+    }
+
+    public static function forActor(Request $request): ?array
+    {
+        $value = $request->session()->get('unifi_action_outcome');
+        if (! is_array($value) || ($value['actor_id'] ?? null) !== $request->user()?->id
+            || ! in_array($value['outcome'] ?? null, [self::SAVED, self::UNCHANGED], true)
+            || ! is_string($value['request_id'] ?? null) || ! preg_match('/\A[a-f0-9]{32}\z/', $value['request_id'])
+            || ! is_string($value['method'] ?? null) || ! is_string($value['path'] ?? null) || ! self::supported($value['method'], $value['path'])) {
+            return null;
+        }
+
+        return array_intersect_key($value, array_flip(['actor_id', 'request_id', 'method', 'path', 'outcome']));
+    }
+
+    private static function flash(Request $request, string $outcome): void
     {
         $marker = $request->header('X-Obli-UniFi-Action');
         $actor = $request->user()?->id;
@@ -21,20 +50,8 @@ final class UnifiActionOutcome
             'request_id' => $marker,
             'method' => $method,
             'path' => $path,
-            'outcome' => 'saved',
+            'outcome' => $outcome,
         ]);
-    }
-
-    public static function forActor(Request $request): ?array
-    {
-        $value = $request->session()->get('unifi_action_outcome');
-        if (! is_array($value) || ($value['actor_id'] ?? null) !== $request->user()?->id || ($value['outcome'] ?? null) !== 'saved'
-            || ! is_string($value['request_id'] ?? null) || ! preg_match('/\A[a-f0-9]{32}\z/', $value['request_id'])
-            || ! is_string($value['method'] ?? null) || ! is_string($value['path'] ?? null) || ! self::supported($value['method'], $value['path'])) {
-            return null;
-        }
-
-        return array_intersect_key($value, array_flip(['actor_id', 'request_id', 'method', 'path', 'outcome']));
     }
 
     private static function supported(string $method, string $path): bool

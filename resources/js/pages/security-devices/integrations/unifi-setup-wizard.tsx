@@ -1,4 +1,5 @@
 import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -15,6 +16,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Spinner } from '@/components/ui/spinner';
 import { Field, InfoCard, StepHead } from '@/components/wizard/primitives';
 import {
     ReviewCard,
@@ -32,7 +34,6 @@ import {
     ChevronsUpDown,
     Clock3,
     KeyRound,
-    Loader2,
     Settings2,
     ShieldAlert,
 } from 'lucide-react';
@@ -191,6 +192,12 @@ function recordedTime(value: string | null | undefined) {
 }
 const validClock = (value: string | null) =>
     value === null || value === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+const connectionLabels: Record<string, string> = {
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    error: 'Error',
+    disabled: 'Disabled',
+};
 
 /** Root owns values, requests, authority and outcomes; this child owns presentation only. */
 export function UnifiSetupWizard(props: UnifiSetupWizardProps) {
@@ -256,12 +263,22 @@ function SetupBody({
         values.refresh_interval_minutes <= 1440
             ? ''
             : 'Enter a whole number of minutes from 1 to 1440.';
-    const startError = validClock(values.quiet_hours_start)
-        ? ''
-        : 'Choose a valid start time from 00:00 to 23:59.';
-    const endError = validClock(values.quiet_hours_end)
-        ? ''
-        : 'Choose a valid end time from 00:00 to 23:59.';
+    // Quiet hours are both set or both clear; one end on its own would be
+    // ignored, so it is refused here as it is on the server.
+    const quietStart = values.quiet_hours_start || '',
+        quietEnd = values.quiet_hours_end || '';
+    const startError = !validClock(values.quiet_hours_start)
+        ? 'Choose a valid start time from 00:00 to 23:59.'
+        : !quietStart && quietEnd
+          ? 'Set a start time as well as an end time, or clear both to turn quiet hours off.'
+          : quietStart && quietStart === quietEnd
+            ? 'Quiet hours must start and end at different times.'
+            : '';
+    const endError = !validClock(values.quiet_hours_end)
+        ? 'Choose a valid end time from 00:00 to 23:59.'
+        : quietStart && !quietEnd
+          ? 'Set an end time as well as a start time, or clear both to turn quiet hours off.'
+          : '';
     const valid = isKey
         ? !keyError
         : kind === 'mapping'
@@ -338,7 +355,7 @@ function SetupBody({
                     : 'Save new key'
                 : 'Save key';
     const keyGuidance =
-        'Saving a key does not connect UniFi. Collection remains stopped until Test Connection succeeds.';
+        'Saving a key does not connect UniFi. Collection remains stopped until a connection test succeeds.';
     return (
         <WizardShell
             open
@@ -353,7 +370,6 @@ function SetupBody({
             steps={steps.map((item) => ({ ...item, disabled: locked }))}
             stepIndex={step}
             onStepClick={jump}
-            pct={valid ? 100 : 0}
             footerStart={
                 <>
                     <Button
@@ -381,14 +397,8 @@ function SetupBody({
                     </Button>
                 ) : (
                     <Button disabled={locked || !valid} onClick={save}>
-                        {pending ? (
-                            <>
-                                <Loader2 className="size-4 animate-spin" />{' '}
-                                Saving…
-                            </>
-                        ) : (
-                            saveLabel
-                        )}
+                        {pending && <Spinner aria-hidden="true" />}
+                        {pending ? 'Saving…' : saveLabel}
                     </Button>
                 )
             }
@@ -420,9 +430,9 @@ function SetupBody({
             }
         >
             {error && (
-                <p role="alert" className="mb-4 text-status-critical">
-                    {error}
-                </p>
+                <Alert variant="destructive" className="mb-4">
+                    <AlertDescription>{error}</AlertDescription>
+                </Alert>
             )}
             {uncertain && (
                 <div role="alert" className="mb-4">
@@ -452,8 +462,8 @@ function SetupBody({
                         value={recordedTime(providerConnection?.disabled_at)}
                     />
                     <p>
-                        A replacement API key and successful Test Connection are
-                        required to resume collection. If compromise is
+                        A replacement API key and a successful connection test
+                        are needed to resume collection. If compromise is
                         suspected, revoke that key in UniFi as well.
                     </p>
                 </InfoCard>
@@ -466,7 +476,7 @@ function SetupBody({
                         {recordedTime(
                             providerConnection.recovery_credentials_replaced_at,
                         )}
-                        . Collection remains stopped until Test Connection
+                        . Collection remains stopped until a connection test
                         succeeds.
                     </InfoCard>
                 )}
@@ -525,8 +535,11 @@ function SetupBody({
                                     <ReviewRow
                                         label="Current connection"
                                         value={
-                                            providerConnection?.status ??
-                                            'Not configured'
+                                            providerConnection
+                                                ? (connectionLabels[
+                                                      providerConnection.status
+                                                  ] ?? 'Not recorded')
+                                                : 'Not configured'
                                         }
                                     />
                                     <p className="text-caption mt-2">
@@ -547,7 +560,7 @@ function SetupBody({
                                         }
                                     />
                                     <ReviewRow
-                                        label="Reported Device count"
+                                        label="Reported device count"
                                         value={
                                             location?.device_count ??
                                             'Not recorded'
@@ -556,7 +569,7 @@ function SetupBody({
                                 </>
                             ) : (
                                 <ReviewRow
-                                    label="Refresh Interval (minutes)"
+                                    label="Refresh interval (minutes)"
                                     value={values.refresh_interval_minutes}
                                 />
                             )}
@@ -584,17 +597,18 @@ function SetupBody({
                                     }
                                 />
                                 <ReviewRow
-                                    label="Quiet Hours Start"
+                                    label="Quiet hours start"
                                     value={
                                         values.quiet_hours_start || 'Not set'
                                     }
                                 />
                                 <ReviewRow
-                                    label="Quiet Hours End"
+                                    label="Quiet hours end"
                                     value={values.quiet_hours_end || 'Not set'}
                                 />
                                 <p className="text-caption mt-2">
-                                    Clock times only. Time zone not recorded.
+                                    New Zealand time. Critical alerts are never
+                                    held back.
                                 </p>
                             </ReviewCard>
                         )}
@@ -605,11 +619,11 @@ function SetupBody({
                             <>
                                 <StepHead
                                     icon={KeyRound}
-                                    title="API Key"
+                                    title="API key"
                                     blurb="Enter the new key. It will never appear in the review or success pane."
                                 />
                                 <Field
-                                    label="API Key"
+                                    label="API key"
                                     required
                                     htmlFor="unifi-setup-api-key"
                                     error={showErrors ? keyError : undefined}
@@ -678,7 +692,7 @@ function SetupBody({
                                     />
                                 </Field>
                                 <Field
-                                    label="UniFi Location"
+                                    label="UniFi location"
                                     required
                                     htmlFor="unifi-setup-location"
                                     error={
@@ -690,7 +704,7 @@ function SetupBody({
                                 >
                                     <RecordChoice
                                         id="unifi-setup-location"
-                                        label="UniFi Location"
+                                        label="UniFi location"
                                         value={values.mapping_token}
                                         choices={discoveredSites
                                             .filter(
@@ -730,7 +744,7 @@ function SetupBody({
                                     blurb="Set the refresh interval. Changing this setting does not restart a stopped connection."
                                 />
                                 <Field
-                                    label="Refresh Interval (minutes)"
+                                    label="Refresh interval (minutes)"
                                     required
                                     htmlFor="unifi-setup-refresh"
                                     error={intervalError || undefined}
@@ -775,7 +789,7 @@ function SetupBody({
                                 <StepHead
                                     icon={Bell}
                                     title="Alerts and quiet hours"
-                                    blurb="Choose which events raise alerts. Quiet hours are optional clock times; the current read does not supply their timezone."
+                                    blurb="Choose which events raise alerts. Quiet hours are optional; set both a start and an end, in New Zealand time. Critical alerts are never held back."
                                 />
                                 <Field
                                     label="Alert on motion events"
@@ -817,8 +831,8 @@ function SetupBody({
                                 ).map((field) => {
                                     const label =
                                         field === 'quiet_hours_start'
-                                            ? 'Quiet Hours Start'
-                                            : 'Quiet Hours End';
+                                            ? 'Quiet hours start'
+                                            : 'Quiet hours end';
                                     const fieldError =
                                         field === 'quiet_hours_start'
                                             ? startError
@@ -858,7 +872,7 @@ function SetupBody({
                                                             ? id + '-error'
                                                             : undefined
                                                     }
-                                                    timezone="Time zone not recorded"
+                                                    timezone="New Zealand time"
                                                     compact
                                                 />
                                                 <Button
@@ -868,7 +882,8 @@ function SetupBody({
                                                         locked || !values[field]
                                                     }
                                                     aria-label={
-                                                        'Clear ' + label
+                                                        'Clear ' +
+                                                        label.toLowerCase()
                                                     }
                                                     onClick={() => {
                                                         if (!locked)

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     post: vi.fn(),
     put: vi.fn(),
     delete: vi.fn(),
+    visit: vi.fn(),
     listeners: new Set<(event: InvalidEvent) => void>(),
 }));
 vi.mock('@inertiajs/react', () => ({
@@ -26,6 +27,7 @@ vi.mock('@inertiajs/react', () => ({
         post: mocks.post,
         put: mocks.put,
         delete: mocks.delete,
+        visit: mocks.visit,
         on: (_name: string, listener: (event: InvalidEvent) => void) => {
             mocks.listeners.add(listener);
             return () => mocks.listeners.delete(listener);
@@ -178,7 +180,7 @@ describe('owned UniFi actions', () => {
             expect(result.current.pending).toBe(false);
         },
     );
-    it.each([401, 403, 404])(
+    it.each([401, 403])(
         'denies an exact-owned %s reply and ignores late success',
         (status) => {
             const denied = vi.fn(),
@@ -375,5 +377,169 @@ describe('UniFi action acknowledgement', () => {
         });
         expect(confirmed).toHaveBeenCalledOnce();
         expect(result.current.uncertain).toBe(false);
+    });
+});
+
+describe('UniFi refused writes', () => {
+    const start = (denied = vi.fn()) => {
+        const confirmed = vi.fn();
+        const hook = renderHook(() => useUnifiAction(42, denied));
+        act(() =>
+            hook.result.current.execute({
+                method: 'post',
+                path,
+                label: 'Syncing devices',
+                onConfirmed: confirmed,
+            }),
+        );
+        return { ...hook, denied, confirmed };
+    };
+    const recoveryInvalid = (
+        visit: { headers: Record<string, string> },
+        status: number,
+    ) => {
+        const event = {
+            detail: {
+                response: {
+                    status,
+                    config: {
+                        method: 'get',
+                        url: '/security-devices/integrations/unifi',
+                        headers: visit.headers,
+                    },
+                    data: 'private response body',
+                },
+            },
+            preventDefault: vi.fn(),
+        };
+        act(() => mocks.listeners.forEach((listener) => listener(event)));
+        return event;
+    };
+    it('treats a 404 as "not saved" after a permitted recovery read, without clearing the page', () => {
+        const { result, denied, confirmed } = start();
+        const options = mocks.post.mock.calls[0][2];
+        const event = response(options, 404);
+        expect(event.preventDefault).toHaveBeenCalled();
+        expect(denied).not.toHaveBeenCalled();
+        expect(mocks.visit).toHaveBeenCalledTimes(1);
+        const [url, visit] = mocks.visit.mock.calls[0];
+        expect(url).toBe('/security-devices/integrations/unifi');
+        expect(visit).toMatchObject({
+            method: 'get',
+            preserveState: true,
+        });
+        expect(visit.headers['X-Obli-UniFi-Action']).not.toBe(
+            options.headers['X-Obli-UniFi-Action'],
+        );
+        expect(result.current.pending).toBe(true);
+        act(() => {
+            visit.onSuccess(page());
+            visit.onFinish();
+        });
+        expect(denied).not.toHaveBeenCalled();
+        expect(confirmed).not.toHaveBeenCalled();
+        expect(result.current.pending).toBe(false);
+        expect(result.current.uncertain).toBe(false);
+        expect(result.current.error).toMatch(/nothing was saved/);
+        expect(result.current.error).not.toContain('private response body');
+        // Not saved, so trying again is allowed.
+        act(() =>
+            result.current.execute({ method: 'post', path, label: 'Retry' }),
+        );
+        expect(mocks.post).toHaveBeenCalledTimes(2);
+    });
+    it.each(['unpermitted read', 'refused read'])(
+        'still clears the page when the recovery after a 404 is a %s',
+        (kind) => {
+            const { denied } = start();
+            response(mocks.post.mock.calls[0][2], 404);
+            const visit = mocks.visit.mock.calls[0][1];
+            if (kind === 'refused read') {
+                const event = recoveryInvalid(visit, 403);
+                expect(event.preventDefault).toHaveBeenCalled();
+            } else
+                act(() => {
+                    visit.onSuccess(page({ can: { manage: false } }));
+                    visit.onFinish();
+                });
+            expect(denied).toHaveBeenCalledOnce();
+        },
+    );
+    it('says the records could not be refreshed when the recovery read fails', () => {
+        const { result, denied } = start();
+        response(mocks.post.mock.calls[0][2], 404);
+        recoveryInvalid(mocks.visit.mock.calls[0][1], 503);
+        expect(denied).not.toHaveBeenCalled();
+        expect(result.current.error).toMatch(/could not be refreshed/);
+        expect(result.current.uncertain).toBe(false);
+        expect(result.current.pending).toBe(false);
+    });
+    it('shows the server validation message as text and allows a corrected retry', () => {
+        const { result } = start();
+        const options = mocks.post.mock.calls[0][2];
+        act(() => {
+            options.onError({
+                'config.quiet_hours_end': [
+                    'Set an end time as well as a start time, or clear both to turn quiet hours off.',
+                ],
+            });
+            options.onFinish();
+        });
+        expect(result.current.error).toBe(
+            'Syncing devices did not complete: Set an end time as well as a start time, or clear both to turn quiet hours off.',
+        );
+        expect(result.current.uncertain).toBe(false);
+        act(() =>
+            result.current.execute({ method: 'post', path, label: 'Retry' }),
+        );
+        expect(mocks.post).toHaveBeenCalledTimes(2);
+    });
+    it('falls back to a plain message when validation carries no text', () => {
+        const { result } = start();
+        const options = mocks.post.mock.calls[0][2];
+        act(() => {
+            options.onError({ field: { html: '<b>x</b>' } });
+            options.onFinish();
+        });
+        expect(result.current.error).toBe(
+            'Syncing devices did not complete. Check the entries and try again.',
+        );
+    });
+    it('treats a non-Inertia 422 as refused, not as an unknown outcome', () => {
+        const { result, denied } = start();
+        response(mocks.post.mock.calls[0][2], 422);
+        expect(denied).not.toHaveBeenCalled();
+        expect(result.current.uncertain).toBe(false);
+        expect(result.current.error).toMatch(/Check the entries/);
+        expect(result.current.error).not.toContain('private response body');
+    });
+    it('reports an acknowledged no-change outcome instead of claiming a save', () => {
+        const confirmed = vi.fn();
+        const { result } = renderHook(() => useUnifiAction(42, vi.fn()));
+        act(() =>
+            result.current.execute({
+                method: 'post',
+                path,
+                label: 'Disabling the connection',
+                unchangedNotice: 'The UniFi connection was already disabled.',
+                confirmed: () => true,
+                onConfirmed: confirmed,
+            }),
+        );
+        const options = mocks.post.mock.calls[0][2];
+        const next = page({}, options);
+        next.props.actionOutcome = {
+            ...next.props.actionOutcome!,
+            outcome: 'unchanged',
+        };
+        act(() => {
+            options.onSuccess(next);
+            options.onFinish();
+        });
+        expect(confirmed).toHaveBeenCalledOnce();
+        expect(result.current.uncertain).toBe(false);
+        expect(result.current.notice).toBe(
+            'The UniFi connection was already disabled.',
+        );
     });
 });

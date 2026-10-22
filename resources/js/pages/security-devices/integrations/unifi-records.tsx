@@ -45,7 +45,7 @@ const iconFor = (row: UnifiListRow): LucideIcon =>
           : row.kind === 'credential'
             ? KeyRound
             : Building2;
-const state = (row: UnifiListRow) =>
+export const unifiRowState = (row: UnifiListRow) =>
     row.kind === 'mapping'
         ? row.record.is_active
             ? 'Active mapping'
@@ -69,7 +69,7 @@ const stateChip = (row: UnifiListRow) => (
                     : 'neutral'
         }
     >
-        {state(row)}
+        {unifiRowState(row)}
     </EntityStatusChip>
 );
 const placement = (row: UnifiListRow) =>
@@ -92,6 +92,41 @@ const observed = (row: UnifiListRow) =>
           : row.kind === 'credential'
             ? time(row.record.last_tested_at)
             : 'Mapping record';
+/**
+ * The text a person can see for a record (its name, placement, status, time
+ * and descriptive facts), lower-cased for search. Links, IDs used only as
+ * references and opaque mapping tokens are deliberately left out.
+ */
+export const unifiRowSearchText = (row: UnifiListRow) => {
+    const facts =
+        row.kind === 'device'
+            ? [
+                  human(row.record.category),
+                  human(row.record.domain),
+                  row.record.subcategory ? human(row.record.subcategory) : '',
+                  row.record.manufacturer,
+                  row.record.model,
+                  row.record.firmware_version,
+              ]
+            : row.kind === 'mapping'
+              ? [row.record.site_name, human(row.record.status)]
+              : row.kind === 'credential'
+                ? [row.record.site_name, human(row.record.capability)]
+                : [
+                      human(row.record.action),
+                      human(row.record.failure_category),
+                  ];
+    return [
+        unifiRowName(row),
+        placement(row),
+        unifiRowState(row),
+        observed(row),
+        ...facts,
+    ]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase();
+};
 function Rows({ facts }: { facts: Array<[string, ReactNode]> }) {
     return (
         <>
@@ -162,7 +197,7 @@ function statusFacts(row: UnifiListRow) {
             <>
                 <Rows
                     facts={[
-                        ['Device state', state(row)],
+                        ['Device state', unifiRowState(row)],
                         ['Recorded health', human(row.record.health_status)],
                         ['Site', row.record.site_name],
                         ['Site ID', text(row.record.site_id)],
@@ -204,7 +239,7 @@ function statusFacts(row: UnifiListRow) {
             <Rows
                 facts={[
                     ['Enabled', row.record.enabled ? 'Yes' : 'No'],
-                    ['Credential status', state(row)],
+                    ['Credential status', unifiRowState(row)],
                     ['Last test', time(row.record.last_tested_at)],
                     ['Failure category', human(row.record.failure_category)],
                 ]}
@@ -213,7 +248,7 @@ function statusFacts(row: UnifiListRow) {
     return (
         <Rows
             facts={[
-                ['Run status', state(row)],
+                ['Run status', unifiRowState(row)],
                 ['Started', time(row.record.started_at)],
                 ['Completed', time(row.record.completed_at)],
                 ['Failure category', human(row.record.failure_category)],
@@ -421,7 +456,7 @@ export function UnifiDiscoveredRecords({
             })}
             actionsFor={(row) => [
                 {
-                    label: 'Map Location',
+                    label: 'Map location',
                     icon: Building2,
                     disabled,
                     onClick: () => onMap(row.mapping_token),

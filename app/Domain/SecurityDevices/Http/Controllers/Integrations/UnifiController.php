@@ -521,7 +521,13 @@ class UnifiController extends Controller
         $connection = IntegrationProviderConnection::query()->forProvider(self::PROVIDER)->firstOrFail();
         $this->secrets->revokeApplication($connection, IntegrationSecretManager::PURPOSE_PRIMARY);
 
-        UnifiActionOutcome::flashSaved($request);
+        // Report what actually happened: an already-disabled connection is
+        // acknowledged as unchanged, not as a fresh save.
+        if ($changed) {
+            UnifiActionOutcome::flashSaved($request);
+        } else {
+            UnifiActionOutcome::flashUnchanged($request);
+        }
 
         return redirect()->back()->with(
             $changed ? 'success' : 'info',
@@ -645,7 +651,13 @@ class UnifiController extends Controller
                     (string) $request->input('mapping_token'),
                 );
             });
-        abort_unless(is_array($discoveredSite), 422, 'The selected provider location is no longer available. Sync locations and try again.');
+        if (! is_array($discoveredSite)) {
+            // A validation error (not a bare HTTP 422) so the page can show
+            // this message and keep the draft.
+            throw ValidationException::withMessages([
+                'mapping_token' => 'This UniFi location is no longer available. Sync UniFi locations, then try again.',
+            ]);
+        }
 
         try {
             IntegrationSiteConfig::updateOrCreate(
@@ -855,13 +867,22 @@ class UnifiController extends Controller
         $user = $request->user();
         abort_unless($this->userCanManage($user), 403);
 
+        // Quiet hours are New Zealand wall-clock times (see
+        // AlertRoutingService::withinQuietHours). One end on its own would be
+        // silently ignored, so both are required together or neither.
         $request->validate([
             'config' => ['nullable', 'array'],
             'config.refresh_interval_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
             'config.alert_motion_events' => ['nullable', 'boolean'],
             'config.alert_device_offline' => ['nullable', 'boolean'],
-            'config.quiet_hours_start' => ['nullable', 'date_format:H:i'],
-            'config.quiet_hours_end' => ['nullable', 'date_format:H:i'],
+            'config.quiet_hours_start' => ['nullable', 'date_format:H:i', 'required_with:config.quiet_hours_end', 'different:config.quiet_hours_end'],
+            'config.quiet_hours_end' => ['nullable', 'date_format:H:i', 'required_with:config.quiet_hours_start'],
+        ], [
+            'config.quiet_hours_start.required_with' => 'Set a start time as well as an end time, or clear both to turn quiet hours off.',
+            'config.quiet_hours_end.required_with' => 'Set an end time as well as a start time, or clear both to turn quiet hours off.',
+            'config.quiet_hours_start.different' => 'Quiet hours must start and end at different times.',
+            'config.quiet_hours_start.date_format' => 'Enter the quiet hours start as a 24-hour time, such as 22:00.',
+            'config.quiet_hours_end.date_format' => 'Enter the quiet hours end as a 24-hour time, such as 06:00.',
         ]);
 
         $connection = IntegrationProviderConnection::query()

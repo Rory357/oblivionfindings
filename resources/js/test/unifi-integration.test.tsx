@@ -188,15 +188,15 @@ describe('UniFi integration', () => {
         expect(screen.getByText('Provider traffic is disabled')).toBeVisible();
         expect(screen.getByText('Security review')).toBeVisible();
         expect(
-            screen.getByRole('button', { name: 'Test Connection' }),
+            screen.getByRole('button', { name: 'Test connection' }),
         ).toBeDisabled();
         fireEvent.click(screen.getByRole('tab', { name: 'Site mappings' }));
         expect(
-            screen.getByRole('button', { name: 'Sync UniFi Locations' }),
+            screen.getByRole('button', { name: 'Sync UniFi locations' }),
         ).toBeDisabled();
         fireEvent.click(screen.getByRole('tab', { name: 'Connection' }));
         expect(
-            screen.getByRole('button', { name: 'Replace Key to Recover' }),
+            screen.getByRole('button', { name: 'Replace key to recover' }),
         ).toBeEnabled();
         expect(
             screen.queryByRole('button', { name: 'Disable connection' }),
@@ -251,9 +251,9 @@ describe('UniFi integration', () => {
             }),
             { key: 'ArrowDown' },
         );
-        await screen.findByRole('menuitem', { name: /Sync Devices/ });
+        await screen.findByRole('menuitem', { name: /Sync devices/ });
         const inactiveSync = screen.getByRole('menuitem', {
-            name: /Sync Devices/,
+            name: /Sync devices/,
         });
         expect(inactiveSync).toHaveAttribute('aria-disabled', 'true');
         expect(inactiveSync).toHaveAccessibleDescription(
@@ -274,8 +274,8 @@ describe('UniFi integration', () => {
             }),
             { key: 'ArrowDown' },
         );
-        await screen.findByRole('menuitem', { name: /Sync Devices/ });
-        fireEvent.click(screen.getByRole('menuitem', { name: /Sync Devices/ }));
+        await screen.findByRole('menuitem', { name: /Sync devices/ });
+        fireEvent.click(screen.getByRole('menuitem', { name: /Sync devices/ }));
         expect(inertiaMocks.router.post).toHaveBeenCalledWith(
             '/security-devices/integrations/unifi/sync-devices',
             { site_config_id: 10 },
@@ -387,19 +387,19 @@ describe('UniFi current read and connected views', () => {
         });
         const { rerender } = render(<UnifiIntegration {...fixture} />);
         expect(
-            screen.getByRole('button', { name: 'Test Connection' }),
+            screen.getByRole('button', { name: 'Test connection' }),
         ).toBeEnabled();
         inertiaMocks.auth.can.securityDevices.integrationsManage = false;
         rerender(<UnifiIntegration {...fixture} />);
         expect(
-            screen.queryByRole('button', { name: 'Test Connection' }),
+            screen.queryByRole('button', { name: 'Test connection' }),
         ).not.toBeInTheDocument();
         expect(screen.queryByText(/0042/)).not.toBeInTheDocument();
     });
     it('connects every meter to its view and searches permitted records', () => {
         render(<UnifiIntegration {...fixture} />);
         expect(
-            screen.getByRole('heading', { name: 'UniFi Integration' }),
+            screen.getByRole('heading', { name: 'UniFi integration' }),
         ).toBeVisible();
         fireEvent.click(
             screen.getAllByRole('button', {
@@ -413,7 +413,13 @@ describe('UniFi current read and connected views', () => {
         );
         expect(screen.getByText('South House')).toBeVisible();
         expect(screen.queryByText('North House')).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+        expect(
+            screen.queryByRole('button', { name: 'Reset filters' }),
+        ).not.toBeInTheDocument();
+        fireEvent.change(
+            screen.getByRole('searchbox', { name: 'Search UniFi records' }),
+            { target: { value: '' } },
+        );
         expect(screen.getByText('North House')).toBeVisible();
         fireEvent.click(
             screen.getByRole('button', { name: 'Open Devices view' }),
@@ -503,7 +509,7 @@ describe('UniFi current read and connected views', () => {
         );
         expect(preventDefault).not.toHaveBeenCalled();
         expect(
-            screen.getByRole('button', { name: 'Test Connection' }),
+            screen.getByRole('button', { name: 'Test connection' }),
         ).toBeVisible();
         React.act(() => invalid(403));
         expect(screen.getByText(/UniFi records are restricted/)).toBeVisible();
@@ -538,7 +544,7 @@ describe('UniFi current read and connected views', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Set up connection' }),
         );
-        const field = screen.getByLabelText(/^API Key/);
+        const field = screen.getByLabelText(/^API key/);
         fireEvent.change(field, { target: { value: 'private unsaved key' } });
         expect(field).toHaveValue('private unsaved key');
         inertiaMocks.auth.can.securityDevices.integrationsManage = false;
@@ -551,14 +557,14 @@ describe('UniFi current read and connected views', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Set up connection' }),
         );
-        expect(screen.getByLabelText(/^API Key/)).toHaveValue('');
+        expect(screen.getByLabelText(/^API key/)).toHaveValue('');
     });
     it('keeps an unsaved key on cancelled close and clears it only after reviewed discard', () => {
         render(<UnifiIntegration {...fixture} providerConnection={null} />);
         fireEvent.click(
             screen.getByRole('button', { name: 'Set up connection' }),
         );
-        fireEvent.change(screen.getByLabelText(/^API Key/), {
+        fireEvent.change(screen.getByLabelText(/^API key/), {
             target: { value: 'synthetic draft' },
         });
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -568,7 +574,7 @@ describe('UniFi current read and connected views', () => {
             }),
         ).toBeVisible();
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-        expect(screen.getByLabelText(/^API Key/)).toHaveValue(
+        expect(screen.getByLabelText(/^API key/)).toHaveValue(
             'synthetic draft',
         );
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -583,7 +589,7 @@ describe('UniFi current read and connected views', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Set up connection' }),
         );
-        expect(screen.getByLabelText(/^API Key/)).toHaveValue('');
+        expect(screen.getByLabelText(/^API key/)).toHaveValue('');
     });
     it('advances Defaults to the authoritative saved response and keeps them after navigation', () => {
         const defaults = {
@@ -600,9 +606,9 @@ describe('UniFi current read and connected views', () => {
             />,
         );
         fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Edit Defaults' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Edit defaults' }));
         fireEvent.change(
-            screen.getByLabelText(/^Refresh Interval \(minutes\)/),
+            screen.getByLabelText(/^Refresh interval \(minutes\)/),
             {
                 target: { value: '30' },
             },
@@ -650,9 +656,9 @@ describe('UniFi current read and connected views', () => {
             }),
         ).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Edit Defaults' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Edit defaults' }));
         expect(
-            screen.getByLabelText(/^Refresh Interval \(minutes\)/),
+            screen.getByLabelText(/^Refresh interval \(minutes\)/),
         ).toHaveValue(30);
     });
     it('uses newly refreshed canonical room context without inventing an unsaved edit', () => {
@@ -684,7 +690,7 @@ describe('UniFi current read and connected views', () => {
             }),
         ).not.toBeInTheDocument();
         expect(
-            screen.getByRole('button', { name: 'Test Connection' }),
+            screen.getByRole('button', { name: 'Test connection' }),
         ).toBeVisible();
     });
     it('does not rebind retained private DTOs after a paired actor and metadata-only update', () => {
@@ -711,7 +717,7 @@ describe('UniFi current read and connected views', () => {
             />,
         );
         fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Edit Defaults' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Edit defaults' }));
         rerender(
             <UnifiIntegration
                 {...fixture}
@@ -722,7 +728,7 @@ describe('UniFi current read and connected views', () => {
             />,
         );
         expect(
-            screen.getByLabelText(/^Refresh Interval \(minutes\)/),
+            screen.getByLabelText(/^Refresh interval \(minutes\)/),
         ).toHaveValue(45);
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
         fireEvent.click(screen.getByRole('tab', { name: 'Connection' }));
@@ -789,7 +795,7 @@ function completedPage(
 function startKeySave() {
     render(<UnifiIntegration {...fixture} providerConnection={null} />);
     fireEvent.click(screen.getByRole('button', { name: 'Set up connection' }));
-    fireEvent.change(screen.getByLabelText(/^API Key/), {
+    fireEvent.change(screen.getByLabelText(/^API key/), {
         target: { value: 'private-test-key-8844' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -816,14 +822,14 @@ describe('UniFi save outcomes', () => {
             failed.onFinish();
         });
         expect(screen.getByRole('alert')).toHaveTextContent(
-            'Key save did not complete',
+            'Saving the key did not complete',
         );
         expect(
             screen.queryByText('PRIVATE raw provider error'),
         ).not.toBeInTheDocument();
         expect(screen.queryByText('Key saved')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-        expect(screen.getByLabelText(/^API Key/)).toHaveValue(
+        expect(screen.getByLabelText(/^API key/)).toHaveValue(
             'private-test-key-8844',
         );
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -856,9 +862,9 @@ describe('UniFi save outcomes', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Set up connection' }),
         );
-        expect(screen.getByLabelText(/^API Key/)).toHaveValue('');
+        expect(screen.getByLabelText(/^API key/)).toHaveValue('');
     });
-    it.each([401, 403, 404])(
+    it.each([401, 403])(
         'clears the private key and records for an exact-owned denied mutation %s',
         (status) => {
             const options = startKeySave();
@@ -989,7 +995,7 @@ describe('UniFi canonical placement and mapping', () => {
             />,
         );
         fireEvent.click(screen.getByRole('tab', { name: 'Site mappings' }));
-        await recordAction('Controller north', 'Map Location');
+        await recordAction('Controller north', 'Map location');
         fireEvent.click(
             screen.getByRole('combobox', { name: 'Approved Site' }),
         );
@@ -1021,7 +1027,7 @@ describe('UniFi canonical placement and mapping', () => {
             screen.getByRole('combobox', { name: 'Approved Site' }),
         ).toHaveTextContent('North House');
         expect(
-            screen.getByRole('combobox', { name: 'UniFi Location' }),
+            screen.getByRole('combobox', { name: 'UniFi location' }),
         ).toHaveTextContent('Controller north');
     });
     it('clears only the canonical room using a nullable payload and leaves the Site placement intact', async () => {
@@ -1053,11 +1059,8 @@ describe('UniFi canonical placement and mapping', () => {
         fireEvent.click(
             await screen.findByRole('option', { name: 'No room assigned' }),
         );
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Review assignment' }),
-        );
         expect(screen.getByText('North House')).toBeVisible();
-        fireEvent.click(screen.getByRole('button', { name: 'Save Room' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save room' }));
         expect(inertiaMocks.router.put.mock.calls.at(-1)!.slice(0, 2)).toEqual([
             '/security-devices/integrations/unifi/hardware/9/room',
             { room_id: null },
@@ -1106,9 +1109,9 @@ describe('UniFi canonical placement and mapping', () => {
         fireEvent.click(
             await screen.findByRole('option', { name: 'Equipment room' }),
         );
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Review assignment' }),
-        );
+        expect(
+            screen.getByRole('combobox', { name: 'Room' }),
+        ).toHaveTextContent('Equipment room');
         ui.rerender(
             <UnifiIntegration
                 {...fixture}
@@ -1125,15 +1128,9 @@ describe('UniFi canonical placement and mapping', () => {
             />,
         );
         expect(
-            screen.queryByRole('button', { name: 'Save Room' }),
-        ).not.toBeInTheDocument();
-        expect(
             screen.getByRole('combobox', { name: 'Room' }),
         ).toHaveTextContent('Other Site room');
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Review assignment' }),
-        );
-        fireEvent.click(screen.getByRole('button', { name: 'Save Room' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save room' }));
         expect(inertiaMocks.router.put.mock.calls.at(-1)!.slice(0, 2)).toEqual([
             '/security-devices/integrations/unifi/hardware/9/room',
             { room_id: 22 },
@@ -1154,10 +1151,10 @@ describe('UniFi reviewed recovery details', () => {
         );
         fireEvent.click(screen.getByRole('tab', { name: 'Site mappings' }));
         expect(
-            screen.getByRole('button', { name: 'Map Location' }),
+            screen.getByRole('button', { name: 'Map location' }),
         ).toBeEnabled();
         expect(
-            screen.getByRole('button', { name: 'Sync UniFi Locations' }),
+            screen.getByRole('button', { name: 'Sync UniFi locations' }),
         ).toBeDisabled();
     });
     it('retains replacement-key recovery facts after replacement leaves the provider disconnected', () => {
@@ -1174,7 +1171,7 @@ describe('UniFi reviewed recovery details', () => {
         expect(screen.getByText('Replacement key saved')).toBeVisible();
         expect(
             screen.getByText(
-                'The replacement key is saved. Test Connection must pass before collection resumes.',
+                'The replacement key is saved. A connection test must pass before collection resumes.',
             ),
         ).toBeVisible();
     });
@@ -1233,7 +1230,7 @@ describe('UniFi unchanged mapping confirmation', () => {
                 />,
             );
             fireEvent.click(screen.getByRole('tab', { name: 'Site mappings' }));
-            await recordAction('Controller south', 'Map Location');
+            await recordAction('Controller south', 'Map location');
             fireEvent.click(
                 screen.getByRole('combobox', { name: 'Approved Site' }),
             );
@@ -1272,4 +1269,228 @@ describe('UniFi unchanged mapping confirmation', () => {
             ).toBeVisible();
         },
     );
+});
+
+describe('UniFi refused writes, outcomes and filters', () => {
+    it('keeps the page and the draft after a 404 write once a recovery read confirms access', () => {
+        const options = startKeySave();
+        const preventDefault = vi.fn();
+        React.act(() =>
+            inertiaMocks.invalid?.({
+                detail: {
+                    response: {
+                        status: 404,
+                        config: {
+                            method: 'post',
+                            url: '/security-devices/integrations/unifi/key',
+                            headers: options.headers,
+                        },
+                        data: 'PRIVATE raw provider error',
+                    },
+                },
+                preventDefault,
+            }),
+        );
+        expect(preventDefault).toHaveBeenCalled();
+        expect(
+            screen.queryByText(/UniFi records are restricted/),
+        ).not.toBeInTheDocument();
+        const [url, recovery] = inertiaMocks.router.visit.mock.calls.at(-1)!;
+        expect(url).toBe('/security-devices/integrations/unifi');
+        expect(recovery).toMatchObject({ method: 'get', preserveState: true });
+        React.act(() => {
+            recovery.onSuccess({
+                component: 'security-devices/integrations/unifi',
+                props: {
+                    ...fixture,
+                    providerConnection: null,
+                    auth: inertiaMocks.auth,
+                },
+            });
+            recovery.onFinish();
+        });
+        expect(
+            screen
+                .getAllByRole('alert')
+                .some((alert) =>
+                    alert.textContent?.includes('nothing was saved'),
+                ),
+        ).toBe(true);
+        expect(
+            screen.queryByText('PRIVATE raw provider error'),
+        ).not.toBeInTheDocument();
+        // Nothing was saved, so saving again is allowed and the draft is kept.
+        expect(screen.getByRole('button', { name: 'Save key' })).toBeEnabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+        expect(screen.getByLabelText(/^API key/)).toHaveValue(
+            'private-test-key-8844',
+        );
+    });
+    it('still clears the page when the recovery read after a 404 is refused', () => {
+        const options = startKeySave();
+        React.act(() =>
+            inertiaMocks.invalid?.({
+                detail: {
+                    response: {
+                        status: 404,
+                        config: {
+                            method: 'post',
+                            url: '/security-devices/integrations/unifi/key',
+                            headers: options.headers,
+                        },
+                    },
+                },
+                preventDefault: vi.fn(),
+            }),
+        );
+        const recovery = inertiaMocks.router.visit.mock.calls.at(-1)![1];
+        React.act(() =>
+            inertiaMocks.invalid?.({
+                detail: {
+                    response: {
+                        status: 403,
+                        config: {
+                            method: 'get',
+                            url: '/security-devices/integrations/unifi',
+                            headers: recovery.headers,
+                        },
+                    },
+                },
+                preventDefault: vi.fn(),
+            }),
+        );
+        expect(screen.getByText(/UniFi records are restricted/)).toBeVisible();
+        expect(
+            screen.queryByDisplayValue('private-test-key-8844'),
+        ).not.toBeInTheDocument();
+    });
+    it('confirms a pasted key with surrounding spaces by its trimmed last four characters', () => {
+        render(<UnifiIntegration {...fixture} providerConnection={null} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Set up connection' }),
+        );
+        fireEvent.change(screen.getByLabelText(/^API key/), {
+            target: { value: '  private-test-key-8844   ' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save key' }));
+        const [url, payload, options] =
+            inertiaMocks.router.post.mock.calls.at(-1)!;
+        expect(url).toBe('/security-devices/integrations/unifi/key');
+        expect(payload).toEqual({ api_key: 'private-test-key-8844' });
+        React.act(() => {
+            options.onSuccess(
+                completedPage({
+                    providerConnection: {
+                        status: 'disconnected',
+                        secret_last4: '8844',
+                    },
+                }),
+            );
+            options.onFinish();
+        });
+        expect(screen.getByText('Key saved')).toBeVisible();
+    });
+    it('says when disabling made no change instead of claiming a save', () => {
+        render(<UnifiIntegration {...fixture} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Disable connection' }),
+        );
+        fireEvent.click(
+            screen.getByLabelText('Provider outage or instability'),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Confirm containment' }),
+        );
+        const options = inertiaMocks.router.post.mock.calls.at(-1)![2];
+        React.act(() => {
+            options.onSuccess(
+                completedPage({
+                    providerConnection: {
+                        status: 'disabled',
+                        secret_last4: '0042',
+                        requires_credential_replacement: true,
+                    },
+                    actionOutcome: {
+                        ...requestAcknowledgement(),
+                        outcome: 'unchanged',
+                    },
+                }),
+            );
+            options.onFinish();
+        });
+        expect(
+            screen.getByText(
+                'The UniFi connection was already disabled, so nothing changed.',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('heading', {
+                name: 'Disable UniFi connection?',
+            }),
+        ).not.toBeInTheDocument();
+    });
+    it('shows the server reason when saving the defaults is refused', () => {
+        render(
+            <UnifiIntegration
+                {...fixture}
+                providerConnection={{
+                    status: 'connected',
+                    defaults: { refresh_interval_minutes: 15 },
+                }}
+            />,
+        );
+        fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Edit defaults' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save defaults' }));
+        const options = inertiaMocks.router.put.mock.calls.at(-1)![2];
+        React.act(() => {
+            options.onError({
+                'config.quiet_hours_end':
+                    'Set an end time as well as a start time, or clear both to turn quiet hours off.',
+            });
+            options.onFinish();
+        });
+        expect(
+            screen
+                .getAllByRole('alert')
+                .some((alert) =>
+                    alert.textContent?.includes(
+                        'Saving the defaults did not complete: Set an end time as well as a start time',
+                    ),
+                ),
+        ).toBe(true);
+        expect(
+            screen.getByRole('button', { name: 'Save defaults' }),
+        ).toBeEnabled();
+    });
+    it('filters a list view by its own status and searches only visible text', () => {
+        render(<UnifiIntegration {...fixture} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'Site mappings' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Status' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Inactive mapping' }),
+        );
+        expect(screen.getByText('South House')).toBeVisible();
+        expect(screen.queryByText('North House')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Clear Status' }));
+        fireEvent.change(
+            screen.getByRole('searchbox', { name: 'Search UniFi records' }),
+            { target: { value: 'opaque-do-not-search' } },
+        );
+        expect(screen.queryByText('Controller north')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Devices' }));
+        fireEvent.change(
+            screen.getByRole('searchbox', { name: 'Search UniFi records' }),
+            { target: { value: '/security-devices/devices/9' } },
+        );
+        expect(screen.queryByText('North gateway')).not.toBeInTheDocument();
+        fireEvent.change(
+            screen.getByRole('searchbox', { name: 'Search UniFi records' }),
+            { target: { value: 'model a' } },
+        );
+        expect(screen.getByText('North gateway')).toBeVisible();
+    });
 });
