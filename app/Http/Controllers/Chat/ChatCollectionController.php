@@ -76,7 +76,7 @@ final class ChatCollectionController extends Controller
             if (! $checked[$thread->id] || ! $this->access->messages($thread, $viewer)->whereKey($message->id)->exists()) {
                 continue;
             }
-            $titles[$thread->id] ??= $this->projection->conversation($thread, $viewer)['title'];
+            $titles[$thread->id] ??= $this->projection->conversation($thread, $viewer, summary: true)['title'];
             $items[] = ['conversation_id' => $thread->id, 'title' => $titles[$thread->id], 'message' => $this->projection->message($message, $viewer)];
             if (count($items) === 50) {
                 break;

@@ -140,7 +140,8 @@ final class ChatBrowserPushDelivery
         }
 
         return DB::transaction(function () use ($id, $message): ?object {
-            OpsConversation::whereKey($message->conversation_id)->lockForUpdate()->first();
+            // Shared: writers still exclude the claim; claims no longer queue behind each other.
+            OpsConversation::whereKey($message->conversation_id)->sharedLock()->first();
             $row = DB::table('chat_browser_push_deliveries')->where('id', $id)->lockForUpdate()->first();
             if (! $row || ! in_array($row->status, ['pending', 'sending'], true)
                 || ($row->status === 'sending' ? $row->lease_until > now()->toDateTimeString() : ($row->available_at > now()->toDateTimeString() && $row->expires_at > now()->toDateTimeString()))) {
@@ -182,7 +183,8 @@ final class ChatBrowserPushDelivery
         $user = $parent ? User::find($parent->user_id) : null;
         $message = $parent ? OpsMessage::with('conversation.client')->find($parent->message_id) : null;
         $subscription = UserPushSubscription::find($row->subscription_id);
-        if (! $user || ! $message?->conversation || ! $subscription || ! $subscription->enabled || ! ChatBrowserProtocol::supports($subscription)
+        // A message notice replaced by a newer one in the same conversation sends no push either.
+        if (! $user || ! $message?->conversation || ! $subscription || ! $subscription->enabled || $parent->status === 'superseded' || ! ChatBrowserProtocol::supports($subscription)
             || (int) $subscription->user_id !== (int) $user->id || ! hash_equals($row->subscription_fingerprint, self::fingerprint($subscription))
             || ! app(ChatNotificationPreferences::class)->browserPushEnabled($user, $parent->event_key)
             || ! app(ChatMessageDelivery::class)->shouldNotify($message, $message->conversation, $user)) {

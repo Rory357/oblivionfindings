@@ -1,0 +1,824 @@
+<title>Oblivion Chat rebuild</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Slate ground, ink chrome band with the horizon line, a contents rail beside one reading column; status shown as signature rings. */
+:root {
+  --ground: #F8FAFC; --card: #FFFFFF; --soft: #F1F5F9; --line: #E2E8F0;
+  --ink: #0F172A; --muted: #475569; --chrome: #1E293B; --chrome-ink: #F8FAFC; --chrome-muted: #CBD5E1;
+  --brand: #7040D6; --brand-ink: #5B30C2; --brand-soft: #EFE9FB; --brand-line: #D9CCF6;
+  --ok: #15803D; --ok-bg: #DCFCE7; --warn: #A16207; --warn-bg: #FEF3C7; --crit: #B91C1C; --crit-bg: #FEE2E2; --info: #1D4ED8; --info-bg: #DBEAFE;
+  --font: "Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --emoji: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ground: #0F172A; --card: #1E293B; --soft: #273449; --line: #334155;
+  --ink: #E2E8F0; --muted: #94A3B8; --chrome: #111827; --chrome-ink: #F8FAFC; --chrome-muted: #CBD5E1;
+  --brand: #A98BF0; --brand-ink: #C4ADF6; --brand-soft: #2A2547; --brand-line: #4A3F7A;
+  --ok: #4ADE80; --ok-bg: #14321F; --warn: #FBBF24; --warn-bg: #3A2E0F; --crit: #F87171; --crit-bg: #3B1717; --info: #93C5FD; --info-bg: #172B4D;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --ground: #0F172A; --card: #1E293B; --soft: #273449; --line: #334155;
+  --ink: #E2E8F0; --muted: #94A3B8; --chrome: #111827; --chrome-ink: #F8FAFC; --chrome-muted: #CBD5E1;
+  --brand: #A98BF0; --brand-ink: #C4ADF6; --brand-soft: #2A2547; --brand-line: #4A3F7A;
+  --ok: #4ADE80; --ok-bg: #14321F; --warn: #FBBF24; --warn-bg: #3A2E0F; --crit: #F87171; --crit-bg: #3B1717; --info: #93C5FD; --info-bg: #172B4D;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 400 15px/1.6 var(--font); -webkit-font-smoothing: antialiased; }
+a { color: var(--brand-ink); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+code { background: var(--soft); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3em; overflow-wrap: anywhere; }
+.e { font-family: var(--emoji); font-style: normal; }
+
+/* chrome band */
+.band { background: var(--chrome); color: var(--chrome-ink); position: relative; }
+.band::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brand) 30%, #E9DFFF 50%, var(--brand) 70%, transparent); }
+.band-in { max-width: 1180px; margin: 0 auto; padding-block: 44px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--chrome-muted); font-weight: 600; display: flex; gap: 10px; align-items: center; }
+.ring { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--brand); display: inline-block; flex: none; }
+.band h1 { font-size: clamp(30px, 4.4vw, 46px); line-height: 1.08; letter-spacing: -.02em; margin: 12px 0 14px; font-weight: 600; text-wrap: balance; }
+.band h1 span { font-weight: 400; color: var(--chrome-muted); }
+.lede { max-width: 68ch; color: var(--chrome-muted); font-size: 17px; margin: 0; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.fact { border: 1px solid #334155; border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--chrome-muted); }
+.fact b { color: var(--chrome-ink); font-weight: 600; }
+
+/* page grid */
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 32px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start; font-size: 13.5px; }
+nav.toc p { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 8px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--line); }
+nav.toc li a { display: block; padding: 4px 0 4px 14px; color: var(--muted); text-decoration: none; margin-left: -1px; border-left: 2px solid transparent; }
+nav.toc li a:hover { color: var(--ink); border-left-color: var(--brand); }
+main { min-width: 0; }
+section { margin-bottom: 56px; scroll-margin-top: 20px; }
+h2 { font-size: 26px; line-height: 1.2; letter-spacing: -.01em; margin: 0 0 6px; font-weight: 600; text-wrap: balance; }
+h3 { font-size: 18px; margin: 28px 0 8px; font-weight: 600; text-wrap: balance; }
+h4 { font-size: 15px; margin: 18px 0 6px; font-weight: 600; }
+.sub { color: var(--muted); margin: 0 0 20px; max-width: 72ch; }
+p, li { max-width: 76ch; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.short { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.short li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px 14px 52px; position: relative; max-width: none; }
+.short li::before { counter-increment: s; content: counter(s); position: absolute; left: 16px; top: 14px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--brand); color: var(--brand-ink); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.short b { font-weight: 600; }
+
+.measure { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 22px; align-items: center; }
+.screen { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--soft); aspect-ratio: 1440 / 900; display: grid; grid-template-rows: 11.1% 8.3% 10% 7.8% 6.7% 6.2% 21.2% 1fr; font-size: 9px; color: var(--muted); max-width: 100%; }
+.screen > div { border-bottom: 1px solid var(--line); padding: 0 8px; display: flex; align-items: center; }
+.screen .msgs { background: var(--brand-soft); color: var(--brand-ink); font-weight: 700; border-bottom: 0; }
+.screen .rest { background: var(--card); }
+.bignum { font-size: 44px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+.bignum small { font-size: 16px; color: var(--muted); font-weight: 500; }
+
+ul.find { padding-left: 18px; margin: 8px 0; }
+ul.find li { margin: 4px 0; }
+
+/* tables */
+.tw { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: var(--soft); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.k { font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+tr.grp td { background: var(--soft); font-weight: 600; font-size: 13px; letter-spacing: .02em; }
+
+/* ring status chips (shape carries the state) */
+.st { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.st i { width: 13px; height: 13px; border-radius: 50%; flex: none; display: inline-block; }
+.st.built { color: var(--ok); } .st.built i { border: 2px solid var(--ok); box-shadow: inset 0 0 0 2px var(--card), inset 0 0 0 7px var(--ok); }
+.st.part { color: var(--warn); } .st.part i { border: 2px solid var(--warn); background: linear-gradient(90deg, var(--warn) 50%, transparent 50%); }
+.st.miss { color: var(--crit); } .st.miss i { border: 2px solid var(--crit); }
+.st.excl { color: var(--muted); } .st.excl i { border: 2px dashed var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+
+.size { display: inline-block; min-width: 28px; text-align: center; font-family: var(--mono); font-size: 11.5px; font-weight: 500; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--soft); color: var(--ink); }
+.tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-ink); border: 1px solid var(--brand-line); white-space: nowrap; }
+.tag.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.tag.crit { background: var(--crit-bg); color: var(--crit); border-color: transparent; }
+.tag.ok { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+
+.note { border-radius: 12px; padding: 14px 18px; background: var(--brand-soft); border: 1px solid var(--brand-line); margin: 16px 0; }
+.note.warn { background: var(--warn-bg); border-color: transparent; }
+.note b { font-weight: 600; }
+
+/* plan pathway */
+.path { list-style: none; margin: 0; padding: 0; position: relative; }
+.path::before { content: ""; position: absolute; left: 13px; top: 18px; bottom: 18px; width: 2px; background: var(--brand-line); border-radius: 2px; }
+.phase { position: relative; padding-left: 46px; margin-bottom: 22px; max-width: none; }
+.phase::before { content: ""; position: absolute; left: 4px; top: 14px; width: 20px; height: 20px; border-radius: 50%; background: var(--ground); border: 2px solid var(--brand); }
+.phase.first::before { background: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
+.phase .card { padding: 16px 20px; }
+.ph-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; }
+.ph-h h3 { margin: 0; }
+.ph-n { font-family: var(--mono); font-size: 12px; color: var(--brand-ink); font-weight: 500; }
+.ph-why { color: var(--muted); margin: 6px 0 10px; }
+.items { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.items li { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); max-width: none; font-size: 14px; }
+.items li:last-child { border-bottom: 0; }
+.items .id { font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.items small { display: block; color: var(--muted); font-size: 13px; }
+.done { margin: 10px 0 0; font-size: 13.5px; color: var(--muted); }
+.done b { color: var(--ink); }
+
+/* decisions */
+.dec { display: grid; gap: 12px; }
+.dec .card { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 14px; }
+.dec .id { font-family: var(--mono); font-weight: 500; color: var(--brand-ink); font-size: 13px; padding-top: 2px; }
+.dec h4 { margin: 0 0 4px; }
+.dec p { margin: 4px 0; }
+.rec { color: var(--ok); font-weight: 600; }
+
+.uniq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.uniq .card h4 { margin: 0 0 6px; display: flex; gap: 8px; align-items: center; }
+.uniq .card ul { margin: 6px 0 0; padding-left: 18px; }
+.uniq .card li { margin: 4px 0; font-size: 14px; }
+.lens { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--brand); display: inline-grid; place-items: center; color: var(--brand-ink); font-size: 12px; font-weight: 700; background: var(--brand-soft); flex: none; }
+
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 18px; }
+
+@media (max-width: 980px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  nav.toc { position: static; }
+  nav.toc ol { display: flex; flex-wrap: wrap; gap: 4px 0; border-left: 0; }
+  nav.toc li a { border-left: 0; padding: 2px 12px 2px 0; }
+  .grid3 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .grid2, .uniq { grid-template-columns: minmax(0, 1fr); }
+  .measure { grid-template-columns: minmax(0, 1fr); }
+  .items li { grid-template-columns: 52px minmax(0, 1fr); }
+  .items li .size { grid-column: 2; justify-self: start; }
+  .dec .card { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<header class="band">
+  <div class="band-in">
+    <div class="eyebrow"><span class="ring" aria-hidden="true"></span>Chat audit and plan · Thursday 22 October 2026</div>
+    <h1>Oblivion Chat rebuild <span>audit and plan</span></h1>
+    <p class="lede">Why Chat looks and feels unfinished, everything it is missing next to WhatsApp and Teams, what outside code it runs on, and a step-by-step plan to rebuild it as Oblivion's own, consistent with the Slate look and the Oblivion signature.</p>
+    <div class="facts">
+      <span class="fact"><b>542</b> chat files audited</span>
+      <span class="fact"><b>≈86,500</b> lines, merged 22 Oct (PR #22)</span>
+      <span class="fact">Checked live on <b>oblivionfindings.com</b> at 1440 × 900</span>
+      <span class="fact"><b>104</b> plan items in <b>10</b> stages</span>
+      <span class="fact"><b>15</b> decisions, all answered</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Contents">
+    <p>Contents</p>
+    <ol>
+      <li><a href="#short">In short</a></li>
+      <li><a href="#progress">Progress so far</a></li>
+      <li><a href="#today">What people see today</a></li>
+      <li><a href="#look">Look and feel</a></li>
+      <li><a href="#features">Features vs WhatsApp and Teams</a></li>
+      <li><a href="#licences">Outside code and licences</a></li>
+      <li><a href="#engine">Under the hood</a></li>
+      <li><a href="#surfaces">Where chat shows up</a></li>
+      <li><a href="#keep">What to keep</a></li>
+      <li><a href="#unique">Making it Oblivion's own</a></li>
+      <li><a href="#cleanroom">Clean-room rebuild</a></li>
+      <li><a href="#plan">The plan, stage by stage</a></li>
+      <li><a href="#decisions">Decisions for you</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="short">
+      <h2>In short</h2>
+      <p class="sub">The headline findings and what happens next.</p>
+      <ol class="short">
+        <li><b>Chat works, but it was built safety-first and finish-last.</b> On a 1440 × 900 screen the messages get 191 px, about a fifth of the height. Banners, an owner row and a reply-status row take the rest.</li>
+        <li><b>Everyday chat features are missing.</b> The emoji button only adds <span class="e">🙂</span>. You can only react with <span class="e">👍</span>. Photos show as file chips. There is no read status, typing indicator, copy, forwarding, formatting or video calling. The old Messages page had some of these, so switching over loses them.</li>
+        <li><b>No open-source code was pasted into Oblivion's files.</b> The licensing you saw is four outside engines Chat runs on: LiveKit (calls), Reverb and Pusher (live updates) and a web-push library. All use permissive licences. On 16 October you chose to keep LiveKit; this plan replaces that decision if you agree.</li>
+        <li><b>Under the hood it won't hold beyond a small team.</b> The conversation list runs thousands of database queries per refresh, every open tab polls about 25–30 times a minute, and one lock per conversation queues every read and write.</li>
+        <li><b>The plan keeps what is Oblivion's</b> (named-worker cover, the family inbox, the reply promise, callbacks, privacy rules, investigations), <b>rebuilds the rest</b> on Oblivion-owned engines, and adds care-only features no chat app has: live care cards, shift-aware mentions, read-and-confirm safety messages and a privacy check before anything goes to family.</li>
+        <li><b>Nothing gets built until you approve the mockups.</b> I've drawn the proposed screens in the design viewer next to the existing chat boards, in the same Slate style. All fifteen decisions at the end were answered on 22 October.</li>
+      </ol>
+    </section>
+
+    <section id="progress">
+      <h2>Progress so far</h2>
+      <p class="sub">Updated 23 October 2026. Branch <code>claude/chat-module-audit-plan-704fd7</code>, 13 commits, not pushed or merged. Every code change passed the full chat test suite (430 tests) before it was committed.</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Item</th><th>Status</th><th>What changed</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Stage 0</td><td><span class="st built"><i></i>Done</span></td><td>Decisions recorded in the spec; clean-room rules and register; project renamed to Oblivion Care (proprietary); missing licence notices added; unused <code>ws</code> removed; DESIGN.md chat rules and two ESLint guardrails; the 10-second jobs only run when needed.</td></tr>
+            <tr><td class="k">Stage 1</td><td><span class="st built"><i></i>Approved</span></td><td>Six Chat v3 boards in the design viewer, approved 22 October; copies in <code>docs/chat-experience/v3/</code>.</td></tr>
+            <tr><td class="k">C1.1</td><td><span class="st part"><i></i>Part</span></td><td>List rows leave out the member-by-member checks and read settings once: about 20 queries per conversation, whatever its size. Paging comes with the list rebuild (C3.1).</td></tr>
+            <tr><td class="k">C1.2</td><td><span class="st built"><i></i>Done</span></td><td>Readers share the conversation lock; writers still exclude them.</td></tr>
+            <tr><td class="k">C1.3</td><td><span class="st excl"><i></i>Moved</span></td><td>One delivery queue joins the Oblivion Live event work (stage 3), which reworks delivery anyway.</td></tr>
+            <tr><td class="k">C1.4</td><td><span class="st built"><i></i>Done</span></td><td>One bell entry per conversation; reading clears it; off-duty backlogs arrive as one notice; mentions kept.</td></tr>
+            <tr><td class="k">C1.5</td><td><span class="st part"><i></i>Part</span></td><td>Nightly clean-up of finished delivery records. The sync log and old notices wait for the retention policy.</td></tr>
+            <tr><td class="k">C1.6</td><td><span class="st built"><i></i>Done</span></td><td>Any emoji as a reaction, several per person, who reacted.</td></tr>
+            <tr><td class="k">C1.7</td><td><span class="st built"><i></i>Done</span></td><td>Pins record who and when and are audited; relatives can't pin; uploads follow the Site's size limit.</td></tr>
+            <tr><td class="k">C1.8</td><td><span class="st part"><i></i>Part</span></td><td>Search checks access once per conversation and builds results in batches. A real index comes with the search redesign.</td></tr>
+            <tr><td class="k">C1.9</td><td><span class="st part"><i></i>Part</span></td><td>A Site channel stays open when one member moves Site. Private groups wait for your answer (below).</td></tr>
+            <tr><td class="k">C1.10</td><td><span class="st excl"><i></i>Moved</span></td><td>Background virus scanning is built with the stage 4 attach tray, which uploads in the background.</td></tr>
+            <tr><td class="k">C1.11</td><td><span class="st built"><i></i>Exists</span></td><td>Service health already checks the scanner, voice checker, live updates and push; the settings rebuild (C7.8) puts it on the overview.</td></tr>
+            <tr><td class="k">C1.12</td><td><span class="st miss"><i></i>Waiting</span></td><td>Waits for the investigator branch (multi-conversation grants and export) to merge.</td></tr>
+            <tr><td class="k">Stage 3</td><td><span class="st part"><i></i>Specs</span></td><td>Clean-room specs written for Oblivion Live, the push sender and the voice checker (<code>docs/chat-experience/clean-room/specs/</code>). Three builder sessions are proposed as cards; the session that wrote the specs doesn't build them.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><b>Your answer needed:</b> when someone in a private group moves to a Site the others can't see, today the whole group disappears for them. Should the group stay, with that person's name kept, or keep hiding?</div>
+    </section>
+
+    <section id="today">
+      <h2>What people see today</h2>
+      <p class="sub">There are two chats in the app, and which one you get depends on a switch.</p>
+      <div class="grid2">
+        <div class="card">
+          <h4>Switch off (your local site, and the default)</h4>
+          <p>The sidebar "Chat" opens the old Messages page from April: the large purple banner with "Welcome to Chat". The new Chat returns "Not found". <b>The header chat button always opens the old page</b>, even when the new Chat is on.</p>
+        </div>
+        <div class="card">
+          <h4>Switch on (oblivionfindings.com)</h4>
+          <p>The new Chat built by Codex and finished on 21 October. Live updates, push, drafts and calls each have their own switch, and all of them are off. Without a virus scanner on the server, files can't be sent. Without the voice-file checker, the microphone button is hidden.</p>
+        </div>
+      </div>
+
+      <h3>The message area is a fifth of the screen</h3>
+      <div class="measure">
+        <div>
+          <div class="bignum">191<small> px</small></div>
+          <p class="sub" style="margin:6px 0 0">of a 900 px window shows messages in a family conversation (measured in the page).</p>
+        </div>
+        <div class="screen" role="img" aria-label="Diagram of the family conversation's vertical space at 1440 by 900: top bar 100 px, header 75, privacy banner 90, owner row 70, reply-status row 60, callbacks button 56, messages 191, composer and margin 258">
+          <div>Top bar and breadcrumb</div>
+          <div>Conversation header</div>
+          <div>"Only the invited family members…" banner · Need urgent help?</div>
+          <div>Owned by Demo Admin · No response expectation configured · 3 buttons</div>
+          <div>Needs reply ▾ · Next: read and respond · Create follow-up</div>
+          <div>Floating "Callbacks" button</div>
+          <div class="msgs">Messages: 191 px</div>
+          <div class="rest">Composer, footer note and page margin</div>
+        </div>
+      </div>
+
+      <h3>What I found clicking through it</h3>
+      <ul class="find">
+        <li><b>Emoji:</b> the smiley button adds " <span class="e">🙂</span>" to the end of the message. There is no picker (<code>chat-thread.tsx:2550</code>).</li>
+        <li><b>Message actions</b> open a pop-up dialog instead of a hover bar or right-click menu. "React" is only "<span class="e">👍</span> Acknowledge", which also uses an emoji as an icon. Copy, Forward and Message info don't exist. Edit and Remove are greyed out with "An administrator must configure the edit/removal window first", because the default edit window is empty.</li>
+        <li><b>The "Latest messages" button covers the last bubble.</b> A floating "Callbacks" button sits over the thread.</li>
+        <li><b>Voice notes</b> show as the text "<span class="e">🎙️</span> Voice note". Recording opens in a pop-up, not inline, and has no waveform. <b>Photos</b> show as file chips, not pictures.</li>
+        <li><b>No photos or online status</b> on people, no grouping of a sender's messages, and only one tick that means "Sent", although who has read what is already stored.</li>
+        <li><b>Calls</b> open a "Call history" pop-up per conversation. There is no Calls page, no video and no screen share, and calls need a voice server that isn't set up.</li>
+        <li><b>Family inbox</b> is a plain list beside an empty panel. Settings › Chat has its own two-column menu instead of the Fleet settings pattern, with lines like "A policy setting never adds someone to a conversation."</li>
+        <li><b>Plain-language slips:</b> "No response expectation configured", "Files stay in this conversation until separately published with permission", "Policy scope", "Reassign / release", "Staff coordination".</li>
+        <li><b>Touch-sized controls:</b> the composer buttons are 44 px touch targets on a desktop-only screen.</li>
+      </ul>
+    </section>
+
+    <section id="look">
+      <h2>Look and feel</h2>
+      <p class="sub">What makes it look unfinished, measured against DESIGN.md and against WhatsApp Web and Teams.</p>
+      <div class="grid3">
+        <div class="card"><h4>Grey on grey</h4><p>The workspace, thread, composer and details all sit on the grey page colour instead of white cards. Other people's bubbles are a faint grey and yours a faint purple, so nothing stands out.</p></div>
+        <div class="card"><h4>About 150 px per line</h4><p>Every message has a name row (even "You"), a padded bordered bubble, a separate time row and an always-visible 44 px ⋯ row. About three messages fit on screen; WhatsApp fits ten to twelve.</p></div>
+        <div class="card"><h4>Banners and pop-ups everywhere</h4><p>Up to seven strips stack above the messages and recovery cards stack above a 200 px composer. Almost every action, from reacting to attaching a photo, opens a pop-up.</p></div>
+      </div>
+      <div class="note warn"><b>The approved mockup is part of the problem.</b> Codex's revision 2 (M01, M03, M06) is a basic Teams-like design, and the build drifted further from it. Building it faithfully would not fix the look, so the rebuild needs a new approved mockup. The new boards are in the design viewer.</div>
+
+      <h3>The 30 problems that matter most, ranked</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>#</th><th>Problem</th><th>Where</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td class="k">1</td><td>Grey on grey everywhere</td><td class="k">chat-workspace.tsx:216</td><td>White card surfaces, a clear tint for your bubbles, white for others</td></tr>
+            <tr><td class="k">2</td><td>About 150 px per one-line message</td><td class="k">chat-thread.tsx:1877–2059</td><td>Group by sender, time inline, actions on hover</td></tr>
+            <tr><td class="k">3</td><td>Banner stack above the messages</td><td class="k">chat-thread.tsx:1629–1752</td><td>One slim bar in the header; one notice slot</td></tr>
+            <tr><td class="k">4</td><td>Composer about 200 px tall with a resize grip</td><td class="k">chat-thread.tsx:2133–2679</td><td>One auto-growing line with + , emoji and mic inline</td></tr>
+            <tr><td class="k">5</td><td>Fake emoji button; one reaction</td><td class="k">chat-thread.tsx:2550, 2754</td><td>Emoji picker and a quick reaction bar</td></tr>
+            <tr><td class="k">6</td><td>Message actions in a pop-up</td><td class="k">chat-thread.tsx:2680–2860</td><td>Hover bar, kebab menu and right-click menu</td></tr>
+            <tr><td class="k">7</td><td>No photos in the conversation</td><td class="k">chat-attachment.tsx:67</td><td>Thumbnails and a grid with "+N"</td></tr>
+            <tr><td class="k">8</td><td>Sending a photo takes five clicks</td><td class="k">chat-attachment-queue.tsx</td><td>+ menu, a tray that uploads in the background, Send; drop and paste</td></tr>
+            <tr><td class="k">9</td><td>A voice note takes about seven clicks</td><td class="k">chat-voice-recorder.tsx</td><td>Inline recording strip and a waveform player</td></tr>
+            <tr><td class="k">10</td><td>The active call doesn't look like a call; 1:1 calls read "Voice call"</td><td class="k">active-call-card.tsx</td><td>Photo, name and timer, round controls, red hang-up</td></tr>
+            <tr><td class="k">11</td><td>Send-checking wording on screen ("Not confirmed · Use the send check below")</td><td class="k">chat-thread.tsx:2116, 2400</td><td>A waiting bubble, then "Not sent · Retry"</td></tr>
+            <tr><td class="k">12</td><td>Developer and auditor words: published, audience, eligible, authorised cover, policy scope</td><td class="k">many</td><td>Plain NZ English, as DESIGN.md asks</td></tr>
+            <tr><td class="k">13</td><td>Four-line list rows, initials in squares, no "You:" and no row menu</td><td class="k">chat-workspace.tsx:509–617</td><td>Photo with ring, one-line preview, time and count on the right, row menu</td></tr>
+            <tr><td class="k">14</td><td>About 330 px of controls in the list: two searches, chips on two lines, four stacked buttons</td><td class="k">chat-workspace.tsx:383–681</td><td>One search, one line of chips, quick views in the list</td></tr>
+            <tr><td class="k">15</td><td>Search takes over the whole workspace</td><td class="k">chat-workspace.tsx:280</td><td>Results in the list column; the thread stays</td></tr>
+            <tr><td class="k">16</td><td>Weak conversation header</td><td class="k">chat-thread.tsx:1570–1580</td><td>Photo, status line, tabs and a ⋯ menu</td></tr>
+            <tr><td class="k">17</td><td>Plain-text dates; "Load earlier messages" button; themed scrollbars used 0 times in 45 scroll areas</td><td class="k">chat-thread.tsx:1792, 1853</td><td>Day chips, load on scroll, <code>.scrollbar-pretty</code></td></tr>
+            <tr><td class="k">18</td><td>A fixed-height frame with scrolling inside scrolling</td><td class="k">chat-workspace.tsx:217</td><td>Full-height workspace page (a DESIGN.md exception, D14)</td></tr>
+            <tr><td class="k">19</td><td>Families get the staff workspace and staff wording</td><td class="k">chat-thread.tsx:2431, 2645</td><td>A family version in the family look</td></tr>
+            <tr><td class="k">20</td><td>The two-pane workspace squeezed into a 720 px side sheet</td><td class="k">chat-launcher.tsx:86–104</td><td>A single-conversation view for sheets and drawers</td></tr>
+            <tr><td class="k">21</td><td>Three chats at once; header and sidebar go to different places</td><td class="k">app-header.tsx:221</td><td>One Chat; one unread count</td></tr>
+            <tr><td class="k">22</td><td>The family home is bolted onto the family dashboard</td><td class="k">family-dashboard.tsx:483</td><td>Its own family chat home</td></tr>
+            <tr><td class="k">23</td><td>Call dock pushes every page 420 px; pixel sizes on the incoming-call card</td><td class="k">chat-call-dock.css:18</td><td>A floating dock and card that don't move the page</td></tr>
+            <tr><td class="k">24</td><td>A microphone test before every call</td><td class="k">chat-calling.tsx:2302</td><td>One-click calls; test only when something fails (D13)</td></tr>
+            <tr><td class="k">25</td><td>Calls over-explain</td><td class="k">call-*.tsx</td><td>Short states: Calling, Ringing, Connected, Reconnecting</td></tr>
+            <tr><td class="k">26</td><td>Settings are mostly prose (about 25 paragraphs, controls in 4 of 8 sections), three nav columns, free-text times; "Enable Chat" shows On while Chat is off</td><td class="k">settings/chat.tsx</td><td>Fleet settings pattern with switches, pickers and an overview</td></tr>
+            <tr><td class="k">27</td><td>Shared parts bypassed: empty states 0 times, bare spinners 7 times, raw form inputs, <code>bg-accent</code> selection, status as text, <code>text-2xl</code> headings</td><td class="k">many</td><td>EmptyState, LoadingState, StatusBadge, typography helpers, toggle tint</td></tr>
+            <tr><td class="k">28</td><td>Blanket 44 px button rules (a named anti-pattern) and about 180 forced 44 px sizes on a desktop screen</td><td class="k">chat-attachment-queue.tsx:313 and 3 more</td><td><code>.frontline-hit</code> where a larger target is needed; compact desktop sizes</td></tr>
+            <tr><td class="k">29</td><td>Hand-made close buttons and restyled call pop-ups</td><td class="k">call-*.tsx</td><td>The pop-up kit's close and dialog shells</td></tr>
+            <tr><td class="k">30</td><td>Chat notifications look different from every other notification</td><td class="k">chat-notice-card.tsx:185</td><td>The app's notification row, with a Chat filter</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Already right</h3>
+      <p>No raw colours or hex in chat code, every pop-up uses the approved widths, and <code>/chat</code> has a Home › Chat trail. Those stay.</p>
+      <h3>How the screens are built</h3>
+      <ul class="find">
+        <li><code>chat-thread.tsx</code> is 2,937 lines with about 45 pieces of state: 1,400 lines of logic and one 1,400-line block of markup. It splits into a thread hook, a send hook, a draft hook and about ten small parts (header, notice, message list, day chip, message group, bubble, attachment grid, message menu, composer).</li>
+        <li><code>chat-workspace.tsx</code> uses one "compact" switch to serve four different places. It becomes three explicit versions: full page, single conversation for sheets and drawers, and family.</li>
+        <li>Six widgets each pair a button with a pop-up that loads its own data (saved, call history, invitations, invite people, manage, callbacks). Each splits into a data part and a body that can also sit inline.</li>
+        <li>The calling provider (about 1,740 lines) also owns the app-wide unread count; that moves out.</li>
+        <li>The server doesn't send photos of people, the last sender, presence, typing, read state, image thumbnails or a name for one-to-one calls. Stage 2 and 3 add them.</li>
+        <li>Worth keeping as they are (tested, no screen code): the API layer, sync, send session and journal, upload coordinator, drafts, mentions, the file preview dialog and the incoming-call card's logic.</li>
+        <li>68 chat test files (about 18,500 lines) assert today's wording; 192 checks in the thread test alone. They are rewritten with the screens.</li>
+      </ul>
+    </section>
+
+    <section id="features">
+      <h2>Features compared with WhatsApp and Teams</h2>
+      <p class="sub">Every feature in your screenshots, plus the rest of what both apps do. "Today" is the new Chat with its switch on.</p>
+      <div class="legend">
+        <span class="st built"><i></i>Built</span>
+        <span class="st part"><i></i>Partly</span>
+        <span class="st miss"><i></i>Missing</span>
+        <span class="st excl"><i></i>Ruled out in the October spec</span>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Feature</th><th>Today</th><th>What's there now</th><th>Plan</th></tr></thead>
+          <tbody>
+            <tr class="grp"><td colspan="4">Conversation list</td></tr>
+            <tr><td>Search conversations, messages, files and people</td><td><span class="st built"><i></i>Built</span></td><td>Search Chat with From and Date filters</td><td class="k">C1.8</td></tr>
+            <tr><td>Filter chips (Unread, Mentions, Groups, Channels, Family, Drafts)</td><td><span class="st part"><i></i>Partly</span></td><td>All, Unread, Mentions, Favourites, Archived, Channels</td><td class="k">C3.1</td></tr>
+            <tr><td>Pin a conversation to the top; sections (Pinned, Favourites, Chats, Channels, Family)</td><td><span class="st miss"><i></i>Missing</span></td><td>One flat list, newest first</td><td class="k">C3.1</td></tr>
+            <tr><td>Photos and on-shift status on rows</td><td><span class="st miss"><i></i>Missing</span></td><td>Two-letter initials</td><td class="k">C3.2</td></tr>
+            <tr><td>Previews with sender ("Hana: …", "You: …"), photo and voice previews</td><td><span class="st part"><i></i>Partly</span></td><td>Text only; attachments read "New Chat message"</td><td class="k">C3.2</td></tr>
+            <tr><td>Draft marker, typing in the list, right-click menu on rows</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.1</td></tr>
+            <tr><td>Mute for 1 hour, 8 hours or until tomorrow</td><td><span class="st part"><i></i>Partly</span></td><td>On or off only</td><td class="k">C3.1</td></tr>
+            <tr><td>Favourite, archive, mark unread, unread counts</td><td><span class="st built"><i></i>Built</span></td><td>Keep</td><td class="k">—</td></tr>
+
+            <tr class="grp"><td colspan="4">In a conversation</td></tr>
+            <tr><td>Grouped messages with one photo and name per group</td><td><span class="st miss"><i></i>Missing</span></td><td>Name printed on every bubble</td><td class="k">C3.3</td></tr>
+            <tr><td>Sent, delivered and read; Message info (who read it, when)</td><td><span class="st part"><i></i>Partly</span></td><td>One tick meaning "Sent"; read positions are stored but never shown</td><td class="k">C3.4</td></tr>
+            <tr><td>Typing indicator; online or on-shift status</td><td><span class="st miss"><i></i>Missing</span></td><td>The old page had online status</td><td class="k">C2.1 C3.4</td></tr>
+            <tr><td>Emoji picker with search, categories, recent and skin tones</td><td><span class="st miss"><i></i>Missing</span></td><td>Button adds <span class="e">🙂</span></td><td class="k">C3.5</td></tr>
+            <tr><td>Reactions: quick bar, any emoji, who reacted</td><td><span class="st part"><i></i>Partly</span></td><td>Only <span class="e">👍</span> can be added; the server allows 6; who reacted is hidden; a database bug lets a person hold only one</td><td class="k">C1.6 C3.6</td></tr>
+            <tr><td>Hover action bar and right-click menu on messages</td><td><span class="st miss"><i></i>Missing</span></td><td>A pop-up dialog for every action</td><td class="k">C3.7</td></tr>
+            <tr><td>Reply with quote</td><td><span class="st built"><i></i>Built</span></td><td>Keep, restyle</td><td class="k">C3.7</td></tr>
+            <tr><td>Reply in a thread (Teams), follow a thread</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.8</td></tr>
+            <tr><td>Copy text; share one message to another chat</td><td><span class="st miss"><i></i>Missing</span></td><td>Bulk forwarding is ruled out; sharing one message is allowed but not built</td><td class="k">C3.7</td></tr>
+            <tr><td>Pin a message; save for me</td><td><span class="st built"><i></i>Built</span></td><td>Pins don't record who or when, and relatives can pin</td><td class="k">C1.7</td></tr>
+            <tr><td>Edit; delete for me; delete for everyone</td><td><span class="st part"><i></i>Partly</span></td><td>Edit off until an admin sets a window; delete is for everyone only</td><td class="k">C3.9</td></tr>
+            <tr><td>Clickable links; link previews</td><td><span class="st miss"><i></i>Missing</span></td><td>Links are plain text; automatic previews were ruled out</td><td class="k">C3.10</td></tr>
+            <tr><td>Report a concern about a message</td><td><span class="st miss"><i></i>Missing</span></td><td>The spec requires it</td><td class="k">C5.9</td></tr>
+            <tr><td>Select several messages</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.9</td></tr>
+            <tr><td>Load older messages on scroll</td><td><span class="st part"><i></i>Partly</span></td><td>A "Load earlier messages" button</td><td class="k">C2.7</td></tr>
+            <tr><td>Header tabs (Chat, Files, Pinned, Notes); search in chat; people</td><td><span class="st part"><i></i>Partly</span></td><td>Search and people built; files, pinned and saved in pop-ups</td><td class="k">C3.11</td></tr>
+
+            <tr class="grp"><td colspan="4">Writing a message</td></tr>
+            <tr><td>Formatting toolbar (bold, italic, underline, strikethrough, lists, quote, code, link)</td><td><span class="st miss"><i></i>Missing</span></td><td>Plain text box</td><td class="k">C3.12</td></tr>
+            <tr><td>Emoji shortcodes such as :smile:</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.5</td></tr>
+            <tr><td>GIFs and stickers</td><td><span class="st excl"><i></i>Ruled out</span></td><td>—</td><td class="k">C3.13 · D6</td></tr>
+            <tr><td>Attach menu: photos and videos, camera, document, voice, poll, contact, location</td><td><span class="st part"><i></i>Partly</span></td><td>Images, PDF and Office files only; no video, audio or camera</td><td class="k">C3.14</td></tr>
+            <tr><td>Paste images; drag and drop files</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.14</td></tr>
+            <tr><td>Photos as pictures; grid with "+2"; viewer with next and previous; video playback</td><td><span class="st miss"><i></i>Missing</span></td><td>File chips; the preview pop-up zooms one file</td><td class="k">C3.15</td></tr>
+            <tr><td>Voice notes inline (bin, timer, waveform, pause, send)</td><td><span class="st part"><i></i>Partly</span></td><td>Record in a pop-up, 2-minute limit, no waveform, hidden without a server tool</td><td class="k">C3.16</td></tr>
+            <tr><td>Polls</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.17</td></tr>
+            <tr><td>Scheduled send; important and urgent messages</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.18 C5.6</td></tr>
+            <tr><td>@mentions of people</td><td><span class="st built"><i></i>Built</span></td><td>People only; no @team or @on-shift</td><td class="k">C5.3</td></tr>
+            <tr><td>Quick replies and slash commands</td><td><span class="st miss"><i></i>Missing</span></td><td>The old page had quick replies</td><td class="k">C3.19</td></tr>
+            <tr><td>Drafts that survive a refresh</td><td><span class="st part"><i></i>Partly</span></td><td>Kept in the tab; server drafts are switched off</td><td class="k">C3.20</td></tr>
+            <tr><td>Offline queue and retry</td><td><span class="st part"><i></i>Partly</span></td><td>Duplicate-safe, but one waiting message at a time</td><td class="k">C2.7</td></tr>
+
+            <tr class="grp"><td colspan="4">Calls</td></tr>
+            <tr><td>Voice call one-to-one; group voice up to 8</td><td><span class="st built"><i></i>Built</span></td><td>Off by default; needs the LiveKit server</td><td class="k">C4.4</td></tr>
+            <tr><td>Video calls; screen share</td><td><span class="st excl"><i></i>Ruled out</span></td><td>The call pass allows the microphone only</td><td class="k">C4.4 C4.5 · D3</td></tr>
+            <tr><td>Calls page across all chats (recent, missed, favourites, start call)</td><td><span class="st miss"><i></i>Missing</span></td><td>History per conversation in a pop-up</td><td class="k">C4.6</td></tr>
+            <tr><td>Ringback for the caller; decline with a message; missed-call push</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C4.7</td></tr>
+            <tr><td>Hold and transfer; call links; raise hand; in-call chat</td><td><span class="st miss"><i></i>Missing</span></td><td>Call links ruled out for family</td><td class="k">C4.7–C4.9</td></tr>
+            <tr><td>Mute, mic and speaker choice, pre-call check, quality signal</td><td><span class="st built"><i></i>Built</span></td><td>Keep</td><td class="k">C4.10</td></tr>
+
+            <tr class="grp"><td colspan="4">Notifications</td></tr>
+            <tr><td>Bell, sounds, do not disturb, availability</td><td><span class="st built"><i></i>Built</span></td><td>The bell gets one entry per message</td><td class="k">C1.4</td></tr>
+            <tr><td>Pop-up for a new message while on another page; browser tab count</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.21</td></tr>
+            <tr><td>Browser push with the tab closed</td><td><span class="st part"><i></i>Partly</span></td><td>Built but can't be switched on for chat in settings</td><td class="k">C2.3</td></tr>
+            <tr><td>Quiet hours on a schedule; email digest</td><td><span class="st part"><i></i>Partly</span></td><td>Manual quiet switch; email shows "not available yet"</td><td class="k">C3.21</td></tr>
+
+            <tr class="grp"><td colspan="4">Teams-style organisation</td></tr>
+            <tr><td>Site channels</td><td><span class="st part"><i></i>Partly</span></td><td>Managers create site channels only; one member's Site change can hide the channel from others</td><td class="k">C1.9</td></tr>
+            <tr><td>Teams, announcement channels, @team and @everyone</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C1.9 C5.3</td></tr>
+            <tr><td>Quick views: Mentions, Saved, Drafts, Followed threads</td><td><span class="st part"><i></i>Partly</span></td><td>Mentions chip and Saved list only</td><td class="k">C3.1</td></tr>
+            <tr><td>Recap or AI summary</td><td><span class="st excl"><i></i>Ruled out</span></td><td>—</td><td class="k">C5.13 · D10</td></tr>
+            <tr><td>Keyboard shortcuts and help sheet</td><td><span class="st part"><i></i>Partly</span></td><td>Enter, Escape, one call shortcut</td><td class="k">C3.22</td></tr>
+
+            <tr class="grp"><td colspan="4">Family</td></tr>
+            <tr><td>Family home, inbox, callbacks, reply promise, urgent help</td><td><span class="st built"><i></i>Built</span></td><td>Oblivion-only; keep</td><td class="k">C6.1</td></tr>
+            <tr><td>"Seen by care team"; who is caring today</td><td><span class="st miss"><i></i>Missing</span></td><td>A generic banner</td><td class="k">C6.2</td></tr>
+            <tr><td>Emoji, reactions, photos for family</td><td><span class="st part"><i></i>Partly</span></td><td>Same limits as staff</td><td class="k">C6.3</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><b>Emoji were never removed.</b> The 21 October "icons instead of emoji" change only replaced emoji used as decoration on family portal pages (DESIGN.md: no emoji as icons). The reaction code was untouched; the new screen simply never got a picker. Emoji in messages, reactions and the picker are content, not icons, and the plan adds that distinction to DESIGN.md (C0.4).</div>
+    </section>
+
+    <section id="licences">
+      <h2>Outside code and licences</h2>
+      <p class="sub">Everything Chat brought in from outside Oblivion, what it does, and what replaces it.</p>
+      <div class="grid2">
+        <div class="card">
+          <h4>What the audit found</h4>
+          <ul class="find">
+            <li><b>No pasted code.</b> None of the 542 chat files carries an outside copyright notice, an "adapted from" note or copied snippets. The call-token, server and webhook code was written from LiveKit's public documentation, not copied from its kits.</li>
+            <li><b>Two config files follow upstream templates:</b> <code>config/reverb.php</code> (Reverb's own published config, MIT, meant to be copied) and <code>livekit.yaml.example</code> (a 38-line subset of LiveKit's sample). Both are rewritten in the clean room.</li>
+            <li><b>Codex read the source of the libraries it used</b> (livekit-client, Reverb, Pusher, the web-push library) while debugging. For a strict clean room, those engines are rebuilt by sessions that never saw that source.</li>
+            <li><b>No copyleft code is linked into Chat.</b> ClamAV (GPL) and ffprobe (LGPL/GPL) run as separate programs. The PDF export uses dompdf (LGPL), which 20+ other screens already use.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Gaps to fix whatever you decide</h4>
+          <ul class="find">
+            <li>Three small MIT parts bundled inside livekit-client and pusher-js (ts-debounce, @stablelib/base64, @stablelib/utf8) are missing from the notices file.</li>
+            <li>The libraries compiled into the LiveKit server program were never listed.</li>
+            <li><code>composer.json</code> still names the project <code>laravel/react-starter-kit</code> with <code>"license": "MIT"</code>, from the starter kit. For "fully Oblivion's" it becomes <code>oblivion/care</code>, <code>"proprietary"</code>.</li>
+            <li><code>firebase/php-jwt</code> is used directly but only installed because sign-in needs it.</li>
+            <li>The <code>ws</code> package is unused and can go.</li>
+            <li>The spec and status file say "no clean-room engine replacement is authorised" (your 16 October choice). That line is updated once you decide D1.</li>
+          </ul>
+        </div>
+      </div>
+      <h3>Outside engines Chat runs on</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Outside part</th><th>What it does in Chat</th><th>Licence</th><th>Runs</th><th>Oblivion-owned replacement</th><th>Size</th></tr></thead>
+          <tbody>
+            <tr><td>livekit-client 2.22.4, with 12 bundled helpers</td><td>Joins voice calls in the browser</td><td>Apache-2.0; helpers MIT, BSD, 0BSD; machina MIT or GPL (we take MIT)</td><td>Browser</td><td>Oblivion Calls client on the browser's own WebRTC</td><td><span class="size">L</span></td></tr>
+            <tr><td>LiveKit server 1.13.10</td><td>Relays call audio; firewall relay (TURN)</td><td>Apache-2.0</td><td>Own server</td><td>Oblivion call signalling over Oblivion Live; direct peer-to-peer media; a relay for firewalls (D4)</td><td><span class="size">L</span>–<span class="size">XL</span></td></tr>
+            <tr><td>pusher-js 8.6.0, with tweetnacl and @stablelib</td><td>Holds the live-update connection</td><td>MIT, Unlicense</td><td>Browser</td><td>Oblivion Live client</td><td><span class="size">S</span></td></tr>
+            <tr><td>laravel/reverb 1.12, with pusher-php-server, Ratchet, 7 ReactPHP parts, evenement, 2 clue parts</td><td>Live-update server</td><td>MIT</td><td>Own process</td><td>Oblivion Live gateway with its own event model</td><td><span class="size">M</span>–<span class="size">L</span></td></tr>
+            <tr><td>minishlink/web-push 10.1, with web-token, spomky-labs, brick/math</td><td>Encrypts and signs browser push (also medication alerts)</td><td>MIT</td><td>PHP</td><td>Oblivion push sender written from the web-push standards (RFC 8291 and 8292), app-wide</td><td><span class="size">M</span></td></tr>
+            <tr><td>firebase/php-jwt 7.0.5</td><td>Signs call passes; checks call-server messages</td><td>BSD-3-Clause</td><td>PHP</td><td>Goes with LiveKit; a small Oblivion signer for Live tickets</td><td><span class="size">S</span></td></tr>
+            <tr><td>ffprobe (FFmpeg)</td><td>Checks voice-note files</td><td>LGPL or GPL, separate program</td><td>Server tool</td><td>Oblivion voice-note checker for the formats browsers record; ffprobe optional</td><td><span class="size">M</span></td></tr>
+            <tr><td>ClamAV</td><td>Virus-scans uploads (app-wide)</td><td>GPL-2.0, separate program</td><td>Server tool</td><td>Keep as a separate standard tool; scanning moves off the upload request</td><td><span class="size">—</span></td></tr>
+            <tr><td>dompdf</td><td>Investigator PDF export (and 20+ other screens)</td><td>LGPL-2.1</td><td>PHP</td><td>App-wide question, not chat; keep for now</td><td><span class="size">—</span></td></tr>
+            <tr><td>ws 8.22</td><td>Nothing (unused test helper)</td><td>MIT</td><td>—</td><td>Remove</td><td><span class="size">S</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="engine">
+      <h2>Under the hood</h2>
+      <p class="sub">What the server side does well, and what has to change before Chat can be switched on for everyone.</p>
+      <div class="grid2">
+        <div class="card">
+          <h4>Won't scale</h4>
+          <ul class="find">
+            <li>The conversation list loads every conversation and runs about 100–200 queries for each 20-person group, so thousands per request. It is refetched every 10–30 seconds and on every live update.</li>
+            <li>One database lock per conversation covers sending, reading, marking read, drafts, uploads and deliveries. One message in a 200-person channel queues hundreds of jobs on one row.</li>
+            <li>A live update says only "refresh", with no conversation, so every open tab refetches everything.</li>
+            <li>About 25–30 requests a minute per open tab; at 300 staff that is 125–150 requests a second. The presence heartbeat locks the user row every 15 seconds.</li>
+            <li>Two background jobs run every 10 seconds even with Chat off: about 17,000 runs a day.</li>
+            <li>Search scans text with no index. Nothing is ever pruned: the change log, deliveries and one bell entry per message per person grow forever.</li>
+            <li>The live-update server is a single node capped at 1,000 connections, files sit on the web server's disk, and virus scans run inside the upload request for up to 30 seconds.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Bugs and risks</h4>
+          <ul class="find">
+            <li><b>Reactions:</b> the database treats most emoji as the same character, so a person can only hold one reaction and removing one can remove another.</li>
+            <li><b>Off-duty messages</b> are pushed back every 5 minutes forever, then arrive in a burst.</li>
+            <li><b>The bell floods:</b> one entry per message, and reading the conversation doesn't clear them.</li>
+            <li><b>Cover staff</b> see the whole history counted as unread.</li>
+            <li><b>One member moving Site can hide a whole group</b> from everyone else, so organisation-wide channels can't work.</li>
+            <li><b>Hard-coded limits</b> (20 MB, 7 call invites) ignore the settings.</li>
+            <li><b>Investigators grant themselves access</b>, with no second approver.</li>
+            <li><b>Set-up traps:</b> files silently fail without the virus scanner, voice notes vanish without the voice checker, edit is off, calls are off.</li>
+            <li><b>Too much machinery for the value:</b> about ten separate duplicate-request schemes, four near-identical delivery queues, unused columns and about 4,700 lines of the old chat kept alive.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="surfaces">
+      <h2>Where chat shows up</h2>
+      <p class="sub">Every place in the app that opens, counts or notifies about chat. Each one moves to the new design in stage 8.</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Where</th><th>File</th><th>Opens</th><th>Who</th><th>Plan</th></tr></thead>
+          <tbody>
+            <tr><td>Sidebar "Chat" with unread count</td><td class="k">app-sidebar.tsx:605</td><td>/chat, or the old page</td><td>Staff</td><td class="k">C7.2</td></tr>
+            <tr><td>Header chat button</td><td class="k">app-header.tsx:219</td><td>Always the old page</td><td>Staff</td><td class="k">C7.1</td></tr>
+            <tr><td>Chat button in staff page headers</td><td class="k">staff-page-shell.tsx:205</td><td>720 px side sheet with the whole workspace</td><td>Staff</td><td class="k">C7.3</td></tr>
+            <tr><td>Chat page and My Chat preferences</td><td class="k">pages/chat/</td><td>Workspace, preferences</td><td>Staff</td><td class="k">C3.*</td></tr>
+            <tr><td>Family inbox, Calls, Saved, Invitations buttons</td><td class="k">chat-workspace.tsx:620</td><td>Panels and pop-ups</td><td>Staff</td><td class="k">C3.1 C4.6</td></tr>
+            <tr><td>Client profile family chat</td><td class="k">clients/show.tsx:2218</td><td>Drawer, or the old pop-up that checks every 8 s</td><td>Staff</td><td class="k">C7.4</td></tr>
+            <tr><td>eMAR "message lead"</td><td class="k">emar/record-dose/dialogs.tsx:202</td><td>Side sheet</td><td>Staff</td><td class="k">C7.3</td></tr>
+            <tr><td>Control Room messaging</td><td class="k">control-room/messaging.tsx:558</td><td>Side sheet, direct chats</td><td>Operators</td><td class="k">C7.3</td></tr>
+            <tr><td>End-of-shift and off-duty handover</td><td class="k">end-of-shift-checklist.tsx:540</td><td>Side sheet</td><td>Staff</td><td class="k">C5.5</td></tr>
+            <tr><td>Call bar and incoming call</td><td class="k">app.tsx:98 → chat-calling.tsx</td><td>Over every page</td><td>Everyone</td><td class="k">C7.6</td></tr>
+            <tr><td>Portal sidebar "Chat"</td><td class="k">app-sidebar.tsx:484</td><td>First person's messages</td><td>Family</td><td class="k">C7.2</td></tr>
+            <tr><td>Portal messages pages</td><td class="k">/portal/clients/{id}/messages</td><td>Workspace, or the old portal page</td><td>Family</td><td class="k">C6.1 C7.10</td></tr>
+            <tr><td>Family dashboard chat, call and callback buttons</td><td class="k">family-dashboard.tsx:1931</td><td>Chat, calls, callbacks</td><td>Family</td><td class="k">C7.5</td></tr>
+            <tr><td>Notifications page and bell</td><td class="k">chat-notice-card.tsx:185</td><td>/chat/notifications/{id}</td><td>Everyone</td><td class="k">C7.7</td></tr>
+            <tr><td>Browser push</td><td class="k">public/sw.js:217</td><td>/chat/notifications/{id}</td><td>Can't be switched on yet</td><td class="k">C2.3 C7.7</td></tr>
+            <tr><td>Settings › Chat and Chat investigations</td><td class="k">layouts/settings/layout.tsx:58</td><td>Settings pages (shown even with Chat off)</td><td>Admins; investigators</td><td class="k">C7.8</td></tr>
+            <tr><td>Notification preferences and role defaults</td><td class="k">settings/notification-catalog.ts</td><td>Chat events (Email and Push are placeholders)</td><td>Everyone; admins</td><td class="k">C7.9</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="keep">
+      <h2>What to keep</h2>
+      <p class="sub">These parts are already Oblivion-specific and well built. The rebuild keeps their behaviour and gives them the new look.</p>
+      <div class="grid3">
+        <div class="card"><h4>Family care</h4><ul class="find"><li>Named worker with care-team cover</li><li>Family inbox: needs reply, assigned to me, waiting on family, callbacks, resolved</li><li>Claim, reassign and hand over family work</li><li>Reply promise that follows working hours and holidays</li><li>Callback requests from request to done</li><li>Urgent help with "Chat is not for emergencies"</li><li>Relatives agree before another relative joins</li></ul></div>
+        <div class="card"><h4>Records and privacy</h4><ul class="find"><li>Messages stay tied to the right client and history limits</li><li>Check of who will read a family message before the first one</li><li>Call record saved to the client's notes</li><li>File saved to the client's photos or documents</li><li>Edit history kept encrypted</li><li>Investigations, preservation holds, offboarding</li><li>Push carries no message text or client details</li></ul></div>
+        <div class="card"><h4>Reliability</h4><ul class="find"><li>Sending can't create duplicates; "checking whether it sent"</li><li>Delivery queue written with the message</li><li>Virus scan that fails closed; safe file serving</li><li>Call rules: first available care-team member answers, people who lose access are removed</li><li>Session timeout that ignores background checks</li><li>Settings per Site with an audit trail</li><li>The test suite</li></ul></div>
+      </div>
+    </section>
+
+    <section id="unique">
+      <h2>Making it Oblivion's own</h2>
+      <p class="sub">Features that only a care platform can offer, because Chat sits next to the roster, the client record, eMAR and incidents. Each one has a plan item in stage 6 or 7.</p>
+      <div class="uniq">
+        <div class="card"><h4><span class="lens" aria-hidden="true">1</span>Live care cards</h4><p>Paste or attach an Oblivion record and it shows as a small live card: client, incident, shift, handover, medication round, task, open shift, leave request, vehicle booking, maintenance job, IT ticket, risk assessment, checklist, calendar event or family note. Each reader sees only what they're allowed to; a restricted card says "You can't open this record".</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">2</span>Turn a message into work</h4><p>From any message: create a task, start an incident report, add a shift note or family note, log a maintenance job or IT ticket, or add a calendar event. The new record links back to the message and the message shows the card.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">3</span>Shift-aware mentions</h4><p><b>@on-shift Kōwhai House</b> reaches whoever is rostered or clocked in right now; <b>@house-lead</b> and <b>@on-call</b> use the on-call rules eMAR already has. Before sending, a chip shows exactly who it will reach.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">4</span>Read and confirm</h4><p>Important safety updates ask each person on shift to confirm they've read them. A ring closes as people confirm; anyone who hasn't is reminded, then their lead. Urgent messages can reach people on shift during quiet hours.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">5</span>Privacy check before family</h4><p>Before a message goes to family, Chat checks it: does it name another person supported, attach a photo without photo consent, or share health details the family's portal access doesn't include? The writer can edit or send with a reason, which is logged. Built for the Privacy Act 2020 and the Health Information Privacy Code.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">6</span>Shift handover in chat</h4><p>At clock-out, a card lists open family threads, unanswered mentions and tasks to hand over. At the next shift, the site channel shows "Since your last shift": what was said, decided and still open.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">7</span>Roster-driven channels</h4><p>Site channels add and remove people from the roster and Site assignment, so nobody has to manage membership. Announcement channels let managers post and staff react, confirm or ask in a thread.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">8</span>Te reo Māori and NZ identity</h4><p>The chat screens in te reo Māori (the app already has the language switch), emoji search in te reo ("aroha" finds <span class="e">❤️</span>), an easy macron helper, and an Oblivion sticker set drawn in the Journey style: Kia ora, Ka pai, Ngā mihi, Mōrena, Kia kaha.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">9</span>The signature, not a WhatsApp clone</h4><p>Rings tell the state: a ring for on shift, dashed for on leave, and delivery shown as a ring that closes from sending to read, always with a word beside it. The horizon line on floating panels, lenses for file types, and the islands only for empty chats.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">10</span>Family who can see who's caring</h4><p>Family conversations show who's caring for their person today and next, "Seen by care team", and the reply promise as a ring that closes. Visit and callback requests appear as cards with their status.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">11</span>Lone-work check-in</h4><p>On an outing, a worker can share their live location in a chat until they tap "I'm back", using the lone-worker rules already in the app.</p></div>
+        <div class="card"><h4><span class="lens" aria-hidden="true">12</span>Careful helpers (optional)</h4><p>Off by default, with a switch per feature: catch-up summary of a long thread (only what the reader may see), a warm plain-language draft reply to family that staff must review, voice-note transcripts, and translation for families who prefer another language. Uses the app's existing AI settings.</p></div>
+      </div>
+    </section>
+
+    <section id="cleanroom">
+      <h2>Clean-room rebuild</h2>
+      <p class="sub">How the outside engines are replaced with Oblivion's own code without carrying anyone else's code across.</p>
+      <div class="grid2">
+        <div class="card">
+          <h4>What "fully Oblivion's" covers</h4>
+          <ul class="find">
+            <li><b>Oblivion owns:</b> every part of Chat in Oblivion's code: the screens, the chat server logic, the live-update engine, the call engine, the push sender, the voice-note checker, the emoji list and the stickers.</li>
+            <li><b>The platform it runs on stays</b>, as it does for every product: PHP, Laravel, React, Tailwind, Radix, lucide, MySQL, Node.js and the browser's built-in calling and push. These use permissive licences; their notices stay.</li>
+            <li><b>Standard separate tools stay separate:</b> the virus scanner, the push services run by Google, Mozilla and Apple, and (unless D4 says otherwise) a firewall relay for calls.</li>
+            <li>Code written by AI tools: ownership of AI-written code isn't settled law everywhere. Ask a lawyer to confirm Oblivion's position before you rely on it commercially.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>The method</h4>
+          <ol class="find">
+            <li><b>Register:</b> one list of every outside part, its licence and where it's used, kept in the repo.</li>
+            <li><b>Specs from public standards only:</b> WebSocket (RFC 6455), web push (RFC 8291, 8292), calling (W3C WebRTC, RFC 8445, 8829), firewall relay (RFC 8656), Unicode emoji data, plus Oblivion's own behaviour specs written from today's tests and screens.</li>
+            <li><b>Separate builders:</b> the sessions that write the new engines get the specs and Oblivion's code only. They may not open the replaced libraries' source or repositories, and each one writes a provenance note.</li>
+            <li><b>Independent check:</b> a different session compares the new code with the replaced libraries' source and records the result.</li>
+            <li><b>Remove and guard:</b> uninstall the packages, update the notices page, and add a check that stops them coming back.</li>
+            <li><b>Sign off</b> each engine in the register.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section id="plan">
+      <h2>The plan, stage by stage</h2>
+      <p class="sub">Ten stages, in order. Sizes: <span class="size">S</span> a day or less, <span class="size">M</span> a few days, <span class="size">L</span> one to two weeks, <span class="size">XL</span> more. Chat stays switched off for staff until stage 2 is done.</p>
+      <ol class="path">
+        <li class="phase first">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 0</span><h3>Decide and set up</h3></div>
+            <p class="ph-why">Your decisions, the clean-room register, and design rules before anything is built.</p>
+            <ul class="items">
+              <li><span class="id">C0.1</span><span>Decisions answered 22 October; update the spec's 16 October "keep LiveKit" line to match.</span><span class="size">S</span></li>
+              <li><span class="id">C0.2</span><span>Third-party register, provenance note template and builder rules for the clean room.<small>Fix the notice gaps, rename the project in composer.json, drop <code>ws</code>.</small></span><span class="size">S</span></li>
+              <li><span class="id">C0.3</span><span>Stop the two 10-second background jobs while Chat is off.</span><span class="size">S</span></li>
+              <li><span class="id">C0.4</span><span>DESIGN.md chat rules: emoji are content (allowed in messages, reactions and the picker), never icons; bubble, header and composer rules; this audit's mistakes as named anti-patterns with ESLint checks where possible.</span><span class="size">S</span></li>
+            </ul>
+            <p class="done"><b>Done when</b> every decision has an answer and the register exists.</p>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 1</span><h3>Design: mockups you approve</h3></div>
+            <p class="ph-why">Your rule: build only approved mockups. The first drawings are already in the design viewer under "Chat v3 — proposed rebuild".</p>
+            <ul class="items">
+              <li><span class="id">C1.0a</span><span>Workspace: conversation list with sections, compact header with tabs, a message area that fills the screen, grouped bubbles, reactions, photos, voice notes, care cards, read rings.</span><span class="size">M</span></li>
+              <li><span class="id">C1.0b</span><span>Writing: emoji picker, reaction bar, stickers, formatting toolbar, attach menu, inline voice recording, slash commands, @on-shift.</span><span class="size">M</span></li>
+              <li><span class="id">C1.0c</span><span>Message menus, Message info, share, threads, pinned bar, important and urgent, polls, multi-select.</span><span class="size">M</span></li>
+              <li><span class="id">C1.0d</span><span>Oblivion-only screens, calls (page, incoming, video grid, dock) and the family portal.</span><span class="size">M</span></li>
+              <li><span class="id">C1.0e</span><span>Every pop-up and state on the pop-up kit (480, 720, 900 widths), light and dark, compared with the existing chat boards.</span><span class="size">M</span></li>
+            </ul>
+            <p class="done"><b>Done when</b> you've marked each board approved or changed.</p>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 2</span><h3>Engine fixes</h3></div>
+            <p class="ph-why">Invisible work that has to land before Chat can be on for everyone.</p>
+            <ul class="items">
+              <li><span class="id">C1.1</span><span>Page the conversation list; build rows in batches; cache settings.</span><span class="size">M</span></li>
+              <li><span class="id">C1.2</span><span>No conversation lock on reading, marking read, drafts or sync.</span><span class="size">M</span></li>
+              <li><span class="id">C1.3</span><span>One delivery queue instead of four; one duplicate-request helper instead of ten.</span><span class="size">M</span></li>
+              <li><span class="id">C1.4</span><span>One bell entry per conversation, cleared when read; off-duty messages wait until the next shift once, then arrive as a summary.</span><span class="size">M</span></li>
+              <li><span class="id">C1.5</span><span>Pruning and retention for the change log, deliveries, call events and chat notifications.</span><span class="size">M</span></li>
+              <li><span class="id">C1.6</span><span>Fix reactions in the database: any emoji, several per person, who reacted.</span><span class="size">S</span></li>
+              <li><span class="id">C1.7</span><span>Cover staff unread counts; limits follow settings; pins record who and when, with a permission.</span><span class="size">S</span></li>
+              <li><span class="id">C1.8</span><span>A search index with permissions applied in the query.</span><span class="size">L</span></li>
+              <li><span class="id">C1.9</span><span>Channel rules: members from Site, role, team or roster; no lockout when one person moves Site; announcement channels; teams.</span><span class="size">L</span></li>
+              <li><span class="id">C1.10</span><span>Virus scanning after upload, with a visible "checking" state.</span><span class="size">M</span></li>
+              <li><span class="id">C1.11</span><span>Set-up warnings in Settings when the scanner, voice checker, live updates or push aren't ready.</span><span class="size">S</span></li>
+              <li><span class="id">C1.12</span><span>A setting for second-person approval of investigator access; it starts off, so self-grant with the audit log stays the default (D11).</span><span class="size">S</span></li>
+            </ul>
+            <p class="done"><b>Done when</b> a load test with 300 staff stays under target and every bug above has a test.</p>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 3</span><h3>Oblivion-owned engines (clean room)</h3></div>
+            <p class="ph-why">Replace the outside engines and give the browser one live connection instead of eight timers.</p>
+            <ul class="items">
+              <li><span class="id">C2.1</span><span><b>Oblivion Live</b>: Oblivion's own live-update gateway and browser client. Signed tickets from the app, events per conversation with a sequence number, catch-up after reconnecting, typing, presence and call signalling.</span><span class="size">L</span></li>
+              <li><span class="id">C2.2</span><span>One sync loop in the browser replacing about eight separate pollers.</span><span class="size">M</span></li>
+              <li><span class="id">C2.3</span><span>Oblivion push sender from the web-push standards (also used by medication alerts); push for chat can be switched on in Settings.</span><span class="size">M</span></li>
+              <li><span class="id">C2.4</span><span>A small Oblivion signer for Live tickets; Chat stops using php-jwt.</span><span class="size">S</span></li>
+              <li><span class="id">C2.5</span><span>Oblivion voice-note checker for the formats browsers record; ffprobe becomes optional.</span><span class="size">M</span></li>
+              <li><span class="id">C2.6</span><span>Message model, one migration: message kinds (text, card, poll, sticker, call, system), formatted text stored as a document (never HTML), threads, priority, scheduled send, shared-from, pin details, link cache.</span><span class="size">L</span></li>
+              <li><span class="id">C2.7</span><span>New screen architecture: split the 2,937-line thread file and its neighbours into small parts; Oblivion's own long-list rendering; an offline outbox in the browser; older messages load on scroll.</span><span class="size">L</span></li>
+              <li><span class="id">C2.8</span><span>Remove pusher-js, Reverb and its parts, the web-push library and php-jwt from Chat; update the notices page; block their return.</span><span class="size">S</span></li>
+            </ul>
+            <p class="done"><b>Done when</b> the independent check finds no carried-over code and the register is signed off.</p>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 4</span><h3>Everyday messaging</h3></div>
+            <p class="ph-why">Everything people expect from WhatsApp and Teams, built to the approved boards.</p>
+            <ul class="items">
+              <li><span class="id">C3.1</span><span>Conversation list: sections, pin to top, filter chips, quick views (Mentions, Saved, Drafts, Followed threads), timed mute, draft and typing markers, right-click menu.</span><span class="size">M</span></li>
+              <li><span class="id">C3.2</span><span>Photos and on-shift rings for people; previews with the sender and the kind of message.</span><span class="size">S</span></li>
+              <li><span class="id">C3.3</span><span>Grouped messages, own messages on the right, a message area that fills the window, header and banners folded into one slim bar.</span><span class="size">M</span></li>
+              <li><span class="id">C3.4</span><span>Sent, delivered and read with Message info for staff; typing; presence.</span><span class="size">M</span></li>
+              <li><span class="id">C3.5</span><span>Emoji picker (search, categories, recent, skin tones, te reo keywords) and :shortcode: typing, built on Unicode's public emoji list with the computer's own emoji font.</span><span class="size">M</span></li>
+              <li><span class="id">C3.6</span><span>Reactions: quick bar of six, any emoji from the picker, who reacted; the admin can set the quick six.</span><span class="size">S</span></li>
+              <li><span class="id">C3.7</span><span>Hover action bar and right-click menu: react, reply, reply in thread, share, copy, pin, save, edit, turn into, Message info, report, delete.</span><span class="size">M</span></li>
+              <li><span class="id">C3.8</span><span>Threads beside the conversation, with follow and unread counts.</span><span class="size">L</span></li>
+              <li><span class="id">C3.9</span><span>Edit on by default for 15 minutes and delete for everyone for 1 hour (D9); delete for me; select several messages.</span><span class="size">S</span></li>
+              <li><span class="id">C3.10</span><span>Clickable links; Oblivion links become care cards; outside previews on by default with an admin switch, fetched by Oblivion's server behind a guard against internal addresses, oversized pages and redirects (D7).</span><span class="size">M</span></li>
+              <li><span class="id">C3.11</span><span>Header tabs: Chat, Files, Pinned, Notes; shared files and photos with filters.</span><span class="size">M</span></li>
+              <li><span class="id">C3.12</span><span>Oblivion's own formatting editor and toolbar (bold, italic, underline, strikethrough, lists, quote, code, link) with keyboard shortcuts.</span><span class="size">L</span></li>
+              <li><span class="id">C3.13</span><span>Oblivion stickers and an organisation library of stickers and GIFs (D6).</span><span class="size">M</span></li>
+              <li><span class="id">C3.14</span><span>Attach menu, paste images, drag and drop, camera, video and audio files.</span><span class="size">M</span></li>
+              <li><span class="id">C3.15</span><span>Photos as pictures, grids with "+2", a viewer with next and previous, video playback.</span><span class="size">M</span></li>
+              <li><span class="id">C3.16</span><span>Voice notes recorded inline with a live waveform, pause and send; playback speed kept.</span><span class="size">M</span></li>
+              <li><span class="id">C3.17</span><span>Polls.</span><span class="size">M</span></li>
+              <li><span class="id">C3.18</span><span>Scheduled send, including "at the start of my next shift".</span><span class="size">M</span></li>
+              <li><span class="id">C3.19</span><span>Quick replies set by the organisation; slash commands.</span><span class="size">S</span></li>
+              <li><span class="id">C3.20</span><span>Drafts kept across refreshes and devices (server drafts on).</span><span class="size">S</span></li>
+              <li><span class="id">C3.21</span><span>New-message pop-up on other pages, tab count, quiet hours on a schedule, email digest.</span><span class="size">M</span></li>
+              <li><span class="id">C3.22</span><span>Keyboard shortcuts (switch chat, edit last, search) and a shortcut help sheet.</span><span class="size">S</span></li>
+              <li><span class="id">C3.23</span><span>Compact desktop controls instead of 44 px touch buttons; plain-language copy throughout.</span><span class="size">S</span></li>
+              <li><span class="id">C3.24</span><span>Use the shared parts: EmptyState, LoadingState, StatusBadge, typography helpers, themed scrollbars, menus, popovers and tooltips; remove the blanket 44 px rules.</span><span class="size">M</span></li>
+              <li><span class="id">C3.25</span><span>Search results in the list column, with the conversation still open beside them.</span><span class="size">S</span></li>
+              <li><span class="id">C3.26</span><span>New chat in one step: a searchable people picker; group and channel choices on the same screen.</span><span class="size">M</span></li>
+              <li><span class="id">C3.27</span><span>Plain sending states: a faded bubble while sending, then "Not sent · Retry"; the duplicate check stays behind the scenes.</span><span class="size">S</span></li>
+            </ul>
+            <p class="done"><b>Done when</b> each board and the build match side by side at 1440 px in light and dark.</p>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 5</span><h3>Calls, Oblivion-owned</h3></div>
+            <p class="ph-why">Calls on the browser's own calling, with signalling over Oblivion Live.</p>
+            <ul class="items">
+              <li><span class="id">C4.1</span><span>Call engine layer, so the screens don't depend on any one engine (first, whatever D3 says).</span><span class="size">S</span></li>
+              <li><span class="id">C4.2</span><span>Oblivion call signalling over Oblivion Live.</span><span class="size">L</span></li>
+              <li><span class="id">C4.3</span><span>Firewall relay for calls (D4).</span><span class="size">M</span>–<span class="size">XL</span></li>
+              <li><span class="id">C4.4</span><span>Voice one-to-one and up to 8 people; video one-to-one and up to 4 (D3, D5).</span><span class="size">L</span></li>
+              <li><span class="id">C4.5</span><span>Screen share.</span><span class="size">M</span></li>
+              <li><span class="id">C4.6</span><span>Calls page across all chats: favourites, recent, missed, start a call.</span><span class="size">M</span></li>
+              <li><span class="id">C4.7</span><span>Ringback, decline with a message, missed-call push, hold and transfer within the care team.</span><span class="size">M</span></li>
+              <li><span class="id">C4.8</span><span>Call links for staff only, signed and expiring.</span><span class="size">M</span></li>
+              <li><span class="id">C4.9</span><span>In-call chat, raise hand, the browser's noise suppression, mini call bar while browsing.</span><span class="size">M</span></li>
+              <li><span class="id">C4.10</span><span>Keep the call record to notes, care-team ring group, pre-call check and quality signal; remove LiveKit.</span><span class="size">S</span></li>
+              <li><span class="id">C4.11</span><span>Call screens that look like calls: photo, name and timer, round controls, red hang-up; one-to-one calls named after the person, not "Voice call".</span><span class="size">M</span></li>
+            </ul>
+            <p class="done"><b>Done when</b> two-browser and four-browser calls pass on home and 4G networks, then LiveKit is uninstalled.</p>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 6</span><h3>Oblivion-only features</h3></div>
+            <p class="ph-why">The features in "Making it Oblivion's own".</p>
+            <ul class="items">
+              <li><span class="id">C5.1</span><span>Live care cards with a card for each record type, checking permission on every view.</span><span class="size">L</span></li>
+              <li><span class="id">C5.2</span><span>Turn a message into a task, incident report, shift note, family note, maintenance job, IT ticket or calendar event.</span><span class="size">M</span></li>
+              <li><span class="id">C5.3</span><span>@on-shift, @house-lead, @on-call, @team, with the audience shown before sending.</span><span class="size">M</span></li>
+              <li><span class="id">C5.4</span><span>Roster-driven site channels and announcement channels.</span><span class="size">M</span></li>
+              <li><span class="id">C5.5</span><span>Shift handover card at clock-out and "Since your last shift".</span><span class="size">M</span></li>
+              <li><span class="id">C5.6</span><span>Important and urgent messages; read and confirm with reminders through the existing escalation rules.</span><span class="size">M</span></li>
+              <li><span class="id">C5.7</span><span>Privacy check before a family message (other people named, photo consent, health details outside portal access).</span><span class="size">L</span></li>
+              <li><span class="id">C5.8</span><span>Te reo Māori chat screens, emoji keywords in te reo, macron helper, Oblivion sticker set.</span><span class="size">M</span></li>
+              <li><span class="id">C5.9</span><span>Report a concern from a message, including starting a safeguarding concern with the message attached.</span><span class="size">M</span></li>
+              <li><span class="id">C5.10</span><span>Signature details: on-shift rings, delivery rings, horizon line on panels, lenses, islands for empty chats (after the signature is approved).</span><span class="size">S</span></li>
+              <li><span class="id">C5.11</span><span>Lone-work live location card for outings.</span><span class="size">M</span></li>
+              <li><span class="id">C5.12</span><span>Chat items in My Day and All Tasks: family replies due, callbacks, read-and-confirm.</span><span class="size">M</span></li>
+              <li><span class="id">C5.13</span><span>Optional helpers: catch-up summary, draft reply, voice-note transcript, translation (D10).</span><span class="size">L</span></li>
+            </ul>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 7</span><h3>Family portal</h3></div>
+            <p class="ph-why">Families get the same chat parts in the family look.</p>
+            <ul class="items">
+              <li><span class="id">C6.1</span><span>Family chat on the new parts, in the family skin and family wording; keep home, callbacks and the reply promise. Urgent help says to call 111 in an emergency and uses the organisation's name, not Oblivion's.</span><span class="size">M</span></li>
+              <li><span class="id">C6.2</span><span>Who's caring today and next; "Seen by care team" (D8); the reply promise as a ring.</span><span class="size">M</span></li>
+              <li><span class="id">C6.3</span><span>Emoji, reactions, stickers, voice notes and photos for family.</span><span class="size">S</span></li>
+              <li><span class="id">C6.4</span><span>Visit and callback requests as cards with their status.</span><span class="size">M</span></li>
+              <li><span class="id">C6.5</span><span>Family video calls if D5 allows them.</span><span class="size">S</span></li>
+            </ul>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 8</span><h3>Everywhere chat appears</h3></div>
+            <p class="ph-why">Every entry point uses the same parts and goes to the same Chat.</p>
+            <ul class="items">
+              <li><span class="id">C7.1</span><span>Header chat button opens Chat (today it always opens the old page) with the same unread count as the sidebar.</span><span class="size">S</span></li>
+              <li><span class="id">C7.2</span><span>Sidebar Chat rows for staff and family read one shared unread count, moved out of the calling code.</span><span class="size">S</span></li>
+              <li><span class="id">C7.3</span><span>Side sheets (staff page headers, eMAR "message lead", Control Room) show one conversation, not the two-pane workspace squeezed to 720 px.</span><span class="size">M</span></li>
+              <li><span class="id">C7.4</span><span>Client profile family chat on the new parts, with an unread count on its button; the old 8-second pop-up goes.</span><span class="size">M</span></li>
+              <li><span class="id">C7.5</span><span>Family dashboard chat, call and callback buttons go to the family chat home.</span><span class="size">S</span></li>
+              <li><span class="id">C7.6</span><span>Call bar and incoming call float over the page instead of pushing it 420 px; one-click calls (D13); Answer and Decline colours (D15).</span><span class="size">M</span></li>
+              <li><span class="id">C7.7</span><span>Chat notifications use the app's notification row, group per conversation and get a Chat filter; push says who wrote (never the text) and shows the brand icon.</span><span class="size">M</span></li>
+              <li><span class="id">C7.8</span><span>Settings › Chat on the Fleet settings pattern (overview, switches, real date and time pickers, sticky save); "Enable Chat" shows the real state; My Chat preferences gets breadcrumbs and stops repeating Appearance.</span><span class="size">L</span></li>
+              <li><span class="id">C7.9</span><span>Real Email and Push switches for chat events in notification preferences and role defaults.</span><span class="size">S</span></li>
+              <li><span class="id">C7.10</span><span>Old Messages and portal messages URLs redirect to Chat once it is on (deleted in C8.3).</span><span class="size">S</span></li>
+            </ul>
+          </div>
+        </li>
+        <li class="phase">
+          <div class="card">
+            <div class="ph-h"><span class="ph-n">Stage 9</span><h3>Switch over, prove it, retire the old chat</h3></div>
+            <p class="ph-why">Turn it on Site by Site, check everything, then delete the old pages.</p>
+            <ul class="items">
+              <li><span class="id">C8.1</span><span>Move old reactions and pins into the new model.</span><span class="size">S</span></li>
+              <li><span class="id">C8.2</span><span>Switch on Site by Site on oblivionfindings.com, then for everyone.</span><span class="size">S</span></li>
+              <li><span class="id">C8.3</span><span>Delete the old Messages, portal messages and client family chat pages and controllers (about 4,700 lines).</span><span class="size">M</span></li>
+              <li><span class="id">C8.4</span><span>Walk every board against the build at 1440 px, light and dark.</span><span class="size">M</span></li>
+              <li><span class="id">C8.5</span><span>Accessibility: keyboard, screen reader and contrast checks on every screen.</span><span class="size">M</span></li>
+              <li><span class="id">C8.6</span><span>Load test (300 staff, 50 conversations each) and security and privacy review: family vs staff, Site scope, push, link fetching.</span><span class="size">M</span></li>
+              <li><span class="id">C8.7</span><span>Clean-room sign-off: similarity check, licence scan, register complete.</span><span class="size">M</span></li>
+              <li><span class="id">C8.8</span><span>A short staff guide and family help page.</span><span class="size">S</span></li>
+              <li><span class="id">C8.9</span><span>Rewrite the chat tests with the screens (68 files assert today's wording), plus tests for every bug in stage 2.</span><span class="size">L</span></li>
+            </ul>
+            <p class="done"><b>Done when</b> the old chat is gone and every check above is recorded.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section id="decisions">
+      <h2>Decisions for you</h2>
+      <p class="sub">All fifteen were decided on 22 October. Two differ from my recommendation: outside link previews are on by default (D7), and second-person approval for investigators is a setting that starts off (D11).</p>
+      <div class="dec">
+        <div class="card"><span class="id">D1</span><div><h4>How far does "Oblivion's own" go?</h4><p><span class="rec">Recommended:</span> replace every chat-specific outside engine (live updates, calls, push, voice checker) with Oblivion's own code through the clean room; keep the platform (Laravel, React and the rest) and standard separate tools.</p><p>Other options: also build Oblivion's own firewall relay; or keep the permissive libraries and only fix the notices.</p><p><span class="tag ok">Decided 22 Oct</span> Replace the chat engines; the platform and virus scanner stay.</p></div></div>
+        <div class="card"><span class="id">D2</span><div><h4>Live updates</h4><p><span class="rec">Recommended:</span> Oblivion Live, Oblivion's own gateway. Alternative: keep Reverb (MIT, made by the Laravel team) and only write our own client and event model.</p><p><span class="tag ok">Decided 22 Oct</span> Oblivion Live (part of "replace the chat engines").</p></div></div>
+        <div class="card"><span class="id">D3</span><div><h4>Calls</h4><p><span class="rec">Recommended:</span> Oblivion's own calls on the browser's built-in calling: voice up to 8 people, video up to 4, screen share. Alternative: keep LiveKit behind the new call layer and add video there.</p><p><span class="tag ok">Decided 22 Oct</span> Oblivion's own calls with video and screen share.</p></div></div>
+        <div class="card"><span class="id">D4</span><div><h4>Firewall relay for calls</h4><p><span class="rec">Recommended:</span> run coturn (BSD licence) as a separate standard server, like the virus scanner, now; decide later whether to write Oblivion's own. Alternative: build our own relay from the start (much more work and a network service to secure).</p><p><span class="tag ok">Decided 22 Oct</span> coturn as a separate standard server (you chose not to build our own relay).</p></div></div>
+        <div class="card"><span class="id">D5</span><div><h4>Video with family</h4><p><span class="rec">Recommended:</span> yes for one-to-one family video calls with the care team, off by default per Site. The October spec ruled video out.</p><p><span class="tag ok">Decided 22 Oct</span> Yes, one-to-one with the care team, off by default per Site.</p></div></div>
+        <div class="card"><span class="id">D6</span><div><h4>GIFs</h4><p><span class="rec">Recommended:</span> no outside GIF service (they see who is chatting and can show unsuitable content); Oblivion stickers plus a library the organisation uploads. Alternative: allow a GIF service, off by default.</p><p><span class="tag ok">Decided 22 Oct</span> Oblivion stickers and the organisation's own library; no outside GIF service.</p></div></div>
+        <div class="card"><span class="id">D7</span><div><h4>Previews of outside websites</h4><p><span class="rec">Recommended:</span> off by default, admin switch; Oblivion links always become care cards.</p><p><span class="tag ok">Decided 22 Oct</span> On by default; an admin can switch it off. Oblivion's server fetches the preview behind a guard that refuses internal addresses, oversized pages and redirects to them, so the reader's browser never contacts the site.</p></div></div>
+        <div class="card"><span class="id">D8</span><div><h4>Read status</h4><p><span class="rec">Recommended:</span> per person for staff; family see "Seen by care team" rather than which worker read it.</p><p><span class="tag ok">Decided 22 Oct</span> As recommended.</p></div></div>
+        <div class="card"><span class="id">D9</span><div><h4>Edit and delete windows</h4><p><span class="rec">Recommended:</span> edit for 15 minutes, delete for everyone for 1 hour, always kept in the encrypted history; admins can change both.</p><p><span class="tag ok">Decided 22 Oct</span> As recommended.</p></div></div>
+        <div class="card"><span class="id">D10</span><div><h4>AI helpers in chat</h4><p><span class="rec">Recommended:</span> plan them, off by default, a switch per feature and per Site, using the existing AI settings; nothing sent for family translation without consent.</p><p><span class="tag ok">Decided 22 Oct</span> Plan them, off by default.</p></div></div>
+        <div class="card"><span class="id">D11</span><div><h4>Investigator access</h4><p><span class="rec">Recommended:</span> a second person approves each grant (today the investigator grants themselves).</p><p><span class="tag ok">Decided 22 Oct</span> A setting. The default keeps self-grant with the separate audit log; an organisation can switch on second-person approval.</p></div></div>
+        <div class="card"><span class="id">D12</span><div><h4>Signature on chat</h4><p><span class="rec">Recommended:</span> draw chat with the signature (rings, horizon line, lenses) as the boards do; it ships when you approve the signature for the whole app.</p><p><span class="tag ok">Decided 22 Oct</span> As recommended.</p></div></div>
+        <div class="card"><span class="id">D13</span><div><h4>Microphone test before calls</h4><p><span class="rec">Recommended:</span> one-click calls; the microphone check runs only when the browser reports a problem, and stays available in My Chat preferences.</p><p><span class="tag ok">Decided 22 Oct</span> As recommended.</p></div></div>
+        <div class="card"><span class="id">D14</span><div><h4>A full-height Chat page</h4><p><span class="rec">Recommended:</span> add a DESIGN.md exception: Chat uses the page kit's Workspace template at full height with the breadcrumb strip, and no Event Horizon header band, as in every chat app.</p><p><span class="tag ok">Decided 22 Oct</span> As recommended.</p></div></div>
+        <div class="card"><span class="id">D15</span><div><h4>Answer and decline buttons</h4><p><span class="rec">Recommended:</span> Answer in the primary colour with a phone icon, Decline in the destructive red, as DESIGN.md asks (green is a status colour, not a button colour). Codex's mockup used green.</p><p><span class="tag ok">Decided 22 Oct</span> As recommended.</p></div></div>
+      </div>
+    </section>
+
+    <footer>
+      <p>Sources: code audit of commits <code>faeb9435c</code> and <code>e800571ff</code>; the Codex session log; DESIGN.md and the Slate design viewer; a walk through the live Chat on oblivionfindings.com at 1440 × 900 as Demo Admin. No code was changed for this audit.</p>
+    </footer>
+  </main>
+</div>
