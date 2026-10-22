@@ -45,6 +45,7 @@
 
 - RFC 8291 Appendix A: the 86-byte header, the ciphertext and the full 144-byte section 5 body match byte for byte. (Section 5's `Content-Length: 145` is one more than the body it shows; the bytes, not that header, are what the test compares.)
 - The RFC 8292 section 2.4 example token verifies with the tests' R ‖ S handling.
+- 23 October, before removal: `tests/Unit/Push`, all of `tests/Unit/Chat`, `tests/Feature/PushNotificationsWebPushTest.php`, `tests/Feature/Chat/ChatBrowserPushTest.php` and `tests/Feature/Chat/ChatBrowserDeviceTest.php` gave 264 passed and 1 failed. The failure was the new `webpush:vapid --show` test reading Windows `\r\n` output; it was fixed in `b17dad5da`. After `composer remove minishlink/web-push` (which dropped exactly web-push, jwt-library, base64url and pki-framework, changing no other package), the same set plus `PushPackageGuardTest` gave 268 passed, 0 failed (1,243 assertions).
 
 ## Open questions
 
