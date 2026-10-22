@@ -189,7 +189,7 @@ jobs:
           tests/Feature/Emar/ActualAbsenceLifecycleTest.php
           tests/Feature/Emar/AwayDosesTest.php
           tests/Unit/Support/MedicationWorkflowDefaultsTest.php
-          tests/Feature/Emar/GuidedRoundOfflineReplayTest.php
+          tests/Feature/Emar/MedicationScopeAuthorizationTest.php
           tests/Feature/Emar/P01RecordingContractTest.php
           tests/Feature/Medication/ControlledDrugStockTruthTest.php
           tests/Unit/MedicationPaperRecoveryMigrationTest.php
