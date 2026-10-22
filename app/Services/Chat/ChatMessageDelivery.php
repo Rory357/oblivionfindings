@@ -105,6 +105,13 @@ final class ChatMessageDelivery
 
                 return 0;
             }
+            // A later message in the same conversation will carry the notice, so a backlog (for example
+            // while someone is off duty) becomes one notice per conversation instead of one per message.
+            if ($this->supersededBy($row, $conversation)) {
+                $this->finish($id, 'superseded');
+
+                return 0;
+            }
             if ($deferredUntil = app(ChatAvailability::class)->deferUntil($user)) {
                 DB::table('chat_message_deliveries')->where('id', $id)->update([
                     'available_at' => $deferredUntil, 'updated_at' => now(),
@@ -121,9 +128,44 @@ final class ChatMessageDelivery
                 throw new \RuntimeException('Chat message notice was not persisted.');
             }
             $this->finish($id, 'delivered');
+            // The bell keeps one unread entry per conversation: the newest. An unread mention stays
+            // until a newer mention replaces it or the conversation is read.
+            $this->markConversationNoticesRead($user, $conversation, null, $row->notification_id, keepMentions: $row->event_key !== 'chat.mentioned');
 
             return 1;
         });
+    }
+
+    /**
+     * Marks a person's chat notices for one conversation as read, up to a message when given.
+     * Used when they read the conversation and when a newer notice replaces older ones.
+     */
+    public function markConversationNoticesRead(User $user, OpsConversation $conversation, ?int $uptoMessageId = null, ?string $exceptNotificationId = null, bool $keepMentions = false): int
+    {
+        $notices = DB::table('chat_message_deliveries')
+            ->join('ops_messages', 'ops_messages.id', '=', 'chat_message_deliveries.message_id')
+            ->where('chat_message_deliveries.user_id', $user->id)
+            ->where('chat_message_deliveries.status', 'delivered')
+            ->where('ops_messages.conversation_id', $conversation->id)
+            ->when($uptoMessageId, fn ($query) => $query->where('chat_message_deliveries.message_id', '<=', $uptoMessageId))
+            ->when($exceptNotificationId, fn ($query) => $query->where('chat_message_deliveries.notification_id', '!=', $exceptNotificationId))
+            ->when($keepMentions, fn ($query) => $query->where('chat_message_deliveries.event_key', '!=', 'chat.mentioned'))
+            ->select('chat_message_deliveries.notification_id');
+
+        return $user->unreadNotifications()->where('type', ChatMessageNotice::class)->whereIn('id', $notices)->update(['read_at' => now()]);
+    }
+
+    /** A plain message gives way to any newer notice in its conversation; a mention only to a newer mention. */
+    private function supersededBy(object $row, OpsConversation $conversation): bool
+    {
+        return DB::table('chat_message_deliveries')
+            ->join('ops_messages', 'ops_messages.id', '=', 'chat_message_deliveries.message_id')
+            ->where('chat_message_deliveries.user_id', $row->user_id)
+            ->where('ops_messages.conversation_id', $conversation->id)
+            ->where('chat_message_deliveries.message_id', '>', $row->message_id)
+            ->whereIn('chat_message_deliveries.status', ['pending', 'delivered'])
+            ->when($row->event_key === 'chat.mentioned', fn ($query) => $query->where('chat_message_deliveries.event_key', 'chat.mentioned'))
+            ->exists();
     }
 
     private function finish(int $id, string $status): void

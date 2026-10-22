@@ -77,7 +77,7 @@ final class ChatProjection
         if ($conversation) {
             $messages->each(fn (OpsMessage $message) => $message->setRelation('conversation', $conversation));
         }
-        EloquentCollection::make($messages->all())->loadMissing(['conversation', 'sender:id,name', 'reactions.user:id,name']);
+        EloquentCollection::make($messages->all())->loadMissing(['conversation', 'sender:id,name', 'pinnedBy:id,name', 'reactions.user:id,name']);
         $ids = $messages->pluck('id')->all();
         $replies = collect();
         foreach ($messages->filter(fn ($message) => $message->reply_to_id && $message->conversation)->groupBy('conversation_id') as $group) {
@@ -101,7 +101,7 @@ final class ChatProjection
 
     public function message(OpsMessage $message, User $viewer, ?array $batch = null): array
     {
-        $message->loadMissing(['sender:id,name', 'reactions.user:id,name']);
+        $message->loadMissing(['sender:id,name', 'pinnedBy:id,name', 'reactions.user:id,name']);
         $deleted = $message->trashed();
         $reply = ! $message->reply_to_id ? null : ($batch !== null
             ? $batch['replies']->get($message->conversation_id.':'.$message->reply_to_id)
@@ -122,6 +122,8 @@ final class ChatProjection
             'content' => $deleted ? '' : $message->content,
             'deleted' => $deleted,
             'pinned' => ! $deleted && $message->is_pinned,
+            'pinned_by_name' => ! $deleted && $message->is_pinned && $message->pinned_by ? ($message->pinned_by === $viewer->id ? 'You' : ($message->pinnedBy?->name ?? 'Former participant')) : null,
+            'pinned_at' => ! $deleted && $message->is_pinned ? $message->pinned_at?->toISOString() : null,
             'saved' => $saved,
             'mentions' => $mentions,
             'created_at' => $message->created_at?->toISOString(),
@@ -138,7 +140,11 @@ final class ChatProjection
             ]),
             // Existing record-linked media keeps its identity. It is never projected as a public storage path.
             'legacy_attachments' => $deleted ? [] : collect($message->attachments ?? [])->map(fn ($file) => $this->legacyAttachment($message, $file, $viewer)),
-            'reactions' => $deleted ? [] : $message->reactions->groupBy('emoji')->map(fn ($rows, $emoji) => ['emoji' => $emoji, 'count' => $rows->count(), 'mine' => $rows->contains('user_id', $viewer->id)])->values(),
+            // Who reacted is shown as names, as WhatsApp and Teams do; reacting is a visible action, unlike reading.
+            'reactions' => $deleted ? [] : $message->reactions->sortBy('id')->groupBy('emoji')->map(fn ($rows, $emoji) => [
+                'emoji' => (string) $emoji, 'count' => $rows->count(), 'mine' => $rows->contains('user_id', $viewer->id),
+                'people' => $rows->map(fn ($row) => $row->user_id === $viewer->id ? 'You' : ($row->user?->name ?? 'Former participant'))->take(20)->values(),
+            ])->values(),
         ];
     }
 
