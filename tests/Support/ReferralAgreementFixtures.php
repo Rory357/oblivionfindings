@@ -20,7 +20,8 @@ function referralAgreementFixture(bool $accept = true, bool $approve = true, boo
 {
     Storage::fake('private');
     [$site, $author, $approver, $referral, $tax, $case, $decision, $evidence] = referralProposalFixture();
-    handoverCanonicalPermissions($author, ['referrals.convert', 'referrals.assessment.view', 'referrals.duplicates.manage',
+    // The author also navigates the open funding case, and handover needs that navigator to manage funding.
+    handoverCanonicalPermissions($author, ['referrals.convert', 'referrals.assessment.view', 'referrals.duplicates.manage', 'referrals.funding.manage',
         'clients.create', 'clients.viewAny', 'clients.update', 'onboarding.view', ...$agreementPermissions]);
     $referral->update(['team' => 'Community support', 'requested_service' => 'supported_living', 'identity' => ['first_name' => 'Casey', 'last_name' => 'Example'],
         'assessment' => ['version' => 1, 'authority_version' => 1, 'identity_status' => 'verified', 'intention' => 'proceed', 'suitability' => 'suitable',

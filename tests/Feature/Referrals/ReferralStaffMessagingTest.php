@@ -169,11 +169,11 @@ it('queues one message through the outbox with a history entry, and never sends 
 
 it('offers only switched-on templates, so the standard ones wait for review', function () {
     [, $referral, $coordinator] = staffMessagingFixture();
-    $version = ReferralSettingsVersion::query()->where('version', 1)->firstOrFail();
-    $configuration = $version->configuration;
+    // Published history is immutable, so publish a later version shaped like one from before templates existed.
+    $configuration = ReferralSettingsVersion::query()->where('version', 1)->firstOrFail()->configuration;
     unset($configuration['communications']);
-    $version->update(['configuration' => $configuration]);
-    // An older publication reads as the standard templates, switched off.
+    ReferralSettingsVersion::query()->create(['version' => 2, 'state' => 'published', 'configuration' => $configuration, 'published_at' => now(), 'effective_at' => now()]);
+    // An older-shaped publication reads as the standard templates, switched off.
     $this->actingAs($coordinator)->getJson('/operations/referrals/'.$referral->reference.'/communications/compose')
         ->assertOk()->assertJsonPath('templates', []);
     $this->postJson('/operations/referrals/'.$referral->reference.'/communications', staffMessageInput())

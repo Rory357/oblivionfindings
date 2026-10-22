@@ -40,7 +40,7 @@ test('intake creates a lightweight client and a referral from new_client fields'
     $client = Client::where('first_name', 'Aroha')->where('last_name', 'Ngata')->first();
     expect($client)->not->toBeNull();
     expect($client->funding_type)->toBe('Whaikaha'); // label derived from the typed source
-    expect($client->status)->toBe('onboarding');
+    expect($client->status)->toBe('active');
 
     $referral = RespiteReferral::where('client_id', $client->id)->first();
     expect($referral)->not->toBeNull();

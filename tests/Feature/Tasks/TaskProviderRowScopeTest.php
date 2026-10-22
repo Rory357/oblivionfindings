@@ -866,6 +866,8 @@ function taskRbacMatrix(): array
         'checklist_run' => $pair('checklist_run', $checklistA, $checklistB, 'TASK-RBAC visible checklist', 'TASK-RBAC private checklist'),
         'shift_task' => $pair('shift_task', $shiftTaskA, $shiftTaskB, 'TASK-RBAC visible shift task', 'TASK-RBAC private shift task'),
         'respite_task' => $pair('respite_task', $respiteTaskA, $respiteTaskB, 'TASK-RBAC visible respite task', 'TASK-RBAC private respite task'),
+        // This support worker holds no referral permission; referral row scoping is covered in tests/Feature/Referrals.
+        'referrals' => ['visible' => [], 'hidden' => []],
         'first_aid_followup' => $pair('first_aid_followup', $firstAidFollowupA, $firstAidFollowupB, 'FA-91001', 'FA-92001'),
         'restraint_review' => $pair('restraint_review', $restraintA, $restraintB, 'RST-91001', 'RST-92001'),
     ];
