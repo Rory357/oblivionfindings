@@ -88,7 +88,7 @@ final class ChatController extends Controller
             ->with(['client', 'participants.user'])
             ->orderByDesc('updated_at')->get();
         $conversations = $this->access->filterAllowed($user, $conversations)
-            ->map(fn ($conversation) => $this->projection->conversation($conversation, $user))->values();
+            ->map(fn ($conversation) => $this->projection->conversation($conversation, $user, summary: true))->values();
         $people = $staff ? $this->visibility->visibleCurrentStaffQuery($user)->where('users.id', '!=', $user->id)->get(['users.id', 'users.name']) : collect();
         if (! $staff && $client) {
             $people = app(ChatFamilyContacts::class)->namedPeople($client)

@@ -17,7 +17,12 @@ final class ChatProjection
 {
     public function __construct(private readonly ChatAccess $access, private readonly ClientFamilyCommunicationAccess $family) {}
 
-    public function conversation(OpsConversation $conversation, User $viewer): array
+    /**
+     * $summary leaves out the fields that check every member's access (mentionable_ids,
+     * can_manage_people, management). Lists use it; an opened conversation gets them from its
+     * own response, so a list of many conversations no longer runs those checks for each row.
+     */
+    public function conversation(OpsConversation $conversation, User $viewer, bool $summary = false): array
     {
         $conversation->loadMissing(['participants.user', 'client']);
         $member = $conversation->participants->firstWhere('user_id', $viewer->id);
@@ -38,10 +43,10 @@ final class ChatProjection
             'id' => $conversation->id,
             'title' => $conversation->title ?: $participants->filter(fn ($p) => $p->user_id !== $viewer->id)->map(fn ($p) => $p->user->name)->join(', '),
             'type' => $conversation->is_managed_channel ? 'channel' : $conversation->conversation_type,
-            'can_manage_people' => $this->access->canManageParticipants($viewer, $conversation),
+            ...($summary ? [] : ['can_manage_people' => $this->access->canManageParticipants($viewer, $conversation)]),
             'client' => $conversation->client ? ['id' => $conversation->client_id, 'name' => $conversation->client->first_name.' '.$conversation->client->last_name] : null,
             'participants' => $participants->map(fn ($p) => ['id' => $p->user_id, 'name' => $p->user->name, 'role' => $p->role])->values(),
-            'mentionable_ids' => app(ChatMentions::class)->eligible($conversation, $viewer)->pluck('id')->values(),
+            ...($summary ? [] : ['mentionable_ids' => app(ChatMentions::class)->eligible($conversation, $viewer)->pluck('id')->values()]),
             'latest_mention_id' => $latestMentionId ? (int) $latestMentionId : null,
             'latest' => $latest ? ['content' => $latest->content, 'created_at' => $latest->created_at?->toISOString()] : null,
             'unread' => max($member?->unread_marker ? 1 : 0, $unread->count()),
@@ -51,16 +56,16 @@ final class ChatProjection
             'can_send' => $policy['enabled'] && ($conversation->conversation_type !== 'family' || $policy['family_enabled'])
                 && ! $conversation->is_archived && ! $member?->is_archived_for_user && $this->access->allows($viewer, $conversation, true),
             'can_call' => $policy['enabled'] && $policy['calls_enabled'] && ($conversation->conversation_type !== 'family' || ($policy['family_enabled'] && $policy['family_calls_enabled'])),
-            'policy' => app(ChatSettings::class)->publicPolicy($conversation),
+            'policy' => app(ChatSettings::class)->publicPolicy($conversation, $policy),
             'care_team_cover' => (bool) $conversation->care_team_cover,
             'queue_status' => $conversation->queue_status,
             'response_clock' => $conversation->conversation_type === 'family'
-                ? app(ChatFamilyResponse::class)->project($conversation, $viewer, app(ChatSettings::class)->forConversation($conversation)) : null,
+                ? app(ChatFamilyResponse::class)->project($conversation, $viewer, $policy) : null,
             'assigned_to' => $conversation->assigned_to,
             'version' => $conversation->chat_version,
             'archived' => (bool) $conversation->is_archived,
             'archived_for_me' => (bool) $member?->is_archived_for_user,
-            'management' => app(ChatConversationManagement::class)->capabilities($viewer, $conversation),
+            ...($summary ? [] : ['management' => app(ChatConversationManagement::class)->capabilities($viewer, $conversation)]),
         ];
     }
 
