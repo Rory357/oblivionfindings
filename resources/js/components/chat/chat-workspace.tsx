@@ -35,12 +35,12 @@ import { ChatCreateConversation } from './chat-create-conversation';
 import { ChatFamilyInbox } from './chat-family-inbox';
 import { ChatInvitations } from './chat-invitations';
 import { useChatPreferences } from './chat-personal-preferences';
-import { useChatRealtime } from './chat-realtime';
 import { ChatSearch } from './chat-search';
 import { ChatShiftHandover } from './chat-shift-handover';
 import { ChatThread } from './chat-thread';
-import { watchChatUpdates } from './chat-update-watch';
-import type { ChatList } from './types';
+import { mergeConversationRows, namedRows } from './live/list-rows';
+import { chatSync, type SyncReason } from './live/sync';
+import type { ChatConversation, ChatList } from './types';
 
 export function ChatWorkspace(props: ChatWorkspaceProps) {
     const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
@@ -86,12 +86,11 @@ function ChatWorkspaceContent({
     const Heading = compact ? 'h2' : 'h1';
     const [callsRequest, setCallsRequest] = useState(0);
     const { values: personal } = useChatPreferences(auth.user.id);
-    const realtime = useChatRealtime();
-    const realtimeRef = useRef(realtime);
-    useEffect(() => {
-        realtimeRef.current = realtime;
-    }, [realtime]);
     const [data, setData] = useState<ChatList | null>(null);
+    const dataRef = useRef<ChatList | null>(null);
+    useEffect(() => {
+        dataRef.current = data;
+    }, [data]);
     const [error, setError] = useState('');
     const [selected, setSelected] = useState<number | null>(
         initialConversation,
@@ -156,6 +155,47 @@ function ChatWorkspaceContent({
             return false;
         }
     }, [clientId, auth.user.id]);
+    // A live event names the conversations that changed: fetch just those rows. Returns null
+    // when the whole list is needed instead (a row new to this list, or a failed row read).
+    const rowRequest = useRef<AbortController | null>(null);
+    const refreshRows = useCallback(
+        async (ids: number[], raised: number[]): Promise<boolean | null> => {
+            const version = generation.current;
+            const current = dataRef.current;
+            if (!current) return null;
+            rowRequest.current?.abort();
+            const controller = new AbortController();
+            rowRequest.current = controller;
+            try {
+                const pages = await Promise.all(
+                    ids.map((id) =>
+                        chatActorRequest<{ conversations: ChatConversation[] }>(
+                            auth.user.id,
+                            `/chat/api/conversations?only=${id}${clientId ? `&client=${clientId}` : ''}`,
+                            { signal: controller.signal },
+                        ),
+                    ),
+                );
+                if (controller.signal.aborted || version !== generation.current)
+                    return true;
+                const latest = dataRef.current ?? current;
+                const merged = mergeConversationRows(
+                    latest.conversations,
+                    ids,
+                    pages.flatMap((page) => page.conversations),
+                    raised,
+                );
+                if (!merged) return null;
+                const next = { ...latest, conversations: merged };
+                dataRef.current = next;
+                setData(next);
+                return true;
+            } catch {
+                return controller.signal.aborted ? true : null;
+            }
+        },
+        [clientId, auth.user.id],
+    );
     useEffect(() => {
         const version = ++generation.current;
         setData(null);
@@ -177,19 +217,35 @@ function ChatWorkspaceContent({
         );
         setQuery('');
         setFilter('all');
-        const stopUpdates = watchChatUpdates(
-            async () => Boolean(await refresh()),
-            {
-                interval: () =>
-                    realtimeRef.current === 'live' ? 30000 : 10000,
+        // One sync loop: rows named by live events, the whole list for list-level changes,
+        // after a reconnect, and on polls while live updates are down.
+        const stopUpdates = chatSync.watch({
+            refresh: async (reason: SyncReason) => {
+                const named = namedRows(reason);
+                if (named) {
+                    const done = await refreshRows(named.ids, named.raised);
+                    if (done !== null) return done;
+                }
+                return Boolean(await refresh());
             },
-        );
+            topics: ['conversation.changed', 'inbox.changed'],
+            wakeOn: ['oblivion:chat-refresh'],
+            poll: 'fallback',
+        });
         return () => {
             generation.current = version + 1;
             request.current?.abort();
+            rowRequest.current?.abort();
             stopUpdates();
         };
-    }, [clientId, auth.user.id, initialConversation, initialMessage, refresh]);
+    }, [
+        clientId,
+        auth.user.id,
+        initialConversation,
+        initialMessage,
+        refresh,
+        refreshRows,
+    ]);
 
     const conversations =
         data?.conversations.filter(
@@ -345,8 +401,7 @@ function ChatWorkspaceContent({
                                                             const id =
                                                                 Number(value);
                                                             if (
-                                                                id !==
-                                                                client.id
+                                                                id !== client.id
                                                             )
                                                                 router.visit(
                                                                     `/chat?client=${id}`,

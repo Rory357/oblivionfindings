@@ -1,5 +1,7 @@
 import type Pusher from 'pusher-js';
 import { ChatError, chatRequest } from './api';
+import { connectLive, type LiveConnection } from './live/connection';
+import { chatSync } from './live/sync';
 
 export type ChatLiveState =
     | 'off'
@@ -13,6 +15,7 @@ type Configuration = {
     key?: string;
     path?: string;
     channel?: string;
+    transport?: 'live' | 'reverb';
 };
 
 export function connectChatRealtime(
@@ -26,6 +29,8 @@ export function connectChatRealtime(
     let attempts = 0;
     let client: Pusher | null = null;
     let configured = '';
+    // Oblivion Live manages its own connection, renewal and reconnects once started.
+    let live: LiveConnection | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let notice: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
@@ -73,7 +78,7 @@ export function connectChatRealtime(
         }, delay);
     };
     const start = async () => {
-        if (stopped || starting || retry) return;
+        if (stopped || starting || retry || live) return;
         if (!navigator.onLine) {
             onState('offline');
             return;
@@ -91,6 +96,21 @@ export function connectChatRealtime(
                 );
             if (typeof config.enabled !== 'boolean')
                 throw new Error('Invalid live-update configuration');
+            if (config.enabled && config.transport === 'live') {
+                if (config.path !== '/chat-live')
+                    throw new Error('Invalid live-update configuration');
+                disconnect();
+                live = connectLive({
+                    actorId,
+                    onState,
+                    onEvent: (event) => chatSync.receive(event),
+                    // A new connection catches up once through the app.
+                    onReady: (resume) => {
+                        if (resume) chatSync.resync();
+                    },
+                });
+                return;
+            }
             if (!config.enabled) {
                 disconnect();
                 onState('off');
@@ -195,7 +215,8 @@ export function connectChatRealtime(
         }
     };
     const wake = () => {
-        if (document.visibilityState !== 'visible') return;
+        // Oblivion Live and the sync loop handle visibility and reconnects themselves.
+        if (live || document.visibilityState !== 'visible') return;
         clearTimeout(retry);
         retry = undefined;
         blocked = false;
@@ -203,6 +224,7 @@ export function connectChatRealtime(
         refresh();
     };
     const offline = () => {
+        if (live) return;
         clearTimeout(retry);
         retry = undefined;
         disconnect();
@@ -222,6 +244,8 @@ export function connectChatRealtime(
         clearTimeout(notice);
         clearInterval(lease);
         disconnect();
+        live?.stop();
+        live = null;
         window.removeEventListener('online', wake);
         window.removeEventListener('offline', offline);
         document.removeEventListener('visibilitychange', wake);

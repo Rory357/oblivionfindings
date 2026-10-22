@@ -69,6 +69,7 @@ export function applyChatChanges(
         conversation: changes.conversation,
         messages: [...messages.values()].sort((a, b) => a.id - b.id),
         sync_cursor: changes.sync_cursor,
+        sync_change_id: changes.sync_change_id ?? history.sync_change_id,
         has_more_changes: changes.has_more_changes,
     };
 }

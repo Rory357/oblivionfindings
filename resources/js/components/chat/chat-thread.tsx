@@ -34,6 +34,7 @@ import {
     useCallback,
     useEffect,
     useImperativeHandle,
+    useMemo,
     useRef,
     useState,
     type ComponentProps,
@@ -98,6 +99,8 @@ import { watchChatUpdates } from './chat-update-watch';
 import { ChatUrgentHelp } from './chat-urgent-contact';
 import { ChatVoiceRecorder } from './chat-voice-recorder';
 import { isChatVoiceNote } from './chat-voice-recording';
+import { chatSync } from './live/sync';
+import { createTypingSignal, typingLabel, useTypingNames } from './live/typing';
 import type {
     ChatConversation,
     ChatHistory,
@@ -176,10 +179,6 @@ function ChatThreadContent({
     const { values: personal } = useChatPreferences(actorId);
     const policy = history?.conversation.policy ?? listPolicy;
     const realtime = useChatRealtime();
-    const realtimeRef = useRef(realtime);
-    useEffect(() => {
-        realtimeRef.current = realtime;
-    }, [realtime]);
     const historyRef = useRef<ChatHistory | null>(null);
     historyRef.current = history;
     const historyAnchor = useRef<number | null>(null);
@@ -210,6 +209,13 @@ function ChatThreadContent({
     const [restoreRetry, setRestoreRetry] = useState(0);
     const [editing, setEditing] = useState<ChatEditDraft | null>(null);
     const [mentions, setMentions] = useState<ChatMention[]>([]);
+    // Typing: sent at most every 3 s while live; others see a line for 6 s (spec section 6).
+    const typing = useMemo(
+        () => createTypingSignal({ actorId, conversationId }),
+        [actorId, conversationId],
+    );
+    useEffect(() => () => typing.stop(), [typing]);
+    const typingText = typingLabel(useTypingNames(conversationId));
     const [files, setFilesState] = useState<ChatSelectedFile[]>([]);
     const [fileCaptions, setFileCaptions] = useState<string[]>([]);
     const [fileMemoryKey, setFileMemoryKey] = useState<string | null>(null);
@@ -572,12 +578,24 @@ function ChatThreadContent({
         setEditing(null);
         setDeleting(null);
         setMentions([]);
-        const stopUpdates = watchChatUpdates(
-            async () => Boolean(await load(controller.signal)),
-            {
-                interval: () => (realtimeRef.current === 'live' ? 30000 : 5000),
+        // One sync loop: fetch this conversation's changes when a live event names it and
+        // its cursor is behind; poll only while live updates are down; catch up after reconnects.
+        const stopUpdates = chatSync.watch({
+            refresh: async () => Boolean(await load(controller.signal)),
+            topics: ['conversation.changed'],
+            match: (event) =>
+                event.type === 'conversation.changed' &&
+                event.conversation_id === conversationId,
+            cursor: {
+                conversationId,
+                position: () =>
+                    historyRef.current?.conversation.id === conversationId
+                        ? (historyRef.current.sync_change_id ?? null)
+                        : null,
             },
-        );
+            wakeOn: ['oblivion:chat-refresh'],
+            poll: 'fallback',
+        });
         return () => {
             controller.abort();
             stopUpdates();
@@ -1166,8 +1184,11 @@ function ChatThreadContent({
                     }
                 },
                 {
-                    interval: () =>
-                        realtimeRef.current === 'live' ? 30000 : 10000,
+                    // Search results follow changes to this conversation only.
+                    topics: ['conversation.changed'],
+                    match: (event) =>
+                        event.type === 'conversation.changed' &&
+                        event.conversation_id === conversationId,
                     events: [
                         'oblivion:chat-refresh',
                         'oblivion:chat-search-refresh',
@@ -1392,6 +1413,7 @@ function ChatThreadContent({
                 readOffset: 0,
             });
             if (active.current !== id) return;
+            typing.stop();
             setDraft('');
             setMentions([]);
             setFiles([]);
@@ -2125,6 +2147,20 @@ function ChatThreadContent({
                             </div>
                         )}
                 </div>
+                {typingText && !searchOpen && (
+                    <p className="text-caption flex shrink-0 items-center gap-2 px-4 pb-1 text-muted-foreground sm:px-6">
+                        <span className="flex gap-0.5" aria-hidden="true">
+                            {[0, 150, 300].map((delay) => (
+                                <span
+                                    key={delay}
+                                    className="size-1 rounded-full bg-muted-foreground motion-safe:animate-pulse"
+                                    style={{ animationDelay: `${delay}ms` }}
+                                />
+                            ))}
+                        </span>
+                        {typingText}
+                    </p>
+                )}
                 {!atEnd && !searchResults && (
                     <div className="relative h-0">
                         <Button
@@ -2464,6 +2500,7 @@ function ChatThreadContent({
                                         }
                                         onChange={(value, selectedMentions) => {
                                             setDraft(value);
+                                            typing.input(value);
                                             setMentions(selectedMentions);
                                             saveChatDraft(key, value);
                                             saveChatThreadMemory(key, {

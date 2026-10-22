@@ -213,14 +213,20 @@ function FamilyWorkSession({
                     }
                 }
             },
-            { interval: () => 10000 },
+            // Live: refreshed when this conversation changes; polled only while down.
+            {
+                topics: ['conversation.changed'],
+                match: (event) =>
+                    event.type === 'conversation.changed' &&
+                    event.conversation_id === conversationId,
+            },
         );
         return () => {
             stop();
             read.current?.abort();
             read.current = null;
         };
-    }, [actorId, path, retry, readError]);
+    }, [actorId, conversationId, path, retry, readError]);
     async function older() {
         const previous = snapshot.current;
         if (!previous?.next_before || read.current || write.current) return;

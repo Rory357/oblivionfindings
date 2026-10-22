@@ -48,9 +48,8 @@ import { ChatCallDock } from './chat-call-dock';
 import { ChatCallbacks } from './chat-callbacks';
 import { claimChatMicrophone } from './chat-microphone';
 import { useChatPreferences } from './chat-personal-preferences';
-import { useChatRealtime } from './chat-realtime';
-import { watchChatUpdates } from './chat-update-watch';
 import { IncomingCallCard, type CallPresentation } from './incoming-call-card';
+import { chatSync } from './live/sync';
 import { useCallRecovery } from './use-call-recovery';
 import { useCallRingtone } from './use-call-ringtone';
 import { useCallSilence } from './use-call-silence';
@@ -210,11 +209,6 @@ export function ChatCallingProvider({
         },
         [actorId],
     );
-    const realtime = useChatRealtime();
-    const realtimeRef = useRef(realtime);
-    useEffect(() => {
-        realtimeRef.current = realtime;
-    }, [realtime]);
     const [status, setStatus] = useState<CallStatus>({
         ready: false,
         availability: 'unavailable',
@@ -489,27 +483,43 @@ export function ChatCallingProvider({
                 return false;
             }
         };
-        const stopUpdates = watchChatUpdates(poll, {
-            // Every open tab runs this provider and shares the Chat request limit:
-            // poll quickly only while a call needs it, otherwise back off.
-            interval: () => {
+        const stopUpdates = chatSync.watch({
+            refresh: poll,
+            // Live: call status is fetched when a call.changed event names one of this
+            // person's calls. Calls keep their own checks until Oblivion Calls lands.
+            topics: ['call.changed'],
+            wakeOn: ['oblivion:chat-refresh', 'oblivion:chat-unread-changed'],
+            whenHidden: true,
+            poll: () => {
                 if (activeRef.current || statusRef.current.calls.length > 0)
                     return 3000;
+                if (chatSync.live) return null;
                 // A call rings for 40 s and recently hidden tabs can still be called.
                 if (document.visibilityState !== 'visible') return 10000;
                 if (!statusRef.current.ready) return 30000;
-                return realtimeRef.current === 'live' ? 15000 : 5000;
+                return 'fallback';
             },
-            whenHidden: true,
-            events: ['oblivion:chat-refresh', 'oblivion:chat-unread-changed'],
         });
-        const heartbeat = window.setInterval(() => {
-            if (document.visibilityState === 'visible')
-                void callRequest('/chat/api/availability', {
+        // The badge follows unread.changed without fetching anything.
+        const stopUnread = chatSync.subscribe(['unread.changed'], (event) => {
+            if (event.type === 'unread.changed')
+                setStatus((current) => ({
+                    ...current,
+                    unread_count: event.total,
+                }));
+        });
+        // Calls still route to people seen in the last 45 s, so visible tabs keep saying so.
+        const heartbeat = chatSync.watch({
+            refresh: async () => {
+                await callRequest('/chat/api/availability', {
                     method: 'PATCH',
                     body: '{}',
                 }).catch(() => undefined);
-        }, 15000);
+                return true;
+            },
+            poll: 15000,
+            immediate: false,
+        });
         return () => {
             stopped.current = true;
             sessionGeneration.current = generation + 1;
@@ -519,7 +529,8 @@ export function ChatCallingProvider({
             joinController.current?.abort();
             pendingJoinRef.current = null;
             stopUpdates();
-            clearInterval(heartbeat);
+            stopUnread();
+            heartbeat();
             void stopAudio();
         };
     }, [enabled, actorId, refresh, stopAudio, callRequest]);

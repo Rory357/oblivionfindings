@@ -88,7 +88,12 @@ export type ChatMessage = {
         url: string | null;
     }[];
     // people: who reacted ("You" for the viewer), first 20, in the order they reacted.
-    reactions: { emoji: string; count: number; mine: boolean; people?: string[] }[];
+    reactions: {
+        emoji: string;
+        count: number;
+        mine: boolean;
+        people?: string[];
+    }[];
 };
 export type ChatPolicy = {
     enabled: boolean;
@@ -114,6 +119,8 @@ export type ChatHistory = {
     messages: ChatMessage[];
     has_more: boolean;
     sync_cursor?: string;
+    /** The newest change the cursor covers; live events with a lower change ID are skipped. */
+    sync_change_id?: number;
     has_more_changes?: boolean;
 };
 
@@ -122,5 +129,6 @@ export type ChatChanges = {
     messages: ChatMessage[];
     new_message_ids: number[];
     sync_cursor: string;
+    sync_change_id?: number;
     has_more_changes: boolean;
 };

@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { watchChatUpdates } from './chat-update-watch';
+import { ChatSync } from './live/sync';
 
 describe('shared Chat update scheduling', () => {
     let stop: (() => void) | undefined;
+    let sync: ChatSync;
     beforeEach(() => {
         vi.useFakeTimers();
+        sync = new ChatSync();
         vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
         vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
     });
@@ -61,6 +64,33 @@ describe('shared Chat update scheduling', () => {
         stop();
         await vi.advanceTimersByTimeAsync(60000);
         expect(read).toHaveBeenCalledTimes(2);
+    });
+    it('runs every watcher on the one sync loop, with one timer between them', async () => {
+        const reads = [1, 2, 3, 4].map(() => vi.fn().mockResolvedValue(true));
+        const stops = reads.map((read, index) =>
+            watchChatUpdates(read, { interval: () => 1000 * (index + 1) }),
+        );
+        await vi.advanceTimersByTimeAsync(0);
+        expect(vi.getTimerCount()).toBe(1);
+        await vi.advanceTimersByTimeAsync(4000);
+        expect(reads.map((read) => read.mock.calls.length)).toEqual([
+            5, 3, 2, 2,
+        ]);
+        expect(vi.getTimerCount()).toBe(1);
+        stops.forEach((stopWatcher) => stopWatcher());
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('polls only while live updates are down when it has no check of its own', async () => {
+        const read = vi.fn().mockResolvedValue(true);
+        stop = watchChatUpdates(read, { topics: ['inbox.changed'] }, sync);
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(read).toHaveBeenCalledTimes(2);
+        sync.setState('live');
+        await vi.advanceTimersByTimeAsync(60000);
+        expect(read).toHaveBeenCalledTimes(2);
+        sync.receive({ type: 'inbox.changed', reason: 'added' });
+        await vi.advanceTimersByTimeAsync(200);
+        expect(read).toHaveBeenCalledTimes(3);
     });
     it('avoids hidden/offline reads and refreshes when the app becomes available', async () => {
         const visible = vi

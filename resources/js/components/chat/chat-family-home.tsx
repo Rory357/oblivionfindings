@@ -180,7 +180,15 @@ function FamilyHomeSession({
                     return false;
                 }
             },
-            { interval: () => 10000 },
+            // Live: refreshed when one of this person's conversations, their list or a
+            // call changes; polled only while live updates are down.
+            {
+                topics: [
+                    'conversation.changed',
+                    'inbox.changed',
+                    'call.changed',
+                ],
+            },
         );
         return () => {
             controller.abort();
