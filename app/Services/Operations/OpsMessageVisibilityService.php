@@ -65,26 +65,12 @@ class OpsMessageVisibilityService
             return false;
         }
 
-        // A managed channel belongs to its Site (checked above), so one member moving Site or
-        // leaving cannot hide it from everyone else. Private chats keep the rule that the viewer
-        // can see every participant.
-        if ($conversation->is_managed_channel) {
-            return true;
-        }
-
-        $participantIds = $conversation->participants()
-            ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        if ($participantIds->isEmpty()) {
-            return false;
-        }
-
-        return $this->visibleCurrentStaffQuery($user)
-            ->whereIn('users.id', $participantIds)
-            ->count() === $participantIds->count();
+        // A staff conversation stays with its members (membership is checked by the caller): a
+        // colleague moving Site keeps their name in it and nobody loses the chat (Stephan, 23 Oct
+        // 2026). A managed channel follows its Site, checked above. Who may be added is decided when
+        // people are added: new groups need everyone to see everyone, and an addition needs the adder
+        // and the new person to see each other (ChatInvitations::eligible()).
+        return true;
     }
 
     /**
@@ -221,43 +207,11 @@ class OpsMessageVisibilityService
             && $conversation->client_id === null
             && (! $conversation->channel_site_id || in_array((int) $conversation->channel_site_id, $siteIds, true)));
 
-        if ($isCurrent && $staff->isNotEmpty()) {
-            $participantsByConversation = DB::table('ops_conversation_participants')
-                ->whereIn('conversation_id', $staff->pluck('id'))
-                ->get(['conversation_id', 'user_id'])
-                ->groupBy('conversation_id');
-
-            $allParticipantIds = $participantsByConversation
-                ->flatten(1)
-                ->pluck('user_id')
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values();
-
-            $visibleStaffIds = $allParticipantIds->isEmpty()
-                ? new Collection
-                : $this->visibleCurrentStaffQuery($user)
-                    ->whereIn('users.id', $allParticipantIds)
-                    ->pluck('users.id')
-                    ->map(fn ($id) => (int) $id)
-                    ->flip();
-
+        // Same as canViewConversation(): a current staff member keeps the staff conversations they
+        // belong to (the caller's query is by membership); a channel's Site is checked above.
+        if ($isCurrent) {
             foreach ($staff as $conversation) {
-                // Same as canViewConversation(): a managed channel follows its Site, not every member.
-                if ($conversation->is_managed_channel) {
-                    $visible->push($conversation->id);
-
-                    continue;
-                }
-                $participantIds = ($participantsByConversation->get($conversation->id) ?? new Collection)
-                    ->pluck('user_id')
-                    ->map(fn ($id) => (int) $id)
-                    ->unique();
-
-                if ($participantIds->isNotEmpty()
-                    && $participantIds->every(fn (int $id) => $visibleStaffIds->has($id))) {
-                    $visible->push($conversation->id);
-                }
+                $visible->push($conversation->id);
             }
         }
 
