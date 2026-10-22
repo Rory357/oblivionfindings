@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { useChatCalling } from '@/components/chat/chat-calling';
+import { Button } from '@/components/ui/button';
 import {
     SheetContent,
     SheetDescription,
@@ -613,7 +613,15 @@ function buildIconNavItems({
             href: '/my-day',
         },
         ...(can?.chat?.use || can?.messages?.viewAny || can?.shifts?.viewAny
-            ? [{ id: 'chat', icon: MessageSquareText, label: 'Chat', href: can?.chat?.use ? '/chat' : '/operations/messages', badge: unreadMessageCount } as IconNavItem]
+            ? [
+                  {
+                      id: 'chat',
+                      icon: MessageSquareText,
+                      label: 'Chat',
+                      href: can?.chat?.use ? '/chat' : '/operations/messages',
+                      badge: unreadMessageCount,
+                  } as IconNavItem,
+              ]
             : []),
         {
             id: 'my-calendar',
@@ -944,10 +952,22 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                     ? [{ title: 'Service desk', href: '/it', icon: Server }]
                     : []),
                 ...(can?.it?.approved_software
-                    ? [{ title: 'Approved software', href: '/security-devices/software', icon: Package }]
+                    ? [
+                          {
+                              title: 'Approved software',
+                              href: '/security-devices/software',
+                              icon: Package,
+                          },
+                      ]
                     : []),
                 ...(can?.it?.remote_support
-                    ? [{ title: 'Remote support', href: '/it/remote-support', icon: Server }]
+                    ? [
+                          {
+                              title: 'Remote support',
+                              href: '/it/remote-support',
+                              icon: Server,
+                          },
+                      ]
                     : []),
                 ...(can?.it?.view ||
                 can?.it?.request ||
@@ -1171,8 +1191,15 @@ function buildOperationsSubPanelGroups({
             href: '/operations/referrals',
             icon: ClipboardList,
         });
-    if ((can?.referrals?.viewAny || can?.referrals?.viewAssigned) && can?.referrals?.reports?.view)
-        clientMgmt.push({ title: 'Referral reports', href: '/operations/referrals/reports', icon: BarChart3 });
+    if (
+        (can?.referrals?.viewAny || can?.referrals?.viewAssigned) &&
+        can?.referrals?.reports?.view
+    )
+        clientMgmt.push({
+            title: 'Referral reports',
+            href: '/operations/referrals/reports',
+            icon: BarChart3,
+        });
     if (
         can?.assets?.telemetryView &&
         (can?.clients?.viewAny ||
@@ -2425,7 +2452,8 @@ export function AppSidebar({
     const portalClients = useStableValue(auth?.portalClients ?? null);
     const labels = useStableValue(labelsProp);
     const chatUnread = useChatCalling()?.unreadCount;
-    const unreadMessageCount = chatUnread ?? (auth as any)?.unreadMessageCount ?? 0;
+    const unreadMessageCount =
+        chatUnread ?? (auth as any)?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
     const { collapsed: fallbackCollapsed, setExpanded: setFallbackExpanded } =
         useAppSidebarState((page.props as any)?.sidebarOpen ?? true);

@@ -88,7 +88,6 @@ async function openAndChoose() {
     fireEvent.click(
         screen.getAllByRole('button', {
             name: 'Record consent',
-            exact: true,
         })[0],
     );
     fireEvent.pointerDown(
@@ -110,9 +109,7 @@ it('requires explicit identity confirmation, shows the purpose, and surfaces ser
     show();
     await openAndChoose();
     expect(screen.getByText(consentType.purpose)).toBeInTheDocument();
-    fireEvent.click(
-        screen.getByRole('button', { name: 'Record Consent', exact: true }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Record Consent' }));
     expect(state.post).not.toHaveBeenCalled();
     expect(
         screen.getByText(/confirm that you identified the person/),
@@ -124,9 +121,7 @@ it('requires explicit identity confirmation, shows the purpose, and surfaces ser
         options.onError({ given_at: 'This decision date needs review.' });
         options.onFinish();
     });
-    fireEvent.click(
-        screen.getByRole('button', { name: 'Record Consent', exact: true }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Record Consent' }));
     expect(state.post).toHaveBeenCalledWith(
         '/operations/clients/2/consents',
         expect.objectContaining({
@@ -144,7 +139,7 @@ it('routes capacity-dependent decisions to a consent request instead of recordin
     show(true);
     await openAndChoose();
     expect(
-        screen.getByRole('button', { name: 'Record Consent', exact: true }),
+        screen.getByRole('button', { name: 'Record Consent' }),
     ).toBeDisabled();
     expect(
         screen.getByRole('link', { name: 'Open consent request (new tab)' }),
@@ -157,7 +152,6 @@ it('does not enable recording for a read-only consent viewer', () => {
     show();
     for (const button of screen.getAllByRole('button', {
         name: 'Record consent',
-        exact: true,
     }))
         expect(button).toBeDisabled();
 });

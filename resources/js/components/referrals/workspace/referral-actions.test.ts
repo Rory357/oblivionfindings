@@ -79,7 +79,10 @@ describe('referralActions', () => {
 
     it('lets anyone who edits or moves the referral set its priority', () => {
         const run = handlers();
-        for (const permissions of [{ edit: true }, { transition: true }]) {
+        for (const permissions of [
+            { edit: true },
+            { transition: true },
+        ] as Record<string, boolean>[]) {
             const priority = referralActions(
                 { stage: 'triage' },
                 permissions,

@@ -74,7 +74,7 @@ export function SupportContactHandoverFields({
                     return (
                         <div
                             key={contact.id}
-                            className="space-y-3 rounded-lg border border-border bg-card p-4"
+                            className="space-y-3 rounded-lg bg-muted p-4"
                         >
                             <div className="flex items-start gap-3">
                                 <Checkbox

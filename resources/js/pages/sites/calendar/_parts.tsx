@@ -2277,7 +2277,9 @@ function RailRow({
                     className="block truncate text-[11px]"
                     style={{ color: `var(--src-${ev.source})` }}
                 >
-                    {ev.typeLabel || srcByKey[ev.source]?.short || srcLabel(ev.source)}
+                    {ev.typeLabel ||
+                        srcByKey[ev.source]?.short ||
+                        srcLabel(ev.source)}
                 </span>
             </span>
             {ev.owner && <Avatar person={ev.owner} size="h-6 w-6" />}

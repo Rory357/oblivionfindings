@@ -766,6 +766,8 @@ export default function SiteCalendar({
     useEffect(() => {
         void fetchEvents();
         return () => {
+            // A generation counter, not a DOM ref: bumping it on cleanup drops responses from the superseded fetch.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
             ++fetchGenerationRef.current;
             abortControllerRef.current?.abort();
         };
@@ -801,7 +803,8 @@ export default function SiteCalendar({
                 if (
                     generation !== railGenerationRef.current ||
                     controller.signal.aborted
-                ) return;
+                )
+                    return;
                 setRailEvents([]);
                 setRailUnavailable(true);
                 const failure = error as {
@@ -847,7 +850,8 @@ export default function SiteCalendar({
             if (
                 generation !== railGenerationRef.current ||
                 controller.signal.aborted
-            ) return;
+            )
+                return;
             setRailEvents([]);
         }
     }, [scope, site?.id, dataAdapter, committeeFilter]);
@@ -855,6 +859,8 @@ export default function SiteCalendar({
     useEffect(() => {
         void fetchRail();
         return () => {
+            // A generation counter, not a DOM ref: bumping it on cleanup drops responses from the superseded fetch.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
             ++railGenerationRef.current;
             railAbortRef.current?.abort();
         };
@@ -1432,7 +1438,8 @@ export default function SiteCalendar({
                     </span>
                     {canCreate && (
                         <span className="hidden items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground md:inline-flex">
-                            {dataAdapter?.interactionHint ?? 'Right-click to add · drag to reschedule'}
+                            {dataAdapter?.interactionHint ??
+                                'Right-click to add · drag to reschedule'}
                         </span>
                     )}
                 </div>

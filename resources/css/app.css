@@ -486,7 +486,9 @@
         from var(--primary) 0.834 calc(c * 0.468) calc(h + 11.5)
     );
     /* Text on ink that isn't white: ≥ 7:1 on --journey-ink for every hue. */
-    --journey-ink-muted: oklch(from var(--journey-lavender) 0.8 calc(c * 0.35) h);
+    --journey-ink-muted: oklch(
+        from var(--journey-lavender) 0.8 calc(c * 0.35) h
+    );
     --journey-lilac: oklch(from var(--journey-lavender) 0.94 calc(c * 0.3) h);
     /* The form half of the sign-in pages and its input fill. */
     --journey-surface: var(--journey-paper);
