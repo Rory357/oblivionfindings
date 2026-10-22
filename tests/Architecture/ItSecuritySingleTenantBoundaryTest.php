@@ -1008,6 +1008,11 @@ it('pins the exact compatibility evidence files excluded from active source scan
         'tests/Feature/Monitoring/MonitoringObservationProvenanceReconciliationTest.php',
         'tests/Feature/Monitoring/MonitoringSchemaTest.php',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php',
+        'resources/js/components/security-devices/collector-installation-profile.test.ts',
+        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php',
+        'tests/Feature/SecurityDevices/HikvisionDiscoveryTest.php',
+        'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php',
+        'tests/Unit/SecurityDevices/HikvisionSourceMigrationTest.php',
     ];
 
     expect(array_keys(itSecurityCompatibilityEvidenceFingerprints()))->toBe($expectedPaths);
