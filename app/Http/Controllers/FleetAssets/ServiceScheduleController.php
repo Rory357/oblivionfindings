@@ -57,7 +57,9 @@ class ServiceScheduleController extends Controller
         $dueSoonCount = $schedules->filter(function ($s) use ($now) {
             if (!$s['next_due_at'] || $s['is_overdue']) return false;
             $dueDate = Carbon::parse($s['next_due_at']);
-            return $dueDate->diffInDays($now, false) <= 14 && $dueDate->isFuture();
+            // diffInDays($now, false) is negative for a future date, so every
+            // future service counted as due soon.
+            return $dueDate->isFuture() && $dueDate->lte($now->copy()->addDays(14));
         })->count();
         $onTrackCount = $totalCount - $overdueCount - $dueSoonCount;
 

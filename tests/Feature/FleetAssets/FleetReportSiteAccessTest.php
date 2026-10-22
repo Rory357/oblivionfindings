@@ -106,6 +106,24 @@ class FleetReportSiteAccessTest extends TestCase
                     && (int) collect($breakdown)->get('community') === 1));
     }
 
+    public function test_decision_report_rates_use_the_whole_period_and_count_idle_days(): void
+    {
+        // Carbon 3's signed diffInDays() made the period 1 day (per-week figures
+        // were period totals) and idle days always 0. Two Harbour trips two days
+        // ago over the default 30-day period.
+        $viewer = $this->staffAt($this->localSite, ['fleet.viewAny']);
+
+        $this->actingAs($viewer)
+            ->get('/fleet-assets/reports/operating-summary')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('vehicle_utilisation.0.trips', 2)
+                ->where('vehicle_utilisation.0.trips_per_week', 0.5)
+                ->where('vehicle_utilisation.0.idle_days', 2)
+                ->where('vehicle_utilisation.0.flag', 'normal')
+                ->where('resident_demand.residents.0.per_week', 0.2));
+    }
+
     public function test_site_viewer_csv_exports_cover_only_their_sites_and_visible_drivers(): void
     {
         $viewer = $this->staffAt($this->localSite, ['fleet.viewAny']);

@@ -421,6 +421,33 @@ class Pkg02bVehicleWorkspaceTest extends TestCase
                 ->etc());
     }
 
+    public function test_fleet_health_counts_only_services_due_in_the_next_14_days_as_due_soon(): void
+    {
+        // Carbon 3's signed diffInDays() made every future service "due soon",
+        // so fleet health read 0% whenever schedules had future due dates.
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage']);
+        $vehicle = $this->vehicle($this->site);
+        FleetServiceSchedule::query()->create(['asset_id' => $vehicle->id, 'name' => 'Soon', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->addDays(5)]);
+        FleetServiceSchedule::query()->create(['asset_id' => $vehicle->id, 'name' => 'Later', 'interval_days' => 365, 'is_active' => true, 'next_due_at' => now()->addMonths(6)]);
+
+        $this->actingAs($manager)->get('/fleet-assets/maintenance/schedules')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('fleet_health_pct', 50)
+                ->etc());
+    }
+
+    public function test_maintenance_dashboard_counts_overdue_services_as_positive_days(): void
+    {
+        // Carbon 3's signed diffInDays() showed "-5d overdue".
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage']);
+        $late = FleetServiceSchedule::query()->create(['asset_id' => $this->vehicle($this->site)->id, 'name' => 'Late', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->subDays(5)]);
+
+        $this->actingAs($manager)->get('/fleet-assets/maintenance/dashboard')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overdue_services', fn ($rows) => collect($rows)->firstWhere('id', $late->id)['days_overdue'] === 5)
+                ->etc());
+    }
+
     public function test_catalogue_additions_are_deduplicated_and_need_management_access(): void
     {
         $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);

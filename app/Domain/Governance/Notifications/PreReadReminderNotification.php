@@ -22,7 +22,8 @@ class PreReadReminderNotification extends Notification
 
     public function toMail($notifiable): MailMessage
     {
-        $daysUntil = now()->diffInDays($this->meeting->scheduled_at);
+        // Whole days: Carbon 3's diffInDays() is a float ("in 2.45 days").
+        $daysUntil = (int) now()->diffInDays($this->meeting->scheduled_at);
 
         return (new MailMessage)
             ->subject("Meeting Pre-Read: {$this->meeting->title}")
