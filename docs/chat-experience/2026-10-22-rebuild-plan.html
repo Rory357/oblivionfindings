@@ -182,6 +182,7 @@ html { scroll-behavior: smooth; }
     <p>Contents</p>
     <ol>
       <li><a href="#short">In short</a></li>
+      <li><a href="#progress">Progress so far</a></li>
       <li><a href="#today">What people see today</a></li>
       <li><a href="#look">Look and feel</a></li>
       <li><a href="#features">Features vs WhatsApp and Teams</a></li>
@@ -208,6 +209,34 @@ html { scroll-behavior: smooth; }
         <li><b>The plan keeps what is Oblivion's</b> (named-worker cover, the family inbox, the reply promise, callbacks, privacy rules, investigations), <b>rebuilds the rest</b> on Oblivion-owned engines, and adds care-only features no chat app has: live care cards, shift-aware mentions, read-and-confirm safety messages and a privacy check before anything goes to family.</li>
         <li><b>Nothing gets built until you approve the mockups.</b> I've drawn the proposed screens in the design viewer next to the existing chat boards, in the same Slate style. All fifteen decisions at the end were answered on 22 October.</li>
       </ol>
+    </section>
+
+    <section id="progress">
+      <h2>Progress so far</h2>
+      <p class="sub">Updated 23 October 2026. Branch <code>claude/chat-module-audit-plan-704fd7</code>, 13 commits, not pushed or merged. Every code change passed the full chat test suite (430 tests) before it was committed.</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Item</th><th>Status</th><th>What changed</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Stage 0</td><td><span class="st built"><i></i>Done</span></td><td>Decisions recorded in the spec; clean-room rules and register; project renamed to Oblivion Care (proprietary); missing licence notices added; unused <code>ws</code> removed; DESIGN.md chat rules and two ESLint guardrails; the 10-second jobs only run when needed.</td></tr>
+            <tr><td class="k">Stage 1</td><td><span class="st built"><i></i>Approved</span></td><td>Six Chat v3 boards in the design viewer, approved 22 October; copies in <code>docs/chat-experience/v3/</code>.</td></tr>
+            <tr><td class="k">C1.1</td><td><span class="st part"><i></i>Part</span></td><td>List rows leave out the member-by-member checks and read settings once: about 20 queries per conversation, whatever its size. Paging comes with the list rebuild (C3.1).</td></tr>
+            <tr><td class="k">C1.2</td><td><span class="st built"><i></i>Done</span></td><td>Readers share the conversation lock; writers still exclude them.</td></tr>
+            <tr><td class="k">C1.3</td><td><span class="st excl"><i></i>Moved</span></td><td>One delivery queue joins the Oblivion Live event work (stage 3), which reworks delivery anyway.</td></tr>
+            <tr><td class="k">C1.4</td><td><span class="st built"><i></i>Done</span></td><td>One bell entry per conversation; reading clears it; off-duty backlogs arrive as one notice; mentions kept.</td></tr>
+            <tr><td class="k">C1.5</td><td><span class="st part"><i></i>Part</span></td><td>Nightly clean-up of finished delivery records. The sync log and old notices wait for the retention policy.</td></tr>
+            <tr><td class="k">C1.6</td><td><span class="st built"><i></i>Done</span></td><td>Any emoji as a reaction, several per person, who reacted.</td></tr>
+            <tr><td class="k">C1.7</td><td><span class="st built"><i></i>Done</span></td><td>Pins record who and when and are audited; relatives can't pin; uploads follow the Site's size limit.</td></tr>
+            <tr><td class="k">C1.8</td><td><span class="st part"><i></i>Part</span></td><td>Search checks access once per conversation and builds results in batches. A real index comes with the search redesign.</td></tr>
+            <tr><td class="k">C1.9</td><td><span class="st part"><i></i>Part</span></td><td>A Site channel stays open when one member moves Site. Private groups wait for your answer (below).</td></tr>
+            <tr><td class="k">C1.10</td><td><span class="st excl"><i></i>Moved</span></td><td>Background virus scanning is built with the stage 4 attach tray, which uploads in the background.</td></tr>
+            <tr><td class="k">C1.11</td><td><span class="st built"><i></i>Exists</span></td><td>Service health already checks the scanner, voice checker, live updates and push; the settings rebuild (C7.8) puts it on the overview.</td></tr>
+            <tr><td class="k">C1.12</td><td><span class="st miss"><i></i>Waiting</span></td><td>Waits for the investigator branch (multi-conversation grants and export) to merge.</td></tr>
+            <tr><td class="k">Stage 3</td><td><span class="st part"><i></i>Specs</span></td><td>Clean-room specs written for Oblivion Live, the push sender and the voice checker (<code>docs/chat-experience/clean-room/specs/</code>). Three builder sessions are proposed as cards; the session that wrote the specs doesn't build them.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><b>Your answer needed:</b> when someone in a private group moves to a Site the others can't see, today the whole group disappears for them. Should the group stay, with that person's name kept, or keep hiding?</div>
     </section>
 
     <section id="today">
