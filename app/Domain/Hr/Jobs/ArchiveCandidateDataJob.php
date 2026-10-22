@@ -58,6 +58,11 @@ class ArchiveCandidateDataJob implements ShouldQueue
                     'cover_letter' => null,
                     // Screening capture holds candidate-supplied PII — scrub on retention.
                     'screening_answers' => null,
+                    // So do the apply wizard's work-readiness answers.
+                    'experience_summary' => null,
+                    'years_of_experience' => null,
+                    'right_to_work_status' => null,
+                    'driver_licence_class' => null,
                 ]);
 
                 if ($anonymise) {

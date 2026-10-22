@@ -1,371 +1,189 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+// The public job page inside the website shell (mockup v2, approved by
+// Stephan 23 Oct 2026). /careers/jobs/{slug} shows the role;
+// /careers/jobs/{slug}/apply shows it with the apply wizard already open.
+import { ApplyWizard } from '@/components/careers/apply-wizard';
 import {
-    employmentTypeLabels,
-    sourceChannelOptions,
-} from '@/lib/job-posting-constants';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { Briefcase, FileText, MapPin } from 'lucide-react';
+    employmentType,
+    formatDate,
+    JobFacts,
+    jobHeading,
+    paragraphs,
+    textLines,
+    type PublicJob,
+} from '@/components/careers/careers-parts';
+import { PageIntro } from '@/components/public-site/primitives';
+import { siteLinks, usePublicSite } from '@/components/public-site/site';
+import { Button } from '@/components/ui/button';
+import PublicSiteLayout from '@/layouts/marketing-layout';
+import { Link } from '@inertiajs/react';
+import {
+    ArrowRight,
+    Briefcase,
+    CalendarClock,
+    MapPin,
+    Wallet,
+    type LucideIcon,
+} from 'lucide-react';
+import { useState } from 'react';
 
 type Props = {
-    job: {
-        id: number;
-        title: string;
-        slug: string;
-        position_role: string | null;
-        employment_type: string;
-        summary: string | null;
-        description: string | null;
-        requirements: string | null;
-        responsibilities: string | null;
-        screening_questions: string[];
-        site: { id: number; name: string } | null;
-        closing_at: string | null;
-    };
-    trackingDefaults: {
-        source_channel: string;
-    };
+    job: PublicJob;
+    /** The apply route opens the wizard straight away. */
+    openApply?: boolean;
+    trackingDefaults?: { source_channel: string };
 };
 
-export default function CareersApply({ job, trackingDefaults }: Props) {
-    const { flash } = usePage().props as { flash?: { success?: string } };
+function BulletList({ items }: { items: string[] }) {
+    return (
+        <ul className="list-disc space-y-2 pl-5 text-muted-foreground marker:text-primary">
+            {items.map((item, index) => (
+                <li key={`${index}-${item}`}>{item}</li>
+            ))}
+        </ul>
+    );
+}
 
-    const screeningQuestions = job.screening_questions ?? [];
-
-    const form = useForm({
-        first_name: '',
-        last_name: '',
-        preferred_name: '',
-        personal_email: '',
-        personal_phone: '',
-        cover_letter: '',
-        cv: null as File | null,
-        privacy_consent: false,
-        source_channel: trackingDefaults?.source_channel ?? 'career_page',
-        source_reference: '',
-        screening_answers: screeningQuestions.map((q) => ({
-            question: q,
-            answer: '',
-        })),
-    });
-
-    const setAnswer = (index: number, answer: string) =>
-        form.setData(
-            'screening_answers',
-            form.data.screening_answers.map((row, i) =>
-                i === index ? { ...row, answer } : row,
-            ),
-        );
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post(`/careers/jobs/${job.slug}/apply`, { forceFormData: true });
-    }
+export default function CareersJob({
+    job,
+    openApply = false,
+    trackingDefaults,
+}: Props) {
+    const { name } = usePublicSite();
+    const [open, setOpen] = useState(openApply);
+    const about = paragraphs(job.description);
+    const duties = textLines(job.responsibilities);
+    const needs = textLines(job.requirements);
+    const glance: [LucideIcon, string, string][] = [
+        ...(job.site
+            ? [[MapPin, 'Where', job.site.name] as [LucideIcon, string, string]]
+            : []),
+        [Briefcase, 'Type', employmentType(job.employment_type)],
+        ...(job.pay
+            ? [[Wallet, 'Pay', job.pay] as [LucideIcon, string, string]]
+            : []),
+        [
+            CalendarClock,
+            'Applications close',
+            formatDate(job.closing_at) ?? 'When the role is filled',
+        ],
+    ];
 
     return (
-        <>
-            <Head title={`Apply - ${job.title}`} />
-            <div className="mx-auto max-w-3xl px-4 py-10">
-                <PageLayout
-                    padding="none"
-                    hero={
-                        <PageHero
-                            variant="compact"
-                            backHref="/careers"
-                            backLabel="Back to careers"
-                            icon={FileText}
-                            title={`Apply for ${job.title}`}
-                        >
-                            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                    <Briefcase className="h-3.5 w-3.5" />{' '}
-                                    {employmentTypeLabels[
-                                        job.employment_type
-                                    ] || job.employment_type}
-                                </span>
-                                {job.position_role && (
-                                    <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                    >
-                                        {job.position_role.replace(/_/g, ' ')}
-                                    </Badge>
-                                )}
-                                {job.site && (
-                                    <span className="flex items-center gap-1">
-                                        <MapPin className="h-3.5 w-3.5" />{' '}
-                                        {job.site.name}
-                                    </span>
-                                )}
-                            </div>
-                        </PageHero>
-                    }
+        <PublicSiteLayout
+            title={job.title}
+            description={job.summary ?? `Apply for the ${job.title} role.`}
+            current="careers"
+            intro={
+                <PageIntro
+                    eyebrow="Careers"
+                    title={jobHeading(job)}
+                    lede={job.summary ?? undefined}
+                    back={{ href: siteLinks.careers, label: 'All open roles' }}
                 >
-                    {flash?.success && (
-                        <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success">
-                            {flash.success}
-                        </div>
+                    <div className="text-journey-ink-muted">
+                        <JobFacts job={job} />
+                    </div>
+                    <Button
+                        size="lg"
+                        className="frontline-tap"
+                        onClick={() => setOpen(true)}
+                    >
+                        Apply for this role
+                        <ArrowRight className="size-4" aria-hidden />
+                    </Button>
+                </PageIntro>
+            }
+        >
+            <div className="journey-site-container grid items-start gap-6 py-12 lg:grid-cols-[1.6fr_1fr]">
+                <article className="space-y-8 rounded-3xl border border-border bg-card p-6 md:p-10">
+                    {about.length > 0 && (
+                        <section className="space-y-3">
+                            <h2 className="text-section-title">
+                                About the role
+                            </h2>
+                            {about.map((paragraph, index) => (
+                                <p
+                                    key={index}
+                                    className="leading-relaxed whitespace-pre-line text-muted-foreground"
+                                >
+                                    {paragraph}
+                                </p>
+                            ))}
+                        </section>
                     )}
-
-                    {job.summary && (
-                        <p className="border-l-2 border-primary/30 pl-4 text-muted-foreground italic">
-                            {job.summary}
+                    {duties.length > 0 && (
+                        <section className="space-y-3">
+                            <h2 className="text-section-title">
+                                What you’ll do
+                            </h2>
+                            <BulletList items={duties} />
+                        </section>
+                    )}
+                    {needs.length > 0 && (
+                        <section className="space-y-3">
+                            <h2 className="text-section-title">
+                                What you’ll bring
+                            </h2>
+                            <BulletList items={needs} />
+                        </section>
+                    )}
+                    <section className="space-y-3 rounded-2xl bg-muted p-5">
+                        <h2 className="font-semibold">
+                            Checks before you start
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                            If we offer you the role, we’ll check two references
+                            and ask for your consent to a New Zealand Police vet
+                            before your first shift. Having a conviction doesn’t
+                            automatically rule you out: we look at each one
+                            fairly and in confidence.
                         </p>
-                    )}
-
-                    <form onSubmit={submit} className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Your details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div>
-                                        <Label>First name *</Label>
-                                        <Input
-                                            value={form.data.first_name}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'first_name',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="mt-1"
-                                        />
-                                        {form.errors.first_name && (
-                                            <p className="mt-1 text-sm text-destructive">
-                                                {form.errors.first_name}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <Label>Last name *</Label>
-                                        <Input
-                                            value={form.data.last_name}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'last_name',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="mt-1"
-                                        />
-                                        {form.errors.last_name && (
-                                            <p className="mt-1 text-sm text-destructive">
-                                                {form.errors.last_name}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
+                    </section>
+                </article>
+                <aside className="space-y-4 rounded-3xl border border-border bg-card p-6">
+                    <p className="font-semibold">At a glance</p>
+                    <dl className="space-y-3 text-sm">
+                        {glance.map(([Icon, term, value]) => (
+                            <div key={term} className="flex gap-3">
+                                <Icon
+                                    className="mt-0.5 size-4 shrink-0 text-primary"
+                                    aria-hidden
+                                />
                                 <div>
-                                    <Label>Preferred name</Label>
-                                    <Input
-                                        value={form.data.preferred_name}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'preferred_name',
-                                                e.target.value,
-                                            )
-                                        }
-                                        className="mt-1"
-                                    />
+                                    <dt className="text-muted-foreground">
+                                        {term}
+                                    </dt>
+                                    <dd className="font-medium">{value}</dd>
                                 </div>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div>
-                                        <Label>Email *</Label>
-                                        <Input
-                                            type="email"
-                                            value={form.data.personal_email}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'personal_email',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="mt-1"
-                                        />
-                                        {form.errors.personal_email && (
-                                            <p className="mt-1 text-sm text-destructive">
-                                                {form.errors.personal_email}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <Label>Phone</Label>
-                                        <Input
-                                            value={form.data.personal_phone}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'personal_phone',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <Label>
-                                        How did you hear about this role?
-                                    </Label>
-                                    <select
-                                        className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
-                                        value={form.data.source_channel}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'source_channel',
-                                                e.target.value,
-                                            )
-                                        }
-                                    >
-                                        {sourceChannelOptions.map((opt) => (
-                                            <option
-                                                key={opt.value}
-                                                value={opt.value}
-                                            >
-                                                {opt.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <Label>Reference (optional)</Label>
-                                    <Input
-                                        value={form.data.source_reference}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'source_reference',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="e.g. campaign code or referral name"
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Application</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <Label>Cover letter</Label>
-                                    <Textarea
-                                        rows={6}
-                                        value={form.data.cover_letter}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'cover_letter',
-                                                e.target.value,
-                                            )
-                                        }
-                                        className="mt-1"
-                                        placeholder="Tell us why you're interested in this role..."
-                                    />
-                                </div>
-                                <div>
-                                    <Label>CV / Resume</Label>
-                                    <Input
-                                        type="file"
-                                        accept=".pdf,.doc,.docx"
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'cv',
-                                                e.target.files?.[0] ?? null,
-                                            )
-                                        }
-                                        className="mt-1"
-                                    />
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        PDF, DOC, or DOCX (max 10MB)
-                                    </p>
-                                    {form.errors.cv && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {form.errors.cv}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="flex items-start gap-2 pt-2">
-                                    <Checkbox
-                                        checked={form.data.privacy_consent}
-                                        onCheckedChange={(checked) =>
-                                            form.setData(
-                                                'privacy_consent',
-                                                Boolean(checked),
-                                            )
-                                        }
-                                        id="privacy-consent"
-                                    />
-                                    <Label
-                                        htmlFor="privacy-consent"
-                                        className="text-sm leading-5 font-normal"
-                                    >
-                                        I consent to the collection and
-                                        processing of my personal information
-                                        for recruitment purposes in accordance
-                                        with the Privacy Act 2020.
-                                    </Label>
-                                </div>
-                                {form.errors.privacy_consent && (
-                                    <p className="text-sm text-destructive">
-                                        {form.errors.privacy_consent}
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {screeningQuestions.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>A few questions</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {form.data.screening_answers.map(
-                                        (row, i) => (
-                                            <div key={i}>
-                                                <Label>{row.question}</Label>
-                                                <Textarea
-                                                    rows={3}
-                                                    value={row.answer}
-                                                    onChange={(e) =>
-                                                        setAnswer(
-                                                            i,
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    className="mt-1"
-                                                    placeholder="Your answer..."
-                                                />
-                                            </div>
-                                        ),
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        <div className="flex justify-end">
-                            <Button
-                                type="submit"
-                                size="lg"
-                                disabled={form.processing}
-                            >
-                                {form.processing
-                                    ? 'Submitting...'
-                                    : 'Submit Application'}
-                            </Button>
-                        </div>
-                    </form>
-                </PageLayout>
+                            </div>
+                        ))}
+                    </dl>
+                    <Button
+                        className="frontline-tap w-full"
+                        onClick={() => setOpen(true)}
+                    >
+                        Apply for this role
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                        Questions?{' '}
+                        <Link
+                            href={siteLinks.contact}
+                            className="font-semibold text-primary hover:underline"
+                        >
+                            Send us a careers question
+                        </Link>
+                        .
+                    </p>
+                </aside>
             </div>
-        </>
+
+            <ApplyWizard
+                job={job}
+                open={open}
+                onClose={() => setOpen(false)}
+                siteName={name}
+                sourceChannel={trackingDefaults?.source_channel}
+            />
+        </PublicSiteLayout>
     );
 }

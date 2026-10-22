@@ -14,7 +14,12 @@ import {
     priorityTone,
 } from '../priority-badge';
 import { ReferralStageBadge } from '../stage-badge';
-import { label, referralHref, type WorkspaceReferral } from '../types';
+import {
+    label,
+    referralHref,
+    shownReference,
+    type WorkspaceReferral,
+} from '../types';
 
 const finished = (stage: string) => ['closed', 'converted'].includes(stage);
 
@@ -108,7 +113,7 @@ export function ReferralCard({
             name={record.name}
             href={referralHref(record.reference)}
             linkLabel={`Open ${record.name}`}
-            subline={`${record.reference} · ${label(record.source)}`}
+            subline={`${shownReference(record)} · ${label(record.source)}`}
             actions={actions}
             onContextMenu={onContextMenu}
             openLabel={openLabel}

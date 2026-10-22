@@ -40,6 +40,9 @@ final class ReferralPresenter
 
         return [
             'reference' => $referral->reference, 'version' => $referral->lock_version,
+            // ENQ- number given to a general enquiry; shown wherever the record appears.
+            'enquiry_reference' => $referral->enquiryReference(),
+            'is_general_enquiry' => $referral->isGeneralEnquiry(),
             'name' => isset($identity['retention_redacted_at']) ? 'Details removed under the retention policy'
                 : ($name !== '' ? $name : 'Enquiry from '.($referral->intake['submitted_contact']['name'] ?? 'an unnamed contact')),
             'preferred_name' => $identity['preferred_name'] ?? null,
@@ -80,6 +83,8 @@ final class ReferralPresenter
             'identity' => Arr::only($referral->identity, ['first_name', 'last_name', 'preferred_name', 'date_of_birth']),
             'contact' => Arr::only($referral->intake['submitted_contact'] ?? [], ['name', 'email', 'phone', 'channel', 'safe_time', 'leave_message', 'communication']),
             'intake' => Arr::only($referral->intake, ['relationship', 'organisation', 'region', 'goals', 'timeframe', 'provenance', 'preparation_reason']),
+            // A Contact us message: what it's about, what they wrote and how they asked us to reply.
+            'enquiry' => isset($referral->intake['enquiry']) ? Arr::only($referral->intake['enquiry'], ['topic', 'message', 'reply_by']) : null,
             'contact_permission' => ReferralAssessment::scope($referral, 'contact'),
             'can_complete_intake' => $referral->general_enquiry && $this->access->can($actor, 'edit') && ReferralAssessment::scope($referral, 'collect'),
             'primary_work_item_id' => $referral->primary_work_item_id,

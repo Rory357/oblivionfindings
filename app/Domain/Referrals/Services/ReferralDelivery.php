@@ -92,7 +92,8 @@ final class ReferralDelivery
             $row->fill(['state' => 'sending', 'claim_token' => $token, 'claimed_at' => now(), 'last_error_code' => null])->save();
             $this->event($row, 'claimed');
 
-            return ['token' => $token, 'recipient' => $row->message['recipient'], 'reference' => $referral->reference];
+            // The reference the person was given (ENQ- for a general enquiry).
+            return ['token' => $token, 'recipient' => $row->message['recipient'], 'reference' => $referral->displayReference()];
         }, 3);
         if ($claim === null) {
             return;

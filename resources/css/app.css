@@ -3,6 +3,7 @@
 @import 'tw-animate-css';
 @import './maintenance-date-time.css';
 @import './journey-auth.css';
+@import './journey-site.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';

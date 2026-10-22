@@ -17,7 +17,14 @@ vi.mock('axios', () => ({
         isAxiosError: (e: { isAxiosError?: boolean }) => !!e.isAxiosError,
     },
 }));
-vi.mock('@inertiajs/react', () => ({ Head: () => null }));
+vi.mock('@inertiajs/react', () => ({
+    Head: () => null,
+    usePage: () => ({
+        url: '/',
+        props: { provider: { phone: '0800 000 000' } },
+    }),
+    router: { on: () => () => {} },
+}));
 vi.mock('@/layouts/marketing-layout', () => ({
     default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
 }));
@@ -61,9 +68,12 @@ it('requires a deliberate file confirmation and displays a receipt without promi
     const file = new File(['%PDF-1.4\nFictional\n%%EOF'], 'letter.pdf', {
         type: 'application/pdf',
     });
-    fireEvent.change(screen.getByLabelText(/^Choose a document/), {
-        target: { files: [file] },
-    });
+    fireEvent.change(
+        screen.getByLabelText(/^Choose a document/, { selector: 'input' }),
+        {
+            target: { files: [file] },
+        },
+    );
     fireEvent.click(screen.getByRole('checkbox'));
     post.mockResolvedValueOnce({
         data: {
@@ -84,9 +94,12 @@ it('requires a deliberate file confirmation and displays a receipt without promi
 it('keeps the same file available for retry after an uncertain upload and clears confirmation on replacement', async () => {
     await openRequest();
     const file = new File(['first'], 'first.pdf', { type: 'application/pdf' });
-    fireEvent.change(screen.getByLabelText(/^Choose a document/), {
-        target: { files: [file] },
-    });
+    fireEvent.change(
+        screen.getByLabelText(/^Choose a document/, { selector: 'input' }),
+        {
+            target: { files: [file] },
+        },
+    );
     fireEvent.click(screen.getByRole('checkbox'));
     post.mockRejectedValueOnce(new Error('Network lost'));
     fireEvent.click(screen.getByRole('button', { name: 'Send document' }));
@@ -94,25 +107,35 @@ it('keeps the same file available for retry after an uncertain upload and clears
         expect(screen.getByRole('alert')).toHaveTextContent('same file'),
     );
     expect(screen.getByText(/first.pdf/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/^Choose a document/), {
-        target: {
-            files: [
-                new File(['second'], 'second.pdf', { type: 'application/pdf' }),
-            ],
+    fireEvent.change(
+        screen.getByLabelText(/^Choose a document/, { selector: 'input' }),
+        {
+            target: {
+                files: [
+                    new File(['second'], 'second.pdf', {
+                        type: 'application/pdf',
+                    }),
+                ],
+            },
         },
-    });
+    );
     expect(screen.getByRole('checkbox')).not.toBeChecked();
 });
 
 it('clears private request details and the selected file when an opened request becomes unavailable', async () => {
     await openRequest();
-    fireEvent.change(screen.getByLabelText(/^Choose a document/), {
-        target: {
-            files: [
-                new File(['first'], 'first.pdf', { type: 'application/pdf' }),
-            ],
+    fireEvent.change(
+        screen.getByLabelText(/^Choose a document/, { selector: 'input' }),
+        {
+            target: {
+                files: [
+                    new File(['first'], 'first.pdf', {
+                        type: 'application/pdf',
+                    }),
+                ],
+            },
         },
-    });
+    );
     fireEvent.click(screen.getByRole('checkbox'));
     post.mockRejectedValueOnce({
         isAxiosError: true,
@@ -122,7 +145,7 @@ it('clears private request details and the selected file when an opened request 
     await screen.findByText(/contact the team for a new request/);
     expect(screen.queryByText('Decision letter')).not.toBeInTheDocument();
     expect(
-        screen.queryByLabelText(/^Choose a document/),
+        screen.queryByLabelText(/^Choose a document/, { selector: 'input' }),
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText(/^10-digit code/)).toHaveValue('');
 });
