@@ -41,7 +41,34 @@ None.
 
 ## Similarity check
 
-Still to do, by the checker session.
+**Clean: no sign of copied code.** Checked by the checker session on 23 October 2026 with [../tools/token-similarity.mjs](../tools/token-similarity.mjs), a cross-language token comparison written for this check (greedy string tiling, as JPlag does).
+
+- **Compared:** the 8 files in `app/Services/Chat/Voice/` and `ChatVoiceInspector.php` against 38 outside source files (78,511 lines), fetched on 23 October 2026 into a scratch folder outside the repository:
+  - FFmpeg `e914b1cb0c51`: ffprobe, the Matroska, Ogg (Opus, Vorbis) and MOV/MP4 demuxers, `isom.c`, the Opus and Vorbis parsers, `mpeg4audio.c`, `crc.c`;
+  - libogg `06a5e0262cdc` (`framing.c`), libopus `084bb7327ce9` (`opus.c`, `opus_decoder.c`), opusfile `6dfd29e7adb8`, libvorbis `1b75110b5a27` (`info.c`);
+  - libwebm `a7c6662c68a9` (`mkvparser.cc`);
+  - GPAC/mp4box `7cda8f465456` (the ISO box readers and `odf_code.c`);
+  - music-metadata `bbd6e943c887` (its EBML, Matroska, Ogg, Opus, Vorbis and MP4 parsers).
+- **Thresholds, every match reviewed by hand:**
+  - structure (names and numbers abstracted): runs of 12 tokens or more, 306 runs;
+  - literal names and numbers: runs of 6 tokens or more, 199 runs;
+  - comment words: runs of 6 words or more, 1 run.
+- **Result:**
+  - The 126 longest structure runs (up to 104 tokens) are lists: constant declarations, number tables and string arrays.
+  - The other 180 are idioms of 12 to 20 tokens, such as counted loops and "if this, throw". Each turns up in several unrelated outside files.
+  - The longest literal run is 12 tokens (`for (i = 1; i < count; i++)`).
+  - The only shared comment words are the standard's own name, "the ISO base media file format".
+  - Shared names are the standards' element and box names, ffprobe's documented output fields and the RFCs' EBML IDs.
+- **Score:** the best coverage of any new file by one outside file, lists left out, is 1.0–5.9 %. The one exception is `VoiceFacts.php` at 15.9 %: one 14-token idiom in an 88-token file.
+  - Unrelated Chat services (`ChatUploads`, `ChatFileSafety`, `ChatSettings`, `ChatServiceHealth`, `SelfHostedCalling`) score 0–5.5 %.
+  - A deliberate PHP port of libopus's packet parser, kept outside the repository and deleted afterwards, scores 41.6 % against `opus.c`, with 31-token runs.
+  - The test code (`tests/Support/ChatVoice/`, `tests/Unit/Chat/Voice/`) scores 0–8.3 %. Its longest run that is not a list is 19 tokens.
+- **Compared by eye:** the closest pairs, because token tools can miss a reordered port. They follow the same standard-defined steps with different structure:
+  - Opus framing against libopus and FFmpeg;
+  - the MPEG-4 descriptor length and ES descriptor flags against FFmpeg's `isom.c`, both written the way ISO/IEC 14496-1's syntax defines them;
+  - EBML VINT reading and signed lacing against FFmpeg and libwebm (the offset 2^(7n−1)−1 is RFC 9559 §10.3.3's own formula);
+  - `stsc` run checks against music-metadata's 22 October chapter-track code;
+  - the Ogg CRC against libogg and FFmpeg. Oblivion's zero-run correction of PHP's `crc32` hash appears in neither.
 
 ## Decisions taken
 
@@ -143,9 +170,77 @@ These are cases where the spec left room or real files differed from it.
   - `ChatVoiceInspectorTest` has 27 tests, including every agreement case.
   - `ChatUploadsTest` now uploads a real Chrome recording with no ffprobe (ready, 4,860 ms, ignoring the browser's claimed length) and a cut copy (blocked).
 
+## Checker review (23 October 2026)
+
+By the checker session on branch `claude/voice-checker-signoff-49310d`. Outside source was opened only for the comparison above; none of it is in Oblivion, and the findings below are described in words.
+
+**Verdict: not signed off yet.** No copying was found, and most of spec section 3 holds. Three findings must be fixed first, and F1 needs Stephan's decision.
+
+### Spec section 3, item by item
+
+| Item | Result |
+|---|---|
+| Recordings from Chrome, Edge, Firefox and Safari, 5 s and 119 s | **Chrome, Edge and Firefox: met.** The 12 files are distinct, made for Oblivion, and match the README; track numbers, Duration and the MP4 layout were read from the bytes. **Safari: missing** (known gap). The 119 s MP4 is generated, not recorded. |
+| A hand-built file for each rule | **Met.** Every rule the spec lists has a case in each format it applies to: two tracks, video, wrong codec, too long, too short, cut inside an element, box or page, a size past the end, a bad CRC, unknown sizes, an empty file. |
+| 10,000 mutations: never throw, never over 2 s, never ready when broken | **The test passes** (re-run: 44 s). **Not met for every input:** F2 makes `inspect()` throw, and F3 takes over 2 s. The random mutations reach neither. |
+| The same results as ffprobe within 20 ms | **Met.** Re-run with ffprobe 8.1.1 configured: all 25 good files agree and both refuse Opus inside MP4, with none skipped. |
+| Voice notes available without ffprobe; with it, both run and a disagreement blocks the file and is reported | **Met, except F2.** `configured()` is always true. The container injects Laravel's logger, so disagreements are logged (checked with `artisan tinker`). |
+
+Re-run by the checker, through the machine-wide heavy-lock:
+- `tests/Unit/Chat/Voice` and `ChatVoiceInspectorTest`, with `CHAT_VOICE_PROBE_BINARY` set to ffprobe 8.1.1: 178 passed (490 assertions), 71 s;
+- `tests/Feature/Chat/ChatUploadsTest.php`: 13 passed (142 assertions), 551 s.
+
+### Findings
+
+- **F1: the Vorbis length comes from the page positions, not the audio. Blocks sign-off; Stephan decides.**
+  - Decision 15 raises the granule length to a floor of (packets − 2) × half the short block. Real packets can each be half a long block: 8 times more at libvorbis's 256/2048, up to 128 times within the Vorbis I limits.
+  - The probe was a real libvorbis file with its page positions scaled down to that floor and its CRCs recomputed, so it is still well formed:
+    - 200 s of audio: the checker says ready, 25,000 ms;
+    - 600 s of audio: ready, 75,000 ms;
+    - ffmpeg decodes 3 min 15 s and 9 min 46 s.
+  - ffprobe reads the real block sizes and calls the 200 s file too long. So with the second opinion the file is blocked; without it the 2-minute limit is bypassed.
+  - Spec section 2 does say "last granule position / sample rate", but section 1 asks for the length from the audio itself, never guessed.
+  - Options:
+    - refuse Vorbis voice notes (no browser records Vorbis, and Oblivion's recorder never asks for it);
+    - decode the setup header's mode table and count each packet's real block size;
+    - accept Vorbis only when the second opinion is configured.
+  - Ogg Opus and WebM are not affected. For MP4, the checker trusts container timing, as ffprobe does: an MP4 with every timing value divided by 8 fools both alike.
+- **F2: `inspect()` can throw when ffprobe is configured. Must fix.**
+  - In `secondOpinion()`, the output callback throws once ffprobe's output passes 2 MiB.
+  - The `catch` block's stop reads the pipes again, so the callback throws a second time from inside the `catch`, and the exception leaves `inspect()`.
+  - Any file with roughly 19,000 or more packets does this; the honest 600 s Vorbis file is one. `ChatUploads::scan()` then fails the request, and the upload stays "scanning" until its 180-second retry, which fails again.
+  - The pattern was already in `faeb9435c`, so the builder did not introduce it.
+- **F3: the 2-second limit can be passed. Must fix.**
+  - In `OpusPacket::samples()`, the padding-length loop of a code-3 packet never checks the time budget. It also does not stop once the declared padding can no longer fit.
+  - The probe was a 20 MiB WebM: 350,000–450,000 valid one-byte Opus blocks, then one packet whose padding-length bytes are all 0xFF to the end. It was blocked correctly, but after 2.07–2.27 s on this PC (measured twice).
+  - One bad 20 MiB padding packet alone takes 1.1–1.2 s.
+- **F4: minor.** In fragmented MP4, the sample-description indexes in `tfhd` and `trex` are skipped without being required to be 1, although `stsd` holds one entry. It does not change the length.
+
+### Builder decisions
+
+All 25 were reviewed against the RFCs, the fixture bytes and the tests. They are sound, except that decision 15 leads to F1 and decision 22's budget is not enforced inside the padding loop (F3). The ones asked about:
+
+- **1, track number:** RFC 9559 section 10 says blocks name the TrackEntry's TrackNumber, and Firefox writes 2 (confirmed). The spec's "track 1" was a shorthand.
+- **2, Duration 0 counts as absent:** RFC 9559 says Duration > 0, so this is a deliberate leniency for Firefox, which writes 0.0 (confirmed). It can only leave the block-based length in charge, never hide audio.
+- **17, fragmented MP4:** the spec refuses only files without `moov`. Chrome writes `moov` with `mvex`, then 19 `moof`/`mdat` pairs (confirmed). Reading both layouts is right while Safari's layout is unknown.
+- **14, Ogg Opus leaves out the pre-skip:** RFC 7845 section 4.3 defines the position as granule − pre-skip, so the checker is right, and ffprobe's 6.5 ms more is its own convention. With the second opinion, a pre-skip over about 960 samples would be blocked. Browsers write 312.
+- **22, the 1.5-second budget:** a sensible margin under 2 s, but see F3.
+- **The mutation test's "undecided" rule:** sound and narrow.
+  - It excuses only a changed size whose new end lands exactly on an existing boundary or the file end, or that becomes unknown-size or 64-bit. Such files can really be valid.
+  - Every other critical-byte change, every cut inside a declared extent and every Ogg change must still block.
+- **Stricter than the RFCs, which is safe:**
+  - decision 13 refuses a stream that starts at a later position (RFC 7845 section 4.5 allows one);
+  - it caps end trimming at one packet, which the RFC makes a SHOULD.
+
+### Spec section 4
+
+- `voice_probe_binary` is optional, Service health names the checker, and the register is updated.
+- `docs/chat-experience/IMPLEMENTATION-STATUS.md` still describes ffprobe as the voice inspector; it should be updated when C2.5 merges.
+
 ## Open questions
 
 - **Safari.** Real Safari recordings (5 s and 119 s) are still needed from a Mac or an iPhone. The MP4 parser has only seen Chrome's fragmented MP4 and generated files.
 - **Disagreement reporting.** Should a disagreement with ffprobe also show in Settings › Chat › Service health, or get its own error code? Today it is logged, and the person sees "could not be verified".
 - **Unused error code.** `voice_check_unavailable` is no longer produced. The browser still understands it, and it is harmless.
-- **Similarity check.** The checker session runs it and signs off REGISTER.md.
+- **Vorbis (F1).** Stephan decides between refusing Vorbis voice notes, decoding the Vorbis mode table, and accepting Vorbis only with the ffprobe second opinion.
+- **Sign-off.** Once F1 to F3 are fixed, a checker session re-runs the voice tests (with and without ffprobe) and the three probe files from the review: the understated Vorbis file, the long file with ffprobe configured, and the padding file. It then signs off REGISTER.md. The similarity check needs re-running only on the files that change.

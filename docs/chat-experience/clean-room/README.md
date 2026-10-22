@@ -39,7 +39,7 @@ Ownership of AI-written code is not settled law everywhere. A lawyer should conf
 
 Before an engine merges, the checker:
 
-1. Runs a token-similarity comparison between the new files and the replaced library's source, and reviews every match above a low threshold by hand.
+1. Runs a token-similarity comparison between the new files and the replaced library's source, and reviews every match above a low threshold by hand. [tools/token-similarity.mjs](tools/token-similarity.mjs) does this across PHP, TypeScript and C. Download the outside source to a scratch folder outside the repository, and calibrate the tool with a deliberate port of one outside function (kept outside the repository) and with unrelated Oblivion files.
 2. Confirms the replaced packages are uninstalled, their licence copies removed from `deploy/chat-calling/licenses/`, and `scripts/chat-license-notices.mjs` updated.
 3. Adds a guard so the package can't come back unnoticed (ESLint `no-restricted-imports` for browser packages; a test that reads `composer.json` for PHP packages).
 4. Marks the engine "signed off" in REGISTER.md with the date and the provenance note.
@@ -67,7 +67,7 @@ Copy into `provenance/<engine>.md`.
 |---|---|---|
 | Oblivion Live (live updates, typing, presence, call signalling) and the Oblivion signer | [specs/oblivion-live.md](specs/oblivion-live.md) | Spec written 23 Oct 2026; ready for a builder session |
 | Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Spec written 23 Oct 2026; ready for a builder session |
-| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Built 23 Oct 2026 on `claude/eager-mahavira-c57cd4` ([provenance](provenance/voice-checker.md)); waiting for a checker session |
+| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Built 23 Oct 2026 on `claude/eager-mahavira-c57cd4` ([provenance](provenance/voice-checker.md)). Checked 23 Oct 2026: no copied code; sign-off held for three findings, back to the builder (Vorbis needs Stephan's decision) |
 | Oblivion Calls | to write after Oblivion Live (stage 5) | — |
 
 The session that wrote these specs opened the built files of livekit-client and pusher-js to read their licence headers, so it does not build those replacements itself.
