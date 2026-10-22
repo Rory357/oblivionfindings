@@ -163,8 +163,10 @@ final class ReferralServiceAgreements
 
             // Only an agreement that still exists needs the "leave it unchanged" confirmation.
             $earlier = $this->liveLink(ReferralServiceAgreement::query()->where('referral_id', $referral->id));
-            abort_if($earlier && ! ($data['acknowledge_earlier_agreement'] ?? false), 422,
-                'An agreement from proposal version '.$earlier->proposal_version.' already exists and will not be changed. Confirm that you are creating a separate draft for version '.$proposal->version.'.');
+            // An explicit check: abort_if() would build this message, reading $earlier, even when there is none.
+            if ($earlier && ! ($data['acknowledge_earlier_agreement'] ?? false)) {
+                abort(422, 'An agreement from proposal version '.$earlier->proposal_version.' already exists and will not be changed. Confirm that you are creating a separate draft for version '.$proposal->version.'.');
+            }
             // A draft Finance deleted keeps its link as history; this version may then get a fresh draft.
             $replaced = ReferralServiceAgreement::query()->where('referral_id', $referral->id)->where('proposal_id', $proposal->id)->lockForUpdate()->orderByDesc('id')->first();
 
