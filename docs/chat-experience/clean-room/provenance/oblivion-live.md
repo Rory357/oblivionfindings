@@ -17,6 +17,14 @@
 - New outside packages: none. The gateway uses only Node's built-in modules; the browser client uses the browser's own `WebSocket`; the PHP side uses Laravel's existing HTTP client.
 - Similarity check: to be run by the checker session.
 
+## Evidence so far (23 Oct 2026)
+
+- Gateway: 68 `node --test` tests pass (handshake, masking, every length form, fragments, invalid UTF-8, oversize, rate limit, ping timeout, tickets, call grants, revoke, internal API, presence) including a seeded frame fuzz test (3,000 reader rounds plus 4,000 random inputs on 200 live connections; repeated with three seeds).
+- Signer: the PHP `CompactToken` and the gateway accept the same fixed token byte for byte (vector in both test suites).
+- Capacity: 5,000 idle signed-in connections on one node used 97 MB resident memory, opened in 4.5 s (`node live/tools/idle-connections.mjs 5000`).
+- Interop without fakes: a ticket from the PHP signer opened a real gateway connection; `OblivionLive::publish()` reached it in about 33 ms on loopback (three runs, 32–35 ms, from just before the call to receipt); `health()` read the node; `revoke()` closed it with 4403.
+- Browser: Vitest connection, sync-loop, typing and row tests, and all 596 existing chat tests.
+
 ## Decisions taken while building
 
 - **Rotation key ID.** The spec lists `previous_secret` but no key ID for it. Tickets name their key with `kid`, so the gateway needs to know the old key's ID during a rotation: added `LIVE_PREVIOUS_KEY_ID` / `chat.live.previous_key_id`.
@@ -27,6 +35,12 @@
 - **Extra limits.** At most 128 fragments per message (empty fragments would otherwise cost nothing against the byte limit); a connection whose unsent backlog passes 1 MiB is dropped; the node refuses new connections over `LIVE_MAX_CONNECTIONS` (default 10,000) with 503.
 - **Presence grace.** A person's last connection closing is reported as offline only after 10 seconds, so a page reload does not flicker their status.
 - **Defence in depth.** The gateway never forwards `presence` to a family connection (`fam: true`), whatever the app publishes.
+- **Idle sessions.** A ticket renewal every 13 minutes is background work: `EnforceSessionTimeout` does not count it as activity (as it did not count Reverb's channel signing), so an open tab cannot keep an idle session signed in. Typing does count.
+- **Change kinds.** `conversation.changed` names what changed: `message`, `edit`, `removal`, `reaction`, `pin`, `save` (only to the person who saved), `people`, `call`, `callback`, `family_work`, `read` and `preferences` (both only to the person themselves). Only message kinds have their own change ID, so the browser skips repeats only for those.
+- **One list row.** `GET /chat/api/conversations?only=<id>` returns just that row (empty when it is no longer visible), so a list refresh after an event costs one row, not the whole list. A row new to the list, list-level changes and catch-ups still fetch the whole list.
+- **Numeric cursor position.** `messages` and `changes` also return `sync_change_id`, the change ID the encrypted cursor covers, so the thread can skip events its cursor has passed without decrypting anything.
+- **Calls keep their own checks.** While a call is ringing or active the call dock still checks every 3 seconds, and the 15-second availability heartbeat stays (call routing needs it), both on the one sync loop, until Oblivion Calls lands (stage 5).
+- **Other watchers.** Watchers with a check of their own (file scans, publication review, notice previews, preferences, callbacks, search, collections, urgent contact, shift handover, follow-ups) keep their interval on the one loop and are also woken by events; only the seven named in spec section 8 stop polling while live.
 
 ## Open questions
 
