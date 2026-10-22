@@ -33,7 +33,12 @@ vi.mock('@inertiajs/react', async () => {
             props: {
                 auth: {
                     user: { id: mocks.actor },
-                    can: { 'securityDevices.groups.manage': true },
+                    can: {
+                        securityDevices: {
+                            groupsManage: true,
+                            monitoringManage: true,
+                        },
+                    },
                 },
             },
         }),
@@ -102,6 +107,8 @@ const indexFixture = (): GroupIndexProps => ({
     filters: {},
 });
 const showFixture = (): GroupShowProps => ({
+    actor_id: 7,
+    as_of: '2026-10-14T03:00:00Z',
     group: {
         id: 17,
         name: 'House devices',
@@ -471,6 +478,24 @@ describe('Device group profile', () => {
         ]);
         expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
     });
+    it('returns keyboard focus to the exact member action after the maintenance reader closes', async () => {
+        mocks.preview.mockResolvedValue({ data: {} });
+        render(<DeviceGroupShow {...showFixture()} />);
+        const opener = screen.getAllByRole('button', {
+            name: 'Actions for Lobby camera',
+        })[0];
+        fireEvent.keyDown(opener, { key: 'ArrowDown' });
+        fireEvent.click(
+            await screen.findByRole('menuitem', {
+                name: 'Preview maintenance policy',
+            }),
+        );
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.click(
+            within(dialog).getAllByRole('button', { name: /^Close$/ })[1],
+        );
+        await waitFor(() => expect(opener).toHaveFocus());
+    });
     it('does not let a preview or pending selection cross to a replacement group or actor', async () => {
         const request = deferred<{ data: AutoRulePreview }>();
         mocks.preview.mockReturnValue(request.promise);
@@ -486,7 +511,7 @@ describe('Device group profile', () => {
         expect(signal.aborted).toBe(true);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(
-            screen.getByRole('heading', { name: 'Different group' }),
+            screen.getByRole('heading', { name: 'Group access unavailable' }),
         ).toBeInTheDocument();
         expect(mocks.post).not.toHaveBeenCalled();
     });

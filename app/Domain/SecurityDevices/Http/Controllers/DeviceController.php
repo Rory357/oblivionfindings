@@ -154,6 +154,7 @@ class DeviceController extends Controller
     public function show(Request $request, Device $device)
     {
         $user = $request->user();
+        $asOf = now()->toImmutable();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
         $this->access->assertCanViewDevice($user, $device);
 
@@ -303,6 +304,8 @@ class DeviceController extends Controller
         $accessibleAssetIds = $this->access->accessibleAssetIds($user);
 
         return Inertia::render('security-devices/devices/show', [
+            'actor_id' => (int) $user->id,
+            'as_of' => $asOf->toISOString(),
             'endpoint_setup' => config('endpoint_management.enabled') && $canUpdate
                 && $user->canDo('securityDevices.commands.admin')
                 && $device->domain === 'it_infrastructure' && in_array($device->category, ['endpoint', 'server'], true)

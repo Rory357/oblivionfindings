@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
+use App\Domain\SecurityDevices\Services\DeviceGroupMaintenancePreview;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator as ValidatorContract;
 use Inertia\Inertia;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class DeviceGroupController extends Controller
 {
@@ -23,6 +25,7 @@ class DeviceGroupController extends Controller
     public function __construct(
         private readonly DeviceGroupAutoRuleService $autoRules,
         private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceGroupMaintenancePreview $maintenancePreview,
     ) {}
 
     public function index(Request $request)
@@ -75,6 +78,7 @@ class DeviceGroupController extends Controller
     public function show(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
+        $asOf = now()->toImmutable();
         $this->assertCanManageGroups($user);
 
         $visibleDevices = $this->access->visibleDevices($user);
@@ -101,6 +105,8 @@ class DeviceGroupController extends Controller
             : 0;
 
         return Inertia::render('security-devices/device-groups/show', [
+            'actor_id' => (int) $user->id,
+            'as_of' => $asOf->toISOString(),
             'group' => [
                 'id' => $group->id,
                 'name' => $group->name,
@@ -127,6 +133,26 @@ class DeviceGroupController extends Controller
                 'category' => $d->category,
             ]),
         ]);
+    }
+
+    public function previewMaintenancePolicy(Request $request, DeviceGroup $group): JsonResponse
+    {
+        try {
+            abort_if($request->getContent() !== '' || $request->request->count() !== 0, 422, 'invalid_request');
+            $data = $this->maintenancePreview->read(
+                $request->user(), (int) $group->id, $request->query(), (string) $request->server('QUERY_STRING', ''),
+            );
+        } catch (HttpExceptionInterface $error) {
+            $status = $error->getStatusCode();
+            if (! in_array($status, [404, 422, 503], true)) {
+                throw $error;
+            }
+
+            return response()->json(['message' => $status === 422 ? 'invalid_request' : 'unavailable'], $status)
+                ->header('Cache-Control', 'private, no-store');
+        }
+
+        return response()->json($data)->header('Cache-Control', 'private, no-store');
     }
 
     public function create(Request $request)

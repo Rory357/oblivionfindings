@@ -34,7 +34,12 @@ vi.mock('@inertiajs/react', async () => {
             props: {
                 auth: {
                     user: { id: mocks.actor },
-                    can: { 'securityDevices.monitoring.manage': mocks.manage },
+                    can: {
+                        securityDevices: {
+                            viewAny: true,
+                            monitoringManage: mocks.manage,
+                        },
+                    },
                 },
             },
         }),

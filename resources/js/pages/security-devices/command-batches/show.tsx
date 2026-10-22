@@ -1,9 +1,22 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import { EntityChip, EntityStatusChip } from '@/components/lists';
+import type { EntityTableColumn } from '@/components/lists/entity-table';
+import { EvidenceRecords } from '@/components/lists/evidence-records';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -12,22 +25,26 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { type StatusVariant } from '@/components/ui/status-badge';
+import { Textarea } from '@/components/ui/textarea';
+import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { formatReadableOperationalValue } from '@/lib/readable-operational-state';
-import { Head, Link, router } from '@inertiajs/react';
+import type { VisitOptions } from '@inertiajs/core';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
-    CheckCircle2,
+    Building2,
     Download,
     FileCheck2,
+    LayoutGrid,
+    List,
     RefreshCw,
     Send,
     ShieldCheck,
-    TriangleAlert,
-    XCircle,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 type BatchTarget = {
     id: number;
@@ -73,7 +90,10 @@ type BatchTarget = {
     } | null;
 };
 
-type BatchPayload = {
+export type BatchPayload = {
+    actor_id: number;
+    as_of: string;
+    requestedById: number;
     id: number;
     uuid: string;
     workspace: string;
@@ -109,63 +129,565 @@ type BatchPayload = {
     partialSemantics: string;
 };
 
+type CurrentAuth = {
+    user?: { id: number } | null;
+    can?: {
+        securityDevices?: {
+            devicesView?: boolean;
+            commandsApprove?: boolean;
+            commandsAdmin?: boolean;
+        };
+    };
+};
+type ReadContext = { actor: number | undefined; id: number; uuid: string };
+function sameReadContext(left: ReadContext, right: ReadContext): boolean {
+    return (
+        left.actor === right.actor &&
+        left.id === right.id &&
+        left.uuid === right.uuid
+    );
+}
+type BatchView =
+    | 'overview'
+    | 'targets'
+    | 'review'
+    | 'ready'
+    | 'results'
+    | 'excluded';
+const views: { key: BatchView; label: string }[] = [
+    { key: 'overview', label: 'Batch overview' },
+    { key: 'targets', label: 'All targets' },
+    { key: 'review', label: 'Awaiting review' },
+    { key: 'ready', label: 'Ready to queue' },
+    { key: 'results', label: 'Execution & results' },
+    { key: 'excluded', label: 'Excluded targets' },
+];
+const progressing = [
+    'queued',
+    'dispatching',
+    'accepted',
+    'running',
+    'succeeded',
+    'reconciling',
+    'uncertain',
+];
+const unsuccessful = [
+    'failed',
+    'blocked',
+    'rejected',
+    'mismatch',
+    'expired',
+    'cancelled',
+];
+const readHeader = 'X-Command-Batch-Read';
+
 function humanise(value: string): string {
     return value.replaceAll('_', ' ').replaceAll('.', ' ');
 }
-
-function statusTone(status: string): string {
-    if (status === 'reconciled' || status === 'completed')
-        return 'border-status-success/30 text-status-success';
-    if (
-        ['failed', 'blocked', 'rejected', 'mismatch', 'expired'].includes(
-            status,
-        )
-    )
-        return 'border-destructive/30 text-destructive';
-    if (
-        [
-            'executing',
-            'queued',
-            'dispatching',
-            'running',
-            'reconciling',
-        ].includes(status)
-    )
-        return 'border-primary/30 text-primary';
-
-    return 'border-status-warning/30 text-status-warning';
+function tone(status: string): StatusVariant {
+    if (status === 'reconciled' || status === 'completed') return 'success';
+    if (unsuccessful.includes(status) || status === 'completed_with_failures')
+        return 'critical';
+    if (progressing.includes(status) || status === 'executing') return 'info';
+    if (status.startsWith('awaiting_') || status === 'partially_completed')
+        return 'warning';
+    return 'neutral';
 }
-
+function time(value: string | null | undefined): string {
+    if (!value) return 'Not recorded';
+    if (!/(Z|[+-]\d{2}:\d{2})$/.test(value)) return 'Time zone not recorded';
+    return formatDateTimeLong(value, 'Time unavailable');
+}
 function SafeSummary({ value }: { value: unknown }) {
-    if (value === null || value === undefined || value === '') return null;
-    if (typeof value === 'string') {
-        return <p className="text-xs text-muted-foreground">{value}</p>;
-    }
-    if (typeof value !== 'object') {
-        return <p className="text-xs text-muted-foreground">{String(value)}</p>;
-    }
+    if (value === null || value === undefined || value === '')
+        return <p className="text-sm text-muted-foreground">Not recorded</p>;
+    if (typeof value !== 'object')
+        return (
+            <p className="text-sm break-words text-muted-foreground">
+                {formatReadableOperationalValue(value)}
+            </p>
+        );
     const entries = Object.entries(value as Record<string, unknown>);
-    if (entries.length === 0) return null;
-
+    if (!entries.length)
+        return <p className="text-sm text-muted-foreground">None recorded</p>;
     return (
-        <dl className="grid gap-x-3 gap-y-1 text-xs sm:grid-cols-2">
+        <>
             {entries.map(([key, entry]) => (
-                <div key={key} className="flex gap-1">
-                    <dt className="font-semibold">{humanise(key)}:</dt>
-                    <dd className="text-muted-foreground">
-                        {formatReadableOperationalValue(entry)}
-                    </dd>
-                </div>
+                <ReviewRow
+                    key={key}
+                    label={humanise(key)}
+                    value={formatReadableOperationalValue(entry)}
+                />
             ))}
-        </dl>
+        </>
     );
 }
+function targetStatus(target: BatchTarget): string {
+    return target.command?.status ?? target.inclusionStatus;
+}
+const evidenceColumns: EntityTableColumn<BatchTarget>[] = [
+    {
+        key: 'identity',
+        label: 'Device & Site',
+        width: '1.2fr',
+        cell: (target) => (
+            <>
+                <ReviewRow
+                    label="Device"
+                    value={
+                        <Link href={target.device.href}>
+                            {target.device.name}
+                        </Link>
+                    }
+                />
+                <ReviewRow label="Device ID" value={target.device.id} />
+                <ReviewRow label="Device UID" value={target.device.uid} />
+                <ReviewRow
+                    label="Provider"
+                    value={target.device.provider ?? 'Native'}
+                />
+                <ReviewRow
+                    label="Category"
+                    value={humanise(target.device.category)}
+                />
+                <ReviewRow
+                    label="Subcategory"
+                    value={
+                        target.device.subcategory
+                            ? humanise(target.device.subcategory)
+                            : 'Not recorded'
+                    }
+                />
+                <ReviewRow
+                    label="Device state"
+                    value={humanise(target.device.status)}
+                />
+                <ReviewRow
+                    label="Recorded health"
+                    value={humanise(target.device.health)}
+                />
+                <ReviewRow
+                    label="Site"
+                    value={
+                        target.site ? (
+                            <Link href={target.site.href}>
+                                {target.site.name}
+                            </Link>
+                        ) : (
+                            'Site unavailable'
+                        )
+                    }
+                />
+                <ReviewRow
+                    label="Site ID"
+                    value={target.site?.id ?? 'Not recorded'}
+                />
+            </>
+        ),
+    },
+    {
+        key: 'inclusion',
+        label: 'Target selection',
+        width: '1fr',
+        cell: (target) => (
+            <>
+                <ReviewRow label="Target ID" value={target.id} />
+                <ReviewRow label="Selection position" value={target.position} />
+                <ReviewRow
+                    label="Inclusion"
+                    value={humanise(target.inclusionStatus)}
+                />
+                <ReviewRow
+                    label="Exclusion code"
+                    value={
+                        target.safeExclusionCode
+                            ? humanise(target.safeExclusionCode)
+                            : 'Not recorded'
+                    }
+                />
+                <ReviewRow
+                    label="Exclusion reason"
+                    value={target.safeExclusionReason ?? 'Not recorded'}
+                />
+            </>
+        ),
+    },
+    {
+        key: 'command',
+        label: 'Command request',
+        width: '1fr',
+        cell: (target) =>
+            target.command ? (
+                <>
+                    <ReviewRow label="Command ID" value={target.command.id} />
+                    <ReviewRow
+                        label="Command reference"
+                        value={target.command.uuid}
+                    />
+                    <ReviewRow
+                        label="Command state"
+                        value={
+                            <EntityStatusChip
+                                variant={tone(target.command.status)}
+                            >
+                                {humanise(target.command.status)}
+                            </EntityStatusChip>
+                        }
+                    />
+                    <ReviewRow
+                        label="Requested by"
+                        value={target.command.requestedBy ?? 'Not recorded'}
+                    />
+                    <ReviewRow
+                        label="Approved by"
+                        value={target.command.approvedBy ?? 'Not recorded'}
+                    />
+                    <ReviewRow
+                        label="Expires"
+                        value={time(target.command.expiresAt)}
+                    />
+                    <ReviewRow
+                        label="Failure reason"
+                        value={
+                            target.command.safeFailureReason ?? 'Not recorded'
+                        }
+                    />
+                    <p className="text-sm font-semibold">Expected state</p>
+                    <SafeSummary value={target.command.expectedState} />
+                </>
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    No child command was created for this target.
+                </p>
+            ),
+    },
+    {
+        key: 'attempt',
+        label: 'Execution evidence',
+        width: '1fr',
+        cell: (target) =>
+            target.command?.latestAttempt ? (
+                <>
+                    <ReviewRow
+                        label="Attempt number"
+                        value={target.command.latestAttempt.number}
+                    />
+                    <ReviewRow
+                        label="Attempt state"
+                        value={humanise(target.command.latestAttempt.status)}
+                    />
+                    <ReviewRow
+                        label="Execution runtime"
+                        value={target.command.latestAttempt.runtime}
+                    />
+                    <ReviewRow
+                        label="Completed"
+                        value={time(target.command.latestAttempt.completedAt)}
+                    />
+                    <ReviewRow
+                        label="Attempt failure"
+                        value={
+                            target.command.latestAttempt.safeFailureReason ??
+                            'Not recorded'
+                        }
+                    />
+                    <p className="text-sm font-semibold">Recorded result</p>
+                    <SafeSummary
+                        value={target.command.latestAttempt.safeResult}
+                    />
+                </>
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    No execution evidence has been recorded.
+                </p>
+            ),
+    },
+    {
+        key: 'reconciliation',
+        label: 'Reconciliation & next action',
+        width: '1fr',
+        cell: (target) => (
+            <>
+                {target.command?.latestReconciliation ? (
+                    <>
+                        <ReviewRow
+                            label="Reconciliation outcome"
+                            value={humanise(
+                                target.command.latestReconciliation.outcome,
+                            )}
+                        />
+                        <ReviewRow
+                            label="Observed"
+                            value={time(
+                                target.command.latestReconciliation.observedAt,
+                            )}
+                        />
+                        <p className="text-sm font-semibold">
+                            Observed evidence
+                        </p>
+                        <SafeSummary
+                            value={
+                                target.command.latestReconciliation
+                                    .safeEvidenceSummary
+                            }
+                        />
+                    </>
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        No reconciliation evidence has been recorded.
+                    </p>
+                )}
+                <ReviewRow
+                    label="Next action"
+                    value={
+                        target.command?.nextAction ??
+                        'Resolve the exclusion before creating a new request.'
+                    }
+                />
+            </>
+        ),
+    },
+];
 
 export default function DeviceCommandBatchShow({
     batch,
 }: {
     batch: BatchPayload;
 }) {
+    const { auth } = usePage<{ auth?: CurrentAuth }>().props;
+    const actor = auth?.user?.id;
+    const [sourceContext] = useState<ReadContext>(() => ({
+        actor: batch.actor_id,
+        id: batch.id,
+        uuid: batch.uuid,
+    }));
+    const readContext = useRef<ReadContext>({
+        actor,
+        id: batch.id,
+        uuid: batch.uuid,
+    });
+    useLayoutEffect(() => {
+        readContext.current = { actor, id: batch.id, uuid: batch.uuid };
+    }, [actor, batch.id, batch.uuid]);
+    const [denied, setDenied] = useState(false);
+    const [notice, setNotice] = useState('');
+    const alive = useRef(true);
+    const sequence = useRef(0);
+    const active = useRef<{
+        token: number;
+        marker: string;
+        url: string;
+        context: ReadContext;
+        complete: boolean;
+        cancel?: () => void;
+    } | null>(null);
+    const path = `/security-devices/command-batches/${batch.id}`;
+    const canRead = Boolean(
+        actor &&
+        actor === sourceContext.actor &&
+        batch.actor_id === sourceContext.actor &&
+        batch.id === sourceContext.id &&
+        batch.uuid === sourceContext.uuid &&
+        auth?.can?.securityDevices?.devicesView === true,
+    );
+    const canApprove =
+        canRead &&
+        batch.canApprove &&
+        batch.requestedById !== actor &&
+        auth?.can?.securityDevices?.commandsApprove === true;
+    const canDispatch =
+        canRead &&
+        batch.canDispatch &&
+        (batch.requestedById === actor ||
+            auth?.can?.securityDevices?.commandsAdmin === true);
+    useEffect(() => {
+        alive.current = true;
+        return () => {
+            alive.current = false;
+            active.current = null;
+        };
+    }, []);
+    useEffect(
+        () =>
+            router.on('invalid', (event) => {
+                const owned = active.current;
+                if (!alive.current || !owned) return;
+                const response = event.detail.response;
+                if (
+                    response.config.method?.toLowerCase() !== 'get' ||
+                    typeof response.config.url !== 'string'
+                )
+                    return;
+                const headers = response.config.headers;
+                const marker =
+                    typeof headers?.get === 'function'
+                        ? headers.get(readHeader)
+                        : headers?.[readHeader];
+                if (String(marker) !== owned.marker) return;
+                let url: URL;
+                try {
+                    url = new URL(response.config.url, window.location.origin);
+                } catch {
+                    return;
+                }
+                if (url.href !== owned.url) return;
+                event.preventDefault();
+                active.current = null;
+                if (!sameReadContext(readContext.current, owned.context))
+                    return;
+                if ([401, 403, 404].includes(response.status)) {
+                    setDenied(true);
+                    setNotice('');
+                } else
+                    setNotice(
+                        'The batch could not be refreshed. Previous records remain dated by their read time. Try Refresh results again.',
+                    );
+            }),
+        [],
+    );
+    const refresh = () => {
+        const complete = denied || !canRead;
+        const context: ReadContext = { actor, id: batch.id, uuid: batch.uuid };
+        if (active.current) {
+            if (
+                !complete ||
+                (active.current.complete &&
+                    sameReadContext(active.current.context, context))
+            )
+                return;
+            const older = active.current;
+            active.current = null;
+            older.cancel?.();
+        }
+        const token = ++sequence.current;
+        const url = new URL(window.location.href);
+        url.hash = '';
+        const marker = Array.from(
+            crypto.getRandomValues(new Uint32Array(4)),
+            (part) => part.toString(16).padStart(8, '0'),
+        ).join('');
+        active.current = { token, marker, url: url.href, context, complete };
+        let settled = false;
+        setNotice('');
+        const options: VisitOptions = {
+            headers: { [readHeader]: marker },
+            onCancelToken: (ticket) => {
+                if (active.current?.token === token)
+                    active.current.cancel = () => ticket.cancel();
+            },
+            onSuccess: (page) => {
+                if (!alive.current || active.current?.token !== token) return;
+                settled = true;
+                if (complete || !sameReadContext(readContext.current, context))
+                    return;
+                const next = page.props as {
+                    batch?: BatchPayload;
+                    auth?: CurrentAuth;
+                };
+                setDenied(
+                    !(
+                        page.component ===
+                            'security-devices/command-batches/show' &&
+                        next.batch?.id === batch.id &&
+                        next.batch.uuid === batch.uuid &&
+                        next.batch.actor_id === actor &&
+                        next.auth?.user?.id === actor &&
+                        next.auth.can?.securityDevices?.devicesView === true
+                    ),
+                );
+            },
+            onCancel: () => {
+                settled = true;
+            },
+            onFinish: () => {
+                if (!alive.current || active.current?.token !== token) return;
+                active.current = null;
+                if (!settled && sameReadContext(readContext.current, context))
+                    setNotice(
+                        'The batch could not be refreshed. Previous records remain dated by their read time. Try Refresh results again.',
+                    );
+            },
+        };
+        if (complete)
+            router.visit(url.href, {
+                ...options,
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
+            });
+        else router.reload({ ...options, only: ['batch', 'auth'] });
+    };
+    const breadcrumbs = [
+        { title: 'Home', href: '/dashboard' },
+        { title: 'Security & Devices', href: '/security-devices' },
+        ...(canRead && !denied
+            ? [{ title: 'Management', href: batch.workspaceHref }]
+            : []),
+        {
+            title: canRead && !denied ? batch.label : 'Command batch',
+            href: path,
+        },
+    ];
+    if (!canRead || denied)
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Command batch" />
+                <div className="min-w-0 space-y-5">
+                    <PageHeader
+                        icon={FileCheck2}
+                        title="Command batch"
+                        subline="Batch records are restricted for the current access."
+                        actions={
+                            <PageHeaderGlassButton
+                                onClick={refresh}
+                                icon={RefreshCw}
+                            >
+                                Refresh results
+                            </PageHeaderGlassButton>
+                        }
+                    />
+                    <p
+                        role="status"
+                        className="rounded-xl border bg-card p-5 text-sm"
+                    >
+                        Command batch records are restricted. Restore access,
+                        then Refresh results.
+                    </p>
+                </div>
+            </AppLayout>
+        );
+    return (
+        <BatchWorkspace
+            key={`${sourceContext.actor}:${sourceContext.id}:${sourceContext.uuid}`}
+            batch={batch}
+            canApprove={canApprove}
+            canDispatch={canDispatch}
+            refresh={refresh}
+            notice={notice}
+            breadcrumbs={breadcrumbs}
+        />
+    );
+}
+
+function BatchWorkspace({
+    batch,
+    canApprove,
+    canDispatch,
+    refresh,
+    notice,
+    breadcrumbs,
+}: {
+    batch: BatchPayload;
+    canApprove: boolean;
+    canDispatch: boolean;
+    refresh: () => void;
+    notice: string;
+    breadcrumbs: { title: string; href: string }[];
+}) {
+    const [view, setView] = useState<BatchView>('overview');
+    const [layout, setLayout] = useState<'cards' | 'table'>('cards');
+    const [search, setSearch] = useState('');
+    const [resultFilter, setResultFilter] = useState('all');
     const [decisionOpen, setDecisionOpen] = useState(false);
     const [decision, setDecision] = useState<'approved' | 'rejected'>(
         'approved',
@@ -173,19 +695,45 @@ export default function DeviceCommandBatchShow({
     const [comment, setComment] = useState('');
     const [dispatchOpen, setDispatchOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-
+    const [dispatching, setDispatching] = useState(false);
+    const alive = useRef(true);
+    const authority = useRef({ canApprove, canDispatch });
+    useLayoutEffect(() => {
+        authority.current = { canApprove, canDispatch };
+    }, [canApprove, canDispatch]);
+    useEffect(() => {
+        alive.current = true;
+        return () => {
+            alive.current = false;
+        };
+    }, []);
+    useEffect(() => {
+        if (!canApprove) {
+            setDecisionOpen(false);
+            setComment('');
+        }
+    }, [canApprove]);
+    useEffect(() => {
+        if (!canDispatch) setDispatchOpen(false);
+    }, [canDispatch]);
     useEffect(() => {
         if (batch.status !== 'executing') return;
-
-        const refresh = window.setInterval(
-            () => router.reload({ only: ['batch'] }),
-            10_000,
-        );
-
-        return () => window.clearInterval(refresh);
-    }, [batch.status]);
-
+        const interval = window.setInterval(refresh, 10_000);
+        return () => window.clearInterval(interval);
+    }, [batch.status, refresh]);
+    const select = (next: BatchView, filter = 'all') => {
+        setView(next);
+        setResultFilter(filter);
+        setSearch('');
+    };
     const submitDecision = () => {
+        if (
+            !alive.current ||
+            !authority.current.canApprove ||
+            submitting ||
+            comment.trim().length < 10
+        )
+            return;
         setSubmitting(true);
         router.post(
             `/security-devices/command-batches/${batch.id}/decision`,
@@ -193,466 +741,600 @@ export default function DeviceCommandBatchShow({
             {
                 preserveScroll: true,
                 onSuccess: () => {
-                    setDecisionOpen(false);
-                    setComment('');
+                    if (alive.current) {
+                        setDecisionOpen(false);
+                        setComment('');
+                    }
                 },
-                onFinish: () => setSubmitting(false),
+                onFinish: () => {
+                    if (alive.current) setSubmitting(false);
+                },
             },
         );
     };
-
     const dispatch = () => {
+        if (!alive.current || !authority.current.canDispatch || dispatching)
+            return;
+        setDispatching(true);
         router.post(
             `/security-devices/command-batches/${batch.id}/dispatch`,
             {},
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    if (alive.current) setDispatchOpen(false);
+                },
+                onFinish: () => {
+                    if (alive.current) setDispatching(false);
+                },
+            },
         );
     };
-
-    const summaryCards = [
-        ['Selected', batch.summary.selected],
-        ['Included', batch.summary.included],
-        ['Excluded', batch.summary.excluded],
-        ['Reconciled', batch.summary.reconciled],
-        ['Awaiting approval', batch.summary.awaitingApproval],
-        ['Ready', batch.summary.ready],
-        ['Executing', batch.summary.queuedOrRunning],
-        ['Failed or blocked', batch.summary.failedOrBlocked],
+    const meters = [
+        {
+            label: 'Selected',
+            value: batch.summary.selected,
+            caption: `${batch.summary.included} included · ${batch.summary.excluded} excluded · ${batch.summary.sites} Sites`,
+            view: 'targets' as const,
+        },
+        {
+            label: 'Awaiting approval',
+            value: batch.summary.awaitingApproval,
+            caption: 'Independent review required',
+            view: 'review' as const,
+        },
+        {
+            label: 'Ready',
+            value: batch.summary.ready,
+            caption: 'Ready for governed queue dispatch',
+            view: 'ready' as const,
+        },
+        {
+            label: 'In progress',
+            value: batch.summary.queuedOrRunning,
+            caption: 'Execution or reconciliation pending',
+            view: 'results' as const,
+            filter: 'in_progress',
+        },
+        {
+            label: 'Reconciled',
+            value: batch.summary.reconciled,
+            caption: `${batch.summary.terminal} terminal child states; terminal does not mean success`,
+            view: 'results' as const,
+            filter: 'reconciled',
+        },
+        {
+            label: 'Failed or blocked',
+            value: batch.summary.failedOrBlocked,
+            caption: 'Unsuccessful terminal children',
+            view: 'results' as const,
+            filter: 'attention',
+        },
     ];
-
+    const scoped = batch.targets.filter((target) => {
+        if (view === 'excluded') return target.inclusionStatus === 'excluded';
+        if (view === 'review')
+            return target.command?.status === 'awaiting_approval';
+        if (view === 'ready') return target.command?.status === 'ready';
+        if (view === 'results') {
+            if (resultFilter === 'reconciled')
+                return target.command?.status === 'reconciled';
+            if (resultFilter === 'attention')
+                return unsuccessful.includes(target.command?.status ?? '');
+            if (resultFilter === 'in_progress')
+                return progressing.includes(target.command?.status ?? '');
+            return target.command !== null;
+        }
+        return true;
+    });
+    const query = search.trim().toLocaleLowerCase();
+    const targets = scoped.filter((target) =>
+        JSON.stringify(target).toLocaleLowerCase().includes(query),
+    );
+    const compact: EntityTableColumn<BatchTarget>[] = [
+        {
+            key: 'site',
+            label: 'Site',
+            width: '1fr',
+            cell: (target) =>
+                target.site ? (
+                    <Link href={target.site.href}>{target.site.name}</Link>
+                ) : (
+                    'Site unavailable'
+                ),
+        },
+        {
+            key: 'state',
+            label: 'Command state',
+            width: '1fr',
+            cell: (target) => (
+                <EntityStatusChip variant={tone(targetStatus(target))}>
+                    {humanise(targetStatus(target))}
+                </EntityStatusChip>
+            ),
+        },
+        {
+            key: 'selection',
+            label: 'Inclusion',
+            width: '1fr',
+            cell: (target) => (
+                <EntityChip>{humanise(target.inclusionStatus)}</EntityChip>
+            ),
+        },
+        {
+            key: 'action',
+            label: 'Next action',
+            width: '1.8fr',
+            cell: (target) => (
+                <span className="block break-words whitespace-normal">
+                    {target.command?.nextAction ??
+                        target.safeExclusionReason ??
+                        'Resolve the exclusion before creating a new request.'}
+                </span>
+            ),
+        },
+    ];
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Security & Devices', href: '/security-devices' },
-                { title: 'Management', href: batch.workspaceHref },
-                {
-                    title: batch.label,
-                    href: `/security-devices/command-batches/${batch.id}`,
-                },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${batch.label} - Device management`} />
-            <PageShell>
-                <PageHero
-                    variant="compact"
-                    title={
-                        <span className="flex items-center gap-3">
-                            <FileCheck2 className="h-6 w-6 text-primary" />
-                            {batch.label}
-                        </span>
+            <div className="min-w-0 space-y-5">
+                <PageHeader
+                    variant="profile"
+                    backHref={batch.workspaceHref}
+                    icon={FileCheck2}
+                    title={batch.label}
+                    wrapTitle
+                    titleChip={
+                        <PageHeaderStatusChip variant={tone(batch.status)}>
+                            {humanise(batch.status)}
+                        </PageHeaderStatusChip>
                     }
-                    description={`Bulk command ${batch.uuid}`}
+                    subline={`Bulk command ${batch.uuid} · ${humanise(batch.risk)} risk`}
                     actions={
-                        <div className="flex flex-wrap gap-2">
-                            <Button asChild variant="outline" size="sm">
+                        <>
+                            {view !== 'overview' && (
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    ariaLabel="Search batch targets"
+                                    placeholder="Search these targets…"
+                                />
+                            )}
+                            <PageHeaderGlassButton asChild icon={Download}>
+                                <a href={batch.exportHref}>
+                                    Download result ledger
+                                </a>
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
+                                icon={RefreshCw}
+                                onClick={refresh}
+                            >
+                                Refresh results
+                            </PageHeaderGlassButton>
+                            {canApprove ? (
+                                <PageHeaderPrimaryButton
+                                    icon={FileCheck2}
+                                    onClick={() => setDecisionOpen(true)}
+                                >
+                                    Review {batch.summary.awaitingApproval}{' '}
+                                    requests
+                                </PageHeaderPrimaryButton>
+                            ) : canDispatch ? (
+                                <PageHeaderPrimaryButton
+                                    icon={Send}
+                                    onClick={() => setDispatchOpen(true)}
+                                >
+                                    Queue {batch.summary.ready} ready requests
+                                </PageHeaderPrimaryButton>
+                            ) : null}
+                        </>
+                    }
+                    meters={meters.map((meter) => (
+                        <PageHeaderMeterBlock
+                            key={meter.label}
+                            label={meter.label}
+                            onClick={() => select(meter.view, meter.filter)}
+                            ariaLabel={`View ${meter.label.toLowerCase()} targets`}
+                        >
+                            <PageHeaderMeterBig>
+                                {meter.value}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {meter.caption}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ))}
+                    mobileSummary={`${humanise(batch.status)} · ${batch.summary.selected} selected targets`}
+                    filters={
+                        view === 'overview' ? (
+                            <PageHeaderFilterButton
+                                onClick={() => select('targets')}
+                            >
+                                Inspect selected targets
+                            </PageHeaderFilterButton>
+                        ) : (
+                            <>
+                                <PageHeaderFilterButton
+                                    onClick={() => {
+                                        setSearch('');
+                                        setResultFilter('all');
+                                    }}
+                                >
+                                    Reset filters
+                                </PageHeaderFilterButton>
+                                {view === 'results' && (
+                                    <PageHeaderFilterSelect
+                                        label="Result state"
+                                        value={resultFilter}
+                                        onChange={setResultFilter}
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'All child requests',
+                                            },
+                                            {
+                                                value: 'in_progress',
+                                                label: 'In progress',
+                                            },
+                                            {
+                                                value: 'reconciled',
+                                                label: 'Reconciled',
+                                            },
+                                            {
+                                                value: 'attention',
+                                                label: 'Failed or blocked',
+                                            },
+                                        ]}
+                                    />
+                                )}
+                                <PageHeaderViewToggle
+                                    value={layout}
+                                    onChange={setLayout}
+                                    options={[
+                                        {
+                                            value: 'cards',
+                                            label: 'Cards',
+                                            icon: LayoutGrid,
+                                        },
+                                        {
+                                            value: 'table',
+                                            label: 'Table',
+                                            icon: List,
+                                        },
+                                    ]}
+                                />
+                            </>
+                        )
+                    }
+                    rail={
+                        <PageHeaderRail
+                            items={views}
+                            value={view}
+                            onSelect={select}
+                            ariaLabel="Command batch sections"
+                        />
+                    }
+                />
+                <p className="text-sm text-muted-foreground">
+                    Read started {time(batch.as_of)} · New Zealand time.
+                    Retained results do not prove live Device state.
+                </p>
+                {notice && (
+                    <p
+                        role="status"
+                        className="rounded-xl border bg-card p-4 text-sm"
+                    >
+                        {notice}
+                    </p>
+                )}
+                {view === 'overview' ? (
+                    <>
+                        <ReviewCard
+                            icon={ShieldCheck}
+                            title="Request and impact"
+                        >
+                            <ReviewRow
+                                label="Batch reference"
+                                value={batch.uuid}
+                            />
+                            <ReviewRow
+                                label="Capability"
+                                value={humanise(batch.capability)}
+                            />
+                            <ReviewRow
+                                label="Workspace"
+                                value={
+                                    <Link href={batch.workspaceHref}>
+                                        {humanise(batch.workspace)}
+                                    </Link>
+                                }
+                            />
+                            <ReviewRow
+                                label="Requested by"
+                                value={batch.requestedBy ?? 'System'}
+                            />
+                            <ReviewRow
+                                label="Requested"
+                                value={time(batch.requestedAt)}
+                            />
+                            <ReviewRow
+                                label="Confirmation mode"
+                                value={humanise(batch.confirmationMode)}
+                            />
+                            <ReviewRow
+                                label="Impact acknowledged"
+                                value={time(batch.impactAcknowledgedAt)}
+                            />
+                            <ReviewRow
+                                label="Operational reason"
+                                value={batch.reason}
+                            />
+                            <ReviewRow
+                                label="Possible impact"
+                                value={batch.impact}
+                            />
+                            <ReviewRow
+                                label="Expected state"
+                                value={batch.expectedResult}
+                            />
+                        </ReviewCard>
+                        <ReviewCard
+                            icon={FileCheck2}
+                            title="Recorded parameters"
+                        >
+                            <SafeSummary value={batch.safeParameters} />
+                        </ReviewCard>
+                        <ReviewCard
+                            icon={ShieldCheck}
+                            title="Independent child lifecycle"
+                        >
+                            <p className="text-sm text-muted-foreground">
+                                {batch.partialSemantics}
+                            </p>
+                        </ReviewCard>
+                        <div className="flex flex-wrap gap-3">
+                            <Button asChild variant="outline">
                                 <Link href={batch.workspaceHref}>
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
+                                    <ArrowLeft className="size-4" />
                                     Management workspace
                                 </Link>
                             </Button>
-                            <Button asChild variant="outline" size="sm">
-                                <a href={batch.exportHref}>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download result ledger
-                                </a>
-                            </Button>
-                        </div>
-                    }
-                />
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {summaryCards.map(([label, value]) => (
-                        <Card key={label}>
-                            <CardContent className="p-4">
-                                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                                    {label}
-                                </p>
-                                <p className="mt-1 text-2xl font-bold">
-                                    {value}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <CardTitle>Governance contract</CardTitle>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Requested by {batch.requestedBy ?? 'System'}{' '}
-                                    at {formatDateTime(batch.requestedAt)}
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Badge
-                                    variant="outline"
-                                    className={statusTone(batch.status)}
-                                >
-                                    {humanise(batch.status)}
-                                </Badge>
-                                <Badge variant="outline">
-                                    {humanise(batch.risk)} risk
-                                </Badge>
-                                <Badge variant="outline">
-                                    {batch.summary.sites} Sites
-                                </Badge>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <dl className="grid gap-4 text-sm lg:grid-cols-3">
-                            <div>
-                                <dt className="font-semibold">
-                                    Operational reason
-                                </dt>
-                                <dd className="mt-1 text-muted-foreground">
-                                    {batch.reason}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="font-semibold">
-                                    Possible impact
-                                </dt>
-                                <dd className="mt-1 text-muted-foreground">
-                                    {batch.impact}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="font-semibold">
-                                    Expected state
-                                </dt>
-                                <dd className="mt-1 text-muted-foreground">
-                                    {batch.expectedResult}
-                                </dd>
-                            </div>
-                        </dl>
-                        <SafeSummary value={batch.safeParameters} />
-                        <div className="rounded-lg border bg-muted/20 p-3 text-sm">
-                            <p className="flex items-center gap-2 font-semibold">
-                                <ShieldCheck className="h-4 w-4" />
-                                Independent child lifecycle
-                            </p>
-                            <p className="mt-1 text-muted-foreground">
-                                {batch.partialSemantics}
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                    router.reload({ only: ['batch'] })
-                                }
-                            >
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Refresh results
-                            </Button>
-                            {batch.canApprove ? (
-                                <Button
-                                    type="button"
-                                    onClick={() => setDecisionOpen(true)}
-                                >
-                                    <FileCheck2 className="mr-2 h-4 w-4" />
+                            {canApprove && (
+                                <Button onClick={() => setDecisionOpen(true)}>
                                     Review {batch.summary.awaitingApproval}{' '}
                                     requests
                                 </Button>
-                            ) : null}
-                            {batch.canDispatch ? (
-                                <Button
-                                    type="button"
-                                    onClick={() => setDispatchOpen(true)}
-                                >
-                                    <Send className="mr-2 h-4 w-4" />
+                            )}
+                            {canDispatch && (
+                                <Button onClick={() => setDispatchOpen(true)}>
                                     Queue {batch.summary.ready} ready requests
                                 </Button>
-                            ) : null}
+                            )}
                         </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Per-Device results</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto rounded-xl border">
-                            <table className="w-full min-w-[68rem] text-left text-sm">
-                                <thead className="bg-muted/70 text-xs text-muted-foreground">
-                                    <tr>
-                                        <th className="px-3 py-3">Device</th>
-                                        <th className="px-3 py-3">Site</th>
-                                        <th className="px-3 py-3">Inclusion</th>
-                                        <th className="px-3 py-3">Command</th>
-                                        <th className="px-3 py-3">
-                                            Latest evidence
-                                        </th>
-                                        <th className="px-3 py-3">
-                                            Next action
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {batch.targets.map((target) => {
-                                        const status =
-                                            target.command?.status ??
-                                            'excluded';
-                                        const successful =
-                                            status === 'reconciled';
-
-                                        return (
-                                            <tr key={target.id}>
-                                                <td className="px-3 py-3 align-top">
-                                                    <Link
-                                                        href={
-                                                            target.device.href
-                                                        }
-                                                        className="frontline-focus font-semibold text-primary hover:underline"
-                                                    >
-                                                        {target.device.name}
-                                                    </Link>
-                                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                                        {target.device.uid} ·{' '}
-                                                        {target.device
-                                                            .provider ??
-                                                            'Native'}
-                                                    </p>
-                                                </td>
-                                                <td className="px-3 py-3 align-top">
-                                                    {target.site ? (
-                                                        <Link
-                                                            href={
-                                                                target.site.href
-                                                            }
-                                                            className="frontline-focus rounded-sm text-primary hover:underline"
-                                                        >
-                                                            {target.site.name}
-                                                        </Link>
-                                                    ) : (
-                                                        'Site unavailable'
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-3 align-top">
-                                                    <div className="flex items-center gap-2">
-                                                        {target.inclusionStatus ===
-                                                        'included' ? (
-                                                            <CheckCircle2 className="h-4 w-4 text-status-success" />
-                                                        ) : (
-                                                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                                                        )}
-                                                        <span className="font-medium">
-                                                            {humanise(
-                                                                target.inclusionStatus,
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    {target.safeExclusionReason ? (
-                                                        <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                                                            {
-                                                                target.safeExclusionReason
-                                                            }
-                                                        </p>
-                                                    ) : null}
-                                                </td>
-                                                <td className="px-3 py-3 align-top">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={statusTone(
-                                                            status,
-                                                        )}
-                                                    >
-                                                        {humanise(status)}
-                                                    </Badge>
-                                                    {target.command
-                                                        ?.approvedBy ? (
-                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                            Approved by{' '}
-                                                            {
-                                                                target.command
-                                                                    .approvedBy
-                                                            }
-                                                        </p>
-                                                    ) : null}
-                                                </td>
-                                                <td className="px-3 py-3 align-top">
-                                                    {target.command
-                                                        ?.latestReconciliation ? (
-                                                        <div className="space-y-1">
-                                                            <p className="flex items-center gap-2 font-medium">
-                                                                {successful ? (
-                                                                    <CheckCircle2 className="h-4 w-4 text-status-success" />
-                                                                ) : (
-                                                                    <TriangleAlert className="h-4 w-4 text-status-warning" />
-                                                                )}
-                                                                {humanise(
-                                                                    target
-                                                                        .command
-                                                                        .latestReconciliation
-                                                                        .outcome,
-                                                                )}
-                                                            </p>
-                                                            <SafeSummary
-                                                                value={
-                                                                    target
-                                                                        .command
-                                                                        .latestReconciliation
-                                                                        .safeEvidenceSummary
-                                                                }
-                                                            />
-                                                        </div>
-                                                    ) : target.command
-                                                          ?.latestAttempt ? (
-                                                        <SafeSummary
-                                                            value={
-                                                                target.command
-                                                                    .latestAttempt
-                                                                    .safeResult
-                                                            }
-                                                        />
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            No execution
-                                                            evidence
-                                                        </span>
-                                                    )}
-                                                    {target.command
-                                                        ?.safeFailureReason ? (
-                                                        <p className="mt-1 max-w-xs text-xs text-destructive">
-                                                            {
-                                                                target.command
-                                                                    .safeFailureReason
-                                                            }
-                                                        </p>
-                                                    ) : null}
-                                                </td>
-                                                <td className="px-3 py-3 align-top">
-                                                    {target.command ? (
-                                                        <div className="mb-2">
-                                                            <p className="text-xs font-semibold">
-                                                                Expected state
-                                                            </p>
-                                                            <SafeSummary
-                                                                value={
-                                                                    target
-                                                                        .command
-                                                                        .expectedState
-                                                                }
-                                                            />
-                                                        </div>
-                                                    ) : null}
-                                                    <p className="max-w-sm text-xs text-muted-foreground">
-                                                        {target.command
-                                                            ?.nextAction ??
-                                                            'Resolve the exclusion before creating a new request.'}
-                                                    </p>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                    </>
+                ) : (
+                    <EvidenceRecords
+                        title={
+                            views.find((item) => item.key === view)?.label ??
+                            'Targets'
+                        }
+                        description="Each selected Device keeps its independent inclusion, child request, execution attempt and reconciliation evidence. Open evidence to review every retained field."
+                        rows={targets}
+                        view={layout}
+                        total={scoped.length}
+                        rowKey={(target) => target.id}
+                        identity={(target) => ({
+                            name: target.device.name,
+                            icon: FileCheck2,
+                            subline: `${target.device.uid} · target ${target.id}`,
+                        })}
+                        articleLabel={(target) =>
+                            `Batch target ${target.id}: ${target.device.name}`
+                        }
+                        actionsFor={(target) => [
+                            {
+                                label: 'Open Device management',
+                                icon: FileCheck2,
+                                onClick: () => router.visit(target.device.href),
+                            },
+                            ...(target.site
+                                ? [
+                                      {
+                                          label: 'Open Site',
+                                          icon: Building2,
+                                          onClick: () =>
+                                              router.visit(target.site!.href),
+                                      },
+                                  ]
+                                : []),
+                        ]}
+                        cardFor={(target) => ({
+                            name: target.device.name,
+                            icon: FileCheck2,
+                            meridian:
+                                tone(targetStatus(target)) === 'critical'
+                                    ? 'critical'
+                                    : target.command?.status === 'reconciled'
+                                      ? 'success'
+                                      : 'neutral',
+                            subline: `${target.device.uid} · ${target.site?.name ?? 'Site unavailable'} · target ${target.id}`,
+                            chips: (
+                                <>
+                                    <EntityStatusChip
+                                        variant={tone(targetStatus(target))}
+                                    >
+                                        {humanise(targetStatus(target))}
+                                    </EntityStatusChip>
+                                    <EntityChip>
+                                        {humanise(target.inclusionStatus)}
+                                    </EntityChip>
+                                    <EntityChip>
+                                        {target.device.provider ?? 'Native'}
+                                    </EntityChip>
+                                </>
+                            ),
+                            alerts:
+                                target.safeExclusionReason ||
+                                target.command?.safeFailureReason ? (
+                                    <EntityStatusChip
+                                        variant={
+                                            target.safeExclusionReason
+                                                ? 'warning'
+                                                : 'critical'
+                                        }
+                                    >
+                                        {target.safeExclusionReason ??
+                                            target.command?.safeFailureReason}
+                                    </EntityStatusChip>
+                                ) : null,
+                            footer: {
+                                primary:
+                                    target.command?.nextAction ??
+                                    'Resolve the exclusion before creating a new request.',
+                                secondary:
+                                    target.command?.uuid ?? 'No child command',
+                                personName:
+                                    target.command?.approvedBy ??
+                                    target.command?.requestedBy,
+                            },
+                        })}
+                        columns={evidenceColumns}
+                        compactColumns={compact}
+                        icon={FileCheck2}
+                        empty={
+                            search
+                                ? 'No targets match this search'
+                                : batch.targets.length === 0
+                                  ? 'No selected targets were retained'
+                                  : view === 'excluded'
+                                    ? 'No excluded targets'
+                                    : view === 'review'
+                                      ? 'No child requests awaiting approval'
+                                      : view === 'ready'
+                                        ? 'No child requests ready to queue'
+                                        : 'No targets in this result state'
+                        }
+                    />
+                )}
+                <Dialog
+                    open={decisionOpen && canApprove}
+                    onOpenChange={(open) => {
+                        if (!submitting) setDecisionOpen(open);
+                    }}
+                >
+                    <DialogContent
+                        className="max-h-[90vh] overflow-y-auto"
+                        style={{
+                            width: 'min(92vw, 720px)',
+                            maxWidth: 'min(92vw, 720px)',
+                        }}
+                    >
+                        <DialogHeader>
+                            <DialogTitle>
+                                Review child command requests
+                            </DialogTitle>
+                            <DialogDescription>
+                                Your decision is applied independently to each
+                                child still awaiting approval. Changed, expired
+                                or ineligible children remain unchanged and are
+                                reported separately.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    type="button"
+                                    variant={
+                                        decision === 'approved'
+                                            ? 'default'
+                                            : 'outline'
+                                    }
+                                    onClick={() => setDecision('approved')}
+                                    disabled={submitting}
+                                >
+                                    Approve
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={
+                                        decision === 'rejected'
+                                            ? 'destructive'
+                                            : 'outline'
+                                    }
+                                    onClick={() => setDecision('rejected')}
+                                    disabled={submitting}
+                                >
+                                    Reject
+                                </Button>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label
+                                    htmlFor="batch-decision-comment"
+                                    className="text-sm font-semibold"
+                                >
+                                    Decision comment
+                                </label>
+                                <Textarea
+                                    id="batch-decision-comment"
+                                    aria-describedby="batch-decision-comment-help"
+                                    rows={4}
+                                    value={comment}
+                                    onChange={(event) =>
+                                        setComment(event.target.value)
+                                    }
+                                    disabled={submitting}
+                                    placeholder="What did you verify across the target list, Site impact and expected state?"
+                                />
+                                <p
+                                    id="batch-decision-comment-help"
+                                    className="text-xs text-muted-foreground"
+                                >
+                                    Minimum 10 characters.{' '}
+                                    {comment.trim().length} entered.
+                                </p>
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-            </PageShell>
-
-            <Dialog open={decisionOpen} onOpenChange={setDecisionOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Review child command requests</DialogTitle>
-                        <DialogDescription>
-                            Your decision is applied independently to each child
-                            still awaiting approval. Changed, expired or
-                            ineligible children remain unchanged and are
-                            reported separately.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-2">
+                        <DialogFooter>
                             <Button
                                 type="button"
-                                variant={
-                                    decision === 'approved'
-                                        ? 'default'
-                                        : 'outline'
-                                }
-                                onClick={() => setDecision('approved')}
+                                variant="outline"
+                                onClick={() => setDecisionOpen(false)}
+                                disabled={submitting}
                             >
-                                Approve
+                                Cancel
                             </Button>
                             <Button
                                 type="button"
                                 variant={
                                     decision === 'rejected'
                                         ? 'destructive'
-                                        : 'outline'
+                                        : 'default'
                                 }
-                                onClick={() => setDecision('rejected')}
+                                onClick={submitDecision}
+                                disabled={
+                                    submitting || comment.trim().length < 10
+                                }
                             >
-                                Reject
+                                {submitting ? 'Recording…' : 'Record decision'}
                             </Button>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label
-                                htmlFor="batch-decision-comment"
-                                className="text-sm font-semibold"
-                            >
-                                Decision comment
-                            </label>
-                            <textarea
-                                id="batch-decision-comment"
-                                aria-describedby="batch-decision-comment-help"
-                                rows={4}
-                                value={comment}
-                                onChange={(event) =>
-                                    setComment(event.target.value)
-                                }
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                placeholder="What did you verify across the target list, Site impact and expected state?"
-                            />
-                            <p
-                                id="batch-decision-comment-help"
-                                className="text-xs text-muted-foreground"
-                            >
-                                Minimum 10 characters. {comment.trim().length}{' '}
-                                entered.
-                            </p>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setDecisionOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            variant={
-                                decision === 'rejected'
-                                    ? 'destructive'
-                                    : 'default'
-                            }
-                            onClick={submitDecision}
-                            disabled={submitting || comment.trim().length < 10}
-                        >
-                            Record decision
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <ConfirmDialog
-                open={dispatchOpen}
-                onClose={() => setDispatchOpen(false)}
-                onConfirm={dispatch}
-                title="Queue ready child requests?"
-                description={`Queue ${batch.summary.ready} independently governed child requests. Every Device is reauthorised and revalidated immediately before dispatch; changed targets close safely without execution.`}
-                confirmText="Queue ready requests"
-                variant="default"
-            />
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+                <ConfirmDialog
+                    open={dispatchOpen && canDispatch}
+                    onClose={() => {
+                        if (!dispatching) setDispatchOpen(false);
+                    }}
+                    onConfirm={dispatch}
+                    processing={dispatching}
+                    title="Queue ready child requests?"
+                    description={`Queue ${batch.summary.ready} independently governed child requests. Every Device is reauthorised and revalidated immediately before dispatch; changed targets close safely without execution.`}
+                    confirmText={
+                        dispatching ? 'Queueing…' : 'Queue ready requests'
+                    }
+                    variant="default"
+                />
+            </div>
         </AppLayout>
     );
 }

@@ -23,6 +23,15 @@ import { LayoutGrid, List, RefreshCw, Search, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { type Paginated } from './devices/shared';
 import type { MaintenanceRow } from './maintenance';
+
+type CurrentPermissions = {
+    securityDevices?: {
+        maintenanceView?: boolean;
+        maintenanceManage?: boolean;
+        devicesView?: boolean;
+    };
+};
+
 export type MaintenanceRecord = {
     id: number;
     device_id: number;
@@ -77,14 +86,17 @@ export type MaintenanceHealthProps = {
 type Tab = 'work' | 'attention' | 'battery';
 export default function MaintenanceHealth(props: MaintenanceHealthProps) {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+        auth?: { user?: { id: number } | null; can?: CurrentPermissions };
     }>().props;
+    // Partial actor metadata cannot establish ownership of retained private data.
+    const [sourceActor] = useState(props.actor_id);
     const [view, setView] = useState<'cards' | 'table'>('cards');
     const [tab, setTab] = useState<Tab>('work');
     const visible = Boolean(
         auth?.user?.id &&
+        sourceActor === props.actor_id &&
         props.actor_id === auth.user.id &&
-        auth.can?.['securityDevices.maintenance.view'] === true,
+        auth.can?.securityDevices?.maintenanceView === true,
     );
     return (
         <MaintenanceHealthBody
@@ -95,9 +107,9 @@ export default function MaintenanceHealth(props: MaintenanceHealthProps) {
             manage={
                 visible &&
                 props.can.manage &&
-                auth?.can?.['securityDevices.maintenance.manage'] === true
+                auth?.can?.securityDevices?.maintenanceManage === true
             }
-            profiles={auth?.can?.['securityDevices.devices.view'] === true}
+            profiles={auth?.can?.securityDevices?.devicesView === true}
             tab={tab}
             setTab={setTab}
             view={view}
@@ -143,8 +155,17 @@ function MaintenanceHealthBody({
             { ...data.filters, ...changes, page: '1' },
             { preserveState: true, preserveScroll: true },
         );
-    const refresh = () =>
-        router.reload({
+    const refresh = () => {
+        if (!visible)
+            return router.get(
+                pageUrl,
+                {},
+                {
+                    preserveState: false,
+                    preserveScroll: true,
+                },
+            );
+        return router.reload({
             only: [
                 'actor_id',
                 'stats',
@@ -160,19 +181,19 @@ function MaintenanceHealthBody({
                     actor_id?: number;
                     auth?: {
                         user?: { id?: number };
-                        can?: Record<string, unknown>;
+                        can?: CurrentPermissions;
                     };
                 };
                 if (
                     page.component === 'security-devices/maintenance-health' &&
                     props.actor_id === actor &&
                     props.auth?.user?.id === actor &&
-                    props.auth.can?.['securityDevices.maintenance.view'] ===
-                        true
+                    props.auth.can?.securityDevices?.maintenanceView === true
                 )
                     setDenied(false);
             },
         });
+    };
     const filtered = Object.values(data.filters).some(
         (value) => value && value !== 'all',
     );

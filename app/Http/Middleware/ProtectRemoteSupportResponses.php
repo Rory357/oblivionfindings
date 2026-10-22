@@ -20,7 +20,9 @@ final class ProtectRemoteSupportResponses
 {
     public static function applies(Request $request): bool
     {
-        return $request->is('it/remote-support/devices/*', 'it/remote-support/sessions/*', 'api/endpoints/agent/remote/*', 'api/endpoints/agent/commands', 'api/endpoints/agent/commands/*', 'api/endpoints/agent/software', 'api/endpoints/agent/software/*', 'security-devices/devices/*/endpoint/software-policy', 'api/endpoints/agent/restarts', 'api/endpoints/agent/restarts/*', 'security-devices/devices/*/endpoint/restart-policy');
+        return $request->is('it/remote-support/devices/*', 'it/remote-support/sessions/*', 'api/endpoints/agent/remote/*', 'api/endpoints/agent/commands', 'api/endpoints/agent/commands/*', 'api/endpoints/agent/software', 'api/endpoints/agent/software/*', 'security-devices/devices/*/endpoint/software-policy', 'api/endpoints/agent/restarts', 'api/endpoints/agent/restarts/*', 'security-devices/devices/*/endpoint/restart-policy', 'security-devices/devices/*/endpoint/script-policy', 'security-devices/devices/*/endpoint/script-policy/*',
+            'api/endpoints/agent/scripts/*/output', 'security-devices/devices/*/commands/*/script-output/*',
+            'security-devices/devices/*/commands/*/script-cancellation', 'security-devices/devices/*/commands/*/script-cancellation/*');
     }
 
     public function handle(Request $request, Closure $next): Response
@@ -33,7 +35,7 @@ final class ProtectRemoteSupportResponses
         $origin = ObliSignIn::issuer();
         abort_unless(strcasecmp($request->getSchemeAndHttpHost(), $origin) === 0, 400);
         $chat = preg_match('#^it/remote-support/devices/[1-9][0-9]*/obli/chat$#', $request->path());
-        $limit = $chat ? 131072 : ($request->is('*/media/offer', '*/media/answer') ? 65536 : 8192);
+        $limit = $chat ? 131072 : ($request->is('*/media/offer', '*/media/answer', 'api/endpoints/agent/scripts/*/output') ? 65536 : 8192);
         abort_if(strlen($request->getContent()) > $limit, 413);
 
         return ProtectObliResponses::headers($next($request));

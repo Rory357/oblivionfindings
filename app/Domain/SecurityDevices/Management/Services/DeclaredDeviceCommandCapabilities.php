@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Management\Services;
 
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
 use App\Domain\SecurityDevices\Models\Device;
@@ -39,7 +40,10 @@ final class DeclaredDeviceCommandCapabilities
             $declared->push('tracking.location_refresh', 'configuration.refresh', 'configuration.apply', 'device.reboot');
         }
 
-        $declared = $declared->reject(fn (string $key): bool => in_array($key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install'], true));
+        $declared = $declared->reject(fn (string $key): bool => in_array($key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install', 'endpoint.script.run'], true));
+        if (app(EndpointScriptAuthority::class)->supports($device)) {
+            $declared->push('endpoint.script.run');
+        }
         if (app(EndpointServiceAuthority::class)->supports($device)) {
             $declared->push('endpoint.service.manage');
         }

@@ -1,5 +1,27 @@
-import { PageHero, PageTabs } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    EntityCard,
+    EntityCardGrid,
+    EntityContextMenu,
+    EntityTable,
+    ListCaption,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+    PageLayout,
+} from '@/components/page';
 import { CollectorInstallationDialog } from '@/components/security-devices/collector-installation-dialog';
 import {
     CollectorEnrollmentDialog,
@@ -9,38 +31,62 @@ import {
 } from '@/components/security-devices/collector-lifecycle-dialogs';
 import {
     DiscoveryScopeActionDialog,
-    DiscoveryScopeDialog,
     type DiscoveryScopeManagement,
     type GovernedDiscoveryScope,
 } from '@/components/security-devices/discovery-scope-dialogs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { Textarea } from '@/components/ui/textarea';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+} from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import type { SharedData } from '@/types';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Activity,
     Cable,
     CircleHelp,
+    Eye,
+    LayoutGrid,
+    List,
     Network,
     Pencil,
     Play,
     Plus,
     Radar,
     RadioTower,
+    RefreshCw,
     RotateCcw,
+    SearchCheck,
     ShieldCheck,
     ShieldX,
+    type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type ReactNode,
+} from 'react';
 
 export type Collector = {
     id: number;
@@ -197,13 +243,7 @@ function tone(value: string): StatusVariant {
 }
 
 function when(value: string | null): string {
-    if (!value) return 'Never reported';
-    return new Date(value).toLocaleString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
+    return formatDateTimeLong(value, 'Not reported');
 }
 
 function Metric({
@@ -380,65 +420,275 @@ export function CollectorCard({
     );
 }
 
-export default function DiscoveryCollectors({
-    workspace,
-}: {
+export type DiscoveryPageProps = {
     workspace: DiscoveryWorkspace;
-}) {
-    const [activeTab, setActiveTab] = useState(workspace.active_tab);
-    const [enrollmentOpen, setEnrollmentOpen] = useState(false);
-    const [installationOpen, setInstallationOpen] = useState(false);
-    const actorId = usePage<SharedData>().props.auth.user.id;
-    const [replacementCollector, setReplacementCollector] =
-        useState<CollectorLifecycleTarget | null>(null);
-    const [revocationCollector, setRevocationCollector] =
-        useState<CollectorLifecycleTarget | null>(null);
-    const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
-    const [editingScope, setEditingScope] =
-        useState<GovernedDiscoveryScope | null>(null);
-    const [scopeAction, setScopeAction] = useState<{
-        scope: GovernedDiscoveryScope;
-        action: 'apply' | 'deactivate';
-    } | null>(null);
-    const scopeManagement: DiscoveryScopeManagement =
-        workspace.scope_management ?? {
-            can_manage: false,
-            create_url: null,
-            protocols: [],
-            sites: [],
+    actor_id: number;
+    as_of: string;
+};
+type DiscoveryView =
+    | 'overview'
+    | 'scopes'
+    | 'runs'
+    | 'candidates'
+    | 'collectors'
+    | 'paths'
+    | 'limitations';
+type DiscoveryLayout = 'cards' | 'table';
+type DiscoveryEntry = {
+    key: string;
+    name: string;
+    subline: string;
+    state: string;
+    icon: LucideIcon;
+    summary: string;
+    site: Collector['site'];
+    source: unknown;
+    actions: MenuItem[];
+    facts: Array<{ label: string; value: ReactNode }>;
+    technical: Array<{ label: string; value: ReactNode }>;
+    note?: string;
+    deviceHref?: string;
+    progress?: { returned: number; planned: number };
+};
+const discoveryPath = '/security-devices/discovery';
+const readProps = ['workspace', 'actor_id', 'as_of', 'auth'];
+const breadcrumbs = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Security & Devices', href: '/security-devices' },
+    { title: 'Discovery & collectors', href: discoveryPath },
+];
+const viewIcons: Record<DiscoveryView, LucideIcon> = {
+    overview: Radar,
+    scopes: Network,
+    runs: Activity,
+    candidates: SearchCheck,
+    collectors: RadioTower,
+    paths: Cable,
+    limitations: CircleHelp,
+};
+const viewLabels: Record<DiscoveryView, string> = {
+    overview: 'Overview',
+    scopes: 'Discovery scopes',
+    runs: 'Runs',
+    candidates: 'Candidates',
+    collectors: 'Remote collectors',
+    paths: 'Coverage & paths',
+    limitations: 'Limitations',
+};
+const knownView = (value: string): DiscoveryView =>
+    value in viewLabels ? (value as DiscoveryView) : 'overview';
+const safeSiteHref = (site: Collector['site']) =>
+    site && site.href === '/security-devices/sites/' + site.id
+        ? site.href
+        : undefined;
+const scopeUrl = (id: number, url: string | null | undefined, suffix = '') =>
+    url === discoveryPath + '/scopes/' + id + suffix ? url : null;
+const collectorUrl = (
+    id: number,
+    url: string | null | undefined,
+    suffix: string,
+) => (url === discoveryPath + '/collectors/' + id + suffix ? url : null);
+
+export default function DiscoveryCollectors(data: DiscoveryPageProps) {
+    const { auth } = usePage<{
+        auth?: {
+            user?: { id?: number } | null;
+            can?: {
+                securityDevices?: {
+                    viewAny?: boolean;
+                    integrationsView?: boolean;
+                    integrationsManage?: boolean;
+                    devicesView?: boolean;
+                };
+            };
         };
-    const changeTab = (tab: string) => {
-        setActiveTab(tab);
+    }>().props;
+    const [sourceActor] = useState(data.actor_id);
+    const [denied, setDenied] = useState(false);
+    const [notice, setNotice] = useState('');
+    const [activeTab, setActiveTab] = useState<DiscoveryView>(
+        knownView(data.workspace.active_tab),
+    );
+    const [layout, setLayout] = useState<DiscoveryLayout>('table');
+    const visible = Boolean(
+        !denied &&
+        data.actor_id > 0 &&
+        sourceActor === data.actor_id &&
+        auth?.user?.id === data.actor_id &&
+        auth.can?.securityDevices?.viewAny === true &&
+        auth.can.securityDevices.integrationsView === true,
+    );
+    const canManage =
+        visible && auth?.can?.securityDevices?.integrationsManage === true;
+    const canViewDevices =
+        visible && auth?.can?.securityDevices?.devicesView === true;
+    const denyAccess = useCallback(() => {
+        setDenied(true);
+        setNotice('');
+    }, []);
+    useEffect(
+        () =>
+            router.on('invalid', (event) => {
+                const response = event.detail.response;
+                if (typeof response.config.url !== 'string') return;
+                let url: URL;
+                try {
+                    url = new URL(response.config.url, window.location.origin);
+                } catch {
+                    return;
+                }
+                if (
+                    url.origin !== window.location.origin ||
+                    (url.pathname !== discoveryPath &&
+                        !url.pathname.startsWith(discoveryPath + '/'))
+                )
+                    return;
+                if ([401, 403, 404].includes(response.status)) {
+                    event.preventDefault();
+                    denyAccess();
+                } else if (response.config.method?.toLowerCase() === 'get') {
+                    event.preventDefault();
+                    setNotice(
+                        'The discovery read could not be refreshed. Previous observations retain their source times. Try Refresh again.',
+                    );
+                }
+            }),
+        [denyAccess],
+    );
+    const refresh = () =>
+        router.reload({ only: readProps, preserveScroll: true });
+    const select = (view: DiscoveryView) => {
+        setActiveTab(view);
         router.get(
-            '/security-devices/discovery',
-            { tab },
-            { preserveState: true, preserveScroll: true, replace: true },
+            discoveryPath,
+            { tab: view },
+            {
+                only: readProps,
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
         );
     };
-    const lifecycleTarget = (
-        collector: Collector,
-    ): CollectorLifecycleTarget => ({
-        id: collector.id,
-        name: collector.name,
-        site: collector.site
-            ? { id: collector.site.id, name: collector.site.name }
-            : null,
-        revoke_url: collector.actions?.revoke_url ?? null,
-        re_enrol_url: collector.actions?.re_enrol_url ?? null,
-    });
-    const refreshCollectors = () =>
-        router.reload({ only: ['workspace'], preserveScroll: true });
+    if (!visible)
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Discovery & collectors" />
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            icon={Radar}
+                            title="Discovery & collectors"
+                            subline="Approved Site discovery and collection paths"
+                            titleChip={
+                                <PageHeaderStatusChip variant="neutral">
+                                    Access unavailable
+                                </PageHeaderStatusChip>
+                            }
+                        />
+                    }
+                >
+                    <EmptyState
+                        icon={ShieldCheck}
+                        title="Discovery records are unavailable"
+                        description={
+                            !data.actor_id
+                                ? 'This read did not include actor metadata. Refresh to request an attributed discovery read.'
+                                : 'Your current account needs Security & Devices access and permission to view integrations. Refresh to check current access.'
+                        }
+                        action={
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    router.get(
+                                        discoveryPath,
+                                        {},
+                                        { preserveState: false },
+                                    )
+                                }
+                            >
+                                Refresh access
+                            </Button>
+                        }
+                    />
+                </PageLayout>
+            </AppLayout>
+        );
+    return (
+        <DiscoveryBody
+            key={JSON.stringify([
+                data.actor_id,
+                data.workspace,
+                canManage,
+                canViewDevices,
+            ])}
+            data={data}
+            canManage={canManage}
+            canViewDevices={canViewDevices}
+            activeTab={activeTab}
+            select={select}
+            layout={layout}
+            setLayout={setLayout}
+            refresh={refresh}
+            notice={notice}
+            onAccessDenied={denyAccess}
+        />
+    );
+}
+
+function DiscoveryBody({
+    data,
+    canManage,
+    canViewDevices,
+    activeTab,
+    select: navigate,
+    layout,
+    setLayout,
+    refresh,
+    notice,
+    onAccessDenied,
+}: {
+    data: DiscoveryPageProps;
+    canManage: boolean;
+    canViewDevices: boolean;
+    activeTab: DiscoveryView;
+    select: (view: DiscoveryView) => void;
+    layout: DiscoveryLayout;
+    setLayout: (layout: DiscoveryLayout) => void;
+    refresh: () => void;
+    notice: string;
+    onAccessDenied: () => void;
+}) {
+    const { workspace: w, actor_id, as_of } = data;
+    const [search, setSearch] = useState('');
+    const select = (view: DiscoveryView) => {
+        setSearch('');
+        navigate(view);
+    };
+    const [installationOpen, setInstallationOpen] = useState(false);
+    const [replacementId, setReplacementId] = useState<number | null>(null);
+    const [revocationId, setRevocationId] = useState<number | null>(null);
+    const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [scopeAction, setScopeAction] = useState<{
+        id: number;
+        action: 'apply' | 'deactivate';
+    } | null>(null);
+    const scopeManagement = w.scope_management ?? {
+        can_manage: false,
+        create_url: null,
+        protocols: [],
+        sites: [],
+    };
+    const mayManageScopes = canManage && scopeManagement.can_manage;
+    const mayManageCollectors = canManage && w.collector_management.can_manage;
+    const currentScope = (id: number) => w.scopes.find((row) => row.id === id);
+    const currentCollector = (id: number) =>
+        w.collectors.find((row) => row.id === id);
     const governedScope = (
         scope: DiscoveryScopeRow,
     ): GovernedDiscoveryScope => ({
-        id: scope.id,
-        name: scope.name,
-        status: scope.status,
-        site: scope.site ? { id: scope.site.id, name: scope.site.name } : null,
-        collection_mode: scope.collection_mode,
-        protocols: scope.protocols,
-        max_targets_per_run: scope.max_targets_per_run,
-        packets_per_second: scope.packets_per_second,
+        ...scope,
         actions: scope.actions ?? {
             can_manage: false,
             update_url: null,
@@ -446,631 +696,1856 @@ export default function DiscoveryCollectors({
             deactivate_url: null,
         },
     });
-
+    const lifecycleTarget = (
+        collector: Collector,
+    ): CollectorLifecycleTarget => ({
+        id: collector.id,
+        name: collector.name,
+        site: collector.site,
+        revoke_url: collectorUrl(
+            collector.id,
+            collector.actions?.revoke_url,
+            '/revoke',
+        ),
+        re_enrol_url: collectorUrl(
+            collector.id,
+            collector.actions?.re_enrol_url,
+            '/re-enrolment',
+        ),
+    });
+    const collectorSitePermitted = (collector: Collector) =>
+        Boolean(
+            collector.site &&
+            w.collector_management.sites.some(
+                (site) => site.id === collector.site?.id,
+            ),
+        );
+    const collectorActions = (collector: Collector): MenuItem[] =>
+        !mayManageCollectors ||
+        !collector.actions?.can_manage ||
+        !collectorSitePermitted(collector)
+            ? []
+            : [
+                  ...(collectorUrl(
+                      collector.id,
+                      collector.actions.re_enrol_url,
+                      '/re-enrolment',
+                  )
+                      ? [
+                            {
+                                label: 'Re-enrol collector',
+                                icon: RotateCcw,
+                                onClick: () => setReplacementId(collector.id),
+                            },
+                        ]
+                      : []),
+                  ...(collectorUrl(
+                      collector.id,
+                      collector.actions.revoke_url,
+                      '/revoke',
+                  )
+                      ? [
+                            {
+                                label: 'Revoke collector',
+                                icon: ShieldX,
+                                danger: true,
+                                onClick: () => setRevocationId(collector.id),
+                            },
+                        ]
+                      : []),
+              ];
+    const scopes: DiscoveryEntry[] = w.scopes.map((scope) => ({
+        key: 'scope:' + scope.id,
+        name: scope.name,
+        subline: scope.site?.name ?? 'Site unavailable',
+        state: scope.status,
+        icon: Network,
+        site: scope.site,
+        source: scope,
+        summary:
+            scope.network_ranges +
+            ' network ranges · ' +
+            scope.protocols.length +
+            ' protocols',
+        actions:
+            !mayManageScopes ||
+            !scope.actions?.can_manage ||
+            !scope.site ||
+            scope.collection_mode !== 'direct'
+                ? []
+                : [
+                      ...(scopeUrl(scope.id, scope.actions.update_url)
+                          ? [
+                                {
+                                    label: 'Update',
+                                    icon: Pencil,
+                                    onClick: () => {
+                                        setEditingId(scope.id);
+                                        setScopeDialogOpen(true);
+                                    },
+                                },
+                            ]
+                          : []),
+                      ...(scopeUrl(scope.id, scope.actions.apply_url, '/apply')
+                          ? [
+                                {
+                                    label: 'Run now',
+                                    icon: Play,
+                                    onClick: () =>
+                                        setScopeAction({
+                                            id: scope.id,
+                                            action: 'apply',
+                                        }),
+                                },
+                            ]
+                          : []),
+                      ...(scopeUrl(
+                          scope.id,
+                          scope.actions.deactivate_url,
+                          '/deactivate',
+                      )
+                          ? [
+                                {
+                                    label: 'Deactivate',
+                                    icon: ShieldX,
+                                    danger: true,
+                                    onClick: () =>
+                                        setScopeAction({
+                                            id: scope.id,
+                                            action: 'deactivate',
+                                        }),
+                                },
+                            ]
+                          : []),
+                  ],
+        facts: [
+            { label: 'Site', value: scope.site?.name },
+            { label: 'Status', value: title(scope.status) },
+            { label: 'Collection mode', value: title(scope.collection_mode) },
+            { label: 'Collector', value: scope.collector?.name },
+            {
+                label: 'Collector availability',
+                value: scope.collector
+                    ? title(scope.collector.state)
+                    : 'No collector configured',
+            },
+            { label: 'Protocols', value: scope.protocols.join(', ') },
+            { label: 'Schedule', value: scope.schedule ?? 'Not scheduled' },
+        ],
+        technical: [
+            { label: 'Scope ID', value: scope.id },
+            { label: 'Network ranges', value: scope.network_ranges },
+            { label: 'Seed hosts', value: scope.seed_hosts },
+            { label: 'Exclusions', value: scope.exclusions },
+            { label: 'Port bounds', value: scope.port_bounds },
+            {
+                label: 'Maximum targets per run',
+                value: scope.max_targets_per_run,
+            },
+            { label: 'Packets per second', value: scope.packets_per_second },
+        ],
+        note: 'Scope configuration is separate from a queued run, returned evidence and supported device capabilities. Network addresses and credentials remain protected.',
+    }));
+    const runs: DiscoveryEntry[] = w.runs.map((run) => ({
+        key: 'run:' + run.id,
+        name: run.scope_name ?? 'Discovery run #' + run.id,
+        subline:
+            run.collection_mode === 'remote_collector'
+                ? 'Remote path' +
+                  (run.collector ? ' · ' + run.collector.name : '')
+                : 'Main application',
+        state: run.status,
+        icon: Activity,
+        site: currentScope(run.scope_id)?.site ?? null,
+        source: run,
+        summary:
+            run.returned +
+            ' of ' +
+            run.planned +
+            ' results returned · ' +
+            run.pending +
+            ' pending',
+        actions: [],
+        progress: { returned: run.returned, planned: run.planned },
+        facts: [
+            { label: 'Run status', value: title(run.status) },
+            { label: 'Scope', value: run.scope_name },
+            { label: 'Collection mode', value: title(run.collection_mode) },
+            { label: 'Collector', value: run.collector?.name },
+            {
+                label: 'Collector availability',
+                value: run.collector
+                    ? title(run.collector.state)
+                    : 'No collector configured',
+            },
+            { label: 'Started at', value: when(run.started_at) },
+            {
+                label: 'Completed at',
+                value: run.completed_at
+                    ? when(run.completed_at)
+                    : 'Not completed',
+            },
+            { label: 'Planned targets', value: run.planned },
+            { label: 'Returned results', value: run.returned },
+            { label: 'Pending targets', value: run.pending },
+        ],
+        technical: [
+            { label: 'Run ID', value: run.id },
+            { label: 'Run reference', value: run.run_uuid },
+            { label: 'Scope ID', value: run.scope_id },
+            { label: 'Trigger', value: run.trigger },
+            { label: 'Found', value: run.found },
+            { label: 'Matched', value: run.matched },
+            { label: 'Proposed', value: run.proposed },
+            { label: 'Changed', value: run.changed },
+            { label: 'Excluded', value: run.excluded },
+            { label: 'Failed', value: run.failed },
+            { label: 'Unresolved', value: run.unresolved },
+        ],
+        note:
+            run.collection_mode === 'remote_collector' && run.pending > 0
+                ? 'Pending targets await collector evidence. A configured remote path does not establish that the run is complete.'
+                : 'An immutable run summary does not establish current network reachability or universal device support.',
+    }));
+    const candidates: DiscoveryEntry[] = w.candidates.map((candidate) => ({
+        key: 'candidate:' + candidate.id,
+        name:
+            candidate.canonical_device && canViewDevices
+                ? candidate.canonical_device.name
+                : candidate.canonical_device
+                  ? 'Canonical Device unavailable'
+                  : 'Proposed Device #' + candidate.id,
+        subline: 'Run #' + candidate.run_id,
+        state: candidate.decision,
+        icon: SearchCheck,
+        site: candidate.scope_id
+            ? (currentScope(candidate.scope_id)?.site ?? null)
+            : null,
+        source: {
+            ...candidate,
+            canonical_device: canViewDevices
+                ? candidate.canonical_device
+                : null,
+        },
+        summary:
+            candidate.confidence +
+            '% decision confidence · ' +
+            candidate.reasons.length +
+            ' reasons',
+        actions: [],
+        deviceHref:
+            canViewDevices &&
+            candidate.canonical_device !== null &&
+            candidate.canonical_device.href ===
+                '/security-devices/devices/' + candidate.canonical_device.id
+                ? candidate.canonical_device.href
+                : undefined,
+        facts: [
+            { label: 'Decision', value: title(candidate.decision) },
+            { label: 'Decision confidence', value: candidate.confidence + '%' },
+            {
+                label: 'Reasons',
+                value:
+                    candidate.reasons.join(', ') ||
+                    'No decision reason recorded',
+            },
+            {
+                label: 'Canonical Device',
+                value: canViewDevices
+                    ? candidate.canonical_device?.name
+                    : 'Device viewing permission required',
+            },
+            {
+                label: 'Review action',
+                value: candidate.review.action
+                    ? title(candidate.review.action)
+                    : 'Not reviewed',
+            },
+            {
+                label: 'Reviewed at',
+                value: candidate.review.reviewed_at
+                    ? when(candidate.review.reviewed_at)
+                    : 'Not reviewed',
+            },
+        ],
+        technical: [
+            { label: 'Candidate ID', value: candidate.id },
+            { label: 'Candidate reference', value: candidate.candidate_uuid },
+            { label: 'Run ID', value: candidate.run_id },
+            { label: 'Scope ID', value: candidate.scope_id },
+        ],
+        note: 'Discovery confidence and candidate reasons support review. They do not approve a canonical Device change or identify a person.',
+    }));
+    const collectors: DiscoveryEntry[] = w.collectors.map((collector) => ({
+        key: 'collector:' + collector.id,
+        name: collector.name,
+        subline: collector.site?.name ?? 'No Site assigned',
+        state: collector.freshness_state,
+        icon: RadioTower,
+        site: collector.site,
+        source: collector,
+        summary:
+            collector.device_load +
+            ' devices · ' +
+            collector.monitor_load +
+            ' checks',
+        actions: collectorActions(collector),
+        facts: [
+            { label: 'Site', value: collector.site?.name },
+            { label: 'Availability', value: title(collector.freshness_state) },
+            {
+                label: 'Reported status',
+                value: title(collector.reported_status),
+            },
+            { label: 'Last heartbeat', value: when(collector.last_seen_at) },
+            {
+                label: 'Heartbeat lag (seconds)',
+                value: collector.heartbeat_lag_seconds,
+            },
+            { label: 'Device load', value: collector.device_load },
+            { label: 'Monitor load', value: collector.monitor_load },
+            { label: 'Affected devices', value: collector.affected_devices },
+            { label: 'Affected monitors', value: collector.affected_monitors },
+        ],
+        technical: [
+            { label: 'Collector ID', value: collector.id },
+            { label: 'Runtime state', value: collector.runtime_state },
+            { label: 'Backlog items', value: collector.backlog_items },
+            { label: 'Spool bytes', value: collector.spool_bytes },
+            { label: 'Sequence gaps', value: collector.gap_count },
+            { label: 'Corrupt frames', value: collector.corrupted_frames },
+            {
+                label: 'Clock drift (seconds)',
+                value: collector.clock_drift_seconds,
+            },
+            {
+                label: 'Revoked at',
+                value: collector.revoked_at
+                    ? when(collector.revoked_at)
+                    : 'Not revoked',
+            },
+        ],
+        note: collector.impact_note,
+    }));
+    const paths: DiscoveryEntry[] = w.collection_paths.map((path) => ({
+        key: 'path:' + path.collector_id,
+        name: path.collector_name,
+        subline: path.site?.name ?? 'No Site assigned',
+        state: path.state,
+        icon: Cable,
+        site: path.site,
+        source: path,
+        summary:
+            path.device_load + ' devices · ' + path.monitor_load + ' checks',
+        actions: [],
+        facts: [
+            { label: 'Site', value: path.site?.name },
+            { label: 'Availability', value: title(path.state) },
+            { label: 'Device load', value: path.device_load },
+            { label: 'Monitor load', value: path.monitor_load },
+            { label: 'Affected devices', value: path.affected_devices },
+        ],
+        technical: [{ label: 'Collector ID', value: path.collector_id }],
+        note: 'Path availability is separate from individual monitor results. Unavailable downstream observations stay uncertain.',
+    }));
+    const rows = { scopes, runs, candidates, collectors, paths };
+    const recordView = activeTab !== 'overview' && activeTab !== 'limitations';
+    const loadedRows = recordView ? rows[activeTab as keyof typeof rows] : [];
+    const allRows = [
+        ...scopes,
+        ...runs,
+        ...candidates,
+        ...collectors,
+        ...paths,
+    ];
+    const globalMatches = allRows.filter((entry) =>
+        JSON.stringify(entry.source)
+            .toLocaleLowerCase()
+            .includes(search.trim().toLocaleLowerCase()),
+    );
+    const filtered = loadedRows.filter((entry) =>
+        JSON.stringify(entry.source)
+            .toLocaleLowerCase()
+            .includes(search.trim().toLocaleLowerCase()),
+    );
+    const counts = {
+        scopes: w.summary.scopes,
+        runs: w.summary.runs,
+        candidates: w.summary.candidates,
+        collectors: w.summary.collectors,
+        paths: w.collection_paths.length,
+    };
+    const selectedScope = editingId === null ? null : currentScope(editingId);
+    const actionScope = scopeAction ? currentScope(scopeAction.id) : null;
+    const replacement =
+        replacementId === null ? null : currentCollector(replacementId);
+    const revocation =
+        revocationId === null ? null : currentCollector(revocationId);
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Security & Devices', href: '/security-devices' },
-                {
-                    title: 'Discovery & collectors',
-                    href: '/security-devices/discovery',
-                },
-            ]}
-        >
-            <Head title="Discovery & collectors - Security & Devices" />
-            <PageShell>
-                <PageHero
-                    variant="compact"
-                    icon={Radar}
-                    title="Discovery & collectors"
-                    description="Understand how Oblivion Findings is configured to reach each Site: without a collector where the main connection is suitable, or through an explicit collector for a difficult remote path."
-                    stats={[
-                        {
-                            label: 'Direct checks',
-                            value: workspace.summary.direct_monitors,
-                        },
-                        {
-                            label: 'Remote checks',
-                            value: workspace.summary.remote_monitors,
-                        },
-                        {
-                            label: 'Collectors',
-                            value: workspace.summary.collectors,
-                        },
-                        {
-                            label: 'Paths unavailable',
-                            value: workspace.summary
-                                .collection_paths_unavailable,
-                        },
-                    ]}
-                />
-
-                <Card className="border-primary/20 bg-primary/5 shadow-xs">
-                    <CardContent className="grid gap-4 p-4 lg:grid-cols-[1.2fr_1fr]">
-                        <div>
-                            <div className="flex items-center gap-2 font-semibold">
-                                <ShieldCheck className="h-5 w-5 text-primary" />
-                                {workspace.boundary.title}
-                            </div>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                {workspace.boundary.description}
-                            </p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            {workspace.boundary.runtime_note}
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <PageTabs
-                    value={activeTab}
-                    onValueChange={changeTab}
-                    items={workspace.tabs.map((tab) => ({
-                        value: tab.key,
-                        label: tab.label,
-                    }))}
-                />
-
-                {activeTab === 'overview' ? (
-                    <div className="space-y-4">
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <Metric
-                                label="Direct checks"
-                                value={workspace.summary.direct_monitors}
-                                note="Main application path"
-                            />
-                            <Metric
-                                label="Remote checks"
-                                value={workspace.summary.remote_monitors}
-                                note="Explicit collector path"
-                            />
-                            <Metric
-                                label="Collectors online"
-                                value={workspace.summary.online_collectors}
-                                note={`${workspace.summary.collectors} configured`}
-                            />
-                            <Metric
-                                label="Devices affected"
-                                value={workspace.summary.affected_devices}
-                                note="By unavailable collector paths"
-                            />
-                        </div>
-                        <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>
-                                        Collector-free configuration
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {workspace.direct_coverage.path_label}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Metric
-                                            label="Checks"
-                                            value={
-                                                workspace.direct_coverage
-                                                    .monitors
-                                            }
-                                            note="No collector required"
-                                        />
-                                        <Metric
-                                            label="Devices"
-                                            value={
-                                                workspace.direct_coverage
-                                                    .devices
-                                            }
-                                            note="Configured without collector"
-                                        />
-                                    </div>
-                                    <p className="mt-4 text-sm text-muted-foreground">
-                                        {workspace.direct_coverage.description}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>
-                                        Remote collection health
-                                    </CardTitle>
-                                    <CardDescription>
-                                        A failed path is grouped once so
-                                        downstream checks are not misrepresented
-                                        as separate failures.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {workspace.collectors.length ? (
-                                        workspace.collectors.map(
-                                            (collector) => (
-                                                <CollectorCard
-                                                    key={collector.id}
-                                                    collector={collector}
-                                                />
-                                            ),
-                                        )
-                                    ) : (
-                                        <EmptyState
-                                            variant="compact"
-                                            icon={RadioTower}
-                                            title="No remote collectors configured"
-                                            description="That is expected when all sites are reachable directly."
-                                        />
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-                ) : null}
-
-                {activeTab === 'collectors' ? (
-                    <Card>
-                        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <CardTitle>Remote collectors</CardTitle>
-                                <CardDescription>
-                                    Heartbeat, site scope, exact monitor load,
-                                    and affected-device impact. No invented
-                                    capacity percentage.
-                                </CardDescription>
-                            </div>
-                            {workspace.collector_management.can_manage &&
-                            workspace.collector_management.issue_url &&
-                            workspace.collector_management.sites.length ? (
-                                <Button
-                                    type="button"
-                                    onClick={() => setInstallationOpen(true)}
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Discovery & collectors" />
+            <PageLayout
+                hero={
+                    <PageHeader
+                        icon={Radar}
+                        title="Discovery & collectors"
+                        wrapTitle
+                        subline="Approved Site scopes · immutable runs · collection paths"
+                        titleChip={
+                            <PageHeaderStatusChip variant="neutral">
+                                Configured collection
+                            </PageHeaderStatusChip>
+                        }
+                        actions={
+                            <>
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search loaded discovery records…"
+                                    ariaLabel="Search loaded discovery records"
+                                />
+                                <PageHeaderGlassButton
+                                    icon={RefreshCw}
+                                    onClick={refresh}
                                 >
-                                    Set up collector
-                                </Button>
-                            ) : null}
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {workspace.collectors.length ? (
-                                workspace.collectors.map((collector) => (
-                                    <CollectorCard
-                                        key={collector.id}
-                                        collector={collector}
-                                        onReEnroll={(selected) => {
-                                            setReplacementCollector(
-                                                lifecycleTarget(selected),
-                                            );
-                                            setEnrollmentOpen(true);
-                                        }}
-                                        onRevoke={(selected) =>
-                                            setRevocationCollector(
-                                                lifecycleTarget(selected),
-                                            )
+                                    Refresh
+                                </PageHeaderGlassButton>
+                                {mayManageScopes &&
+                                    scopeManagement.create_url ===
+                                        discoveryPath + '/scopes' &&
+                                    scopeManagement.sites.length > 0 && (
+                                        <PageHeaderPrimaryButton
+                                            icon={Plus}
+                                            onClick={() => {
+                                                setEditingId(null);
+                                                setScopeDialogOpen(true);
+                                            }}
+                                        >
+                                            Create direct scope
+                                        </PageHeaderPrimaryButton>
+                                    )}
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Configured checks"
+                                    value={w.summary.monitors}
+                                    onClick={() => select('paths')}
+                                >
+                                    <PageHeaderMeterDonut
+                                        percent={
+                                            w.summary.monitors
+                                                ? (w.summary.direct_monitors /
+                                                      w.summary.monitors) *
+                                                  100
+                                                : 0
                                         }
                                     />
-                                ))
-                            ) : (
-                                <EmptyState
-                                    variant="compact"
-                                    icon={RadioTower}
-                                    title="No remote collectors configured"
-                                />
-                            )}
-                        </CardContent>
-                    </Card>
-                ) : null}
-
-                {activeTab === 'scopes' ? (
-                    <Card>
-                        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <CardTitle>Governed discovery scopes</CardTitle>
-                                <CardDescription>
-                                    Site, collection path, protocol coverage,
-                                    bounds, exclusions, and schedule without
-                                    exposing target addresses or credentials.
-                                </CardDescription>
-                            </div>
-                            {scopeManagement.can_manage &&
-                            scopeManagement.create_url &&
-                            scopeManagement.sites.length ? (
-                                <Button
-                                    type="button"
-                                    onClick={() => {
-                                        setEditingScope(null);
-                                        setScopeDialogOpen(true);
-                                    }}
+                                    <PageHeaderMeterCaption>
+                                        {w.summary.direct_monitors} direct ·{' '}
+                                        {w.summary.remote_monitors} remote
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Discovery scopes"
+                                    onClick={() => select('scopes')}
                                 >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create direct scope
-                                </Button>
-                            ) : null}
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {workspace.scopes.length ? (
-                                workspace.scopes.map((scope) => (
-                                    <article
-                                        key={scope.id}
-                                        aria-label={`Discovery scope ${scope.name}`}
-                                        className="rounded-xl border p-4"
-                                    >
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div>
-                                                <strong>{scope.name}</strong>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {scope.site ? (
-                                                        <Link
-                                                            href={
-                                                                scope.site.href
-                                                            }
-                                                        >
-                                                            {scope.site.name}
-                                                        </Link>
-                                                    ) : (
-                                                        'Site unavailable'
-                                                    )}{' '}
-                                                    ·{' '}
-                                                    {title(
-                                                        scope.collection_mode,
-                                                    )}
-                                                </p>
-                                            </div>
-                                            <StatusBadge
-                                                variant={tone(scope.status)}
-                                            >
-                                                {title(scope.status)}
-                                            </StatusBadge>
-                                        </div>
-                                        <p className="mt-3 text-sm">
-                                            {scope.protocols
-                                                .map(title)
-                                                .join(', ') || 'No protocols'}
-                                        </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            {scope.network_ranges} network
-                                            ranges · {scope.exclusions}{' '}
-                                            exclusions · maximum{' '}
-                                            {scope.max_targets_per_run} targets
-                                            at {scope.packets_per_second}/s
-                                        </p>
-                                        {scope.actions?.can_manage ? (
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                {scope.actions.update_url ? (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            setEditingScope(
-                                                                governedScope(
-                                                                    scope,
-                                                                ),
-                                                            );
-                                                            setScopeDialogOpen(
-                                                                true,
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Pencil className="mr-2 h-4 w-4" />
-                                                        Update
-                                                    </Button>
-                                                ) : null}
-                                                {scope.actions.apply_url ? (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            setScopeAction({
-                                                                scope: governedScope(
-                                                                    scope,
-                                                                ),
-                                                                action: 'apply',
-                                                            })
-                                                        }
-                                                    >
-                                                        <Play className="mr-2 h-4 w-4" />
-                                                        Run now
-                                                    </Button>
-                                                ) : null}
-                                                {scope.actions
-                                                    .deactivate_url ? (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="destructive"
-                                                        onClick={() =>
-                                                            setScopeAction({
-                                                                scope: governedScope(
-                                                                    scope,
-                                                                ),
-                                                                action: 'deactivate',
-                                                            })
-                                                        }
-                                                    >
-                                                        <ShieldX className="mr-2 h-4 w-4" />
-                                                        Deactivate
-                                                    </Button>
-                                                ) : null}
-                                            </div>
-                                        ) : null}
-                                    </article>
-                                ))
-                            ) : (
-                                <EmptyState
-                                    variant="compact"
-                                    icon={Radar}
-                                    title="No discovery scopes in this Site view"
-                                />
-                            )}
-                        </CardContent>
-                    </Card>
-                ) : null}
-
-                {activeTab === 'runs' ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Immutable discovery runs</CardTitle>
-                            <CardDescription>
-                                Recent immutable run summaries from the native
-                                discovery runtime. Candidate decisions are
-                                listed separately below.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {workspace.summary.runs_truncated ? (
-                                <p className="rounded-lg bg-status-warning-bg p-3 text-sm text-status-warning">
-                                    Showing the latest{' '}
-                                    {workspace.summary.runs_shown} of{' '}
-                                    {workspace.summary.runs} runs.
+                                    <PageHeaderMeterBig>
+                                        {w.summary.scopes}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Governed bounds and protocols
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Runs"
+                                    onClick={() => select('runs')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {w.summary.runs}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {w.summary.runs_shown} returned in this
+                                        read
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Candidates for review"
+                                    tone={
+                                        w.summary.candidates_requiring_review
+                                            ? 'warning'
+                                            : 'brand'
+                                    }
+                                    onClick={() => select('candidates')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {w.summary.candidates_requiring_review}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {w.summary.candidates} candidates across
+                                        permitted scopes
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Collectors reporting"
+                                    value={
+                                        w.summary.online_collectors +
+                                        '/' +
+                                        w.summary.collectors
+                                    }
+                                    onClick={() => select('collectors')}
+                                >
+                                    <PageHeaderMeterDonut
+                                        percent={
+                                            w.summary.collectors
+                                                ? (w.summary.online_collectors /
+                                                      w.summary.collectors) *
+                                                  100
+                                                : 0
+                                        }
+                                    />
+                                    <PageHeaderMeterCaption>
+                                        Within the returned heartbeat window
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Paths unavailable"
+                                    tone={
+                                        w.summary.collection_paths_unavailable
+                                            ? 'critical'
+                                            : 'brand'
+                                    }
+                                    onClick={() => select('paths')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {w.summary.collection_paths_unavailable}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {w.summary.affected_devices} devices
+                                        affected
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
+                        filters={
+                            <>
+                                {(recordView || search.trim() !== '') && (
+                                    <PageHeaderViewToggle
+                                        value={layout}
+                                        onChange={setLayout}
+                                        ariaLabel="Discovery record layout"
+                                        options={[
+                                            {
+                                                value: 'cards',
+                                                label: 'Cards',
+                                                icon: LayoutGrid,
+                                            },
+                                            {
+                                                value: 'table',
+                                                label: 'Table',
+                                                icon: List,
+                                            },
+                                        ]}
+                                    />
+                                )}
+                                <span className="text-caption text-band-foreground/80">
+                                    {as_of
+                                        ? 'Read started ' +
+                                          when(as_of) +
+                                          ' · NZ time'
+                                        : 'Read time not returned'}{' '}
+                                    · search covers loaded records
+                                </span>
+                            </>
+                        }
+                        rail={
+                            <PageHeaderRail
+                                value={activeTab}
+                                onSelect={select}
+                                ariaLabel="Discovery views"
+                                items={w.tabs
+                                    .filter((tab) => tab.key in viewLabels)
+                                    .map((tab) => ({
+                                        key: knownView(tab.key),
+                                        label: tab.label,
+                                        icon: viewIcons[knownView(tab.key)],
+                                    }))}
+                            />
+                        }
+                    />
+                }
+            >
+                <div className="space-y-5">
+                    {notice && (
+                        <Alert>
+                            <AlertTitle>
+                                Discovery refresh unavailable
+                            </AlertTitle>
+                            <AlertDescription>{notice}</AlertDescription>
+                        </Alert>
+                    )}
+                    {!recordView && search.trim() !== '' && (
+                        <DiscoveryRecords
+                            rows={globalMatches}
+                            title="Matching loaded discovery records"
+                            loaded={allRows.length}
+                            total={allRows.length}
+                            layout={layout}
+                            empty="No loaded records match this search"
+                        />
+                    )}
+                    {activeTab === 'overview' && (
+                        <>
+                            <ReviewCard
+                                icon={ShieldCheck}
+                                title={w.boundary.title}
+                            >
+                                <p className="text-subtle">
+                                    {w.boundary.description}
                                 </p>
-                            ) : null}
-                            {workspace.runs.length ? (
-                                workspace.runs.map((run) => (
-                                    <DiscoveryRunCard key={run.id} run={run} />
-                                ))
-                            ) : (
-                                <EmptyState
-                                    variant="compact"
-                                    icon={Activity}
-                                    title="No discovery runs in this Site view"
-                                />
-                            )}
-                        </CardContent>
-                    </Card>
-                ) : null}
-
-                {activeTab === 'candidates' ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Discovery candidates</CardTitle>
-                            <CardDescription>
-                                Confidence and bounded decision reasons remain
-                                reviewable before canonical Device changes.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {workspace.summary.candidates_truncated ? (
-                                <p className="rounded-lg bg-status-warning-bg p-3 text-sm text-status-warning">
-                                    Showing {workspace.summary.candidates_shown}{' '}
-                                    of {workspace.summary.candidates}{' '}
-                                    candidates. Candidates requiring review are
-                                    prioritised.
+                                <p className="text-caption mt-3">
+                                    {w.boundary.runtime_note}
                                 </p>
-                            ) : null}
-                            {workspace.candidates.length ? (
-                                workspace.candidates.map((candidate) => (
-                                    <article
-                                        key={candidate.id}
-                                        className="rounded-xl border p-4"
-                                    >
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div>
-                                                {candidate.canonical_device ? (
-                                                    <Link
-                                                        href={
-                                                            candidate
-                                                                .canonical_device
-                                                                .href
-                                                        }
-                                                        className="font-semibold hover:underline"
-                                                    >
-                                                        {
-                                                            candidate
-                                                                .canonical_device
-                                                                .name
-                                                        }
-                                                    </Link>
-                                                ) : (
-                                                    <strong>
-                                                        Proposed Device
-                                                    </strong>
-                                                )}
-                                                <p className="text-xs text-muted-foreground">
-                                                    {candidate.reasons
-                                                        .map(title)
-                                                        .join(', ') ||
-                                                        'No decision reason recorded'}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <StatusBadge
-                                                    variant={tone(
-                                                        candidate.decision,
-                                                    )}
-                                                >
-                                                    {title(candidate.decision)}
-                                                </StatusBadge>
-                                                <span className="text-sm font-medium tabular-nums">
-                                                    {candidate.confidence}%
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </article>
-                                ))
-                            ) : (
-                                <EmptyState
-                                    variant="compact"
-                                    icon={CircleHelp}
-                                    title="No discovery candidates in this Site view"
+                            </ReviewCard>
+                            <DirectCoverage workspace={w} />
+                            <DiscoveryRecords
+                                rows={collectors.slice(0, 3)}
+                                title="Remote collection health"
+                                loaded={collectors.length}
+                                total={w.summary.collectors}
+                                layout="cards"
+                                empty="No remote collectors configured"
+                            />
+                            <ReviewCard
+                                icon={Activity}
+                                title="Returned evidence window"
+                            >
+                                <ReviewRow
+                                    label="Run summaries shown"
+                                    value={
+                                        w.summary.runs_shown +
+                                        ' of ' +
+                                        w.summary.runs
+                                    }
                                 />
-                            )}
-                        </CardContent>
-                    </Card>
-                ) : null}
-
-                {activeTab === 'paths' ? (
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Direct path</CardTitle>
-                            </CardHeader>
-                            <CardContent className="rounded-xl border p-4">
-                                <div className="flex items-center gap-2">
-                                    <Network className="h-5 w-5 text-primary" />
-                                    <p className="font-semibold">
-                                        {workspace.direct_coverage.path_label}
-                                    </p>
-                                    <StatusBadge variant="success">
-                                        Configured
-                                    </StatusBadge>
-                                </div>
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    {workspace.direct_coverage.devices} devices
-                                    · {workspace.direct_coverage.monitors}{' '}
-                                    checks
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Remote paths</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                {workspace.collection_paths.map((path) => (
-                                    <div
-                                        key={path.collector_id}
-                                        className="rounded-xl border p-4"
-                                    >
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Cable className="h-5 w-5 text-primary" />
-                                            <p className="font-semibold">
-                                                {path.collector_name}
-                                            </p>
-                                            <StatusBadge
-                                                variant={tone(path.state)}
-                                            >
-                                                {title(path.state)}
-                                            </StatusBadge>
-                                        </div>
-                                        <p className="mt-2 text-sm text-muted-foreground">
-                                            {path.site ? (
-                                                <Link
-                                                    href={path.site.href}
-                                                    className="frontline-focus rounded-sm hover:text-primary hover:underline"
-                                                >
-                                                    {path.site.name}
-                                                </Link>
-                                            ) : (
-                                                'No site assigned'
-                                            )}{' '}
-                                            · {path.device_load} devices ·{' '}
-                                            {path.monitor_load} checks
-                                        </p>
+                                <ReviewRow
+                                    label="Run window truncated"
+                                    value={
+                                        w.summary.runs_truncated
+                                            ? 'Yes · latest runs returned'
+                                            : 'No'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Candidate summaries shown"
+                                    value={
+                                        w.summary.candidates_shown +
+                                        ' of ' +
+                                        w.summary.candidates
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Candidate window truncated"
+                                    value={
+                                        w.summary.candidates_truncated
+                                            ? 'Yes · review candidates prioritised'
+                                            : 'No'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Candidates requiring review"
+                                    value={
+                                        w.summary.candidates_requiring_review
+                                    }
+                                />
+                            </ReviewCard>
+                        </>
+                    )}
+                    {activeTab === 'paths' && <DirectCoverage workspace={w} />}
+                    {recordView && (
+                        <>
+                            {activeTab === 'collectors' &&
+                                mayManageCollectors &&
+                                w.collector_management.issue_url ===
+                                    discoveryPath + '/collectors/enrolments' &&
+                                w.collector_management.sites.length > 0 && (
+                                    <div className="flex justify-end">
+                                        <Button
+                                            onClick={() =>
+                                                setInstallationOpen(true)
+                                            }
+                                        >
+                                            Set up collector
+                                        </Button>
                                     </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    </div>
-                ) : null}
-
-                {activeTab === 'limitations' ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Known limitations</CardTitle>
-                            <CardDescription>
-                                Unknown evidence stays explicit instead of being
-                                filled with guesses.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid gap-3 lg:grid-cols-3">
-                            <div className="rounded-xl border border-dashed p-4">
-                                <div className="flex items-center gap-2">
-                                    <CircleHelp className="h-5 w-5" />
-                                    <StatusBadge variant="neutral">
-                                        {title(
-                                            workspace.limitations
-                                                .unsupported_state,
-                                        )}
-                                    </StatusBadge>
-                                </div>
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    {workspace.limitations.unsupported_note}
+                                )}
+                            {activeTab === 'runs' &&
+                                w.summary.runs_truncated && (
+                                    <Alert>
+                                        <AlertTitle>
+                                            Bounded run history
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                            Showing the latest{' '}
+                                            {w.summary.runs_shown} of{' '}
+                                            {w.summary.runs} runs. Search covers
+                                            the returned window.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            {activeTab === 'candidates' &&
+                                w.summary.candidates_truncated && (
+                                    <Alert>
+                                        <AlertTitle>
+                                            Bounded candidate history
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                            Showing {w.summary.candidates_shown}{' '}
+                                            of {w.summary.candidates}{' '}
+                                            candidates. Candidates requiring
+                                            review are prioritised.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            <DiscoveryRecords
+                                rows={filtered}
+                                title={viewLabels[activeTab]}
+                                loaded={loadedRows.length}
+                                total={counts[activeTab as keyof typeof counts]}
+                                layout={layout}
+                                empty={
+                                    search
+                                        ? 'No loaded records match this search'
+                                        : 'No ' +
+                                          viewLabels[
+                                              activeTab
+                                          ].toLocaleLowerCase() +
+                                          ' in this Site view'
+                                }
+                            />
+                        </>
+                    )}
+                    {activeTab === 'limitations' && (
+                        <div className="grid gap-5 lg:grid-cols-3">
+                            <ReviewCard
+                                icon={CircleHelp}
+                                title="Capability evidence"
+                            >
+                                <StatusBadge variant="neutral">
+                                    {title(w.limitations.unsupported_state)}
+                                </StatusBadge>
+                                <p className="text-subtle mt-3">
+                                    {w.limitations.unsupported_note}
                                 </p>
-                            </div>
-                            <div className="rounded-xl border border-dashed p-4">
-                                <div className="flex items-center gap-2">
-                                    <Radar className="h-5 w-5" />
-                                    <p className="font-semibold">
-                                        Not configured
-                                    </p>
-                                </div>
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    {workspace.limitations.not_configured_note}
+                            </ReviewCard>
+                            <ReviewCard icon={Radar} title="Not configured">
+                                <p className="text-subtle">
+                                    {w.limitations.not_configured_note}
                                 </p>
-                            </div>
-                            <div className="rounded-xl border border-dashed p-4">
-                                <div className="flex items-center gap-2">
-                                    <Activity className="h-5 w-5" />
-                                    <p className="font-semibold">
-                                        Collector capacity
-                                    </p>
-                                </div>
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    {workspace.limitations.capacity_note}
+                            </ReviewCard>
+                            <ReviewCard
+                                icon={Activity}
+                                title="Collector capacity"
+                            >
+                                <p className="text-subtle">
+                                    {w.limitations.capacity_note}
                                 </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ) : null}
-            </PageShell>
-            {workspace.collector_management.issue_url ? (
-                <CollectorEnrollmentDialog
-                    open={enrollmentOpen}
-                    onOpenChange={setEnrollmentOpen}
-                    issueUrl={workspace.collector_management.issue_url}
-                    sites={workspace.collector_management.sites}
-                    replacement={replacementCollector}
-                    onIssued={refreshCollectors}
-                />
-            ) : null}
-            {workspace.collector_management.can_manage && (
+                            </ReviewCard>
+                        </div>
+                    )}
+                </div>
+            </PageLayout>
+            {mayManageCollectors && (
                 <CollectorInstallationDialog
                     open={installationOpen}
                     onClose={() => setInstallationOpen(false)}
-                    sites={workspace.collector_management.sites}
-                    actorId={actorId}
+                    sites={w.collector_management.sites}
+                    actorId={actor_id}
                 />
             )}
-            <CollectorRevocationDialog
-                open={revocationCollector !== null}
-                onOpenChange={(open) => {
-                    if (!open) setRevocationCollector(null);
-                }}
-                collector={revocationCollector}
-                onRevoked={refreshCollectors}
-            />
-            <DiscoveryScopeDialog
-                open={scopeDialogOpen}
-                onOpenChange={setScopeDialogOpen}
-                management={scopeManagement}
-                scope={editingScope}
-                onSaved={refreshCollectors}
-            />
-            <DiscoveryScopeActionDialog
-                open={scopeAction !== null}
-                onOpenChange={(open) => {
-                    if (!open) setScopeAction(null);
-                }}
-                scope={scopeAction?.scope ?? null}
-                action={scopeAction?.action ?? 'apply'}
-                onApplied={refreshCollectors}
-            />
+            {mayManageCollectors &&
+                replacement &&
+                collectorSitePermitted(replacement) && (
+                    <CollectorEnrollmentDialog
+                        open
+                        onOpenChange={(open) => {
+                            if (!open) setReplacementId(null);
+                        }}
+                        issueUrl={w.collector_management.issue_url ?? ''}
+                        sites={w.collector_management.sites}
+                        replacement={lifecycleTarget(replacement)}
+                        onIssued={refresh}
+                    />
+                )}
+            {mayManageCollectors &&
+                revocation &&
+                collectorSitePermitted(revocation) && (
+                    <CollectorRevocationDialog
+                        open
+                        onOpenChange={(open) => {
+                            if (!open) setRevocationId(null);
+                        }}
+                        collector={lifecycleTarget(revocation)}
+                        onRevoked={refresh}
+                    />
+                )}
+            {mayManageScopes &&
+                scopeDialogOpen &&
+                (editingId === null || selectedScope) && (
+                    <DiscoveryScopeWizard
+                        key={editingId ?? 'new'}
+                        management={scopeManagement}
+                        scope={
+                            selectedScope ? governedScope(selectedScope) : null
+                        }
+                        onClose={() => setScopeDialogOpen(false)}
+                        onSaved={refresh}
+                        onAccessDenied={onAccessDenied}
+                    />
+                )}
+            {mayManageScopes && actionScope && scopeAction && (
+                <DiscoveryScopeActionDialog
+                    open
+                    scope={governedScope(actionScope)}
+                    action={scopeAction.action}
+                    onOpenChange={(open) => {
+                        if (!open) setScopeAction(null);
+                    }}
+                    onApplied={refresh}
+                />
+            )}
         </AppLayout>
+    );
+}
+
+function DirectCoverage({ workspace: w }: { workspace: DiscoveryWorkspace }) {
+    return (
+        <ReviewCard icon={Cable} title={w.direct_coverage.path_label}>
+            <ReviewRow
+                label="Configured checks"
+                value={w.direct_coverage.monitors}
+            />
+            <ReviewRow
+                label="Configured devices"
+                value={w.direct_coverage.devices}
+            />
+            <p className="text-subtle mt-3">{w.direct_coverage.description}</p>
+            <Button asChild variant="outline" className="mt-3">
+                <Link href="/security-devices/monitoring">Open Monitoring</Link>
+            </Button>
+        </ReviewCard>
+    );
+}
+function DiscoveryRecords({
+    rows,
+    loaded,
+    total,
+    title: label,
+    layout,
+    empty,
+}: {
+    rows: DiscoveryEntry[];
+    loaded: number;
+    total: number;
+    title: string;
+    layout: DiscoveryLayout;
+    empty: string;
+}) {
+    const [readingKey, setReadingKey] = useState<string | null>(null);
+    const reading = rows.find((entry) => entry.key === readingKey);
+    const context = useEntityContextMenu<DiscoveryEntry>();
+    const actions = (entry: DiscoveryEntry): MenuItem[] => [
+        {
+            label: 'View details',
+            icon: Eye,
+            onClick: () => setReadingKey(entry.key),
+        },
+        ...entry.actions,
+    ];
+    return (
+        <>
+            <ListCaption
+                title={label}
+                caption={
+                    rows.length +
+                    ' of ' +
+                    loaded +
+                    ' loaded · ' +
+                    total +
+                    ' in scope'
+                }
+            />
+            {rows.length === 0 ? (
+                <EmptyState
+                    icon={Radar}
+                    title={empty}
+                    description="Returned observations stay distinct from configured collection, running work and confirmed outcomes."
+                />
+            ) : layout === 'cards' ? (
+                <EntityCardGrid>
+                    {rows.map((entry) => (
+                        <EntityCard
+                            key={entry.key}
+                            name={entry.name}
+                            subline={entry.subline}
+                            icon={entry.icon}
+                            meridian="neutral"
+                            actions={actions(entry)}
+                            onOpen={() => setReadingKey(entry.key)}
+                            onContextMenu={(event) =>
+                                context.open(event, entry)
+                            }
+                            chips={
+                                <StatusBadge variant={tone(entry.state)}>
+                                    {title(entry.state)}
+                                </StatusBadge>
+                            }
+                            metric={
+                                entry.progress
+                                    ? {
+                                          label: 'Results returned',
+                                          value:
+                                              entry.progress.returned +
+                                              ' of ' +
+                                              entry.progress.planned,
+                                          percent: entry.progress.planned
+                                              ? Math.min(
+                                                    100,
+                                                    (entry.progress.returned /
+                                                        entry.progress
+                                                            .planned) *
+                                                        100,
+                                                )
+                                              : null,
+                                      }
+                                    : undefined
+                            }
+                            footer={{
+                                primary: entry.summary,
+                                secondary:
+                                    entry.site?.name ??
+                                    'Site context unavailable',
+                                personIcon: entry.icon,
+                            }}
+                        />
+                    ))}
+                </EntityCardGrid>
+            ) : (
+                <EntityTable
+                    rows={rows}
+                    rowKey={(entry) => entry.key}
+                    identityLabel="Record"
+                    wrapIdentity
+                    identity={(entry) => ({
+                        name: entry.name,
+                        subline: entry.subline,
+                        icon: entry.icon,
+                    })}
+                    columns={[
+                        {
+                            key: 'state',
+                            label: 'Returned state',
+                            width: '1fr',
+                            cell: (entry) => (
+                                <StatusBadge variant={tone(entry.state)}>
+                                    {title(entry.state)}
+                                </StatusBadge>
+                            ),
+                        },
+                        {
+                            key: 'observations',
+                            label: 'Observations',
+                            width: '2fr',
+                            cell: (entry) => entry.summary,
+                        },
+                    ]}
+                    actionsFor={actions}
+                    onOpen={(entry) => setReadingKey(entry.key)}
+                    onRowContextMenu={context.open}
+                    rowHeight="content"
+                    minWidth={800}
+                />
+            )}
+            {context.ctx &&
+                rows.some((entry) => entry.key === context.ctx?.record.key) && (
+                    <EntityContextMenu
+                        x={context.ctx.x}
+                        y={context.ctx.y}
+                        title={context.ctx.record.name}
+                        icon={context.ctx.record.icon}
+                        items={actions(context.ctx.record)}
+                        onClose={context.close}
+                    />
+                )}
+            {reading && (
+                <DiscoveryReader
+                    entry={reading}
+                    onClose={() => setReadingKey(null)}
+                />
+            )}
+        </>
+    );
+}
+function DiscoveryReader({
+    entry,
+    onClose,
+}: {
+    entry: DiscoveryEntry;
+    onClose: () => void;
+}) {
+    const [section, setSection] = useState(0);
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title={'Discovery details · ' + entry.name}
+            description="Returned Site-scoped configuration and observations. Operational actions retain their canonical owner."
+            railIcon={entry.icon}
+            railTitle={entry.name}
+            railSub={entry.subline}
+            sequential={false}
+            stepIndex={section}
+            onStepClick={setSection}
+            headerLabel={
+                section === 0 ? 'Record observations' : 'Technical detail'
+            }
+            steps={[
+                {
+                    key: 'observations',
+                    label: 'Record observations',
+                    blurb: 'Site, state and source times',
+                    icon: Eye,
+                },
+                {
+                    key: 'technical',
+                    label: 'Technical detail',
+                    blurb: 'Bounds, references and exact counts',
+                    icon: Activity,
+                },
+            ]}
+            footerEnd={
+                <Button variant="outline" onClick={onClose}>
+                    Close details
+                </Button>
+            }
+        >
+            <WizardStepPane>
+                <div className="space-y-5">
+                    <ReviewCard
+                        icon={entry.icon}
+                        title={
+                            section === 0
+                                ? 'Record observations'
+                                : 'Technical detail'
+                        }
+                    >
+                        {(section === 0 ? entry.facts : entry.technical).map(
+                            (fact) => (
+                                <ReviewRow
+                                    key={fact.label}
+                                    label={fact.label}
+                                    value={fact.value}
+                                />
+                            ),
+                        )}
+                    </ReviewCard>
+                    {entry.note && <p className="text-subtle">{entry.note}</p>}
+                    {section === 0 && safeSiteHref(entry.site) && (
+                        <Button asChild variant="outline">
+                            <Link href={safeSiteHref(entry.site)!}>
+                                Open Site technology
+                            </Link>
+                        </Button>
+                    )}
+                    {section === 0 && entry.deviceHref && (
+                        <Button asChild variant="outline">
+                            <Link href={entry.deviceHref}>
+                                Open canonical Device
+                            </Link>
+                        </Button>
+                    )}
+                    <p className="text-caption">
+                        Source times are shown in NZ time. Read start does not
+                        establish that every source is current.
+                    </p>
+                </div>
+            </WizardStepPane>
+        </WizardShell>
+    );
+}
+
+function list(value: string): string[] {
+    return value
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function ports(value: string): number[] {
+    return value
+        .split(/[\s,]+/)
+        .map(Number)
+        .filter((item) => Number.isInteger(item));
+}
+
+const DEFAULT_PORTS: Record<string, string> = {
+    tcp: '22, 80, 443, 161, 5985, 5986',
+    dns: '53',
+    http: '80, 443',
+    tls: '443',
+    snmp: '161',
+};
+
+function scopeFailureMessage(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+        const errors = error.response?.data?.errors;
+        if (errors && typeof errors === 'object') {
+            const message = Object.values(errors as Record<string, unknown>)
+                .flatMap((value) => (Array.isArray(value) ? value : [value]))
+                .find(
+                    (value): value is string =>
+                        typeof value === 'string' && value.length > 0,
+                );
+            if (message) return message;
+        }
+    }
+
+    return 'The discovery change could not be applied. Review the governed Site bounds and try again.';
+}
+
+export function DiscoveryScopeWizard({
+    management,
+    scope,
+    onClose,
+    onSaved,
+    onAccessDenied,
+}: {
+    management: DiscoveryScopeManagement;
+    scope: GovernedDiscoveryScope | null;
+    onClose: () => void;
+    onSaved: () => void;
+    onAccessDenied?: () => void;
+}) {
+    const editing = scope !== null;
+    const [siteId, setSiteId] = useState(
+        scope?.site?.id.toString() ??
+            (management.sites.length === 1
+                ? management.sites[0].id.toString()
+                : ''),
+    );
+    const [name, setName] = useState(scope?.name ?? '');
+    const [cidrs, setCidrs] = useState('');
+    const [seedHosts, setSeedHosts] = useState('');
+    const [exclusions, setExclusions] = useState('');
+    const [selectedProtocols, setSelectedProtocols] = useState<string[]>(
+        scope?.protocols ??
+            ['icmp', 'tcp', 'dns', 'tls'].filter((protocol) =>
+                management.protocols.includes(protocol),
+            ),
+    );
+    const [allowedPorts, setAllowedPorts] = useState<Record<string, string>>(
+        editing ? {} : { ...DEFAULT_PORTS },
+    );
+    const [snmpReference, setSnmpReference] = useState('');
+    const [maxTargets, setMaxTargets] = useState(
+        scope?.max_targets_per_run.toString() ?? '1024',
+    );
+    const [packetsPerSecond, setPacketsPerSecond] = useState(
+        scope?.packets_per_second.toString() ?? '20',
+    );
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [step, setStep] = useState(0);
+    const [discardOpen, setDiscardOpen] = useState(false);
+    const [uncertain, setUncertain] = useState(false);
+    const active = useRef(true),
+        pending = useRef(false),
+        controller = useRef(new AbortController());
+    useEffect(() => {
+        active.current = true;
+        const requestController = controller.current;
+        return () => {
+            active.current = false;
+            requestController.abort();
+        };
+    }, []);
+    const values = {
+        siteId,
+        name,
+        cidrs,
+        seedHosts,
+        exclusions,
+        selectedProtocols,
+        allowedPorts,
+        snmpReference,
+        maxTargets,
+        packetsPerSecond,
+    };
+    const [baseline] = useState(values);
+    const dirty = JSON.stringify(values) !== JSON.stringify(baseline);
+    const close = () => {
+        if (!submitting) {
+            if (dirty) setDiscardOpen(true);
+            else onClose();
+        }
+    };
+    const toggleProtocol = (protocol: string, checked: boolean) =>
+        setSelectedProtocols((current) =>
+            checked
+                ? [...new Set([...current, protocol])]
+                : current.filter((item) => item !== protocol),
+        );
+    const validIdentity =
+        name.trim().length >= 3 &&
+        (editing ||
+            management.sites.some((site) => String(site.id) === siteId));
+    const validNetworks = editing || list(cidrs).length > 0;
+    const validProtocols =
+        selectedProtocols.length > 0 &&
+        selectedProtocols.every((protocol) =>
+            management.protocols.includes(protocol),
+        ) &&
+        Number.isInteger(Number(maxTargets)) &&
+        Number(maxTargets) >= 1 &&
+        Number(maxTargets) <= 65536 &&
+        Number.isInteger(Number(packetsPerSecond)) &&
+        Number(packetsPerSecond) >= 1 &&
+        Number(packetsPerSecond) <= 1000 &&
+        (editing ||
+            !selectedProtocols.includes('snmp') ||
+            snmpReference.trim() !== '');
+    const ready = validIdentity && validNetworks && validProtocols;
+    const next = () => {
+        const valid =
+            step === 0
+                ? validIdentity
+                : step === 1
+                  ? validNetworks
+                  : validProtocols;
+        if (valid) {
+            setError(null);
+            setStep(step + 1);
+        } else
+            setError(
+                'Complete the required details in this step before continuing.',
+            );
+    };
+    const submit = async () => {
+        const url = editing
+            ? scopeUrl(scope.id, scope.actions.update_url)
+            : management.create_url === discoveryPath + '/scopes'
+              ? management.create_url
+              : null;
+        if (
+            !management.can_manage ||
+            !url ||
+            !ready ||
+            pending.current ||
+            uncertain
+        )
+            return;
+        const payload: Record<string, unknown> = {
+            name: name.trim(),
+            protocols: selectedProtocols,
+            max_targets_per_run: Number(maxTargets),
+            packets_per_second: Number(packetsPerSecond),
+        };
+        if (!editing) payload.site_id = Number(siteId);
+        if (cidrs.trim()) payload.cidrs = list(cidrs);
+        if (seedHosts.trim()) payload.seed_hosts = list(seedHosts);
+        if (exclusions.trim()) payload.exclusions = list(exclusions);
+        const submittedPortBounds = Object.fromEntries(
+            selectedProtocols
+                .filter(
+                    (protocol) =>
+                        protocol !== 'icmp' &&
+                        Boolean(allowedPorts[protocol]?.trim()),
+                )
+                .map((protocol) => [protocol, ports(allowedPorts[protocol])]),
+        );
+        if (Object.keys(submittedPortBounds).length)
+            payload.port_bounds = submittedPortBounds;
+        if (selectedProtocols.includes('snmp') && snmpReference.trim())
+            payload.snmp_credential_reference = snmpReference.trim();
+        pending.current = true;
+        setSubmitting(true);
+        setError(null);
+        try {
+            const response = editing
+                ? await axios.patch(url, payload, {
+                      signal: controller.current.signal,
+                  })
+                : await axios.post(url, payload, {
+                      signal: controller.current.signal,
+                  });
+            if (!active.current) return;
+            const returned = response.data?.scope;
+            if (
+                !returned ||
+                !Number.isInteger(returned.id) ||
+                returned.id <= 0 ||
+                returned.site_id !== Number(siteId) ||
+                (editing && returned.id !== scope.id)
+            ) {
+                setUncertain(true);
+                setError(
+                    'The save response could not be verified. A change may already have been saved. Refresh the scope records before sending another change.',
+                );
+                return;
+            }
+            onSaved();
+            onClose();
+        } catch (requestError) {
+            if (!active.current || controller.current.signal.aborted) return;
+            if (
+                axios.isAxiosError(requestError) &&
+                [401, 403, 404].includes(requestError.response?.status ?? 0)
+            ) {
+                onAccessDenied?.();
+                return;
+            }
+            if (
+                !axios.isAxiosError(requestError) ||
+                !requestError.response ||
+                requestError.response.status >= 500
+            ) {
+                setUncertain(true);
+                setError(
+                    'Save status is unknown. Your draft remains here. Refresh the scope records before sending another change.',
+                );
+            } else setError(scopeFailureMessage(requestError));
+        } finally {
+            if (active.current) {
+                pending.current = false;
+                setSubmitting(false);
+            }
+        }
+    };
+    if (!management.can_manage)
+        return (
+            <EmptyState
+                icon={ShieldCheck}
+                title="Scope management is unavailable"
+                description="Current permission to manage integrations is required."
+            />
+        );
+    return (
+        <>
+            <WizardShell
+                open
+                onClose={close}
+                title={
+                    editing
+                        ? 'Update discovery scope'
+                        : 'Create direct discovery scope'
+                }
+                description="Save a governed configuration for an approved Site. Creating or updating a scope does not start a network scan."
+                railIcon={Network}
+                railTitle={editing ? 'Update scope' : 'Create direct scope'}
+                railSub={scope?.name ?? 'Approved Site discovery'}
+                steps={[
+                    {
+                        key: 'identity',
+                        label: 'Site and scope',
+                        blurb: 'Approved Site and useful name',
+                        icon: ShieldCheck,
+                    },
+                    {
+                        key: 'networks',
+                        label: 'Networks',
+                        blurb: 'Approved ranges, seeds and exclusions',
+                        icon: Network,
+                    },
+                    {
+                        key: 'protocols',
+                        label: 'Protocols and limits',
+                        blurb: 'Allowed ports and bounded rate',
+                        icon: Activity,
+                    },
+                    {
+                        key: 'review',
+                        label: 'Review',
+                        blurb: 'Check configuration before saving',
+                        icon: Eye,
+                    },
+                ]}
+                stepIndex={step}
+                onStepClick={(index) => {
+                    if (!submitting) setStep(index);
+                }}
+                pct={
+                    ([validIdentity, validNetworks, validProtocols].filter(
+                        Boolean,
+                    ).length /
+                        3) *
+                    100
+                }
+                pctLabel="Required details"
+                footerStart={
+                    <>
+                        <Button
+                            variant="ghost"
+                            disabled={submitting}
+                            onClick={close}
+                        >
+                            Cancel
+                        </Button>
+                        {step > 0 && (
+                            <Button
+                                variant="outline"
+                                disabled={submitting}
+                                onClick={() => setStep(step - 1)}
+                            >
+                                Back
+                            </Button>
+                        )}
+                    </>
+                }
+                footerEnd={
+                    step < 3 ? (
+                        <Button disabled={submitting} onClick={next}>
+                            Continue
+                        </Button>
+                    ) : (
+                        <Button
+                            disabled={submitting || !ready || uncertain}
+                            onClick={() => void submit()}
+                        >
+                            {submitting
+                                ? 'Saving…'
+                                : editing
+                                  ? 'Apply scope update'
+                                  : 'Create direct scope'}
+                        </Button>
+                    )
+                }
+            >
+                <WizardStepPane>
+                    <div className="space-y-5">
+                        {error && (
+                            <Alert variant="destructive">
+                                <AlertTitle>
+                                    Scope save needs attention
+                                </AlertTitle>
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+                        {uncertain && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    onSaved();
+                                    onClose();
+                                }}
+                            >
+                                Refresh and close draft
+                            </Button>
+                        )}
+                        <fieldset disabled={submitting} className="space-y-5">
+                            {step === 0 && (
+                                <>
+                                    {!editing ? (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="discovery-scope-site">
+                                                Site
+                                            </Label>
+                                            <Select
+                                                value={siteId}
+                                                onValueChange={setSiteId}
+                                            >
+                                                <SelectTrigger id="discovery-scope-site">
+                                                    <SelectValue placeholder="Select an approved Site" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {management.sites.map(
+                                                        (site) => (
+                                                            <SelectItem
+                                                                key={site.id}
+                                                                value={site.id.toString()}
+                                                            >
+                                                                {site.name}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-lg border p-3 text-sm">
+                                            <strong>
+                                                {scope.site?.name ??
+                                                    'Site unavailable'}
+                                            </strong>
+                                            <p className="text-muted-foreground">
+                                                Main application over Site
+                                                connectivity
+                                            </p>
+                                        </div>
+                                    )}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="discovery-scope-name">
+                                            Scope name
+                                        </Label>
+                                        <Input
+                                            id="discovery-scope-name"
+                                            value={name}
+                                            onChange={(event) =>
+                                                setName(event.target.value)
+                                            }
+                                            minLength={3}
+                                            maxLength={128}
+                                            required
+                                        />
+                                    </div>
+                                </>
+                            )}
+                            {step === 1 && (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="discovery-scope-cidrs">
+                                            {editing
+                                                ? 'Replacement approved networks (optional)'
+                                                : 'Approved networks'}
+                                        </Label>
+                                        <Textarea
+                                            id="discovery-scope-cidrs"
+                                            value={cidrs}
+                                            onChange={(event) =>
+                                                setCidrs(event.target.value)
+                                            }
+                                            rows={3}
+                                            required={!editing}
+                                            placeholder="10.44.0.0/16"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            One CIDR per line. Existing ranges
+                                            remain hidden; leave blank while
+                                            editing to preserve them.
+                                        </p>
+                                    </div>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="discovery-scope-seeds">
+                                                {editing
+                                                    ? 'Replacement seed hosts (optional)'
+                                                    : 'Seed hosts (optional)'}
+                                            </Label>
+                                            <Textarea
+                                                id="discovery-scope-seeds"
+                                                value={seedHosts}
+                                                onChange={(event) =>
+                                                    setSeedHosts(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                rows={3}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="discovery-scope-exclusions">
+                                                {editing
+                                                    ? 'Replacement exclusions (optional)'
+                                                    : 'Exclusions (optional)'}
+                                            </Label>
+                                            <Textarea
+                                                id="discovery-scope-exclusions"
+                                                value={exclusions}
+                                                onChange={(event) =>
+                                                    setExclusions(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                rows={3}
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                            {step === 2 && (
+                                <>
+                                    <fieldset className="space-y-2">
+                                        <legend className="text-sm font-medium">
+                                            Native discovery protocols
+                                        </legend>
+                                        <div className="grid gap-2 sm:grid-cols-3">
+                                            {management.protocols.map(
+                                                (protocol) => (
+                                                    <label
+                                                        key={protocol}
+                                                        className="flex items-center gap-2 rounded-lg border p-3 text-sm"
+                                                    >
+                                                        <Checkbox
+                                                            checked={selectedProtocols.includes(
+                                                                protocol,
+                                                            )}
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
+                                                                toggleProtocol(
+                                                                    protocol,
+                                                                    Boolean(
+                                                                        checked,
+                                                                    ),
+                                                                )
+                                                            }
+                                                        />
+                                                        {protocol.toUpperCase()}
+                                                    </label>
+                                                ),
+                                            )}
+                                        </div>
+                                    </fieldset>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <Label>
+                                                Protocol-specific allowed ports
+                                            </Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Each adapter is limited to its
+                                                own approved ports. Leave every
+                                                field blank while editing to
+                                                preserve the hidden allowlist.
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            {selectedProtocols
+                                                .filter(
+                                                    (protocol) =>
+                                                        protocol !== 'icmp',
+                                                )
+                                                .map((protocol) => (
+                                                    <div
+                                                        key={protocol}
+                                                        className="space-y-2"
+                                                    >
+                                                        <Label
+                                                            htmlFor={`discovery-scope-ports-${protocol}`}
+                                                        >
+                                                            {protocol.toUpperCase()}{' '}
+                                                            ports
+                                                        </Label>
+                                                        <Input
+                                                            id={`discovery-scope-ports-${protocol}`}
+                                                            value={
+                                                                allowedPorts[
+                                                                    protocol
+                                                                ] ?? ''
+                                                            }
+                                                            onChange={(event) =>
+                                                                setAllowedPorts(
+                                                                    (
+                                                                        current,
+                                                                    ) => ({
+                                                                        ...current,
+                                                                        [protocol]:
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                    }),
+                                                                )
+                                                            }
+                                                            placeholder={
+                                                                DEFAULT_PORTS[
+                                                                    protocol
+                                                                ] ??
+                                                                'Approved ports'
+                                                            }
+                                                        />
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                    {selectedProtocols.includes('snmp') ? (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="discovery-scope-snmp-reference">
+                                                SNMPv3 credential reference
+                                            </Label>
+                                            <Input
+                                                id="discovery-scope-snmp-reference"
+                                                value={snmpReference}
+                                                onChange={(event) =>
+                                                    setSnmpReference(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required={!editing}
+                                                autoComplete="off"
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Enter a Site reference only.
+                                                Secret material is leased at
+                                                execution and is never entered
+                                                here.
+                                            </p>
+                                        </div>
+                                    ) : null}
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="discovery-scope-target-limit">
+                                                Maximum targets per run
+                                            </Label>
+                                            <Input
+                                                id="discovery-scope-target-limit"
+                                                type="number"
+                                                min={1}
+                                                max={65536}
+                                                value={maxTargets}
+                                                onChange={(event) =>
+                                                    setMaxTargets(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="discovery-scope-rate">
+                                                Packets per second
+                                            </Label>
+                                            <Input
+                                                id="discovery-scope-rate"
+                                                type="number"
+                                                min={1}
+                                                max={1000}
+                                                value={packetsPerSecond}
+                                                onChange={(event) =>
+                                                    setPacketsPerSecond(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                            {step === 3 && (
+                                <div className="space-y-5">
+                                    <ReviewCard
+                                        icon={ShieldCheck}
+                                        title="Site and scope"
+                                        onEdit={() => setStep(0)}
+                                    >
+                                        <ReviewRow
+                                            label="Site"
+                                            value={
+                                                scope?.site?.name ??
+                                                management.sites.find(
+                                                    (site) =>
+                                                        String(site.id) ===
+                                                        siteId,
+                                                )?.name
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Scope name"
+                                            value={name.trim()}
+                                        />
+                                    </ReviewCard>
+                                    <ReviewCard
+                                        icon={Network}
+                                        title="Network bounds"
+                                        onEdit={() => setStep(1)}
+                                    >
+                                        <ReviewRow
+                                            label="Approved networks"
+                                            value={
+                                                cidrs.trim() ||
+                                                (editing
+                                                    ? 'Keep protected existing ranges'
+                                                    : null)
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Seed hosts"
+                                            value={
+                                                seedHosts.trim() ||
+                                                (editing
+                                                    ? 'Keep existing seeds'
+                                                    : 'None entered')
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Exclusions"
+                                            value={
+                                                exclusions.trim() ||
+                                                (editing
+                                                    ? 'Keep existing exclusions'
+                                                    : 'None entered')
+                                            }
+                                        />
+                                    </ReviewCard>
+                                    <ReviewCard
+                                        icon={Activity}
+                                        title="Protocols and limits"
+                                        onEdit={() => setStep(2)}
+                                    >
+                                        <ReviewRow
+                                            label="Protocols"
+                                            value={selectedProtocols.join(', ')}
+                                        />
+                                        <ReviewRow
+                                            label="Allowed ports"
+                                            value={
+                                                selectedProtocols
+                                                    .filter((protocol) =>
+                                                        allowedPorts[
+                                                            protocol
+                                                        ]?.trim(),
+                                                    )
+                                                    .map(
+                                                        (protocol) =>
+                                                            protocol +
+                                                            ': ' +
+                                                            allowedPorts[
+                                                                protocol
+                                                            ],
+                                                    )
+                                                    .join(' · ') ||
+                                                (editing
+                                                    ? 'Keep protected existing allowlist'
+                                                    : 'None entered')
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Maximum targets"
+                                            value={maxTargets}
+                                        />
+                                        <ReviewRow
+                                            label="Packets per second"
+                                            value={packetsPerSecond}
+                                        />
+                                        {selectedProtocols.includes('snmp') && (
+                                            <ReviewRow
+                                                label="SNMP credential reference"
+                                                value={
+                                                    snmpReference
+                                                        ? 'Site reference supplied'
+                                                        : 'Keep existing reference'
+                                                }
+                                            />
+                                        )}
+                                    </ReviewCard>
+                                    <p className="text-subtle">
+                                        This saves scope configuration. Run now
+                                        is a separate, authorised action. The
+                                        server checks the current Site bounds
+                                        and supported protocols before saving.
+                                    </p>
+                                </div>
+                            )}
+                        </fieldset>
+                    </div>
+                </WizardStepPane>
+            </WizardShell>
+            <ConfirmDialog
+                open={discardOpen}
+                onClose={() => setDiscardOpen(false)}
+                onConfirm={onClose}
+                title="Discard this discovery draft?"
+                description="The unsent scope entries will be discarded. A change already sent may still have been saved."
+                confirmText="Discard draft"
+                cancelText="Keep editing"
+            />
+        </>
     );
 }

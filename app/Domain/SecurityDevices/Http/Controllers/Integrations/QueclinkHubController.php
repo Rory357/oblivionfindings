@@ -85,6 +85,7 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $user = $request->user();
+        $asOf = now()->toImmutable();
         $targetType = in_array($request->string('target_type')->toString(), ['vehicle', 'staff', 'client'], true)
             ? $request->string('target_type')->toString()
             : null;
@@ -95,6 +96,8 @@ class QueclinkHubController extends Controller
         $deviceSearch = Str::limit(trim($request->string('device_search')->toString()), 100, '');
 
         return Inertia::render('security-devices/integrations/queclink-hub', [
+            'actor_id' => (int) $user->id,
+            'as_of' => $asOf->toISOString(),
             'listener' => function () use ($user): array {
                 $port = (int) (AppSetting::query()->where('key', 'queclink.listener.port')->value('value')
                     ?? config('services.queclink.port', 8090));
@@ -119,7 +122,7 @@ class QueclinkHubController extends Controller
 
                 return [
                     'frames_last_hour' => $this->visibleFrameQuery($user)->where('created_at', '>=', now()->subHour())->count(),
-                    'last_frame_at' => $lastFrameAt ? Carbon::parse($lastFrameAt)->toDateTimeString() : null,
+                    'last_frame_at' => $lastFrameAt ? Carbon::parse($lastFrameAt)->toISOString() : null,
                 ];
             },
             'cloudIntegration' => function (): array {

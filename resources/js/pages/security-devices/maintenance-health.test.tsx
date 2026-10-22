@@ -12,7 +12,7 @@ import { healthFixture } from './maintenance-health-test-fixtures';
 import MaintenanceHealth from './maintenance-health';
 const mocks = vi.hoisted(() => ({
     actor: 7,
-    can: {} as Record<string, boolean>,
+    can: {} as Record<string, Record<string, boolean>>,
     get: vi.fn(),
     post: vi.fn(),
     reload: vi.fn(),
@@ -45,9 +45,11 @@ vi.mock('@/layouts/app-layout', () => ({
 beforeEach(() => {
     mocks.actor = 7;
     mocks.can = {
-        'securityDevices.maintenance.view': true,
-        'securityDevices.maintenance.manage': true,
-        'securityDevices.devices.view': true,
+        securityDevices: {
+            maintenanceView: true,
+            maintenanceManage: true,
+            devicesView: true,
+        },
     };
     for (const key of ['get', 'post', 'reload', 'visit'] as const)
         mocks[key].mockReset();
@@ -93,6 +95,119 @@ const reply = (component = 'security-devices/maintenance-health') => ({
     },
 });
 describe('Maintenance and health shared legacy workspace', () => {
+    it('withholds retained work after current nested maintenance-view authority is withdrawn', () => {
+        const data = healthFixture();
+        const ui = render(<MaintenanceHealth {...data} />);
+        expect(workCard()).toBeInTheDocument();
+        mocks.can.securityDevices.maintenanceView = false;
+        ui.rerender(<MaintenanceHealth {...data} />);
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Calibrate synthetic pump'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('does not rebind retained private health data when auth and response actor metadata change together', async () => {
+        const data = healthFixture();
+        const ui = render(<MaintenanceHealth {...data} />);
+        fireEvent.click(
+            within(workCard()).getByRole('button', {
+                name: /^Calibrate synthetic pump/,
+            }),
+        );
+        await screen.findByRole('dialog');
+        expect(
+            screen.getByText('Private retained work note'),
+        ).toBeInTheDocument();
+        mocks.actor = 8;
+        ui.rerender(<MaintenanceHealth {...data} actor_id={8} />);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryAllByRole('article')).toHaveLength(0);
+        expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Private retained work note'),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText('Synthetic pump')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Health attention' }));
+        expect(screen.queryAllByRole('article')).toHaveLength(0);
+        fireEvent.click(screen.getByRole('tab', { name: 'Low battery' }));
+        expect(screen.queryAllByRole('article')).toHaveLength(0);
+        expect(
+            screen.queryByText('Synthetic door sensor'),
+        ).not.toBeInTheDocument();
+        expect(screen.getAllByText('Restricted').length).toBeGreaterThan(0);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.get).toHaveBeenCalledWith(
+            '/security-devices/maintenance-health',
+            {},
+            { preserveState: false, preserveScroll: true },
+        );
+        expect(mocks.reload).not.toHaveBeenCalled();
+        expect(mocks.post).not.toHaveBeenCalled();
+        ui.unmount();
+        const current = healthFixture();
+        current.actor_id = 8;
+        current.records.data = [
+            {
+                ...current.records.data[0],
+                description: 'Current actor permitted health work',
+            },
+        ];
+        render(<MaintenanceHealth {...current} />);
+        expect(
+            screen.getByText('Current actor permitted health work'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('Calibrate synthetic pump'),
+        ).not.toBeInTheDocument();
+    });
+
+    it.each([
+        '/security-devices/maintenance-health',
+        '/security-devices/maintenance',
+    ])(
+        'uses a complete denied-context read for the canonical workspace %s',
+        (href) => {
+            const data = healthFixture();
+            data.pageMeta = {
+                title: 'Maintenance',
+                description: 'Operational maintenance',
+                href,
+            };
+            const ui = render(<MaintenanceHealth {...data} />);
+            mocks.can.securityDevices.maintenanceView = false;
+            ui.rerender(<MaintenanceHealth {...data} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+            expect(mocks.get).toHaveBeenCalledWith(
+                href,
+                {},
+                { preserveState: false, preserveScroll: true },
+            );
+            expect(mocks.reload).not.toHaveBeenCalled();
+            expect(mocks.post).not.toHaveBeenCalled();
+        },
+    );
+
+    it('keeps an ordinary same-actor header refresh as a partial read', () => {
+        render(<MaintenanceHealth {...healthFixture()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.reload).toHaveBeenCalledWith({
+            only: [
+                'actor_id',
+                'stats',
+                'records',
+                'attentionDevices',
+                'lowBatteryDevices',
+                'filters',
+                'can',
+                'auth',
+            ],
+            onSuccess: expect.any(Function),
+        });
+        expect(mocks.get).not.toHaveBeenCalled();
+        expect(mocks.post).not.toHaveBeenCalled();
+    });
+
     it('retains full work, cost and notes facts with NZ dates and canonical device links', async () => {
         render(<MaintenanceHealth {...healthFixture()} />);
         fireEvent.click(
@@ -250,8 +365,8 @@ describe('Maintenance and health shared legacy workspace', () => {
         ).toBeInTheDocument();
     });
     it('requires current manage and separate profile access', async () => {
-        mocks.can['securityDevices.maintenance.manage'] = false;
-        mocks.can['securityDevices.devices.view'] = false;
+        mocks.can.securityDevices.maintenanceManage = false;
+        mocks.can.securityDevices.devicesView = false;
         render(<MaintenanceHealth {...healthFixture()} />);
         expect(
             screen.queryByRole('link', { name: 'Synthetic pump' }),
@@ -358,6 +473,14 @@ describe('Maintenance and health shared legacy workspace', () => {
         expect(
             screen.getByText(/Maintenance records are restricted/),
         ).toBeInTheDocument();
+        expect(mocks.post).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.get).toHaveBeenCalledWith(
+            '/security-devices/maintenance-health',
+            {},
+            { preserveState: false, preserveScroll: true },
+        );
+        expect(mocks.reload).not.toHaveBeenCalled();
         expect(mocks.post).toHaveBeenCalledTimes(1);
     });
 });

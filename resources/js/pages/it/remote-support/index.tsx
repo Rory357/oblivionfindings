@@ -24,6 +24,7 @@ import { useState, type FormEvent } from 'react';
 import { RemoteConnectionDialog } from './_dialogs';
 import { RemotePolicyEditor } from './policy-editor';
 import { RestartPolicyEditor } from './restart-policy';
+import { ScriptPolicyEditor } from './script-policy';
 import { ServiceActionPolicyEditor } from './service-action-policy';
 import { SoftwarePolicyEditor } from './software-policy';
 import { TechnicianObli } from './technician-obli';
@@ -45,6 +46,7 @@ export interface RemoteSupportProps {
     can_manage_restart_policy?: boolean;
     can_manage_software_policy?: boolean;
     can_view_software_catalogue?: boolean;
+    can_view_script_catalogue?: boolean;
     computers: {
         data: Computer[];
         total: number;
@@ -68,6 +70,7 @@ function RemoteSupportWorkspace({
     can_manage_restart_policy,
     can_manage_software_policy,
     can_view_software_catalogue,
+    can_view_script_catalogue,
     computers,
     selected,
     ticket,
@@ -104,20 +107,34 @@ function RemoteSupportWorkspace({
                     title="Remote support"
                     subline="Computer support and Obli assistance"
                     actions={
-                        <form
-                            onSubmit={searchComputers}
-                            className="flex items-center gap-2"
-                        >
-                            <PageHeaderSearch
-                                value={search}
-                                onChange={setSearch}
-                                placeholder="Search computers…"
-                            />
-                            <Button type="submit" variant="secondary">
-                                <Search aria-hidden="true" />
-                                Search
-                            </Button>
-                        </form>
+                        <>
+                            <form
+                                onSubmit={searchComputers}
+                                className="flex items-center gap-2"
+                            >
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search computers…"
+                                />
+                                <Button type="submit" variant="secondary">
+                                    <Search aria-hidden="true" />
+                                    Search
+                                </Button>
+                            </form>
+                            {can_view_script_catalogue && (
+                                <Button variant="secondary" asChild>
+                                    <Link
+                                        href={
+                                            '/security-devices/scripts?expected_actor_id=' +
+                                            actor_id
+                                        }
+                                    >
+                                        Script catalogue
+                                    </Link>
+                                </Button>
+                            )}
+                        </>
                     }
                     meters={
                         <>
@@ -275,6 +292,14 @@ function RemoteSupportWorkspace({
                                 <div className="mt-4">
                                     <RemotePolicyEditor
                                         key={actor_id + ':' + selected.id}
+                                        actorId={actor_id}
+                                        device={selected}
+                                    />
+                                </div>
+                            )}
+                            {selected && (
+                                <div className="mt-4">
+                                    <ScriptPolicyEditor
                                         actorId={actor_id}
                                         device={selected}
                                     />

@@ -13,7 +13,7 @@ import { estateFixture } from './estate-test-fixtures';
 import Dashboard from './dashboard';
 const mocks = vi.hoisted(() => ({
     actor: 7,
-    can: {} as Record<string, boolean>,
+    can: {} as Record<string, Record<string, boolean>>,
     visit: vi.fn(),
     reload: vi.fn(),
 }));
@@ -67,11 +67,13 @@ vi.mock('@/components/security-devices/add-device-dialog', async () => {
 beforeEach(() => {
     mocks.actor = 7;
     mocks.can = {
-        'securityDevices.viewAny': true,
-        'securityDevices.devices.view': true,
-        'securityDevices.events.view': true,
-        'securityDevices.maintenance.view': true,
-        'securityDevices.devices.create': true,
+        securityDevices: {
+            viewAny: true,
+            devicesView: true,
+            eventsView: true,
+            maintenanceView: true,
+            devicesCreate: true,
+        },
     };
     mocks.visit.mockReset();
     mocks.reload.mockReset();
@@ -104,6 +106,21 @@ function invalid(status: number, path = '/security-devices') {
     return event;
 }
 describe('Estate shared records and authority', () => {
+    it('withholds retained estate records after current nested view authority is withdrawn', () => {
+        const data = estateFixture();
+        const ui = render(<Dashboard {...data} />);
+        expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
+        mocks.can.securityDevices.viewAny = false;
+        ui.rerender(<Dashboard {...data} />);
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Register device' }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Estate records are restricted',
+        );
+    });
+
     it('preserves work queue destinations, restricted IT and neutral zero-item states', async () => {
         const data = estateFixture();
         data.operations.action_queue[0].count = 0;
@@ -301,7 +318,7 @@ describe('Estate shared records and authority', () => {
         render(<Dashboard {...data} />);
         expect(screen.getAllByText(/Not measured/).length).toBeGreaterThan(0);
         cleanup();
-        mocks.can['securityDevices.events.view'] = false;
+        mocks.can.securityDevices.eventsView = false;
         render(<Dashboard {...data} />);
         expect(
             screen.getByText('Monitoring access required'),
@@ -324,7 +341,7 @@ describe('Estate shared records and authority', () => {
             }),
         ).toBeInTheDocument();
         expect(mocks.visit).not.toHaveBeenCalled();
-        mocks.can['securityDevices.devices.create'] = false;
+        mocks.can.securityDevices.devicesCreate = false;
         ui.rerender(<Dashboard {...data} />);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(
@@ -370,5 +387,55 @@ describe('Estate shared records and authority', () => {
         expect(
             screen.queryByText('Private backend details'),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('dashboard received DTO ownership', () => {
+    it('quarantines retained private DTOs after paired actor metadata changes', async () => {
+        const original = estateFixture();
+        const { rerender } = render(<Dashboard {...original} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'Affected Sites' }));
+        await details('Kauri House');
+        mocks.actor = 8;
+        // Same-page partial update: actor metadata changes, all private DTOs remain from actor 7.
+        rerender(
+            <Dashboard
+                {...original}
+                actor_id={8}
+                as_of="2026-10-13T02:00:00Z"
+            />,
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(screen.queryByText('Synthetic pump')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Add device' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.visit).toHaveBeenCalledWith(
+            '/security-devices',
+            expect.objectContaining({
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
+            }),
+        );
+        expect(mocks.visit.mock.calls.at(-1)![1]).not.toHaveProperty('only');
+        expect(mocks.reload).not.toHaveBeenCalled();
+    });
+});
+
+describe('dashboard same-account reads', () => {
+    it('keeps the existing same-account refresh projection and owner', () => {
+        const original = estateFixture();
+        const { rerender } = render(<Dashboard {...original} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.reload).toHaveBeenCalledTimes(1);
+        expect(mocks.reload.mock.calls[0][0].only).toEqual(
+            expect.arrayContaining(['actor_id', 'as_of', 'auth']),
+        );
+        expect(mocks.visit).not.toHaveBeenCalled();
+        rerender(<Dashboard {...original} as_of="2026-10-13T02:00:00Z" />);
+        expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
     });
 });

@@ -27,6 +27,16 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+type CurrentPermissions = {
+    securityDevices?: {
+        viewAny?: boolean;
+        commandsAdmin?: boolean;
+        integrationsManage?: boolean;
+        devicesView?: boolean;
+        integrationsView?: boolean;
+    };
+};
+
 export type AgentDownload = {
     id: string;
     platform: 'windows' | 'linux';
@@ -94,27 +104,35 @@ function DownloadLink({ artifact }: { artifact: AgentDownload }) {
 }
 export default function AgentDownloads(props: AgentDownloadsProps) {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+        auth?: { user?: { id: number } | null; can?: CurrentPermissions };
     }>().props;
+    const [sourceActor] = useState(auth?.user?.id);
+    const sameActor = Boolean(sourceActor && sourceActor === auth?.user?.id);
     const computer = Boolean(
+        sameActor &&
         auth?.user?.id &&
-        auth.can?.['securityDevices.viewAny'] === true &&
-        auth.can?.['securityDevices.commands.admin'] === true,
+        auth.can?.securityDevices?.viewAny === true &&
+        auth.can?.securityDevices?.commandsAdmin === true,
     );
     const site = Boolean(
+        sameActor &&
         auth?.user?.id &&
-        auth.can?.['securityDevices.viewAny'] === true &&
-        auth.can?.['securityDevices.integrations.manage'] === true,
+        auth.can?.securityDevices?.viewAny === true &&
+        auth.can?.securityDevices?.integrationsManage === true,
     );
     return (
         <AgentReleaseList
             key={JSON.stringify([auth?.user?.id, auth?.can, props])}
             {...props}
+            sameActor={sameActor}
             computer={computer}
             site={site}
-            deviceView={auth?.can?.['securityDevices.devices.view'] === true}
+            deviceView={
+                sameActor && auth?.can?.securityDevices?.devicesView === true
+            }
             integrationView={
-                auth?.can?.['securityDevices.integrations.view'] === true
+                sameActor &&
+                auth?.can?.securityDevices?.integrationsView === true
             }
         />
     );
@@ -129,11 +147,13 @@ function AgentReleaseList({
     site,
     deviceView,
     integrationView,
+    sameActor,
 }: AgentDownloadsProps & {
     computer: boolean;
     site: boolean;
     deviceView: boolean;
     integrationView: boolean;
+    sameActor: boolean;
 }) {
     const [layout, setLayout] = useState<'cards' | 'table'>('cards');
     const [view, setView] = useState<ReleaseView>('all');
@@ -219,16 +239,24 @@ function AgentReleaseList({
                         />
                         <PageHeaderGlassButton
                             onClick={() =>
-                                router.reload({
-                                    only: [
-                                        'artifacts',
-                                        'catalogue_available',
-                                        'catalogue_expires_at',
-                                        'can_manage_computers',
-                                        'can_manage_collectors',
-                                        'auth',
-                                    ],
-                                })
+                                !sameActor
+                                    ? router.visit(
+                                          '/security-devices/agent-downloads',
+                                          {
+                                              preserveState: false,
+                                              preserveScroll: true,
+                                          },
+                                      )
+                                    : router.reload({
+                                          only: [
+                                              'artifacts',
+                                              'catalogue_available',
+                                              'catalogue_expires_at',
+                                              'can_manage_computers',
+                                              'can_manage_collectors',
+                                              'auth',
+                                          ],
+                                      })
                             }
                         >
                             <RefreshCw />

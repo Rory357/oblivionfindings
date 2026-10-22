@@ -6,6 +6,7 @@ use App\Domain\It\Services\ItRemoteSupportAccess;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointActionPolicy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartPolicy;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScripts;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePolicy;
 use App\Domain\SecurityDevices\Models\Device;
@@ -46,6 +47,7 @@ final class ItRemoteSupportController extends Controller
         $response = Inertia::render('it/remote-support/index', [
             'actor_id' => $actor->id,
             'can_view_software_catalogue' => EndpointSoftwarePackages::canOpen($actor),
+            'can_view_script_catalogue' => app(EndpointScripts::class)->canOpen($actor),
             'can_manage_software_policy' => $actor->canDo(EndpointSoftwarePolicy::MANAGE),
             'can_manage_restart_policy' => $actor->canDo(EndpointRestartPolicy::MANAGE),
             'can_manage_action_policy' => $actor->canDo(EndpointActionPolicy::MANAGE),

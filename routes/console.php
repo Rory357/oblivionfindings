@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\CompanyHub\Services\HubSearchInsights;
 use App\Domain\Finance\Jobs\CalculateGstReturnJob;
 use App\Domain\Finance\Jobs\CheckBillDueDatesJob;
 use App\Domain\Finance\Jobs\GenerateRecurringJournalsJob;
@@ -1025,9 +1026,12 @@ app(Schedule::class)->command('workforce:recover-eligibility-refresh')->everyMin
 app(Schedule::class)->command('company-hub:deliver-notices')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
 
 Artisan::command('company-hub:prune-search-insights', function () {
-    $this->info((string) app(\App\Domain\CompanyHub\Services\HubSearchInsights::class)->prune());
+    $this->info((string) app(HubSearchInsights::class)->prune());
 })->purpose('Remove Company Hub search topic totals older than 90 calendar days');
 app(Schedule::class)->command('company-hub:prune-search-insights')->dailyAt('02:10')->timezone('Pacific/Auckland')->withoutOverlapping();
 
 app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
 app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
+
+// Content expiry applies independently of publication, execution policy and agent enrolment.
+app(Schedule::class)->command('endpoints:purge-script-outputs')->everyMinute()->withoutOverlapping();

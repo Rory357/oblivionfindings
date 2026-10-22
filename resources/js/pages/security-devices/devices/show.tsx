@@ -1,11 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import {
-    PageHero,
-    type PageHeroBadge,
-    type PageHeroBadgeTone,
-    type PageHeroMetaItem,
-    type PageHeroStat,
-} from '@/components/page';
+import { PageHeader, PageHeaderViewToggle } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { useGroupedProfileSearchShortcut } from '@/components/page/grouped-profile-nav';
 import { ReasonDialog } from '@/components/reason-dialog';
@@ -14,15 +8,7 @@ import {
     useEditDeviceDialogState,
 } from '@/components/security-devices/add-device-dialog';
 import { CctvNavigationActions } from '@/components/security-devices/cctv-navigation-actions';
-import {
-    DeviceDocumentHistory,
-    type DeviceDocumentHistoryItem,
-} from '@/components/security-devices/device-document-history';
-import {
-    ControlRoomAlertAccessRequired,
-    FleetTechnologyAccessRequired,
-} from '@/components/security-devices/permission-destinations';
-import { Badge } from '@/components/ui/badge';
+import type { DeviceDocumentHistoryItem } from '@/components/security-devices/device-document-history';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -39,7 +25,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -50,34 +35,37 @@ import {
 } from '@/components/ui/select';
 import { TabsRoot as Tabs, TabsContent } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
-import { Head, Link, router } from '@inertiajs/react';
+import { formatDate, formatDateTime } from '@/lib/datetime';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    Activity,
-    AlertTriangle,
     ArrowRightLeft,
-    Check,
-    Clock,
     Cpu,
     Edit,
-    FileText,
-    GitBranch,
-    Link2,
     MapPin,
     Minus,
-    Network,
     Plus,
-    Radio,
     Trash2,
-    Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { InstallationProfileDialog } from './_installation-dialog';
 import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
+import { DeviceProfileHeader } from './device-profile-header';
 import {
     DeviceProfileGroupNavigation,
     DeviceProfileNavigation,
 } from './device-profile-navigation';
+import {
+    DeviceAssetRecords,
+    DeviceAssignmentRecords,
+    DeviceControlRoomRecords,
+    DeviceDocumentHistoryRecords,
+    DeviceDocumentRecords,
+    DeviceEventRecords,
+    DeviceMaintenanceRecords,
+    DeviceRelationshipHistoryRecords,
+    DeviceRelationshipRecords,
+    type DeviceRecordsView,
+} from './device-profile-records';
 import {
     DeviceAuditSection,
     DeviceConfigurationSection,
@@ -169,7 +157,9 @@ type HistoricalRelationship = Relationship & {
 
 type TargetEntity = { id: number; name: string; [key: string]: unknown };
 
-type Props = {
+export type Props = {
+    actor_id: number;
+    as_of: string;
     endpoint_setup?: { actor_id: number } | null;
     device: DeviceDetail;
     profile: DeviceProfile;
@@ -230,38 +220,6 @@ type Props = {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function heroTone(state: string | null | undefined): PageHeroBadgeTone {
-    switch (state) {
-        case 'active':
-        case 'available':
-        case 'fresh':
-        case 'healthy':
-        case 'online':
-            return 'success';
-        case 'attention':
-        case 'degraded':
-        case 'maintenance':
-        case 'stale':
-        case 'warning':
-            return 'warning';
-        case 'critical':
-        case 'failed':
-        case 'lost':
-        case 'offline':
-            return 'critical';
-        default:
-            return 'default';
-    }
-}
-
-function heroStatTone(
-    state: string | null | undefined,
-): 'neutral' | 'success' | 'warning' | 'critical' | 'info' {
-    const tone = heroTone(state);
-
-    return tone === 'default' ? 'neutral' : tone;
-}
-
 function humanise(value: string | null | undefined): string {
     if (!value) return 'Not recorded';
 
@@ -283,7 +241,95 @@ function targetTypeLabel(t: string): string {
 
 // ── Component ─────────────────────────────────────────────────────
 
-export default function DeviceShow({
+export default function DeviceShow(data: Props) {
+    const { auth } = usePage<{
+        auth?: {
+            user?: { id: number } | null;
+            can?: { securityDevices?: Record<string, unknown> };
+        };
+    }>().props;
+    const permission = auth?.can?.securityDevices;
+    const [sourceDevice] = useState(data.device.id);
+    const [sourceAuthority] = useState(() =>
+        JSON.stringify([data.actor_id, auth?.can]),
+    );
+    const authorityMatches =
+        sourceAuthority === JSON.stringify([data.actor_id, auth?.can]);
+    if (
+        !authorityMatches ||
+        sourceDevice !== data.device.id ||
+        !auth?.user?.id ||
+        data.actor_id !== auth.user.id ||
+        permission?.viewAny !== true ||
+        permission.devicesView !== true
+    )
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
+                    { title: 'Security & Devices', href: '/security-devices' },
+                    { title: 'Devices', href: '/security-devices/devices' },
+                ]}
+            >
+                <Head title="Device access required" />
+                <div className="space-y-5">
+                    <PageHeader
+                        actions={
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    router.visit(
+                                        `/security-devices/devices/${data.device.id}`,
+                                        {
+                                            preserveState: false,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
+                            >
+                                Refresh current record
+                            </Button>
+                        }
+                        icon={Cpu}
+                        title="Device access required"
+                        subline="Device records are restricted."
+                    />
+                    <p
+                        role="status"
+                        className="rounded-xl border bg-card p-5 text-sm"
+                    >
+                        This device is not available in your current access.
+                        Return to Devices and reopen a permitted record.
+                    </p>
+                </div>
+            </AppLayout>
+        );
+    const can = {
+        ...data.can,
+        update: data.can.update && permission.devicesUpdate === true,
+        delete: data.can.delete && permission.devicesDelete === true,
+        assign: data.can.assign && permission.devicesAssign === true,
+        viewEvents: data.can.viewEvents && permission.eventsView === true,
+        manageMaintenance:
+            data.can.manageMaintenance && permission.maintenanceManage === true,
+    };
+    return (
+        <DeviceShowBody
+            key={JSON.stringify([data.actor_id, data.device.id, permission])}
+            {...data}
+            can={can}
+            endpoint_setup={
+                permission.devicesUpdate === true &&
+                permission.commandsAdmin === true
+                    ? data.endpoint_setup
+                    : null
+            }
+        />
+    );
+}
+
+function DeviceShowBody({
+    as_of,
     endpoint_setup = null,
     device,
     profile,
@@ -304,14 +350,13 @@ export default function DeviceShow({
     relationshipHistory,
     can,
 }: Props) {
-    const totalRelationships =
-        relationships.parents.length + relationships.children.length;
     const totalRelationshipHistory =
         relationshipHistory.parents.length +
         relationshipHistory.children.length;
     const [activeSection, setActiveSection] = useState<DeviceProfileSectionKey>(
         profile.sections[0]?.key ?? 'health',
     );
+    const [recordsView, setRecordsView] = useState<DeviceRecordsView>('cards');
     const [profileSearchOpen, setProfileSearchOpen] = useState(false);
     useGroupedProfileSearchShortcut(() => setProfileSearchOpen(true));
     const editDeviceDialog = useEditDeviceDialogState();
@@ -373,9 +418,23 @@ export default function DeviceShow({
         [availableAssets, linkedAssetIds],
     );
 
+    const linkAssetIsEligible = pickableAssets.some(
+        (asset) => String(asset.id) === linkAssetId,
+    );
+    const assetChoiceError =
+        linkAssetId && !linkAssetIsEligible
+            ? 'This asset is no longer available to link. Choose a current asset.'
+            : '';
+
     const submitLink = () => {
         if (!linkAssetId) {
             setLinkError('Pick an asset to link.');
+            return;
+        }
+        if (!linkAssetIsEligible) {
+            setLinkError(
+                'This asset is no longer available to link. Choose a current asset.',
+            );
             return;
         }
         setLinkSubmitting(true);
@@ -389,7 +448,19 @@ export default function DeviceShow({
             },
             {
                 preserveScroll: true,
-                onSuccess: () => {
+                onSuccess: (page) => {
+                    const flash = page.props.flash;
+                    if (
+                        flash !== null &&
+                        typeof flash === 'object' &&
+                        'error' in flash &&
+                        Boolean(flash.error)
+                    ) {
+                        setLinkError(
+                            'The asset was not linked. Review the current asset choices and try again.',
+                        );
+                        return;
+                    }
                     setLinkOpen(false);
                     setLinkAssetId('');
                     setLinkType(linkTypes[0]?.value ?? 'primary');
@@ -583,12 +654,6 @@ export default function DeviceShow({
         );
     };
 
-    const formatBytes = (n: number): string => {
-        if (n < 1024) return `${n} B`;
-        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-        return `${(n / 1024 / 1024).toFixed(1)} MB`;
-    };
-
     // ── Lifecycle service-date dialog state ─────────────────────
     const [serviceDueOpen, setServiceDueOpen] = useState(false);
     const [serviceDue, setServiceDue] = useState(
@@ -693,6 +758,14 @@ export default function DeviceShow({
         }
     }, [assignType, assignmentTargets]);
 
+    const assignmentTargetIsEligible = targetOptions.some(
+        (target) => target.value === assignId,
+    );
+    const assignmentChoiceError =
+        assignId && !assignmentTargetIsEligible
+            ? 'This assignment target is no longer available. Choose a current target.'
+            : '';
+
     const openAssignDialog = () => {
         setAssignType('site');
         setAssignId('');
@@ -706,6 +779,12 @@ export default function DeviceShow({
     const submitAssign = () => {
         if (!assignId) {
             setAssignError('Please select a target.');
+            return;
+        }
+        if (!assignmentTargetIsEligible) {
+            setAssignError(
+                'This assignment target is no longer available. Choose a current target.',
+            );
             return;
         }
         setSubmitting(true);
@@ -741,96 +820,10 @@ export default function DeviceShow({
         );
     };
 
-    const identityDescription = [
-        profile.header.identity.manufacturer,
-        profile.header.identity.model,
-    ]
-        .filter(Boolean)
-        .join(' ');
-    const requiredActionIcon =
-        profile.header.requiredAction.state === 'none' ? Check : AlertTriangle;
-    const heroMeta: PageHeroMetaItem[] = [
-        {
-            icon: Cpu,
-            label: profile.header.identity.type || 'Registered device',
-        },
-        { label: profile.header.identity.uid },
-        {
-            icon: MapPin,
-            label: profile.header.location?.name ?? 'Unassigned',
-            href: profile.header.location?.href ?? undefined,
-        },
-        {
-            icon: Radio,
-            label: profile.header.providerObservation.label,
-        },
-    ];
-    const heroBadges: PageHeroBadge[] = [
-        {
-            icon: Activity,
-            label: humanise(profile.header.health.deviceState),
-            tone: heroTone(profile.header.health.deviceState),
-            dot: true,
-        },
-        {
-            icon: Radio,
-            label: profile.header.health.label,
-            tone: heroTone(profile.header.health.state),
-        },
-        {
-            icon: Clock,
-            label: humanise(profile.header.freshness.state),
-            tone: heroTone(profile.header.freshness.state),
-        },
-        {
-            icon: requiredActionIcon,
-            label: profile.header.requiredAction.label,
-            tone: heroTone(profile.header.requiredAction.state),
-            onClick: () =>
-                openProfileSection(profile.header.requiredAction.section),
-            'aria-label': `${profile.header.requiredAction.label}: ${profile.header.requiredAction.description}`,
-        },
-    ];
-    const heroStats: PageHeroStat[] = [
-        {
-            label: 'Monitors',
-            value: profile.health.monitoring
-                ? `${profile.health.monitoring.healthy}/${profile.health.monitoring.enabled}`
-                : '—',
-            sub: profile.health.monitoring
-                ? 'healthy / enabled'
-                : 'Unavailable',
-            tone:
-                profile.health.monitoring?.attention ||
-                profile.health.monitoring?.uncertain
-                    ? 'warning'
-                    : 'success',
-            hideOnMobile: false,
-        },
-        {
-            label: 'Last observation',
-            value: formatRelative(
-                profile.header.freshness.observedAt,
-                Date.now(),
-                'Never',
-            ),
-            sub: profile.header.providerObservation.label,
-            tone: heroStatTone(profile.header.freshness.state),
-            hideOnMobile: false,
-        },
-        {
-            label: 'Assignment',
-            value: profile.header.assignment?.name ?? 'Unassigned',
-            sub: profile.header.assignment
-                ? humanise(profile.header.assignment.type)
-                : 'No current owner',
-            hideOnMobile: false,
-        },
-    ];
-
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
                 { title: 'Devices', href: '/security-devices/devices' },
                 { title: device.name },
@@ -839,19 +832,11 @@ export default function DeviceShow({
             <Head title={`${device.name} - Security & Devices`} />
 
             <PageShell>
-                <PageHero
-                    title={device.name}
-                    description={
-                        identityDescription ||
-                        profile.header.identity.type ||
-                        'Registered device'
-                    }
-                    backHref="/security-devices/devices"
-                    backLabel="Devices"
-                    icon={Cpu}
-                    meta={heroMeta}
-                    badges={heroBadges}
-                    stats={heroStats}
+                <DeviceProfileHeader
+                    profile={profile}
+                    asOf={as_of}
+                    onSection={openProfileSection}
+                    onSearch={() => setProfileSearchOpen(true)}
                     actions={
                         <div className="flex flex-wrap gap-2">
                             <CctvNavigationActions
@@ -891,7 +876,26 @@ export default function DeviceShow({
                                 )}
                         </div>
                     }
-                    footer={
+                    filters={
+                        [
+                            'assignments',
+                            'events',
+                            'maintenance',
+                            'topology',
+                            'documents',
+                        ].includes(activeSection) ? (
+                            <PageHeaderViewToggle
+                                value={recordsView}
+                                onChange={setRecordsView}
+                                ariaLabel="Device record view"
+                                options={[
+                                    { value: 'cards', label: 'Cards' },
+                                    { value: 'table', label: 'Table' },
+                                ]}
+                            />
+                        ) : undefined
+                    }
+                    rail={
                         <DeviceProfileGroupNavigation
                             sections={profile.sections}
                             activeSection={activeSection}
@@ -953,8 +957,8 @@ export default function DeviceShow({
                         </TabsContent>
 
                         {/* ── Assignments tab ───────────────────────── */}
-                        <TabsContent value="assignments" className="space-y-4">
-                            <div className="grid gap-4 lg:grid-cols-2">
+                        <TabsContent value="assignments" className="space-y-5">
+                            <div className="space-y-5">
                                 <Card>
                                     <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
                                         <div>
@@ -1045,127 +1049,29 @@ export default function DeviceShow({
                                     </CardContent>
                                 </Card>
 
-                                <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
-                                        <div>
-                                            <CardTitle className="flex items-center gap-2">
-                                                <Link2 className="h-4 w-4" />{' '}
-                                                Linked assets
-                                            </CardTitle>
-                                            <CardDescription>
-                                                Physical asset relationships
-                                                without duplicating the asset
-                                                register.
-                                            </CardDescription>
-                                        </div>
-                                        {can.update &&
-                                            pickableAssets.length > 0 && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setLinkOpen(true);
-                                                        setLinkError('');
-                                                    }}
-                                                >
-                                                    <Plus className="mr-1 h-3.5 w-3.5" />{' '}
-                                                    Link asset
-                                                </Button>
-                                            )}
-                                    </CardHeader>
-                                    <CardContent>
-                                        {assetLinks.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {assetLinks.map((link) => (
-                                                    <div
-                                                        key={link.id}
-                                                        className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
-                                                    >
-                                                        <div className="min-w-0 flex-1">
-                                                            {link.href ? (
-                                                                <Link
-                                                                    href={
-                                                                        link.href
-                                                                    }
-                                                                    className="frontline-focus inline-block max-w-full truncate rounded-sm font-medium text-primary hover:underline"
-                                                                >
-                                                                    {link.asset_name ??
-                                                                        `Asset #${link.asset_id}`}
-                                                                </Link>
-                                                            ) : (
-                                                                <>
-                                                                    <p className="truncate font-medium">
-                                                                        {link.asset_name ??
-                                                                            `Asset #${link.asset_id}`}
-                                                                    </p>
-                                                                    {link.access
-                                                                        .state ===
-                                                                    'restricted' ? (
-                                                                        <FleetTechnologyAccessRequired
-                                                                            label={
-                                                                                link
-                                                                                    .access
-                                                                                    .label
-                                                                            }
-                                                                            className="min-h-0 text-xs"
-                                                                        />
-                                                                    ) : null}
-                                                                </>
-                                                            )}
-                                                            {link.asset_tag && (
-                                                                <p className="font-mono text-xs text-muted-foreground">
-                                                                    {
-                                                                        link.asset_tag
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                            {link.notes && (
-                                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                                    {link.notes}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="text-[10px]"
-                                                            >
-                                                                {link.link_type.replace(
-                                                                    /_/g,
-                                                                    ' ',
-                                                                )}
-                                                            </Badge>
-                                                            {can.update && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
-                                                                    aria-label={`Unlink ${link.asset_name ?? `Asset ${link.asset_id}`} from device`}
-                                                                    onClick={() =>
-                                                                        setPendingAssetUnlink(
-                                                                            link,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        unlinkingId ===
-                                                                        link.id
-                                                                    }
-                                                                    title="Unlink (history preserved)"
-                                                                >
-                                                                    <Minus className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground">
-                                                No linked assets.
-                                            </p>
+                                <div className="space-y-5">
+                                    {can.update &&
+                                        pickableAssets.length > 0 && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    setLinkOpen(true);
+                                                    setLinkError('');
+                                                }}
+                                            >
+                                                <Plus className="mr-1 h-3.5 w-3.5" />
+                                                Link asset
+                                            </Button>
                                         )}
-                                    </CardContent>
-                                </Card>
+                                    <DeviceAssetRecords
+                                        rows={assetLinks}
+                                        view={recordsView}
+                                        canUpdate={can.update}
+                                        unlinkingId={unlinkingId}
+                                        onUnlink={setPendingAssetUnlink}
+                                    />
+                                </div>
                             </div>
 
                             <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
@@ -1185,7 +1091,10 @@ export default function DeviceShow({
                                             </label>
                                             <Select
                                                 value={linkAssetId}
-                                                onValueChange={setLinkAssetId}
+                                                onValueChange={(value) => {
+                                                    setLinkAssetId(value);
+                                                    setLinkError('');
+                                                }}
                                             >
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select an asset" />
@@ -1246,9 +1155,12 @@ export default function DeviceShow({
                                                 placeholder="e.g. Installed in dashboard console"
                                             />
                                         </div>
-                                        {linkError && (
-                                            <p className="text-sm text-status-critical">
-                                                {linkError}
+                                        {(linkError || assetChoiceError) && (
+                                            <p
+                                                role="alert"
+                                                className="text-sm text-status-critical"
+                                            >
+                                                {linkError || assetChoiceError}
                                             </p>
                                         )}
                                     </div>
@@ -1263,7 +1175,8 @@ export default function DeviceShow({
                                         <Button
                                             onClick={submitLink}
                                             disabled={
-                                                linkSubmitting || !linkAssetId
+                                                linkSubmitting ||
+                                                !linkAssetIsEligible
                                             }
                                         >
                                             {linkSubmitting
@@ -1274,712 +1187,105 @@ export default function DeviceShow({
                                 </DialogContent>
                             </Dialog>
 
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-lg font-semibold">
-                                        Assignment History
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        All assignments for this device, newest
-                                        first.
-                                    </p>
-                                </div>
-                                {can.assign && (
-                                    <Button
-                                        size="sm"
-                                        onClick={openAssignDialog}
-                                    >
-                                        <Plus className="mr-1 h-3 w-3" /> Assign
-                                    </Button>
-                                )}
-                            </div>
-
-                            {assignmentHistory.length > 0 ? (
-                                <div className="space-y-2">
-                                    {assignmentHistory.map((a) => (
-                                        <div
-                                            key={a.id}
-                                            className={`rounded-lg border p-4 text-sm ${a.is_active ? 'border-primary bg-primary/5' : ''}`}
-                                        >
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-medium">
-                                                            {a.assignable_name}
-                                                        </span>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-[10px]"
-                                                        >
-                                                            {targetTypeLabel(
-                                                                a.assignable_type,
-                                                            )}
-                                                        </Badge>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-[10px]"
-                                                        >
-                                                            {a.assignment_type}
-                                                        </Badge>
-                                                        {a.is_active && (
-                                                            <Badge
-                                                                variant="default"
-                                                                className="text-[10px]"
-                                                            >
-                                                                Active
-                                                            </Badge>
-                                                        )}
-                                                        {a.is_overdue && (
-                                                            <Badge
-                                                                variant="destructive"
-                                                                className="text-[10px]"
-                                                            >
-                                                                Overdue
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
-                                                        <span>
-                                                            Assigned:{' '}
-                                                            {formatDateTime(
-                                                                a.assigned_at,
-                                                            )}
-                                                        </span>
-                                                        {a.assigned_by && (
-                                                            <span>
-                                                                by{' '}
-                                                                {a.assigned_by}
-                                                            </span>
-                                                        )}
-                                                        {a.released_at && (
-                                                            <>
-                                                                <span>
-                                                                    Released:{' '}
-                                                                    {formatDateTime(
-                                                                        a.released_at,
-                                                                    )}
-                                                                </span>
-                                                                {a.released_by && (
-                                                                    <span>
-                                                                        by{' '}
-                                                                        {
-                                                                            a.released_by
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                        {a.expected_return_at && (
-                                                            <span>
-                                                                Return by:{' '}
-                                                                {formatDate(
-                                                                    a.expected_return_at,
-                                                                )}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {a.notes && (
-                                                        <p className="mt-1 text-xs text-muted-foreground italic">
-                                                            {a.notes}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    icon={MapPin}
-                                    title="No assignment history"
-                                    description="This device has never been assigned."
-                                    variant="compact"
-                                    action={
-                                        can.assign ? (
-                                            <Button
-                                                size="sm"
-                                                onClick={openAssignDialog}
-                                            >
-                                                Assign Now
-                                            </Button>
-                                        ) : undefined
-                                    }
-                                />
+                            {can.assign && (
+                                <Button size="sm" onClick={openAssignDialog}>
+                                    <Plus className="mr-1 h-3 w-3" />
+                                    Assign
+                                </Button>
                             )}
+                            <DeviceAssignmentRecords
+                                rows={assignmentHistory}
+                                view={recordsView}
+                            />
                         </TabsContent>
 
                         {/* ── Events tab ────────────────────────────── */}
-                        <TabsContent value="events" className="space-y-4">
+                        <TabsContent value="events" className="space-y-5">
                             {profile.controlRoomAlerts.length > 0 && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>
-                                            Control Room alerts
-                                        </CardTitle>
-                                        <CardDescription>
-                                            Active operational alerts linked
-                                            through this device's canonical
-                                            Control Room projection.
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        {profile.controlRoomAlerts.map(
-                                            (alert, index) =>
-                                                alert.href &&
-                                                alert.access.state ===
-                                                    'available' ? (
-                                                    <Link
-                                                        key={
-                                                            alert.id ??
-                                                            `restricted-alert-${index}`
-                                                        }
-                                                        href={alert.href}
-                                                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm transition-colors hover:bg-muted/50"
-                                                    >
-                                                        <span className="min-w-0">
-                                                            <span className="font-medium">
-                                                                {
-                                                                    alert.reference
-                                                                }
-                                                            </span>
-                                                            <span className="ml-2 text-muted-foreground">
-                                                                {alert.type?.replace(
-                                                                    /[._-]+/g,
-                                                                    ' ',
-                                                                )}
-                                                            </span>
-                                                        </span>
-                                                        <span className="flex shrink-0 items-center gap-2">
-                                                            {alert.severity ? (
-                                                                <Badge variant="outline">
-                                                                    {
-                                                                        alert.severity
-                                                                    }
-                                                                </Badge>
-                                                            ) : null}
-                                                            {alert.status ? (
-                                                                <Badge variant="secondary">
-                                                                    {
-                                                                        alert.status
-                                                                    }
-                                                                </Badge>
-                                                            ) : null}
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {formatDateTime(
-                                                                    alert.triggeredAt,
-                                                                )}
-                                                            </span>
-                                                        </span>
-                                                    </Link>
-                                                ) : (
-                                                    <div
-                                                        key={
-                                                            alert.id ??
-                                                            `restricted-alert-${index}`
-                                                        }
-                                                        className="rounded-md border px-3"
-                                                    >
-                                                        <ControlRoomAlertAccessRequired
-                                                            label={
-                                                                alert.access
-                                                                    .label
-                                                            }
-                                                        />
-                                                    </div>
-                                                ),
-                                        )}
-                                    </CardContent>
-                                </Card>
+                                <DeviceControlRoomRecords
+                                    rows={profile.controlRoomAlerts}
+                                    view={recordsView}
+                                />
                             )}
-
-                            {can.viewEvents && (
-                                <>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-semibold">
-                                                Recent Events
-                                            </h3>
-                                            <p className="text-sm text-muted-foreground">
-                                                Last 20 events for this device.
-                                            </p>
-                                        </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            asChild
+                            {can.viewEvents ? (
+                                <div className="space-y-5">
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link
+                                            href={`/security-devices/monitoring?device_id=${device.id}`}
                                         >
-                                            <Link
-                                                href={`/security-devices/monitoring?device_id=${device.id}`}
-                                            >
-                                                View all events
-                                            </Link>
-                                        </Button>
-                                    </div>
-
-                                    {recentEvents.length > 0 ? (
-                                        <div className="space-y-1">
-                                            {recentEvents.map((evt) => (
-                                                <div
-                                                    key={evt.id}
-                                                    className={`flex items-start gap-3 rounded-md border p-3 text-sm ${
-                                                        evt.severity ===
-                                                        'critical'
-                                                            ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
-                                                            : evt.severity ===
-                                                                'warning'
-                                                              ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
-                                                              : ''
-                                                    }`}
-                                                >
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <Badge
-                                                                variant={
-                                                                    evt.severity ===
-                                                                    'critical'
-                                                                        ? 'destructive'
-                                                                        : evt.severity ===
-                                                                            'warning'
-                                                                          ? 'outline'
-                                                                          : 'secondary'
-                                                                }
-                                                                className="text-[10px]"
-                                                            >
-                                                                {evt.severity}
-                                                            </Badge>
-                                                            <span className="font-medium">
-                                                                {evt.event_type.replace(
-                                                                    /_/g,
-                                                                    ' ',
-                                                                )}
-                                                            </span>
-                                                            {evt.source && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    via{' '}
-                                                                    {evt.source}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <span className="shrink-0 text-xs text-muted-foreground">
-                                                        {formatDateTime(
-                                                            evt.occurred_at,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <EmptyState
-                                            icon={Clock}
-                                            title="No events yet"
-                                            description="Device events will appear here as they are recorded."
-                                            variant="compact"
-                                        />
-                                    )}
-                                </>
+                                            View all events
+                                        </Link>
+                                    </Button>
+                                    <DeviceEventRecords
+                                        rows={recentEvents}
+                                        view={recordsView}
+                                    />
+                                </div>
+                            ) : (
+                                <p
+                                    role="note"
+                                    className="text-sm text-muted-foreground"
+                                >
+                                    Device event access required.
+                                </p>
                             )}
                         </TabsContent>
 
                         {/* ── Maintenance tab ───────────────────────── */}
-                        <TabsContent value="maintenance" className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-lg font-semibold">
-                                        Maintenance Records
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        Scheduled, in-progress, and completed
-                                        maintenance for this device.
-                                    </p>
-                                </div>
-                                {can.manageMaintenance && (
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setMaintOpen(true)}
-                                    >
-                                        <Plus className="mr-1 h-3 w-3" />{' '}
-                                        Schedule Maintenance
-                                    </Button>
-                                )}
-                            </div>
-
-                            {maintenanceRecords.length > 0 ? (
-                                <div className="space-y-2">
-                                    {maintenanceRecords.map((m) => {
-                                        const isOverdue =
-                                            m.status === 'scheduled' &&
-                                            m.scheduled_for &&
-                                            new Date(m.scheduled_for) <
-                                                new Date();
-                                        return (
-                                            <div
-                                                key={m.id}
-                                                className={`rounded-lg border p-4 text-sm ${isOverdue ? 'border-status-warning/30 bg-status-warning-bg' : ''}`}
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="font-medium">
-                                                                {m.type.replace(
-                                                                    /_/g,
-                                                                    ' ',
-                                                                )}
-                                                            </span>
-                                                            <Badge
-                                                                variant={
-                                                                    m.status ===
-                                                                    'completed'
-                                                                        ? 'default'
-                                                                        : m.status ===
-                                                                            'scheduled'
-                                                                          ? 'outline'
-                                                                          : 'secondary'
-                                                                }
-                                                                className="text-[10px]"
-                                                            >
-                                                                {m.status}
-                                                            </Badge>
-                                                            {isOverdue && (
-                                                                <Badge
-                                                                    variant="destructive"
-                                                                    className="text-[10px]"
-                                                                >
-                                                                    Overdue
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                            {m.description}
-                                                        </p>
-                                                        <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
-                                                            {m.scheduled_for && (
-                                                                <span>
-                                                                    Due:{' '}
-                                                                    {formatDate(
-                                                                        m.scheduled_for,
-                                                                    )}
-                                                                </span>
-                                                            )}
-                                                            {m.completed_at && (
-                                                                <span>
-                                                                    Completed:{' '}
-                                                                    {formatDateTime(
-                                                                        m.completed_at,
-                                                                    )}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    {can.manageMaintenance &&
-                                                        m.status ===
-                                                            'scheduled' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    router.post(
-                                                                        `/security-devices/maintenance/${m.id}/complete`,
-                                                                        {},
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Check className="mr-1 h-3 w-3" />{' '}
-                                                                Complete
-                                                            </Button>
-                                                        )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    icon={Wrench}
-                                    title="No maintenance records"
-                                    description="Schedule maintenance to keep this device in good operating condition."
-                                    variant="compact"
-                                    action={
-                                        can.manageMaintenance ? (
-                                            <Button
-                                                size="sm"
-                                                onClick={() =>
-                                                    setMaintOpen(true)
-                                                }
-                                            >
-                                                Schedule Maintenance
-                                            </Button>
-                                        ) : undefined
-                                    }
-                                />
+                        <TabsContent value="maintenance" className="space-y-5">
+                            {can.manageMaintenance && (
+                                <Button
+                                    size="sm"
+                                    onClick={() => setMaintOpen(true)}
+                                >
+                                    <Plus className="mr-1 h-3 w-3" />
+                                    Schedule maintenance
+                                </Button>
                             )}
+                            <DeviceMaintenanceRecords
+                                rows={maintenanceRecords}
+                                view={recordsView}
+                                asOf={as_of}
+                                canManage={can.manageMaintenance}
+                                onComplete={(m) =>
+                                    router.post(
+                                        `/security-devices/maintenance/${m.id}/complete`,
+                                        {},
+                                        { preserveScroll: true },
+                                    )
+                                }
+                            />
                         </TabsContent>
 
                         {/* ── Topology tab ──────────────────────────── */}
-                        <TabsContent value="topology">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                                    <div>
-                                        <CardTitle>Device Topology</CardTitle>
-                                        <CardDescription>
-                                            Physical and logical relationships
-                                            to other devices.
-                                        </CardDescription>
-                                    </div>
-                                    {can.update && otherDevices.length > 0 && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                                setRelOpen(true);
-                                                setRelError('');
-                                            }}
-                                        >
-                                            <Plus className="mr-1 h-3.5 w-3.5" />{' '}
-                                            Link device
-                                        </Button>
-                                    )}
-                                </CardHeader>
-                                <CardContent>
-                                    {totalRelationships > 0 ? (
-                                        <div className="space-y-4">
-                                            {relationships.parents.length >
-                                                0 && (
-                                                <div>
-                                                    <p className="mb-2 text-xs font-medium text-muted-foreground">
-                                                        Upstream (this device's
-                                                        parents)
-                                                    </p>
-                                                    {relationships.parents.map(
-                                                        (r) => (
-                                                            <div
-                                                                key={r.id}
-                                                                className="mb-1 flex items-center gap-3 rounded-md border p-3 text-sm"
-                                                            >
-                                                                <Network className="h-4 w-4 text-muted-foreground" />
-                                                                <span className="text-muted-foreground">
-                                                                    This device{' '}
-                                                                    {r.type.replace(
-                                                                        /_/g,
-                                                                        ' ',
-                                                                    )}
-                                                                </span>
-                                                                <Link
-                                                                    href={`/security-devices/devices/${r.device_id}`}
-                                                                    className="flex-1 truncate text-primary hover:underline"
-                                                                >
-                                                                    {r.device_name ??
-                                                                        `Device #${r.device_id}`}
-                                                                </Link>
-                                                                {r.port && (
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="text-[10px]"
-                                                                    >
-                                                                        {r.port}
-                                                                    </Badge>
-                                                                )}
-                                                                {can.update && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
-                                                                        aria-label={`Remove relationship to ${r.device_name ?? `Device ${r.device_id}`}`}
-                                                                        onClick={() =>
-                                                                            setPendingRelationshipRemoval(
-                                                                                r,
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            unlinkingRelId ===
-                                                                            r.id
-                                                                        }
-                                                                        title="Remove relationship"
-                                                                    >
-                                                                        <Minus className="h-3.5 w-3.5" />
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            )}
-                                            {relationships.children.length >
-                                                0 && (
-                                                <div>
-                                                    <p className="mb-2 text-xs font-medium text-muted-foreground">
-                                                        Downstream (this
-                                                        device's children)
-                                                    </p>
-                                                    {relationships.children.map(
-                                                        (r) => (
-                                                            <div
-                                                                key={r.id}
-                                                                className="mb-1 flex items-center gap-3 rounded-md border p-3 text-sm"
-                                                            >
-                                                                <GitBranch className="h-4 w-4 text-muted-foreground" />
-                                                                <Link
-                                                                    href={`/security-devices/devices/${r.device_id}`}
-                                                                    className="flex-1 truncate text-primary hover:underline"
-                                                                >
-                                                                    {r.device_name ??
-                                                                        `Device #${r.device_id}`}
-                                                                </Link>
-                                                                <span className="text-muted-foreground">
-                                                                    {r.type.replace(
-                                                                        /_/g,
-                                                                        ' ',
-                                                                    )}{' '}
-                                                                    this device
-                                                                </span>
-                                                                {r.port && (
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="text-[10px]"
-                                                                    >
-                                                                        {r.port}
-                                                                    </Badge>
-                                                                )}
-                                                                {can.update && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
-                                                                        aria-label={`Remove relationship to ${r.device_name ?? `Device ${r.device_id}`}`}
-                                                                        onClick={() =>
-                                                                            setPendingRelationshipRemoval(
-                                                                                r,
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            unlinkingRelId ===
-                                                                            r.id
-                                                                        }
-                                                                        title="Remove relationship"
-                                                                    >
-                                                                        <Minus className="h-3.5 w-3.5" />
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <EmptyState
-                                            icon={Network}
-                                            title="No relationships"
-                                            description={
-                                                can.update
-                                                    ? 'Click "Link device" to record a physical or logical connection.'
-                                                    : 'Device topology relationships will appear here when configured.'
-                                            }
-                                            variant="compact"
-                                        />
-                                    )}
-                                    {totalRelationshipHistory > 0 && (
-                                        <details className="mt-5 border-t pt-4">
-                                            <summary className="flex min-h-11 cursor-pointer items-center font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none">
-                                                Relationship history (
-                                                {totalRelationshipHistory})
-                                            </summary>
-                                            <p className="mb-3 text-xs text-muted-foreground">
-                                                Removed relationships are
-                                                retained with their operator and
-                                                reason evidence.
-                                            </p>
-                                            <div className="space-y-2">
-                                                {relationshipHistory.parents.map(
-                                                    (relationship) => (
-                                                        <div
-                                                            key={
-                                                                relationship.id
-                                                            }
-                                                            className="rounded-md border bg-muted/20 p-3 text-sm"
-                                                        >
-                                                            <p>
-                                                                This device{' '}
-                                                                {relationship.type.replace(
-                                                                    /_/g,
-                                                                    ' ',
-                                                                )}{' '}
-                                                                <Link
-                                                                    href={`/security-devices/devices/${relationship.device_id}`}
-                                                                    className="font-medium text-primary hover:underline"
-                                                                >
-                                                                    {relationship.device_name ??
-                                                                        `Device #${relationship.device_id}`}
-                                                                </Link>
-                                                            </p>
-                                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                                Removed{' '}
-                                                                {formatDateTime(
-                                                                    relationship.unlinked_at,
-                                                                )}
-                                                                {relationship.unlinked_by
-                                                                    ? ` by ${relationship.unlinked_by}`
-                                                                    : ''}
-                                                                . Reason:{' '}
-                                                                <span className="break-words text-foreground">
-                                                                    {
-                                                                        relationship.unlink_reason
-                                                                    }
-                                                                </span>
-                                                            </p>
-                                                        </div>
-                                                    ),
-                                                )}
-                                                {relationshipHistory.children.map(
-                                                    (relationship) => (
-                                                        <div
-                                                            key={
-                                                                relationship.id
-                                                            }
-                                                            className="rounded-md border bg-muted/20 p-3 text-sm"
-                                                        >
-                                                            <p>
-                                                                <Link
-                                                                    href={`/security-devices/devices/${relationship.device_id}`}
-                                                                    className="font-medium text-primary hover:underline"
-                                                                >
-                                                                    {relationship.device_name ??
-                                                                        `Device #${relationship.device_id}`}
-                                                                </Link>{' '}
-                                                                {relationship.type.replace(
-                                                                    /_/g,
-                                                                    ' ',
-                                                                )}{' '}
-                                                                this device
-                                                            </p>
-                                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                                Removed{' '}
-                                                                {formatDateTime(
-                                                                    relationship.unlinked_at,
-                                                                )}
-                                                                {relationship.unlinked_by
-                                                                    ? ` by ${relationship.unlinked_by}`
-                                                                    : ''}
-                                                                . Reason:{' '}
-                                                                <span className="break-words text-foreground">
-                                                                    {
-                                                                        relationship.unlink_reason
-                                                                    }
-                                                                </span>
-                                                            </p>
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        </details>
-                                    )}
-                                </CardContent>
-                            </Card>
+                        <TabsContent value="topology" className="space-y-5">
+                            {can.update && otherDevices.length > 0 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setRelOpen(true);
+                                        setRelError('');
+                                    }}
+                                >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    Link device
+                                </Button>
+                            )}
+                            <DeviceRelationshipRecords
+                                rows={relationships}
+                                view={recordsView}
+                                canUpdate={can.update}
+                                unlinkingId={unlinkingRelId}
+                                onUnlink={setPendingRelationshipRemoval}
+                            />
+                            {totalRelationshipHistory > 0 && (
+                                <DeviceRelationshipHistoryRecords
+                                    rows={relationshipHistory}
+                                    view={recordsView}
+                                />
+                            )}
 
-                            {/* Link-device dialog */}
                             <Dialog open={relOpen} onOpenChange={setRelOpen}>
                                 <DialogContent className="sm:max-w-md">
                                     <DialogHeader>
@@ -2137,144 +1443,37 @@ export default function DeviceShow({
                         </TabsContent>
 
                         {/* ── Documents tab ─────────────────────────── */}
-                        <TabsContent value="documents">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                                    <div>
-                                        <CardTitle>Documents</CardTitle>
-                                        <CardDescription>
-                                            Manuals, compliance certs, install
-                                            photos, firmware notes, and other
-                                            device-specific files.
-                                        </CardDescription>
-                                    </div>
-                                    {can.update && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                                setDocOpen(true);
-                                                setDocError('');
-                                            }}
-                                        >
-                                            <Plus className="mr-1 h-3.5 w-3.5" />{' '}
-                                            Upload document
-                                        </Button>
-                                    )}
-                                </CardHeader>
-                                <CardContent>
-                                    {documents.length === 0 ? (
-                                        <EmptyState
-                                            icon={FileText}
-                                            title="No documents"
-                                            description={
-                                                can.update
-                                                    ? 'Click "Upload document" to attach a manual, photo, or compliance cert.'
-                                                    : 'No documents have been uploaded for this device.'
-                                            }
-                                            variant="compact"
-                                        />
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {documents.map((doc) => {
-                                                const expired =
-                                                    doc.expiry_date &&
-                                                    new Date(doc.expiry_date) <
-                                                        new Date();
-                                                return (
-                                                    <div
-                                                        key={doc.id}
-                                                        className="flex items-start gap-3 rounded-md border p-3 text-sm"
-                                                    >
-                                                        <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                                                        <div className="min-w-0 flex-1 space-y-1">
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <a
-                                                                    href={
-                                                                        doc.download_url
-                                                                    }
-                                                                    className="truncate font-medium text-primary hover:underline"
-                                                                >
-                                                                    {doc.title}
-                                                                </a>
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="text-[10px]"
-                                                                >
-                                                                    {doc.category.replace(
-                                                                        /_/g,
-                                                                        ' ',
-                                                                    )}
-                                                                </Badge>
-                                                                {doc.version && (
-                                                                    <Badge
-                                                                        variant="secondary"
-                                                                        className="text-[10px]"
-                                                                    >
-                                                                        v
-                                                                        {
-                                                                            doc.version
-                                                                        }
-                                                                    </Badge>
-                                                                )}
-                                                                {expired && (
-                                                                    <Badge
-                                                                        variant="destructive"
-                                                                        className="text-[10px]"
-                                                                    >
-                                                                        Expired
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            <p className="truncate font-mono text-xs text-muted-foreground">
-                                                                {
-                                                                    doc.original_name
-                                                                }{' '}
-                                                                ·{' '}
-                                                                {formatBytes(
-                                                                    doc.size_bytes,
-                                                                )}
-                                                                {doc.expiry_date &&
-                                                                    ` · expires ${doc.expiry_date}`}
-                                                            </p>
-                                                            {doc.notes && (
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {doc.notes}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        {can.update && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
-                                                                aria-label={`Remove document ${doc.title}`}
-                                                                onClick={() =>
-                                                                    setPendingDocumentDeletion(
-                                                                        {
-                                                                            id: doc.id,
-                                                                            title: doc.title,
-                                                                        },
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    deletingDocId ===
-                                                                    doc.id
-                                                                }
-                                                                title="Remove document"
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            <DeviceDocumentHistory items={documentHistory} />
+                        <TabsContent value="documents" className="space-y-5">
+                            {can.update && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setDocOpen(true);
+                                        setDocError('');
+                                    }}
+                                >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    Upload document
+                                </Button>
+                            )}
+                            <DeviceDocumentRecords
+                                rows={documents}
+                                view={recordsView}
+                                asOf={as_of}
+                                canUpdate={can.update}
+                                deletingId={deletingDocId}
+                                onRemove={(doc) =>
+                                    setPendingDocumentDeletion({
+                                        id: doc.id,
+                                        title: doc.title,
+                                    })
+                                }
+                            />
+                            <DeviceDocumentHistoryRecords
+                                rows={documentHistory}
+                                view={recordsView}
+                            />
 
                             {/* Upload dialog */}
                             <Dialog open={docOpen} onOpenChange={setDocOpen}>
@@ -2555,7 +1754,10 @@ export default function DeviceShow({
                                 </label>
                                 <Select
                                     value={assignId}
-                                    onValueChange={setAssignId}
+                                    onValueChange={(value) => {
+                                        setAssignId(value);
+                                        setAssignError('');
+                                    }}
                                 >
                                     <SelectTrigger>
                                         <SelectValue
@@ -2641,9 +1843,12 @@ export default function DeviceShow({
                                 />
                             </div>
 
-                            {assignError && (
-                                <p className="text-sm text-destructive">
-                                    {assignError}
+                            {(assignError || assignmentChoiceError) && (
+                                <p
+                                    role="alert"
+                                    className="text-sm text-destructive"
+                                >
+                                    {assignError || assignmentChoiceError}
                                 </p>
                             )}
                         </div>
@@ -2657,7 +1862,9 @@ export default function DeviceShow({
                             </Button>
                             <Button
                                 onClick={submitAssign}
-                                disabled={submitting || !assignId}
+                                disabled={
+                                    submitting || !assignmentTargetIsEligible
+                                }
                             >
                                 {submitting
                                     ? 'Saving...'

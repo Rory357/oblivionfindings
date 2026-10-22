@@ -25,7 +25,12 @@ vi.mock('@inertiajs/react', async () => {
             props: {
                 auth: {
                     user: { id: scope.actor },
-                    can: { 'securityDevices.monitoring.manage': scope.manage },
+                    can: {
+                        securityDevices: {
+                            viewAny: true,
+                            monitoringManage: scope.manage,
+                        },
+                    },
                 },
             },
         }),

@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Management\Services;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionRoute;
@@ -20,6 +21,12 @@ final class CommandExecutionRouteResolver
 
     public function resolve(Device $device, int $siteId, string $capability): CommandExecutionRoute
     {
+        if ($capability === 'endpoint.script.run') {
+            // A heartbeat observation or editable device metadata cannot activate
+            // the unfinished script lifecycle or fall through to a provider.
+            return app(EndpointScriptAuthority::class)->supports($device)
+                ? CommandExecutionRoute::endpoint() : CommandExecutionRoute::unavailable('Reviewed script execution is not available.');
+        }
         if ($capability === 'endpoint.software.install') {
             return app(EndpointSoftwareAuthority::class)->supports($device) ? CommandExecutionRoute::endpoint() : CommandExecutionRoute::unavailable('Approved machine MSI installation is unavailable.');
         }

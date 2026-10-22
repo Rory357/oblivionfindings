@@ -27,6 +27,10 @@ import {
 } from '@/components/ui/dialog';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
+    rememberOverlayTrigger,
+    restoreOverlayFocus,
+} from '@/components/ui/overlay-focus-return';
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -44,6 +48,7 @@ import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
+    CalendarClock,
     Cpu,
     Edit,
     Eye,
@@ -65,6 +70,10 @@ import {
 } from '../devices/shared';
 import { GroupWizard, groupTypeLabel } from './_dialogs';
 import type { AutoRuleCondition, AutoRules } from './auto-rule-builder';
+import MaintenancePolicyPreview, {
+    maintenanceMemberIdentity,
+    strictPreviewUtc,
+} from './maintenance-policy-preview';
 
 export type GroupDetail = {
     id: number;
@@ -83,6 +92,8 @@ export type AvailableDevice = {
     category: string;
 };
 export type GroupShowProps = {
+    actor_id: number;
+    as_of: string;
     group: GroupDetail;
     members: Paginated<DeviceListItem>;
     availableDevices: AvailableDevice[];
@@ -137,27 +148,94 @@ function MemberCard({
 export default function DeviceGroupShow(props: GroupShowProps) {
     const [layout, setLayout] = useState<'cards' | 'table'>('cards');
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+        auth?: {
+            user?: { id: number } | null;
+            can?: {
+                securityDevices?: {
+                    groupsManage?: boolean;
+                    monitoringManage?: boolean;
+                };
+            };
+        };
     }>().props;
+    const [sourceActor] = useState(props.actor_id);
+    const visible =
+        Number.isSafeInteger(sourceActor) &&
+        sourceActor > 0 &&
+        sourceActor === props.actor_id &&
+        auth?.user?.id === sourceActor &&
+        auth.can?.securityDevices?.groupsManage === true &&
+        typeof props.as_of === 'string' &&
+        strictPreviewUtc(props.as_of);
+    if (!visible)
+        return (
+            <AppLayout>
+                <Head title="Group access unavailable" />
+                <PageLayout>
+                    <PageHeader
+                        title="Group access unavailable"
+                        icon={Cpu}
+                        subline="Refresh the group to review current access."
+                    />
+                    <Button
+                        variant="outline"
+                        onClick={() =>
+                            router.get(
+                                '/security-devices/device-groups/' +
+                                    props.group.id,
+                                {},
+                                { preserveState: false, preserveScroll: true },
+                            )
+                        }
+                    >
+                        Refresh group
+                    </Button>
+                </PageLayout>
+            </AppLayout>
+        );
     return (
         <GroupProfile
             key={JSON.stringify([auth?.user?.id, auth?.can, props])}
             {...props}
+            sourceActor={sourceActor}
+            canPreview={auth.can?.securityDevices?.monitoringManage === true}
             layout={layout}
             setLayout={setLayout}
         />
     );
 }
 function GroupProfile({
+    actor_id,
+    as_of,
+    sourceActor,
+    canPreview,
     group,
     members,
     availableDevices,
     layout,
     setLayout,
 }: GroupShowProps & {
+    sourceActor: number;
+    canPreview: boolean;
     layout: 'cards' | 'table';
     setLayout: (value: 'cards' | 'table') => void;
 }) {
+    const maintenanceFocus = useRef<{
+        target: HTMLElement | null;
+        owner: HTMLElement | null;
+    }>({ target: null, owner: null });
+    const [maintenanceMember, setMaintenanceMember] = useState<{
+        id: number;
+        identity: string;
+    } | null>(null);
+    const currentPreviewMember = maintenanceMember
+        ? members.data.find(
+              (member) =>
+                  member.id === maintenanceMember.id &&
+                  maintenanceMemberIdentity(member) ===
+                      maintenanceMember.identity,
+          )
+        : undefined;
     const [editOpen, setEditOpen] = useState(false);
     const [edited, setEdited] = useState(false);
     const [view, setView] = useState<ProfileView>('members');
@@ -355,6 +433,33 @@ function GroupProfile({
         });
     };
     const actionsFor = (device: DeviceListItem): MenuItem[] => [
+        ...(canPreview
+            ? [
+                  {
+                      label: 'Preview maintenance policy',
+                      icon: CalendarClock,
+                      onClick: () => {
+                          const row = document
+                              .querySelector<HTMLAnchorElement>(
+                                  'a[href="/security-devices/devices/' +
+                                      device.id +
+                                      '"]',
+                              )
+                              ?.closest('article, [role="row"]');
+                          rememberOverlayTrigger(
+                              maintenanceFocus,
+                              row?.querySelector<HTMLElement>(
+                                  'button[aria-haspopup="menu"]',
+                              ) ?? null,
+                          );
+                          setMaintenanceMember({
+                              id: device.id,
+                              identity: maintenanceMemberIdentity(device),
+                          });
+                      },
+                  },
+              ]
+            : []),
         {
             label: 'Open device',
             icon: Eye,
@@ -1101,6 +1206,20 @@ function GroupProfile({
                     }
                     confirmText="Remove device"
                 />
+                {currentPreviewMember && canPreview && (
+                    <MaintenancePolicyPreview
+                        group={group}
+                        member={currentPreviewMember}
+                        actorId={actor_id}
+                        sourceActor={sourceActor}
+                        asOf={as_of}
+                        onClose={() => setMaintenanceMember(null)}
+                        onCloseAutoFocus={(event) => {
+                            event.preventDefault();
+                            restoreOverlayFocus(maintenanceFocus);
+                        }}
+                    />
+                )}
                 <GroupWizard
                     open={editOpen}
                     group={group}

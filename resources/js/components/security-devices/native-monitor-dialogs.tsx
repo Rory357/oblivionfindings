@@ -219,11 +219,19 @@ function useNativeMonitorCommit() {
 }
 function useNativeActor() {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, boolean> };
+        auth?: {
+            user?: { id: number } | null;
+            can?: {
+                securityDevices?: {
+                    viewAny?: boolean;
+                    monitoringManage?: boolean;
+                };
+            };
+        };
     }>().props;
     return {
         id: auth?.user?.id ?? 0,
-        manage: auth?.can?.['securityDevices.monitoring.manage'] === true,
+        manage: auth?.can?.securityDevices?.monitoringManage === true,
         identity: JSON.stringify([auth?.user?.id, auth?.can]),
     };
 }

@@ -26,9 +26,11 @@ vi.mock('@inertiajs/react', async () => {
                 auth: {
                     user: { id: 7 },
                     can: {
-                        'securityDevices.events.view': true,
-                        'securityDevices.devices.view': true,
-                        'securityDevices.integrations.manage': false,
+                        securityDevices: {
+                            eventsView: true,
+                            devicesView: true,
+                            integrationsManage: false,
+                        },
                     },
                 },
             },

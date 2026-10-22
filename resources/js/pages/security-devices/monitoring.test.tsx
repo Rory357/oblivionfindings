@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     reload: vi.fn(),
     actor: 7,
     profiles: true,
+    events: true,
 }));
 vi.mock('@inertiajs/react', async () => {
     const actual =
@@ -32,9 +33,11 @@ vi.mock('@inertiajs/react', async () => {
                 auth: {
                     user: { id: mocks.actor },
                     can: {
-                        'securityDevices.devices.view': mocks.profiles,
-                        'securityDevices.events.view': true,
-                        'securityDevices.monitoring.manage': true,
+                        securityDevices: {
+                            devicesView: mocks.profiles,
+                            eventsView: mocks.events,
+                            monitoringManage: true,
+                        },
                     },
                 },
             },
@@ -464,9 +467,41 @@ beforeEach(() => {
     mocks.reload.mockReset();
     mocks.actor = 7;
     mocks.profiles = true;
+    mocks.events = true;
     localStorage.clear();
 });
 describe('Monitoring shared records and scope', () => {
+    it('does not rebind received private checks when actor metadata changes together', () => {
+        const data = monitoringFixture();
+        const ui = render(<Monitoring workspace={data} />);
+        expect(screen.getAllByText('Remote SNMP').length).toBeGreaterThan(0);
+        mocks.actor = 8;
+        ui.rerender(<Monitoring workspace={{ ...data, actor_id: 8 }} />);
+        expect(screen.queryByText('Remote SNMP')).not.toBeInTheDocument();
+        expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Refresh monitoring' }),
+        );
+        expect(mocks.visit).toHaveBeenCalledWith(
+            '/security-devices/monitoring',
+            expect.objectContaining({ preserveState: false }),
+        );
+    });
+    it('withholds retained checks after current nested event-view authority is withdrawn', () => {
+        const workspace = monitoringFixture();
+        const ui = render(<Monitoring workspace={workspace} />);
+        expect(screen.getAllByText('Remote SNMP').length).toBeGreaterThan(0);
+        mocks.events = false;
+        ui.rerender(<Monitoring workspace={workspace} />);
+        expect(screen.queryByText('Remote SNMP')).not.toBeInTheDocument();
+        expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Monitoring is being refreshed for your current access.',
+            ),
+        ).toBeInTheDocument();
+    });
+
     it('keeps full-scope meters separate from a bounded filtered inventory and clears unrelated meter filters', () => {
         const data = monitoringFixture();
         data.filters = { ...data.filters, search: 'private draft', site_id: 4 };
@@ -576,7 +611,7 @@ describe('Monitoring shared records and scope', () => {
     });
     it('clears private details, local search and management drafts on actor or response replacement', () => {
         const data = monitoringFixture();
-        const { rerender } = render(<Monitoring workspace={data} />);
+        const { rerender, unmount } = render(<Monitoring workspace={data} />);
         fireEvent.change(screen.getByRole('searchbox'), {
             target: { value: 'private search' },
         });
@@ -599,6 +634,10 @@ describe('Monitoring shared records and scope', () => {
         data.actor_id = 8;
         if (data.monitor_management) data.monitor_management.actor_id = 8;
         rerender(<Monitoring workspace={data} />);
+        expect(screen.queryByText('Remote SNMP')).not.toBeInTheDocument();
+        unmount();
+        // A complete Inertia visit remounts the page with an attributed new read.
+        const freshRead = render(<Monitoring workspace={data} />);
         fireEvent.click(screen.getByRole('radio', { name: 'Table' }));
         fireEvent.click(
             screen.getAllByRole('button', {
@@ -606,7 +645,9 @@ describe('Monitoring shared records and scope', () => {
             })[0],
         );
         expect(screen.getByRole('dialog')).toBeInTheDocument();
-        rerender(<Monitoring workspace={{ ...data, monitors: [] }} />);
+        freshRead.rerender(
+            <Monitoring workspace={{ ...data, monitors: [] }} />,
+        );
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
     it('keeps unknown evidence neutral and distinguishes absence of findings from proof of healthy collection', () => {

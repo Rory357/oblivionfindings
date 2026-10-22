@@ -666,6 +666,7 @@ class RbacSeeder extends Seeder
         $admin?->permissions()->sync(
             Permission::query()
                 ->whereNotIn('key', self::RESTRICTED_INDEPENDENT_AUTHORITY)
+                ->where('key', 'not like', 'securityDevices.endpoints.script%')
                 ->pluck('id'),
         );
 

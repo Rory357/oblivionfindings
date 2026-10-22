@@ -12,7 +12,7 @@ import { integrationsFixture } from './integrations-test-fixtures';
 import IntegrationsHub from './integrations';
 const mocks = vi.hoisted(() => ({
     actor: 7,
-    can: {} as Record<string, boolean>,
+    can: {} as Record<string, Record<string, boolean>>,
     visit: vi.fn(),
     reload: vi.fn(),
 }));
@@ -41,9 +41,11 @@ vi.mock('@/layouts/app-layout', () => ({
 beforeEach(() => {
     mocks.actor = 7;
     mocks.can = {
-        'securityDevices.integrations.view': true,
-        'securityDevices.integrations.manage': true,
-        'securityDevices.devices.view': true,
+        securityDevices: {
+            integrationsView: true,
+            integrationsManage: true,
+            devicesView: true,
+        },
     };
     mocks.visit.mockReset();
     mocks.reload.mockReset();
@@ -76,6 +78,18 @@ function invalid(status: number, path = '/security-devices/integrations') {
     return e;
 }
 describe('Shared integration catalogue', () => {
+    it('withholds retained providers after current nested integration-view authority is withdrawn', () => {
+        const data = integrationsFixture();
+        const ui = render(<IntegrationsHub {...data} />);
+        expect(card('UniFi')).toBeInTheDocument();
+        mocks.can.securityDevices.integrationsView = false;
+        ui.rerender(<IntegrationsHub {...data} />);
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Provider records are restricted',
+        );
+    });
+
     it('separates connected, old collection, unconfigured and unsupported/unavailable states', () => {
         render(<IntegrationsHub {...integrationsFixture()} />);
         expect(
@@ -339,7 +353,7 @@ describe('Shared integration catalogue', () => {
             }),
         );
         expect(screen.getByText('SYNTHETIC-REF-1234')).toBeInTheDocument();
-        mocks.can['securityDevices.integrations.manage'] = false;
+        mocks.can.securityDevices.integrationsManage = false;
         r.rerender(<IntegrationsHub {...data} />);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         const newD = await details();
@@ -364,7 +378,7 @@ describe('Shared integration catalogue', () => {
         expect(screen.getByText('No matching providers')).toBeInTheDocument();
     });
     it('removes device destinations after current device permission is withdrawn', async () => {
-        mocks.can['securityDevices.devices.view'] = false;
+        mocks.can.securityDevices.devicesView = false;
         render(<IntegrationsHub {...integrationsFixture()} />);
         const d = await details();
         fireEvent.click(
@@ -463,5 +477,55 @@ describe('Shared integration catalogue', () => {
                 'Access to this destination is required. Ask an administrator.',
             ),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('integrations received DTO ownership', () => {
+    it('quarantines retained private DTOs after paired actor metadata changes', async () => {
+        const original = integrationsFixture();
+        const { rerender } = render(<IntegrationsHub {...original} />);
+        await details();
+        mocks.actor = 8;
+        // Same-page partial update: actor metadata changes, all private DTOs remain from actor 7.
+        rerender(
+            <IntegrationsHub
+                {...original}
+                actor_id={8}
+                as_of="2026-10-13T02:00:00Z"
+            />,
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('SYNTHETIC-REF-1234'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.visit).toHaveBeenCalledWith(
+            '/security-devices/integrations',
+            expect.objectContaining({
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
+            }),
+        );
+        expect(mocks.visit.mock.calls.at(-1)![1]).not.toHaveProperty('only');
+        expect(mocks.reload).not.toHaveBeenCalled();
+    });
+});
+
+describe('integrations same-account reads', () => {
+    it('keeps the existing same-account refresh projection and owner', () => {
+        const original = integrationsFixture();
+        const { rerender } = render(<IntegrationsHub {...original} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.reload).toHaveBeenCalledTimes(1);
+        expect(mocks.reload.mock.calls[0][0].only).toEqual(
+            expect.arrayContaining(['actor_id', 'as_of', 'auth']),
+        );
+        expect(mocks.visit).not.toHaveBeenCalled();
+        rerender(
+            <IntegrationsHub {...original} as_of="2026-10-13T02:00:00Z" />,
+        );
+        expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
     });
 });

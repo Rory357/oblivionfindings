@@ -39,6 +39,7 @@ class MilesightController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $asOf = now()->toImmutable();
         abort_unless($this->userCanManage($user), 403);
 
         $providerConnection = IntegrationProviderConnection::query()
@@ -110,6 +111,8 @@ class MilesightController extends Controller
             ->all();
 
         return Inertia::render('security-devices/integrations/milesight', [
+            'actor_id' => (int) $user->id,
+            'as_of' => $asOf->toISOString(),
             'providerConnection' => $providerConnection ? [
                 'status' => $providerConnection->status,
                 'secret_last4' => $providerConnection->secret_last4,
