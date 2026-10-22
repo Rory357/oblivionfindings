@@ -18,6 +18,8 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -46,6 +48,7 @@ import {
     Database,
     Eye,
     Gauge,
+    Inbox,
     Loader2,
     Play,
     RefreshCw,
@@ -103,6 +106,161 @@ const stamp = (value: string | null | undefined) =>
     value
         ? `${formatRelative(value, Date.now(), 'Not recorded')} · ${formatDateTimeLong(value)}`
         : 'Not recorded';
+
+// ── Plain labels for returned keys ─────────────────────────────────
+// Raw enum values never reach the page (DESIGN.md "Auditor and developer
+// language"); an unknown key falls back to sentence-case words.
+
+export function plainLabel(
+    value: string | null | undefined,
+    fallback = 'Not recorded',
+): string {
+    const words = (value ?? '').replace(/[_-]+/g, ' ').trim().toLowerCase();
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : fallback;
+}
+const ASSIGNMENT_TYPE_LABELS: Record<string, string> = {
+    vehicle: 'Vehicle',
+    staff: 'Staff member',
+    client: 'Client',
+    site: 'Site',
+    room: 'Room',
+};
+export const assignmentTypeLabel = (type: string | null | undefined) =>
+    type ? (ASSIGNMENT_TYPE_LABELS[type] ?? plainLabel(type)) : 'Not recorded';
+export const pairingStateLabel = (status: Device['status']) =>
+    status === 'paired'
+        ? 'Paired'
+        : status === 'pending'
+          ? 'Pending claim'
+          : 'Rejected';
+export const connectionStateLabel = (
+    state: Device['connection_state'] | null | undefined,
+) =>
+    state === 'connected'
+        ? 'Connected'
+        : state === 'disconnected'
+          ? 'Disconnected'
+          : 'Not recorded';
+const COMMAND_STATUS_LABELS: Record<RecentCommand['status'], string> = {
+    queued: 'Queued',
+    sent: 'Sent',
+    acked: 'Acknowledged',
+    failed: 'Failed',
+    expired: 'Expired',
+    cancelled: 'Cancelled',
+};
+export function CommandStatusBadge({
+    status,
+}: {
+    status: RecentCommand['status'];
+}) {
+    return (
+        <StatusBadge
+            variant={
+                status === 'failed'
+                    ? 'critical'
+                    : status === 'sent'
+                      ? 'warning'
+                      : status === 'queued' || status === 'acked'
+                        ? 'info'
+                        : 'neutral'
+            }
+        >
+            {COMMAND_STATUS_LABELS[status] ?? plainLabel(status)}
+        </StatusBadge>
+    );
+}
+const PRESET_SECTION_LABELS: Record<string, string> = {
+    server: 'Server connection',
+    tracking: 'Global tracking',
+    pin: 'SIM PIN',
+    dog: 'Watchdog',
+    time: 'Time zone',
+    non_movement: 'Non-movement detection',
+    power: 'Power saving',
+    wifi: 'Wi-Fi',
+    geo: 'On-device geofence',
+    bluetooth: 'Bluetooth',
+    beacons: 'BLE accessories',
+    allowlist: 'Phone allow-list',
+    firmware_update: 'Firmware update',
+    firmware_version: 'Firmware version',
+};
+const presetSections = (sections: string[]) =>
+    sections
+        .map((section) => PRESET_SECTION_LABELS[section] ?? plainLabel(section))
+        .join(', ');
+const TARGET_CATEGORY_LABELS: Record<string, string> = {
+    personal_tracker: 'Personal trackers',
+    vehicle_tracker: 'Vehicle trackers',
+    all: 'All trackers',
+};
+const deviceRecord = (device: Device) =>
+    device.canonical_device_id
+        ? `Device #${device.canonical_device_id}`
+        : 'Not linked to a device record';
+const presetVersion = (preset: Preset) =>
+    preset.profile_version
+        ? `Version ${preset.profile_version}`
+        : 'Version not recorded';
+
+/**
+ * Tracker pickers list the paired trackers returned on the current page of
+ * results (25 at a time), not every paired tracker. Say so, and point to the
+ * header search, which searches every tracker on the server.
+ */
+export const pageScopeHint = (shown: number, total: number) =>
+    `Showing the ${shown} paired tracker${shown === 1 ? '' : 's'} on this page of results, out of ${total}. To choose a different tracker, use Search devices at the top of the page.`;
+
+// ── Replies that are not a page ────────────────────────────────────
+
+export type RequestFailure = 'denied' | 'not_saved' | 'refused' | 'unconfirmed';
+type FailedResponse = {
+    status?: number;
+    config?: { method?: string; url?: string };
+    request?: { responseURL?: string };
+};
+function replyPath(url: string | undefined): string | null {
+    if (!url) return null;
+    try {
+        return new URL(url, window.location.href).pathname;
+    } catch {
+        return null;
+    }
+}
+/**
+ * What a non-page reply to a Queclink request means for the person.
+ * 401/403, or a refused read of the hub page itself, is lost access: private
+ * records are cleared. A 404 or 409/422 for a write that was not redirected
+ * means the server refused it and nothing changed, so the form stays and the
+ * person can try again. Anything else (server error, a refused follow-up page)
+ * may have been recorded and must be confirmed by refreshing.
+ */
+export function requestFailure(response: FailedResponse): RequestFailure {
+    const status = response.status ?? 0;
+    if (status === 401 || status === 403) return 'denied';
+    const requested = replyPath(response.config?.url);
+    const final = replyPath(response.request?.responseURL) ?? requested;
+    if (status === 404 && final === hubPath) return 'denied';
+    const method = (response.config?.method ?? 'get').toLowerCase();
+    const redirected = final !== requested;
+    if (method !== 'get' && !redirected) {
+        if (status === 404) return 'not_saved';
+        if (status === 409 || status === 422) return 'refused';
+    }
+    return 'unconfirmed';
+}
+export const REQUEST_FAILURE_MESSAGES: Record<
+    Exclude<RequestFailure, 'denied'>,
+    string
+> = {
+    not_saved:
+        'This change was not saved. The record may have changed or been removed. Refresh current records, then try again.',
+    refused:
+        'This change was not accepted, so nothing was saved. Refresh current records to check the current state, then try again.',
+    unconfirmed:
+        'This response did not confirm the request. Refresh current records before trying again.',
+};
 const enabled: Array<[string, string]> = [
     ['1', 'Enabled'],
     ['0', 'Disabled'],
@@ -372,31 +530,26 @@ function useQueclinkRequest(actor: number, onDenied: () => void) {
     useEffect(
         () =>
             router.on('invalid', (event) => {
-                const response = event.detail.response as unknown as {
-                    status?: number;
-                    config?: { method?: string; url?: string };
-                };
+                const response = event.detail
+                    .response as unknown as FailedResponse;
                 const active = owned.current;
                 if (
                     !active ||
-                    new URL(response.config?.url ?? '', window.location.href)
-                        .pathname !== active.path ||
+                    replyPath(response.config?.url) !== active.path ||
                     response.config?.method?.toLowerCase() !== active.method
                 )
                     return;
                 event.preventDefault();
-                if (
-                    response.status === 401 ||
-                    response.status === 403 ||
-                    response.status === 404
-                )
-                    onDenied();
-                else {
-                    setErrors({
-                        response:
-                            'This response did not confirm the request. Refresh current records before trying again.',
-                    });
+                const failure = requestFailure(response);
+                if (failure === 'denied') onDenied();
+                else if (failure === 'unconfirmed') {
+                    setErrors({ response: REQUEST_FAILURE_MESSAGES[failure] });
                     setUncertain();
+                } else {
+                    // The server refused the write: nothing changed, so the
+                    // draft stays and the person may try again.
+                    active.settled = true;
+                    setErrors({ response: REQUEST_FAILURE_MESSAGES[failure] });
                 }
             }),
         [onDenied, setUncertain],
@@ -808,15 +961,17 @@ function SettingsEditor({
                                     value={target.reference}
                                 />
                                 <ReviewRow
-                                    label="Canonical Device"
-                                    value={target.canonical_device_id}
+                                    label="Device record"
+                                    value={deviceRecord(target)}
                                 />
                                 <ReviewRow
                                     label="Section"
                                     value={
                                         kind === 'advanced'
                                             ? definition.label
-                                            : kind
+                                            : kind === 'server'
+                                              ? 'Server connection'
+                                              : 'Global tracking'
                                     }
                                 />
                                 <ReviewRow
@@ -900,6 +1055,7 @@ function SavePresetWizard({
     const [capturedServer] = useState(server),
         [capturedGlobal] = useState(global);
     const request = useQueclinkRequest(actor, onDenied);
+    const sectionsId = useId();
     const dirty = Boolean(
         name || description || includeServer || !includeTracking,
     );
@@ -912,11 +1068,14 @@ function SavePresetWizard({
         ...(includeTracking ? { tracking: { ...capturedGlobal } } : {}),
         ...(includeServer ? { server: { ...capturedServer } } : {}),
     };
+    // The server trims every string (TrimStrings), so the saved name is
+    // compared with the trimmed entry, never the raw typed value.
+    const savedName = name.trim();
     const submit = () =>
         request.run(
             'post',
             `${hubPath}/presets`,
-            { name, description, sections },
+            { name: savedName, description: description.trim(), sections },
             (page) => {
                 if (
                     page.component ===
@@ -942,7 +1101,7 @@ function SavePresetWizard({
                                   preset.profile_version > 0 &&
                                   typeof preset.payload_hash === 'string' &&
                                   preset.payload_hash.length > 0 &&
-                                  preset.name === name &&
+                                  preset.name === savedName &&
                                   preset.sections.length ===
                                       Object.keys(sections).length &&
                                   Object.keys(sections).every((section) =>
@@ -1065,32 +1224,32 @@ function SavePresetWizard({
                                 <legend className="text-sm font-medium">
                                     Sections to include
                                 </legend>
-                                <Label className="flex gap-2">
-                                    <input
-                                        type="checkbox"
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id={`${sectionsId}-tracking`}
                                         checked={includeTracking}
                                         disabled={request.busy}
-                                        onChange={(event) =>
-                                            setIncludeTracking(
-                                                event.target.checked,
-                                            )
+                                        onCheckedChange={(checked) =>
+                                            setIncludeTracking(checked === true)
                                         }
                                     />
-                                    Global tracking
-                                </Label>
-                                <Label className="flex gap-2">
-                                    <input
-                                        type="checkbox"
+                                    <Label htmlFor={`${sectionsId}-tracking`}>
+                                        Global tracking
+                                    </Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id={`${sectionsId}-server`}
                                         checked={includeServer}
                                         disabled={request.busy}
-                                        onChange={(event) =>
-                                            setIncludeServer(
-                                                event.target.checked,
-                                            )
+                                        onCheckedChange={(checked) =>
+                                            setIncludeServer(checked === true)
                                         }
                                     />
-                                    Server connection
-                                </Label>
+                                    <Label htmlFor={`${sectionsId}-server`}>
+                                        Server connection
+                                    </Label>
+                                </div>
                             </fieldset>
                         </div>
                     ) : (
@@ -1263,8 +1422,8 @@ function ApplicationWizard({
                     >
                         <ReviewRow label="Tracker" value={target.reference} />
                         <ReviewRow
-                            label="Canonical Device"
-                            value={target.canonical_device_id}
+                            label="Device record"
+                            value={deviceRecord(target)}
                         />
                         <ReviewRow
                             label="Assignment"
@@ -1286,47 +1445,40 @@ function ApplicationWizard({
 function PresetRows({ preset }: { preset: Preset }) {
     return (
         <>
-            <ReviewRow label="Preset ID" value={preset.id} />
             <ReviewRow label="Name" value={preset.name} />
-            <ReviewRow label="Slug" value={preset.slug} />
             <ReviewRow label="Description" value={preset.description} />
-            <ReviewRow label="Target category" value={preset.target_category} />
+            <ReviewRow
+                label="Suitable for"
+                value={
+                    TARGET_CATEGORY_LABELS[preset.target_category] ??
+                    plainLabel(preset.target_category)
+                }
+            />
             <ReviewRow
                 label="Source"
                 value={preset.is_system ? 'Built-in' : 'Custom'}
             />
-            <ReviewRow label="Sections" value={preset.sections.join(', ')} />
-            <ReviewRow label="Profile UUID" value={preset.profile_uuid} />
             <ReviewRow
-                label="Profile version"
+                label="Settings included"
+                value={presetSections(preset.sections) || 'None recorded'}
+            />
+            <ReviewRow label="Version" value={presetVersion(preset)} />
+            <ReviewRow
+                label="Saved settings reference"
                 value={
-                    preset.profile_version
-                        ? `Profile v${preset.profile_version}`
-                        : null
+                    preset.profile_uuid ? (
+                        <span className="text-caption break-all">
+                            {preset.profile_uuid}
+                        </span>
+                    ) : null
                 }
             />
-            <ReviewRow label="Payload hash" value={preset.payload_hash} />
             <ReviewRow label="Created" value={stamp(preset.created_at)} />
         </>
     );
 }
 function CommandBadge({ command }: { command: RecentCommand }) {
-    return (
-        <StatusBadge
-            variant={
-                command.status === 'failed'
-                    ? 'critical'
-                    : command.status === 'sent'
-                      ? 'warning'
-                      : command.status === 'queued' ||
-                          command.status === 'acked'
-                        ? 'info'
-                        : 'neutral'
-            }
-        >
-            {command.status === 'acked' ? 'Acknowledged' : command.status}
-        </StatusBadge>
-    );
+    return <CommandStatusBadge status={command.status} />;
 }
 type Reader = {
     targetIdentity?: string | null;
@@ -1376,6 +1528,7 @@ function SettingsReader({
 
 export function QueclinkSettingsWorkspace({
     devices,
+    total,
     listener,
     presets,
     retiredPresets = [],
@@ -1389,6 +1542,8 @@ export function QueclinkSettingsWorkspace({
     payloadFor,
 }: {
     devices: Device[];
+    /** Every paired tracker matching the current search, across all pages. */
+    total?: number;
     listener: Props['listener'];
     presets: Preset[];
     retiredPresets?: RetiredPreset[];
@@ -1436,6 +1591,7 @@ export function QueclinkSettingsWorkspace({
             <SettingsWorkspaceBody
                 key={JSON.stringify([auth.can?.securityDevices, can.manage])}
                 devices={devices}
+                total={total ?? devices.length}
                 listener={listener}
                 presets={presets}
                 retiredPresets={retiredPresets}
@@ -1461,6 +1617,7 @@ export function QueclinkSettingsWorkspace({
 }
 function SettingsWorkspaceBody({
     devices,
+    total,
     listener,
     presets,
     retiredPresets,
@@ -1476,6 +1633,7 @@ function SettingsWorkspaceBody({
     payloadFor,
 }: {
     devices: Device[];
+    total: number;
     listener: Props['listener'];
     presets: Preset[];
     retiredPresets: RetiredPreset[];
@@ -1497,6 +1655,7 @@ function SettingsWorkspaceBody({
     ) => Record<string, string | string[]>;
 }) {
     const [targetId, setTargetId] = useState(String(devices[0]?.id ?? ''));
+    const pageLimited = total > devices.length;
     const target =
         devices.find((device) => String(device.id) === targetId) ?? null;
     const currentTargetIdentity = targetIdentity(target);
@@ -1547,7 +1706,11 @@ function SettingsWorkspaceBody({
             preset: Preset | null;
         } | null>(null),
         [reader, setReader] = useState<Reader | null>(null),
-        [retiring, setRetiring] = useState<Preset | null>(null);
+        [retiring, setRetiring] = useState<Preset | null>(null),
+        [cancelling, setCancelling] = useState<{
+            command: RecentCommand;
+            identity: string | null;
+        } | null>(null);
     const request = useQueclinkRequest(actor, onDenied);
     const configurationContext = useEntityContextMenu<{
         title: string;
@@ -1638,16 +1801,20 @@ function SettingsWorkspaceBody({
                                 value={<CommandBadge command={command} />}
                             />
                             <ReviewRow
-                                label="Execution"
+                                label="Started from"
                                 value={
                                     command.governed
                                         ? 'Device Management'
-                                        : 'Legacy provider-console history'
+                                        : 'Older Queclink console (read only)'
                                 }
                             />
                             <ReviewRow
-                                label="Failure category"
-                                value={command.failure_category}
+                                label="Reason it failed"
+                                value={
+                                    command.failure_category
+                                        ? plainLabel(command.failure_category)
+                                        : null
+                                }
                             />
                             <p className="mt-3 text-sm text-muted-foreground">
                                 Command and acknowledgement content remain
@@ -1775,22 +1942,23 @@ function SettingsWorkspaceBody({
                     label: 'Tracker context',
                     body: (
                         <ReviewCard icon={Smartphone} title="Selected tracker">
-                            <ReviewRow label="Tracker ID" value={target.id} />
                             <ReviewRow
                                 label="Reference"
                                 value={target.reference}
                             />
                             <ReviewRow
-                                label="Canonical Device"
-                                value={target.canonical_device_id}
+                                label="Device record"
+                                value={deviceRecord(target)}
                             />
                             <ReviewRow
                                 label="Pairing state"
-                                value={target.status}
+                                value={pairingStateLabel(target.status)}
                             />
                             <ReviewRow
-                                label="Connection state"
-                                value={target.connection_state}
+                                label="Connection"
+                                value={connectionStateLabel(
+                                    target.connection_state,
+                                )}
                             />
                             <ReviewRow
                                 label="Model"
@@ -1822,7 +1990,13 @@ function SettingsWorkspaceBody({
                             />
                             <ReviewRow
                                 label="Assignment type"
-                                value={target.assignment?.type}
+                                value={
+                                    target.assignment
+                                        ? assignmentTypeLabel(
+                                              target.assignment.type,
+                                          )
+                                        : null
+                                }
                             />
                             <ReviewRow
                                 label="Assigned"
@@ -1850,16 +2024,33 @@ function SettingsWorkspaceBody({
                           : request.uncertain
                             ? 'Refresh current records first.'
                             : undefined,
+                      danger: true,
                       onClick: () =>
-                          request.run(
-                              'post',
-                              `${hubPath}/commands/${command.id}/cancel`,
-                              {},
-                          ),
+                          setCancelling({
+                              command,
+                              identity: currentTargetIdentity,
+                          }),
                   },
               ]
             : []),
     ];
+    // The confirmation closes itself if the command is no longer queued for
+    // the same tracker (sent, cancelled elsewhere, or a different target).
+    const cancellingCommand =
+        cancelling &&
+        cancelling.identity === currentTargetIdentity &&
+        !request.busy &&
+        !request.uncertain
+            ? commands.find(
+                  (command) =>
+                      command.id === cancelling.command.id &&
+                      command.status === 'queued' &&
+                      !command.governed,
+              )
+            : undefined;
+    useEffect(() => {
+        if (cancelling && !cancellingCommand) setCancelling(null);
+    }, [cancelling, cancellingCommand]);
     const presetActions = (preset: Preset | RetiredPreset): MenuItem[] => [
         {
             label: 'View preset details',
@@ -1872,7 +2063,7 @@ function SettingsWorkspaceBody({
                       label: 'Review application',
                       icon: Play,
                       disabled: !target?.canonical_device_id
-                          ? 'Select a tracker linked to a canonical Device.'
+                          ? 'Select a tracker that is linked to a device record.'
                           : undefined,
                       onClick: () => {
                           setFormTargetIdentity(currentTargetIdentity);
@@ -1917,15 +2108,11 @@ function SettingsWorkspaceBody({
     }, [reader, readerCurrent]);
     if (!devices.length)
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Device settings</CardTitle>
-                    <CardDescription>
-                        Pair a Queclink device before configuring device
-                        settings.
-                    </CardDescription>
-                </CardHeader>
-            </Card>
+            <EmptyState
+                icon={Smartphone}
+                title="No paired trackers to configure"
+                description="Pair a Queclink device before configuring device settings. Claim a recognised tracker from the Pending view."
+            />
         );
     const presetList = (
         rows: Array<Preset | RetiredPreset>,
@@ -1946,16 +2133,13 @@ function SettingsWorkspaceBody({
                         label: 'Sections',
                         width: '1fr',
                         cell: (preset) =>
-                            preset.sections.join(', ') || 'Not recorded',
+                            presetSections(preset.sections) || 'Not recorded',
                     },
                     {
                         key: 'version',
                         label: 'Version',
                         width: '110px',
-                        cell: (preset) =>
-                            preset.profile_version
-                                ? `Profile v${preset.profile_version}`
-                                : 'Not recorded',
+                        cell: presetVersion,
                     },
                     {
                         key: 'history',
@@ -1963,7 +2147,7 @@ function SettingsWorkspaceBody({
                         width: '1.2fr',
                         cell: (preset) =>
                             'retired_at' in preset
-                                ? `${stamp(preset.retired_at)} · ${preset.retired_by ?? 'Actor not recorded'} · ${preset.retirement_reason ?? 'Reason not recorded'}`
+                                ? `${stamp(preset.retired_at)} · ${preset.retired_by ?? 'Person not recorded'} · ${preset.retirement_reason ?? 'Reason not recorded'}`
                                 : stamp(preset.created_at),
                     },
                 ]}
@@ -2003,21 +2187,19 @@ function SettingsWorkspaceBody({
                                 </EntityChip>
                                 {preset.sections.map((section) => (
                                     <EntityChip key={section}>
-                                        {section}
+                                        {presetSections([section])}
                                     </EntityChip>
                                 ))}
                             </>
                         }
                         footer={{
-                            primary: preset.profile_version
-                                ? `Profile v${preset.profile_version}`
-                                : 'Version not recorded',
+                            primary: presetVersion(preset),
                             secondary:
                                 'retired_at' in preset ? (
                                     <>
                                         {stamp(preset.retired_at)} ·{' '}
                                         {preset.retired_by ??
-                                            'Actor not recorded'}
+                                            'Person not recorded'}
                                         <p>
                                             {preset.retirement_reason ??
                                                 'Reason not recorded'}
@@ -2057,7 +2239,14 @@ function SettingsWorkspaceBody({
                                 }}
                                 disabled={request.busy || request.uncertain}
                             >
-                                <SelectTrigger id={targetInputId}>
+                                <SelectTrigger
+                                    id={targetInputId}
+                                    aria-describedby={
+                                        pageLimited
+                                            ? `${targetInputId}-scope`
+                                            : undefined
+                                    }
+                                >
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -2074,6 +2263,14 @@ function SettingsWorkspaceBody({
                                     ))}
                                 </SelectContent>
                             </Select>
+                            {pageLimited && (
+                                <p
+                                    id={`${targetInputId}-scope`}
+                                    className="text-caption max-w-md"
+                                >
+                                    {pageScopeHint(devices.length, total)}
+                                </p>
+                            )}
                         </div>
                         <Button
                             disabled={
@@ -2106,8 +2303,10 @@ function SettingsWorkspaceBody({
                     </div>
                     <div className="grid gap-x-5 sm:grid-cols-2 lg:grid-cols-3">
                         <ReviewRow
-                            label="Connection health"
-                            value={target?.connection_state}
+                            label="Connection"
+                            value={connectionStateLabel(
+                                target?.connection_state,
+                            )}
                         />
                         <ReviewRow
                             label="Model"
@@ -2358,10 +2557,12 @@ function SettingsWorkspaceBody({
                 {presets.length ? (
                     presetList(presets, false)
                 ) : (
-                    <p className="text-sm text-muted-foreground">
-                        No presets yet. Prepare Server or Global draft values,
-                        then save them as a reusable preset.
-                    </p>
+                    <EmptyState
+                        variant="compact"
+                        icon={BookMarked}
+                        title="No presets yet"
+                        description="Prepare server connection or global tracking draft values, then save them as a reusable preset."
+                    />
                 )}
             </section>
             {retiredPresets.length > 0 && (
@@ -2412,12 +2613,12 @@ function SettingsWorkspaceBody({
                                 },
                                 {
                                     key: 'execution',
-                                    label: 'Execution',
+                                    label: 'Started from',
                                     width: '1fr',
                                     cell: (command) =>
                                         command.governed
                                             ? 'Device Management'
-                                            : 'Legacy history',
+                                            : 'Older Queclink console',
                                 },
                             ]}
                             actionsFor={commandActions}
@@ -2452,20 +2653,23 @@ function SettingsWorkspaceBody({
                                     chips={<CommandBadge command={command} />}
                                     footer={{
                                         primary: command.governed
-                                            ? 'Governed Device execution detail · content protected'
+                                            ? 'Started in Device Management · details protected'
                                             : command.status === 'queued'
-                                              ? 'Legacy provider-console command · cancellation only · content protected'
-                                              : 'Legacy provider-console history · read only · content protected',
-                                        secondary: `ACK: ${stamp(command.acked_at)}`,
+                                              ? 'Older Queclink console command · can only be cancelled · details protected'
+                                              : 'Older Queclink console history · read only · details protected',
+                                        secondary: `Acknowledged: ${stamp(command.acked_at)}`,
                                     }}
                                 />
                             ))}
                         </EntityCardGrid>
                     )
                 ) : (
-                    <p className="text-sm text-muted-foreground">
-                        No command history is returned for this tracker.
-                    </p>
+                    <EmptyState
+                        variant="compact"
+                        icon={Inbox}
+                        title="No command history for this tracker"
+                        description="Commands sent to this tracker appear here. New device actions start from Device Management."
+                    />
                 )}
             </section>
             {configurationContext.ctx &&
@@ -2568,6 +2772,27 @@ function SettingsWorkspaceBody({
                     onClose={() => setRetiring(null)}
                 />
             )}
+            <ConfirmDialog
+                open={Boolean(cancellingCommand && target && manage)}
+                onClose={() => setCancelling(null)}
+                onConfirm={() => {
+                    if (cancellingCommand && manage)
+                        request.run(
+                            'post',
+                            `${hubPath}/commands/${cancellingCommand.id}/cancel`,
+                            {},
+                        );
+                    setCancelling(null);
+                }}
+                title="Cancel this queued command?"
+                description={
+                    cancellingCommand && target
+                        ? `${cancellingCommand.command_word} #${cancellingCommand.id} has not been sent to ${target.reference} yet. Cancelling removes it from the queue and it cannot be resumed here. Start any new device action from Device Management.`
+                        : ''
+                }
+                confirmText="Cancel command"
+                cancelText="Keep command"
+            />
         </div>
     );
 }

@@ -24,6 +24,7 @@ import {
     PageLayout,
 } from '@/components/page';
 import { RecordPicker } from '@/components/people-locations/record-picker';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -40,7 +41,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Field, StepHead } from '@/components/wizard/primitives';
 import {
@@ -60,6 +63,7 @@ import {
     CheckCircle,
     ClipboardList,
     Eye,
+    Inbox,
     KeyRound,
     LayoutGrid,
     List,
@@ -67,6 +71,7 @@ import {
     MapPin,
     Plug,
     RefreshCw,
+    Search,
     Trash2,
     Webhook,
 } from 'lucide-react';
@@ -177,8 +182,63 @@ const views = [
     { key: 'activity' as const, label: 'Recent activity', icon: ClipboardList },
     { key: 'credentials' as const, label: 'Site credentials', icon: KeyRound },
 ];
+// Server timestamps are ISO-8601 UTC instants; the shared helper shows them in
+// NZ time. An unparseable value reads "Not recorded", never a raw string.
 const stamp = (value?: string | null) =>
-    value ? formatDateTimeLong(value, value) : 'Not recorded';
+    formatDateTimeLong(value, 'Not recorded');
+/** Sentence-case words for a returned key the page has no label for. */
+const plainLabel = (value?: string | null, fallback = 'Not recorded') => {
+    const words = (value ?? '').replace(/[_-]+/g, ' ').trim().toLowerCase();
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : fallback;
+};
+const ACTION_LABELS: Record<string, string> = {
+    discover_applications: 'Application discovery',
+    sync_devices: 'Device sync',
+    device_sync: 'Device sync',
+};
+const STATUS_LABELS: Record<string, string> = {
+    started: 'In progress',
+    success: 'Succeeded',
+    partial: 'Partly completed',
+    failed: 'Failed',
+};
+const CREDENTIAL_STATE_LABELS: Record<SiteCredentialRow['state'], string> = {
+    connected: 'Connected',
+    untested: 'Not tested',
+    disabled: 'Disabled',
+    error: 'Needs attention',
+};
+const actionLabel = (action: string) =>
+    ACTION_LABELS[action] ?? plainLabel(action);
+const statusLabel = (status: string) =>
+    STATUS_LABELS[status] ?? plainLabel(status);
+const credentialStateLabel = (state: SiteCredentialRow['state']) =>
+    CREDENTIAL_STATE_LABELS[state] ?? plainLabel(state);
+const REFUSED_NOTICE =
+    'This change was not accepted, so nothing was saved. Review the current details and try again. Your unsent entries remain available.';
+const NOT_SAVED_NOTICE =
+    'This change was not saved. The record may have changed or been removed. Refresh the page, then try again. Your unsent entries remain available.';
+const UNCONFIRMED_NOTICE =
+    'The request could not be completed. Review the current details and try again. Your unsent entries remain available.';
+/** The first server validation message for a refused request. */
+const firstError = (errors: Record<string, string | undefined>) =>
+    Object.values(errors).find(
+        (value): value is string =>
+            typeof value === 'string' &&
+            value.trim() !== '' &&
+            value.length <= 300,
+    ) ?? REFUSED_NOTICE;
+function replyPath(url: unknown): string | null {
+    if (typeof url !== 'string' || url === '') return null;
+    try {
+        const target = new URL(url, window.location.origin);
+        return target.origin === window.location.origin
+            ? target.pathname
+            : null;
+    } catch {
+        return null;
+    }
+}
 const needsAttention = (log: SyncLog) =>
     log.status === 'failed' ||
     log.items_errored > 0 ||
@@ -302,28 +362,45 @@ function MilesightBody({
             router.on('invalid', (event) => {
                 if (!live.current || !busy.current) return;
                 const response = event.detail.response;
-                const url = response.config.url;
-                if (typeof url !== 'string') return;
-                let target: URL;
-                try {
-                    target = new URL(url, window.location.origin);
-                } catch {
-                    return;
-                }
+                const requested = replyPath(response.config.url);
                 if (
-                    target.origin !== window.location.origin ||
-                    (target.pathname !== base &&
-                        !target.pathname.startsWith(base + '/'))
+                    requested === null ||
+                    (requested !== base && !requested.startsWith(base + '/'))
                 )
                     return;
                 event.preventDefault();
                 busy.current = false;
                 setPending(null);
-                if ([401, 403, 404].includes(response.status)) setDenied(true);
-                else
-                    setNotice(
-                        'The request could not be completed. Review the current details and try again. Your unsent entries remain available.',
-                    );
+                // A redirected write reports the page it was sent on to.
+                const final =
+                    replyPath(
+                        (response.request as { responseURL?: unknown })
+                            ?.responseURL,
+                    ) ?? requested;
+                const write =
+                    (response.config.method ?? 'get').toLowerCase() !== 'get';
+                if (
+                    response.status === 401 ||
+                    response.status === 403 ||
+                    (response.status === 404 && final === base)
+                )
+                    // Lost access, or this page itself was refused.
+                    setDenied(true);
+                else if (
+                    write &&
+                    final === requested &&
+                    response.status === 404
+                )
+                    // The record the change targeted no longer exists for this
+                    // account; nothing was saved and access is unchanged.
+                    setNotice(NOT_SAVED_NOTICE);
+                else if (
+                    write &&
+                    final === requested &&
+                    (response.status === 409 || response.status === 422)
+                )
+                    setNotice(REFUSED_NOTICE);
+                else setNotice(UNCONFIRMED_NOTICE);
             }),
         [],
     );
@@ -362,7 +439,10 @@ function MilesightBody({
                         { value: 'attention', label: 'Needs attention' },
                         ...Array.from(
                             new Set(logs.map((log) => log.status)),
-                        ).map((status) => ({ value: status, label: status })),
+                        ).map((status) => ({
+                            value: status,
+                            label: statusLabel(status),
+                        })),
                     ]
                   : [
                         { value: 'all', label: 'All Site credentials' },
@@ -392,7 +472,7 @@ function MilesightBody({
             (log): RecordEntry => ({
                 key: 'log:' + log.id,
                 kind: 'log',
-                name: log.action,
+                name: actionLabel(log.action),
                 data: log,
             }),
         ),
@@ -461,6 +541,9 @@ function MilesightBody({
             preserveScroll: true,
             onSuccess: (page) => {
                 acceptResponse(page);
+            },
+            onError: (errors) => {
+                if (live.current) setNotice(firstError(errors));
             },
             onFinish: () => {
                 if (live.current) {
@@ -842,19 +925,18 @@ function MilesightBody({
                 ) : (
                     <>
                         {notice && (
-                            <p
-                                role="status"
-                                className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm"
-                            >
-                                {notice}
-                            </p>
+                            <Alert variant="warning" role="status">
+                                <AlertTriangle aria-hidden="true" />
+                                <AlertTitle>Request not completed</AlertTitle>
+                                <AlertDescription>{notice}</AlertDescription>
+                            </Alert>
                         )}
                         {pending && (
                             <p
                                 role="status"
                                 className="flex items-center gap-2 text-sm text-muted-foreground"
                             >
-                                <Loader2 className="size-4 animate-spin" />
+                                <Spinner aria-hidden="true" />
                                 Request in progress. The provider result will
                                 appear after the response.
                             </p>
@@ -952,15 +1034,17 @@ function MilesightBody({
                                                 </Button>
                                             </div>
                                             {connection?.status === 'error' && (
-                                                <p
+                                                <Alert
+                                                    variant="destructive"
                                                     role="status"
-                                                    className="flex gap-2 text-sm text-status-critical"
                                                 >
-                                                    <AlertTriangle className="size-4 shrink-0" />
-                                                    The provider connection
-                                                    needs attention. Test the
-                                                    connection or retry.
-                                                </p>
+                                                    <AlertTriangle aria-hidden="true" />
+                                                    <AlertDescription>
+                                                        The provider connection
+                                                        needs attention. Test
+                                                        the connection or retry.
+                                                    </AlertDescription>
+                                                </Alert>
                                             )}
                                         </CardContent>
                                     </Card>
@@ -999,10 +1083,12 @@ function MilesightBody({
                                 {search &&
                                     !showCredentials &&
                                     !showConnectionHistory && (
-                                        <EmptyState>
-                                            No connection details match this
-                                            search.
-                                        </EmptyState>
+                                        <EmptyState
+                                            variant="compact"
+                                            icon={Search}
+                                            title="No connection details match this search"
+                                            description="Clear the search or try another word."
+                                        />
                                     )}
                                 <Card>
                                     <CardHeader>
@@ -1153,10 +1239,12 @@ function MilesightBody({
                                 {search &&
                                     !showCallback &&
                                     !showWebhookHistory && (
-                                        <EmptyState>
-                                            No webhook details match this
-                                            search.
-                                        </EmptyState>
+                                        <EmptyState
+                                            variant="compact"
+                                            icon={Search}
+                                            title="No webhook details match this search"
+                                            description="Clear the search or try another word."
+                                        />
                                     )}
                             </>
                         )}
@@ -1197,15 +1285,33 @@ function MilesightBody({
                                     </p>
                                 )}
                                 {filtered.length === 0 ? (
-                                    <EmptyState>
-                                        {records.length
-                                            ? 'No records match the current search and filter.'
-                                            : view === 'applications'
-                                              ? 'No Milesight applications or Site mappings were returned. Test the connection, then discover applications.'
-                                              : view === 'activity'
-                                                ? 'No connection tests or sync attempts were returned.'
-                                                : 'No Site credential records were returned for your approved Sites.'}
-                                    </EmptyState>
+                                    records.length ? (
+                                        <EmptyState
+                                            variant="compact"
+                                            icon={Search}
+                                            title="No records match the current search and filter"
+                                            description="Clear the search or choose another filter."
+                                        />
+                                    ) : (
+                                        <EmptyState
+                                            variant="compact"
+                                            icon={Inbox}
+                                            title={
+                                                view === 'applications'
+                                                    ? 'No Milesight applications or Site mappings were returned'
+                                                    : view === 'activity'
+                                                      ? 'No connection tests or sync attempts were returned'
+                                                      : 'No Site credential records were returned for your approved Sites'
+                                            }
+                                            description={
+                                                view === 'applications'
+                                                    ? 'Test the connection, then discover applications.'
+                                                    : view === 'activity'
+                                                      ? 'Tests and syncs appear here after they run.'
+                                                      : 'Site credentials are added from each Site’s Integrations page.'
+                                            }
+                                        />
+                                    )
                                 ) : layout === 'table' ? (
                                     <EntityTable
                                         rows={filtered}
@@ -1389,10 +1495,15 @@ function MilesightBody({
                                             currentRemoval.id;
                                 busy.current = true;
                                 setPending('remove');
+                                setNotice('');
                                 router.delete(base + target, {
                                     preserveScroll: true,
                                     onSuccess: (page) => {
                                         acceptResponse(page);
+                                    },
+                                    onError: (errors) => {
+                                        if (live.current)
+                                            setNotice(firstError(errors));
                                     },
                                     onFinish: () => {
                                         if (live.current) {
@@ -1410,22 +1521,42 @@ function MilesightBody({
         </AppLayout>
     );
 }
-function EmptyState({ children }: { children: ReactNode }) {
+/** Server validation messages for a reviewed form, in the shared alert. */
+function FormErrors({
+    errors,
+}: {
+    errors: Record<string, string | undefined>;
+}) {
+    const messages = Array.from(
+        new Set(
+            Object.values(errors).filter(
+                (error): error is string =>
+                    typeof error === 'string' && !!error,
+            ),
+        ),
+    );
+    if (messages.length === 0) return null;
     return (
-        <Card>
-            <CardContent className="py-8 text-sm text-muted-foreground">
-                {children}
-            </CardContent>
-        </Card>
+        <Alert variant="destructive" className="mt-3">
+            <AlertTriangle aria-hidden="true" />
+            <AlertTitle>Not saved</AlertTitle>
+            <AlertDescription>
+                <ul className="space-y-1">
+                    {messages.map((message) => (
+                        <li key={message}>{message}</li>
+                    ))}
+                </ul>
+            </AlertDescription>
+        </Alert>
     );
 }
 function recordSubtitle(record: RecordEntry): string {
     if (record.kind === 'application')
         return 'Discovered Milesight application';
     if (record.kind === 'mapping')
-        return `${record.data.site_type ?? 'Site type not recorded'} · Site #${record.data.site_id} · Mapping #${record.data.id}`;
+        return `${record.data.site_type ? plainLabel(record.data.site_type) : 'Site type not recorded'} · Site #${record.data.site_id} · Mapping #${record.data.id}`;
     if (record.kind === 'credential')
-        return `${record.data.capability} · Site #${record.data.site_id}`;
+        return `${plainLabel(record.data.capability)} · Site #${record.data.site_id}`;
     return `Attempt #${record.data.id} · ${stamp(record.data.started_at)}`;
 }
 function recordFacts(record: RecordEntry) {
@@ -1456,9 +1587,7 @@ function recordFacts(record: RecordEntry) {
                           : 'neutral'
                 }
             >
-                {record.data.state === 'untested'
-                    ? 'Not tested'
-                    : record.data.state}
+                {credentialStateLabel(record.data.state)}
             </EntityStatusChip>
         );
     return (
@@ -1472,7 +1601,7 @@ function recordFacts(record: RecordEntry) {
                           : 'neutral'
                 }
             >
-                {record.data.status}
+                {statusLabel(record.data.status)}
             </EntityStatusChip>
             <EntityChip>{record.data.items_errored} errored</EntityChip>
         </>
@@ -1550,7 +1679,7 @@ function RecordReader({
                                 }
                             />
                             <ReviewRow
-                                label="Mapping token"
+                                label="Discovery reference"
                                 value={record.data.mapping_token}
                             />
                         </>
@@ -1567,7 +1696,11 @@ function RecordReader({
                             />
                             <ReviewRow
                                 label="Site type"
-                                value={record.data.site_type}
+                                value={
+                                    record.data.site_type
+                                        ? plainLabel(record.data.site_type)
+                                        : null
+                                }
                             />
                             <ReviewRow
                                 label="Milesight application"
@@ -1587,7 +1720,7 @@ function RecordReader({
                             />
                             <ReviewRow
                                 label="Status"
-                                value={record.data.status}
+                                value={statusLabel(record.data.status)}
                             />
                             <ReviewRow
                                 label="Processed"
@@ -1607,7 +1740,13 @@ function RecordReader({
                             />
                             <ReviewRow
                                 label="Failure category"
-                                value={record.data.failure_category}
+                                value={
+                                    record.data.failure_category
+                                        ? plainLabel(
+                                              record.data.failure_category,
+                                          )
+                                        : null
+                                }
                             />
                             <ReviewRow
                                 label="Started"
@@ -1631,7 +1770,7 @@ function RecordReader({
                             />
                             <ReviewRow
                                 label="Capability"
-                                value={record.data.capability}
+                                value={plainLabel(record.data.capability)}
                             />
                             <ReviewRow
                                 label="Enabled"
@@ -1639,11 +1778,17 @@ function RecordReader({
                             />
                             <ReviewRow
                                 label="State"
-                                value={record.data.state}
+                                value={credentialStateLabel(record.data.state)}
                             />
                             <ReviewRow
                                 label="Failure category"
-                                value={record.data.failure_category}
+                                value={
+                                    record.data.failure_category
+                                        ? plainLabel(
+                                              record.data.failure_category,
+                                          )
+                                        : null
+                                }
                             />
                             <ReviewRow
                                 label="Last tested"
@@ -1894,24 +2039,14 @@ function CredentialWizard({
                                 Saving does not connect the provider or import
                                 Devices. Test the connection after saving.
                             </p>
-                            {Object.values(form.errors).map((error) => (
-                                <p
-                                    key={error}
-                                    role="alert"
-                                    className="mt-2 text-sm text-status-critical"
-                                >
-                                    {error}
-                                </p>
-                            ))}
+                            <FormErrors errors={form.errors} />
                         </ReviewCard>
                     )}
                     {notice && (
-                        <p
-                            role="alert"
-                            className="mt-3 text-sm text-status-warning"
-                        >
-                            {notice}
-                        </p>
+                        <Alert variant="warning" className="mt-3">
+                            <AlertTriangle aria-hidden="true" />
+                            <AlertDescription>{notice}</AlertDescription>
+                        </Alert>
                     )}
                 </WizardStepPane>
             </WizardShell>
@@ -2054,12 +2189,10 @@ function SecretDialog({
                             </p>
                         )}
                         {notice && (
-                            <p
-                                role="alert"
-                                className="text-sm text-status-warning"
-                            >
-                                {notice}
-                            </p>
+                            <Alert variant="warning">
+                                <AlertTriangle aria-hidden="true" />
+                                <AlertDescription>{notice}</AlertDescription>
+                            </Alert>
                         )}
                         <DialogFooter>
                             <Button
@@ -2275,7 +2408,7 @@ function MappingWizard({
                                         options={sites.map((option) => ({
                                             value: String(option.id),
                                             label: option.name,
-                                            description: `${option.type ?? 'Site'} · #${option.id}`,
+                                            description: `${option.type ? plainLabel(option.type) : 'Site'} · #${option.id}`,
                                         }))}
                                         onChange={(value) =>
                                             form.setData('site_id', value)
@@ -2299,30 +2432,25 @@ function MappingWizard({
                                 value={site?.name}
                             />
                             <ReviewRow label="Site ID" value={site?.id} />
-                            <ReviewRow label="Site type" value={site?.type} />
+                            <ReviewRow
+                                label="Site type"
+                                value={
+                                    site?.type ? plainLabel(site.type) : null
+                                }
+                            />
                             <p className="mt-3 text-sm text-muted-foreground">
                                 Mapping does not import Devices. Use Sync
                                 Devices after the returned mapping is active and
                                 the provider is connected.
                             </p>
-                            {Object.values(form.errors).map((error) => (
-                                <p
-                                    key={error}
-                                    role="alert"
-                                    className="mt-2 text-sm text-status-critical"
-                                >
-                                    {error}
-                                </p>
-                            ))}
+                            <FormErrors errors={form.errors} />
                         </ReviewCard>
                     )}
                     {notice && (
-                        <p
-                            role="alert"
-                            className="mt-3 text-sm text-status-warning"
-                        >
-                            {notice}
-                        </p>
+                        <Alert variant="warning" className="mt-3">
+                            <AlertTriangle aria-hidden="true" />
+                            <AlertDescription>{notice}</AlertDescription>
+                        </Alert>
                     )}
                 </WizardStepPane>
             </WizardShell>

@@ -414,7 +414,15 @@ describe('QueclinkHub page chrome', () => {
             '/security-devices/integrations/queclink?rejected_page=2',
             {},
             expect.objectContaining({
-                only: ['devices', 'actor_id', 'as_of', 'auth', 'can'],
+                only: [
+                    'devices',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
             }),
         );
     });
@@ -598,7 +606,15 @@ describe('QueclinkHub page chrome', () => {
                 target_search: 'Vehicle 0501',
             }),
             expect.objectContaining({
-                only: ['targets', 'actor_id', 'as_of', 'auth', 'can'],
+                only: [
+                    'targets',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
                 preserveState: true,
             }),
         );
@@ -639,7 +655,15 @@ describe('QueclinkHub page chrome', () => {
                 target_search: 'Worker 0501',
             }),
             expect.objectContaining({
-                only: ['targets', 'actor_id', 'as_of', 'auth', 'can'],
+                only: [
+                    'targets',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
                 preserveState: true,
             }),
         );
@@ -713,7 +737,15 @@ describe('QueclinkHub page chrome', () => {
             '/security-devices/integrations/queclink',
             { device_search: 'NeedleModel' },
             expect.objectContaining({
-                only: ['devices', 'actor_id', 'as_of', 'auth', 'can'],
+                only: [
+                    'devices',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
             }),
         );
 
@@ -723,7 +755,15 @@ describe('QueclinkHub page chrome', () => {
             '/security-devices/integrations/queclink?paired_page=2',
             {},
             expect.objectContaining({
-                only: ['devices', 'actor_id', 'as_of', 'auth', 'can'],
+                only: [
+                    'devices',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
             }),
         );
     });
@@ -852,7 +892,7 @@ describe('QueclinkHub device settings', () => {
 
         expect(screen.getByText('Retired preset history')).toBeVisible();
         expect(screen.getByText(/Moana Jones/)).toBeVisible();
-        expect(screen.getByText(/Profile v3/)).toBeVisible();
+        expect(screen.getByText(/Version 3/)).toBeVisible();
         expect(screen.getByText(/Replaced by the approved/)).toBeVisible();
     });
 
@@ -926,7 +966,7 @@ describe('QueclinkHub device settings', () => {
         );
 
         expect(screen.getByText('Device settings')).toBeVisible();
-        expect(screen.getByText('Connection health')).toBeVisible();
+        expect(screen.getByText('Connection')).toBeVisible();
         expect(screen.getByText(/Amelia Wilson/)).toBeVisible();
         expect(screen.getByText(/Values are protected/)).toBeVisible();
         expect(
@@ -943,12 +983,12 @@ describe('QueclinkHub device settings', () => {
         ).toBeVisible();
         expect(
             screen.getByText(
-                'Legacy provider-console command · cancellation only · content protected',
+                'Older Queclink console command · can only be cancelled · details protected',
             ),
         ).toBeVisible();
         expect(
             screen.getByText(
-                'Legacy provider-console history · read only · content protected',
+                'Older Queclink console history · read only · details protected',
             ),
         ).toBeVisible();
         expect(
@@ -1028,6 +1068,12 @@ describe('QueclinkHub device settings', () => {
                 name: 'Cancel queued command',
             }),
         );
+        expect(inertiaMocks.router.post).not.toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/commands/44/cancel',
+            expect.anything(),
+            expect.anything(),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel command' }));
 
         expect(inertiaMocks.router.post).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink/commands/44/cancel',

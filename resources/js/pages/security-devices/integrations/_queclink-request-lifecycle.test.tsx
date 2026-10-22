@@ -517,6 +517,29 @@ describe('Queclink request lifecycle and current resource withdrawal', () => {
         ).toBeDisabled();
         expect(mocks.post).toHaveBeenCalledTimes(1);
     });
+    it('keeps a kept draft when the person switches to another view and back', () => {
+        render(<QueclinkHub {...fixture()} />);
+        settings();
+        fireEvent.click(
+            screen.getByRole('button', { name: /^Server connection/ }),
+        );
+        fireEvent.change(screen.getByLabelText('Main host'), {
+            target: { value: 'kept.example' },
+        });
+        next();
+        next();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep draft' }));
+        fireEvent.click(screen.getByRole('tab', { name: /^Overview/ }));
+        expect(
+            screen.queryByRole('button', { name: /^Server connection/ }),
+        ).not.toBeInTheDocument();
+        settings();
+        fireEvent.click(
+            screen.getByRole('button', { name: /^Server connection/ }),
+        );
+        expect(screen.getByLabelText('Main host')).toHaveValue('kept.example');
+        expect(mocks.post).not.toHaveBeenCalled();
+    });
     it('withdraws a kept draft and an open configuration menu on canonical target change without reviving them when the old target returns', () => {
         const data = fixture(),
             ui = render(<QueclinkHub {...data} />);

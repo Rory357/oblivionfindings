@@ -47,7 +47,7 @@ vi.mock('@inertiajs/react', async () => {
 const listener = {
     port: 8090,
     endpoint_configured: true,
-    service_state: 'active',
+    service_state: 'active' as const,
     connected_count: 1,
 };
 const device = (id = 2): Device => ({
@@ -440,6 +440,83 @@ describe('Queclink advanced settings workflows', () => {
         );
         expect(mocks.post).toHaveBeenCalledTimes(2);
     });
+    it('sends and confirms a trimmed preset name, so a trailing space does not lock the page', () => {
+        render(workspace());
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Save current as preset' }),
+        );
+        fireEvent.change(screen.getByLabelText('Name'), {
+            target: { value: '  Synthetic spaced preset  ' },
+        });
+        next();
+        fireEvent.click(screen.getByRole('button', { name: 'Save preset' }));
+        expect(mocks.post.mock.calls[0][1]).toEqual(
+            expect.objectContaining({ name: 'Synthetic spaced preset' }),
+        );
+        // The server's TrimStrings middleware stores the trimmed name.
+        const saved = {
+            ...preset(),
+            id: 9,
+            name: 'Synthetic spaced preset',
+            sections: ['tracking'],
+        };
+        act(() => {
+            callbacks().onSuccess({
+                component: 'security-devices/integrations/queclink-hub',
+                url: '/security-devices/integrations/queclink',
+                props: { actor_id: 17, auth: currentAuth(), presets: [saved] },
+            });
+            callbacks().onFinish();
+        });
+        expect(screen.getByText('Preset saved')).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: 'Refresh current records' }),
+        ).not.toBeInTheDocument();
+    });
+    it.each([
+        [404, /This change was not saved/],
+        [422, /This change was not accepted/],
+    ] as const)(
+        'explains a refused %s settings write without locking the page or claiming lost access',
+        (status, message) => {
+            render(workspace());
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Read full config' }),
+            );
+            const reply = new CustomEvent('inertia:invalid', {
+                cancelable: true,
+                detail: {
+                    response: {
+                        status,
+                        data: '<html>RAW-REFUSAL-PAGE</html>',
+                        config: {
+                            method: 'post',
+                            url: '/security-devices/integrations/queclink/devices/2/configuration/read',
+                        },
+                    },
+                },
+            });
+            act(() => {
+                document.dispatchEvent(reply);
+                callbacks().onFinish();
+            });
+            expect(reply.defaultPrevented).toBe(true);
+            expect(screen.getByRole('alert')).toHaveTextContent(message);
+            expect(
+                screen.queryByText(/RAW-REFUSAL-PAGE/),
+            ).not.toBeInTheDocument();
+            expect(
+                screen.queryByText(/settings are restricted/),
+            ).not.toBeInTheDocument();
+            expect(
+                screen.getByRole('button', { name: 'Read full config' }),
+            ).toBeEnabled();
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Read full config' }),
+            );
+            expect(mocks.post).toHaveBeenCalledTimes(2);
+        },
+    );
     it.each(['actor', 'viewAny', 'integrationsManage'] as const)(
         'removes private settings, readers and pending drafts after current %s authority loss',
         async (kind) => {
@@ -574,12 +651,19 @@ describe('Queclink advanced settings workflows', () => {
         const reader = screen.getByRole('dialog');
         for (const text of [
             'profile-synthetic-6',
-            'synthetic-profile-hash',
-            'Profile v3',
-            'synthetic-safety-baseline',
-            'personal_tracker',
+            'Version 3',
+            'Personal trackers',
+            'Global tracking, Server connection',
         ])
             expect(within(reader).getByText(text)).toBeVisible();
+        // Internal keys and integrity hashes are not shown as preset facts.
+        for (const text of [
+            'personal_tracker',
+            'synthetic-safety-baseline',
+            'synthetic-profile-hash',
+            'tracking, server',
+        ])
+            expect(within(reader).queryByText(text)).not.toBeInTheDocument();
         fireEvent.click(screen.getAllByRole('button', { name: /^Close$/ })[0]);
         fireEvent.contextMenu(screen.getByRole('row', { name: /SYN6/ }), {
             clientX: 80,
@@ -639,6 +723,25 @@ describe('Queclink advanced settings workflows', () => {
         ];
         render(workspace({ devices: [target] }));
         await menu('SYN4', 'Cancel queued command');
+        // Cancelling is irreversible, so it waits for the shared confirmation.
+        expect(mocks.post).not.toHaveBeenCalled();
+        const confirm = screen.getByRole('alertdialog');
+        expect(
+            within(confirm).getByText('Cancel this queued command?'),
+        ).toBeVisible();
+        expect(confirm).toHaveTextContent('Tracker ending 2998');
+        fireEvent.click(
+            within(confirm).getByRole('button', { name: 'Keep command' }),
+        );
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(mocks.post).not.toHaveBeenCalled();
+        await menu('SYN4', 'Cancel queued command');
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Cancel command',
+            }),
+        );
+        expect(mocks.post).toHaveBeenCalledTimes(1);
         expect(mocks.post.mock.calls[0].slice(0, 2)).toEqual([
             '/security-devices/integrations/queclink/commands/4/cancel',
             {},

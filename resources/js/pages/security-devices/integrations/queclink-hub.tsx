@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import InputError from '@/components/input-error';
 import {
     EntityCard,
     EntityCardGrid,
@@ -42,7 +43,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { TabsRoot as Tabs, TabsContent } from '@/components/ui/tabs';
 import {
     ReviewCard,
@@ -80,10 +81,27 @@ import {
     Unlink,
     XCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useId,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
+import {
+    assignmentTypeLabel,
+    CommandStatusBadge,
+    connectionStateLabel,
+    pageScopeHint,
+    pairingStateLabel,
+    plainLabel,
     QueclinkRequestBoundary,
     QueclinkSettingsWorkspace,
+    REQUEST_FAILURE_MESSAGES,
+    requestFailure,
     useQueclinkRequestLedger,
 } from './_queclink-settings';
 import {
@@ -95,6 +113,10 @@ import {
 
 type DeviceStatus = 'pending' | 'paired' | 'rejected';
 type PairingType = 'vehicle' | 'staff' | 'client';
+/** DeviceAssignment::TARGET_* — a claim pairs vehicle/staff/client; Device Management can also assign a Site or room. */
+type AssignmentType = PairingType | 'site' | 'room';
+/** SafeOperationalData::serviceState() — the only listener states the server sends. */
+type ListenerServiceState = 'active' | 'inactive' | 'unavailable';
 type Direction = 'inbound' | 'outbound';
 type FrameType = 'RESP' | 'ACK' | 'SACK' | 'BUFF' | 'AT' | 'unknown';
 
@@ -112,7 +134,7 @@ export type Device = {
     last_seen_at: string | null;
     last_frame_at: string | null;
     assignment: {
-        type: PairingType;
+        type: AssignmentType;
         assigned_at: string | null;
         label: string;
     } | null;
@@ -192,7 +214,7 @@ export type Props = {
     listener: {
         port: number;
         endpoint_configured: boolean;
-        service_state: string;
+        service_state: ListenerServiceState;
         connected_count: number;
     };
     devices: {
@@ -310,6 +332,29 @@ function deviceCount(devices: Props['devices'], status: DeviceStatus): number {
     return devices.counts?.[status] ?? devices[status].length;
 }
 
+function listenerLabel(state: ListenerServiceState): string {
+    return state === 'active'
+        ? 'Listener active'
+        : state === 'inactive'
+          ? 'Listener stopped'
+          : 'Listener status unavailable';
+}
+
+/** Server refusals and failed reads for hub actions, shown above the views. */
+const HubNoticeContext = createContext<(message: string) => void>(() => {});
+const useHubNotice = () => useContext(HubNoticeContext);
+
+/** The first server validation message for a refused hub action. */
+function firstError(errors: Record<string, string | undefined>): string {
+    const message = Object.values(errors).find(
+        (value): value is string =>
+            typeof value === 'string' &&
+            value.trim() !== '' &&
+            value.length <= 300,
+    );
+    return message ?? REQUEST_FAILURE_MESSAGES.refused;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/dashboard' },
     { title: 'Security & Devices', href: '/security-devices' },
@@ -327,7 +372,20 @@ type HubView =
     | 'ims';
 type RecordLayout = 'cards' | 'table';
 const hubPath = '/security-devices/integrations/queclink';
-const authorityProps = ['actor_id', 'as_of', 'auth', 'can'];
+// Every partial read returns current authority and the header summary with it:
+// "Read started" (as_of) must never stamp header numbers from an older read.
+const authorityProps = [
+    'actor_id',
+    'as_of',
+    'auth',
+    'can',
+    'listener',
+    'statistics',
+];
+// Writes the hub's own views send with plain router/useForm calls. Settings
+// requests own their replies (see useQueclinkRequest) and are not listed.
+const hubWritePath =
+    /^\/security-devices\/integrations\/queclink\/(?:devices\/\d+\/(?:claim|reject|restore|release|command)|bulk|settings|key)$/;
 
 // The payload belongs to the returned actor. Current shared permissions must
 // independently allow this manager-only hub, including after partial visits.
@@ -346,8 +404,12 @@ export default function QueclinkHub(data: Props) {
     }>().props;
     const requestLedger = useQueclinkRequestLedger();
     const [denied, setDenied] = useState(false);
+    const [notice, setNotice] = useState('');
     const [sourceActor] = useState(data.actor_id);
-    const denyAccess = useCallback(() => setDenied(true), []);
+    const denyAccess = useCallback(() => {
+        setNotice('');
+        setDenied(true);
+    }, []);
     const [activeTab, setActiveTab] = useState<HubView>(
         deviceCount(data.devices, 'pending') > 0 ? 'pending' : 'overview',
     );
@@ -366,11 +428,7 @@ export default function QueclinkHub(data: Props) {
         () =>
             router.on('invalid', (event) => {
                 const response = event.detail.response;
-                if (
-                    typeof response.config.url !== 'string' ||
-                    ![401, 403, 404].includes(response.status)
-                )
-                    return;
+                if (typeof response.config.url !== 'string') return;
                 let target: URL;
                 try {
                     target = new URL(
@@ -381,15 +439,34 @@ export default function QueclinkHub(data: Props) {
                     return;
                 }
                 if (
-                    target.origin === window.location.origin &&
-                    (target.pathname === hubPath ||
-                        target.pathname.startsWith(hubPath + '/'))
-                ) {
+                    target.origin !== window.location.origin ||
+                    (target.pathname !== hubPath &&
+                        !target.pathname.startsWith(hubPath + '/'))
+                )
+                    return;
+                const failure = requestFailure(response);
+                if (failure === 'denied') {
+                    // Lost access, or the hub page itself was refused: clear
+                    // every private record and draft.
                     event.preventDefault();
-                    setDenied(true);
+                    denyAccess();
+                    return;
+                }
+                const method = (response.config.method ?? 'get').toLowerCase();
+                if (method === 'get' && target.pathname === hubPath) {
+                    // A search, page or refresh read failed; nothing changed.
+                    event.preventDefault();
+                    setNotice(
+                        'Current records could not be loaded. The details shown are from the previous read. Try again in a moment.',
+                    );
+                } else if (hubWritePath.test(target.pathname)) {
+                    // Hub actions without their own reply handling. Settings
+                    // requests explain their own replies beside the form.
+                    event.preventDefault();
+                    setNotice(REQUEST_FAILURE_MESSAGES[failure]);
                 }
             }),
-        [],
+        [denyAccess],
     );
     if (!visible)
         return (
@@ -435,22 +512,26 @@ export default function QueclinkHub(data: Props) {
     // callbacks. Current role and resource withdrawal boundaries remain explicit.
     return (
         <QueclinkRequestBoundary ledger={requestLedger}>
-            <QueclinkWorkspace
-                key={JSON.stringify([
-                    data.actor_id,
-                    data.can.manage,
-                    auth?.can?.securityDevices,
-                ])}
-                data={data}
-                canViewDevices={
-                    auth?.can?.securityDevices?.devicesView === true
-                }
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                layout={layout}
-                setLayout={setLayout}
-                onAccessDenied={denyAccess}
-            />
+            <HubNoticeContext.Provider value={setNotice}>
+                <QueclinkWorkspace
+                    key={JSON.stringify([
+                        data.actor_id,
+                        data.can.manage,
+                        auth?.can?.securityDevices,
+                    ])}
+                    data={data}
+                    canViewDevices={
+                        auth?.can?.securityDevices?.devicesView === true
+                    }
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    layout={layout}
+                    setLayout={setLayout}
+                    onAccessDenied={denyAccess}
+                    notice={notice}
+                    onDismissNotice={() => setNotice('')}
+                />
+            </HubNoticeContext.Provider>
         </QueclinkRequestBoundary>
     );
 }
@@ -463,6 +544,8 @@ function QueclinkWorkspace({
     layout,
     setLayout,
     onAccessDenied,
+    notice = '',
+    onDismissNotice,
 }: {
     data: Props;
     canViewDevices: boolean;
@@ -471,6 +554,8 @@ function QueclinkWorkspace({
     layout: RecordLayout;
     setLayout: (layout: RecordLayout) => void;
     onAccessDenied: () => void;
+    notice?: string;
+    onDismissNotice?: () => void;
 }) {
     const {
         listener,
@@ -500,6 +585,12 @@ function QueclinkWorkspace({
             },
         );
     const listView = ['pending', 'devices', 'rejected'].includes(activeTab);
+    // Device settings mounts on first visit and then stays mounted (hidden)
+    // for this authority, so its drafts are not lost on a view switch.
+    const [settingsOpened, setSettingsOpened] = useState(
+        activeTab === 'settings',
+    );
+    if (activeTab === 'settings' && !settingsOpened) setSettingsOpened(true);
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Queclink Integration" />
@@ -519,16 +610,13 @@ function QueclinkWorkspace({
                                     variant={
                                         listener.service_state === 'active'
                                             ? 'success'
-                                            : 'neutral'
+                                            : listener.service_state ===
+                                                'inactive'
+                                              ? 'critical'
+                                              : 'neutral'
                                     }
                                 >
-                                    {listener.service_state === 'active'
-                                        ? 'Listener active'
-                                        : listener.service_state ===
-                                            'not_applicable'
-                                          ? 'Development host'
-                                          : 'Listener ' +
-                                            listener.service_state}
+                                    {listenerLabel(listener.service_state)}
                                 </PageHeaderStatusChip>
                             }
                             actions={
@@ -721,6 +809,23 @@ function QueclinkWorkspace({
                         data-testid="queclink-page-shell"
                         className="w-full space-y-5"
                     >
+                        {notice && (
+                            <Alert variant="warning">
+                                <AlertTriangle aria-hidden="true" />
+                                <AlertTitle>Request not completed</AlertTitle>
+                                <AlertDescription>
+                                    <p>{notice}</p>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={onDismissNotice}
+                                    >
+                                        Dismiss
+                                    </Button>
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         <TabsContent value="overview" className="space-y-5">
                             <SiteCredentialsCard rows={siteCredentials} />
                             <OverviewTab
@@ -763,16 +868,27 @@ function QueclinkWorkspace({
                                 canViewDevices={canViewDevices}
                             />
                         </TabsContent>
-                        <TabsContent value="settings" className="space-y-5">
-                            <DeviceSettingsTab
-                                devices={devices.paired}
-                                listener={listener}
-                                presets={presets}
-                                retiredPresets={retiredPresets}
-                                can={can}
-                                layout={layout}
-                                onAccessDenied={onAccessDenied}
-                            />
+                        {/* Once opened, kept mounted while hidden: "Keep
+                            draft" values and the chosen tracker survive a
+                            switch to another view and back. */}
+                        <TabsContent
+                            value="settings"
+                            forceMount
+                            hidden={activeTab !== 'settings'}
+                            className="space-y-5"
+                        >
+                            {settingsOpened && (
+                                <DeviceSettingsTab
+                                    devices={devices.paired}
+                                    total={pairedCount}
+                                    listener={listener}
+                                    presets={presets}
+                                    retiredPresets={retiredPresets}
+                                    can={can}
+                                    layout={layout}
+                                    onAccessDenied={onAccessDenied}
+                                />
+                            )}
                         </TabsContent>
                         <TabsContent value="console" className="space-y-5">
                             <DebugConsoleTab
@@ -781,6 +897,7 @@ function QueclinkWorkspace({
                                     .sort()
                                     .join('|')}
                                 devices={devices.paired}
+                                total={pairedCount}
                                 can={can}
                                 onAccessDenied={onAccessDenied}
                             />
@@ -805,16 +922,13 @@ function ListenerStatusBadge({ listener }: { listener: Props['listener'] }) {
     const variant =
         state === 'active'
             ? 'success'
-            : state === 'failed' || state === 'inactive'
+            : state === 'inactive'
               ? 'critical'
               : 'neutral';
     return (
         <StatusBadge variant={variant}>
             <Server aria-hidden="true" className="size-3" />
-            {state === 'not_applicable'
-                ? 'Development host · listener requires a separate runtime'
-                : 'Listener ' + state}{' '}
-            · {listener.connected_count} connected
+            {listenerLabel(state)} · {listener.connected_count} connected
         </StatusBadge>
     );
 }
@@ -988,11 +1102,12 @@ export function OverviewTab({
                                 Default: 8090. Apply this port through the
                                 approved secure device-management process.
                             </p>
+                            <InputError message={settings.errors.port} />
                             {portChanged &&
                                 deviceCount(devices, 'paired') > 0 && (
-                                    <p className="flex items-start gap-1 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
-                                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                                        <span>
+                                    <Alert variant="warning" role="status">
+                                        <AlertTriangle aria-hidden="true" />
+                                        <AlertDescription>
                                             {deviceCount(devices, 'paired')}{' '}
                                             paired{' '}
                                             {deviceCount(devices, 'paired') ===
@@ -1002,8 +1117,8 @@ export function OverviewTab({
                                             will need to be reconfigured to dial
                                             port {settings.data.port} before
                                             they reconnect.
-                                        </span>
-                                    </p>
+                                        </AlertDescription>
+                                    </Alert>
                                 )}
                         </div>
                         <div className="space-y-2">
@@ -1026,6 +1141,9 @@ export function OverviewTab({
                                 hostname remains protected; enter a value only
                                 to set or replace it.
                             </p>
+                            <InputError
+                                message={settings.errors.public_hostname}
+                            />
                         </div>
                         <div className="md:col-span-2">
                             <Button
@@ -1108,28 +1226,30 @@ export function OverviewTab({
                         </Alert>
                     ) : null}
                     {provisioning && (
-                        <div
-                            className="space-y-3 rounded-lg border border-status-success/30 bg-status-success-bg p-4"
+                        <Alert
+                            variant="success"
+                            role="status"
                             aria-live="polite"
                         >
-                            <div className="flex items-center gap-2 font-medium text-status-success">
-                                <ShieldCheck
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                />
+                            <ShieldCheck aria-hidden="true" />
+                            <AlertTitle>
                                 Ready for secure provisioning
-                            </div>
-                            <ol className="space-y-1 text-sm text-muted-foreground">
-                                {provisioning.instructions.map((step, i) => (
-                                    <li key={i}>
-                                        <span className="mr-2 font-medium text-foreground">
-                                            {i + 1}.
-                                        </span>
-                                        {step}
-                                    </li>
-                                ))}
-                            </ol>
-                        </div>
+                            </AlertTitle>
+                            <AlertDescription>
+                                <ol className="space-y-1">
+                                    {provisioning.instructions.map(
+                                        (step, i) => (
+                                            <li key={i}>
+                                                <span className="mr-2 font-medium">
+                                                    {i + 1}.
+                                                </span>
+                                                {step}
+                                            </li>
+                                        ),
+                                    )}
+                                </ol>
+                            </AlertDescription>
+                        </Alert>
                     )}
                 </CardContent>
             </Card>
@@ -1187,13 +1307,17 @@ export function OverviewTab({
                             protected.
                         </Step>
                     </ol>
-                    <div className="mt-4 rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-xs text-status-warning">
-                        <strong>Safety note:</strong> any device that knows this
-                        server's address and port can land in the Pending tab.
-                        Claim only IMEIs you recognise. Rejected devices are
-                        inert — they stay connected but receive no
-                        acknowledgements and contribute nothing to the system.
-                    </div>
+                    <Alert variant="warning" role="note" className="mt-4">
+                        <AlertTriangle aria-hidden="true" />
+                        <AlertTitle>Safety note</AlertTitle>
+                        <AlertDescription>
+                            Any device that knows this server&apos;s address and
+                            port can land in the Pending tab. Claim only IMEIs
+                            you recognise. Rejected devices are inert — they
+                            stay connected but receive no acknowledgements and
+                            contribute nothing to the system.
+                        </AlertDescription>
+                    </Alert>
                 </CardContent>
             </Card>
         </>
@@ -1318,9 +1442,7 @@ function TrackerRecords({
                 device.connection_state === 'connected' ? 'info' : 'neutral'
             }
         >
-            {device.connection_state === 'connected'
-                ? 'Connected'
-                : 'Disconnected'}
+            {connectionStateLabel(device.connection_state)}
         </StatusBadge>
     );
     return (
@@ -1362,15 +1484,13 @@ function TrackerRecords({
                                 <>
                                     {connection(device)}
                                     <EntityChip>
-                                        {device.status === 'paired'
-                                            ? 'Paired'
-                                            : device.status === 'pending'
-                                              ? 'Pending claim'
-                                              : 'Rejected'}
+                                        {pairingStateLabel(device.status)}
                                     </EntityChip>
                                     {device.assignment && (
                                         <EntityChip>
-                                            {device.assignment.type}
+                                            {assignmentTypeLabel(
+                                                device.assignment.type,
+                                            )}
                                         </EntityChip>
                                     )}
                                 </>
@@ -1407,8 +1527,10 @@ function TrackerRecords({
                                     {device.assignment?.label ??
                                         'No current assignment'}
                                     {device.assignment && (
-                                        <span className="text-caption block capitalize">
-                                            {device.assignment.type}
+                                        <span className="text-caption block">
+                                            {assignmentTypeLabel(
+                                                device.assignment.type,
+                                            )}
                                         </span>
                                     )}
                                 </span>
@@ -1528,7 +1650,7 @@ function TrackerReader({
                                 />
                                 <ReviewRow
                                     label="Pairing state"
-                                    value={device.status}
+                                    value={pairingStateLabel(device.status)}
                                 />
                                 <ReviewRow
                                     label="Model"
@@ -1536,7 +1658,9 @@ function TrackerReader({
                                 />
                                 <ReviewRow
                                     label="Connection"
-                                    value={device.connection_state}
+                                    value={connectionStateLabel(
+                                        device.connection_state,
+                                    )}
                                 />
                                 <ReviewRow
                                     label="First seen"
@@ -1558,8 +1682,13 @@ function TrackerReader({
                                 <ReviewRow
                                     label="Type"
                                     value={
-                                        device.assignment?.type ??
-                                        device.pending_pairing_type
+                                        device.assignment
+                                            ? assignmentTypeLabel(
+                                                  device.assignment.type,
+                                              )
+                                            : device.pending_pairing_type
+                                              ? `${assignmentTypeLabel(device.pending_pairing_type)} (expected)`
+                                              : null
                                     }
                                 />
                                 <ReviewRow
@@ -1610,8 +1739,10 @@ function TrackerReader({
                                 <ReviewRow
                                     label="Configuration state"
                                     value={
-                                        device.configuration?.state ??
-                                        'Not observed'
+                                        device.configuration?.state ===
+                                        'observed'
+                                            ? 'Observed'
+                                            : 'Not observed'
                                     }
                                 />
                                 <ReviewRow
@@ -1652,16 +1783,18 @@ function TrackerReader({
                                         >
                                             <ReviewRow
                                                 label="Status"
-                                                value={commandStatusBadge(
-                                                    command.status,
-                                                )}
+                                                value={
+                                                    <CommandStatusBadge
+                                                        status={command.status}
+                                                    />
+                                                }
                                             />
                                             <ReviewRow
-                                                label="Governed"
+                                                label="Started from"
                                                 value={
                                                     command.governed
-                                                        ? 'Yes'
-                                                        : 'No'
+                                                        ? 'Device Management'
+                                                        : 'Older Queclink console'
                                                 }
                                             />
                                             <ReviewRow
@@ -1694,8 +1827,14 @@ function TrackerReader({
                                                 value={fmt(command.expires_at)}
                                             />
                                             <ReviewRow
-                                                label="Failure category"
-                                                value={command.failure_category}
+                                                label="Reason it failed"
+                                                value={
+                                                    command.failure_category
+                                                        ? plainLabel(
+                                                              command.failure_category,
+                                                          )
+                                                        : null
+                                                }
                                             />
                                         </ReviewCard>
                                     ),
@@ -1730,6 +1869,7 @@ function PendingTab({
     layout?: RecordLayout;
     canViewDevices?: boolean;
 }) {
+    const notify = useHubNotice();
     const [claimingId, setClaimingId] = useState<number | null>(null);
     const [rejectingId, setRejectingId] = useState<number | null>(null);
     const claiming = can.manage
@@ -1802,7 +1942,10 @@ function PendingTab({
                         router.post(
                             hubPath + '/devices/' + rejecting.id + '/reject',
                             {},
-                            { preserveScroll: true },
+                            {
+                                preserveScroll: true,
+                                onError: (errors) => notify(firstError(errors)),
+                            },
                         );
                 }}
                 title="Reject tracker?"
@@ -1834,6 +1977,7 @@ export function RejectedTab({
     layout?: RecordLayout;
     canViewDevices?: boolean;
 }) {
+    const notify = useHubNotice();
     const [restoringId, setRestoringId] = useState<number | null>(null);
     const restoring = can.manage
         ? rejected.find((device) => device.id === restoringId)
@@ -1879,7 +2023,10 @@ export function RejectedTab({
                         router.post(
                             hubPath + '/devices/' + restoring.id + '/restore',
                             {},
-                            { preserveScroll: true },
+                            {
+                                preserveScroll: true,
+                                onError: (errors) => notify(firstError(errors)),
+                            },
                         );
                 }}
                 title="Restore tracker to pending?"
@@ -2310,7 +2457,9 @@ export function ClaimDialog({
                             >
                                 <ReviewRow
                                     label="Type"
-                                    value={form.data.pairing_type}
+                                    value={assignmentTypeLabel(
+                                        form.data.pairing_type,
+                                    )}
                                 />
                                 <ReviewRow
                                     label="Target"
@@ -2377,6 +2526,7 @@ function DevicesTab({
     layout?: RecordLayout;
     canViewDevices?: boolean;
 }) {
+    const notify = useHubNotice();
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [bulkOpen, setBulkOpen] = useState(false);
     const [releasingId, setReleasingId] = useState<number | null>(null);
@@ -2476,7 +2626,10 @@ function DevicesTab({
                         router.post(
                             hubPath + '/devices/' + releasing.id + '/release',
                             {},
-                            { preserveScroll: true },
+                            {
+                                preserveScroll: true,
+                                onError: (errors) => notify(firstError(errors)),
+                            },
                         );
                 }}
                 title="Release tracker assignment?"
@@ -2493,6 +2646,18 @@ function DevicesTab({
     );
 }
 
+type BulkAction =
+    | 'read_configuration'
+    | 'reboot'
+    | 'resident_safety_profile'
+    | 'apply_preset';
+const BULK_ACTION_LABELS: Record<BulkAction, string> = {
+    read_configuration: 'Read full configuration',
+    apply_preset: 'Apply a preset',
+    resident_safety_profile: 'Apply resident safety profile',
+    reboot: 'Reboot selected devices',
+};
+
 function BulkActionDialog({
     devices,
     presets,
@@ -2502,12 +2667,7 @@ function BulkActionDialog({
     presets: Preset[];
     onClose: () => void;
 }) {
-    const [action, setAction] = useState<
-        | 'read_configuration'
-        | 'reboot'
-        | 'resident_safety_profile'
-        | 'apply_preset'
-    >('read_configuration');
+    const [action, setAction] = useState<BulkAction>('read_configuration');
     const [section, setSection] = useState('all');
     const [presetId, setPresetId] = useState<string>(
         presets[0] ? String(presets[0].id) : '',
@@ -2567,9 +2727,9 @@ function BulkActionDialog({
             {
                 preserveScroll: true,
                 onSuccess: onClose,
-                onError: () =>
+                onError: (errors) =>
                     setFailure(
-                        'The management handoff could not be saved. Your choices remain here. Review the selected trackers and try again.',
+                        `${firstError(errors)} Your choices remain here. Review the selected trackers and try again.`,
                     ),
                 onFinish: () => setProcessing(false),
             },
@@ -2688,31 +2848,25 @@ function BulkActionDialog({
                                     <Select
                                         value={action}
                                         onValueChange={(value) =>
-                                            setAction(
-                                                value as
-                                                    | 'read_configuration'
-                                                    | 'reboot'
-                                                    | 'resident_safety_profile'
-                                                    | 'apply_preset',
-                                            )
+                                            setAction(value as BulkAction)
                                         }
                                     >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="read_configuration">
-                                                Read full configuration
-                                            </SelectItem>
-                                            <SelectItem value="apply_preset">
-                                                Apply a preset
-                                            </SelectItem>
-                                            <SelectItem value="resident_safety_profile">
-                                                Apply resident safety profile
-                                            </SelectItem>
-                                            <SelectItem value="reboot">
-                                                Reboot selected devices
-                                            </SelectItem>
+                                            {(
+                                                Object.keys(
+                                                    BULK_ACTION_LABELS,
+                                                ) as BulkAction[]
+                                            ).map((key) => (
+                                                <SelectItem
+                                                    key={key}
+                                                    value={key}
+                                                >
+                                                    {BULK_ACTION_LABELS[key]}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -2808,13 +2962,19 @@ function BulkActionDialog({
                             >
                                 <ReviewRow
                                     label="Action"
-                                    value={action.replaceAll('_', ' ')}
+                                    value={BULK_ACTION_LABELS[action]}
                                 />
                                 <ReviewRow
                                     label="Read section"
                                     value={
                                         action === 'read_configuration'
-                                            ? section
+                                            ? section === 'all'
+                                                ? 'All sections'
+                                                : (SECTION_READ_OPTIONS.find(
+                                                      (option) =>
+                                                          option.code ===
+                                                          section,
+                                                  )?.label ?? section)
                                             : null
                                     }
                                 />
@@ -2910,68 +3070,51 @@ export type GlobalSettingsForm = {
     charge_standby_mode: string;
 };
 
-function str(value: unknown, fallback: string): string {
-    return value === null || value === undefined || value === ''
-        ? fallback
-        : String(value);
-}
-
+// Draft starting values. Device readback stays protected, so drafts always
+// start from these documented GL30 defaults, never from observed values.
 function serverDefaults(
-    device: Device | null,
+    _device: Device | null,
     listener: Props['listener'],
 ): ServerSettingsForm {
-    const current: Record<string, string> = {};
-    const host = str(current.main_host, '');
-    const port = str(current.main_port, String(listener.port || 8090));
+    const port = String(listener.port || 8090);
 
     return {
-        report_mode: str(current.report_mode, '3'),
-        manual_netreg: str(current.manual_netreg, '0'),
-        buffer_mode: str(current.buffer_mode, '1'),
-        main_host: host,
+        report_mode: '3',
+        manual_netreg: '0',
+        buffer_mode: '1',
+        main_host: '',
         main_port: port,
-        backup_host: str(current.backup_host, host),
-        backup_port: str(current.backup_port, port),
-        sms_gateway: str(current.sms_gateway, ''),
-        heartbeat_interval_minutes: str(
-            current.heartbeat_interval_minutes,
-            '5',
-        ),
-        sack_enable: str(current.sack_enable, '1'),
-        sms_ack_enable: str(current.sms_ack_enable, '0'),
-        psm_network_hold_time_seconds: str(
-            current.psm_network_hold_time_seconds,
-            '30',
-        ),
-        protocol_format: str(current.protocol_format, '0'),
+        backup_host: '',
+        backup_port: port,
+        sms_gateway: '',
+        heartbeat_interval_minutes: '5',
+        sack_enable: '1',
+        sms_ack_enable: '0',
+        psm_network_hold_time_seconds: '30',
+        protocol_format: '0',
     };
 }
 
 function globalDefaults(device: Device | null): GlobalSettingsForm {
-    const current: Record<string, string> = {};
-
     return {
-        device_name: str(current.device_name, device?.model_hint || 'GL30MEU'),
-        gnss_timeout_seconds: str(current.gnss_timeout_seconds, '150'),
-        event_mask: str(current.event_mask, '08E3'),
-        report_item_mask: str(current.report_item_mask, '006F'),
-        mode_selection: str(current.mode_selection, '1'),
-        continuous_send_interval_seconds: str(
-            current.continuous_send_interval_seconds,
-            '30',
-        ),
-        start_mode: str(current.start_mode, '0'),
-        specified_time_of_day: str(current.specified_time_of_day, '1200'),
-        wakeup_interval_hours: str(current.wakeup_interval_hours, '1'),
-        gnss_enable: str(current.gnss_enable, '1'),
-        agps_mode: str(current.agps_mode, '1'),
-        gsm_report: str(current.gsm_report, '0000'),
-        battery_low_percentage: str(current.battery_low_percentage, '10'),
-        function_button_mode: str(current.function_button_mode, '1'),
-        sos_report_mode: str(current.sos_report_mode, '1'),
-        wifi_report: str(current.wifi_report, '2'),
-        led_on: str(current.led_on, '1'),
-        charge_standby_mode: str(current.charge_standby_mode, '0'),
+        device_name: device?.model_hint || 'GL30MEU',
+        gnss_timeout_seconds: '150',
+        event_mask: '08E3',
+        report_item_mask: '006F',
+        mode_selection: '1',
+        continuous_send_interval_seconds: '30',
+        start_mode: '0',
+        specified_time_of_day: '1200',
+        wakeup_interval_hours: '1',
+        gnss_enable: '1',
+        agps_mode: '1',
+        gsm_report: '0000',
+        battery_low_percentage: '10',
+        function_button_mode: '1',
+        sos_report_mode: '1',
+        wifi_report: '2',
+        led_on: '1',
+        charge_standby_mode: '0',
     };
 }
 
@@ -3511,26 +3654,10 @@ function advancedPayload(
     return payload;
 }
 
-function commandStatusBadge(status: RecentCommand['status']) {
-    const variant =
-        status === 'failed'
-            ? 'critical'
-            : status === 'acked'
-              ? 'info'
-              : status === 'sent'
-                ? 'warning'
-                : status === 'queued'
-                  ? 'info'
-                  : 'neutral';
-    return (
-        <StatusBadge variant={variant}>
-            {status === 'acked' ? 'Acknowledged' : status}
-        </StatusBadge>
-    );
-}
-
 export function DeviceSettingsTab(props: {
     devices: Device[];
+    /** Paired trackers across every page of the current search. */
+    total?: number;
     listener: Props['listener'];
     presets: Preset[];
     retiredPresets?: RetiredPreset[];
@@ -3554,10 +3681,13 @@ export function DeviceSettingsTab(props: {
 
 export function DebugConsoleTab({
     devices,
+    total,
     can,
     onAccessDenied,
 }: {
     devices: Device[];
+    /** Paired trackers across every page of the current search. */
+    total?: number;
     can: Props['can'];
     onAccessDenied?: () => void;
 }) {
@@ -3710,33 +3840,26 @@ export function DebugConsoleTab({
         }
     }, [frames, autoscroll]);
 
-    const streamStatus = {
-        connecting: {
-            label: 'Connecting',
-            icon: Loader2,
-            className: 'text-status-info',
-        },
-        live: {
-            label: 'Live',
-            icon: Activity,
-            className: 'text-status-success',
-        },
-        reconnecting: {
-            label: 'Reconnecting',
-            icon: RefreshCw,
-            className: 'text-status-warning',
-        },
-        error: {
-            label: 'Unavailable',
-            icon: XCircle,
-            className: 'text-status-critical',
-        },
-        paused: {
-            label: 'Paused',
-            icon: Clock,
-            className: 'text-muted-foreground',
-        },
-    }[streamState];
+    const streamStatus = (
+        {
+            connecting: {
+                label: 'Connecting',
+                icon: Loader2,
+                variant: 'info',
+            },
+            live: { label: 'Live', icon: Activity, variant: 'success' },
+            reconnecting: {
+                label: 'Reconnecting',
+                icon: RefreshCw,
+                variant: 'warning',
+            },
+            error: { label: 'Unavailable', icon: XCircle, variant: 'critical' },
+            paused: { label: 'Paused', icon: Clock, variant: 'neutral' },
+        } as const satisfies Record<
+            FrameStreamState,
+            { label: string; icon: typeof Activity; variant: StatusVariant }
+        >
+    )[streamState];
     const StreamStatusIcon = streamStatus.icon;
 
     const toggleStreaming = () => {
@@ -3772,14 +3895,13 @@ export function DebugConsoleTab({
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Badge
-                                variant="outline"
+                            <StatusBadge
+                                variant={streamStatus.variant}
                                 role="status"
                                 aria-live="polite"
-                                className={streamStatus.className}
                             >
                                 <StreamStatusIcon
-                                    className={`mr-1 h-3 w-3 ${
+                                    className={`size-3 ${
                                         streamState === 'connecting' ||
                                         streamState === 'reconnecting'
                                             ? 'animate-spin motion-reduce:animate-none'
@@ -3788,7 +3910,7 @@ export function DebugConsoleTab({
                                     aria-hidden="true"
                                 />
                                 {streamStatus.label}
-                            </Badge>
+                            </StatusBadge>
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -3923,7 +4045,7 @@ export function DebugConsoleTab({
                 </CardContent>
             </Card>
 
-            <GovernedCommandHandoff devices={devices} can={can} />
+            <GovernedCommandHandoff devices={devices} total={total} can={can} />
         </div>
     );
 }
@@ -3963,12 +4085,16 @@ function FrameLine({ frame }: { frame: Frame }) {
 
 export function GovernedCommandHandoff({
     devices,
+    total = devices.length,
     can,
 }: {
     devices: Device[];
+    total?: number;
     can: Props['can'];
 }) {
     const [target, setTarget] = useState<Device | null>(devices[0] ?? null);
+    const pickerId = useId();
+    const pageLimited = total > devices.length;
     const locationForm = useForm<{
         mode: 'preset';
         preset: 'request_location';
@@ -3983,6 +4109,13 @@ export function GovernedCommandHandoff({
         mode: 'preset',
         preset: 'reboot',
     });
+    const actionErrors = {
+        ...locationForm.errors,
+        ...restartForm.errors,
+    } as Record<string, string | undefined>;
+    const actionError = Object.values(actionErrors).some(Boolean)
+        ? firstError(actionErrors)
+        : null;
 
     return (
         <Card className="order-first 2xl:order-last">
@@ -3996,7 +4129,7 @@ export function GovernedCommandHandoff({
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
-                    <Label>Target device</Label>
+                    <Label htmlFor={pickerId}>Target device</Label>
                     <Select
                         value={target ? String(target.id) : ''}
                         onValueChange={(v) =>
@@ -4005,7 +4138,12 @@ export function GovernedCommandHandoff({
                             )
                         }
                     >
-                        <SelectTrigger>
+                        <SelectTrigger
+                            id={pickerId}
+                            aria-describedby={
+                                pageLimited ? `${pickerId}-scope` : undefined
+                            }
+                        >
                             <SelectValue placeholder="Pick a paired device…" />
                         </SelectTrigger>
                         <SelectContent>
@@ -4019,6 +4157,11 @@ export function GovernedCommandHandoff({
                             ))}
                         </SelectContent>
                     </Select>
+                    {pageLimited && (
+                        <p id={`${pickerId}-scope`} className="text-caption">
+                            {pageScopeHint(devices.length, total)}
+                        </p>
+                    )}
                 </div>
 
                 <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
@@ -4026,6 +4169,14 @@ export function GovernedCommandHandoff({
                     this provider console. Only capabilities with a governed
                     Device adapter appear in Management.
                 </div>
+
+                {actionError && (
+                    <Alert variant="destructive">
+                        <XCircle aria-hidden="true" />
+                        <AlertTitle>Action not started</AlertTitle>
+                        <AlertDescription>{actionError}</AlertDescription>
+                    </Alert>
+                )}
 
                 <div className="grid gap-2">
                     <Button
@@ -4084,6 +4235,7 @@ export function CloudIntegrationTab({
     cloudIntegration: Props['cloudIntegration'];
     can: Props['can'];
 }) {
+    const notify = useHubNotice();
     const [removeLegacyCredentialOpen, setRemoveLegacyCredentialOpen] =
         useState(false);
 
@@ -4093,7 +4245,9 @@ export function CloudIntegrationTab({
                 <CardHeader>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <CardTitle>Queclink cloud API</CardTitle>
-                        <Badge variant="outline">Cloud API unavailable</Badge>
+                        <StatusBadge variant="neutral">
+                            Cloud API unavailable
+                        </StatusBadge>
                     </div>
                     <CardDescription>
                         Direct TCP intake remains the primary path. No verified
@@ -4116,30 +4270,33 @@ export function CloudIntegrationTab({
                     </div>
 
                     {cloudIntegration.legacy_credential_stored ? (
-                        <div className="space-y-3 rounded-lg border border-status-warning/30 bg-status-warning/5 p-4 text-sm">
-                            <p className="font-medium">
+                        <Alert variant="warning" role="note">
+                            <AlertTriangle aria-hidden="true" />
+                            <AlertTitle>
                                 Legacy cloud credential ending in{' '}
                                 {cloudIntegration.legacy_credential_last4 ??
                                     'unknown'}
-                            </p>
-                            <p className="text-muted-foreground">
-                                This retained credential is not used, tested, or
-                                considered connected. Remove it after confirming
-                                no external process depends on the retired
-                                scaffold.
-                            </p>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                disabled={!can.manage}
-                                onClick={() =>
-                                    setRemoveLegacyCredentialOpen(true)
-                                }
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Remove legacy cloud credential
-                            </Button>
-                        </div>
+                            </AlertTitle>
+                            <AlertDescription>
+                                <p>
+                                    This retained credential is not used,
+                                    tested, or considered connected. Remove it
+                                    after confirming no external process depends
+                                    on the retired cloud connection.
+                                </p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={!can.manage}
+                                    onClick={() =>
+                                        setRemoveLegacyCredentialOpen(true)
+                                    }
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remove legacy cloud credential
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
                     ) : (
                         <p className="text-sm text-muted-foreground">
                             No legacy cloud credential is stored. There is
@@ -4154,7 +4311,10 @@ export function CloudIntegrationTab({
                 onConfirm={() =>
                     router.delete(
                         '/security-devices/integrations/queclink/key',
-                        { preserveScroll: true },
+                        {
+                            preserveScroll: true,
+                            onError: (errors) => notify(firstError(errors)),
+                        },
                     )
                 }
                 title="Remove legacy Queclink cloud credential?"

@@ -265,7 +265,7 @@ describe('Milesight shared integration workspace', () => {
         tab('Recent activity');
         expect(
             screen.getByText(
-                'No connection tests or sync attempts were returned.',
+                'No connection tests or sync attempts were returned',
             ),
         ).toBeInTheDocument();
         tab('Site credentials');
@@ -283,7 +283,9 @@ describe('Milesight shared integration workspace', () => {
         expect(screen.getByText(/12 processed/)).toHaveTextContent(
             '3 created · 8 updated',
         );
-        fireEvent.click(card('device_sync'));
+        expect(screen.queryByText('device_sync')).not.toBeInTheDocument();
+        expect(screen.queryByText('failed')).not.toBeInTheDocument();
+        fireEvent.click(card('Device sync'));
         const dialog = screen.getByRole('dialog');
         for (const label of [
             'Attempt ID',
@@ -298,9 +300,25 @@ describe('Milesight shared integration workspace', () => {
         ])
             expect(within(dialog).getByText(label)).toBeInTheDocument();
         expect(
-            within(dialog).getByText('provider_failure'),
+            within(dialog).getByText('Provider failure'),
         ).toBeInTheDocument();
+        expect(within(dialog).getByText('Failed')).toBeInTheDocument();
+        expect(
+            within(dialog).queryByText('provider_failure'),
+        ).not.toBeInTheDocument();
         expect(within(dialog).getByText('99')).toBeInTheDocument();
+    });
+    it('shows UTC server instants in NZ time, never the raw wall-clock string', () => {
+        // 1 Oct 00:00 UTC is 1:00 pm NZDT (daylight time began 27 Sep 2026).
+        render(<MilesightIntegration {...fixture()} />);
+        expect(screen.getByText('1 October 2026, 1:00 pm')).toBeInTheDocument();
+        expect(
+            screen.getByText('30 September 2026, 1:00 pm'),
+        ).toBeInTheDocument();
+        tab('Webhook');
+        expect(
+            screen.getByText('28 September 2026, 1:00 pm'),
+        ).toBeInTheDocument();
     });
     it('retains every Site credential field through a reader while reusing its existing safe card', () => {
         render(<MilesightIntegration {...fixture()} />);
@@ -570,6 +588,77 @@ describe('Milesight request and draft boundaries', () => {
             screen.queryByText('Private rejection text'),
         ).not.toBeInTheDocument();
     });
+    it('reads a refused write as not saved instead of lost access, keeping every fact', () => {
+        render(<MilesightIntegration {...fixture()} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Test connection' }),
+        );
+        const event = invalid(
+            404,
+            '/security-devices/integrations/milesight/test',
+            'post',
+        );
+        expect(event.defaultPrevented).toBe(true);
+        expect(screen.getByText(/This change was not saved/)).toBeVisible();
+        expect(
+            screen.queryByText('Integration access unavailable', {
+                selector: '[data-slot="card-title"]',
+            }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText('•••1234')).toBeInTheDocument();
+        expect(
+            screen.queryByText('Private rejection text'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Test connection' }),
+        ).toBeEnabled();
+    });
+    it('explains a refused 422 write without a raw reply and still treats 403 as lost access', () => {
+        render(<MilesightIntegration {...fixture()} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Test connection' }),
+        );
+        expect(
+            invalid(
+                422,
+                '/security-devices/integrations/milesight/test',
+                'post',
+            ).defaultPrevented,
+        ).toBe(true);
+        expect(screen.getByText(/This change was not accepted/)).toBeVisible();
+        expect(screen.getByText('•••1234')).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Test connection' }),
+        );
+        invalid(403, '/security-devices/integrations/milesight/test', 'post');
+        expect(screen.queryByText('•••1234')).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Integration access unavailable', {
+                selector: '[data-slot="card-title"]',
+            }),
+        ).toBeInTheDocument();
+    });
+    it('shows the server validation message for a refused device sync', async () => {
+        render(<MilesightIntegration {...fixture()} />);
+        tab('Applications & Sites');
+        await action('North house', 'Sync Devices');
+        const callbacks = mocks.post.mock.calls.at(-1)![2];
+        act(() => {
+            callbacks.onError({
+                site_config_id:
+                    'Map a Milesight application to this Site before syncing devices.',
+            });
+            callbacks.onFinish();
+        });
+        expect(
+            screen.getByText(
+                'Map a Milesight application to this Site before syncing devices.',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.getByText('North house', { selector: 'h3' }),
+        ).toBeVisible();
+    });
     it('searches returned records in the shared table and gives an honest filtered empty state', () => {
         render(<MilesightIntegration {...fixture()} />);
         tab('Applications & Sites');
@@ -579,7 +668,7 @@ describe('Milesight request and draft boundaries', () => {
             target: { value: 'unreturned-record' },
         });
         expect(
-            screen.getByText('No records match the current search and filter.'),
+            screen.getByText('No records match the current search and filter'),
         ).toBeInTheDocument();
         expect(screen.queryByRole('table')).not.toBeInTheDocument();
     });

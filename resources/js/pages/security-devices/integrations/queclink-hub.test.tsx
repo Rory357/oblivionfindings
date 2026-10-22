@@ -337,6 +337,30 @@ describe('Queclink shared page and record views', () => {
             ),
         ).toBeVisible();
     });
+    it('shows plain listener, pairing, connection and assignment labels instead of returned keys', () => {
+        render(
+            <QueclinkHub
+                {...fixture({
+                    listener: {
+                        ...fixture().listener,
+                        service_state: 'inactive',
+                    },
+                })}
+            />,
+        );
+        expect(screen.getByText('Listener stopped')).toBeVisible();
+        chooseView(/^Devices/);
+        expect(screen.getByText('Client')).toBeVisible();
+        expect(screen.queryByText('client')).not.toBeInTheDocument();
+        openRow(paired.reference);
+        const reader = screen.getByRole('dialog');
+        expect(within(reader).getByText('Paired')).toBeVisible();
+        expect(within(reader).getByText('Disconnected')).toBeVisible();
+        expect(within(reader).queryByText('paired')).not.toBeInTheDocument();
+        expect(
+            within(reader).queryByText('disconnected'),
+        ).not.toBeInTheDocument();
+    });
     it('keeps canonical record navigation hidden without current device permission', () => {
         mocks.auth.can.securityDevices.devicesView = false;
         render(<QueclinkHub {...fixture()} />);
@@ -390,7 +414,17 @@ describe('Queclink shared page and record views', () => {
             '/security-devices/integrations/queclink',
             { device_search: 'GL30' },
             expect.objectContaining({
-                only: ['devices', 'actor_id', 'as_of', 'auth', 'can'],
+                // The header summary is read with the list, so the new
+                // "Read started" time never labels older header numbers.
+                only: [
+                    'devices',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
             }),
         );
         result.rerender(
@@ -484,6 +518,78 @@ describe('Queclink current authority', () => {
         ).toBeVisible();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+    it('reads a refused write as not saved, keeping current records instead of claiming lost access', () => {
+        render(<QueclinkHub {...fixture()} />);
+        const preventDefault = vi.fn();
+        act(() =>
+            mocks.invalid?.({
+                preventDefault,
+                detail: {
+                    response: {
+                        status: 404,
+                        config: {
+                            method: 'post',
+                            url: '/security-devices/integrations/queclink/devices/3/reject',
+                        },
+                    },
+                },
+            }),
+        );
+        expect(preventDefault).toHaveBeenCalled();
+        expect(screen.getByText(/This change was not saved/)).toBeVisible();
+        expect(
+            screen.queryByText('Queclink access is unavailable'),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText(pending.reference)).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        expect(
+            screen.queryByText(/This change was not saved/),
+        ).not.toBeInTheDocument();
+    });
+    it('explains a refused 422 hub action instead of opening a raw error page', () => {
+        render(<QueclinkHub {...fixture()} />);
+        const preventDefault = vi.fn();
+        act(() =>
+            mocks.invalid?.({
+                preventDefault,
+                detail: {
+                    response: {
+                        status: 422,
+                        data: '<html>RAW-ERROR-PAGE</html>',
+                        config: {
+                            method: 'post',
+                            url: '/security-devices/integrations/queclink/devices/2/release',
+                        },
+                    },
+                },
+            }),
+        );
+        expect(preventDefault).toHaveBeenCalled();
+        expect(screen.getByText(/This change was not accepted/)).toBeVisible();
+        expect(screen.queryByText(/RAW-ERROR-PAGE/)).not.toBeInTheDocument();
+        expect(screen.getByText(pending.reference)).toBeVisible();
+    });
+    it('still clears private records when the hub page read itself is refused', () => {
+        render(<QueclinkHub {...fixture()} />);
+        act(() =>
+            mocks.invalid?.({
+                preventDefault: vi.fn(),
+                detail: {
+                    response: {
+                        status: 404,
+                        config: {
+                            method: 'get',
+                            url: '/security-devices/integrations/queclink',
+                        },
+                    },
+                },
+            }),
+        );
+        expect(
+            screen.getByText('Queclink access is unavailable'),
+        ).toBeVisible();
+        expect(screen.queryByText(pending.reference)).not.toBeInTheDocument();
+    });
     it('clears old frames and closes the stream when a background history read is denied', async () => {
         vi.stubGlobal(
             'fetch',
@@ -550,7 +656,13 @@ describe('Queclink assignment drafts and review', () => {
         expect(screen.getByRole('alert')).toHaveTextContent(
             'Your choices remain here',
         );
-        expect(screen.getByText('read configuration')).toBeVisible();
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'Current Site access changed.',
+        );
+        expect(screen.getByText('Read full configuration')).toBeVisible();
+        expect(
+            screen.queryByText('read configuration'),
+        ).not.toBeInTheDocument();
         expect(
             screen.queryByText('Commands completed'),
         ).not.toBeInTheDocument();

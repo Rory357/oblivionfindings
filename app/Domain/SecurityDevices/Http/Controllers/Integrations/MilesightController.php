@@ -104,8 +104,8 @@ class MilesightController extends Controller
                 'items_updated' => $log->items_updated,
                 'items_errored' => $log->items_errored,
                 'failure_category' => $log->status === IntegrationSyncLog::STATUS_FAILED ? 'provider_failure' : null,
-                'started_at' => $log->started_at?->toDateTimeString(),
-                'completed_at' => $log->completed_at?->toDateTimeString(),
+                'started_at' => $log->started_at?->toISOString(),
+                'completed_at' => $log->completed_at?->toISOString(),
             ])
             ->values()
             ->all();
@@ -116,8 +116,8 @@ class MilesightController extends Controller
             'providerConnection' => $providerConnection ? [
                 'status' => $providerConnection->status,
                 'secret_last4' => $providerConnection->secret_last4,
-                'last_tested_at' => $providerConnection->last_tested_at?->toDateTimeString(),
-                'last_synced_at' => $providerConnection->last_synced_at?->toDateTimeString(),
+                'last_tested_at' => $providerConnection->last_tested_at?->toISOString(),
+                'last_synced_at' => $providerConnection->last_synced_at?->toISOString(),
                 'endpoint_configured' => filled($config['base_url'] ?? null),
                 'client_id_configured' => filled($config['client_id'] ?? null),
                 'applications_synced_at' => $config['applications_synced_at'] ?? null,
@@ -129,7 +129,7 @@ class MilesightController extends Controller
                     ? (string) $config['webhook_secret_last4']
                     : null,
                 'webhook_url' => route('webhooks.receive', ['provider' => self::PROVIDER]),
-                'last_webhook_received_at' => $latestWebhookEventAt?->toDateTimeString(),
+                'last_webhook_received_at' => $latestWebhookEventAt?->toISOString(),
             ] : null,
             'discoveredApplications' => $discoveredApplications,
             'siteConfigs' => $siteConfigs,
@@ -463,16 +463,16 @@ class MilesightController extends Controller
                     (string) $request->input('mapping_token'),
                 );
             });
-        abort_unless(is_array($application), 422, 'The selected Milesight application is no longer available. Sync applications and try again.');
-        abort_if(
-            IntegrationSiteConfig::query()
-                ->forProvider(self::PROVIDER)
-                ->where('mapped_external_site_id', (string) $application['external_id'])
-                ->where('site_id', '!=', $site->id)
-                ->exists(),
-            422,
-            'This Milesight application is already mapped to another Site.',
-        );
+        if (! is_array($application)) {
+            $this->rejectRequest($request, 'mapping_token', 'The selected Milesight application is no longer available. Discover applications and try again.');
+        }
+        if (IntegrationSiteConfig::query()
+            ->forProvider(self::PROVIDER)
+            ->where('mapped_external_site_id', (string) $application['external_id'])
+            ->where('site_id', '!=', $site->id)
+            ->exists()) {
+            $this->rejectRequest($request, 'mapping_token', 'This Milesight application is already mapped to another Site.');
+        }
 
         try {
             IntegrationSiteConfig::query()->updateOrCreate(
@@ -527,7 +527,9 @@ class MilesightController extends Controller
             ->whereHas('site')
             ->find((int) $request->input('site_config_id'));
         abort_unless($siteConfig, 404);
-        abort_if(blank($siteConfig->mapped_external_site_id), 422, 'Map a Milesight application before syncing devices.');
+        if (blank($siteConfig->mapped_external_site_id)) {
+            $this->rejectRequest($request, 'site_config_id', 'Map a Milesight application to this Site before syncing devices.');
+        }
 
         $connection = IntegrationProviderConnection::query()
             ->forProvider(self::PROVIDER)
@@ -581,6 +583,21 @@ class MilesightController extends Controller
 
             return redirect()->back()->with('error', 'Milesight device sync failed. Review the bounded diagnostic state and retry.');
         }
+    }
+
+    /**
+     * A refused request that changed nothing. Inertia visits get the reason
+     * back as a validation message the page shows in place (a non-Inertia
+     * error page would arrive with no message); other clients keep the 422.
+     * Messages are the fixed strings in this controller, never exception text.
+     */
+    private function rejectRequest(Request $request, string $field, string $message): never
+    {
+        if ($request->header('X-Inertia')) {
+            throw ValidationException::withMessages([$field => $message]);
+        }
+
+        abort(422, $message);
     }
 
     private function mappingToken(string $externalId): string
