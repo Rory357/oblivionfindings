@@ -20,7 +20,6 @@ use App\Http\Controllers\Chat\ChatNotificationController;
 use App\Http\Controllers\Chat\ChatParticipantController;
 use App\Http\Controllers\Chat\ChatPersonalPreferencesController;
 use App\Http\Controllers\Chat\ChatPrivateDraftController;
-use App\Http\Controllers\Chat\ChatRealtimeController;
 use App\Http\Controllers\Chat\ChatSearchController;
 use App\Http\Controllers\Chat\ChatSendAttemptController;
 use App\Http\Controllers\Chat\ChatUploadController;
@@ -74,8 +73,6 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/clients/{client}/urgent-contact', ChatUrgentContactController::class)->whereNumber('client')->middleware(EnsureChatActor::class)->name('urgent-contact');
         Route::get('/clients/{client}/home', ChatFamilyHomeController::class)->whereNumber('client')->middleware(EnsureChatActor::class)->name('family-home');
         Route::get('/clients/{client}/home/conversations/{conversation}', [ChatFamilyHomeController::class, 'conversation'])->whereNumber(['client', 'conversation'])->middleware(EnsureChatActor::class)->name('family-home.conversation');
-        Route::get('/realtime', [ChatRealtimeController::class, 'configuration'])->middleware(EnsureChatActor::class)->name('realtime');
-        Route::post('/realtime/auth', [ChatRealtimeController::class, 'authorizeChannel'])->middleware(EnsureChatActor::class)->name('realtime.auth');
         // Oblivion Live: a short-lived connection ticket, and typing signals (never stored).
         Route::post('/live/ticket', [ChatLiveController::class, 'ticket'])->middleware(['throttle:30,1,chat-live-ticket:', EnsureChatActor::class])->name('live.ticket');
         Route::post('/conversations/{conversation}/typing', [ChatLiveController::class, 'typing'])->middleware(['throttle:60,1,chat-typing:', EnsureChatActor::class])->name('typing');

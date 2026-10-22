@@ -14,7 +14,6 @@ use Illuminate\Cache\Repository as Cache;
 use Illuminate\Config\Repository as Config;
 use Illuminate\Container\Container;
 use Illuminate\Http\Client\Factory;
-use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Facades\Http;
@@ -91,7 +90,7 @@ class ChatServiceHealthTest extends TestCase
         CarbonImmutable::setTestNow(CarbonImmutable::now());
         $first = $this->service()->snapshot();
         CarbonImmutable::setTestNow(CarbonImmutable::now()->addMinute());
-        $this->config->set('chat.realtime.enabled', true);
+        $this->config->set('chat.live.enabled', true);
         $next = $this->rows($this->service()->snapshot());
         self::assertSame('unchanged', $next['messaging']['trend']);
         self::assertSame('changed', $next['realtime']['trend']);
@@ -152,14 +151,24 @@ class ChatServiceHealthTest extends TestCase
         self::assertStringNotContainsString('private scanner details', json_encode($snapshot));
     }
 
-    public function test_realtime_uses_a_filtered_read_and_does_not_broadcast(): void
+    public function test_realtime_makes_a_signed_read_of_oblivion_live_and_publishes_nothing(): void
     {
-        $this->config->set('chat.realtime.enabled', true);
-        $this->config->set('broadcasting.connections.chat', ['key' => 'test', 'secret' => 'test', 'app_id' => 'test']);
-        $pusher = Mockery::mock()->shouldReceive('get')->once()->with('/channels', ['filter_by_prefix' => 'private-chat.health-check.'])->andReturn((object) ['channels' => []])->getMock();
-        $broadcaster = Mockery::mock()->shouldReceive('getPusher')->once()->andReturn($pusher)->getMock();
-        Broadcast::swap(Mockery::mock()->shouldReceive('connection')->once()->with('chat')->andReturn($broadcaster)->getMock());
-        self::assertSame('passed', $this->rows($this->service()->snapshot())['realtime']['state']);
+        $this->config->set('chat.live', ['enabled' => true, 'secret' => str_repeat('s', 40), 'key_id' => 'k-health', 'internal_url' => 'http://127.0.0.1:8092']);
+        Http::fake(['127.0.0.1:8092/internal/health' => Http::response(['status' => 'ok', 'connections' => 3, 'users' => 2, 'version' => '1.0.0'])]);
+        $row = $this->rows($this->service()->snapshot())['realtime'];
+        self::assertSame('passed', $row['state']);
+        self::assertStringContainsString('1 node, 3 open connections', $row['detail']);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request->method() === 'GET' && $request->hasHeader('X-Live-Signature') && $request->hasHeader('X-Live-Timestamp'));
+    }
+
+    public function test_realtime_reports_an_unreachable_or_half_configured_gateway(): void
+    {
+        $this->config->set('chat.live', ['enabled' => true, 'secret' => str_repeat('s', 40), 'key_id' => 'k-health', 'internal_url' => 'http://127.0.0.1:8092']);
+        Http::fake(['127.0.0.1:8092/*' => Http::failedConnection()]);
+        self::assertSame('unavailable', $this->rows($this->service()->snapshot())['realtime']['state']);
+        $this->config->set('chat.live.secret', null);
+        self::assertSame('not_configured', $this->rows($this->service()->snapshot())['realtime']['state']);
     }
 
     public function test_a_reachable_calling_server_does_not_claim_verified_media(): void

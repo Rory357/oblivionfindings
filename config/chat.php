@@ -31,11 +31,6 @@ return [
             'timeout_seconds' => (int) env('CHAT_SCANNER_TIMEOUT_SECONDS', 30),
         ],
     ],
-    'realtime' => [
-        'enabled' => env('CHAT_REALTIME_ENABLED', false),
-        // Same-origin proxy; no managed WebSocket service or public fallback.
-        'path' => '/chat-live',
-    ],
     // Oblivion Live, Chat's own live-update gateway (live/server.mjs). Spec:
     // docs/chat-experience/clean-room/specs/oblivion-live.md. Secrets stay server-side.
     'live' => [

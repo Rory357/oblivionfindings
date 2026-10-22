@@ -38,15 +38,14 @@ use App\Services\Files\MalwareScanner;
 use App\Services\Files\MalwareScanResult;
 use App\Services\Operations\OpsMessageVisibilityService;
 use App\Support\SecurityPolicy;
+use App\Support\Signing\CompactToken;
 use Carbon\Carbon;
-use Illuminate\Contracts\Broadcasting\Broadcaster;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Notifications\Events\NotificationSending;
-use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -1388,59 +1387,54 @@ it('denies edits after family relationship revocation and isolates separate rela
 
 function enableSharedChatRealtime(): void
 {
-    config(['chat.realtime.enabled' => true, 'broadcasting.connections.chat.key' => 'chat-test-public',
-        'broadcasting.connections.chat.secret' => 'chat-test-secret-not-for-deployment', 'broadcasting.connections.chat.app_id' => 'chat-tests']);
+    config(['chat.live.enabled' => true, 'chat.live.secret' => 'chat-live-test-secret-not-for-deployment-01', 'chat.live.key_id' => 'k-test',
+        'chat.live.internal_url' => 'http://127.0.0.1:8092']);
+    Http::fake(['127.0.0.1:8092/*' => Http::response(['delivered' => 0])]);
 }
 
-it('authorises only the signed-in eligible viewer live channel and exposes no server secret', function () {
+it('issues live tickets only to the signed-in eligible viewer and exposes no server secret', function () {
     $site = Site::factory()->create();
     [$viewer, $other] = [sharedChatStaff($site), sharedChatStaff($site)];
-    $this->actingAs($viewer)->withHeader('X-Chat-Actor', (string) $viewer->id)->getJson(route('chat.realtime'))->assertOk()->assertExactJson(['actor_id' => $viewer->id, 'enabled' => false]);
+    $this->actingAs($viewer)->withHeader('X-Chat-Actor', (string) $viewer->id)->postJson(route('chat.live.ticket'))->assertNotFound();
     enableSharedChatRealtime();
-    $config = $this->getJson(route('chat.realtime'))->assertOk()->assertJsonPath('channel', 'private-chat.user.'.$viewer->id)->assertJsonPath('path', '/chat-live');
-    expect($config->getContent())->not->toContain('chat-test-secret');
-    $channel = 'private-chat.user.'.$viewer->id;
-    $this->postJson(route('chat.realtime.auth'), ['socket_id' => '123.456', 'channel_name' => $channel])->assertOk()->assertJsonPath('auth', 'chat-test-public:'.hash_hmac('sha256', '123.456:'.$channel, 'chat-test-secret-not-for-deployment'));
-    $this->postJson(route('chat.realtime.auth'), ['socket_id' => '123.456', 'channel_name' => 'private-chat.user.'.$other->id])->assertForbidden();
-    $this->postJson(route('chat.realtime.auth'), ['socket_id' => '123.456', 'channel_name' => 'chat.public'])->assertForbidden();
-    $this->postJson(route('chat.realtime.auth'), ['socket_id' => 'not-a-socket', 'channel_name' => $channel])->assertUnprocessable();
+    $ticket = $this->postJson(route('chat.live.ticket'))->assertOk()->assertJsonPath('url', '/chat-live');
+    expect($ticket->getContent())->not->toContain('chat-live-test-secret');
+    expect(CompactToken::verify($ticket->json('ticket'), ['k-test' => 'chat-live-test-secret-not-for-deployment-01'], 'oblivion-live')['sub'])->toBe($viewer->id);
+    $this->withHeader('X-Chat-Actor', (string) $other->id)->postJson(route('chat.live.ticket'))->assertForbidden();
+    // The old Reverb channel endpoints are gone.
+    $this->withHeader('X-Chat-Actor', (string) $viewer->id)->getJson('/chat/api/realtime')->assertNotFound();
+    $this->postJson('/chat/api/realtime/auth', ['socket_id' => '123.456', 'channel_name' => 'private-chat.user.'.$viewer->id])->assertNotFound();
     $viewer->hrEmployeeProfile()->update(['is_active' => false]);
-    $this->actingAs($viewer->fresh())->getJson(route('chat.realtime'))->assertForbidden();
-    $this->postJson(route('chat.realtime.auth'), ['socket_id' => '123.456', 'channel_name' => $channel])->assertForbidden();
+    $this->actingAs($viewer->fresh())->withHeader('X-Chat-Actor', (string) $viewer->id)->postJson(route('chat.live.ticket'))->assertForbidden();
 });
 
-it('rechecks family portal eligibility for live-channel renewal', function () {
+it('rechecks family portal eligibility for every live ticket renewal', function () {
     enableSharedChatRealtime();
     $client = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
     $relative = sharedChatRelative($client);
-    $this->actingAs($relative)->withHeader('X-Chat-Actor', (string) $relative->id)->getJson(route('chat.realtime'))->assertOk()->assertJsonPath('enabled', true);
+    $this->actingAs($relative)->withHeader('X-Chat-Actor', (string) $relative->id)->postJson(route('chat.live.ticket'))->assertOk();
     $client->portalUsers()->detach($relative->id);
-    $this->actingAs($relative->fresh())->postJson(route('chat.realtime.auth'), ['socket_id' => '123.456', 'channel_name' => 'private-chat.user.'.$relative->id])->assertForbidden();
+    $this->actingAs($relative->fresh())->withHeader('X-Chat-Actor', (string) $relative->id)->postJson(route('chat.live.ticket'))->assertForbidden();
 });
 
-it('publishes content-free live hints only to currently authorised recipients', function () {
+it('publishes content-free live events only to currently authorised recipients', function () {
     enableSharedChatRealtime();
     $site = Site::factory()->create();
     [$sender, $recipient, $outsider] = [sharedChatStaff($site), sharedChatStaff($site), sharedChatStaff($site)];
     $conversation = sharedChatConversation($sender, $recipient);
-    $sent = [];
-    $transport = Mockery::mock(Broadcaster::class);
-    $transport->shouldReceive('broadcast')->andReturnUsing(function ($channels, $event, $data) use (&$sent) {
-        $sent[] = ['channels' => array_map(fn ($channel) => (string) $channel, $channels), 'event' => $event, 'data' => $data];
-    });
-    Broadcast::shouldReceive('connection')->with('chat')->andReturn($transport);
+    $sent = fn () => collect(Http::recorded())->flatMap(fn ($pair) => $pair[0]->data()['events'] ?? [])->values()->all();
     $service = app(ChatRealtime::class);
     $service->publish($conversation->id);
-    expect($sent[0]['channels'])->toEqualCanonicalizing(['private-chat.user.'.$sender->id, 'private-chat.user.'.$recipient->id]);
-    expect($sent[0]['data'])->toBe(['refresh' => true]);
-    expect($sent[0]['event'])->toBe('chat.changed');
+    expect($sent()[0]['to'])->toEqualCanonicalizing([$sender->id, $recipient->id]);
+    expect($sent()[0]['type'])->toBe('conversation.changed');
+    expect($sent()[0]['data'])->toBe(['conversation_id' => $conversation->id, 'change_id' => 0, 'kinds' => ['message']]);
     $service->publish($conversation->id, $recipient->id);
-    expect($sent[1]['channels'])->toBe(['private-chat.user.'.$recipient->id]);
+    expect($sent()[1]['to'])->toBe([$recipient->id]);
     $conversation->participants()->where('user_id', $recipient->id)->delete();
     $service->publish($conversation->id, $recipient->id);
-    expect($sent)->toHaveCount(2);
+    expect($sent())->toHaveCount(2);
     $service->publish($conversation->id, $outsider->id);
-    expect($sent)->toHaveCount(2);
+    expect($sent())->toHaveCount(2);
 });
 
 it('wakes call participants on state changes without broadcasting polling heartbeats', function () {

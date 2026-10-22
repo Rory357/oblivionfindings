@@ -8,33 +8,24 @@ use App\Models\OpsConversation;
 use App\Models\User;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\Operations\OpsMessageVisibilityService;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Who hears about a Chat change, and how. Oblivion Live (chat.live) sends targeted, content-free
- * events; the older Reverb connection (chat.realtime) still sends a bare refresh until Oblivion
- * Live replaces it. Events are hints only: every fetch re-checks access.
+ * events naming what changed. Events are hints only: every fetch re-checks access.
  */
 final class ChatRealtime
 {
     public function configured(): bool
     {
-        return (bool) config('chat.shared_experience') && ($this->usesLive() || $this->reverbConfigured());
+        return $this->usesLive();
     }
 
-    /** True when browsers connect to Oblivion Live rather than Reverb. */
+    /** Shared Chat is on and Oblivion Live is switched on and fully configured. */
     public function usesLive(): bool
     {
         return (bool) config('chat.shared_experience') && app(OblivionLive::class)->enabled();
-    }
-
-    private function reverbConfigured(): bool
-    {
-        return config('chat.realtime.enabled')
-            && filled(config('broadcasting.connections.chat.key')) && filled(config('broadcasting.connections.chat.secret'));
     }
 
     public function eligible(User $user): bool
@@ -79,14 +70,6 @@ final class ChatRealtime
         }
         $ids = $this->recipients($conversation, $onlyUserId);
         if ($ids === []) {
-            return;
-        }
-        if (! $this->usesLive()) {
-            // Reverb, kept behind CHAT_REALTIME_ENABLED until Oblivion Live passes end to end.
-            foreach (collect($ids)->map(fn (int $id) => new PrivateChannel('chat.user.'.$id))->chunk(100) as $chunk) {
-                Broadcast::connection('chat')->broadcast($chunk->values()->all(), 'chat.changed', ['refresh' => true]);
-            }
-
             return;
         }
         if ($inbox !== null) {

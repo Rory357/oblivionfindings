@@ -68,7 +68,6 @@ final class ChatSessionActivityTest extends TestCase
             ['GET', '/chat/api/conversations/12/messages'],
             ['GET', '/chat/notifications/example/display'],
             ['PATCH', '/chat/api/availability'],
-            ['POST', '/chat/api/realtime/auth'],
             ['POST', '/chat/api/live/ticket'],
             ['POST', '/chat/api/conversations/12/changes'],
             ['POST', '/chat/api/conversations/12/read'],

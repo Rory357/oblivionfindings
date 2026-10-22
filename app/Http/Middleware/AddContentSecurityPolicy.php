@@ -82,8 +82,8 @@ class AddContentSecurityPolicy
         // Keep OSM-only deployments on their existing policy; no unsafe script execution is added.
         $google = filled(config('fleet.maps.api_key'));
         $googleSources = $google ? ' https://*.googleapis.com https://*.gstatic.com https://*.google.com' : '';
-        // Oblivion Live (and Reverb until it is removed) use a same-origin socket only.
-        $chatSocket = config('chat.shared_experience') && (config('chat.live.enabled') || config('chat.realtime.enabled'))
+        // Oblivion Live uses a same-origin socket only.
+        $chatSocket = config('chat.shared_experience') && config('chat.live.enabled')
             ? ' '.($request->isSecure() ? 'wss://' : 'ws://').$request->getHttpHost() : '';
         $chatSocket .= $this->callingSources();
 

@@ -157,13 +157,6 @@ it('marks family tickets and refuses people who may not use Chat', function () {
     liveAs($this, $staff)->postJson(route('chat.live.ticket'))->assertNotFound();
 });
 
-it('tells the browser to use Oblivion Live and no longer signs Reverb channels', function () {
-    $staff = liveStaff(Site::factory()->create());
-    liveAs($this, $staff)->getJson(route('chat.realtime'))->assertOk()
-        ->assertExactJson(['actor_id' => $staff->id, 'enabled' => true, 'transport' => 'live', 'path' => '/chat-live']);
-    liveAs($this, $staff)->postJson(route('chat.realtime.auth'), ['socket_id' => '123.456', 'channel_name' => 'private-chat.user.'.$staff->id])->assertForbidden();
-});
-
 it('sends conversation.changed with the newest change ID and kinds to members who pass allows()', function () {
     $site = Site::factory()->create();
     [$sender, $recipient, $outsider] = [liveStaff($site), liveStaff($site), liveStaff($site)];
