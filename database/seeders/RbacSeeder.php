@@ -58,6 +58,14 @@ class RbacSeeder extends Seeder
         // Private staff chat inspection: named investigators only. Grant migration:
         // 2026_10_20_101000_register_chat_investigation_permission (no role grants).
         'chat.investigate',
+        // Approved Windows scripts: named people only. Registration migration:
+        // 2026_10_22_090000_register_endpoint_script_permissions (no role grants).
+        'securityDevices.endpoints.scriptUpload',
+        'securityDevices.endpoints.scriptReview',
+        'securityDevices.endpoints.scriptPolicyManage',
+        'securityDevices.endpoints.scriptRun',
+        'securityDevices.endpoints.scriptUnattended',
+        'securityDevices.endpoints.scriptOutputView',
     ];
 
     public function run(): void
