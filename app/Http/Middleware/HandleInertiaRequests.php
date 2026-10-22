@@ -585,7 +585,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v12';
+    protected const PERMISSIONS_CACHE_VERSION = 'v13';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -772,6 +772,7 @@ class HandleInertiaRequests extends Middleware
                 'monitoringManage' => $user->canDo('securityDevices.monitoring.manage'),
                 'reportsView' => $user->canDo('securityDevices.reports.view'),
                 'commandsAdmin' => $user->canDo('securityDevices.commands.admin'),
+                'commandsApprove' => $user->canDo('securityDevices.commands.approve'),
             ],
 
             'calendar' => [

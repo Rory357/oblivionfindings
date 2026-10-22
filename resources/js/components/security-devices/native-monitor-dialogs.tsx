@@ -219,11 +219,19 @@ function useNativeMonitorCommit() {
 }
 function useNativeActor() {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, boolean> };
+        auth?: {
+            user?: { id: number } | null;
+            can?: {
+                securityDevices?: {
+                    viewAny?: boolean;
+                    monitoringManage?: boolean;
+                };
+            };
+        };
     }>().props;
     return {
         id: auth?.user?.id ?? 0,
-        manage: auth?.can?.['securityDevices.monitoring.manage'] === true,
+        manage: auth?.can?.securityDevices?.monitoringManage === true,
         identity: JSON.stringify([auth?.user?.id, auth?.can]),
     };
 }
@@ -531,7 +539,7 @@ function NativeMonitorWizardBody({
                 open
                 onClose={close}
                 title={
-                    editing ? `Update ${monitor.name}` : 'Create direct monitor'
+                    editing ? `Update ${monitor.name}` : 'Add direct monitor'
                 }
                 description="Configure an approved device check. A saved configuration does not prove the connection works."
                 railIcon={Activity}
@@ -594,7 +602,7 @@ function NativeMonitorWizardBody({
                                 ? 'Saving…'
                                 : editing
                                   ? 'Apply monitor update'
-                                  : 'Create direct monitor'}
+                                  : 'Add direct monitor'}
                         </Button>
                     )
                 }

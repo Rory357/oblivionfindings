@@ -1,7 +1,4 @@
 import {
-    ClientProfileAccessRequired,
-    FleetTechnologyAccessRequired,
-    HrEmployeeEquipmentAccessRequired,
     ItChangeDestination,
     ItWorkspaceAccessRequired,
 } from '@/components/security-devices/permission-destinations';
@@ -34,24 +31,20 @@ import { SoftwarePackagePicker } from '@/pages/security-devices/software/_packag
 import { Link, router } from '@inertiajs/react';
 import {
     Activity,
-    AlertTriangle,
     ArrowRight,
     Cable,
-    CheckCircle2,
     ClipboardList,
-    Clock3,
     Cpu,
     Download,
     FileClock,
     HardDrive,
-    MapPin,
     RadioTower,
     Settings2,
     ShieldCheck,
     TicketCheck,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
+import type { DeviceProfile } from './device-profile';
 
 function stateBadgeVariant(
     state: string | null,
@@ -1973,169 +1966,6 @@ function Metric({
                 <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
             )}
         </div>
-    );
-}
-
-export function DeviceProfileHeader({
-    profile,
-    onOpenSection,
-}: {
-    profile: DeviceProfile;
-    onOpenSection: (section: DeviceProfileSectionKey) => void;
-}) {
-    const { header } = profile;
-    const ActionIcon =
-        header.requiredAction.state === 'none'
-            ? CheckCircle2
-            : header.requiredAction.state === 'critical'
-              ? AlertTriangle
-              : Clock3;
-
-    return (
-        <Card data-testid="device-profile-header" className="overflow-hidden">
-            <CardContent className="space-y-4 p-4 md:p-5">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                    <div className="sm:col-span-2 xl:col-span-1">
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Identity
-                        </p>
-                        <p className="mt-1 font-semibold">
-                            {header.identity.type || 'Registered device'}
-                        </p>
-                        <p className="font-mono text-xs text-muted-foreground">
-                            {header.identity.uid}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Location
-                        </p>
-                        {header.location?.href ? (
-                            <Link
-                                href={header.location.href}
-                                className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-                            >
-                                <MapPin className="h-3.5 w-3.5" />
-                                {header.location.name}
-                            </Link>
-                        ) : (
-                            <div className="mt-1 space-y-1">
-                                <p className="text-sm font-semibold">
-                                    {header.location?.name ?? 'Unassigned'}
-                                </p>
-                                {header.location?.access?.state ===
-                                'restricted' ? (
-                                    header.location.type === 'staff' ? (
-                                        <HrEmployeeEquipmentAccessRequired
-                                            label={header.location.access.label}
-                                            className="min-h-0 text-xs"
-                                        />
-                                    ) : header.location.type === 'vehicle' ? (
-                                        <FleetTechnologyAccessRequired
-                                            label={header.location.access.label}
-                                            className="min-h-0 text-xs"
-                                        />
-                                    ) : (
-                                        <ClientProfileAccessRequired
-                                            label={header.location.access.label}
-                                            className="min-h-0 text-xs"
-                                        />
-                                    )
-                                ) : null}
-                            </div>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                            {header.assignment
-                                ? `${humanise(header.assignment.type)} assignment`
-                                : 'No current assignment'}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Health
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                            <Badge
-                                variant={stateBadgeVariant(header.health.state)}
-                            >
-                                {header.health.label}
-                            </Badge>
-                            <Badge variant="outline">
-                                {humanise(header.health.deviceState)}
-                            </Badge>
-                        </div>
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Freshness
-                        </p>
-                        <div className="mt-1 flex items-center gap-2">
-                            <Badge
-                                variant={stateBadgeVariant(
-                                    header.freshness.state,
-                                )}
-                            >
-                                {humanise(header.freshness.state)}
-                            </Badge>
-                            <span
-                                className="text-xs text-muted-foreground"
-                                title={formatDateTime(
-                                    header.freshness.observedAt,
-                                )}
-                            >
-                                {formatRelative(
-                                    header.freshness.observedAt,
-                                    Date.now(),
-                                    'Never observed',
-                                )}
-                            </span>
-                        </div>
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Observation source
-                        </p>
-                        <p className="mt-1 text-sm font-semibold">
-                            {header.providerObservation.label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            {humanise(header.providerObservation.source)}
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    className={`flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${
-                        header.requiredAction.state === 'critical'
-                            ? 'border-destructive/30 bg-destructive/5'
-                            : 'bg-muted/30'
-                    }`}
-                >
-                    <div className="flex min-w-0 gap-3">
-                        <ActionIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                        <div>
-                            <p className="text-sm font-semibold">
-                                {header.requiredAction.label}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                {header.requiredAction.description}
-                            </p>
-                        </div>
-                    </div>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0"
-                        onClick={() =>
-                            onOpenSection(header.requiredAction.section)
-                        }
-                    >
-                        Open details <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
     );
 }
 

@@ -11,6 +11,9 @@ use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointDownloadsContr
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointLifecycleController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointRestartCommandController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointRestartPolicyController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointScriptCatalogueController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointScriptCommandController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointScriptPolicyController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointSoftwareCatalogueController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointSoftwarePolicyController;
 use App\Domain\SecurityDevices\Endpoints\Http\Middleware\EndpointTransport;
@@ -69,6 +72,26 @@ Route::middleware([
         Route::get('/devices/{device}/endpoint/bootstrap-options', [EndpointLifecycleController::class, 'options'])->name('security-devices.devices.endpoint.bootstrap-options');
         Route::post('/devices/{device}/endpoint/bootstrap', [EndpointLifecycleController::class, 'bootstrap'])->name('security-devices.devices.endpoint.bootstrap');
         Route::post('/devices/{device}/endpoint/revoke', [EndpointLifecycleController::class, 'revoke'])->name('security-devices.devices.endpoint.revoke');
+    });
+
+    $scripts = EndpointScriptCatalogueController::class;
+    Route::get('/scripts/confirm-identity', [$scripts, 'confirmIdentity'])->name('security-devices.scripts.confirm-identity');
+    Route::get('/scripts', [$scripts, 'index'])->name('security-devices.scripts.index');
+    Route::post('/scripts', [$scripts, 'upload'])->middleware('throttle:10,1')->name('security-devices.scripts.upload');
+    Route::get('/scripts/uploads/{request_key}', [$scripts, 'recovery'])->whereUuid('request_key')->name('security-devices.scripts.recovery');
+    Route::get('/scripts/{script}', [$scripts, 'show'])->whereUuid('script')->name('security-devices.scripts.show');
+    Route::get('/scripts/{script}/material', [$scripts, 'material'])->whereUuid('script')->name('security-devices.scripts.material');
+    Route::get('/scripts/{script}/requests/{request_key}', [$scripts, 'actionRecovery'])->whereUuid('script')->whereUuid('request_key')->name('security-devices.scripts.action-recovery');
+    foreach (['submit', 'review', 'withdraw'] as $action) {
+        Route::post('/scripts/{script}/'.$action, [$scripts, $action])->whereUuid('script')->middleware('throttle:10,1')->name('security-devices.scripts.'.$action);
+    }
+
+    Route::middleware(EndpointTransport::class)->group(function (): void {
+        $policy = EndpointScriptPolicyController::class;
+        Route::get('/devices/{device}/endpoint/script-policy', [$policy, 'show'])->name('security-devices.devices.endpoint.script-policy');
+        Route::put('/devices/{device}/endpoint/script-policy', [$policy, 'update'])->middleware('throttle:10,1')->name('security-devices.devices.endpoint.script-policy.update');
+        Route::get('/devices/{device}/endpoint/script-policy/requests/{request_key}', [$policy, 'recovery'])->whereUuid('request_key')->name('security-devices.devices.endpoint.script-policy.recovery');
+        Route::get('/devices/{device}/endpoint/script-policy/confirm-identity', [$policy, 'confirmIdentity'])->name('security-devices.devices.endpoint.script-policy.confirm-identity');
     });
 
     $software = EndpointSoftwareCatalogueController::class;
@@ -171,6 +194,14 @@ Route::middleware([
     Route::get('/devices/{device}/endpoint/restart-policy', [$restartPolicy, 'show'])->name('security-devices.devices.endpoint.restart-policy.show');
     Route::put('/devices/{device}/endpoint/restart-policy', [$restartPolicy, 'update'])->name('security-devices.devices.endpoint.restart-policy.update');
     Route::post('/devices/{device}/commands/{command}/cancel', [EndpointRestartCommandController::class, 'cancel'])->name('security-devices.devices.commands.cancel');
+    Route::get('/devices/{device}/commands/{command}/script-output/{attempt}', [EndpointScriptCommandController::class, 'outputReceipt'])
+        ->whereUuid('attempt')->name('security-devices.devices.commands.script-output');
+    Route::get('/devices/{device}/commands/{command}/script-output/{attempt}/content', [EndpointScriptCommandController::class, 'outputContent'])
+        ->whereUuid('attempt')->middleware('throttle:30,1')->name('security-devices.devices.commands.script-output.content');
+    Route::post('/devices/{device}/commands/{command}/script-cancellation', [EndpointScriptCommandController::class, 'cancel'])
+        ->middleware('throttle:10,1')->name('security-devices.devices.commands.script-cancellation');
+    Route::get('/devices/{device}/commands/{command}/script-cancellation/requests/{request_key}', [EndpointScriptCommandController::class, 'cancellation'])
+        ->whereUuid('request_key')->name('security-devices.devices.commands.script-cancellation.recovery');
 
     Route::post('/commands/{command}/decision', [DeviceCommandApprovalController::class, 'store'])
         ->middleware('permission:securityDevices.commands.approve')
@@ -367,6 +398,12 @@ Route::middleware([
     Route::get('/device-groups/{group}', [DeviceGroupController::class, 'show'])
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.show');
+
+    // Own throttle bucket (prefix) so this read never spends another route's limit.
+    Route::get('/device-groups/{group}/maintenance-policy-preview', [DeviceGroupController::class, 'previewMaintenancePolicy'])
+        ->middleware(['permission:securityDevices.groups.manage', 'permission:securityDevices.monitoring.manage', 'throttle:30,1,device-group-maintenance-preview'])
+        ->missing(static fn () => DeviceGroupController::previewUnavailable(404))
+        ->name('security-devices.device-groups.maintenance-policy-preview');
 
     Route::get('/device-groups/{group}/edit', [DeviceGroupController::class, 'edit'])
         ->middleware('permission:securityDevices.groups.manage')

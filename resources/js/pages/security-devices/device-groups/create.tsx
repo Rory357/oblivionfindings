@@ -24,15 +24,15 @@ export default function DeviceGroupForm({
                     title: 'Device groups',
                     href: '/security-devices/device-groups',
                 },
-                { title: isEdit ? 'Edit group' : 'Create group' },
+                { title: isEdit ? 'Edit device group' : 'Add device group' },
             ]}
         >
             <Head
-                title={`${isEdit ? 'Edit' : 'Create'} group - Security & Devices`}
+                title={`${isEdit ? 'Edit' : 'Add'} device group - Security & Devices`}
             />
             <PageHeader
                 icon={GitBranch}
-                title="Device groups"
+                title={isEdit ? 'Edit device group' : 'Add device group'}
                 subline="Group details and optional automatic membership rules."
                 actions={
                     <PageHeaderGlassButton asChild>

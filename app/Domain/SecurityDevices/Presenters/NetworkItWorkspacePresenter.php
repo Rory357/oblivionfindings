@@ -195,7 +195,7 @@ class NetworkItWorkspacePresenter
                 'title' => 'Native monitoring, honest evidence',
                 'description' => 'Oblivion Findings presents canonical devices, retained native observations, and known relationship evidence without depending on a provider-shaped runtime or navigation model.',
                 'collectionNote' => 'Missing discovery, protocol, interface, capacity, configuration, or firmware collection stays visible as not collected, not observed, partial, or unsupported.',
-                'managementNote' => 'Configuration and firmware are read-only until governed command, approval, execution, and reconciliation workflows are enabled.',
+                'managementNote' => 'Configuration and firmware evidence here is read-only. Changes are requested from the Management tab, where each one is approved before it runs and then checked against fresh evidence.',
             ],
             'overview' => $overview,
             'activeTab' => [

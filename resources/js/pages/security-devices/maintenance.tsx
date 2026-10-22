@@ -19,7 +19,15 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { LayoutGrid, List, RefreshCw, Search, Wrench } from 'lucide-react';
 import { useState } from 'react';
-export { MaintenanceCard } from '@/components/security-devices/maintenance-records';
+
+type CurrentPermissions = {
+    securityDevices?: {
+        maintenanceView?: boolean;
+        maintenanceManage?: boolean;
+        devicesView?: boolean;
+    };
+};
+
 type NamedLink = { id: number; name: string; href: string };
 export type MaintenanceRow = {
     id: number;
@@ -72,14 +80,17 @@ export default function Maintenance({
 }: {
     workspace: MaintenanceWorkspace;
 }) {
+    // Partial actor metadata cannot establish ownership of retained private data.
+    const [sourceActor] = useState(workspace.actor_id);
     const [layout, setLayout] = useState<'cards' | 'table'>('cards');
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+        auth?: { user?: { id: number } | null; can?: CurrentPermissions };
     }>().props;
     const visible = Boolean(
         auth?.user?.id &&
+        sourceActor === workspace.actor_id &&
         workspace.actor_id === auth.user.id &&
-        auth.can?.['securityDevices.maintenance.view'] === true,
+        auth.can?.securityDevices?.maintenanceView === true,
     );
     return (
         <MaintenanceBody
@@ -90,9 +101,9 @@ export default function Maintenance({
             canManage={
                 visible &&
                 workspace.permissions.manage &&
-                auth?.can?.['securityDevices.maintenance.manage'] === true
+                auth?.can?.securityDevices?.maintenanceManage === true
             }
-            profiles={auth?.can?.['securityDevices.devices.view'] === true}
+            profiles={auth?.can?.securityDevices?.devicesView === true}
             layout={layout}
             setLayout={setLayout}
         />
@@ -128,27 +139,36 @@ function MaintenanceBody({
             { ...workspace.filters, tab: workspace.active_tab, ...changes },
             { preserveState: true, preserveScroll: true },
         );
-    const refresh = () =>
-        router.reload({
+    const refresh = () => {
+        if (!visible)
+            return router.get(
+                '/security-devices/maintenance',
+                {},
+                {
+                    preserveState: false,
+                    preserveScroll: true,
+                },
+            );
+        return router.reload({
             only: ['workspace', 'auth'],
             onSuccess: (page) => {
                 const data = page.props as {
                     workspace?: MaintenanceWorkspace;
                     auth?: {
                         user?: { id?: number };
-                        can?: Record<string, unknown>;
+                        can?: CurrentPermissions;
                     };
                 };
                 if (
                     page.component === 'security-devices/maintenance' &&
                     data.workspace?.actor_id === actor &&
                     data.auth?.user?.id === actor &&
-                    data.auth?.can?.['securityDevices.maintenance.view'] ===
-                        true
+                    data.auth?.can?.securityDevices?.maintenanceView === true
                 )
                     setScopeDenied(false);
             },
         });
+    };
     const denyCompletionScope = () => {
         setReview(null);
         setScopeDenied(true);

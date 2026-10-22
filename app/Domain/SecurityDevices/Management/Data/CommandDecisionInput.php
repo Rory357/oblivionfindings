@@ -9,5 +9,6 @@ final readonly class CommandDecisionInput
     public function __construct(
         public CommandApprovalDecision $decision,
         public string $comment,
+        public ?int $expectedActorId = null,
     ) {}
 }

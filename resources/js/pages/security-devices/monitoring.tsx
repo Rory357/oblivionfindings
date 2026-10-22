@@ -57,6 +57,13 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
+type CurrentPermissions = {
+    securityDevices?: {
+        eventsView?: boolean;
+        devicesView?: boolean;
+    };
+};
+
 type NamedLink = { id: number; name: string; href: string };
 
 export type MonitorRow = {
@@ -643,7 +650,7 @@ export default function Monitoring({
     workspace: MonitoringWorkspace;
 }) {
     const { auth } = usePage<{
-        auth: { user?: { id: number }; can?: Record<string, boolean> };
+        auth: { user?: { id: number }; can?: CurrentPermissions };
     }>().props;
     const [view, setView] = useState<MonitoringView>(() => {
         try {
@@ -654,9 +661,12 @@ export default function Monitoring({
             return 'cards';
         }
     });
+    const [sourceActor] = useState(workspace.actor_id);
     if (
+        !sourceActor ||
+        sourceActor !== workspace.actor_id ||
         workspace.actor_id !== auth?.user?.id ||
-        auth?.can?.['securityDevices.events.view'] !== true
+        auth?.can?.securityDevices?.eventsView !== true
     )
         return (
             <AppLayout
@@ -677,7 +687,10 @@ export default function Monitoring({
                     actions={
                         <PageHeaderGlassButton
                             onClick={() =>
-                                router.reload({ only: ['workspace'] })
+                                router.visit('/security-devices/monitoring', {
+                                    preserveState: false,
+                                    preserveScroll: true,
+                                })
                             }
                         >
                             Refresh monitoring
@@ -704,7 +717,7 @@ export default function Monitoring({
                 }
             }}
             owners={{
-                profiles: auth?.can?.['securityDevices.devices.view'] === true,
+                profiles: auth?.can?.securityDevices?.devicesView === true,
             }}
         />
     );
@@ -841,7 +854,7 @@ function MonitoringScreen({
                                     }}
                                 >
                                     <Plus className="size-4" />
-                                    Create direct monitor
+                                    Add direct monitor
                                 </PageHeaderPrimaryButton>
                             ) : null}
                             {workspace.can.view_control_room ? (
@@ -990,7 +1003,7 @@ function MonitoringScreen({
                                     ) : null}
                                 </>
                             ) : (
-                                <span className="text-[11.5px] text-band-foreground/70">
+                                <span className="text-xs text-band-foreground/70">
                                     These evidence views use the full permitted
                                     scope. Monitor search opens Overview.
                                 </span>

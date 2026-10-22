@@ -214,7 +214,7 @@ export function DiscoveryScopeDialog({
                     <DialogTitle>
                         {editing
                             ? `Update ${scope.name}`
-                            : 'Create direct discovery scope'}
+                            : 'Add direct discovery scope'}
                     </DialogTitle>
                     <DialogDescription>
                         Central discovery over the main SD-WAN is the default.
@@ -451,7 +451,7 @@ export function DiscoveryScopeDialog({
                                 ? 'Applying…'
                                 : editing
                                   ? 'Apply scope update'
-                                  : 'Create direct scope'}
+                                  : 'Add direct scope'}
                         </Button>
                     </DialogFooter>
                 </form>

@@ -5,6 +5,10 @@ namespace App\Domain\SecurityDevices\Management\Services;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartContract;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptContract;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptIdentity;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptPolicy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
 use App\Domain\SecurityDevices\Management\Data\ClientLocationCommandOrigin;
@@ -53,6 +57,20 @@ final class DeviceCommandRequestService
 
     public function request(Device $device, User $actor, CommandRequestInput $input): DeviceCommandRequest
     {
+        if ($input->capability === EndpointScriptContract::CAPABILITY) {
+            abort_unless($input->originContext === null, 422);
+            if (! app(EndpointScriptPolicy::class)->available()) {
+                throw ValidationException::withMessages(['capability' => 'Reviewed script execution is not available.']);
+            }
+
+            return app(EndpointScriptAuthority::class)->withBinding($device, $actor, $input->parameters,
+                function (User $current, Device $locked, array $binding) use ($input): DeviceCommandRequest {
+                    abort_unless(app(EndpointScriptIdentity::class)->confirmed($current)
+                        && $input->stepUpConfirmedAt?->timestamp === app('request')->session()->get('auth.password_confirmed_at'), 403);
+
+                    return $this->requestCanonical($locked, $current, $input, scriptBinding: $binding);
+                });
+        }
         $reserved = str_starts_with(strtolower(trim($input->idempotencyKey)), 'client-location');
         if ($reserved && ($input->originContext === null
             || preg_match('/^client-location:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $input->idempotencyKey) !== 1)) {
@@ -95,7 +113,7 @@ final class DeviceCommandRequestService
         throw new \LogicException('Unreachable request retry state.');
     }
 
-    private function requestCanonical(Device $device, User $actor, CommandRequestInput $input, ?DeviceCommandRequest $clientExisting = null, ?array $clientCurrent = null): DeviceCommandRequest
+    private function requestCanonical(Device $device, User $actor, CommandRequestInput $input, ?DeviceCommandRequest $clientExisting = null, ?array $clientCurrent = null, ?array $scriptBinding = null): DeviceCommandRequest
     {
         abort_unless($actor->canDo('securityDevices.devices.view'), 403);
         if ($clientCurrent === null) {
@@ -178,7 +196,7 @@ final class DeviceCommandRequestService
             'reason' => $reason,
             'idempotency_key' => $idempotencyKey,
         ], [
-            'reason' => ['required', 'string', 'min:10', ...($capability->key === 'endpoint.computer.restart' ? ['not_regex:/[\p{Cc}\p{Cf}]/u'] : []), 'max:'.(in_array($capability->key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install'], true) ? 500 : 1000)],
+            'reason' => ['required', 'string', 'min:10', ...(in_array($capability->key, ['endpoint.computer.restart', EndpointScriptContract::CAPABILITY], true) ? ['not_regex:/[\p{Cc}\p{Cf}\x{FFFD}]/u'] : []), 'max:'.(in_array($capability->key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install', EndpointScriptContract::CAPABILITY], true) ? 500 : 1000)],
             'idempotency_key' => ['required', 'string', 'max:128', 'regex:/^[A-Za-z0-9:_-]+$/'],
         ])->validate();
 
@@ -220,7 +238,7 @@ final class DeviceCommandRequestService
                 'it_change_id' => 'This action requires a current approved IT Change linked to this Device and Site.',
             ]);
         }
-        if (! $input->breakGlass && ! $capability->requiresChange && $input->itChangeId !== null && ! in_array($capability->key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install'], true)) {
+        if (! $input->breakGlass && ! $capability->requiresChange && $input->itChangeId !== null && ! in_array($capability->key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install', EndpointScriptContract::CAPABILITY], true)) {
             throw ValidationException::withMessages([
                 'it_change_id' => 'This action does not use an IT Change maintenance window.',
             ]);
@@ -236,6 +254,9 @@ final class DeviceCommandRequestService
             ->where('capability', $capability->key)
             ->first();
         if ($existing) {
+            if ($scriptBinding !== null) {
+                app(EndpointScriptAuthority::class)->assertBinding($existing, $scriptBinding);
+            }
             $resumed = $this->resumeExisting(
                 $existing,
                 $actor,
@@ -275,9 +296,13 @@ final class DeviceCommandRequestService
             $change !== null,
             $input->breakGlass,
         );
-        $expectedState = $capability->key === 'endpoint.service.manage'
-            ? app(EndpointServiceAuthority::class)->bind($device, $actor, $parameters)
-            : ($capability->key === 'endpoint.computer.restart' ? app(EndpointRestartAuthority::class)->bind($device, $actor, $parameters) : ($capability->key === 'endpoint.software.install' ? app(EndpointSoftwareAuthority::class)->bind($device, $actor, $parameters) : $this->expectedState->resolve($capability->key, $parameters)));
+        $expectedState = match ($capability->key) {
+            EndpointScriptContract::CAPABILITY => $scriptBinding ?? throw new \LogicException('Script binding must retain current authority locks.'),
+            'endpoint.service.manage' => app(EndpointServiceAuthority::class)->bind($device, $actor, $parameters),
+            'endpoint.computer.restart' => app(EndpointRestartAuthority::class)->bind($device, $actor, $parameters),
+            'endpoint.software.install' => app(EndpointSoftwareAuthority::class)->bind($device, $actor, $parameters),
+            default => $this->expectedState->resolve($capability->key, $parameters),
+        };
         $safeSummary = Arr::only($parameters, $capability->safeSummaryFields);
         $commandUuid = (string) Str::orderedUuid();
         $payload = new CommandSigningPayload(
@@ -331,6 +356,7 @@ final class DeviceCommandRequestService
             $breakGlassReviewer,
             $breakGlassReason,
             $now,
+            $scriptBinding,
         ): DeviceCommandRequest {
             // Client intake already checked and locked the key before its
             // evidence graph. A concurrent insertion is handled after rollback.
@@ -342,6 +368,9 @@ final class DeviceCommandRequestService
                 ->lockForUpdate()
                 ->first();
             if ($existing) {
+                if ($scriptBinding !== null) {
+                    app(EndpointScriptAuthority::class)->assertBinding($existing, $scriptBinding);
+                }
                 $this->assertIdempotentContract(
                     $existing,
                     $parameters,
@@ -367,6 +396,7 @@ final class DeviceCommandRequestService
                 'it_change_id' => $change?->id,
                 'collector_id' => $collectorId,
                 'capability' => $capability->key,
+                ...($capability->key === EndpointScriptContract::CAPABILITY ? ['execution_route' => 'endpoint'] : []),
                 'capability_version' => 1,
                 'management_level' => $capability->level,
                 'risk' => $capability->risk,
@@ -397,7 +427,7 @@ final class DeviceCommandRequestService
                 'risk' => $capability->risk->value,
                 'site_id' => $siteId,
                 'status' => $status->value,
-                'execution_route' => $collectorId === null ? 'central' : 'collector',
+                'execution_route' => $capability->key === EndpointScriptContract::CAPABILITY ? 'endpoint' : ($collectorId === null ? 'central' : 'collector'),
                 'safe_parameters' => $safeSummary,
                 'confirmation_mode' => $capability->confirmationMode->value,
                 'impact_acknowledged' => $impactAcknowledgedAt !== null,

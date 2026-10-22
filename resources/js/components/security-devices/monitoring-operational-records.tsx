@@ -12,6 +12,7 @@ import { ControlRoomAlertAccessRequired } from '@/components/security-devices/pe
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewRow } from '@/components/wizard/shell';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { readableKey, readablePhrase } from '@/lib/security-devices-labels';
 import type {
     CentralSiteReadiness,
     CollectionPath,
@@ -36,12 +37,13 @@ import type { ReactNode } from 'react';
 export type MonitoringView = EvidenceRecordsView;
 export type MonitoringOwners = { profiles: boolean };
 type Fact = [string, ReactNode];
+/** Sentence-case words for a monitoring key ("Collection unavailable"). */
 export function monitoringLabel(value: string | null | undefined) {
-    return value
-        ? value
-              .replace(/[_-]/g, ' ')
-              .replace(/\b\w/g, (letter) => letter.toUpperCase())
-        : 'Not recorded';
+    return readableKey(value);
+}
+/** The same words mid-sentence ("Runtime collection unavailable"). */
+export function monitoringPhrase(value: string | null | undefined) {
+    return readablePhrase(value);
 }
 export function monitoringTone(value: string): StatusVariant {
     if (
@@ -347,7 +349,7 @@ export function MonitorRecords({
                     </p>
                     {r.reported_state !== r.effective_state ? (
                         <EntityChip>
-                            Reported {monitoringLabel(r.reported_state)}
+                            Reported {monitoringPhrase(r.reported_state)}
                         </EntityChip>
                     ) : null}
                     {r.latest_observation ? (
@@ -372,7 +374,7 @@ export function MonitorRecords({
                                 allowed={owners.profiles}
                             />
                             {r.suppression_reason
-                                ? ` · ${monitoringLabel(r.suppression_reason)}`
+                                ? ` · ${monitoringPhrase(r.suppression_reason)}`
                                 : ''}
                         </p>
                     ) : null}
@@ -657,7 +659,7 @@ export function CollectionRecords({
                         · {r.affected_devices} affected devices ·{' '}
                         {r.affected_monitors} affected monitors
                     </p>
-                    <p>Reported {monitoringLabel(r.reported_status)}</p>
+                    <p>Reported {monitoringPhrase(r.reported_status)}</p>
                 </>
             )}
             footer={(r) => `Last heartbeat ${stamp(r.last_seen_at)}`}
@@ -765,15 +767,15 @@ export function ReadinessRecords({
                         />
                         <MonitoringState
                             value={r.runtime.state}
-                            label={`Runtime ${monitoringLabel(r.runtime.state)}`}
+                            label={`Runtime ${monitoringPhrase(r.runtime.state)}`}
                         />
                         <MonitoringState
                             value={r.topology.state}
-                            label={`Topology ${monitoringLabel(r.topology.state)}`}
+                            label={`Topology ${monitoringPhrase(r.topology.state)}`}
                         />
                         <MonitoringState
                             value={r.discovery.state}
-                            label={`Discovery ${monitoringLabel(r.discovery.state)}`}
+                            label={`Discovery ${monitoringPhrase(r.discovery.state)}`}
                         />
                         {r.unmonitored_devices > 0 ? (
                             <EntityChip>
@@ -1007,7 +1009,7 @@ export function DependencyRecords({
                     <p>{percent(r.confidence)} confidence</p>
                     <p>
                         {monitoringLabel(r.source)} evidence ·{' '}
-                        {monitoringLabel(r.policy)}
+                        {monitoringPhrase(r.policy)}
                     </p>
                 </>
             )}
@@ -1141,7 +1143,7 @@ export function TrendRecords({
                         {r.latest_value ?? 'No numeric value'} {r.unit ?? ''}
                     </p>
                     <p>
-                        {r.samples} samples · {monitoringLabel(r.direction)} ·{' '}
+                        {r.samples} samples · {monitoringPhrase(r.direction)} ·{' '}
                         {r.state_changes} state changes
                     </p>
                 </>
@@ -1245,7 +1247,7 @@ export function CapacityRecords({
                         samples
                     </p>
                     <p>
-                        Projection {monitoringLabel(r.projection.state)}
+                        Projection {monitoringPhrase(r.projection.state)}
                         {r.projection.threshold_at
                             ? ` · threshold ${stamp(r.projection.threshold_at)}`
                             : ''}
@@ -1346,7 +1348,7 @@ export function RetentionRecords({
             keyFor={(r) => r.id}
             name={(r) => r.name}
             subline={(r) =>
-                `${monitoringLabel(r.scope)} · ${monitoringLabel(r.data_class)}`
+                `${monitoringLabel(r.scope)} · ${monitoringPhrase(r.data_class)}`
             }
             icon={Clock3}
             state={(r) => (r.legal_hold ? 'legal_hold' : 'retention_policy')}
@@ -1416,13 +1418,13 @@ export function QueueRecords({
             description="A dispatched heartbeat alone does not prove a worker consumed it."
             keyFor={(r) => r.name}
             name={(r) => monitoringLabel(r.name)}
-            subline={(r) => `Queue ${monitoringLabel(r.name)}`}
+            subline={(r) => `Queue ${monitoringPhrase(r.name)}`}
             icon={Activity}
             state={(r) => r.state}
             summary={(r) => (
                 <>
                     <p>
-                        Worker {monitoringLabel(r.worker_state)}
+                        Worker {monitoringPhrase(r.worker_state)}
                         {r.heartbeat_age_seconds === null
                             ? ' · no heartbeat consumed'
                             : ` · heartbeat ${r.heartbeat_age_seconds}s ago`}

@@ -137,7 +137,7 @@ class DeviceController extends Controller
             ],
             'scopeLabel' => $scopeLabel,
             'filterOptions' => [
-                'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
+                'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => self::domainLabel($d)]),
                 'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
                 'healthStatuses' => collect(HealthStatus::cases())->map(fn ($h) => ['value' => $h->value, 'label' => $h->label()]),
                 'providers' => $providers,
@@ -154,6 +154,7 @@ class DeviceController extends Controller
     public function show(Request $request, Device $device)
     {
         $user = $request->user();
+        $asOf = now()->toImmutable();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
         $this->access->assertCanViewDevice($user, $device);
 
@@ -303,6 +304,8 @@ class DeviceController extends Controller
         $accessibleAssetIds = $this->access->accessibleAssetIds($user);
 
         return Inertia::render('security-devices/devices/show', [
+            'actor_id' => (int) $user->id,
+            'as_of' => $asOf->toISOString(),
             'endpoint_setup' => config('endpoint_management.enabled') && $canUpdate
                 && $user->canDo('securityDevices.commands.admin')
                 && $device->domain === 'it_infrastructure' && in_array($device->category, ['endpoint', 'server'], true)
@@ -311,6 +314,8 @@ class DeviceController extends Controller
                 'id' => $device->id,
                 'name' => $device->name,
                 'status' => $device->status?->value,
+                // The assign dialog says which consent rule applies (tracking devices only).
+                'domain' => $device->domain,
             ],
             'profile' => $profile,
             'activeAssignment' => $activeAssignment ? [
@@ -880,13 +885,25 @@ class DeviceController extends Controller
     // mapDeviceForList() and resolveAssignableName() are in MapsDevicesForList trait.
 
     /** @return array{taxonomy: array<string, mixed>, domains: Collection<int, array{value: string, label: string}>, statuses: Collection<int, array{value: string, label: string}>} */
+    /** Domains are named as the Security & Devices sidebar names their workspaces. */
+    private static function domainLabel(DeviceDomain $domain): string
+    {
+        return match ($domain) {
+            DeviceDomain::ItInfrastructure => 'Network & IT',
+            DeviceDomain::Security => 'Security',
+            DeviceDomain::IotHealthcare => 'Healthcare',
+            DeviceDomain::Tracking => 'Tracking',
+            DeviceDomain::Facilities => 'Facilities & IoT',
+        };
+    }
+
     private function deviceFormOptions(): array
     {
         return [
             'taxonomy' => DeviceTaxonomy::all(),
             'domains' => collect(DeviceDomain::cases())->map(fn ($domain) => [
                 'value' => $domain->value,
-                'label' => $domain->label(),
+                'label' => self::domainLabel($domain),
             ]),
             'statuses' => collect(DeviceStatus::cases())->map(fn ($status) => [
                 'value' => $status->value,

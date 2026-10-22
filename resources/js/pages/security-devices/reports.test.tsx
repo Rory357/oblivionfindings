@@ -12,7 +12,7 @@ import { reportFixture } from './reports-test-fixtures';
 import Reports from './reports';
 const mocks = vi.hoisted(() => ({
     actor: 7,
-    can: {} as Record<string, boolean>,
+    can: {} as Record<string, Record<string, boolean>>,
     reload: vi.fn(),
     download: vi.fn(),
     visit: vi.fn(),
@@ -47,7 +47,7 @@ vi.mock('@/layouts/app-layout', () => ({
 }));
 beforeEach(() => {
     mocks.actor = 7;
-    mocks.can = { 'securityDevices.reports.view': true };
+    mocks.can = { securityDevices: { reportsView: true } };
     mocks.reload.mockReset();
     mocks.download.mockReset();
     mocks.visit.mockReset();
@@ -83,7 +83,10 @@ type Reload = {
         component: string;
         props: {
             actor_id: number;
-            auth: { user: { id: number }; can: Record<string, boolean> };
+            auth: {
+                user: { id: number };
+                can: Record<string, Record<string, boolean>>;
+            };
         };
     }) => void;
 };
@@ -240,7 +243,7 @@ describe('Security and Devices report catalogue', () => {
         expect(screen.getByText(/Reports are restricted/)).toBeInTheDocument();
     });
     it('requires current report view permission independently of other manager permissions', () => {
-        mocks.can = { 'securityDevices.integrations.manage': true };
+        mocks.can = { securityDevices: { integrationsManage: true } };
         render(<Reports {...reportFixture()} />);
         expect(screen.queryByRole('article')).not.toBeInTheDocument();
         expect(
@@ -322,47 +325,93 @@ describe('Security and Devices report catalogue', () => {
             screen.queryByText('Secret SQL message'),
         ).not.toBeInTheDocument();
     });
-    it('requires the correct actor and owner when recovering a denied catalogue', () => {
-        render(<Reports {...reportFixture()} />);
+    it('requires a complete page remount to recover a denied catalogue for the current owner', () => {
+        const data = reportFixture();
+        const { unmount } = render(<Reports {...data} />);
         fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
-        invalid(404);
-        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
-        const cb = mocks.reload.mock.calls[1][0] as Reload;
+        const partial = mocks.reload.mock.calls[0][0] as Reload;
         act(() =>
-            cb.onSuccess({
+            partial.onSuccess({
                 component: 'security-devices/reports',
                 props: {
                     actor_id: 8,
                     auth: {
                         user: { id: 8 },
-                        can: { 'securityDevices.reports.view': true },
+                        can: { securityDevices: { reportsView: true } },
                     },
                 },
             }),
         );
         expect(screen.queryByRole('article')).not.toBeInTheDocument();
-        act(() => cb.onFinish());
+        act(() => partial.onFinish());
         fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
-        const good = mocks.reload.mock.calls[2][0] as Reload;
-        act(() =>
-            good.onSuccess({
-                component: 'security-devices/reports',
-                props: {
-                    actor_id: 7,
-                    auth: {
-                        user: { id: 7 },
-                        can: { 'securityDevices.reports.view': true },
-                    },
-                },
+        expect(mocks.visit).toHaveBeenCalledWith(
+            '/security-devices/reports',
+            expect.objectContaining({
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
             }),
         );
+        expect(mocks.visit.mock.calls[0][1]).not.toHaveProperty('only');
+        expect(mocks.reload).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        unmount();
+        mocks.actor = 8;
+        render(
+            <Reports
+                {...data}
+                actor_id={8}
+                stats={{ ...data.stats, devices: 99 }}
+            />,
+        );
         expect(screen.getAllByRole('article')).toHaveLength(3);
-        expect(mocks.reload.mock.calls[2][0].only).toEqual([
-            'stats',
-            'windowDays',
-            'actor_id',
-            'as_of',
-            'auth',
-        ]);
+        expect(screen.queryAllByText('2010')).toHaveLength(0);
+        expect(screen.getAllByText('99').length).toBeGreaterThan(0);
+    });
+});
+
+describe('reports received DTO ownership', () => {
+    it('quarantines retained private DTOs after paired actor metadata changes', async () => {
+        const original = reportFixture();
+        const { rerender } = render(<Reports {...original} />);
+        await open('Device inventory');
+        mocks.actor = 8;
+        // Same-page partial update: actor metadata changes, all private DTOs remain from actor 7.
+        rerender(
+            <Reports {...original} actor_id={8} as_of="2026-10-13T02:00:00Z" />,
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: /Download/ }),
+        ).not.toBeInTheDocument();
+        expect(screen.queryAllByText('2010')).toHaveLength(0);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.visit).toHaveBeenCalledWith(
+            '/security-devices/reports',
+            expect.objectContaining({
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
+            }),
+        );
+        expect(mocks.visit.mock.calls.at(-1)![1]).not.toHaveProperty('only');
+        expect(mocks.reload).not.toHaveBeenCalled();
+    });
+});
+
+describe('reports same-account reads', () => {
+    it('keeps the existing same-account refresh projection and owner', () => {
+        const original = reportFixture();
+        const { rerender } = render(<Reports {...original} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.reload).toHaveBeenCalledTimes(1);
+        expect(mocks.reload.mock.calls[0][0].only).toEqual(
+            expect.arrayContaining(['actor_id', 'as_of', 'auth']),
+        );
+        expect(mocks.visit).not.toHaveBeenCalled();
+        rerender(<Reports {...original} as_of="2026-10-13T02:00:00Z" />);
+        expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
     });
 });

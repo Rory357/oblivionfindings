@@ -50,6 +50,7 @@ import {
 import { useMemo, useState } from 'react';
 import {
     DeviceCard,
+    deviceCategoryLabel,
     deviceMonitoringVariant,
     formatTimeSince,
     type DeviceListItem,
@@ -227,7 +228,7 @@ function DeviceInventory({
             label: 'Equipment',
             width: '1fr',
             cell: (device) => (
-                <EntityChip>{device.category.replaceAll('_', ' ')}</EntityChip>
+                <EntityChip>{deviceCategoryLabel(device.category)}</EntityChip>
             ),
         },
         {
@@ -379,7 +380,7 @@ function DeviceInventory({
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                             <PageHeaderMeterBlock
-                                label="Need attention"
+                                label="Needs attention"
                                 tone={stats.attention > 0 ? 'warning' : 'brand'}
                                 onClick={() =>
                                     selectMeterView({ view: 'needs_attention' })

@@ -2,6 +2,7 @@
 
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointAgentController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointRestartCommandController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointScriptCommandController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointServiceCommandController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointSoftwareCommandController;
 use App\Domain\SecurityDevices\Endpoints\Http\Middleware\EndpointTransport;
@@ -25,6 +26,12 @@ Route::prefix('endpoints/agent')->name('api.endpoints.agent.')->middleware(Endpo
     Route::get('software/{attempt}/artifact', [$software, 'artifact'])->whereUuid('attempt')->name('software.artifact');
     Route::post('software/{attempt}/claim', [$software, 'claim'])->whereUuid('attempt')->name('software.claim');
     Route::post('software/{attempt}/result', [$software, 'result'])->whereUuid('attempt')->name('software.result');
+    $scripts = EndpointScriptCommandController::class;
+    Route::get('scripts', [$scripts, 'poll'])->name('scripts.poll');
+    Route::get('scripts/{attempt}/artifact', [$scripts, 'artifact'])->whereUuid('attempt')->name('scripts.artifact');
+    Route::post('scripts/{attempt}/claim', [$scripts, 'claim'])->whereUuid('attempt')->name('scripts.claim');
+    Route::post('scripts/{attempt}/result', [$scripts, 'result'])->whereUuid('attempt')->name('scripts.result');
+    Route::post('scripts/{attempt}/output', [$scripts, 'output'])->whereUuid('attempt')->name('scripts.output');
     Route::post('heartbeat', [EndpointAgentController::class, 'heartbeat'])->name('heartbeat');
 });
 

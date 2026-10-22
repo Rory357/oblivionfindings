@@ -306,8 +306,8 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
                                 {options.enrolment_minutes} minutes and connects
                                 only this approved computer to the server shown
                                 above. Creating it does not install software or
-                                start a remote session. AI provider keys stay in
-                                Oblivion.
+                                start a remote session. AI provider keys stay on
+                                this server.
                             </p>
                         )}
                         <p className="text-subtle">
