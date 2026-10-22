@@ -223,7 +223,7 @@ describe('catalogue workspace privacy and draft boundaries', () => {
         };
         const rendered = render(<RemoteSupport {...props} />);
         expect(
-            screen.getByRole('link', { name: 'Script catalogue' }),
+            screen.getByRole('link', { name: 'Approved scripts' }),
         ).toHaveAttribute(
             'href',
             '/security-devices/scripts?expected_actor_id=43',
@@ -234,7 +234,7 @@ describe('catalogue workspace privacy and draft boundaries', () => {
             />,
         );
         expect(
-            screen.queryByRole('link', { name: 'Script catalogue' }),
+            screen.queryByRole('link', { name: 'Approved scripts' }),
         ).not.toBeInTheDocument();
     });
     it('removes an upload draft when its current upload permission is withdrawn', () => {

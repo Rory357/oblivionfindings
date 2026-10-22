@@ -11,6 +11,7 @@ import {
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page/page-header';
@@ -22,7 +23,7 @@ import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { FileCode, Monitor, Search, ShieldCheck } from 'lucide-react';
+import { FileCode, Monitor, Plus, Search, ShieldCheck } from 'lucide-react';
 import { useCallback, useState, type MouseEvent } from 'react';
 import {
     scriptBase,
@@ -42,10 +43,13 @@ const variants: Record<ScriptStatus, StatusVariant> = {
     published: 'success',
     withdrawn: 'warning',
 };
+const title = 'Approved scripts';
+// The catalogue is reached from Remote support, so the trail goes back there.
 const breadcrumbs = [
     { title: 'Home', href: '/dashboard' },
     { title: 'IT & Support', href: '/it' },
-    { title: 'Scripts', href: scriptBase },
+    { title: 'Remote support', href: '/it/remote-support' },
+    { title, href: scriptBase },
 ];
 function status(row: ScriptRecord) {
     return (
@@ -68,8 +72,8 @@ export default function ScriptCatalogue(props: ScriptIndex) {
         signedInActor !== props.actor_id
     ) {
         return (
-            <main>
-                <Head title="Scripts" />
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title={title} />
                 <Alert>
                     <AlertDescription>
                         Sign-in has changed. Load the current catalogue before
@@ -82,7 +86,7 @@ export default function ScriptCatalogue(props: ScriptIndex) {
                         </Button>
                     </AlertDescription>
                 </Alert>
-            </main>
+            </AppLayout>
         );
     }
     let index: ScriptIndex;
@@ -102,7 +106,7 @@ export default function ScriptCatalogue(props: ScriptIndex) {
     } catch {
         return (
             <AppLayout breadcrumbs={breadcrumbs}>
-                <Head title="Scripts" />
+                <Head title={title} />
                 <Alert>
                     <AlertDescription>
                         Script information could not be verified.{' '}
@@ -137,14 +141,28 @@ export default function ScriptCatalogue(props: ScriptIndex) {
 }
 export function ScriptWorkspace({ index }: { index: ScriptIndex }) {
     const [rows, setRows] = useState(index.scripts),
-        [summary, setSummary] = useState(index.summary),
         [search, setSearch] = useState(index.query.search);
+    // Header counts follow the latest props (a Refresh that leaves the visible
+    // rows unchanged keeps this workspace mounted) plus decisions made here.
+    const [counts, setCounts] = useState({
+        source: index.summary,
+        value: index.summary,
+    });
+    if (counts.source !== index.summary)
+        setCounts({ source: index.summary, value: index.summary });
+    const summary =
+        counts.source === index.summary ? counts.value : index.summary;
     const [selected, setSelected] = useState<ScriptRecord | null>(null),
         [open, setOpen] = useState(false),
         [guarded, setGuarded] = useState(false);
-    const [uploadMounted, setUploadMounted] = useState(false),
-        [uploadOpen, setUploadOpen] = useState(false),
-        [refreshNeeded, setRefreshNeeded] = useState(false);
+    // Each upload gets its own dialog instance (and so its own request key);
+    // a saved one is never reopened by "Add script".
+    const [upload, setUpload] = useState<{
+            key: number;
+            open: boolean;
+            saved: boolean;
+        } | null>(null),
+        [uploadSaved, setUploadSaved] = useState(false);
     const [context, setContext] = useState<{
         x: number;
         y: number;
@@ -164,34 +182,50 @@ export function ScriptWorkspace({ index }: { index: ScriptIndex }) {
             return;
         }
         leave.request(() => {
-            setUploadMounted(false);
-            setUploadOpen(false);
+            setUpload(null);
             setSelected(row);
             setOpen(true);
             setGuarded(false);
         });
     }
-    function upload() {
-        if (!index.can_upload) return;
-        if (uploadMounted) {
-            setUploadOpen(true);
-            return;
-        }
+    function startUpload() {
         leave.request(() => {
             setSelected(null);
             setOpen(false);
             setGuarded(false);
-            setUploadMounted(true);
-            setUploadOpen(true);
+            setUploadSaved(false);
+            setUpload((previous) => ({
+                key: (previous?.key ?? 0) + 1,
+                open: true,
+                saved: false,
+            }));
         });
+    }
+    function addScript() {
+        if (!index.can_upload) return;
+        // An unfinished draft reopens as it was left; a saved one is done.
+        if (upload && !upload.saved) {
+            setUpload({ ...upload, open: true });
+            return;
+        }
+        startUpload();
+    }
+    function refresh() {
+        router.reload({ onSuccess: () => setUploadSaved(false) });
     }
     function changed(row: ScriptRecord) {
         const before = rows.find((x) => x.uuid === row.uuid);
         if (before && before.status !== row.status) {
-            setSummary((counts) => ({
-                ...counts,
-                [before.status]: Math.max(0, counts[before.status] - 1),
-                [row.status]: counts[row.status] + 1,
+            setCounts((current) => ({
+                ...current,
+                value: {
+                    ...current.value,
+                    [before.status]: Math.max(
+                        0,
+                        current.value[before.status] - 1,
+                    ),
+                    [row.status]: current.value[row.status] + 1,
+                },
             }));
         }
         setRows((values) => values.map((x) => (x.uuid === row.uuid ? row : x)));
@@ -225,19 +259,19 @@ export function ScriptWorkspace({ index }: { index: ScriptIndex }) {
     );
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Scripts" />
+            <Head title={title} />
             <ItModuleShell>
                 <PageHeader
-                    title="Scripts"
+                    title={title}
                     icon={FileCode}
                     subline="Reviewed Windows scripts and their approval history"
                     actions={
                         <>
                             {index.can_upload && (
-                                <PageHeaderGlassButton onClick={upload}>
-                                    <FileCode aria-hidden="true" />
+                                <PageHeaderPrimaryButton onClick={addScript}>
+                                    <Plus aria-hidden="true" />
                                     Add script
-                                </PageHeaderGlassButton>
+                                </PageHeaderPrimaryButton>
                             )}
                             <PageHeaderGlassButton asChild>
                                 <Link href="/it/remote-support">
@@ -299,11 +333,30 @@ export function ScriptWorkspace({ index }: { index: ScriptIndex }) {
                 <div className="grid min-w-0 gap-5 pt-5">
                     <Alert>
                         <AlertDescription>
-                            Script execution is not available yet. Catalogue
-                            approval records the reviewed version; it does not
-                            run the script.
+                            Scripts can’t run on computers yet. Approving a
+                            script records the reviewed version; it does not run
+                            it.
                         </AlertDescription>
                     </Alert>
+                    {uploadSaved && (
+                        <Alert role="status">
+                            <AlertDescription>
+                                Script draft saved. Refresh the catalogue to
+                                update the list and counts.
+                                <div className="flex flex-wrap gap-2">
+                                    <Button variant="outline" onClick={refresh}>
+                                        Refresh catalogue
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setUploadSaved(false)}
+                                    >
+                                        Dismiss
+                                    </Button>
+                                </div>
+                            </AlertDescription>
+                        </Alert>
+                    )}
                     {!index.identity_confirmed && (
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <p className="text-subtle">
@@ -334,10 +387,7 @@ export function ScriptWorkspace({ index }: { index: ScriptIndex }) {
                         }
                         caption={`${shown.length} shown`}
                         right={
-                            <Button
-                                variant="outline"
-                                onClick={() => router.reload()}
-                            >
+                            <Button variant="outline" onClick={refresh}>
                                 Refresh
                             </Button>
                         }
@@ -478,27 +528,26 @@ export function ScriptWorkspace({ index }: { index: ScriptIndex }) {
                         />
                     )}
                 </div>
-                {refreshNeeded && (
-                    <Alert role="status">
-                        <AlertDescription>
-                            Upload saved. Refresh the catalogue to see its
-                            current state.{' '}
-                            <Button
-                                variant="outline"
-                                onClick={() => router.reload()}
-                            >
-                                Refresh catalogue
-                            </Button>
-                        </AlertDescription>
-                    </Alert>
-                )}
-                {uploadMounted && index.can_upload && (
+                {upload && index.can_upload && (
                     <ScriptUploadDialog
+                        key={upload.key}
                         actorId={index.actor_id}
-                        open={uploadOpen}
-                        onClose={() => setUploadOpen(false)}
+                        open={upload.open}
+                        onClose={() =>
+                            setUpload(
+                                (current) =>
+                                    current && { ...current, open: false },
+                            )
+                        }
                         onDirtyChange={guard}
-                        onUploaded={() => setRefreshNeeded(true)}
+                        onUploaded={() => {
+                            setUpload(
+                                (current) =>
+                                    current && { ...current, saved: true },
+                            );
+                            setUploadSaved(true);
+                        }}
+                        onAddAnother={startUpload}
                     />
                 )}
                 {context && (

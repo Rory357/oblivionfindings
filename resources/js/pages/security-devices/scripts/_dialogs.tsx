@@ -1,32 +1,93 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
+import { formatFileSize } from '@/components/ui/file-dropzone';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
 import axios from 'axios';
-import { FileCode, ListChecks, ShieldCheck } from 'lucide-react';
+import { FileCode, ListChecks, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+    responseStatus,
     scriptBase,
+    scriptBusyMessage,
     scriptMaterial,
     scriptReply,
     scriptStatusLabel,
     scriptText,
     type ScriptAction,
+    type ScriptManifest,
     type ScriptMaterial,
     type ScriptRecord,
+    type ScriptReview,
 } from './_contracts';
+import { ReasonField } from './_reason-field';
 
 const actions: Record<
     ScriptAction,
-    { label: string; status: ScriptRecord['status'] }
+    {
+        label: string;
+        status: ScriptRecord['status'];
+        confirmTitle: string;
+        confirmText: string;
+        effect: string;
+        destructive: boolean;
+    }
 > = {
-    submit: { label: 'Submit for review', status: 'pending_review' },
-    review: { label: 'Approve this version', status: 'published' },
-    withdraw: { label: 'Withdraw this version', status: 'withdrawn' },
+    submit: {
+        label: 'Submit for review',
+        status: 'pending_review',
+        confirmTitle: 'Submit this script for review?',
+        confirmText: 'Submit for review',
+        effect: 'Another authorised person will check this exact version before it can be approved. You can’t edit it after submitting — to change it, withdraw it and upload a new version. Nothing runs on any computer.',
+        destructive: false,
+    },
+    review: {
+        label: 'Approve this version',
+        status: 'published',
+        confirmTitle: 'Approve this script version?',
+        confirmText: 'Approve version',
+        effect: 'This exact version becomes an approved script, recorded with you as its reviewer. Each computer’s script policy and staff consent still apply, and scripts can’t run yet.',
+        destructive: false,
+    },
+    withdraw: {
+        label: 'Withdraw this version',
+        status: 'withdrawn',
+        confirmTitle: 'Withdraw this script version?',
+        confirmText: 'Withdraw version',
+        effect: 'This version can no longer be approved or used on any computer. This can’t be undone — to use the script again, upload it as a new version.',
+        destructive: true,
+    },
 };
-export function ScriptFacts({ entries }: { entries: [string, ReactNode][] }) {
+export const architectureLabel = (value: ScriptManifest['architecture']) =>
+    value === 'amd64' ? 'x64' : 'ARM64';
+export const outputSensitivityLabel: Record<
+    ScriptReview['output_sensitivity'],
+    string
+> = {
+    none: 'No sensitive output',
+    operational: 'Operational information',
+    sensitive: 'Sensitive information',
+};
+export const timeoutLabel: Record<
+    ScriptManifest['execution_policy']['timeout_mode'],
+    string
+> = {
+    report_only: 'Report that it ran too long and let it finish',
+    terminate_owned_job: 'Ask the computer to stop the script',
+};
+const identityExpired =
+    'Your identity check has expired — it lasts 15 minutes. Confirm your identity again to continue.';
+const deniedCodes = [401, 403, 404, 419];
+export function ScriptFacts({
+    entries,
+    technical = false,
+}: {
+    entries: [string, ReactNode][];
+    /** Hashes and other long identifiers: monospace, any-point wrapping. */
+    technical?: boolean;
+}) {
     return (
         <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
             {entries.map(([label, value]) => (
@@ -34,7 +95,13 @@ export function ScriptFacts({ entries }: { entries: [string, ReactNode][] }) {
                     <dt className="text-caption text-muted-foreground">
                         {label}
                     </dt>
-                    <dd className="text-subtle">{value}</dd>
+                    <dd
+                        className={
+                            technical ? 'text-caption font-mono' : 'text-subtle'
+                        }
+                    >
+                        {value}
+                    </dd>
                 </div>
             ))}
         </dl>
@@ -51,6 +118,8 @@ type Pending = {
         reviewed_content_hash?: string;
     };
 };
+/** Why the current record is being reloaded after a refused or failed write. */
+type Reload = 'changed' | 'refused' | 'not_saved' | 'read' | 'manual';
 export function ScriptReviewDialog({
     actorId,
     item,
@@ -74,6 +143,8 @@ export function ScriptReviewDialog({
         [reason, setReason] = useState(''),
         [notice, setNotice] = useState(''),
         [denied, setDenied] = useState(false);
+    const [confirming, setConfirming] = useState<ScriptAction | null>(null),
+        [reloadNeeded, setReloadNeeded] = useState(false);
     const active = useRef<AbortController | null>(null),
         alive = useRef(true),
         busyNow = useRef(false);
@@ -95,56 +166,146 @@ export function ScriptReviewDialog({
     }, [open, pending]);
     const query = '?expected_actor_id=' + actorId;
     const confirmHref = scriptBase + '/confirm-identity' + query;
-    async function readMaterial() {
-        if (busyNow.current || pending || !current.can_read_material) return;
+    const live = (controller: AbortController) =>
+        !controller.signal.aborted && alive.current;
+    function start() {
         const controller = new AbortController();
         active.current = controller;
         busyNow.current = true;
         setBusy(true);
-        setNotice('');
+        return controller;
+    }
+    function finish() {
+        busyNow.current = false;
+        if (alive.current) {
+            setBusy(false);
+            setConfirming(null);
+        }
+    }
+    const read = (path: string, controller: AbortController) =>
+        axios.get<unknown>(scriptBase + '/' + item.uuid + path + query, {
+            signal: controller.signal,
+            timeout: 30000,
+            headers: { Accept: 'application/json' },
+        });
+    /** Genuine loss of access: hide every private detail held here. */
+    function deny() {
         setMaterial(null);
+        setReason('');
+        setDenied(true);
+        setReloadNeeded(false);
+    }
+    /** Load the current record after a write that did not save. */
+    async function reload(
+        why: Reload,
+        controller: AbortController,
+        action?: ScriptAction,
+    ) {
         try {
-            const fresh = await axios.get<unknown>(
-                scriptBase + '/' + item.uuid + query,
-                {
-                    signal: controller.signal,
-                    timeout: 30000,
-                    headers: { Accept: 'application/json' },
-                },
-            );
+            const fresh = await read('', controller);
+            if (!live(controller)) return;
             const row = scriptReply(fresh.data, actorId, item).script;
-            if (controller.signal.aborted || !alive.current) return;
             setCurrent(row);
             onChanged(row);
-            if (!row.can_read_material)
-                throw Error('Identity needs confirmation');
-            const response = await axios.get<unknown>(
-                scriptBase + '/' + item.uuid + '/material' + query,
-                {
-                    signal: controller.signal,
-                    timeout: 30000,
-                    headers: { Accept: 'application/json' },
-                },
+            setReloadNeeded(false);
+            // The record still has the verified content hash, so the code read
+            // stays valid while this person may still read it.
+            if (!row.can_read_material) setMaterial(null);
+            if (why === 'changed')
+                setNotice(
+                    'This script changed since you opened it, so your change was not saved. Its current details are shown — check them before deciding again.',
+                );
+            else if (why === 'not_saved')
+                setNotice(
+                    'Your change was not saved. The current details are shown — check them, then try again.',
+                );
+            // Submitting needs no identity check, so only a reviewer's refusal
+            // can be an expired one.
+            else if (
+                !row.can_read_material &&
+                why !== 'manual' &&
+                action !== 'submit'
+            )
+                setNotice(
+                    identityExpired +
+                        (why === 'refused'
+                            ? ' Your change was not saved.'
+                            : ''),
+                );
+            else if (why === 'refused')
+                setNotice(
+                    'This decision isn’t available for this script with your current access, so your change was not saved.',
+                );
+            else if (why === 'read')
+                setNotice(
+                    'The script could not be read and verified. Try again in a moment.',
+                );
+            else setNotice('');
+        } catch (error) {
+            if (!live(controller)) return;
+            if (deniedCodes.includes(responseStatus(error) ?? 0)) {
+                deny();
+                return;
+            }
+            setReloadNeeded(true);
+            setNotice(
+                (why === 'changed'
+                    ? 'This script changed since you opened it, so your change was not saved. '
+                    : why === 'read' || why === 'manual'
+                      ? ''
+                      : 'Your change was not saved. ') +
+                    'The current details could not be loaded. Load them again before deciding.',
             );
+        }
+    }
+    async function loadCurrent() {
+        if (busyNow.current) return;
+        const controller = start();
+        try {
+            await reload('manual', controller);
+        } finally {
+            finish();
+        }
+    }
+    async function readMaterial() {
+        if (busyNow.current || pending || !current.can_read_material) return;
+        const controller = start();
+        setNotice('');
+        setMaterial(null);
+        let stage: 'record' | 'material' = 'record';
+        try {
+            const fresh = await read('', controller);
+            const row = scriptReply(fresh.data, actorId, item).script;
+            if (!live(controller)) return;
+            setCurrent(row);
+            onChanged(row);
+            if (!row.can_read_material) {
+                setNotice(identityExpired);
+                return;
+            }
+            stage = 'material';
+            const response = await read('/material', controller);
             const verified = await scriptMaterial(response.data, actorId, row);
-            if (!controller.signal.aborted && alive.current) {
+            if (live(controller)) {
                 setMaterial(verified);
                 setDenied(false);
             }
         } catch (error) {
-            if (!controller.signal.aborted && alive.current) {
-                setMaterial(null);
-                setDenied(
-                    axios.isAxiosError(error) &&
-                        [401, 403, 404].includes(error.response?.status ?? 0),
-                );
+            if (!live(controller)) return;
+            setMaterial(null);
+            const status = responseStatus(error);
+            if (status === 503) setNotice(scriptBusyMessage);
+            // The record was readable a moment ago, so a refusal here is
+            // usually an identity check that has just expired.
+            else if (status === 403 && stage === 'material')
+                await reload('read', controller);
+            else if (deniedCodes.includes(status ?? 0)) deny();
+            else
                 setNotice(
-                    'The script could not be read and verified. Refresh your access or confirm your identity before trying again.',
+                    'The script could not be read and verified. Try again in a moment.',
                 );
-            }
         } finally {
-            busyNow.current = false;
-            if (alive.current) setBusy(false);
+            finish();
         }
     }
     function accept(value: unknown, request: Pending) {
@@ -172,12 +333,10 @@ export function ScriptReviewDialog({
     }
     async function send(request: Pending) {
         if (busyNow.current) return;
-        const controller = new AbortController();
-        active.current = controller;
-        busyNow.current = true;
-        setBusy(true);
+        const controller = start();
         setPending(request);
         setNotice('');
+        setReloadNeeded(false);
         try {
             const response = await axios.post<unknown>(
                 scriptBase + '/' + item.uuid + '/' + request.action,
@@ -188,31 +347,42 @@ export function ScriptReviewDialog({
                     headers: { Accept: 'application/json' },
                 },
             );
-            if (!controller.signal.aborted && alive.current)
-                accept(response.data, request);
+            if (live(controller)) accept(response.data, request);
         } catch (error) {
-            if (!controller.signal.aborted && alive.current) {
-                setMaterial(null);
-                setDenied(
-                    axios.isAxiosError(error) &&
-                        [401, 403, 404].includes(error.response?.status ?? 0),
+            if (!live(controller)) return;
+            const status = responseStatus(error);
+            if (status === 503) {
+                // Nothing was written; the same request can be sent again.
+                setNotice(scriptBusyMessage);
+            } else if (status === 401 || status === 419) {
+                setPending(null);
+                deny();
+            } else if (status === 400 || status === 422) {
+                setPending(null);
+                setNotice(
+                    'This decision wasn’t accepted, so nothing changed. Check the reason and try again.',
                 );
+            } else if (status === 409) {
+                // A stale version: reload it so a new decision gets a new key.
+                setPending(null);
+                await reload('changed', controller);
+            } else if (status === 403 || status === 404) {
+                setPending(null);
+                await reload('refused', controller, request.action);
+            } else {
+                setMaterial(null);
                 setNotice(
                     'The outcome could not be confirmed. Check the saved outcome before making another change.',
                 );
             }
         } finally {
-            busyNow.current = false;
-            if (alive.current) setBusy(false);
+            finish();
         }
     }
     async function recover() {
         if (!pending || busyNow.current) return;
         const request = pending,
-            controller = new AbortController();
-        active.current = controller;
-        busyNow.current = true;
-        setBusy(true);
+            controller = start();
         try {
             const response = await axios.get<unknown>(
                 scriptBase +
@@ -227,45 +397,50 @@ export function ScriptReviewDialog({
                     headers: { Accept: 'application/json' },
                 },
             );
-            if (!controller.signal.aborted && alive.current)
-                accept(response.data, request);
+            if (live(controller)) accept(response.data, request);
         } catch (error) {
-            if (!controller.signal.aborted && alive.current) {
-                setMaterial(null);
-                setDenied(
-                    (previous) =>
-                        previous ||
-                        (axios.isAxiosError(error) &&
-                            [401, 403, 404].includes(
-                                error.response?.status ?? 0,
-                            )),
-                );
-                setNotice(
-                    'No matching saved outcome is available yet. Keep this request for checking or retry the same request; do not create a replacement.',
-                );
+            if (!live(controller)) return;
+            const status = responseStatus(error);
+            if (status === 503) {
+                setNotice(scriptBusyMessage);
+                return;
             }
+            if (status === 404 && !denied) {
+                // No receipt for this request: it never landed. Check the
+                // record is still visible before offering a fresh attempt.
+                setPending(null);
+                await reload('not_saved', controller);
+                return;
+            }
+            setMaterial(null);
+            setDenied(
+                (previous) => previous || deniedCodes.includes(status ?? 0),
+            );
+            setNotice(
+                'No matching saved outcome is available yet. Keep this request for checking or retry the same request; do not create a replacement.',
+            );
         } finally {
-            busyNow.current = false;
-            if (alive.current) setBusy(false);
+            finish();
         }
     }
-    function decide(action: ScriptAction) {
-        const allowed =
-            current[
-                ('can_' + action) as
-                    | 'can_submit'
-                    | 'can_review'
-                    | 'can_withdraw'
-            ];
-        if (
-            busyNow.current ||
-            pending ||
-            denied ||
-            !allowed ||
-            !scriptText(reason.trim(), 500, 10) ||
-            (action === 'review' && !material)
-        )
+    const allowed = (action: ScriptAction) =>
+        current[
+            ('can_' + action) as 'can_submit' | 'can_review' | 'can_withdraw'
+        ];
+    const ready = (action: ScriptAction) =>
+        !busy &&
+        !pending &&
+        !denied &&
+        !reloadNeeded &&
+        allowed(action) &&
+        scriptText(reason.trim(), 500, 10) &&
+        (action !== 'review' || !!material);
+    function decide() {
+        const action = confirming;
+        if (!action || busyNow.current || !ready(action)) {
+            setConfirming(null);
             return;
+        }
         void send({
             action,
             before: current,
@@ -282,13 +457,14 @@ export function ScriptReviewDialog({
     }
     const policy = current.manifest.execution_policy,
         review = current.review;
+    const choosing = confirming ? actions[confirming] : null;
     return (
         <>
             <WizardShell
                 open={open}
                 onClose={onClose}
                 title="Script review"
-                description="Read this exact version and its declared effects before changing its catalogue status."
+                description="Read this exact version and what it does before changing its catalogue status."
                 railIcon={FileCode}
                 railTitle={
                     denied ? 'Unavailable script' : current.manifest.name
@@ -322,32 +498,46 @@ export function ScriptReviewDialog({
                 onStepClick={setStep}
                 headerLabel={['Script', 'Inputs and effects', 'Decision'][step]}
                 sequential={false}
-                pct={material ? 100 : 0}
-                pctLabel="Code verification"
+                pct={null}
                 footerStart={
                     <Button variant="outline" onClick={onClose}>
                         Close
                     </Button>
                 }
                 footerEnd={
-                    <Button
-                        variant="outline"
-                        onClick={() => setStep((step + 1) % 3)}
-                    >
-                        {step === 2 ? 'Back to script' : 'Next section'}
-                    </Button>
+                    !denied && (
+                        <Button
+                            variant="outline"
+                            onClick={() => setStep((step + 1) % 3)}
+                        >
+                            {step === 2 ? 'Back to script' : 'Next section'}
+                        </Button>
+                    )
                 }
             >
                 {notice && (
                     <Alert role="status">
-                        <AlertDescription>{notice}</AlertDescription>
+                        <AlertDescription>
+                            {notice}
+                            {reloadNeeded && !denied && (
+                                <Button
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() => void loadCurrent()}
+                                >
+                                    Load current details
+                                </Button>
+                            )}
+                        </AlertDescription>
                     </Alert>
                 )}
                 {denied ? (
-                    <p className="text-subtle">
-                        This record is no longer available with your current
-                        access. Refresh the catalogue.
-                    </p>
+                    <EmptyState
+                        variant="compact"
+                        icon={ShieldOff}
+                        title="This script is no longer available to you"
+                        description="Your access to this record has changed, so its details are hidden. Close this window and refresh the catalogue to see what you can open."
+                    />
                 ) : (
                     <WizardStepPane key={step}>
                         {step === 0 && (
@@ -360,7 +550,7 @@ export function ScriptReviewDialog({
                                         ],
                                         [
                                             'Runtime',
-                                            `PowerShell ${current.manifest.interpreter_version} · ${current.manifest.architecture === 'amd64' ? 'x64' : 'ARM64'}`,
+                                            `PowerShell ${current.manifest.interpreter_version} · ${architectureLabel(current.manifest.architecture)}`,
                                         ],
                                         [
                                             'Version',
@@ -368,7 +558,9 @@ export function ScriptReviewDialog({
                                         ],
                                         [
                                             'Script size',
-                                            `${current.manifest.size_bytes} bytes`,
+                                            formatFileSize(
+                                                current.manifest.size_bytes,
+                                            ),
                                         ],
                                     ]}
                                 />
@@ -407,28 +599,34 @@ export function ScriptReviewDialog({
                                 )}
                                 <details className="rounded-md border p-3">
                                     <summary className="frontline-focus cursor-pointer">
-                                        Version identities
+                                        Technical details
                                     </summary>
                                     <div className="mt-3">
                                         <ScriptFacts
+                                            technical
                                             entries={[
                                                 [
-                                                    'Script SHA-256',
+                                                    'Script file (SHA-256)',
                                                     current.manifest.sha256,
                                                 ],
                                                 [
-                                                    'Runtime manifest SHA-256',
+                                                    'Runtime manifest (SHA-256)',
                                                     current.manifest
                                                         .runtime_manifest_sha256,
                                                 ],
                                                 [
-                                                    'Wrapper SHA-256',
+                                                    'Script wrapper (SHA-256)',
                                                     current.manifest
                                                         .wrapper_sha256,
                                                 ],
                                                 [
-                                                    'Review content SHA-256',
+                                                    'Reviewed content (SHA-256)',
                                                     current.content_hash,
+                                                ],
+                                                [
+                                                    'Outcome check (SHA-256)',
+                                                    policy.expected_observation_schema ??
+                                                        'None',
                                                 ],
                                             ]}
                                         />
@@ -475,7 +673,7 @@ export function ScriptReviewDialog({
                                     </ul>
                                 )}
                                 <h3 className="text-section-title">
-                                    Execution limits
+                                    Limits when it runs
                                 </h3>
                                 <ScriptFacts
                                     entries={[
@@ -484,39 +682,39 @@ export function ScriptReviewDialog({
                                             `${policy.runtime_seconds} seconds`,
                                         ],
                                         [
-                                            'On timeout',
-                                            policy.timeout_mode ===
-                                            'report_only'
-                                                ? 'Report the timeout; continue observing owned work'
-                                                : 'Request termination of the owned job',
+                                            'If it runs too long',
+                                            timeoutLabel[policy.timeout_mode],
                                         ],
                                         [
-                                            'Retained output',
-                                            `${policy.output_bytes} bytes across both streams`,
+                                            'Output kept',
+                                            policy.output_bytes === 0
+                                                ? 'None'
+                                                : `Up to ${formatFileSize(policy.output_bytes)} (results and errors together)`,
                                         ],
                                         [
-                                            'Output retention',
+                                            'Output kept for',
                                             `${policy.output_retention_hours} hours`,
                                         ],
                                         [
                                             'Network use',
-                                            'Reviewed destinations; no enforced network block',
+                                            'Only the destinations listed below. This is a declaration; no network block enforces it.',
                                         ],
                                         [
-                                            'Completion exit codes',
+                                            'Success exit codes',
                                             policy.success_exit_codes.join(
                                                 ', ',
                                             ),
                                         ],
                                         [
-                                            'Independent outcome schema',
-                                            policy.expected_observation_schema ??
-                                                'None',
+                                            'Independent outcome check',
+                                            policy.expected_observation_schema
+                                                ? 'Required'
+                                                : 'Not required',
                                         ],
                                     ]}
                                 />
                                 <h3 className="text-section-title">
-                                    Declared effects
+                                    What it does
                                 </h3>
                                 <ScriptFacts
                                     entries={[
@@ -527,7 +725,7 @@ export function ScriptReviewDialog({
                                                 : 'Changes the computer',
                                         ],
                                         [
-                                            'Child processes',
+                                            'Programs it starts',
                                             review.child_processes.join(
                                                 ' · ',
                                             ) || 'None declared',
@@ -540,18 +738,23 @@ export function ScriptReviewDialog({
                                         ],
                                         [
                                             'Output sensitivity',
-                                            review.output_sensitivity,
+                                            outputSensitivityLabel[
+                                                review.output_sensitivity
+                                            ],
                                         ],
-                                        ['Compensation', review.compensation],
+                                        ['Recovery plan', review.compensation],
                                         [
                                             'Restart behaviour',
                                             review.restart_behavior === 'none'
                                                 ? 'No restart'
                                                 : 'May request a restart',
                                         ],
-                                        ['Detached work', 'Not allowed'],
                                         [
-                                            'Unpublished dynamic code',
+                                            'Background work left running',
+                                            'Not allowed',
+                                        ],
+                                        [
+                                            'Downloads or runs other code',
                                             'Not allowed',
                                         ],
                                     ]}
@@ -616,25 +819,17 @@ export function ScriptReviewDialog({
                                         </a>
                                     </Button>
                                 )}
-                                <div className="space-y-2">
-                                    <Label htmlFor="script-decision-reason">
-                                        Reason for this decision
-                                    </Label>
-                                    <Textarea
-                                        id="script-decision-reason"
-                                        value={reason}
-                                        disabled={!!pending || busy}
-                                        onChange={(e) =>
-                                            setReason(e.target.value)
-                                        }
-                                        maxLength={500}
-                                    />
-                                </div>
+                                <ReasonField
+                                    id="script-decision-reason"
+                                    label="Reason for this decision"
+                                    value={reason}
+                                    disabled={!!pending || busy}
+                                    onChange={setReason}
+                                />
                                 <p className="text-caption text-muted-foreground">
                                     Approval records this version in the
                                     catalogue. Computer permissions and consent
-                                    still apply; script execution is not
-                                    available yet.
+                                    still apply; scripts can’t run yet.
                                 </p>
                                 {current.can_review && !material && (
                                     <p className="text-subtle">
@@ -644,35 +839,17 @@ export function ScriptReviewDialog({
                                 )}
                                 <div className="flex flex-wrap gap-2">
                                     {(['submit', 'review', 'withdraw'] as const)
-                                        .filter(
-                                            (a) =>
-                                                current[
-                                                    ('can_' + a) as
-                                                        | 'can_submit'
-                                                        | 'can_review'
-                                                        | 'can_withdraw'
-                                                ],
-                                        )
+                                        .filter(allowed)
                                         .map((a) => (
                                             <Button
                                                 key={a}
                                                 variant={
-                                                    a === 'withdraw'
+                                                    actions[a].destructive
                                                         ? 'destructive'
                                                         : 'default'
                                                 }
-                                                disabled={
-                                                    busy ||
-                                                    !!pending ||
-                                                    !scriptText(
-                                                        reason.trim(),
-                                                        500,
-                                                        10,
-                                                    ) ||
-                                                    (a === 'review' &&
-                                                        !material)
-                                                }
-                                                onClick={() => decide(a)}
+                                                disabled={!ready(a)}
+                                                onClick={() => setConfirming(a)}
                                             >
                                                 {actions[a].label}
                                             </Button>
@@ -701,6 +878,26 @@ export function ScriptReviewDialog({
                     </div>
                 )}
             </WizardShell>
+            <ConfirmDialog
+                open={choosing !== null}
+                onClose={() => {
+                    if (!busy) setConfirming(null);
+                }}
+                onConfirm={decide}
+                title={choosing?.confirmTitle ?? ''}
+                description={
+                    <>
+                        <p className="font-medium text-foreground">
+                            {current.manifest.name} · version{' '}
+                            {current.script_version}
+                        </p>
+                        <p>{choosing?.effect}</p>
+                    </>
+                }
+                confirmText={busy ? 'Saving…' : (choosing?.confirmText ?? '')}
+                variant={choosing?.destructive ? 'destructive' : 'default'}
+                processing={busy}
+            />
         </>
     );
 }

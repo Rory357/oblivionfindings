@@ -27,6 +27,10 @@ const corpus = JSON.parse(
     ),
 );
 const original = corpus.uploaded;
+const httpError = (status: number) => ({
+    isAxiosError: true,
+    response: { status },
+});
 function file(text: string, name: string) {
     const bytes = new TextEncoder().encode(text);
     return Object.assign(new File([bytes.buffer], name), {
@@ -71,23 +75,37 @@ async function fill(acknowledge = true) {
     fireEvent.click(screen.getByRole('button', { name: 'Next section' }));
     expect(screen.getByLabelText('Time limit (seconds)')).toHaveValue(60);
     fireEvent.click(screen.getByRole('button', { name: 'Next section' }));
-    fireEvent.change(screen.getByLabelText('Compensation or recovery plan'), {
+    fireEvent.change(screen.getByLabelText('Recovery plan'), {
         target: { value: original.script.review.compensation },
     });
     if (acknowledge)
         fireEvent.click(
-            screen.getByRole('checkbox', { name: /creates no detached work/ }),
+            screen.getByRole('checkbox', { name: /leaves no background work/ }),
         );
     fireEvent.click(screen.getByRole('button', { name: 'Next section' }));
     fireEvent.change(screen.getByLabelText('Reason for this upload'), {
         target: { value: 'Synthetic independent catalogue verification.' },
     });
 }
+/** Move to the inputs section and add one input. */
+function addInput() {
+    fireEvent.click(screen.getByRole('button', { name: /Inputs and limits/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add input' }));
+}
+let keys: string[] = [];
 beforeEach(() => {
     vi.clearAllMocks();
+    keys = [];
     vi.stubGlobal('crypto', {
         subtle: webcrypto.subtle,
-        randomUUID: () => original.receipt.request_key,
+        randomUUID: () => {
+            const next =
+                keys.length === 0
+                    ? original.receipt.request_key
+                    : '33333333-3333-4333-8333-33333333333' + keys.length;
+            keys.push(next);
+            return next;
+        },
     });
 });
 afterEach(() => {
@@ -96,12 +114,13 @@ afterEach(() => {
 });
 describe('script upload wizard', () => {
     it('saves the selected original bytes and reports a draft rather than execution', async () => {
-        const uploaded = vi.fn();
-        render(view({ onUploaded: uploaded }));
+        const uploaded = vi.fn(),
+            another = vi.fn();
+        render(view({ onUploaded: uploaded, onAddAnother: another }));
         await fill();
         vi.mocked(axios.post).mockResolvedValueOnce({ data: original });
         fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
-        await screen.findByRole('heading', { name: 'Upload saved' });
+        await screen.findByRole('heading', { name: 'Script draft saved' });
         expect(uploaded).toHaveBeenCalledWith(original.script);
         const request = vi.mocked(axios.post).mock.calls[0][1] as Record<
             string,
@@ -114,16 +133,181 @@ describe('script upload wizard', () => {
             corpus.material.runtime_manifest,
         );
         expect(screen.getByText(/It has not been run/)).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add another script' }),
+        );
+        expect(another).toHaveBeenCalledTimes(1);
     });
-    it('requires the declaration before sending and preserves all form entries', async () => {
+    it('marks a missing declaration next to its field and preserves all form entries', async () => {
         render(view());
         await fill(false);
         fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
-        await screen.findByText(/Confirm the restrictions/);
+        await screen.findByText(/One detail needs fixing before upload/);
         expect(axios.post).not.toHaveBeenCalled();
+        // The wizard jumps to the section holding the problem.
+        expect(screen.getByText(/Tick this to confirm/)).toBeVisible();
+        expect(
+            screen.getByRole('checkbox', { name: /leaves no background work/ }),
+        ).toHaveAttribute('aria-invalid', 'true');
+        expect(screen.getByLabelText('Recovery plan')).toHaveValue(
+            original.script.review.compensation,
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: /Check and upload/ }),
+        );
         expect(screen.getByLabelText('Reason for this upload')).toHaveValue(
             'Synthetic independent catalogue verification.',
         );
+    });
+    it('explains reserved, unnamed and blank-choice inputs at the field instead of a refresh message', async () => {
+        render(view());
+        await fill();
+        addInput();
+        fireEvent.change(screen.getByLabelText('Input 1 name'), {
+            target: { value: 'Verbose' },
+        });
+        addInput();
+        fireEvent.click(
+            screen.getByRole('button', { name: /Check and upload/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
+        await screen.findByText(/2 details need fixing before upload/);
+        expect(axios.post).not.toHaveBeenCalled();
+        expect(
+            screen.getByText(
+                '“Verbose” is reserved by PowerShell. Choose another name.',
+            ),
+        ).toBeVisible();
+        expect(screen.getByText('Name this input.')).toBeVisible();
+        expect(screen.queryByText(/Refresh the catalogue/)).toBeNull();
+        await waitFor(() =>
+            expect(screen.getByLabelText('Input 1 name')).toHaveFocus(),
+        );
+        fireEvent.change(screen.getByLabelText('Input 1 name'), {
+            target: { value: 'Mode' },
+        });
+        expect(screen.queryByText(/reserved by PowerShell/)).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Remove input 2' }));
+        vi.mocked(axios.post).mockRejectedValueOnce(Error('offline'));
+        fireEvent.click(
+            screen.getByRole('button', { name: /Check and upload/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
+        await waitFor(() => expect(axios.post).toHaveBeenCalledTimes(1));
+        const body = vi.mocked(axios.post).mock.calls[0][1] as {
+            metadata: { parameter_schema: { name: string }[] };
+        };
+        expect(body.metadata.parameter_schema).toEqual([
+            {
+                name: 'Mode',
+                type: 'boolean',
+                required: false,
+                constraints: {},
+            },
+        ]);
+    });
+    it('ignores blank lines between choices', async () => {
+        render(view());
+        await fill();
+        addInput();
+        fireEvent.change(screen.getByLabelText('Input 1 name'), {
+            target: { value: 'Mode' },
+        });
+        fireEvent.keyDown(
+            screen.getByRole('combobox', { name: 'Input type' }),
+            {
+                key: 'ArrowDown',
+            },
+        );
+        fireEvent.click(await screen.findByRole('option', { name: 'Choice' }));
+        const options = await screen.findByLabelText('Choices (one per line)');
+        fireEvent.change(options, {
+            target: { value: 'inspect\n\nreport\n' },
+        });
+        vi.mocked(axios.post).mockRejectedValueOnce(Error('offline'));
+        fireEvent.click(
+            screen.getByRole('button', { name: /Check and upload/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
+        await waitFor(() => expect(axios.post).toHaveBeenCalledTimes(1));
+        const body = vi.mocked(axios.post).mock.calls[0][1] as {
+            metadata: {
+                parameter_schema: { constraints: { values: string[] } }[];
+            };
+        };
+        expect(body.metadata.parameter_schema[0].constraints.values).toEqual([
+            'inspect',
+            'report',
+        ]);
+    });
+    it('keeps reasons on one line', async () => {
+        render(view());
+        await fill();
+        const field = screen.getByLabelText('Reason for this upload');
+        expect(fireEvent.keyDown(field, { key: 'Enter' })).toBe(false);
+        fireEvent.change(field, {
+            target: { value: 'First line\r\nsecond line\tend' },
+        });
+        expect(field).toHaveValue('First line second line end');
+    });
+    it('hands the form back after a definite refusal and sends the edit under a new request key', async () => {
+        render(view());
+        await fill();
+        vi.mocked(axios.post).mockRejectedValueOnce(httpError(422));
+        fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
+        await screen.findByText(
+            /didn’t accept this upload, so nothing was saved/,
+        );
+        const field = screen.getByLabelText('Reason for this upload');
+        expect(field).toBeEnabled();
+        expect(
+            screen.queryByRole('button', { name: 'Retry same upload' }),
+        ).not.toBeInTheDocument();
+        fireEvent.change(field, {
+            target: { value: 'Corrected synthetic catalogue verification.' },
+        });
+        vi.mocked(axios.post).mockRejectedValueOnce(Error('offline'));
+        fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
+        await waitFor(() => expect(axios.post).toHaveBeenCalledTimes(2));
+        const [first, second] = vi
+            .mocked(axios.post)
+            .mock.calls.map((call) => call[1] as Record<string, unknown>);
+        expect(second.request_key).not.toBe(first.request_key);
+        expect(second.reason).toBe(
+            'Corrected synthetic catalogue verification.',
+        );
+    });
+    it('unlocks the form when recovery finds no saved upload for the request', async () => {
+        render(view());
+        await fill();
+        vi.mocked(axios.post).mockRejectedValueOnce(Error('timed out'));
+        fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
+        await screen.findByText(/upload outcome could not be confirmed/);
+        expect(screen.getByLabelText('Reason for this upload')).toBeDisabled();
+        vi.mocked(axios.get).mockRejectedValueOnce(httpError(404));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved upload' }),
+        );
+        await screen.findByText(/No saved upload was found for this request/);
+        expect(screen.getByLabelText('Reason for this upload')).toBeEnabled();
+        expect(
+            screen.getByRole('button', { name: 'Upload draft' }),
+        ).toBeEnabled();
+    });
+    it('keeps a busy upload locked and retries exactly the same request', async () => {
+        render(view());
+        await fill();
+        vi.mocked(axios.post).mockRejectedValueOnce(httpError(503));
+        fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
+        await screen.findByText(/catalogue is busy saving another change/);
+        expect(screen.getByLabelText('Reason for this upload')).toBeDisabled();
+        const first = vi.mocked(axios.post).mock.calls[0][1];
+        vi.mocked(axios.post).mockResolvedValueOnce({ data: original });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Retry same upload' }),
+        );
+        await screen.findByRole('heading', { name: 'Script draft saved' });
+        expect(vi.mocked(axios.post).mock.calls[1][1]).toBe(first);
     });
     it('keeps exactly the same upload after a lost response and close/reopen', async () => {
         const uploaded = vi.fn(),
@@ -153,7 +337,7 @@ describe('script upload wizard', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Check saved upload' }),
         );
-        await screen.findByRole('heading', { name: 'Upload saved' });
+        await screen.findByRole('heading', { name: 'Script draft saved' });
         expect(axios.get).toHaveBeenLastCalledWith(
             '/security-devices/scripts/uploads/' +
                 original.receipt.request_key +
@@ -179,7 +363,7 @@ describe('script upload wizard', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
         await screen.findByText(/upload outcome could not be confirmed/);
         expect(
-            screen.queryByRole('heading', { name: 'Upload saved' }),
+            screen.queryByRole('heading', { name: 'Script draft saved' }),
         ).not.toBeInTheDocument();
         expect(
             screen.getByRole('button', { name: 'Upload draft' }),
@@ -188,12 +372,9 @@ describe('script upload wizard', () => {
     it('hides private form details after access denial while retaining recovery', async () => {
         render(view());
         await fill();
-        vi.mocked(axios.post).mockRejectedValueOnce({
-            isAxiosError: true,
-            response: { status: 403 },
-        });
+        vi.mocked(axios.post).mockRejectedValueOnce(httpError(403));
         fireEvent.click(screen.getByRole('button', { name: 'Upload draft' }));
-        await screen.findByText(/Private upload details are hidden/);
+        await screen.findByText(/private upload details are hidden/i);
         expect(
             screen.queryByLabelText('Reason for this upload'),
         ).not.toBeInTheDocument();

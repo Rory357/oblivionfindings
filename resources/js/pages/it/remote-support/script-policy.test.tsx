@@ -5,11 +5,12 @@ import {
     render,
     screen,
     waitFor,
+    within,
 } from '@testing-library/react';
 import axios from 'axios';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ScriptPolicyEditor } from './script-policy';
+import { ScriptPolicyEditor, scriptPolicyLoosening } from './script-policy';
 import {
     scriptPolicyReferenceFor,
     scriptPolicyReply,
@@ -22,6 +23,8 @@ import {
 } from './script-policy-journal';
 
 const auth = vi.hoisted(() => ({ actor: 2001 as number | null }));
+// Counts live navigation guards (Inertia "before" listeners) currently held.
+const guards = vi.hoisted(() => ({ active: 0 }));
 vi.mock('axios', () => ({ default: { get: vi.fn(), put: vi.fn() } }));
 vi.mock('@inertiajs/react', () => ({
     usePage: () => ({
@@ -29,8 +32,17 @@ vi.mock('@inertiajs/react', () => ({
             auth: auth.actor === null ? null : { user: { id: auth.actor } },
         },
     }),
-    router: { on: () => () => undefined },
+    router: {
+        on: (event: string) => {
+            if (event !== 'before') return () => undefined;
+            guards.active++;
+            return () => {
+                guards.active--;
+            };
+        },
+    },
 }));
+const httpError = (status: number) => ({ response: { status } });
 const device = { id: 2100, name: 'Reception computer' };
 // Synthetic component fixtures, not an original-native HTTP interoperability export.
 function current(): ScriptPolicyReply {
@@ -71,6 +83,7 @@ beforeEach(() => {
     vi.resetAllMocks();
     sessionStorage.clear();
     auth.actor = 2001;
+    guards.active = 0;
     vi.stubGlobal('crypto', webcrypto);
     vi.mocked(axios.get).mockResolvedValue({ data: current() });
     vi.mocked(axios.put).mockImplementation(async (_url, body) => ({
@@ -98,13 +111,21 @@ async function review() {
     fireEvent.click(screen.getByRole('button', { name: 'Review policy' }));
     await screen.findByRole('button', { name: 'Save policy' });
 }
+/** Turning scripts on loosens security, so saving asks first. */
+async function confirmSave() {
+    fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Allow scripts' }),
+    );
+}
 
 describe('script policy editor', () => {
     it('reviews a new actor-bound request and keeps execution unavailable', async () => {
         await open();
         await review();
         expect(axios.put).not.toHaveBeenCalled();
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        await confirmSave();
         await screen.findByText('Policy change recorded');
         expect(axios.put).toHaveBeenCalledTimes(1);
         const body = vi.mocked(axios.put).mock
@@ -127,7 +148,7 @@ describe('script policy editor', () => {
         vi.mocked(axios.put).mockRejectedValueOnce(Error('Lost response'));
         await open();
         await review();
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        await confirmSave();
         await screen.findByText(/save could not be confirmed/);
         expect(
             screen.queryByLabelText('Reason for this change'),
@@ -145,7 +166,7 @@ describe('script policy editor', () => {
         vi.mocked(axios.put).mockRejectedValueOnce(Error('Lost response'));
         await open();
         await review();
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        await confirmSave();
         await screen.findByText(/save could not be confirmed/);
         const body = vi.mocked(axios.put).mock
             .calls[0][1] as ScriptPolicyAttempt;
@@ -171,12 +192,12 @@ describe('script policy editor', () => {
     });
 
     it('keeps private context hidden after a denial followed by a network error', async () => {
-        vi.mocked(axios.put).mockRejectedValueOnce({
-            response: { status: 403 },
-        });
+        vi.mocked(axios.put).mockRejectedValueOnce(httpError(403));
         await open();
         await review();
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        // The refusal is re-checked; a refused re-check is a genuine denial.
+        vi.mocked(axios.get).mockRejectedValueOnce(httpError(403));
+        await confirmSave();
         await screen.findByText(/Current access could not be confirmed/);
         expect(screen.queryByText(device.name)).not.toBeInTheDocument();
         expect(
@@ -223,7 +244,7 @@ describe('script policy editor', () => {
                     resolve = done;
                 }),
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        await confirmSave();
         await waitFor(() => expect(axios.put).toHaveBeenCalledTimes(1));
         const body = vi.mocked(axios.put).mock
             .calls[0][1] as ScriptPolicyAttempt;
@@ -254,7 +275,7 @@ describe('script policy editor', () => {
         vi.mocked(axios.put).mockRejectedValueOnce(Error('Lost reply'));
         const view = await open();
         await review();
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        await confirmSave();
         await screen.findByText(/save could not be confirmed/);
         const body = vi.mocked(axios.put).mock
             .calls[0][1] as ScriptPolicyAttempt;
@@ -283,7 +304,7 @@ describe('script policy editor', () => {
         vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
             throw Error('Storage unavailable');
         });
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        await confirmSave();
         await screen.findByText(/No save was sent/);
         expect(axios.put).not.toHaveBeenCalled();
         expect(
@@ -291,7 +312,7 @@ describe('script policy editor', () => {
         ).toBeInTheDocument();
     });
 
-    it('keeps a missing reloaded request unresolved and reviews a separate current revision explicitly', async () => {
+    it('reports a reloaded request with no saved record as not saved and starts from current settings', async () => {
         const original: ScriptPolicyAttempt = {
             expected_actor_id: 2001,
             expected_version: 0,
@@ -307,11 +328,55 @@ describe('script policy editor', () => {
         const button = await screen.findByRole('button', {
             name: 'Check script policy save',
         });
-        vi.mocked(axios.get).mockRejectedValueOnce({
-            response: { status: 404 },
-        });
+        vi.mocked(axios.get)
+            .mockRejectedValueOnce(httpError(404))
+            .mockResolvedValueOnce({
+                data: {
+                    ...current(),
+                    policy: {
+                        version: 1,
+                        enabled: false,
+                        consent_mode: 'attended',
+                    },
+                },
+            });
         fireEvent.click(button);
-        await screen.findByText(/Current access could not be confirmed/);
+        await screen.findByText(/This change was not saved/);
+        expect(
+            screen.queryByText(/Current access could not be confirmed/),
+        ).toBeNull();
+        expect(scriptPolicyReferences(2001, 2100)).toEqual([]);
+        expect(screen.getByLabelText('Reason for this change')).toHaveValue('');
+        await review();
+        await confirmSave();
+        await screen.findByText('Policy change recorded');
+        const sent = vi.mocked(axios.put).mock
+            .calls[0][1] as ScriptPolicyAttempt;
+        expect(sent.expected_version).toBe(1);
+        expect(sent.request_key).not.toBe(original.request_key);
+    });
+
+    it('keeps an unresolved reloaded request when reviewing a separate current revision', async () => {
+        const original: ScriptPolicyAttempt = {
+            expected_actor_id: 2001,
+            expected_version: 0,
+            request_key: '11111111-1111-4111-8111-111111111111',
+            enabled: true,
+            consent_mode: 'attended',
+            reason: 'Previous unconfirmed policy request.',
+        };
+        retainScriptPolicyReference(
+            await scriptPolicyReferenceFor(original, 2100),
+        );
+        render(<ScriptPolicyEditor actorId={2001} device={device} />);
+        const button = await screen.findByRole('button', {
+            name: 'Check script policy save',
+        });
+        vi.mocked(axios.get).mockRejectedValueOnce(
+            Error('Network unavailable'),
+        );
+        fireEvent.click(button);
+        await screen.findByText(/saved request could not be confirmed/);
         fireEvent.click(
             screen.getByRole('button', { name: 'Check current access' }),
         );
@@ -340,7 +405,7 @@ describe('script policy editor', () => {
             ),
         ).toBeInTheDocument();
         await review();
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        await confirmSave();
         await screen.findByText('Policy change recorded');
         const sent = vi.mocked(axios.put).mock
             .calls[0][1] as ScriptPolicyAttempt;
@@ -406,7 +471,7 @@ describe('script policy editor', () => {
                     }),
             },
         });
-        fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
+        await confirmSave();
         auth.actor = null;
         view.rerender(<ScriptPolicyEditor actorId={2001} device={device} />);
         await act(async () => resolve(new ArrayBuffer(32)));
@@ -482,6 +547,221 @@ describe('script policy editor', () => {
         );
         await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(1));
         expect(view.container).toBeEmptyDOMElement();
+    });
+
+    it('asks before turning scripts on, says what is allowed and uses the warning tone', async () => {
+        await open();
+        await review();
+        expect(
+            screen.getByText(
+                /lets approved scripts run on this computer, with staff/,
+            ),
+        ).toBeVisible();
+        const save = screen.getByRole('button', { name: 'Save policy' });
+        expect(save).toHaveClass('bg-destructive');
+        fireEvent.click(save);
+        const dialog = await screen.findByRole('alertdialog');
+        expect(
+            within(dialog).getByText(
+                'Allow approved scripts on Reception computer?',
+            ),
+        ).toBeVisible();
+        expect(
+            within(dialog).getByRole('button', { name: 'Allow scripts' }),
+        ).toHaveClass('bg-destructive');
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+        expect(axios.put).not.toHaveBeenCalled();
+    });
+
+    it('saves a change that tightens access without an extra confirmation', async () => {
+        vi.mocked(axios.get).mockResolvedValue({
+            data: {
+                ...current(),
+                policy: { version: 1, enabled: true, consent_mode: 'attended' },
+            },
+        });
+        await open();
+        fireEvent.click(screen.getByRole('switch'));
+        fireEvent.change(screen.getByLabelText('Reason for this change'), {
+            target: { value: 'Turn scripts off for this computer.' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Review policy' }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Save policy' }),
+        );
+        await screen.findByText('Policy change recorded');
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(vi.mocked(axios.put).mock.calls[0][1]).toMatchObject({
+            enabled: false,
+            expected_version: 1,
+        });
+    });
+
+    it('classifies which saves loosen script security', () => {
+        const off = {
+            version: 1,
+            enabled: false,
+            consent_mode: 'attended',
+        } as const;
+        const on = { ...off, enabled: true } as const;
+        const unattended = { ...on, consent_mode: 'unattended' } as const;
+        expect(scriptPolicyLoosening(off, on)).toBe('enabled');
+        expect(scriptPolicyLoosening(off, unattended)).toBe('unattended');
+        expect(scriptPolicyLoosening(on, unattended)).toBe('unattended');
+        expect(scriptPolicyLoosening(unattended, on)).toBeNull();
+        expect(scriptPolicyLoosening(on, off)).toBeNull();
+        expect(scriptPolicyLoosening(unattended, unattended)).toBeNull();
+        expect(scriptPolicyLoosening(off, off)).toBeNull();
+    });
+
+    it('guards navigation only for real unsaved edits in the open dialog, and discarding clears them', async () => {
+        const leftover: ScriptPolicyAttempt = {
+            expected_actor_id: 2001,
+            expected_version: 0,
+            request_key: '11111111-1111-4111-8111-111111111111',
+            enabled: true,
+            consent_mode: 'attended',
+            reason: 'Previous unconfirmed policy request.',
+        };
+        retainScriptPolicyReference(
+            await scriptPolicyReferenceFor(leftover, 2100),
+        );
+        const first = render(
+            <ScriptPolicyEditor actorId={2001} device={device} />,
+        );
+        await screen.findByRole('button', {
+            name: 'Check script policy save',
+        });
+        // A leftover recovery reminder alone never blocks leaving the page.
+        expect(guards.active).toBe(0);
+        first.unmount();
+        sessionStorage.clear();
+        await open();
+        expect(guards.active).toBe(0);
+        fireEvent.change(screen.getByLabelText('Reason for this change'), {
+            target: { value: 'An unsaved reason.' },
+        });
+        expect(guards.active).toBe(1);
+        fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+        const dialog = await screen.findByRole('alertdialog');
+        expect(
+            within(dialog).getByText('Discard this script policy change?'),
+        ).toBeVisible();
+        fireEvent.click(
+            within(dialog).getByRole('button', {
+                name: 'Discard and continue',
+            }),
+        );
+        await waitFor(() => expect(guards.active).toBe(0));
+        fireEvent.click(screen.getByRole('button', { name: 'Script policy' }));
+        await waitFor(() =>
+            expect(screen.getByLabelText('Reason for this change')).toHaveValue(
+                '',
+            ),
+        );
+    });
+
+    it('reloads the current policy after a stale-version conflict and saves again under a new key', async () => {
+        vi.mocked(axios.put).mockRejectedValueOnce(httpError(409));
+        await open();
+        await review();
+        vi.mocked(axios.get).mockResolvedValueOnce({
+            data: {
+                ...current(),
+                policy: {
+                    version: 1,
+                    enabled: false,
+                    consent_mode: 'attended',
+                },
+            },
+        });
+        await confirmSave();
+        await screen.findByText(/The policy changed since you opened it/);
+        expect(
+            screen.queryByText(/Current access could not be confirmed/),
+        ).toBeNull();
+        expect(scriptPolicyReferences(2001, 2100)).toEqual([]);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Use current policy' }),
+        );
+        await review();
+        await confirmSave();
+        await screen.findByText('Policy change recorded');
+        const [first, second] = vi
+            .mocked(axios.put)
+            .mock.calls.map((call) => call[1] as ScriptPolicyAttempt);
+        expect(second.request_key).not.toBe(first.request_key);
+        expect(second.expected_version).toBe(1);
+    });
+
+    it('asks for identity again when the 15-minute check has expired instead of reporting lost access', async () => {
+        vi.mocked(axios.put).mockRejectedValueOnce(httpError(403));
+        await open();
+        await review();
+        vi.mocked(axios.get).mockResolvedValueOnce({
+            data: { ...current(), identity_confirmed: false },
+        });
+        await confirmSave();
+        await screen.findByText(/Your identity check has expired/);
+        expect(
+            screen.queryByText(/Current access could not be confirmed/),
+        ).toBeNull();
+        expect(
+            screen.getByRole('link', { name: /Confirm your identity/ }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/devices/2100/endpoint/script-policy/confirm-identity?expected_actor_id=2001',
+        );
+        expect(scriptPolicyReferences(2001, 2100)).toEqual([]);
+    });
+
+    it('treats a busy save as retryable with the same frozen request', async () => {
+        vi.mocked(axios.put).mockRejectedValueOnce(httpError(503));
+        await open();
+        await review();
+        await confirmSave();
+        await screen.findByText(/being saved\. Try again in a moment/);
+        expect(
+            screen.queryByText(/Current access could not be confirmed/),
+        ).toBeNull();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Retry same save' }),
+        );
+        await screen.findByText('Policy change recorded');
+        expect(vi.mocked(axios.put).mock.calls[1][1]).toBe(
+            vi.mocked(axios.put).mock.calls[0][1],
+        );
+    });
+
+    it('reports a lost save with no saved record as not saved and keeps the edits', async () => {
+        vi.mocked(axios.put).mockRejectedValueOnce(Error('Lost reply'));
+        await open();
+        await review();
+        await confirmSave();
+        await screen.findByText(/save could not be confirmed/);
+        vi.mocked(axios.get).mockRejectedValueOnce(httpError(404));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved request' }),
+        );
+        await screen.findByText(/This change was not saved/);
+        expect(screen.getByLabelText('Reason for this change')).toHaveValue(
+            'Allow reviewed scripts with staff consent.',
+        );
+        expect(screen.getByRole('switch')).toBeChecked();
+        expect(scriptPolicyReferences(2001, 2100)).toEqual([]);
+    });
+
+    it('keeps the reason on one line', async () => {
+        await open();
+        const field = screen.getByLabelText('Reason for this change');
+        expect(fireEvent.keyDown(field, { key: 'Enter' })).toBe(false);
+        fireEvent.change(field, {
+            target: { value: 'Allow reviewed scripts\nwith staff consent.' },
+        });
+        expect(field).toHaveValue('Allow reviewed scripts with staff consent.');
     });
 
     it('rejects changed receipts and unsupported or malformed current policy documents', () => {

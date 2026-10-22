@@ -115,10 +115,42 @@ const uuid =
 const digest = /^[0-9a-f]{64}$/;
 const badUnicode = /[\uD800-\uDFFF]/u;
 function requireValue(value: unknown): asserts value {
-    if (!value)
-        throw Error(
-            'Script information could not be verified. Refresh the catalogue.',
-        );
+    if (!value) throw Error('Script information could not be verified.');
+}
+/** Shown when the catalogue answers 503 because another save holds the record. */
+export const scriptBusyMessage =
+    'Another change to this script is being saved. Try again in a moment.';
+/** HTTP status of a failed request, or null when no answer arrived. */
+export function responseStatus(error: unknown): number | null {
+    const status = (error as { response?: { status?: unknown } } | null)
+        ?.response?.status;
+    return typeof status === 'number' ? status : null;
+}
+/**
+ * Reasons and notes are one line of plain text: the server rejects control
+ * characters, so line breaks and tabs become spaces as they are typed or
+ * pasted instead of silently disabling the action.
+ */
+export function singleLine(value: string): string {
+    return value.replace(/\r\n|[\r\n\t\p{Zl}\p{Zp}]/gu, ' ');
+}
+/** A specific, fixable message for a one-line text value, or null when valid. */
+export function textIssue(
+    value: string,
+    min: number,
+    max: number,
+    noun: string,
+): string | null {
+    if (/[\p{Cc}\p{Cf}\uFFFD]/u.test(value) || badUnicode.test(value))
+        return `Remove hidden or special characters from the ${noun}. They are often copied in from other documents.`;
+    const length = Array.from(value.trim()).length;
+    if (length < min)
+        return min === 1
+            ? `Enter the ${noun}.`
+            : `Give a ${noun} of at least ${min} characters.`;
+    if (Array.from(value).length > max)
+        return `Keep the ${noun} to ${max.toLocaleString('en-NZ')} characters or fewer.`;
+    return null;
 }
 function object(value: unknown, keys: string[]): Record<string, unknown> {
     requireValue(
@@ -151,30 +183,33 @@ const timestamp = (x: unknown) =>
     (typeof x === 'string' &&
         /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?Z$/.test(x) &&
         Number.isFinite(Date.parse(x)));
+/** PowerShell common parameters, lower case; the catalogue refuses them. */
+export const reservedScriptParameterNames: ReadonlySet<string> = new Set([
+    'verbose',
+    'debug',
+    'erroraction',
+    'warningaction',
+    'informationaction',
+    'progressaction',
+    'errorvariable',
+    'warningvariable',
+    'informationvariable',
+    'outvariable',
+    'outbuffer',
+    'pipelinevariable',
+    'whatif',
+    'confirm',
+]);
+export const scriptParameterName = /^[A-Za-z][A-Za-z0-9_]{0,31}$/;
 function parameters(value: unknown): void {
     requireValue(Array.isArray(value) && value.length <= 16);
     const seen = new Set<string>();
-    const reserved = new Set([
-        'verbose',
-        'debug',
-        'erroraction',
-        'warningaction',
-        'informationaction',
-        'progressaction',
-        'errorvariable',
-        'warningvariable',
-        'informationvariable',
-        'outvariable',
-        'outbuffer',
-        'pipelinevariable',
-        'whatif',
-        'confirm',
-    ]);
+    const reserved = reservedScriptParameterNames;
     for (const raw of value) {
         const p = object(raw, ['name', 'type', 'required', 'constraints']);
         requireValue(
             typeof p.name === 'string' &&
-                /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(p.name) &&
+                scriptParameterName.test(p.name) &&
                 typeof p.required === 'boolean',
         );
         const key = p.name.toLowerCase();
@@ -508,7 +543,7 @@ function stable(value: unknown): string {
         );
     return JSON.stringify(value);
 }
-export { review as scriptReview, stable as scriptCanonical };
+export { stable as scriptCanonical, review as scriptReview };
 export async function scriptMaterial(
     value: unknown,
     actor: number,

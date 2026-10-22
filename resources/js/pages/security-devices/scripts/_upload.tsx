@@ -1,6 +1,8 @@
+import InputError from '@/components/input-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { EmptyState } from '@/components/ui/empty-state';
 import { FileDropzone, formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,22 +14,42 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
+import {
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+} from '@/components/wizard/shell';
 import axios from 'axios';
-import { FileCode, ListChecks, ShieldCheck, Upload } from 'lucide-react';
+import {
+    FileCode,
+    ListChecks,
+    ShieldCheck,
+    ShieldOff,
+    Upload,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
+    responseStatus,
     scriptBase,
     scriptStatusLabel,
     type ScriptParameter,
     type ScriptRecord,
     type ScriptReview,
 } from './_contracts';
-import { ScriptFacts } from './_dialogs';
+import {
+    architectureLabel,
+    outputSensitivityLabel,
+    ScriptFacts,
+    timeoutLabel,
+} from './_dialogs';
+import { ReasonField } from './_reason-field';
 import {
     prepareScriptUpload,
     readScriptFile,
+    scriptExitCodes,
+    scriptLines,
     scriptRuntime,
+    scriptUploadIssues,
     scriptUploadReply,
     type PreparedScriptUpload,
     type RuntimeSelection,
@@ -67,28 +89,40 @@ const steps = [
     {
         key: 'files',
         label: 'Files',
-        blurb: 'Script and runtime identity',
+        blurb: 'Script and runtime files',
         icon: FileCode,
     },
     {
         key: 'inputs',
         label: 'Inputs and limits',
-        blurb: 'Bounded execution contract',
+        blurb: 'What it accepts and how long it runs',
         icon: ListChecks,
     },
     {
         key: 'effects',
-        label: 'Declared effects',
-        blurb: 'Review and compensation',
+        label: 'What it does',
+        blurb: 'Effects and recovery plan',
         icon: ShieldCheck,
     },
     {
         key: 'upload',
         label: 'Check and upload',
-        blurb: 'Save an immutable draft',
+        blurb: 'Save a draft for review',
         icon: Upload,
     },
 ];
+/** The fields that make up the completeness meter. */
+const essentials = [
+    'script-name',
+    'script-publisher',
+    'script-file',
+    'script-runtime',
+    'script-compensation',
+    'script-acknowledged',
+    'script-upload-reason',
+];
+/** Statuses where the catalogue refused the request, so nothing was saved. */
+const rejected = [400, 409, 413, 415, 422];
 function Choice({
     id,
     label,
@@ -130,6 +164,7 @@ function NumberField({
     min,
     max,
     disabled,
+    error,
 }: {
     id: string;
     label: string;
@@ -138,6 +173,7 @@ function NumberField({
     min: number;
     max: number;
     disabled: boolean;
+    error?: string;
 }) {
     return (
         <div className="space-y-2">
@@ -149,6 +185,8 @@ function NumberField({
                 min={min}
                 max={max}
                 disabled={disabled}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? id + '-error' : undefined}
                 value={Number.isFinite(value) ? value : ''}
                 onChange={(e) =>
                     onChange(
@@ -156,26 +194,25 @@ function NumberField({
                     )
                 }
             />
+            <InputError id={id + '-error'} message={error} />
         </div>
     );
 }
-const lines = (value: string) =>
-    value
-        .split(/\r?\n/)
-        .map((x) => x.trim())
-        .filter(Boolean);
 export function ScriptUploadDialog({
     actorId,
     open,
     onClose,
     onUploaded,
     onDirtyChange,
+    onAddAnother,
 }: {
     actorId: number;
     open: boolean;
     onClose: () => void;
     onUploaded: (row: ScriptRecord) => void;
     onDirtyChange: (dirty: boolean) => void;
+    /** Starts a separate, empty upload after this one is saved. */
+    onAddAnother?: () => void;
 }) {
     const [metadata, setMetadata] = useState<ScriptMetadata>(() =>
         structuredClone(emptyMetadata),
@@ -196,14 +233,41 @@ export function ScriptUploadDialog({
         [attempt, setAttempt] = useState<PreparedScriptUpload | null>(null),
         [saved, setSaved] = useState<ScriptRecord | null>(null),
         [denied, setDenied] = useState(false);
+    // Field messages appear once an upload has been tried, then follow edits.
+    const [checked, setChecked] = useState(false),
+        [focusField, setFocusField] = useState<string | null>(null);
     const active = useRef<AbortController | null>(null),
         alive = useRef(true),
         busyNow = useRef(false),
         changed = useRef(false);
+    // A request whose outcome is unknown keeps the form locked so a retry
+    // sends exactly the same upload; a refused one hands the form back.
     const disabled = busy || !!attempt || !!saved || denied;
     const dirty =
         !saved &&
         (!!file || !!runtime || !!attempt || changed.current || reason !== '');
+    const issues = scriptUploadIssues({
+        metadata,
+        review,
+        file,
+        runtime,
+        exitCodes,
+        children,
+        destinations,
+        acknowledged,
+        reason,
+    });
+    const issueFor = (field: string) =>
+        checked ? issues.find((x) => x.field === field)?.message : undefined;
+    const pct = saved
+        ? 100
+        : Math.round(
+              (100 *
+                  essentials.filter(
+                      (field) => !issues.some((x) => x.field === field),
+                  ).length) /
+                  essentials.length,
+          );
     useEffect(() => {
         onDirtyChange(dirty);
     }, [dirty, onDirtyChange]);
@@ -214,6 +278,14 @@ export function ScriptUploadDialog({
             active.current?.abort();
         };
     }, []);
+    useEffect(() => {
+        if (!focusField) return;
+        const timer = setTimeout(() => {
+            document.getElementById(focusField)?.focus();
+            setFocusField(null);
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [focusField, step]);
     const update = (patch: Partial<ScriptMetadata>) => {
         changed.current = true;
         setMetadata((value) => ({ ...value, ...patch }));
@@ -265,35 +337,48 @@ export function ScriptUploadDialog({
         }
     }
     function prepare(): PreparedScriptUpload {
-        if (!file || !runtime)
-            throw Error('Choose both the script and its runtime manifest.');
-        if (!acknowledged)
+        if (issues.length > 0) {
+            setChecked(true);
+            setStep(issues[0].step);
+            setFocusField(issues[0].field);
             throw Error(
-                'Confirm the restrictions on detached work and dynamic code.',
+                issues.length === 1
+                    ? 'One detail needs fixing before upload. It’s marked below.'
+                    : `${issues.length} details need fixing before upload. The first is marked below; the others are marked in their sections.`,
             );
-        const codes = exitCodes.split(',').map((x) => x.trim());
-        if (codes.some((x) => !/^(0|[1-9][0-9]*)$/.test(x)))
-            throw Error(
-                'Enter whole-number success exit codes separated by commas.',
-            );
+        }
+        // Every new preparation gets a new request key, so an edited upload
+        // can never be confused with one that was refused or is still unknown.
         return prepareScriptUpload(
             actorId,
             crypto.randomUUID(),
             reason.trim(),
             {
                 ...metadata,
+                parameter_schema: metadata.parameter_schema.map((p) =>
+                    p.type === 'enum'
+                        ? {
+                              ...p,
+                              constraints: {
+                                  values: scriptLines(
+                                      p.constraints.values.join('\n'),
+                                  ),
+                              },
+                          }
+                        : p,
+                ),
                 execution_policy: {
                     ...metadata.execution_policy,
-                    success_exit_codes: codes.map(Number),
+                    success_exit_codes: scriptExitCodes(exitCodes),
                 },
             },
             {
                 ...review,
-                child_processes: lines(children),
-                network_destinations: lines(destinations),
+                child_processes: scriptLines(children),
+                network_destinations: scriptLines(destinations),
             },
-            file,
-            runtime,
+            file!,
+            runtime!,
         );
     }
     function accept(data: unknown, request: PreparedScriptUpload) {
@@ -339,13 +424,27 @@ export function ScriptUploadDialog({
                 accept(response.data, request);
         } catch (error) {
             if (alive.current && !controller.signal.aborted) {
-                setDenied(
-                    axios.isAxiosError(error) &&
-                        [401, 403, 404].includes(error.response?.status ?? 0),
-                );
-                setNotice(
-                    'The upload outcome could not be confirmed. Check its saved outcome or retry this same request.',
-                );
+                const status = responseStatus(error);
+                if (status !== null && rejected.includes(status)) {
+                    // A definite refusal: nothing was saved, so the form is
+                    // editable again and the next upload gets a new key.
+                    setAttempt(null);
+                    setNotice(
+                        'The catalogue didn’t accept this upload, so nothing was saved. Check the details and upload again.',
+                    );
+                } else if (status === 503) {
+                    setNotice(
+                        'The catalogue is busy saving another change, so this upload wasn’t saved yet. Retry the same upload in a moment.',
+                    );
+                } else {
+                    setDenied(
+                        status !== null &&
+                            [401, 403, 404, 419].includes(status),
+                    );
+                    setNotice(
+                        'The upload outcome could not be confirmed. Check its saved outcome or retry this same request.',
+                    );
+                }
             }
         } finally {
             busyNow.current = false;
@@ -376,15 +475,28 @@ export function ScriptUploadDialog({
                 accept(response.data, request);
         } catch (error) {
             if (alive.current && !controller.signal.aborted) {
-                setDenied(
-                    (previous) =>
-                        previous ||
-                        (axios.isAxiosError(error) &&
-                            [401, 403].includes(error.response?.status ?? 0)),
-                );
-                setNotice(
-                    'No matching saved outcome could be confirmed. Keep this request for checking; retrying uses the same files and request ID.',
-                );
+                const status = responseStatus(error);
+                if (status === 404) {
+                    // No upload was saved under this request's key.
+                    setAttempt(null);
+                    setNotice(
+                        'No saved upload was found for this request, so nothing was saved. Check the details and upload again.',
+                    );
+                } else if (status === 503) {
+                    setNotice(
+                        'The catalogue is busy saving another change. Check the saved upload again in a moment.',
+                    );
+                } else {
+                    setDenied(
+                        (previous) =>
+                            previous ||
+                            (status !== null &&
+                                [401, 403, 419].includes(status)),
+                    );
+                    setNotice(
+                        'No matching saved outcome could be confirmed. Keep this request for checking; retrying uses the same files and request ID.',
+                    );
+                }
             }
         } finally {
             busyNow.current = false;
@@ -413,8 +525,8 @@ export function ScriptUploadDialog({
             onStepClick={setStep}
             headerLabel={steps[step].label}
             sequential={false}
-            pct={saved ? 100 : 0}
-            pctLabel="Upload saved"
+            pct={pct}
+            pctLabel="Details complete"
             footerStart={
                 <Button variant="outline" onClick={onClose}>
                     Close
@@ -432,29 +544,40 @@ export function ScriptUploadDialog({
                     </Button>
                 ))
             }
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title="Script draft saved"
+                        blurb={`Your upload was recorded. Current status: ${scriptStatusLabel[saved.status]}. Open it from the catalogue when you’re ready to submit it for review. It has not been run.`}
+                        actions={
+                            <>
+                                {onAddAnother && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={onAddAnother}
+                                    >
+                                        Add another script
+                                    </Button>
+                                )}
+                                <Button onClick={onClose}>Done</Button>
+                            </>
+                        }
+                    />
+                ) : undefined
+            }
         >
             {notice && (
                 <Alert role="status">
                     <AlertDescription>{notice}</AlertDescription>
                 </Alert>
             )}
-            {saved ? (
-                <div className="space-y-4">
-                    <h3 className="text-section-title">Upload saved</h3>
-                    <p>
-                        Your original upload was recorded. Current status:{' '}
-                        {scriptStatusLabel[saved.status]}.
-                    </p>
-                    <p className="text-subtle">
-                        Close this window and refresh the catalogue to review
-                        the saved version. It has not been run.
-                    </p>
-                </div>
-            ) : denied ? (
-                <p className="text-subtle">
-                    Your access has changed. Private upload details are hidden.
-                    Refresh the catalogue before starting another upload.
-                </p>
+            {denied ? (
+                <EmptyState
+                    variant="compact"
+                    icon={ShieldOff}
+                    title="Upload details hidden"
+                    description="Your access has changed, so private upload details are hidden. You can still check whether this upload was saved."
+                />
             ) : (
                 <WizardStepPane key={step}>
                     <div className="space-y-4">
@@ -469,9 +592,17 @@ export function ScriptUploadDialog({
                                         value={metadata.name}
                                         maxLength={200}
                                         disabled={disabled}
+                                        aria-invalid={
+                                            issueFor('script-name')
+                                                ? true
+                                                : undefined
+                                        }
                                         onChange={(e) =>
                                             update({ name: e.target.value })
                                         }
+                                    />
+                                    <InputError
+                                        message={issueFor('script-name')}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -483,11 +614,19 @@ export function ScriptUploadDialog({
                                         value={metadata.publisher_label}
                                         maxLength={200}
                                         disabled={disabled}
+                                        aria-invalid={
+                                            issueFor('script-publisher')
+                                                ? true
+                                                : undefined
+                                        }
                                         onChange={(e) =>
                                             update({
                                                 publisher_label: e.target.value,
                                             })
                                         }
+                                    />
+                                    <InputError
+                                        message={issueFor('script-publisher')}
                                     />
                                 </div>
                                 <Label id="script-file-label">
@@ -496,6 +635,11 @@ export function ScriptUploadDialog({
                                 <FileDropzone
                                     id="script-file"
                                     aria-labelledby="script-file-label"
+                                    aria-invalid={
+                                        issueFor('script-file')
+                                            ? true
+                                            : undefined
+                                    }
                                     accept=".ps1"
                                     multiple={false}
                                     disabled={disabled}
@@ -505,6 +649,7 @@ export function ScriptUploadDialog({
                                     title="Choose script"
                                     hint="One UTF-8 .ps1 file, up to 256 KB"
                                 />
+                                <InputError message={issueFor('script-file')} />
                                 {file && (
                                     <p className="text-subtle [overflow-wrap:anywhere]">
                                         {file.name} ·{' '}
@@ -517,6 +662,11 @@ export function ScriptUploadDialog({
                                 <FileDropzone
                                     id="script-runtime"
                                     aria-labelledby="script-runtime-label"
+                                    aria-invalid={
+                                        issueFor('script-runtime')
+                                            ? true
+                                            : undefined
+                                    }
                                     accept=".json"
                                     multiple={false}
                                     disabled={disabled}
@@ -526,13 +676,16 @@ export function ScriptUploadDialog({
                                     title="Choose runtime manifest"
                                     hint="The reviewed PowerShell bundle manifest, up to 1 MB"
                                 />
+                                <InputError
+                                    message={issueFor('script-runtime')}
+                                />
                                 {runtime && (
                                     <p className="text-subtle [overflow-wrap:anywhere]">
                                         {runtime.name} · PowerShell{' '}
                                         {runtime.version} ·{' '}
-                                        {runtime.architecture === 'amd64'
-                                            ? 'x64'
-                                            : 'ARM64'}
+                                        {architectureLabel(
+                                            runtime.architecture,
+                                        )}
                                     </p>
                                 )}
                                 <p className="text-caption text-muted-foreground">
@@ -561,12 +714,24 @@ export function ScriptUploadDialog({
                                                 disabled={disabled}
                                                 maxLength={32}
                                                 value={p.name}
+                                                aria-invalid={
+                                                    issueFor(
+                                                        'parameter-name-' + i,
+                                                    )
+                                                        ? true
+                                                        : undefined
+                                                }
                                                 onChange={(e) =>
                                                     parameter(i, {
                                                         ...p,
                                                         name: e.target.value,
                                                     })
                                                 }
+                                            />
+                                            <InputError
+                                                message={issueFor(
+                                                    'parameter-name-' + i,
+                                                )}
                                             />
                                         </div>
                                         <Choice
@@ -650,6 +815,9 @@ export function ScriptUploadDialog({
                                                         Number.MAX_SAFE_INTEGER
                                                     }
                                                     disabled={disabled}
+                                                    error={issueFor(
+                                                        'parameter-min-' + i,
+                                                    )}
                                                     onChange={(value) =>
                                                         parameter(i, {
                                                             ...p,
@@ -673,6 +841,9 @@ export function ScriptUploadDialog({
                                                         Number.MAX_SAFE_INTEGER
                                                     }
                                                     disabled={disabled}
+                                                    error={issueFor(
+                                                        'parameter-max-' + i,
+                                                    )}
                                                     onChange={(value) =>
                                                         parameter(i, {
                                                             ...p,
@@ -696,6 +867,9 @@ export function ScriptUploadDialog({
                                                     min={0}
                                                     max={1024}
                                                     disabled={disabled}
+                                                    error={issueFor(
+                                                        'parameter-min-' + i,
+                                                    )}
                                                     onChange={(value) =>
                                                         parameter(i, {
                                                             ...p,
@@ -716,6 +890,9 @@ export function ScriptUploadDialog({
                                                     min={0}
                                                     max={1024}
                                                     disabled={disabled}
+                                                    error={issueFor(
+                                                        'parameter-max-' + i,
+                                                    )}
                                                     onChange={(value) =>
                                                         parameter(i, {
                                                             ...p,
@@ -743,6 +920,14 @@ export function ScriptUploadDialog({
                                                         'parameter-options-' + i
                                                     }
                                                     disabled={disabled}
+                                                    aria-invalid={
+                                                        issueFor(
+                                                            'parameter-options-' +
+                                                                i,
+                                                        )
+                                                            ? true
+                                                            : undefined
+                                                    }
                                                     value={p.constraints.values.join(
                                                         '\n',
                                                     )}
@@ -756,6 +941,12 @@ export function ScriptUploadDialog({
                                                             },
                                                         })
                                                     }
+                                                />
+                                                <InputError
+                                                    message={issueFor(
+                                                        'parameter-options-' +
+                                                            i,
+                                                    )}
                                                 />
                                             </div>
                                         )}
@@ -798,7 +989,7 @@ export function ScriptUploadDialog({
                                     Add input
                                 </Button>
                                 <h3 className="text-section-title">
-                                    Execution limits
+                                    Limits when it runs
                                 </h3>
                                 <NumberField
                                     id="script-time"
@@ -810,26 +1001,28 @@ export function ScriptUploadDialog({
                                     min={1}
                                     max={900}
                                     disabled={disabled}
+                                    error={issueFor('script-time')}
                                     onChange={(value) =>
                                         policy({ runtime_seconds: value })
                                     }
                                 />
                                 <NumberField
                                     id="script-output"
-                                    label="Maximum retained output (bytes)"
+                                    label="Most output to keep (bytes)"
                                     value={
                                         metadata.execution_policy.output_bytes
                                     }
                                     min={0}
                                     max={65536}
                                     disabled={disabled}
+                                    error={issueFor('script-output')}
                                     onChange={(value) =>
                                         policy({ output_bytes: value })
                                     }
                                 />
                                 <NumberField
                                     id="script-retention"
-                                    label="Output retention (hours)"
+                                    label="Keep output for (hours)"
                                     value={
                                         metadata.execution_policy
                                             .output_retention_hours
@@ -837,6 +1030,7 @@ export function ScriptUploadDialog({
                                     min={1}
                                     max={168}
                                     disabled={disabled}
+                                    error={issueFor('script-retention')}
                                     onChange={(value) =>
                                         policy({
                                             output_retention_hours: value,
@@ -845,7 +1039,7 @@ export function ScriptUploadDialog({
                                 />
                                 <Choice
                                     id="script-timeout"
-                                    label="On timeout"
+                                    label="If it runs too long"
                                     value={
                                         metadata.execution_policy.timeout_mode
                                     }
@@ -853,11 +1047,11 @@ export function ScriptUploadDialog({
                                     values={[
                                         [
                                             'report_only',
-                                            'Report timeout and continue observing',
+                                            timeoutLabel.report_only,
                                         ],
                                         [
                                             'terminate_owned_job',
-                                            'Request termination of owned work',
+                                            timeoutLabel.terminate_owned_job,
                                         ],
                                     ]}
                                     onChange={(value) =>
@@ -876,16 +1070,24 @@ export function ScriptUploadDialog({
                                         id="script-exit-codes"
                                         value={exitCodes}
                                         disabled={disabled}
+                                        aria-invalid={
+                                            issueFor('script-exit-codes')
+                                                ? true
+                                                : undefined
+                                        }
                                         onChange={(e) => {
                                             changed.current = true;
                                             setExitCodes(e.target.value);
                                         }}
                                     />
+                                    <InputError
+                                        message={issueFor('script-exit-codes')}
+                                    />
                                 </div>
                                 <p className="text-caption text-muted-foreground">
-                                    A success exit code describes execution. It
-                                    does not prove the computer reached the
-                                    intended state.
+                                    A success exit code describes how the script
+                                    finished. It does not prove the computer
+                                    reached the intended state.
                                 </p>
                             </>
                         )}
@@ -913,23 +1115,31 @@ export function ScriptUploadDialog({
                                             Scripts that change the computer can
                                             be saved as drafts, but cannot be
                                             approved until an independent
-                                            outcome check is implemented.
+                                            outcome check is available.
                                         </AlertDescription>
                                     </Alert>
                                 )}
                                 <div className="space-y-2">
                                     <Label htmlFor="script-children">
-                                        Child processes (one per line; leave
+                                        Programs it starts (one per line; leave
                                         empty if none)
                                     </Label>
                                     <Textarea
                                         id="script-children"
                                         value={children}
                                         disabled={disabled}
+                                        aria-invalid={
+                                            issueFor('script-children')
+                                                ? true
+                                                : undefined
+                                        }
                                         onChange={(e) => {
                                             changed.current = true;
                                             setChildren(e.target.value);
                                         }}
+                                    />
+                                    <InputError
+                                        message={issueFor('script-children')}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -941,10 +1151,18 @@ export function ScriptUploadDialog({
                                         id="script-network"
                                         value={destinations}
                                         disabled={disabled}
+                                        aria-invalid={
+                                            issueFor('script-network')
+                                                ? true
+                                                : undefined
+                                        }
                                         onChange={(e) => {
                                             changed.current = true;
                                             setDestinations(e.target.value);
                                         }}
+                                    />
+                                    <InputError
+                                        message={issueFor('script-network')}
                                     />
                                 </div>
                                 <p className="text-caption text-muted-foreground">
@@ -956,14 +1174,16 @@ export function ScriptUploadDialog({
                                     label="Output sensitivity"
                                     value={review.output_sensitivity}
                                     disabled={disabled}
-                                    values={[
-                                        ['none', 'No sensitive output'],
+                                    values={(
                                         [
+                                            'none',
                                             'operational',
-                                            'Operational information',
-                                        ],
-                                        ['sensitive', 'Sensitive information'],
-                                    ]}
+                                            'sensitive',
+                                        ] as const
+                                    ).map((key): [string, string] => [
+                                        key,
+                                        outputSensitivityLabel[key],
+                                    ])}
                                     onChange={(value) =>
                                         updateReview({
                                             output_sensitivity:
@@ -971,22 +1191,19 @@ export function ScriptUploadDialog({
                                         })
                                     }
                                 />
-                                <div className="space-y-2">
-                                    <Label htmlFor="script-compensation">
-                                        Compensation or recovery plan
-                                    </Label>
-                                    <Textarea
-                                        id="script-compensation"
-                                        value={review.compensation}
-                                        maxLength={1000}
-                                        disabled={disabled}
-                                        onChange={(e) =>
-                                            updateReview({
-                                                compensation: e.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
+                                <ReasonField
+                                    id="script-compensation"
+                                    label="Recovery plan"
+                                    noun="recovery plan"
+                                    min={1}
+                                    max={1000}
+                                    value={review.compensation}
+                                    disabled={disabled}
+                                    error={issueFor('script-compensation')}
+                                    onChange={(compensation) =>
+                                        updateReview({ compensation })
+                                    }
+                                />
                                 <Choice
                                     id="script-restart"
                                     label="Restart behaviour"
@@ -1009,18 +1226,31 @@ export function ScriptUploadDialog({
                                         })
                                     }
                                 />
-                                <Label className="flex items-start gap-2">
-                                    <Checkbox
-                                        checked={acknowledged}
-                                        disabled={disabled}
-                                        onCheckedChange={(value) => {
-                                            changed.current = true;
-                                            setAcknowledged(value === true);
-                                        }}
+                                <div className="space-y-2">
+                                    <Label className="flex items-start gap-2">
+                                        <Checkbox
+                                            id="script-acknowledged"
+                                            checked={acknowledged}
+                                            disabled={disabled}
+                                            aria-invalid={
+                                                issueFor('script-acknowledged')
+                                                    ? true
+                                                    : undefined
+                                            }
+                                            onCheckedChange={(value) => {
+                                                changed.current = true;
+                                                setAcknowledged(value === true);
+                                            }}
+                                        />
+                                        This script leaves no background work
+                                        running and loads no other code.
+                                    </Label>
+                                    <InputError
+                                        message={issueFor(
+                                            'script-acknowledged',
+                                        )}
                                     />
-                                    This script creates no detached work and
-                                    loads no unpublished dynamic code.
-                                </Label>
+                                </div>
                             </>
                         )}
                         {step === 3 && (
@@ -1045,7 +1275,7 @@ export function ScriptUploadDialog({
                                         [
                                             'Runtime',
                                             runtime
-                                                ? `PowerShell ${runtime.version} · ${runtime.architecture}`
+                                                ? `PowerShell ${runtime.version} · ${architectureLabel(runtime.architecture)}`
                                                 : 'Not selected',
                                         ],
                                         [
@@ -1070,7 +1300,7 @@ export function ScriptUploadDialog({
                                             `${metadata.execution_policy.output_bytes} bytes`,
                                         ],
                                         [
-                                            'Output retention',
+                                            'Output kept for',
                                             `${metadata.execution_policy.output_retention_hours} hours`,
                                         ],
                                     ]}
@@ -1089,24 +1319,18 @@ export function ScriptUploadDialog({
                                         </pre>
                                     </details>
                                 )}
-                                <div className="space-y-2">
-                                    <Label htmlFor="script-upload-reason">
-                                        Reason for this upload
-                                    </Label>
-                                    <Textarea
-                                        id="script-upload-reason"
-                                        value={reason}
-                                        maxLength={500}
-                                        disabled={disabled}
-                                        onChange={(e) =>
-                                            setReason(e.target.value)
-                                        }
-                                    />
-                                </div>
+                                <ReasonField
+                                    id="script-upload-reason"
+                                    label="Reason for this upload"
+                                    value={reason}
+                                    disabled={disabled}
+                                    error={issueFor('script-upload-reason')}
+                                    onChange={setReason}
+                                />
                                 <p className="text-caption text-muted-foreground">
-                                    Uploading saves a new immutable draft.
-                                    Another authorised person must review it.
-                                    Script execution is not available yet.
+                                    Uploading saves this exact version as a
+                                    draft. Another authorised person must review
+                                    it. Scripts can’t run yet.
                                 </p>
                             </>
                         )}

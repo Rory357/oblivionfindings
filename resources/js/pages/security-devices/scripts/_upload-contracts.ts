@@ -1,9 +1,12 @@
 import {
+    reservedScriptParameterNames,
     scriptCanonical,
     scriptManifest,
+    scriptParameterName,
     scriptReply,
     scriptReview,
     scriptText,
+    textIssue,
     type ScriptManifest,
     type ScriptReview,
 } from './_contracts';
@@ -237,7 +240,10 @@ export function prepareScriptUpload(
                 key,
             ),
     );
-    check(scriptText(reason, 500, 10), 'Give a reason of 10–500 characters.');
+    check(
+        scriptText(reason, 500, 10),
+        'Give a reason of 10–500 characters on one line.',
+    );
     check(
         scriptText(metadata.name, 200, 1) &&
             scriptText(metadata.publisher_label, 200, 1),
@@ -247,15 +253,25 @@ export function prepareScriptUpload(
         scriptText(review.compensation, 1000, 1),
         'Add a compensation or recovery plan using 1–1,000 readable characters.',
     );
-    const manifest = scriptManifest({
-        ...metadata,
-        script_uuid: key,
-        script_version: 1,
-        sha256: file.sha256,
-        size_bytes: file.size,
-        runtime_manifest_sha256: runtime.sha256,
-    });
-    scriptReview(review);
+    let manifest: ScriptManifest;
+    try {
+        manifest = scriptManifest({
+            ...metadata,
+            script_uuid: key,
+            script_version: 1,
+            sha256: file.sha256,
+            size_bytes: file.size,
+            runtime_manifest_sha256: runtime.sha256,
+        });
+        scriptReview(review);
+    } catch {
+        // scriptUploadIssues names the field for every rule a person can
+        // break; anything left is a mismatch the form can't explain. Never
+        // suggest refreshing: that would discard the draft.
+        throw Error(
+            'Some script details could not be checked. Review the inputs and limits, then upload again.',
+        );
+    }
     check(
         metadata.interpreter_version === runtime.version &&
             metadata.architecture === runtime.architecture &&
@@ -283,6 +299,199 @@ export function prepareScriptUpload(
     // Freeze a detached copy so editing fields cannot change a retained retry.
     return JSON.parse(JSON.stringify({ body, manifest }));
 }
+/** Non-blank trimmed lines: "one per line" fields ignore empty lines. */
+export const scriptLines = (value: string) =>
+    value
+        .split(/\r?\n/)
+        .map((x) => x.trim())
+        .filter(Boolean);
+export type ScriptUploadDraft = {
+    metadata: ScriptMetadata;
+    review: ScriptReview;
+    file: ScriptFile | null;
+    runtime: RuntimeSelection | null;
+    exitCodes: string;
+    children: string;
+    destinations: string;
+    acknowledged: boolean;
+    reason: string;
+};
+/** Wizard section index (0 files … 3 check and upload) for each field id. */
+export type ScriptUploadIssue = {
+    field: string;
+    step: number;
+    message: string;
+};
+const whole = (x: unknown, min: number, max: number): x is number =>
+    typeof x === 'number' && Number.isSafeInteger(x) && x >= min && x <= max;
+const count = (n: number) => n.toLocaleString('en-NZ');
+function listIssue(value: string, noun: string): string | null {
+    const rows = scriptLines(value);
+    if (rows.length > 32) return `List up to 32 ${noun}, one per line.`;
+    for (const row of rows) {
+        const issue = textIssue(row, 1, 256, noun + ' list');
+        if (issue) return issue;
+    }
+    return null;
+}
+/**
+ * Every rule a person can break while filling in the upload, as a fixable
+ * message next to its field. Mirrors the catalogue's own manifest rules so
+ * that the generic contract check never has to explain a user mistake.
+ */
+export function scriptUploadIssues(
+    draft: ScriptUploadDraft,
+): ScriptUploadIssue[] {
+    const issues: ScriptUploadIssue[] = [];
+    const add = (field: string, step: number, message: string | null) => {
+        if (message) issues.push({ field, step, message });
+    };
+    const { metadata, review } = draft;
+    add('script-name', 0, textIssue(metadata.name, 1, 200, 'script name'));
+    add(
+        'script-publisher',
+        0,
+        textIssue(metadata.publisher_label, 1, 200, 'publisher or author'),
+    );
+    add('script-file', 0, draft.file ? null : 'Choose the PowerShell script.');
+    add(
+        'script-runtime',
+        0,
+        draft.runtime ? null : 'Choose the runtime manifest.',
+    );
+    const seen = new Set<string>();
+    metadata.parameter_schema.forEach((p, i) => {
+        const key = p.name.toLowerCase();
+        add(
+            'parameter-name-' + i,
+            1,
+            p.name.trim() === ''
+                ? 'Name this input.'
+                : !scriptParameterName.test(p.name)
+                  ? 'Start with a letter and use only letters, numbers and underscores (up to 32 characters).'
+                  : reservedScriptParameterNames.has(key)
+                    ? `“${p.name}” is reserved by PowerShell. Choose another name.`
+                    : seen.has(key)
+                      ? 'Another input already uses this name.'
+                      : null,
+        );
+        seen.add(key);
+        if (p.type === 'integer') {
+            const { minimum, maximum } = p.constraints;
+            const lowest = -Number.MAX_SAFE_INTEGER;
+            add(
+                'parameter-min-' + i,
+                1,
+                whole(minimum, lowest, Number.MAX_SAFE_INTEGER)
+                    ? null
+                    : 'Enter a whole number.',
+            );
+            add(
+                'parameter-max-' + i,
+                1,
+                !whole(maximum, lowest, Number.MAX_SAFE_INTEGER)
+                    ? 'Enter a whole number.'
+                    : whole(minimum, lowest, Number.MAX_SAFE_INTEGER) &&
+                        maximum < minimum
+                      ? 'The maximum must be the same as or more than the minimum.'
+                      : null,
+            );
+        } else if (p.type === 'string') {
+            const { min_length: low, max_length: high } = p.constraints;
+            add(
+                'parameter-min-' + i,
+                1,
+                whole(low, 0, 1024)
+                    ? null
+                    : 'Enter a whole number from 0 to 1,024.',
+            );
+            add(
+                'parameter-max-' + i,
+                1,
+                !whole(high, 0, 1024)
+                    ? 'Enter a whole number from 0 to 1,024.'
+                    : whole(low, 0, 1024) && high < low
+                      ? 'The maximum must be the same as or more than the minimum.'
+                      : null,
+            );
+        } else if (p.type === 'enum') {
+            const values = scriptLines(p.constraints.values.join('\n'));
+            add(
+                'parameter-options-' + i,
+                1,
+                values.length === 0
+                    ? 'Add at least one choice.'
+                    : values.length > 32
+                      ? 'Use 32 choices or fewer.'
+                      : (values
+                            .map((x) => textIssue(x, 1, 1024, 'choice'))
+                            .find(Boolean) ??
+                        (new Set(values).size !== values.length
+                            ? 'Each choice must be different.'
+                            : null)),
+            );
+        }
+    });
+    const policy = metadata.execution_policy;
+    add(
+        'script-time',
+        1,
+        whole(policy.runtime_seconds, 1, 900)
+            ? null
+            : 'Use a time limit from 1 to 900 seconds.',
+    );
+    add(
+        'script-output',
+        1,
+        whole(policy.output_bytes, 0, 65536)
+            ? null
+            : `Use a whole number from 0 to ${count(65536)} bytes.`,
+    );
+    add(
+        'script-retention',
+        1,
+        whole(policy.output_retention_hours, 1, 168)
+            ? null
+            : 'Keep output for 1 to 168 hours.',
+    );
+    const codes = draft.exitCodes.split(',').map((x) => x.trim());
+    add(
+        'script-exit-codes',
+        1,
+        codes.some((x) => !/^(0|[1-9][0-9]*)$/.test(x))
+            ? 'Enter whole numbers separated by commas, such as 0, 3010.'
+            : codes.length > 16
+              ? 'List up to 16 success exit codes.'
+              : codes.some((x) => Number(x) > 4294967295)
+                ? `Each exit code must be ${count(4294967295)} or less.`
+                : new Set(codes.map(Number)).size !== codes.length
+                  ? 'List each exit code once.'
+                  : null,
+    );
+    add('script-children', 2, listIssue(draft.children, 'programs'));
+    add(
+        'script-network',
+        2,
+        listIssue(draft.destinations, 'network destinations'),
+    );
+    add(
+        'script-compensation',
+        2,
+        textIssue(review.compensation, 1, 1000, 'recovery plan'),
+    );
+    add(
+        'script-acknowledged',
+        2,
+        draft.acknowledged
+            ? null
+            : 'Tick this to confirm the script leaves no background work running and loads no other code.',
+    );
+    add('script-upload-reason', 3, textIssue(draft.reason, 10, 500, 'reason'));
+    return issues;
+}
+/** Exit codes as typed ("0, 3010") once scriptUploadIssues has passed them. */
+export const scriptExitCodes = (value: string) =>
+    value.split(',').map((x) => Number(x.trim()));
 export function scriptUploadReply(
     value: unknown,
     expected: PreparedScriptUpload,

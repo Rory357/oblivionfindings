@@ -1,6 +1,7 @@
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     PageHeader,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderSearch,
@@ -15,6 +16,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowRight,
     ExternalLink,
+    FileCode,
     Monitor,
     Search,
     ShieldCheck,
@@ -117,22 +119,23 @@ function RemoteSupportWorkspace({
                                     onChange={setSearch}
                                     placeholder="Search computers…"
                                 />
-                                <Button type="submit" variant="secondary">
+                                <PageHeaderGlassButton type="submit">
                                     <Search aria-hidden="true" />
                                     Search
-                                </Button>
+                                </PageHeaderGlassButton>
                             </form>
                             {can_view_script_catalogue && (
-                                <Button variant="secondary" asChild>
+                                <PageHeaderGlassButton asChild>
                                     <Link
                                         href={
                                             '/security-devices/scripts?expected_actor_id=' +
                                             actor_id
                                         }
                                     >
-                                        Script catalogue
+                                        <FileCode aria-hidden="true" />
+                                        Approved scripts
                                     </Link>
-                                </Button>
+                                </PageHeaderGlassButton>
                             )}
                         </>
                     }
