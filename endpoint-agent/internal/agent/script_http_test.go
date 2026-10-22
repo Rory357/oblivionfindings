@@ -36,9 +36,9 @@ type scriptHTTPFixture struct {
 
 func scriptLoadHTTPFixture(t *testing.T, env string, dst any) {
 	t.Helper()
-	path := os.Getenv(env)
+	path := scriptFixturePath(env)
 	if path == "" {
-		t.Skip("original PHP producer required: " + env)
+		t.Skip("PHP producer export not found: set " + env + " or restore tests/fixtures")
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {

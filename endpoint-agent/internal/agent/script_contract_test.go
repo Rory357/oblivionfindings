@@ -15,7 +15,7 @@ import (
 // This test requires the original PHP contract + EndpointCommandSigner export.
 // It does not execute scripts or claim catalogue/authority/installed acceptance.
 func TestScriptPHPContractCorpus(t *testing.T) {
-	path := os.Getenv("OBLI_SCRIPT_EXPORT")
+	path := scriptFixturePath("OBLI_SCRIPT_EXPORT")
 	if path == "" {
 		t.Skip("original PHP script contract export not supplied")
 	}
@@ -113,7 +113,7 @@ func TestScriptPHPContractCorpus(t *testing.T) {
 }
 
 func TestScriptPHPRuntimePaths(t *testing.T) {
-	path := os.Getenv("OBLI_SCRIPT_EXPORT")
+	path := scriptFixturePath("OBLI_SCRIPT_EXPORT")
 	if path == "" {
 		t.Skip("original PHP runtime corpus not supplied")
 	}
@@ -186,7 +186,7 @@ func TestScriptSchemaRejectsLooseTypes(t *testing.T) {
 }
 
 func TestScriptPHPClaimCancellationAndResultCorpus(t *testing.T) {
-	path := os.Getenv("OBLI_SCRIPT_EXPORT")
+	path := scriptFixturePath("OBLI_SCRIPT_EXPORT")
 	if path == "" {
 		t.Skip("original PHP script receipt export not supplied")
 	}

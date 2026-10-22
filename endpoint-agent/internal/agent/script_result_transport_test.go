@@ -18,7 +18,7 @@ func TestScriptOriginalHTTPResult(t *testing.T) {
 		{"unattended", "OBLI_SCRIPT_UNATTENDED_EXPORT"},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
-			path := os.Getenv(fixture.env)
+			path := scriptFixturePath(fixture.env)
 			if path == "" {
 				t.Skip("original script HTTP result export not supplied")
 			}

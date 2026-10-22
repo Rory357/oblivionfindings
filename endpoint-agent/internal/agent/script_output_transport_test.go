@@ -11,7 +11,7 @@ import (
 )
 
 func TestScriptOriginalHTTPOutput(t *testing.T) {
-	path := os.Getenv("OBLI_SCRIPT_OUTPUT_HTTP_EXPORT")
+	path := scriptFixturePath("OBLI_SCRIPT_OUTPUT_HTTP_EXPORT")
 	if path == "" {
 		t.Skip("original private output HTTP export not supplied")
 	}

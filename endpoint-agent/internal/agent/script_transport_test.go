@@ -13,7 +13,7 @@ import (
 // Original authenticated PHP HTTP responses, with synthetic approved dispatch state.
 // This validates bytes and leases; it neither contacts a server nor starts a process.
 func TestScriptOriginalHTTPTransport(t *testing.T) {
-	path := os.Getenv("OBLI_SCRIPT_TRANSPORT_EXPORT")
+	path := scriptFixturePath("OBLI_SCRIPT_TRANSPORT_EXPORT")
 	if path == "" {
 		t.Skip("original script HTTP transport export not supplied")
 	}

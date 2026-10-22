@@ -13,7 +13,7 @@ import (
 
 // Original PHP HTTP stop envelopes. No network, process, or native job is run.
 func TestScriptOriginalHTTPCancellation(t *testing.T) {
-	path := os.Getenv("OBLI_SCRIPT_CANCEL_EXPORT")
+	path := scriptFixturePath("OBLI_SCRIPT_CANCEL_EXPORT")
 	if path == "" {
 		t.Skip("original script HTTP cancellation export not supplied")
 	}
