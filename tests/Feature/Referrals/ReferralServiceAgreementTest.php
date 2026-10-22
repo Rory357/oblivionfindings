@@ -225,11 +225,15 @@ it('lets provider managers create the draft and keeps approval independent of it
     $grant = require base_path('database/migrations/2026_10_21_130000_grant_provider_manager_service_agreements.php');
     $grant->up();
     $grant->up();
+    $financeRead = require base_path('database/migrations/2026_10_23_090000_grant_finance_service_agreement_view.php');
+    $financeRead->up();
+    $financeRead->up();
     $agreementKeys = fn (string $name) => Role::query()->where('name', $name)->firstOrFail()->permissions()
         ->where('key', 'like', 'service_agreements.%')->pluck('key')->sort()->values()->all();
-    // Provider managers only: Finance and coordinators were not chosen (Stephan, 21 Oct 2026).
+    // Provider managers create and approve (Stephan, 21 Oct 2026); Finance only reads, so its notice opens
+    // (23 Oct 2026); coordinators get nothing.
     expect($agreementKeys('provider_manager'))->toBe(['service_agreements.create', 'service_agreements.update', 'service_agreements.viewAny'])
-        ->and($agreementKeys('finance'))->toBe([])->and($agreementKeys('coordinator'))->toBe([]);
+        ->and($agreementKeys('finance'))->toBe(['service_agreements.viewAny'])->and($agreementKeys('coordinator'))->toBe([]);
     // The person-record access a seeded provider manager already holds (RbacSeeder).
     Role::query()->where('name', 'provider_manager')->firstOrFail()->permissions()
         ->syncWithoutDetaching(Permission::query()->whereIn('key', ['clients.viewAny', 'clients.update'])->pluck('id')->all());
