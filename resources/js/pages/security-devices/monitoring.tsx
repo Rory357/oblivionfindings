@@ -854,7 +854,7 @@ function MonitoringScreen({
                                     }}
                                 >
                                     <Plus className="size-4" />
-                                    Create direct monitor
+                                    Add direct monitor
                                 </PageHeaderPrimaryButton>
                             ) : null}
                             {workspace.can.view_control_room ? (
@@ -1003,7 +1003,7 @@ function MonitoringScreen({
                                     ) : null}
                                 </>
                             ) : (
-                                <span className="text-[11.5px] text-band-foreground/70">
+                                <span className="text-xs text-band-foreground/70">
                                     These evidence views use the full permitted
                                     scope. Monitor search opens Overview.
                                 </span>

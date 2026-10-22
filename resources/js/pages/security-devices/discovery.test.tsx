@@ -282,9 +282,7 @@ function reviewField(label: string) {
     return screen.getByText(label).closest('.wizard-review-row')!;
 }
 function beginCreate() {
-    fireEvent.click(
-        screen.getByRole('button', { name: 'Create direct scope' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add direct scope' }));
 }
 function fillCreate() {
     fireEvent.change(screen.getByLabelText('Scope name'), {
@@ -603,7 +601,7 @@ describe('Discovery current actor, permissions and Site scope', () => {
             screen.queryByDisplayValue('Private unsaved network draft'),
         ).not.toBeInTheDocument();
         expect(
-            screen.queryByRole('button', { name: 'Create direct scope' }),
+            screen.queryByRole('button', { name: 'Add direct scope' }),
         ).not.toBeInTheDocument();
         view('Discovery scopes');
         rowMenu('Approved Harbour network');
@@ -728,7 +726,7 @@ describe('Discovery scope wizard draft and canonical payload', () => {
         ).toBeVisible();
         expect(mocks.post).not.toHaveBeenCalled();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct scope' }),
+            screen.getByRole('button', { name: 'Add direct scope' }),
         );
         expect(mocks.post).toHaveBeenCalledWith(
             '/security-devices/discovery/scopes',
@@ -793,7 +791,7 @@ describe('Discovery scope wizard draft and canonical payload', () => {
         );
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct scope' }),
+            screen.getByRole('button', { name: 'Add direct scope' }),
         );
         expect(await screen.findByRole('alert')).toHaveTextContent(
             'Choose a unique scope name.',
@@ -823,13 +821,13 @@ describe('Discovery scope wizard draft and canonical payload', () => {
         beginCreate();
         fillCreate();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct scope' }),
+            screen.getByRole('button', { name: 'Add direct scope' }),
         );
         expect(await screen.findByRole('alert')).toHaveTextContent(
             'Save status is unknown',
         );
         expect(
-            screen.getByRole('button', { name: 'Create direct scope' }),
+            screen.getByRole('button', { name: 'Add direct scope' }),
         ).toBeDisabled();
         expect(mocks.reload).not.toHaveBeenCalled();
         expect(mocks.post).toHaveBeenCalledTimes(1);
@@ -868,7 +866,7 @@ describe('Discovery scope wizard draft and canonical payload', () => {
         beginCreate();
         fillCreate();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct scope' }),
+            screen.getByRole('button', { name: 'Add direct scope' }),
         );
         expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -900,7 +898,7 @@ describe('Discovery scope wizard draft and canonical payload', () => {
         beginCreate();
         fillCreate();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct scope' }),
+            screen.getByRole('button', { name: 'Add direct scope' }),
         );
         expect(
             await screen.findByText('Discovery records are unavailable'),

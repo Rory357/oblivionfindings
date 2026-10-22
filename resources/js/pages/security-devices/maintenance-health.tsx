@@ -69,6 +69,8 @@ export type LowBatteryDevice = {
 export type MaintenanceHealthProps = {
     actor_id: number;
     pageMeta?: { title: string; description: string; href: string };
+    /** Shown beside recorded costs: Finance owns the money record. */
+    financeNote?: string;
     stats: {
         overdue: number;
         upcoming: number;
@@ -174,6 +176,7 @@ function MaintenanceHealthBody({
                 'lowBatteryDevices',
                 'filters',
                 'can',
+                'financeNote',
                 'auth',
             ],
             onSuccess: (page) => {
@@ -444,6 +447,7 @@ function MaintenanceHealthBody({
                             canManage={manage}
                             onComplete={setReview}
                             filtered={filtered}
+                            financeNote={data.financeNote}
                         />
                         {(data.records.meta.last_page ?? 1) > 1 ? (
                             <nav

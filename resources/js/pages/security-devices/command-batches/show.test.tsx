@@ -335,7 +335,7 @@ describe('Command batch profile and retained evidence', () => {
             within(dialog).getByText('child-retained-203'),
         ).toBeInTheDocument();
         expect(within(dialog).getByText('Reviewer A')).toBeInTheDocument();
-        expect(within(dialog).getByText('retry count')).toBeInTheDocument();
+        expect(within(dialog).getByText('Retry count')).toBeInTheDocument();
         fireEvent.click(
             within(dialog).getByRole('button', { name: /Execution evidence/ }),
         );
@@ -348,8 +348,8 @@ describe('Command batch profile and retained evidence', () => {
                 name: /Reconciliation & next action/,
             }),
         );
-        expect(within(dialog).getByText('matched')).toBeInTheDocument();
-        expect(within(dialog).getByText('delay ms')).toBeInTheDocument();
+        expect(within(dialog).getByText('Matched')).toBeInTheDocument();
+        expect(within(dialog).getByText('Delay ms')).toBeInTheDocument();
         expect(
             within(dialog).getByText(
                 'The expected Device state was freshly verified.',
@@ -360,14 +360,14 @@ describe('Command batch profile and retained evidence', () => {
         render(<CommandBatch batch={fixture()} />);
         for (const text of [
             'batch-retained-42',
-            'network restart',
+            'Network & IT',
             'Requester A',
-            'typed acknowledgement',
+            'Typed acknowledgement',
             'Approved maintenance window',
             'Network connectivity can briefly stop.',
             'Each Device returns to its recorded expected state.',
-            'delay seconds',
-            'force',
+            'Delay seconds',
+            'Force',
             '0',
             'No',
         ]) {
@@ -376,6 +376,17 @@ describe('Command batch profile and retained evidence', () => {
         expect(
             screen.getByText(/failure or exclusion never converts/),
         ).toBeInTheDocument();
+        // Capability uses the server's label, workspace its real name and the
+        // status chip sentence case — never the raw keys.
+        expect(
+            screen.getAllByText('Restart network Devices').length,
+        ).toBeGreaterThan(1);
+        expect(screen.getByText('Executing')).toBeInTheDocument();
+        for (const raw of ['network-it', 'network restart', 'executing']) {
+            expect(
+                screen.queryByText(raw, { exact: true }),
+            ).not.toBeInTheDocument();
+        }
     });
     it('uses shared table, search and both menus while retaining exact Device and Site destinations', async () => {
         render(<CommandBatch batch={fixture()} />);

@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
@@ -92,12 +93,16 @@ class AlertsEventsController extends Controller
             }
         }
 
-        // Date range filter.
-        if ($request->filled('from')) {
-            $query->where('occurred_at', '>=', $request->input('from'));
+        // Date range filter: `from` and `to` are New Zealand calendar days
+        // (Y-m-d), matching the times shown on the page; their bounds are
+        // converted to UTC for the stored occurred_at instants.
+        $from = $this->calendarDay($request->input('from'));
+        if ($from !== null) {
+            $query->where('occurred_at', '>=', WorkerClock::dayStartUtc($from));
         }
-        if ($request->filled('to')) {
-            $query->where('occurred_at', '<=', $request->input('to').' 23:59:59');
+        $to = $this->calendarDay($request->input('to'));
+        if ($to !== null) {
+            $query->where('occurred_at', '<=', WorkerClock::dayEndUtc($to));
         }
 
         // Search across event_type and source.
@@ -133,17 +138,11 @@ class AlertsEventsController extends Controller
             ->pluck('source');
 
         return Inertia::render('security-devices/alerts-events', [
-            'pageMeta' => $request->routeIs('security-devices.monitoring')
-                ? [
-                    'title' => 'Monitoring',
-                    'description' => 'Active device events and collection signals. Control Room remains the place for operational triage and escalation.',
-                    'href' => '/security-devices/monitoring',
-                ]
-                : [
-                    'title' => 'Alerts & Events',
-                    'description' => 'Read-only device event stream. For alert triage and escalation, use Control Room.',
-                    'href' => '/security-devices/alerts-events',
-                ],
+            'pageMeta' => [
+                'title' => 'Alerts & events',
+                'description' => 'Read-only device event stream. For alert triage and escalation, use Control Room.',
+                'href' => '/security-devices/alerts-events',
+            ],
             'stats' => $stats,
             'snapshotAt' => $snapshotAt->toISOString(),
             'windowStart' => $last24h->toISOString(),
@@ -190,5 +189,15 @@ class AlertsEventsController extends Controller
                     ->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
             ],
         ]);
+    }
+
+    /** A real Y-m-d calendar day from the query string, or null. */
+    private function calendarDay(mixed $value): ?string
+    {
+        if (! is_string($value) || preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $parts) !== 1) {
+            return null;
+        }
+
+        return checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]) ? $value : null;
     }
 }

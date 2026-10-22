@@ -556,10 +556,9 @@ function AgentReleaseList({
                         Connect to this organisation
                     </h2>
                     <p className="text-subtle">
-                        The installation profile identifies this Oblivion server
-                        and the approved computer or Site. Check that
-                        destination before enrolment. AI provider keys stay in
-                        Oblivion.
+                        The installation profile identifies this server and the
+                        approved computer or Site. Check that destination before
+                        enrolment. AI provider keys stay on this server.
                     </p>
                     <p className="text-subtle">
                         Windows packages provide computer support, Site

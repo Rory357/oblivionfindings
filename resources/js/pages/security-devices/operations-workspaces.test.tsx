@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { MaintenanceCard, type MaintenanceRow } from './maintenance';
+import { MaintenanceRecords } from '@/components/security-devices/maintenance-records';
+import type { MaintenanceRow } from './maintenance';
 import {
     MonitoringContent,
     type MonitoringWorkspace,
@@ -375,7 +376,7 @@ describe('Security & Devices operations workspaces', () => {
         expect(screen.getByText('Commands')).toBeInTheDocument();
         expect(screen.getByText('Orchestration')).toBeInTheDocument();
         expect(screen.getAllByText('Counts restricted')).toHaveLength(8);
-        expect(screen.getAllByText(/Worker Not Observed/)).toHaveLength(8);
+        expect(screen.getAllByText(/Worker not observed/)).toHaveLength(8);
         expect(screen.getByText('No heartbeat evidence.')).toBeInTheDocument();
         expect(
             screen.getByText('Independent outage watchdog'),
@@ -443,8 +444,8 @@ describe('Security & Devices operations workspaces', () => {
             screen.getByRole('link', { name: 'Central Site' }),
         ).toHaveAttribute('href', '/security-devices/sites/2');
         expect(screen.getByText('Central path verified')).toBeInTheDocument();
-        expect(screen.getByText('Runtime Available')).toBeInTheDocument();
-        expect(screen.getByText('Topology Current')).toBeInTheDocument();
+        expect(screen.getByText('Runtime available')).toBeInTheDocument();
+        expect(screen.getByText('Topology current')).toBeInTheDocument();
         expect(
             screen.getByText(/Latest durable central evidence/),
         ).toBeInTheDocument();
@@ -483,7 +484,7 @@ describe('Security & Devices operations workspaces', () => {
         expect(
             screen.getByText('Central path not verified'),
         ).toBeInTheDocument();
-        expect(screen.getByText('Topology Stale')).toBeInTheDocument();
+        expect(screen.getByText('Topology stale')).toBeInTheDocument();
     });
 
     it('shows maintenance provenance and canonical device and site links without exposing private notes', () => {
@@ -511,7 +512,18 @@ describe('Security & Devices operations workspaces', () => {
             },
         };
 
-        render(<MaintenanceCard row={row} canManage={false} />);
+        render(
+            <MaintenanceRecords
+                rows={[row]}
+                view="cards"
+                profiles
+                canManage={false}
+                onComplete={vi.fn()}
+                total={1}
+                shown={1}
+                truncated={false}
+            />,
+        );
 
         expect(
             screen.getByRole('link', { name: 'Infusion pump' }),
@@ -643,7 +655,7 @@ describe('Security & Devices operations workspaces', () => {
         );
 
         expect(screen.getByText(/p95 86.2/)).toBeInTheDocument();
-        expect(screen.getByText(/Projection Forecast/)).toBeInTheDocument();
+        expect(screen.getByText(/Projection forecast/)).toBeInTheDocument();
         expect(screen.getByText(/91% confidence/)).toBeInTheDocument();
         expect(
             screen.getByText(/Measured history:.*1 Jul.*19 Jul/),

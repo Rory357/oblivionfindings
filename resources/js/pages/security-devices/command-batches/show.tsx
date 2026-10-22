@@ -16,6 +16,7 @@ import {
     PageHeaderStatusChip,
     PageHeaderViewToggle,
 } from '@/components/page';
+import { securityDevicesNavigationGroups } from '@/components/security-devices/security-devices-navigation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,7 @@ import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { formatReadableOperationalValue } from '@/lib/readable-operational-state';
+import { readableKey } from '@/lib/security-devices-labels';
 import type { VisitOptions } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -186,8 +188,17 @@ const readHeader = 'X-Command-Batch-Read';
 /** Server rule: DecideDeviceCommandRequest `comment` max:1000. */
 const COMMENT_MAX = 1000;
 
+/** Sentence-case words for a status, mode or field key; never the raw key. */
 function humanise(value: string): string {
-    return value.replaceAll('_', ' ').replaceAll('.', ' ');
+    return readableKey(value);
+}
+/** The workspace's own name from the Security & Devices navigation. */
+function workspaceName(slug: string): string {
+    const href = `/security-devices/${slug}`;
+    const item = securityDevicesNavigationGroups
+        .flatMap((group) => group.items)
+        .find((entry) => entry.href === href || entry.aliases?.includes(href));
+    return item?.title ?? readableKey(slug);
 }
 function tone(status: string): StatusVariant {
     if (status === 'reconciled' || status === 'completed') return 'success';
@@ -1065,15 +1076,12 @@ function BatchWorkspace({
                                 label="Batch reference"
                                 value={batch.uuid}
                             />
-                            <ReviewRow
-                                label="Capability"
-                                value={humanise(batch.capability)}
-                            />
+                            <ReviewRow label="Capability" value={batch.label} />
                             <ReviewRow
                                 label="Workspace"
                                 value={
                                     <Link href={batch.workspaceHref}>
-                                        {humanise(batch.workspace)}
+                                        {workspaceName(batch.workspace)}
                                     </Link>
                                 }
                             />

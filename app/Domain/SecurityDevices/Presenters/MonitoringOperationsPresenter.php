@@ -140,7 +140,7 @@ class MonitoringOperationsPresenter
             ],
             'active_tab' => $this->tab($filters['tab'] ?? null),
             'boundary' => [
-                'title' => 'Oblivion native monitoring',
+                'title' => 'Built-in monitoring',
                 'description' => 'The main application monitors SD-WAN reachable sites directly. Hardened collectors extend coverage only where a remote path requires local collection.',
                 'privacy_note' => 'Probe targets, credentials, configuration, raw messages, and metric dimensions are never projected into this workspace. Only bounded retained summaries and aggregate capacity projections are shown.',
                 'control_room_note' => 'This workspace explains technical evidence and coverage. Control Room remains the operational triage and escalation destination.',

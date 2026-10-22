@@ -1033,7 +1033,7 @@ function DiscoveryBody({
                                                 setScopeDialogOpen(true);
                                             }}
                                         >
-                                            Create direct scope
+                                            Add direct scope
                                         </PageHeaderPrimaryButton>
                                     )}
                             </>
@@ -2003,11 +2003,11 @@ export function DiscoveryScopeWizard({
                 title={
                     editing
                         ? 'Update discovery scope'
-                        : 'Create direct discovery scope'
+                        : 'Add direct discovery scope'
                 }
                 description="Save which networks discovery may check at one of your Sites. Saving does not start a scan."
                 railIcon={Network}
-                railTitle={editing ? 'Update scope' : 'Create direct scope'}
+                railTitle={editing ? 'Update scope' : 'Add direct scope'}
                 railSub={scope?.name ?? 'Approved Site discovery'}
                 steps={[
                     {
@@ -2076,7 +2076,7 @@ export function DiscoveryScopeWizard({
                                 ? 'Saving…'
                                 : editing
                                   ? 'Apply scope update'
-                                  : 'Create direct scope'}
+                                  : 'Add direct scope'}
                         </Button>
                     )
                 }

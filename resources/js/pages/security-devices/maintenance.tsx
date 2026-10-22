@@ -28,7 +28,6 @@ type CurrentPermissions = {
     };
 };
 
-export { MaintenanceCard } from '@/components/security-devices/maintenance-records';
 type NamedLink = { id: number; name: string; href: string };
 export type MaintenanceRow = {
     id: number;

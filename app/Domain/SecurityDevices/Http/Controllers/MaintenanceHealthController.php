@@ -118,17 +118,12 @@ class MaintenanceHealthController extends Controller
 
         return Inertia::render('security-devices/maintenance-health', [
             'actor_id' => $user->id,
-            'pageMeta' => $request->routeIs('security-devices.maintenance')
-                ? [
-                    'title' => 'Maintenance',
-                    'description' => 'Device servicing, calibration, repair, and health-related work across the estate.',
-                    'href' => '/security-devices/maintenance',
-                ]
-                : [
-                    'title' => 'Maintenance & Health',
-                    'description' => 'Device maintenance scheduling, health monitoring, and operational attention tracking.',
-                    'href' => '/security-devices/maintenance-health',
-                ],
+            'pageMeta' => [
+                'title' => 'Maintenance & health',
+                'description' => 'Device maintenance scheduling, health monitoring, and operational attention tracking.',
+                'href' => '/security-devices/maintenance-health',
+            ],
+            'financeNote' => MaintenanceOperationsPresenter::FINANCE_NOTE,
             'stats' => $stats,
             'records' => [
                 'data' => $records->getCollection()->map(fn (DeviceMaintenanceRecord $r) => [

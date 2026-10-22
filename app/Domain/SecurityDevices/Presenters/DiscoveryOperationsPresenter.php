@@ -210,7 +210,7 @@ class DiscoveryOperationsPresenter
                 : 'overview',
             'boundary' => [
                 'title' => 'Direct first, collectors only where needed',
-                'description' => 'Oblivion Findings monitors SD-WAN reachable sites from the main application. A collector is an explicit remote collection path, not a requirement for every monitor.',
+                'description' => 'This system monitors SD-WAN reachable Sites from the main application. A collector is an explicit remote collection path, not a requirement for every monitor.',
                 'runtime_note' => 'Governed scopes, immutable runs, candidate reasons, collector state, and canonical Device links are shown from the native runtime.',
             ],
             'summary' => [

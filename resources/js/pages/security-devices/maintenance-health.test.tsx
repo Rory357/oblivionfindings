@@ -8,8 +8,8 @@ import {
     within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { healthFixture } from './maintenance-health-test-fixtures';
 import MaintenanceHealth from './maintenance-health';
+import { healthFixture } from './maintenance-health-test-fixtures';
 const mocks = vi.hoisted(() => ({
     actor: 7,
     can: {} as Record<string, Record<string, boolean>>,
@@ -200,6 +200,7 @@ describe('Maintenance and health shared legacy workspace', () => {
                 'lowBatteryDevices',
                 'filters',
                 'can',
+                'financeNote',
                 'auth',
             ],
             onSuccess: expect.any(Function),
@@ -238,6 +239,12 @@ describe('Maintenance and health shared legacy workspace', () => {
         expect(
             within(dialog).getAllByText('Not recorded').length,
         ).toBeGreaterThan(0);
+        // The recorded cost carries the server's Finance boundary note.
+        expect(
+            within(dialog).getByText(
+                'Costs shown in legacy maintenance history are informational. Finance remains the authoritative financial record.',
+            ),
+        ).toBeInTheDocument();
     });
     it('keeps all attention facts and exact last-seen time without claiming live or unique totals', async () => {
         render(<MaintenanceHealth {...healthFixture()} />);
