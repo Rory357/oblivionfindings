@@ -1,6 +1,7 @@
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
-import { Head } from '@inertiajs/react';
+import { type PublicProvider } from '@/components/public-provider';
+import { Head, usePage } from '@inertiajs/react';
 import React from 'react';
 
 interface MarketingLayoutProps {
@@ -12,11 +13,13 @@ interface MarketingLayoutProps {
 const MarketingLayout: React.FC<MarketingLayoutProps> = ({
     children,
     title,
-    description = 'Oblivion Findings helps supported living providers manage residents, visits, notes, and compliance in one simple, web-based dashboard.',
+    description = 'Explore supported living, share your goals and get help understanding funding and the next steps towards support.',
 }) => {
+    const provider = usePage().props.provider as PublicProvider | undefined;
+    const name = provider?.name ?? 'Oblivion Care';
     const fullTitle = title
-        ? `${title} · Oblivion Findings`
-        : 'Oblivion Findings · Supported Living Platform';
+        ? `${title} · ${name}`
+        : `${name} · Supported living`;
 
     return (
         <>
@@ -29,8 +32,17 @@ const MarketingLayout: React.FC<MarketingLayoutProps> = ({
             </Head>
 
             <div className="min-h-screen bg-background text-foreground">
+                <a
+                    href="#main-content"
+                    className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-background focus:p-3 focus:ring-2 focus:ring-ring"
+                >
+                    Skip to content
+                </a>
                 {/* Gradient background - subtle in light, more visible in dark */}
-                <div className="pointer-events-none fixed inset-0 -z-10">
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+                >
                     <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background" />
                     <div className="absolute top-0 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/5" />
                 </div>
@@ -38,13 +50,19 @@ const MarketingLayout: React.FC<MarketingLayoutProps> = ({
                 {/* Page container */}
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
                     {/* Top nav */}
-                    <Header />
+                    <Header name={name} />
 
                     {/* Main content */}
-                    <main className="mt-8 sm:mt-12">{children}</main>
+                    <main
+                        id="main-content"
+                        tabIndex={-1}
+                        className="mt-8 sm:mt-12"
+                    >
+                        {children}
+                    </main>
 
                     {/* Footer */}
-                    <Footer />
+                    <Footer provider={provider} />
                 </div>
             </div>
         </>

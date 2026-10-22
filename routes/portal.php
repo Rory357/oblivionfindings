@@ -279,11 +279,16 @@ Route::middleware(['auth'])->group(function () {
 
     // Client Calendar
     Route::get('/operations/clients/{client}/calendar', function (Request $request, Client $client) {
-        app(ClientCalendarController::class)->authorize('view', $client);
+        // S13: staff only; family accounts have /portal/clients/{client}/calendar.
+        app(ClientCalendarController::class)->authorize('viewAsStaff', $client);
+        $canViewVisitRequests = $request->user()->can('viewVisitRequests', $client);
 
         return inertia('operations/clients/calendar', [
             'client' => ['id' => $client->id, 'first_name' => $client->first_name, 'last_name' => $client->last_name],
-            'pending_visit_count' => FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
+            'pending_visit_count' => $canViewVisitRequests
+                ? FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count()
+                : 0,
+            'can_view_visit_requests' => $canViewVisitRequests,
         ]);
     })->name('client.calendar');
     Route::get('/clients/{client}/calendar/events', [ClientCalendarController::class, 'events'])->name('client.calendar.events');

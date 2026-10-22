@@ -929,6 +929,13 @@ class HandleInertiaRequests extends Middleware
                 'conductDPIA' => $user->canDo('privacy.conductDPIA'),
             ],
 
+            'referrals' => [
+                'viewAny' => $user->canDo('referrals.viewAny'),
+                'viewAssigned' => $user->canDo('referrals.viewAssigned'),
+                'reports' => ['view' => $user->canDo('referrals.reports.view')],
+                'settings' => ['view' => $user->canDo('referrals.settings.view')],
+            ],
+
             'respite' => [
                 'viewAny' => $user->canDo('respite.viewAny'),
                 'create' => $user->canDo('respite.create'),

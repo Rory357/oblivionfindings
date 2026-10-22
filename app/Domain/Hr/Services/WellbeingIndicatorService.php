@@ -479,7 +479,8 @@ class WellbeingIndicatorService
             $previousDate = Carbon::parse($dates[$index - 1]);
             $currentDate = Carbon::parse($dates[$index]);
 
-            if ($previousDate->diffInDays($currentDate) === 1) {
+            // Carbon 3's diffInDays() returns a float, so `=== 1` never matched.
+            if ($previousDate->copy()->addDay()->isSameDay($currentDate)) {
                 $currentStreak++;
                 $maxStreak = max($maxStreak, $currentStreak);
             } else {

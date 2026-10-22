@@ -1,134 +1,102 @@
+import {
+    BrandLockup,
+    JourneyWordmark,
+    useCustomBrandName,
+} from '@/components/brand/brand-lockup';
+import {
+    enquiryUrl,
+    phoneUrl,
+    type PublicProvider,
+} from '@/components/public-provider';
+import { useAppearance } from '@/hooks/use-appearance';
 import { Link } from '@inertiajs/react';
-import { Heart, Mail, MapPin } from 'lucide-react';
-import React from 'react';
+import { Phone } from 'lucide-react';
 
-const Footer: React.FC = () => {
-    const year = new Date().getFullYear();
-
-    const footerLinks = {
-        product: [
-            { label: 'Features', href: '/features' },
-            { label: 'Smart Monitoring', href: '/smart-monitoring' },
-            { label: 'Pricing', href: '/pricing' },
-            { label: 'Demo', href: '/contact' },
-            { label: 'Log in', href: '/login' },
-        ],
-        company: [
-            { label: 'About', href: '/about' },
-            { label: 'Contact', href: '/contact' },
-            { label: 'Support', href: '/contact' },
-        ],
-        legal: [
-            { label: 'Privacy Policy', href: '/privacy' },
-            { label: 'Terms of Service', href: '/terms' },
-            { label: 'Cookie Policy', href: '/privacy' },
-        ],
-    };
-
+export default function Footer({ provider }: { provider?: PublicProvider }) {
+    const customName = useCustomBrandName();
+    const { appearance } = useAppearance();
+    const dark =
+        appearance === 'dark' ||
+        (appearance === 'system' &&
+            typeof window !== 'undefined' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const groups = [
+        {
+            title: 'Getting support',
+            links: [
+                { href: '/services', label: 'Our support' },
+                { href: '/funding', label: 'Funding assistance' },
+                { href: enquiryUrl('referral'), label: 'Make a referral' },
+            ],
+        },
+        {
+            title: 'Stay connected',
+            links: [
+                { href: '/contact', label: 'Contact us' },
+                { href: '/careers', label: 'Careers' },
+                { href: '/login', label: 'Staff and family sign in' },
+            ],
+        },
+        {
+            title: 'Your information',
+            links: [
+                { href: '/privacy-policy', label: 'Privacy' },
+                { href: '/terms', label: 'Website terms' },
+                { href: '/accessibility', label: 'Accessibility' },
+            ],
+        },
+    ];
     return (
-        <footer className="mt-20 border-t border-border pt-12">
-            <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
-                {/* Brand */}
-                <div className="lg:col-span-1">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20">
-                            OF
-                        </div>
-                        <span className="text-sm font-semibold tracking-tight">
-                            Oblivion Findings
-                        </span>
-                    </div>
-                    <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                        Modern operations platform for supported living
-                        providers. Manage residents, staff, compliance and care
-                        delivery in one place.
+        <footer className="mt-16 border-t border-border pt-8">
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <BrandLockup surface={dark ? 'dark' : 'light'} />
+                    <p className="text-subtle mt-3">
+                        Start with a conversation about your goals, your choices
+                        and the support that matters to you.
                     </p>
-                    <div className="mt-6 space-y-3 text-sm text-muted-foreground">
+                    {provider?.phone && (
                         <a
-                            href="mailto:hello@oblivionfindings.co.nz"
-                            className="flex items-center gap-2 transition-colors hover:text-primary"
+                            href={phoneUrl(provider.phone)}
+                            className="frontline-tap text-subtle mt-3 inline-flex items-center gap-2 rounded focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                            <Mail size={16} />
-                            <span>hello@oblivionfindings.co.nz</span>
+                            <Phone className="size-4" />
+                            {provider.phone}
                         </a>
-                        <div className="flex items-center gap-2">
-                            <MapPin size={16} />
-                            <span>Auckland, New Zealand</span>
-                        </div>
-                    </div>
+                    )}
                 </div>
-
-                {/* Product */}
-                <div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                        Product
-                    </h3>
-                    <ul className="mt-4 space-y-3">
-                        {footerLinks.product.map((link) => (
-                            <li key={link.label}>
-                                <Link
-                                    href={link.href}
-                                    className="text-sm text-muted-foreground transition-colors hover:text-primary"
-                                >
-                                    {link.label}
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* Company */}
-                <div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                        Company
-                    </h3>
-                    <ul className="mt-4 space-y-3">
-                        {footerLinks.company.map((link) => (
-                            <li key={link.label}>
-                                <Link
-                                    href={link.href}
-                                    className="text-sm text-muted-foreground transition-colors hover:text-primary"
-                                >
-                                    {link.label}
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* Legal */}
-                <div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                        Legal
-                    </h3>
-                    <ul className="mt-4 space-y-3">
-                        {footerLinks.legal.map((link) => (
-                            <li key={link.label}>
-                                <Link
-                                    href={link.href}
-                                    className="text-sm text-muted-foreground transition-colors hover:text-primary"
-                                >
-                                    {link.label}
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+                {groups.map((group) => (
+                    <nav key={group.title} aria-label={group.title}>
+                        <h2 className="font-medium">{group.title}</h2>
+                        <ul className="mt-2">
+                            {group.links.map((link) => (
+                                <li key={link.href}>
+                                    <Link
+                                        href={link.href}
+                                        className="frontline-tap text-subtle inline-flex items-center rounded py-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        {link.label}
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+                ))}
             </div>
-
-            {/* Bottom */}
-            <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
-                <p className="text-xs text-muted-foreground">
-                    © {year} Oblivion Findings. All rights reserved.
-                </p>
-                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                    Made with{' '}
-                    <Heart size={12} className="text-status-critical" /> in New
-                    Zealand
-                </p>
-            </div>
+            <p className="text-caption mt-8 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border py-6 text-muted-foreground">
+                <span>
+                    © {new Date().getFullYear()}{' '}
+                    {customName ?? provider?.name ?? 'Oblivion Care'}. Support
+                    availability and funding are confirmed individually.
+                </span>
+                {customName && (
+                    <span className="flex items-center gap-1.5">
+                        Powered by
+                        <JourneyWordmark className="text-[13px] text-current" />
+                        <span className="sr-only">Oblivion Care</span>
+                    </span>
+                )}
+            </p>
         </footer>
     );
-};
-
-export default Footer;
+}

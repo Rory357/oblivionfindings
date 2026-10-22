@@ -72,8 +72,10 @@ class AuditEvidencePack extends Model
 
     public function isExpiringSoon(int $days = 30): bool
     {
-        return $this->retention_until && 
-               $this->retention_until->diffInDays(now()) <= $days &&
+        // Retention still running and ending within $days (Carbon 3's signed
+        // diffInDays() made every future date pass; past dates are canDelete()).
+        return $this->retention_until &&
+               $this->retention_until->between(now(), now()->addDays($days)) &&
                !$this->deleted_after_retention;
     }
 

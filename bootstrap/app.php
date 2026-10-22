@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\It\Services\ItTicketRequestTrace;
+use App\Domain\Referrals\Http\ProtectDocumentRequestResponses;
 use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Http\Middleware\AddContentSecurityPolicy;
 use App\Http\Middleware\AuthenticateItServiceIdentity;
@@ -103,6 +104,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(fn (Throwable $exception, Request $request) => ProtectDocumentRequestResponses::render($exception, $request));
+        $exceptions->report(fn (Throwable $exception) => ProtectDocumentRequestResponses::report($exception));
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectRemoteSupportResponses::render($exception, $request));
         $exceptions->report(fn (Throwable $exception) => ProtectRemoteSupportResponses::report($exception));
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectObliResponses::render($exception, $request));

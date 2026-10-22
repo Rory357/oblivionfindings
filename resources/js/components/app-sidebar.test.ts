@@ -7,6 +7,30 @@ import {
     isSubItemActive,
 } from './app-sidebar';
 
+describe('app sidebar referral destinations', () => {
+    it('selects Reports separately while retaining intake and calendar navigation', () => {
+        for (const url of [
+            '/operations/referrals/reports?view=overview',
+            '/operations/referrals/reports/',
+        ]) {
+            expect(isSubItemActive(url, '/operations/referrals')).toBe(false);
+            expect(isSubItemActive(url, '/operations/referrals/reports')).toBe(
+                true,
+            );
+        }
+        for (const url of [
+            '/operations/referrals',
+            '/operations/referrals/calendar',
+            '/operations/referrals/01M56KN8AKKP86VRZ8TKNXD5WY',
+        ]) {
+            expect(isSubItemActive(url, '/operations/referrals')).toBe(true);
+            expect(isSubItemActive(url, '/operations/referrals/reports')).toBe(
+                false,
+            );
+        }
+    });
+});
+
 describe('app sidebar workforce navigation', () => {
     it('selects only the queue entry for queue pages and preserves other Rostering views', () => {
         for (const url of [
@@ -15,7 +39,9 @@ describe('app sidebar workforce navigation', () => {
             '/operations/rostering/conflicts/review/42',
         ]) {
             expect(isSubItemActive(url, '/operations/rostering')).toBe(false);
-            expect(isSubItemActive(url, '/operations/rostering/conflicts')).toBe(true);
+            expect(
+                isSubItemActive(url, '/operations/rostering/conflicts'),
+            ).toBe(true);
         }
         for (const url of [
             '/operations/rostering?tab=availability',
@@ -23,7 +49,9 @@ describe('app sidebar workforce navigation', () => {
             '/operations/rostering/conflicts-history',
         ]) {
             expect(isSubItemActive(url, '/operations/rostering')).toBe(true);
-            expect(isSubItemActive(url, '/operations/rostering/conflicts')).toBe(false);
+            expect(
+                isSubItemActive(url, '/operations/rostering/conflicts'),
+            ).toBe(false);
         }
     });
 

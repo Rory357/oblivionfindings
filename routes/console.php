@@ -1029,5 +1029,12 @@ Artisan::command('company-hub:prune-search-insights', function () {
 })->purpose('Remove Company Hub search topic totals older than 90 calendar days');
 app(Schedule::class)->command('company-hub:prune-search-insights')->dailyAt('02:10')->timezone('Pacific/Auckland')->withoutOverlapping();
 
+app(Schedule::class)->command('referrals:deliver-communications --limit=25')->everyMinute()->withoutOverlapping()->onOneServer();
+
+// Intake drafts already expire after seven days, but were only removed when their author came back.
+Artisan::command('referrals:prune-intake-drafts', function () {
+    $this->info((string) \App\Domain\Referrals\Models\ReferralIntakeDraft::query()->where('expires_at', '<=', now())->delete());
+})->purpose('Remove unfinished referral intake drafts once their seven-day expiry has passed');
+app(Schedule::class)->command('referrals:prune-intake-drafts')->dailyAt('02:20')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
 app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();

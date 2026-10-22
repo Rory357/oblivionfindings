@@ -209,7 +209,10 @@ export function HorizontalBarChart({
     return (
         <div className="space-y-2">
             {items.map((item, i) => {
-                const pct = Math.max((item.value / maxValue) * 100, 3);
+                const pct =
+                    item.value > 0
+                        ? Math.max((item.value / maxValue) * 100, 3)
+                        : 0;
                 const barColor = item.color ?? color;
                 return (
                     <div key={i}>

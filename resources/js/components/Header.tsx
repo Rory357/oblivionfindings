@@ -1,176 +1,127 @@
+import { BrandLockup } from '@/components/brand/brand-lockup';
+import { enquiryUrl } from '@/components/public-provider';
 import { Button } from '@/components/ui/button';
 import { useAppearance } from '@/hooks/use-appearance';
 import { Link, usePage } from '@inertiajs/react';
 import { Menu, Moon, Sun, X } from 'lucide-react';
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-const Header: React.FC = () => {
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+export default function Header({ name = 'Oblivion Care' }: { name?: string }) {
+    const [open, setOpen] = useState(false);
     const { url } = usePage();
     const { appearance, updateAppearance } = useAppearance();
-
-    const isActive = (path: string) => {
-        if (path === '/') return url === '/';
-        return url.startsWith(path);
-    };
-
-    const navItems = [
-        { href: '/', label: 'Home' },
-        { href: '/features', label: 'Features' },
-        { href: '/smart-monitoring', label: 'Smart Monitoring' },
-        { href: '/pricing', label: 'Pricing' },
-    ];
-
-    const toggleTheme = () => {
-        const newAppearance = appearance === 'dark' ? 'light' : 'dark';
-        updateAppearance(newAppearance);
-    };
-
-    const isDark =
+    useEffect(() => setOpen(false), [url]);
+    const dark =
         appearance === 'dark' ||
         (appearance === 'system' &&
             typeof window !== 'undefined' &&
             window.matchMedia('(prefers-color-scheme: dark)').matches);
-
+    const links = [
+        { href: '/services', label: 'Our support' },
+        { href: '/funding', label: 'Funding help' },
+        { href: '/about', label: 'About us' },
+        { href: '/contact', label: 'Contact' },
+    ];
+    const navigation = links.map((item) => (
+        <Link
+            key={item.href}
+            href={item.href}
+            aria-current={url.split('?')[0] === item.href ? 'page' : undefined}
+            onClick={() => setOpen(false)}
+            className="frontline-tap text-subtle flex items-center rounded-lg px-3 py-2 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
+        >
+            {item.label}
+        </Link>
+    ));
     return (
-        <header className="flex items-center justify-between gap-4">
-            <Link href="/" className="group flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-transform group-hover:scale-105">
-                    OF
-                </div>
-                <div>
-                    <span className="text-sm font-semibold tracking-tight">
-                        Oblivion Findings
-                    </span>
-                    <p className="text-[11px] text-muted-foreground italic">
-                        Preserving stories. Powered by code.
-                    </p>
-                </div>
+        <header className="relative flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+            {/* The brand slot (Settings › Branding): Journey lockup, a client logo or a client name — never a hard-coded mark. */}
+            <Link
+                href="/"
+                aria-label={`${name} home`}
+                className="frontline-tap flex min-w-0 items-center rounded-lg focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <BrandLockup surface={dark ? 'dark' : 'light'} />
             </Link>
-
-            {/* Desktop nav */}
-            <nav className="hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
-                {navItems.map((item) => (
-                    <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`rounded-full px-4 py-2 transition-colors ${
-                            isActive(item.href)
-                                ? 'bg-muted font-medium text-foreground'
-                                : 'hover:bg-muted/50 hover:text-foreground'
-                        }`}
-                    >
-                        {item.label}
-                    </Link>
-                ))}
-                <Link
-                    href="/contact"
-                    className={`rounded-full px-4 py-2 transition-colors ${
-                        isActive('/contact')
-                            ? 'bg-muted font-medium text-foreground'
-                            : 'hover:bg-muted/50 hover:text-foreground'
-                    }`}
-                >
-                    Contact
-                </Link>
+            <nav
+                aria-label="Main navigation"
+                className="hidden items-center gap-1 lg:flex"
+            >
+                {navigation}
             </nav>
-
             <div className="flex items-center gap-2">
-                {/* Theme toggle */}
                 <Button
-                    type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    onClick={toggleTheme}
-                    className="hidden h-10 w-10 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:inline-flex"
-                    aria-label="Toggle theme"
+                    className="frontline-tap"
+                    aria-label={
+                        dark ? 'Use light appearance' : 'Use dark appearance'
+                    }
+                    onClick={() => updateAppearance(dark ? 'light' : 'dark')}
                 >
-                    {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                    {dark ? (
+                        <Sun className="size-4" />
+                    ) : (
+                        <Moon className="size-4" />
+                    )}
                 </Button>
-
                 <Link
                     href="/login"
-                    className="hidden rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted sm:inline-flex"
+                    className="text-subtle hidden items-center rounded-lg px-3 py-2 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring lg:flex"
                 >
-                    Log in
+                    Staff and family sign in
                 </Link>
-
-                <Link
-                    href="/contact"
-                    className="rounded-full bg-primary-fill px-4 py-2 text-sm font-medium text-primary-fill-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary-fill/90 hover:shadow-primary/30"
-                >
-                    Book a demo
-                </Link>
-
-                {/* Mobile menu button */}
+                <Button asChild className="hidden sm:inline-flex">
+                    <Link href={enquiryUrl()}>Explore support</Link>
+                </Button>
                 <Button
-                    type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="h-10 w-10 rounded-xl text-muted-foreground sm:hidden"
-                    aria-label="Toggle menu"
+                    className="frontline-tap lg:hidden"
+                    aria-expanded={open}
+                    aria-controls="public-mobile-menu"
+                    aria-label={open ? 'Close navigation' : 'Open navigation'}
+                    onClick={() => setOpen(!open)}
                 >
-                    {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                    {open ? (
+                        <X className="size-4" />
+                    ) : (
+                        <Menu className="size-4" />
+                    )}
                 </Button>
             </div>
-
-            {/* Mobile nav */}
-            {mobileMenuOpen && (
-                <div className="absolute top-20 right-4 left-4 z-50 rounded-2xl border border-border bg-popover/95 p-4 shadow-2xl backdrop-blur-xl sm:hidden">
-                    <nav className="flex flex-col gap-1">
-                        {navItems.map((item) => (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={() => setMobileMenuOpen(false)}
-                                className={`rounded-xl px-4 py-3 text-sm transition-colors ${
-                                    isActive(item.href)
-                                        ? 'bg-primary/10 font-medium text-primary'
-                                        : 'text-muted-foreground hover:bg-muted'
-                                }`}
-                            >
-                                {item.label}
-                            </Link>
-                        ))}
-                        <Link
-                            href="/contact"
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={`rounded-xl px-4 py-3 text-sm transition-colors ${
-                                isActive('/contact')
-                                    ? 'bg-primary/10 font-medium text-primary'
-                                    : 'text-muted-foreground hover:bg-muted'
-                            }`}
-                        >
-                            Contact
-                        </Link>
-                        <div className="my-2 h-px bg-border" />
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => {
-                                toggleTheme();
-                                setMobileMenuOpen(false);
-                            }}
-                            className="h-auto justify-start gap-3 rounded-xl px-4 py-3 text-sm font-normal text-muted-foreground hover:bg-muted"
-                        >
-                            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                            <span>
-                                Switch to {isDark ? 'light' : 'dark'} mode
-                            </span>
-                        </Button>
-                        <Link
-                            href="/login"
-                            onClick={() => setMobileMenuOpen(false)}
-                            className="rounded-xl px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
-                        >
-                            Log in
-                        </Link>
-                    </nav>
-                </div>
+            {open && (
+                <nav
+                    id="public-mobile-menu"
+                    aria-label="Mobile navigation"
+                    className="w-full space-y-1 rounded-xl border border-border bg-card p-3 lg:hidden"
+                    onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                            setOpen(false);
+                            document
+                                .querySelector<HTMLButtonElement>(
+                                    '[aria-controls="public-mobile-menu"]',
+                                )
+                                ?.focus();
+                        }
+                    }}
+                >
+                    {navigation}
+                    <Link
+                        href={enquiryUrl()}
+                        onClick={() => setOpen(false)}
+                        className="frontline-tap flex items-center rounded-lg px-3 py-2 font-medium text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        Explore support
+                    </Link>
+                    <Link
+                        href="/login"
+                        className="frontline-tap text-subtle flex items-center rounded-lg px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        Staff and family sign in
+                    </Link>
+                </nav>
             )}
         </header>
     );
-};
-
-export default Header;
+}

@@ -39,6 +39,7 @@ class RbacSeeder extends Seeder
      * Every seeder that backfills the admin role must exclude these keys.
      */
     public const RESTRICTED_INDEPENDENT_AUTHORITY = [
+        ...\App\Domain\Referrals\ReferralPermissions::INDEPENDENT,
         'healthSafety.events.close',
         'healthSafety.events.closeAny',
         'healthSafety.closureExceptions.request',
@@ -633,7 +634,7 @@ class RbacSeeder extends Seeder
             ['key' => 'funding.viewAllSites', 'description' => 'View funding records across all active Sites', 'group' => 'funding', 'module' => 'Finance'],
         ];
 
-        foreach ($permissionDefinitions as $permDef) {
+        foreach ([...$permissionDefinitions, ...\App\Domain\Referrals\ReferralPermissions::definitions()] as $permDef) {
             Permission::firstOrCreate(
                 ['key' => $permDef['key']],
                 [
@@ -1084,6 +1085,26 @@ class RbacSeeder extends Seeder
             foreach ($hazard->roles()->pluck('roles.id')->all() as $roleId) {
                 Role::find($roleId)?->permissions()->syncWithoutDetaching($grantIds);
             }
+        }
+
+        // Referral role presets (specification §10). Mirrors the deploy grant migrations
+        // 2026_10_20_090000_grant_referral_role_presets and 2026_10_21_120000_grant_referral_communications_send
+        // (staff messaging: coordinators and service managers). Runs after the role syncs above;
+        // syncWithoutDetaching augments rather than replaces. Admin never gets the independent keys.
+        foreach (\App\Domain\Referrals\ReferralPermissions::rolePresets() as $roleName => $keys) {
+            Role::where('name', $roleName)->first()?->permissions()
+                ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
+        }
+
+        // Provider managers create and approve drafts made from referrals (Stephan, 21 Oct 2026).
+        // Mirrors 2026_10_21_130000_grant_provider_manager_service_agreements. The keys are created
+        // here because OperationsPermissionsSeeder runs after this seeder.
+        foreach (\App\Domain\Referrals\Services\ReferralServiceAgreements::PERMISSION_DEFINITIONS as $definition) {
+            Permission::firstOrCreate(['key' => $definition['key']], ['description' => $definition['description'], 'group' => 'service_agreements', 'module' => 'Operations']);
+        }
+        foreach (\App\Domain\Referrals\Services\ReferralServiceAgreements::ROLE_GRANTS as $roleName => $keys) {
+            Role::where('name', $roleName)->first()?->permissions()
+                ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
         }
 
         // Self-service IT ticketing: every STAFF role can raise and track its

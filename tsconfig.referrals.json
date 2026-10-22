@@ -1,0 +1,22 @@
+{
+    "extends": "./tsconfig.json",
+    "include": [
+        "resources/js/pages/settings/referrals/**/*.tsx",
+        "resources/js/pages/public-provider/**/*.tsx",
+        "resources/js/pages/public-referrals/**/*.tsx",
+        "resources/js/pages/operations/referrals/**/*.tsx",
+        "resources/js/pages/operations/onboarding/Show.tsx",
+        "resources/js/pages/operations/onboarding/Index.tsx",
+        "resources/js/pages/operations/service-agreements/Create.tsx",
+        "resources/js/pages/operations/service-agreements/Show.tsx",
+        "resources/js/pages/operations/clients/consents/Index.tsx",
+        "resources/js/pages/operations/clients/show.tsx",
+        "resources/js/pages/privacy/retention/review.tsx",
+        "resources/js/pages/privacy/retention.tsx",
+        "resources/js/components/privacy/referral-retention-settings*.tsx",
+        "resources/js/components/privacy/privacy-wizard-configs.tsx",
+        "resources/js/pages/respite/stays/show.tsx",
+        "resources/js/components/referrals/**/*.tsx",
+        "resources/js/types/**/*.d.ts"
+    ]
+}

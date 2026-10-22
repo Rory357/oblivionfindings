@@ -28,7 +28,7 @@ import {
     Users,
     XCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 type OnboardingWorkflow = {
     id: number;
@@ -41,7 +41,11 @@ type OnboardingWorkflow = {
     completed_steps_count: number;
     overdue_steps: number;
     client: { id: number; first_name: string; last_name: string } | null;
-    assigned_to: { id: number; name: string } | null;
+    assigned_to: number | null;
+    assignee: { id: number; name: string } | null;
+    scope: string;
+    site: { id: number; name: string } | null;
+    service_context: { id: number; name: string } | null;
 };
 
 type Props = {
@@ -55,6 +59,7 @@ type Props = {
     filters: {
         q?: string | null;
         status?: string | null;
+        overdue?: boolean;
     };
     stats: {
         active: number;
@@ -116,21 +121,22 @@ export default function OnboardingDashboard({
         : 'all';
 
     const [q, setQ] = useState(filters.q ?? '');
-    const [overdueOnly, setOverdueOnly] = useState(false);
+    const overdueOnly = filters.overdue ?? false;
 
     const applyFilters = useCallback(
-        (overrides: { view?: ViewKey; q?: string }) => {
+        (overrides: { view?: ViewKey; q?: string; overdue?: boolean }) => {
             const nextView = overrides.view ?? view;
             const nextQ = overrides.q ?? filters.q ?? '';
             const params: Record<string, string> = {};
             if (nextView !== 'all') params.status = nextView;
             if (nextQ.trim() !== '') params.q = nextQ.trim();
+            if (overrides.overdue ?? overdueOnly) params.overdue = '1';
             router.get('/operations/onboarding', params, {
                 preserveState: true,
                 replace: true,
             });
         },
-        [view, filters.q],
+        [view, filters.q, overdueOnly],
     );
 
     useEffect(() => {
@@ -139,12 +145,7 @@ export default function OnboardingDashboard({
         return () => clearTimeout(t);
     }, [q, filters.q, applyFilters]);
 
-    const shown = useMemo(() => {
-        const rows = workflows?.data ?? [];
-        return overdueOnly
-            ? rows.filter((wf) => (wf.overdue_steps ?? 0) > 0)
-            : rows;
-    }, [workflows?.data, overdueOnly]);
+    const shown = workflows?.data ?? [];
 
     const railItems: PageHeaderRailItem<ViewKey>[] = [
         { key: 'all', label: 'All workflows', icon: Layers, count: total },
@@ -170,7 +171,7 @@ export default function OnboardingDashboard({
 
     const currentViewLabel =
         railItems.find((v) => v.key === view)?.label ?? 'All workflows';
-    const viewTotal = view === 'all' ? total : countOf(view);
+    const viewTotal = workflows.total;
 
     const header = (
         <PageHeader
@@ -200,7 +201,12 @@ export default function OnboardingDashboard({
                     <PageHeaderMeterBlock
                         label="Active"
                         ariaLabel="View in-progress workflows"
-                        onClick={() => applyFilters({ view: 'in_progress' })}
+                        onClick={() =>
+                            applyFilters({
+                                view: 'in_progress',
+                                overdue: false,
+                            })
+                        }
                     >
                         <PageHeaderMeterBig>{s.active}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
@@ -212,8 +218,10 @@ export default function OnboardingDashboard({
                         tone={s.overdue_steps > 0 ? 'critical' : 'success'}
                         ariaLabel="View in-progress workflows with overdue steps"
                         onClick={() => {
-                            setOverdueOnly(true);
-                            applyFilters({ view: 'in_progress' });
+                            applyFilters({
+                                view: 'in_progress',
+                                overdue: true,
+                            });
                         }}
                     >
                         <PageHeaderMeterBig>
@@ -226,7 +234,9 @@ export default function OnboardingDashboard({
                     <PageHeaderMeterBlock
                         label="This month"
                         ariaLabel="View completed workflows"
-                        onClick={() => applyFilters({ view: 'completed' })}
+                        onClick={() =>
+                            applyFilters({ view: 'completed', overdue: false })
+                        }
                     >
                         <PageHeaderMeterBig>
                             {s.completed_this_month}
@@ -239,7 +249,12 @@ export default function OnboardingDashboard({
                         <PageHeaderMeterBlock
                             label="Completed"
                             ariaLabel="View all completed workflows"
-                            onClick={() => applyFilters({ view: 'completed' })}
+                            onClick={() =>
+                                applyFilters({
+                                    view: 'completed',
+                                    overdue: false,
+                                })
+                            }
                         >
                             <PageHeaderMeterDonut
                                 percent={(countOf('completed') / total) * 100}
@@ -259,14 +274,21 @@ export default function OnboardingDashboard({
                 <PageHeaderFilterCheck
                     label="Overdue only"
                     checked={overdueOnly}
-                    onChange={setOverdueOnly}
+                    onChange={(checked) =>
+                        applyFilters({
+                            overdue: checked,
+                            ...(checked ? { view: 'in_progress' } : {}),
+                        })
+                    }
                 />
             }
             rail={
                 <PageHeaderRail
                     items={railItems}
                     value={view}
-                    onSelect={(key) => applyFilters({ view: key })}
+                    onSelect={(key) =>
+                        applyFilters({ view: key, overdue: false })
+                    }
                     ariaLabel="Workflow views"
                 />
             }
@@ -359,14 +381,23 @@ export default function OnboardingDashboard({
                                                         </StatusBadge>
                                                     )}
                                                 </div>
-                                                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                                    {wf.assigned_to && (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {wf.scope ===
+                                                    'additional_support'
+                                                        ? 'Additional support'
+                                                        : 'Person onboarding'}
+                                                    {wf.service_context
+                                                        ? ` · ${wf.service_context.name}`
+                                                        : ''}
+                                                    {wf.site
+                                                        ? ` · ${wf.site.name}`
+                                                        : ''}
+                                                </p>
+                                                <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                                    {wf.assignee && (
                                                         <span>
                                                             Coordinator:{' '}
-                                                            {
-                                                                wf.assigned_to
-                                                                    .name
-                                                            }
+                                                            {wf.assignee.name}
                                                         </span>
                                                     )}
                                                     {wf.started_at && (
@@ -401,14 +432,10 @@ export default function OnboardingDashboard({
                                                 className="h-8 gap-1.5 text-xs"
                                             >
                                                 <Link
-                                                    href={
-                                                        wf.client
-                                                            ? `/operations/clients/${wf.client.id}?tab=onboarding`
-                                                            : '#'
-                                                    }
+                                                    href={`/operations/onboarding/${wf.id}`}
                                                 >
                                                     <ExternalLink className="h-3 w-3" />
-                                                    View {clientLabel}
+                                                    View onboarding
                                                 </Link>
                                             </Button>
                                         </CardContent>

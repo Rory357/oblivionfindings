@@ -199,5 +199,15 @@ return [
         'controlroom.alert' => [
             'target_groups' => ['managers_core'],
         ],
+
+        // --- Service agreements ---
+        // A draft made from a referral proposal needs Finance's review. Finance only: without
+        // include_managers=false the manager roles would be added to the target group.
+        'service_agreements.referral_draft_created' => [
+            'include_managers' => false,
+            'include_assigned_workers' => false,
+            'include_entity_user' => false,
+            'target_groups' => ['finance'],
+        ],
     ],
 ];

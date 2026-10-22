@@ -35,6 +35,7 @@ class PortalClientController extends Controller
 
         $documents = $canViewFamilyInformation
             ? ClientDocument::query()
+                ->whereNull('source_referral_evidence_id')
                 ->where('client_id', $client->id)
                 ->where('portal_visible', true)
                 ->orderByDesc('created_at')

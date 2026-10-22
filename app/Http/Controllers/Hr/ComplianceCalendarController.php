@@ -178,7 +178,8 @@ class ComplianceCalendarController extends Controller
             return '#ef4444'; // Red - expired
         }
 
-        if ($expiresAt->diffInDays($now) <= 30) {
+        // lte() rather than diffInDays($now) <= 30, which Carbon 3 signs.
+        if ($expiresAt->lte($now->copy()->addDays(30))) {
             return '#f97316'; // Orange - expiring within 30 days
         }
 

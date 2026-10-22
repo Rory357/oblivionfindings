@@ -43,6 +43,7 @@ use App\Services\Tasks\Providers\MedicationPrescriberRequestProvider;
 use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
 use App\Services\Tasks\Providers\MedicationReviewProvider;
 use App\Services\Tasks\Providers\MedicationRoundProvider;
+use App\Services\Tasks\Providers\ReferralTaskProvider;
 use App\Services\Tasks\Providers\RespiteTaskProvider;
 use App\Services\Tasks\Providers\RestraintReviewProvider;
 use App\Services\Tasks\Providers\SafeguardingActionPlanProvider;
@@ -60,7 +61,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(41);
+    expect($providers)->toHaveCount(42);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -103,6 +104,7 @@ it('registers every task source behind exactly one authorization boundary', func
         SiteChecklistRunProvider::class => 'checklist_run',
         ShiftTaskProvider::class => 'shift_task',
         RespiteTaskProvider::class => 'respite_task',
+        ReferralTaskProvider::class => 'referrals',
         FirstAidFollowupProvider::class => 'first_aid_followup',
         RestraintReviewProvider::class => 'restraint_review',
     ]);

@@ -88,8 +88,11 @@ class LeaveReportService
                 $days = max(1, $startDate->diffInWeekdays($endDate) + 1);
                 $totalDays += $days;
 
-                // A new spell if there's a gap of more than 1 calendar day since last absence
-                if ($lastEnd === null || $startDate->diffInDays($lastEnd) > 1) {
+                // A new spell if there's a gap of more than 1 calendar day since last absence.
+                // Last end → this start: Carbon 3's diffInDays() is signed, and the
+                // reverse order was always negative, so each person had one spell.
+                if ($lastEnd === null
+                    || $lastEnd->copy()->startOfDay()->diffInDays($startDate->copy()->startOfDay()) > 1) {
                     $spells++;
                 }
                 $lastEnd = $endDate;

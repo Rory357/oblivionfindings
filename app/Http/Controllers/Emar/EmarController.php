@@ -246,6 +246,7 @@ class EmarController extends Controller
     private function getMedicationCharts(Client $client): array
     {
         return ClientDocument::query()
+            ->whereNull('source_referral_evidence_id')
             ->with('uploadedBy:id,name')
             ->where('client_id', $client->id)
             ->where('category', 'med_chart')

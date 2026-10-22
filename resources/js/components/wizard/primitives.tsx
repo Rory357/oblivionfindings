@@ -204,6 +204,8 @@ export function SelectInput({
     placeholder,
     options,
     ariaLabel,
+    disabled = false,
+    className,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -213,14 +215,16 @@ export function SelectInput({
     /** Accessible name for the trigger; falls back to the placeholder so a
      *  placeholder-only (unselected) trigger is never a nameless button (axe button-name). */
     ariaLabel?: string;
+    disabled?: boolean;
+    className?: string;
 }) {
     return (
         // Keep the empty string as a real controlled value. Converting it to
         // undefined makes Radix switch ownership mid-session and can commit a
         // highlighted option instead of the option the worker clicked.
-        <Select value={value} onValueChange={onChange}>
+        <Select value={value} onValueChange={onChange} disabled={disabled}>
             <SelectTrigger
-                className="w-full"
+                className={cn('w-full', className)}
                 aria-label={ariaLabel ?? placeholder}
             >
                 <SelectValue placeholder={placeholder} />

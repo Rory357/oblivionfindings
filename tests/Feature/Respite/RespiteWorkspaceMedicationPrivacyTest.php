@@ -200,8 +200,11 @@ test('chart-alert text is concealed from readers without controlled view for a p
 });
 
 test('a canonical-only life-threatening allergy still requires the anaphylaxis acknowledgement at check-in', function () {
+    require_once __DIR__.'/../../Support/RespiteCommencementFixtures.php';
     $a1 = ($this->resident)($this->houseA, 'Aroha');
     $stay = RespiteStay::query()->where('client_id', $a1->id)->firstOrFail();
+    $stay->booking->update(['start_at' => now(), 'end_at' => now()->addDays(2)]);
+    prepareRespiteCommencement($stay->booking);
     $manager = ($this->staffAt)($this->houseA, [], 'coordinator');
 
     $this->actingAs($manager)

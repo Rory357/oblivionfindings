@@ -104,6 +104,7 @@ class TaskAggregator
             new Providers\SiteChecklistRunProvider,
             new Providers\ShiftTaskProvider,
             new Providers\RespiteTaskProvider,
+            new Providers\ReferralTaskProvider,
             new Providers\FirstAidFollowupProvider,
             new Providers\RestraintReviewProvider,
         ];

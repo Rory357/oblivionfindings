@@ -441,6 +441,23 @@
     --src-period-close: oklch(50% 0.13 105);
     --src-period-close-bg: oklch(96% 0.05 105);
     --src-period-close-ln: oklch(86% 0.09 105);
+    /* Referrals → Calendar sources: next actions and follow-ups, calls and
+       meetings (appointments), assessment work and funding assistance. Same
+       fixed, distinct-hue rule; the four are spaced well apart from each other
+       (135 / 245 / 88 / 300) so they read side by side on the referral calendar
+       without borrowing the Sites inspection/compliance keys. */
+    --src-referral-follow-up: oklch(48% 0.13 135);
+    --src-referral-follow-up-bg: oklch(95% 0.05 135);
+    --src-referral-follow-up-ln: oklch(85% 0.08 135);
+    --src-referral-appointment: oklch(50% 0.15 245);
+    --src-referral-appointment-bg: oklch(96% 0.035 245);
+    --src-referral-appointment-ln: oklch(87% 0.06 245);
+    --src-referral-assessment: oklch(50% 0.12 88);
+    --src-referral-assessment-bg: oklch(96% 0.05 90);
+    --src-referral-assessment-ln: oklch(86% 0.09 90);
+    --src-referral-funding: oklch(50% 0.18 300);
+    --src-referral-funding-bg: oklch(96% 0.04 300);
+    --src-referral-funding-ln: oklch(88% 0.07 300);
     /* External busy (two-way sync, pull-only) — deliberately desaturated slate so it
        reads as "not ours / blocked" against the chromatic obligation sources. */
     --src-external: oklch(46% 0.03 265);
@@ -469,7 +486,9 @@
         from var(--primary) 0.834 calc(c * 0.468) calc(h + 11.5)
     );
     /* Text on ink that isn't white: ≥ 7:1 on --journey-ink for every hue. */
-    --journey-ink-muted: oklch(from var(--journey-lavender) 0.8 calc(c * 0.35) h);
+    --journey-ink-muted: oklch(
+        from var(--journey-lavender) 0.8 calc(c * 0.35) h
+    );
     --journey-lilac: oklch(from var(--journey-lavender) 0.94 calc(c * 0.3) h);
     /* The form half of the sign-in pages and its input fill. */
     --journey-surface: var(--journey-paper);

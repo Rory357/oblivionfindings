@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { ListCaption } from '@/components/lists';
 import {
     PageHeader,
@@ -13,9 +14,11 @@ import {
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -25,7 +28,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -37,6 +39,7 @@ import {
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { toDatetimeLocal } from '@/lib/datetime';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -167,7 +170,9 @@ export default function ConsentsIndex({
     stats = {} as any,
     consent_types = [],
 }: Props) {
-    const { labels } = usePage().props as any;
+    const { labels, auth } = usePage().props as any;
+    const canRecord = auth?.can?.consents?.record === true;
+    const canRequest = auth?.can?.consents?.request === true;
     const name = `${client.first_name} ${client.last_name}`;
     const hasConsentTypes = consent_types.length > 0;
 
@@ -177,7 +182,7 @@ export default function ConsentsIndex({
         consent_type_id: '',
         status: 'given',
         given_method: 'written',
-        given_at: new Date().toISOString().split('T')[0],
+        given_at: toDatetimeLocal(new Date()).slice(0, 10),
         given_by_relationship: '',
         given_notes: '',
         expires_at: '',
@@ -186,6 +191,13 @@ export default function ConsentsIndex({
     });
     const [withdrawReason, setWithdrawReason] = useState('');
     const [consentFile, setConsentFile] = useState<File | null>(null);
+    const [recordBusy, setRecordBusy] = useState(false);
+    const [recordErrors, setRecordErrors] = useState<Record<string, string>>(
+        {},
+    );
+    const selectedConsentType = consent_types.find(
+        (type) => String(type.id) === formData.consent_type_id,
+    );
 
     const [view, setView] = useState<ViewKey>('all');
     const [search, setSearch] = useState('');
@@ -201,6 +213,27 @@ export default function ConsentsIndex({
     };
 
     const submitConsent = () => {
+        if (recordBusy || !canRecord) return;
+        if (
+            !formData.consent_type_id ||
+            !formData.given_at ||
+            formData.given_by_relationship !== 'self'
+        ) {
+            setRecordErrors({
+                decision:
+                    'Choose the consent type and date, and confirm that you identified the person making this decision.',
+            });
+            return;
+        }
+        if (selectedConsentType?.requires_capacity_assessment) {
+            setRecordErrors({
+                decision:
+                    'Use the consent request workflow for the required decision-specific capacity assessment.',
+            });
+            return;
+        }
+        setRecordErrors({});
+        setRecordBusy(true);
         const payload = buildDirectConsentPayload(formData, consentFile);
         router.post(`/operations/clients/${client.id}/consents`, payload, {
             forceFormData: !!consentFile,
@@ -214,8 +247,11 @@ export default function ConsentsIndex({
                     given_notes: '',
                     expires_at: '',
                     refusal_reason: '',
+                    given_by_relationship: '',
                 });
             },
+            onError: (errors) => setRecordErrors(errors),
+            onFinish: () => setRecordBusy(false),
         });
     };
 
@@ -361,7 +397,7 @@ export default function ConsentsIndex({
                     <PageHeaderPrimaryButton
                         icon={Plus}
                         onClick={() => setShowRecord(true)}
-                        disabled={!hasConsentTypes}
+                        disabled={!hasConsentTypes || !canRecord}
                         className="disabled:pointer-events-none disabled:opacity-50"
                     >
                         Record consent
@@ -519,7 +555,9 @@ export default function ConsentsIndex({
                                     <Button
                                         size="sm"
                                         onClick={() => setShowRecord(true)}
-                                        disabled={!hasConsentTypes}
+                                        disabled={
+                                            !hasConsentTypes || !canRecord
+                                        }
                                     >
                                         <Plus className="h-3.5 w-3.5" /> Record
                                         consent
@@ -719,192 +757,298 @@ export default function ConsentsIndex({
             </PageLayout>
 
             {/* Record Consent Dialog */}
-            <Dialog open={showRecord} onOpenChange={setShowRecord}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
+            <Dialog
+                open={showRecord}
+                onOpenChange={(open) => {
+                    if (!recordBusy) setShowRecord(open);
+                }}
+            >
+                <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-lg">
+                    <DialogHeader className="shrink-0">
                         <DialogTitle>Record Consent</DialogTitle>
                         <DialogDescription>
                             Record a new consent for {client.first_name}.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="space-y-1.5">
-                            <Label>Consent Type *</Label>
-                            <Select
-                                value={formData.consent_type_id}
-                                onValueChange={(v) =>
-                                    setFormData({
-                                        ...formData,
-                                        consent_type_id: v,
-                                    })
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select type..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {consent_types.map((t: any) => (
-                                        <SelectItem
-                                            key={t.id}
-                                            value={String(t.id)}
-                                        >
-                                            {t.name}{' '}
-                                            {t.is_mandatory && (
-                                                <span className="text-status-critical">
-                                                    *
-                                                </span>
+                    <div className="min-h-0 flex-1 overflow-y-auto px-1 py-2">
+                        <fieldset
+                            disabled={recordBusy}
+                            className="min-w-0 space-y-4"
+                        >
+                            {Object.keys(recordErrors).length > 0 && (
+                                <Alert variant="warning">
+                                    <AlertDescription>
+                                        <ul className="list-disc pl-5">
+                                            {Object.entries(recordErrors).map(
+                                                ([key, message]) => (
+                                                    <li key={key}>{message}</li>
+                                                ),
                                             )}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                                        </ul>
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                            <p className="text-subtle">
+                                Record the decision made by the person on this
+                                record. Representative decisions and capacity
+                                assessments must use a verified consent request.
+                            </p>
+                            {canRequest && (
+                                <Button asChild variant="outline">
+                                    <a
+                                        href={`/operations/clients/${client.id}/consent-requests/create`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Open consent request (new tab)
+                                    </a>
+                                </Button>
+                            )}
                             <div className="space-y-1.5">
-                                <Label>Status *</Label>
+                                <Label htmlFor="consent-consent_type_id">
+                                    Consent Type *
+                                </Label>
                                 <Select
-                                    value={formData.status}
-                                    onValueChange={(v) =>
-                                        setFormData({ ...formData, status: v })
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="given">
-                                            Given
-                                        </SelectItem>
-                                        <SelectItem value="refused">
-                                            Refused
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Method *</Label>
-                                <Select
-                                    value={formData.given_method}
+                                    value={formData.consent_type_id}
                                     onValueChange={(v) =>
                                         setFormData({
                                             ...formData,
-                                            given_method: v,
+                                            consent_type_id: v,
                                         })
                                     }
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue />
+                                    <SelectTrigger id="consent-consent_type_id">
+                                        <SelectValue placeholder="Select type..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="written">
-                                            Written
-                                        </SelectItem>
-                                        <SelectItem value="verbal">
-                                            Verbal
-                                        </SelectItem>
-                                        <SelectItem value="electronic">
-                                            Electronic
-                                        </SelectItem>
+                                        {consent_types.map((t: any) => (
+                                            <SelectItem
+                                                key={t.id}
+                                                value={String(t.id)}
+                                            >
+                                                {t.name}{' '}
+                                                {t.is_mandatory && (
+                                                    <span className="text-status-critical">
+                                                        *
+                                                    </span>
+                                                )}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="space-y-1.5">
-                                <Label>Date Given *</Label>
-                                <Input
-                                    type="date"
-                                    value={formData.given_at}
-                                    onChange={(e) =>
+                            {selectedConsentType && (
+                                <Alert variant="info">
+                                    <AlertDescription>
+                                        <strong>
+                                            {selectedConsentType.name} · Version{' '}
+                                            {selectedConsentType.version ?? '—'}
+                                        </strong>
+                                        <p>{selectedConsentType.purpose}</p>
+                                        <p>{selectedConsentType.description}</p>
+                                        {selectedConsentType.requires_capacity_assessment && (
+                                            <p>
+                                                A decision-specific capacity
+                                                assessment is required. Use the
+                                                consent request workflow.
+                                            </p>
+                                        )}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                            <div className="flex items-start gap-3">
+                                <Checkbox
+                                    id="direct-consent-identity"
+                                    checked={
+                                        formData.given_by_relationship ===
+                                        'self'
+                                    }
+                                    onCheckedChange={(checked) =>
                                         setFormData({
                                             ...formData,
-                                            given_at: e.target.value,
+                                            given_by_relationship:
+                                                checked === true ? 'self' : '',
                                         })
                                     }
                                 />
+                                <Label htmlFor="direct-consent-identity">
+                                    I identified {name} and recorded their own
+                                    decision about the stated purpose.
+                                </Label>
                             </div>
-                            <div className="space-y-1.5">
-                                <Label>Expiry Date</Label>
-                                <Input
-                                    type="date"
-                                    value={formData.expires_at}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            expires_at: e.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
-                        </div>
-                        {formData.status === 'refused' && (
-                            <div className="space-y-1.5">
-                                <Label>Reason for Refusal</Label>
-                                <Textarea
-                                    value={formData.refusal_reason}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            refusal_reason: e.target.value,
-                                        })
-                                    }
-                                    placeholder="Document why consent was refused..."
-                                />
-                            </div>
-                        )}
-                        <div className="space-y-1.5">
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={formData.given_notes}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        given_notes: e.target.value,
-                                    })
-                                }
-                                placeholder="Additional notes..."
-                                className="min-h-[60px]"
-                            />
-                        </div>
-                        {/* Signed Document Upload */}
-                        <div className="space-y-1.5">
-                            <Label>Signed Document</Label>
-                            <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-primary bg-primary/5 p-4 transition-colors hover:bg-primary/10">
-                                <Upload className="h-5 w-5 text-primary" />
-                                <div>
-                                    <p className="text-sm font-medium text-primary">
-                                        {consentFile
-                                            ? consentFile.name
-                                            : 'Click to upload signed consent form'}
-                                    </p>
-                                    <p className="text-[10px] text-primary">
-                                        PDF, JPEG, or PNG up to 10 MB
-                                    </p>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="consent-status">
+                                        Status *
+                                    </Label>
+                                    <Select
+                                        value={formData.status}
+                                        onValueChange={(v) =>
+                                            setFormData({
+                                                ...formData,
+                                                status: v,
+                                            })
+                                        }
+                                    >
+                                        <SelectTrigger id="consent-status">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="given">
+                                                Given
+                                            </SelectItem>
+                                            <SelectItem value="refused">
+                                                Refused
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                                <input
-                                    type="file"
-                                    className="hidden"
-                                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="consent-given_method">
+                                        Method *
+                                    </Label>
+                                    <Select
+                                        value={formData.given_method}
+                                        onValueChange={(v) =>
+                                            setFormData({
+                                                ...formData,
+                                                given_method: v,
+                                            })
+                                        }
+                                    >
+                                        <SelectTrigger id="consent-given_method">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="written">
+                                                Written
+                                            </SelectItem>
+                                            <SelectItem value="verbal">
+                                                Verbal
+                                            </SelectItem>
+                                            <SelectItem value="electronic">
+                                                Electronic
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="consent-given_at">
+                                        Date Given *
+                                    </Label>
+                                    <DatePicker
+                                        id="consent-given_at"
+                                        label="Date Given"
+                                        value={formData.given_at}
+                                        onChange={(value) =>
+                                            setFormData({
+                                                ...formData,
+                                                given_at: value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="consent-expires_at">
+                                        Expiry Date
+                                    </Label>
+                                    <DatePicker
+                                        id="consent-expires_at"
+                                        label="Expiry Date"
+                                        value={formData.expires_at}
+                                        onChange={(value) =>
+                                            setFormData({
+                                                ...formData,
+                                                expires_at: value,
+                                            })
+                                        }
+                                        allowClear
+                                    />
+                                </div>
+                            </div>
+                            {formData.status === 'refused' && (
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="consent-refusal_reason">
+                                        Reason for Refusal
+                                    </Label>
+                                    <Textarea
+                                        id="consent-refusal_reason"
+                                        value={formData.refusal_reason}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                refusal_reason: e.target.value,
+                                            })
+                                        }
+                                        placeholder="Document why consent was refused..."
+                                    />
+                                </div>
+                            )}
+                            <div className="space-y-1.5">
+                                <Label htmlFor="consent-given_notes">
+                                    Notes
+                                </Label>
+                                <Textarea
+                                    id="consent-given_notes"
+                                    value={formData.given_notes}
                                     onChange={(e) =>
-                                        setConsentFile(
-                                            e.target.files?.[0] ?? null,
-                                        )
+                                        setFormData({
+                                            ...formData,
+                                            given_notes: e.target.value,
+                                        })
                                     }
+                                    placeholder="Additional notes..."
+                                    className="min-h-[60px]"
                                 />
-                            </label>
-                        </div>
+                            </div>
+                            {/* Signed Document Upload */}
+                            <div className="space-y-1.5">
+                                <Label>Signed Document</Label>
+                                <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-primary bg-primary/5 p-4 transition-colors hover:bg-primary/10">
+                                    <Upload className="h-5 w-5 text-primary" />
+                                    <div>
+                                        <p className="text-sm font-medium text-primary">
+                                            {consentFile
+                                                ? consentFile.name
+                                                : 'Click to upload signed consent form'}
+                                        </p>
+                                        <p className="text-[10px] text-primary">
+                                            PDF, JPEG, or PNG up to 10 MB
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        className="hidden"
+                                        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                        onChange={(e) =>
+                                            setConsentFile(
+                                                e.target.files?.[0] ?? null,
+                                            )
+                                        }
+                                    />
+                                </label>
+                            </div>
+                        </fieldset>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0">
                         <Button
                             variant="outline"
                             onClick={() => setShowRecord(false)}
+                            disabled={recordBusy}
                         >
                             Cancel
                         </Button>
                         <Button
                             className="bg-primary hover:bg-primary"
                             onClick={submitConsent}
-                            disabled={!formData.consent_type_id}
+                            disabled={
+                                recordBusy ||
+                                !canRecord ||
+                                !formData.consent_type_id ||
+                                !!selectedConsentType?.requires_capacity_assessment
+                            }
                         >
                             Record Consent
                         </Button>

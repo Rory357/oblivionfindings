@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Referrals\Services\ReferralDocumentHandovers;
 use App\Models\Client;
 use App\Models\ClientDocument;
 use App\Models\ClientDocumentFolder;
@@ -32,10 +33,13 @@ class ClientDocumentController extends Controller
         AuditLogger::log('documents.list', $client);
 
         $documents = ClientDocument::query()
+            ->visibleReferralReleases($user)
             ->where('client_id', $client->id)
             ->orderByDesc('created_at')
             ->with(['uploadedBy:id,name,email'])
             ->get();
+
+        app(ReferralDocumentHandovers::class)->project($documents);
 
         $folderRecords = ClientDocumentFolder::query()
             ->where('client_id', $client->id)
@@ -67,6 +71,7 @@ class ClientDocumentController extends Controller
                 'effective_date' => optional($d->effective_date)->toDateString(),
                 'expiry_date' => optional($d->expiry_date)->toDateString(),
                 'portal_visible' => (bool) $d->portal_visible,
+                'care_release' => $d->care_release,
                 'notes' => $d->notes,
                 'original_name' => $d->original_name,
                 'mime_type' => $d->mime_type,
@@ -173,6 +178,7 @@ class ClientDocumentController extends Controller
     {
         $this->authorize('update', $client);
         abort_unless($document->client_id === $client->id, 404);
+        abort_unless(ClientDocument::query()->whereKey($document->id)->visibleReferralReleases($request->user())->exists(), 404);
 
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:200'],
@@ -186,6 +192,14 @@ class ClientDocumentController extends Controller
         ]);
 
         // Only update portal_visible if it was explicitly sent (so older clients don't accidentally flip)
+        abort_if($document->source_referral_evidence_id && ($data['portal_visible'] ?? false), 422, 'Referral handover documents are released for staff care only. Portal sharing needs a separately reviewed document.');
+        abort_if($document->source_referral_evidence_id && array_key_exists('category', $data) && $data['category'] !== 'referral_handover', 422, 'Keep the referral handover classification. A clinical document needs its separate reviewed workflow.');
+        if ($document->source_referral_evidence_id) {
+            foreach (['version', 'effective_date', 'expiry_date'] as $field) {
+                $current = $field === 'version' ? $document->version : $document->{$field}?->toDateString();
+                abort_if(array_key_exists($field, $data) && ($data[$field] ?: null) !== ($current ?: null), 422, 'Review the source evidence and care handover to change its version or dates.');
+            }
+        }
         if (! array_key_exists('portal_visible', $data)) {
             $data['portal_visible'] = $document->portal_visible;
         }
@@ -195,6 +209,10 @@ class ClientDocumentController extends Controller
         }
 
         $document->update($data);
+
+        if ($document->source_referral_evidence_id) {
+            return back()->with('success', 'Handover document details updated.');
+        }
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'document', $document, $client, [
             'title' => 'Document updated',
@@ -247,10 +265,21 @@ class ClientDocumentController extends Controller
             );
         }
 
+        $releasedBytes = null;
+        if ($document->source_referral_evidence_id) {
+            abort_if($routeName && str_starts_with($routeName, 'portal.'), 403);
+            $releasedBytes = app(ReferralDocumentHandovers::class)->bytes($request->user(), $client, $document);
+        }
+
         AuditLogger::log('documents.download', $document, [
             'document_id' => $document->id,
-            'original_name' => $document->original_name,
+            ...($document->source_referral_evidence_id ? [] : ['original_name' => $document->original_name]),
         ]);
+
+        if ($document->source_referral_evidence_id) {
+            return response()->streamDownload(fn () => print ($releasedBytes), $document->original_name,
+                ['Content-Type' => $document->mime_type, 'Cache-Control' => 'no-store, private', 'X-Content-Type-Options' => 'nosniff']);
+        }
 
         return Storage::disk($document->storage_disk)->download(
             $document->storage_path,
@@ -262,9 +291,16 @@ class ClientDocumentController extends Controller
     {
         $this->authorize('update', $client);
         abort_unless($document->client_id === $client->id, 404);
+        abort_unless(ClientDocument::query()->whereKey($document->id)->visibleReferralReleases($request->user())->exists(), 404);
 
-        Storage::disk($document->storage_disk)->delete($document->storage_path);
+        if (! $document->source_referral_evidence_id) {
+            Storage::disk($document->storage_disk)->delete($document->storage_path);
+        }
         $document->delete();
+
+        if ($document->source_referral_evidence_id) {
+            return back()->with('success', 'The person-document link was removed. Original referral evidence is retained.');
+        }
 
         app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'document', $document, $client, [
             'title' => 'Document deleted',
