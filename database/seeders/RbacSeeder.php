@@ -1106,6 +1106,11 @@ class RbacSeeder extends Seeder
             Role::where('name', $roleName)->first()?->permissions()
                 ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
         }
+        // Finance reads agreements (Stephan, 23 Oct 2026). Mirrors 2026_10_23_090000_grant_finance_service_agreement_view.
+        foreach (\App\Domain\Referrals\Services\ReferralServiceAgreements::READ_ONLY_ROLE_GRANTS as $roleName => $keys) {
+            Role::where('name', $roleName)->first()?->permissions()
+                ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
+        }
 
         // Self-service IT ticketing: every STAFF role can raise and track its
         // own helpdesk tickets. Dynamic over the roles table so niche roles
