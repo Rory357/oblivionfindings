@@ -218,6 +218,30 @@ export default function ShiftSeriesShow({
                 },
             },
         );
+    // "Reopen occurrence" only opens the confirmation; the request is sent
+    // from its confirm button (ShiftController::reopenOccurrence).
+    const [occurrenceToReopen, setOccurrenceToReopen] =
+        useState<SeriesOccurrence | null>(null);
+    const [reopening, setReopening] = useState(false);
+    const reopenOccurrence = () => {
+        if (occurrenceToReopen === null) return;
+        router.patch(
+            `/operations/shifts/${occurrenceToReopen.id}/reopen`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setReopening(true),
+                onFinish: () => {
+                    setReopening(false);
+                    setOccurrenceToReopen(null);
+                },
+            },
+        );
+    };
+    const reopenStaff = occurrenceToReopen?.user_id
+        ? (occurrenceToReopen.staff?.name?.trim() ?? '') ||
+          'the same staff member'
+        : null;
     const remainingShiftsLabel = `${stats.remaining_occurrences} upcoming ${
         stats.remaining_occurrences === 1 ? 'shift' : 'shifts'
     }`;
@@ -973,12 +997,8 @@ export default function ShiftSeriesShow({
                                                             size="sm"
                                                             variant="outline"
                                                             onClick={() =>
-                                                                router.patch(
-                                                                    `/operations/shifts/${occurrence.id}/reopen`,
-                                                                    {},
-                                                                    {
-                                                                        preserveScroll: true,
-                                                                    },
+                                                                setOccurrenceToReopen(
+                                                                    occurrence,
                                                                 )
                                                             }
                                                         >
@@ -1027,6 +1047,42 @@ export default function ShiftSeriesShow({
                 cancelText="Keep shifts"
                 variant="destructive"
                 processing={cancellingFuture}
+            />
+
+            <ConfirmDialog
+                open={occurrenceToReopen !== null}
+                onClose={() => {
+                    if (!reopening) setOccurrenceToReopen(null);
+                }}
+                onConfirm={reopenOccurrence}
+                title="Reopen this shift?"
+                description={
+                    <div className="space-y-2">
+                        <p className="font-medium text-foreground">
+                            {[
+                                formatDateTime(occurrenceToReopen?.starts_at),
+                                series.client?.name,
+                                occurrenceToReopen?.location,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                        </p>
+                        <p>
+                            {reopenStaff
+                                ? `It goes back on the roster with ${reopenStaff} still assigned, so check they can still work it. Nobody is notified.`
+                                : 'It goes back on the roster as an unassigned draft. Nobody is notified.'}
+                        </p>
+                        <p>
+                            Anything changed when it was cancelled, such as a
+                            returned timesheet or a closed cover request, stays
+                            as it is. The rest of the series doesn&apos;t
+                            change.
+                        </p>
+                    </div>
+                }
+                confirmText="Reopen shift"
+                variant="default"
+                processing={reopening}
             />
         </AppLayout>
     );

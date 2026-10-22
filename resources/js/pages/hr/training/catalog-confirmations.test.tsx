@@ -12,7 +12,9 @@ import TrainingHub from './catalog';
 // Cancelling a session and waiving training used browser prompt(). Cancelling
 // a session now opens a dialog with an optional reason and a destructive
 // "Cancel session" button; waiving opens a reason dialog whose reason is
-// required. Nothing is sent until the dialog's button is pressed.
+// required. Archiving a course from its menu or the bulk bar used to send
+// straight away and now asks first. Nothing is sent until the dialog's button
+// is pressed.
 
 type VisitOptions = {
     data?: unknown;
@@ -74,7 +76,7 @@ const sheet = {
     enrollments: [],
 };
 
-const renderHub = () =>
+const renderHub = ({ isActive = true }: { isActive?: boolean } = {}) =>
     render(
         <TrainingHub
             summary={{
@@ -107,7 +109,7 @@ const renderHub = () =>
                     provider: 'St John',
                     cost: 180,
                     is_mandatory: true,
-                    is_active: true,
+                    is_active: isActive,
                     requires_renewal: true,
                     validity_period_months: 24,
                     cpd_points: null,
@@ -148,6 +150,7 @@ const renderHub = () =>
 beforeEach(() => {
     router.delete.mockReset();
     router.patch.mockReset();
+    router.post.mockReset();
     router.reload.mockReset();
     vi.stubGlobal(
         'fetch',
@@ -323,6 +326,146 @@ describe('Training › assignments: waive training', () => {
             '/hr/training/assignments/55/waive',
             { reason: 'Holds a current certificate' },
             expect.objectContaining({ preserveScroll: true }),
+        );
+    });
+});
+
+describe('Training › catalogue: archive a course', () => {
+    const archiveDialog = () => screen.getByRole('alertdialog');
+    const settle = (_url: string, _data: unknown, options?: VisitOptions) => {
+        options?.onStart?.();
+        options?.onFinish?.();
+    };
+
+    const openCatalog = (isActive = true) => {
+        renderHub({ isActive });
+        fireEvent.click(screen.getByRole('tab', { name: /Catalog/ }));
+    };
+
+    const openArchiveFromMenu = () => {
+        openCatalog();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Actions for First aid level 2',
+            }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    };
+
+    it('asks before archiving from the course menu and sends nothing yet', () => {
+        openArchiveFromMenu();
+
+        expect(router.patch).not.toHaveBeenCalled();
+        expect(
+            within(archiveDialog()).getByText('Archive this course?'),
+        ).toBeInTheDocument();
+        expect(archiveDialog()).toHaveTextContent(
+            'First aid level 2 is marked inactive. It stays in the catalogue',
+        );
+        expect(archiveDialog()).toHaveTextContent(
+            'New starters are no longer enrolled in it during induction.',
+        );
+    });
+
+    it('Cancel archives nothing', async () => {
+        openArchiveFromMenu();
+
+        fireEvent.click(
+            within(archiveDialog()).getByRole('button', { name: 'Cancel' }),
+        );
+
+        expect(router.patch).not.toHaveBeenCalled();
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+    });
+
+    it('archives the course with the same toggle request once confirmed', async () => {
+        router.patch.mockImplementation(settle);
+        openArchiveFromMenu();
+
+        fireEvent.click(
+            within(archiveDialog()).getByRole('button', {
+                name: 'Archive course',
+            }),
+        );
+
+        expect(router.patch).toHaveBeenCalledTimes(1);
+        expect(router.patch).toHaveBeenCalledWith(
+            '/hr/training/courses/3/toggle',
+            {},
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+    });
+
+    it('still activates an inactive course straight away', () => {
+        openCatalog(false);
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Actions for First aid level 2',
+            }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(router.patch).toHaveBeenCalledWith(
+            '/hr/training/courses/3/toggle',
+            {},
+            expect.objectContaining({ preserveScroll: true }),
+        );
+    });
+
+    const openBulkArchive = () => {
+        openCatalog();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Select First aid level 2' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    };
+
+    it('asks before archiving the selected courses, and Cancel sends nothing', async () => {
+        openBulkArchive();
+
+        expect(router.post).not.toHaveBeenCalled();
+        expect(
+            within(archiveDialog()).getByText('Archive 1 course?'),
+        ).toBeInTheDocument();
+        expect(archiveDialog()).toHaveTextContent(
+            'The selected course is marked inactive.',
+        );
+
+        fireEvent.click(
+            within(archiveDialog()).getByRole('button', { name: 'Cancel' }),
+        );
+
+        expect(router.post).not.toHaveBeenCalled();
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+        expect(screen.getByText('1 selected')).toBeInTheDocument();
+    });
+
+    it('sends the same bulk archive request once confirmed', async () => {
+        router.post.mockImplementation(settle);
+        openBulkArchive();
+
+        fireEvent.click(
+            within(archiveDialog()).getByRole('button', {
+                name: 'Archive course',
+            }),
+        );
+
+        expect(router.post).toHaveBeenCalledTimes(1);
+        expect(router.post).toHaveBeenCalledWith(
+            '/hr/training/courses/bulk-archive',
+            { course_ids: [3], active: false },
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
         );
     });
 });
