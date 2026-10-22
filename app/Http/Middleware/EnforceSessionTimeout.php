@@ -74,8 +74,11 @@ class EnforceSessionTimeout
             return true;
         }
 
+        // Oblivion Live renews its ticket every 13 minutes from an open tab: that alone must
+        // never keep an idle session signed in.
         return $request->isMethod('POST') && $request->is(
             'chat/api/realtime/auth',
+            'chat/api/live/ticket',
             'chat/api/conversations/*/changes',
             'chat/api/conversations/*/read',
             'chat/api/calls/*/connected',

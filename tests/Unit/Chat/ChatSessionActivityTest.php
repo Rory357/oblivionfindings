@@ -69,6 +69,7 @@ final class ChatSessionActivityTest extends TestCase
             ['GET', '/chat/notifications/example/display'],
             ['PATCH', '/chat/api/availability'],
             ['POST', '/chat/api/realtime/auth'],
+            ['POST', '/chat/api/live/ticket'],
             ['POST', '/chat/api/conversations/12/changes'],
             ['POST', '/chat/api/conversations/12/read'],
             ['POST', '/chat/api/calls/example/connected'],
@@ -92,6 +93,8 @@ final class ChatSessionActivityTest extends TestCase
             ['GET', '/chat/notifications/example'],
             ['GET', '/my-day'],
             ['POST', '/chat/api/conversations/12/messages'],
+            // Typing is the person at the keyboard.
+            ['POST', '/chat/api/conversations/12/typing'],
             ['POST', '/chat/api/conversations/12/calls'],
             ['POST', '/chat/api/calls/example/join'],
             ['POST', '/chat/api/calls/example/leave'],
