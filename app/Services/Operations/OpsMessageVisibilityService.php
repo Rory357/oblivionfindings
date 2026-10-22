@@ -65,6 +65,13 @@ class OpsMessageVisibilityService
             return false;
         }
 
+        // A managed channel belongs to its Site (checked above), so one member moving Site or
+        // leaving cannot hide it from everyone else. Private chats keep the rule that the viewer
+        // can see every participant.
+        if ($conversation->is_managed_channel) {
+            return true;
+        }
+
         $participantIds = $conversation->participants()
             ->pluck('user_id')
             ->map(fn ($id) => (int) $id)
@@ -116,7 +123,7 @@ class OpsMessageVisibilityService
                 ->when(config('chat.shared_experience') && $this->isCurrentStaff($user), fn (Builder $cover) => $cover->orWhere(fn (Builder $family) => $family->where('conversation_type', 'family')->where('care_team_cover', true)
                     ->whereHas('client', fn (Builder $clients) => $this->familyCommunicationAccess->scopeViewableClients($clients, $user)))))
             ->with('client:id,site_id')
-            ->get(config('chat.shared_experience') ? ['id', 'conversation_type', 'client_id', 'channel_site_id'] : ['id', 'conversation_type', 'client_id']);
+            ->get(config('chat.shared_experience') ? ['id', 'conversation_type', 'client_id', 'channel_site_id', 'is_managed_channel'] : ['id', 'conversation_type', 'client_id']);
 
         if (! config('chat.shared_experience')) {
             $conversations = $conversations->filter(fn ($conversation) => $conversation->participants()->where('user_id', $user->id)->first()?->history_after_id === null);
@@ -236,6 +243,12 @@ class OpsMessageVisibilityService
                     ->flip();
 
             foreach ($staff as $conversation) {
+                // Same as canViewConversation(): a managed channel follows its Site, not every member.
+                if ($conversation->is_managed_channel) {
+                    $visible->push($conversation->id);
+
+                    continue;
+                }
                 $participantIds = ($participantsByConversation->get($conversation->id) ?? new Collection)
                     ->pluck('user_id')
                     ->map(fn ($id) => (int) $id)
