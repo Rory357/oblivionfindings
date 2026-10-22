@@ -208,9 +208,8 @@ it('prints a fresh VAPID pair in the stored form with webpush:vapid --show', fun
     Illuminate\Support\Facades\Artisan::call('webpush:vapid', ['--show' => true]);
     $output = Illuminate\Support\Facades\Artisan::output();
 
-    expect($output)->toMatch('/^VAPID_PUBLIC_KEY=[A-Za-z0-9_-]{87}$/m')
-        ->and($output)->toMatch('/^VAPID_PRIVATE_KEY=[A-Za-z0-9_-]{43}$/m');
-    preg_match('/^VAPID_PUBLIC_KEY=(\S+)$/m', $output, $public);
-    preg_match('/^VAPID_PRIVATE_KEY=(\S+)$/m', $output, $private);
-    expect(App\Services\Push\VapidKeys::fromStored($public[1], $private[1])->signingKey())->toBeInstanceOf(OpenSSLAsymmetricKey::class);
+    // Console lines end in \r\n on Windows.
+    expect(preg_match('/^VAPID_PUBLIC_KEY=([A-Za-z0-9_-]{87})\r?$/m', $output, $public))->toBe(1)
+        ->and(preg_match('/^VAPID_PRIVATE_KEY=([A-Za-z0-9_-]{43})\r?$/m', $output, $private))->toBe(1)
+        ->and(App\Services\Push\VapidKeys::fromStored($public[1], $private[1])->signingKey())->toBeInstanceOf(OpenSSLAsymmetricKey::class);
 });
