@@ -258,7 +258,10 @@ function ScriptPolicyWorkspace({ actorId, device }: Props) {
     );
     const loosening =
         data && draft ? scriptPolicyLoosening(data.policy, draft) : null;
-    const confirm = (dto: ScriptPolicyReply, ref: ScriptPolicyReference) => {
+    const acceptSaved = (
+        dto: ScriptPolicyReply,
+        ref: ScriptPolicyReference,
+    ) => {
         let warning = '';
         try {
             setJournal({
@@ -394,7 +397,7 @@ function ScriptPolicyWorkspace({ actorId, device }: Props) {
                 device.id,
                 attempt,
             );
-            if (alive.current && !next.signal.aborted) confirm(dto, ref);
+            if (alive.current && !next.signal.aborted) acceptSaved(dto, ref);
         } catch (error) {
             if (!live(next)) return;
             if (!sent) {
@@ -460,7 +463,7 @@ function ScriptPolicyWorkspace({ actorId, device }: Props) {
                 device.id,
                 chosen,
             );
-            if (alive.current && !next.signal.aborted) confirm(dto, chosen);
+            if (alive.current && !next.signal.aborted) acceptSaved(dto, chosen);
         } catch (error) {
             if (!live(next)) return;
             const status = responseStatus(error);

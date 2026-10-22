@@ -540,7 +540,7 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
             }
             // Prepared transport is internal until results/cancellation and the
             // installed executor are complete. Queue/dispatch stays closed.
-            throw new CommandDispatchPreconditionException('script_executor_unavailable', 'Reviewed script dispatch is not implemented. No execution was authorised.');
+            throw new CommandDispatchPreconditionException('script_executor_unavailable', 'Reviewed script execution is not available in this release. No execution was authorised.');
         }
         if ($request->capability === 'endpoint.software.install') {
             try {

@@ -200,6 +200,7 @@ describe('Device Group automatic membership builder', () => {
             <DeviceGroupShow
                 actor_id={7}
                 as_of="2026-10-20T10:00:00Z"
+                can_preview_maintenance={false}
                 group={{
                     id: 14,
                     name: 'Security estate',
@@ -266,6 +267,7 @@ describe('Device Group automatic membership builder', () => {
             <DeviceGroupShow
                 actor_id={7}
                 as_of="2026-10-20T10:00:00Z"
+                can_preview_maintenance={false}
                 group={{
                     id: 14,
                     name: 'Security estate',

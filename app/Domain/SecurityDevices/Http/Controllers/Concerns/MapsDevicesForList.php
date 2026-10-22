@@ -70,7 +70,7 @@ trait MapsDevicesForList
 
     private function viewerMayViewClient(object $client): bool
     {
-        $viewer = request()->user();
+        $viewer = auth()->user();
         if (! $viewer) {
             return false;
         }

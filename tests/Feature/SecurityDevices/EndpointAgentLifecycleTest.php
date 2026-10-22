@@ -89,6 +89,19 @@ function endpointScriptReadinessWire(string $name): string
     throw new LogicException('Original Go heartbeat fixture is missing.');
 }
 
+/**
+ * The committed Go heartbeat corpus carries fixed observed_at times, so these
+ * tests run at the corpus time. beforeEach has already assigned the device to
+ * its Site at the real "now", which would then lie in the future and leave the
+ * device with no current Site, so the assignment is re-dated to the test clock.
+ */
+function endpointScriptReadinessClock($test): void
+{
+    $test->travelTo(CarbonImmutable::parse('2026-10-21T00:00:00Z'));
+    DeviceAssignment::query()->where('device_id', $test->endpointDevice->id)
+        ->update(['assigned_at' => now()->subMinute()]);
+}
+
 function endpointScriptReadinessPost($test, string $credential, string $raw)
 {
     return $test->call('POST', 'https://localhost/api/endpoints/agent/heartbeat', [], [], [], [
@@ -107,7 +120,7 @@ function endpointScriptReadinessDeny(callable $action, int $status): void
 }
 
 it('stores original Go script readiness without enabling routes and clears it on a newer omitted report', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-10-21T00:00:00Z'));
+    endpointScriptReadinessClock($this);
     [, $credential] = endpointEnrolledFixture($this);
     $ready = endpointScriptReadinessWire('ready');
     $absent = endpointScriptReadinessWire('absent');
@@ -134,7 +147,7 @@ it('stores original Go script readiness without enabling routes and clears it on
 });
 
 it('rejects malformed and ambiguous script readiness before accepting a heartbeat sequence', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-10-21T00:00:00Z'));
+    endpointScriptReadinessClock($this);
     [, $credential] = endpointEnrolledFixture($this);
     $raw = endpointScriptReadinessWire('ready');
     $base = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
@@ -165,7 +178,7 @@ it('rejects malformed and ambiguous script readiness before accepting a heartbea
 });
 
 it('rechecks script readiness freshness architecture assignment revocation and replacement', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-10-21T00:00:00Z'));
+    endpointScriptReadinessClock($this);
     [$issue, $credential] = endpointEnrolledFixture($this);
     $raw = endpointScriptReadinessWire('ready');
     endpointScriptReadinessPost($this, $credential, $raw)->assertOk();

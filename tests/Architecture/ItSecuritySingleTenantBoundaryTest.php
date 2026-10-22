@@ -138,8 +138,11 @@ it('keeps Device assignment history in the canonical Device profile payload only
         ->not->toContain('function history(')
         ->and($deviceController)
         ->toContain("'assignmentHistory' =>")
+        // The profile hands the canonical payload to the shared records
+        // component instead of mapping it inline; it never fetches history.
         ->and($deviceProfile)
-        ->toContain('assignmentHistory.map(');
+        ->toContain('rows={assignmentHistory}')
+        ->not->toContain('/assignments`');
 });
 
 it('keeps active IT and Security Devices surfaces free of known inert interaction patterns', function () {
@@ -263,9 +266,12 @@ it('keeps the Site Profile technology tab bound to its canonical optional projec
         ->toContain('<SiteTechnologyProjectionPanel')
         ->toContain('data={tabData as SiteTechnologyProjection}')
         ->toContain('canViewHardwarePlacement={props.can.viewHardwarePlacement}')
+        // The Security & Devices Site header links to the Site profile's
+        // technology tab only for someone who may view that profile.
         ->and($securitySite)
-        ->toContain('<SiteProfileDestination')
-        ->toContain('tab="technology"')
+        ->toContain('{can.view_site_profile ? (')
+        ->toContain("'?tab=technology'")
+        ->toContain('<SiteProfileAccessRequired')
         ->and($projection)
         ->toContain('canViewHardwarePlacement &&')
         ->toContain('data.can.view_room_placement ? (')
@@ -1481,6 +1487,15 @@ function itSecurityCompatibilityEvidenceFingerprints(): array
         // no-effect assertions changed; the three legacy storage writes remain.
         'tests/Feature/Monitoring/MonitoringSchemaTest.php' => '3159c9921ee8f28862c9234c2386233d249ab011919c709b793f2c5f3db2a6cd',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php' => 'af83c6c0b9e9cd1dcd91aa27740df2a2ebaad85462926a9a49b3878751aeada2',
+        // Reviewed 23 Oct 2026: each mention is a single-tenant negative check —
+        // a request carrying tenant_id is rejected (400 / invalid profile), a
+        // response has no tenant_id key, or a migration's SQL contains neither
+        // tenant_id nor organization_id. No tenant storage or comparison.
+        'resources/js/components/security-devices/collector-installation-profile.test.ts' => 'cd5256ee9c0fa8510d1d6c7956c14290ef5cec982a0db1cc20ac69dd09ab8184',
+        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php' => '9aa213da0516d7a27ab59a648063be63053b2495757a6ff2f95c3fd13770657d',
+        'tests/Feature/SecurityDevices/HikvisionDiscoveryTest.php' => '9f8026a7a883a95d888572e0a5fcadb54c161c59f169d66ec0587e871bb52360',
+        'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php' => '5b398a7c029e4662c34d9272a7735b431e96a6e92874090d6b5a1f14661cab01',
+        'tests/Unit/SecurityDevices/HikvisionSourceMigrationTest.php' => '1227fb93bd2fdbcc2216a8bf204fb572f5254e616c584c3cecc5c1fcbb0a1f51',
     ];
 }
 
