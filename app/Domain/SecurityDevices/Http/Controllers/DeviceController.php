@@ -314,6 +314,8 @@ class DeviceController extends Controller
                 'id' => $device->id,
                 'name' => $device->name,
                 'status' => $device->status?->value,
+                // The assign dialog says which consent rule applies (tracking devices only).
+                'domain' => $device->domain,
             ],
             'profile' => $profile,
             'activeAssignment' => $activeAssignment ? [

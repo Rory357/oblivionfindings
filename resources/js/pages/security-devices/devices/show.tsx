@@ -13,6 +13,7 @@ import {
 } from '@/components/security-devices/add-device-dialog';
 import { CctvNavigationActions } from '@/components/security-devices/cctv-navigation-actions';
 import type { DeviceDocumentHistoryItem } from '@/components/security-devices/device-document-history';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -88,6 +89,7 @@ type DeviceDetail = {
     id: number;
     name: string;
     status: string;
+    domain?: string | null;
 };
 
 type Assignment = {
@@ -1840,11 +1842,13 @@ function DeviceShowBody({
                             )}
 
                             {assignType === 'client' && (
-                                <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-xs text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
-                                    Client device assignments require a valid
-                                    consent record (NZ privacy). Ensure consent
-                                    has been recorded before assigning.
-                                </div>
+                                <Alert variant="warning" role="note">
+                                    <AlertDescription>
+                                        {device.domain === 'tracking'
+                                            ? "Tracking a client needs their active location-tracking consent (NZ privacy). The client's most recent active consent is recorded with this assignment; without one, the assignment is refused."
+                                            : "Record the client's consent before assigning this device (NZ privacy). Consent is checked automatically only for tracking devices."}
+                                    </AlertDescription>
+                                </Alert>
                             )}
 
                             <div>
