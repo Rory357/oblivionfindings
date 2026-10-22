@@ -1,8 +1,13 @@
 import { PageHero, PageLayout } from '@/components/page';
+import {
+    dayAfter,
+    PrivacyFieldDialog,
+} from '@/components/privacy/privacy-field-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { toDateInput } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -12,13 +17,18 @@ import {
     FileText,
     User,
 } from 'lucide-react';
+import { useState } from 'react';
 
 type Props = {
     request: any;
     staff: Array<{ id: number; name: string }>;
 };
 
+type RequestAction = 'verify' | 'complete' | 'extend' | 'refuse';
+
 export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
+    const [action, setAction] = useState<RequestAction | null>(null);
+    const closeAction = () => setAction(null);
     const isIdentityVerified =
         dsr.identity_verified === 'verified' ||
         dsr.identity_verified === true ||
@@ -298,19 +308,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                                 <Button
                                     size="sm"
                                     data-test="privacy-dsr-verify"
-                                    onClick={() => {
-                                        const method = prompt(
-                                            'Enter verification method (e.g., ID document, phone verification):',
-                                        );
-                                        if (method) {
-                                            router.post(
-                                                `/privacy/requests/${dsr.id}/verify-identity`,
-                                                {
-                                                    verification_method: method,
-                                                },
-                                            );
-                                        }
-                                    }}
+                                    onClick={() => setAction('verify')}
                                 >
                                     Verify Identity
                                 </Button>
@@ -333,72 +331,143 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                                 size="sm"
                                 variant="outline"
                                 data-test="privacy-dsr-complete"
-                                onClick={() => {
-                                    const notes = prompt(
-                                        'Enter completion notes:',
-                                    );
-                                    if (notes !== null) {
-                                        router.post(
-                                            `/privacy/requests/${dsr.id}/complete`,
-                                            {
-                                                completion_notes: notes,
-                                            },
-                                        );
-                                    }
-                                }}
+                                onClick={() => setAction('complete')}
                             >
                                 Mark Complete
                             </Button>
                             <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                    const reason = prompt(
-                                        'Enter extension reason:',
-                                    );
-                                    const date = prompt(
-                                        'Enter new due date (YYYY-MM-DD):',
-                                    );
-                                    if (reason && date) {
-                                        router.post(
-                                            `/privacy/requests/${dsr.id}/extend`,
-                                            {
-                                                extension_reason: reason,
-                                                extended_due_date: date,
-                                            },
-                                        );
-                                    }
-                                }}
+                                data-test="privacy-dsr-extend"
+                                onClick={() => setAction('extend')}
                             >
                                 Extend Deadline
                             </Button>
                             <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => {
-                                    const reason = prompt(
-                                        'Enter rejection reason:',
-                                    );
-                                    const legalBasis = prompt(
-                                        'Enter legal basis for rejection:',
-                                    );
-                                    if (reason && legalBasis) {
-                                        router.post(
-                                            `/privacy/requests/${dsr.id}/refuse`,
-                                            {
-                                                rejection_reason: reason,
-                                                rejection_legal_basis:
-                                                    legalBasis,
-                                            },
-                                        );
-                                    }
-                                }}
+                                data-test="privacy-dsr-refuse"
+                                onClick={() => setAction('refuse')}
                             >
                                 Refuse Request
                             </Button>
                         </CardContent>
                     </Card>
                 )}
+
+                {/* Effects below follow DataSubjectRequestLifecycleService:
+                    verify moves the request to in progress; complete and
+                    refuse are final (no transition leaves either status);
+                    none of the four contacts the requester. */}
+                <PrivacyFieldDialog
+                    open={action === 'verify'}
+                    onClose={closeAction}
+                    title={
+                        dsr.subject_name
+                            ? `Verify ${dsr.subject_name}'s identity?`
+                            : "Verify the requester's identity?"
+                    }
+                    description="Record how you confirmed who they are. The request moves to in progress with your name and today's date, so it can then be completed or refused."
+                    fields={[
+                        {
+                            name: 'verification_method',
+                            label: 'How you checked their identity',
+                            kind: 'text',
+                            required: 'Say how you checked their identity.',
+                            maxLength: 255,
+                            placeholder:
+                                'For example, passport sighted in person',
+                        },
+                    ]}
+                    submitLabel="Verify identity"
+                    variant="default"
+                    url={`/privacy/requests/${dsr.id}/verify-identity`}
+                />
+                <PrivacyFieldDialog
+                    open={action === 'complete'}
+                    onClose={closeAction}
+                    title="Mark this request as complete?"
+                    description="The request is closed as completed, with your name and today's date. It can't be reopened. The requester isn't told automatically, so make sure they've had your response."
+                    fields={[
+                        {
+                            name: 'completion_notes',
+                            label: 'Completion notes',
+                            kind: 'textarea',
+                            placeholder: 'How the request was answered',
+                        },
+                    ]}
+                    submitLabel="Mark complete"
+                    variant="default"
+                    url={`/privacy/requests/${dsr.id}/complete`}
+                />
+                <PrivacyFieldDialog
+                    open={action === 'extend'}
+                    onClose={closeAction}
+                    title="Extend the due date for this request?"
+                    description={`It's currently due ${formatDate(dsr.extended_due_date || dsr.due_date)}. The due date changes to the day you choose and your reason is kept with the request. The requester isn't told automatically.`}
+                    fields={[
+                        {
+                            name: 'extended_due_date',
+                            label: 'New due date',
+                            kind: 'date',
+                            required: 'Choose the new due date.',
+                            // Server rule: after:today.
+                            min: dayAfter(toDateInput(new Date())),
+                            minMessage: 'Choose a date after today.',
+                        },
+                        {
+                            name: 'extension_reason',
+                            label: 'Reason for the extension',
+                            kind: 'textarea',
+                            required: 'Add the reason for the extension.',
+                        },
+                    ]}
+                    submitLabel="Extend due date"
+                    variant="default"
+                    url={`/privacy/requests/${dsr.id}/extend`}
+                />
+                <PrivacyFieldDialog
+                    open={action === 'refuse'}
+                    onClose={closeAction}
+                    title="Refuse this request?"
+                    description={
+                        <>
+                            <p>
+                                The request is closed as refused. Your reason,
+                                the legal basis, your name and today's date are
+                                kept on the record.
+                            </p>
+                            <p>
+                                It can't be reopened or changed afterwards. The
+                                requester isn't told automatically, so send them
+                                the decision yourself.
+                            </p>
+                        </>
+                    }
+                    fields={[
+                        {
+                            name: 'rejection_reason',
+                            label: 'Reason for refusing',
+                            kind: 'textarea',
+                            required: 'Add the reason for refusing.',
+                        },
+                        {
+                            name: 'rejection_legal_basis',
+                            label: 'Legal basis',
+                            kind: 'text',
+                            required: 'Add the legal basis for refusing.',
+                            // The column holds 255 characters; the server
+                            // rule doesn't cap it yet, so a longer value fails
+                            // at the database instead of with a message.
+                            maxLength: 255,
+                            placeholder:
+                                "The Privacy Act 2020 section you're relying on",
+                        },
+                    ]}
+                    submitLabel="Refuse request"
+                    variant="destructive"
+                    url={`/privacy/requests/${dsr.id}/refuse`}
+                />
             </PageLayout>
         </AppLayout>
     );

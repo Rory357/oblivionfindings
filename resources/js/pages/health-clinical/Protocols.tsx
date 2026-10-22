@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -170,22 +171,40 @@ export default function Protocols({
         );
     };
 
-    const toggleActive = (protocol: Protocol) => {
-        const action = protocol.is_active ? 'Deactivate' : 'Activate';
+    // Activate / Deactivate only opens the confirmation; the request is sent
+    // from its confirm button. The target stays set after closing so the
+    // wording doesn't flip while the dialog fades away.
+    const [toggleTarget, setToggleTarget] = useState<Protocol | null>(null);
+    const [toggleOpen, setToggleOpen] = useState(false);
+    const [toggling, setToggling] = useState(false);
 
-        if (!window.confirm(`${action} ${protocol.name}?`)) {
-            return;
-        }
+    const askToggleActive = (protocol: Protocol) => {
+        setToggleTarget(protocol);
+        setToggleOpen(true);
+    };
 
+    const toggleActive = () => {
+        if (toggleTarget === null) return;
         router.patch(
-            `/health-clinical/protocols/${protocol.id}/toggle-active`,
+            `/health-clinical/protocols/${toggleTarget.id}/toggle-active`,
             {
-                is_active: !protocol.is_active,
+                is_active: !toggleTarget.is_active,
                 idempotency_key: crypto.randomUUID(),
             },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onStart: () => setToggling(true),
+                onFinish: () => {
+                    setToggling(false);
+                    setToggleOpen(false);
+                },
+            },
         );
     };
+
+    const toggleClientName = toggleTarget?.client
+        ? `${toggleTarget.client.first_name} ${toggleTarget.client.last_name}`
+        : null;
 
     return (
         <HealthClinicalShell
@@ -568,7 +587,7 @@ export default function Protocols({
                                                             size="sm"
                                                             variant="ghost"
                                                             onClick={() =>
-                                                                toggleActive(
+                                                                askToggleActive(
                                                                     protocol,
                                                                 )
                                                             }
@@ -622,6 +641,45 @@ export default function Protocols({
                     ) : null}
                 </CardContent>
             </Card>
+
+            <ConfirmDialog
+                open={toggleOpen && toggleTarget !== null}
+                onClose={() => {
+                    if (!toggling) setToggleOpen(false);
+                }}
+                onConfirm={toggleActive}
+                title={
+                    toggleTarget?.is_active
+                        ? 'Deactivate this protocol?'
+                        : 'Activate this protocol?'
+                }
+                description={
+                    toggleTarget ? (
+                        <div className="space-y-2">
+                            <p>
+                                <span className="font-medium text-foreground">
+                                    {toggleTarget.name}
+                                </span>
+                                {toggleClientName
+                                    ? ` for ${toggleClientName}`
+                                    : ''}
+                            </p>
+                            <p>
+                                {toggleTarget.is_active
+                                    ? 'Upcoming checks are taken off the schedule from now and no new ones are added. Observations already recorded are kept, and you can activate the protocol again later.'
+                                    : `New checks are scheduled from now, on its usual frequency (${formatFrequency(toggleTarget)}).`}
+                            </p>
+                        </div>
+                    ) : null
+                }
+                confirmText={
+                    toggleTarget?.is_active
+                        ? 'Deactivate protocol'
+                        : 'Activate protocol'
+                }
+                variant={toggleTarget?.is_active ? 'destructive' : 'default'}
+                processing={toggling}
+            />
         </HealthClinicalShell>
     );
 }

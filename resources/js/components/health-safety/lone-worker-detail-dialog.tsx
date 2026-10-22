@@ -43,7 +43,11 @@ import {
     XCircle,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { LoneWorkerActionForm } from './lone-worker-action-form';
+import {
+    isLoneWorkerConfirmAction,
+    LoneWorkerActionForm,
+    LoneWorkerConfirmAction,
+} from './lone-worker-action-form';
 import {
     type ActionTarget,
     ALERT_STATUS_META,
@@ -162,7 +166,12 @@ function SessionDetailDialog({
     );
 
     const canRemove = can.manage && d.status === 'completed';
-    const footerEnd = action ? null : (
+    // Remove / Trigger emergency ask in a ConfirmDialog over the session, so
+    // the body and footer stay put; the other actions take over the body.
+    const confirmAction =
+        action && isLoneWorkerConfirmAction(action) ? action : null;
+    const formAction = action && !confirmAction ? action : null;
+    const footerEnd = formAction ? null : (
         <div className="flex flex-wrap items-center justify-end gap-2">
             {canAct ? (
                 <>
@@ -233,12 +242,10 @@ function SessionDetailDialog({
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
-            {action ? (
+            {formAction ? (
                 <LoneWorkerActionForm
-                    target={action}
-                    onDone={() =>
-                        action.kind === 'delete' ? onClose() : setAction(null)
-                    }
+                    target={formAction}
+                    onDone={() => setAction(null)}
                     onCancel={() => setAction(null)}
                 />
             ) : section === 'overview' ? (
@@ -248,6 +255,18 @@ function SessionDetailDialog({
             ) : (
                 <SessionAlerts d={d} onOpenAlert={onOpenAlert} />
             )}
+            {confirmAction ? (
+                <LoneWorkerConfirmAction
+                    open
+                    target={confirmAction}
+                    onDone={() =>
+                        confirmAction.kind === 'delete'
+                            ? onClose()
+                            : setAction(null)
+                    }
+                    onCancel={() => setAction(null)}
+                />
+            ) : null}
         </WizardShell>
     );
 }

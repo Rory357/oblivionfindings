@@ -5,6 +5,7 @@
  *   2. a body-takeover pane inside the session detail WizardShell,
  *   3. a body-takeover pane inside the alert detail dialog.
  * Matches the Add-client modal family chrome (StepHead + wizard primitives + footer band). */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import {
     Dialog,
@@ -34,8 +35,12 @@ import {
 import { type ReactNode } from 'react';
 import {
     type ActionTarget,
+    type Alert,
+    type AlertDetail,
     canonicalControlRoomAlertId,
     LONE_WORKER_ROUTE,
+    type Session,
+    type SessionDetail,
 } from './lone-worker-types';
 
 const INTERVAL_OPTIONS = [
@@ -145,9 +150,106 @@ const CHECKIN_TILES = [
     },
 ];
 
+type ConfirmTarget = {
+    kind: 'delete' | 'emergency';
+    session: Session | SessionDetail;
+};
+type FormTarget =
+    | { kind: 'checkin' | 'extend' | 'end'; session: Session | SessionDetail }
+    | { kind: 'acknowledge' | 'resolve'; alert: Alert | AlertDetail };
+
+/** Remove and Trigger emergency have no fields: they are a yes/no, so they ask
+ * through the shared ConfirmDialog rather than a form pane (GOOD-CATCHES HS-32). */
+export function isLoneWorkerConfirmAction(
+    target: ActionTarget,
+): target is ConfirmTarget {
+    return target.kind === 'delete' || target.kind === 'emergency';
+}
+
+/**
+ * Remove a completed session, or raise an emergency, after asking first. The
+ * request is sent only from the confirm button and the dialog stays open until
+ * it settles. Verified against LoneWorkerController::destroy (soft delete of a
+ * completed session; no restore route) and ::triggerEmergency (marks the
+ * session as an emergency and sends a critical Control Room alert).
+ */
+export function LoneWorkerConfirmAction({
+    target,
+    open,
+    onDone,
+    onCancel,
+}: {
+    target: ConfirmTarget;
+    open: boolean;
+    onDone: () => void;
+    onCancel: () => void;
+}) {
+    const form = useForm<Record<string, string>>(
+        target.kind === 'emergency' ? { emergency_notes: '' } : {},
+    );
+    const worker = target.session.user?.name ?? 'this worker';
+    const base = `${LONE_WORKER_ROUTE}/sessions/${target.session.id}`;
+
+    const finish = (page: { props: Record<string, unknown> }) => {
+        const flash = page.props.flash as { error?: string } | undefined;
+        if (flash?.error) onCancel();
+        else onDone();
+    };
+
+    const confirm = () => {
+        if (target.kind === 'emergency') {
+            form.post(`${base}/emergency`, {
+                preserveScroll: true,
+                onSuccess: finish,
+            });
+        } else {
+            form.delete(base, { preserveScroll: true, onSuccess: finish });
+        }
+    };
+
+    return (
+        <ConfirmDialog
+            open={open}
+            onClose={() => {
+                if (!form.processing) onCancel();
+            }}
+            onConfirm={confirm}
+            processing={form.processing}
+            variant="destructive"
+            {...(target.kind === 'emergency'
+                ? {
+                      title: `Raise an emergency for ${worker}?`,
+                      description: (
+                          <>
+                              This marks {worker}&rsquo;s session as an
+                              emergency and sends a critical alert to the
+                              Control Room straight away. Only do this if they
+                              need help now.
+                          </>
+                      ),
+                      confirmText: 'Raise emergency',
+                  }
+                : {
+                      title: 'Remove this session?',
+                      description: (
+                          <>
+                              {worker}&rsquo;s completed session comes off the
+                              lone worker register. A copy is kept for audit
+                              records, but it can&rsquo;t be put back from the
+                              app. Use this for test, duplicate or mistaken
+                              entries.
+                          </>
+                      ),
+                      confirmText: 'Remove session',
+                  })}
+        />
+    );
+}
+
 /**
  * The reusable inner action form (no Dialog wrapper). Posts to the existing endpoints
  * and refreshes in place; gates success on `!flash.error` (302 + flash, not a 422).
+ * Remove and Trigger emergency hand over to `LoneWorkerConfirmAction`.
  */
 export function LoneWorkerActionForm({
     target,
@@ -155,6 +257,35 @@ export function LoneWorkerActionForm({
     onCancel,
 }: {
     target: ActionTarget;
+    onDone: () => void;
+    onCancel: () => void;
+}) {
+    if (isLoneWorkerConfirmAction(target)) {
+        return (
+            <LoneWorkerConfirmAction
+                open
+                target={target}
+                onDone={onDone}
+                onCancel={onCancel}
+            />
+        );
+    }
+
+    return (
+        <LoneWorkerFormBody
+            target={target as FormTarget}
+            onDone={onDone}
+            onCancel={onCancel}
+        />
+    );
+}
+
+function LoneWorkerFormBody({
+    target,
+    onDone,
+    onCancel,
+}: {
+    target: FormTarget;
     onDone: () => void;
     onCancel: () => void;
 }) {
@@ -173,13 +304,11 @@ export function LoneWorkerActionForm({
                         session?.check_in_interval_minutes ?? 30,
                     ),
                 }
-              : target.kind === 'emergency'
-                ? { emergency_notes: '' }
-                : target.kind === 'acknowledge'
-                  ? { notes: '' }
-                  : target.kind === 'resolve'
-                    ? { resolution_notes: '' }
-                    : {},
+              : target.kind === 'acknowledge'
+                ? { notes: '' }
+                : target.kind === 'resolve'
+                  ? { resolution_notes: '' }
+                  : {},
     );
 
     const finish = (page: { props: Record<string, unknown> }) => {
@@ -202,13 +331,6 @@ export function LoneWorkerActionForm({
                     preserveScroll: true,
                     onSuccess: finish,
                 });
-            } else if (target.kind === 'emergency') {
-                form.post(`${base}/emergency`, {
-                    preserveScroll: true,
-                    onSuccess: finish,
-                });
-            } else if (target.kind === 'delete') {
-                form.delete(base, { preserveScroll: true, onSuccess: finish });
             }
             return;
         }
@@ -302,23 +424,6 @@ export function LoneWorkerActionForm({
                     </InfoCard>
                 )}
 
-                {target.kind === 'delete' && (
-                    <InfoCard icon={Trash2} tone="crit">
-                        Remove this completed session from the register? It is
-                        soft-deleted — the record is retained for audit and an
-                        administrator can restore it. Use this for test,
-                        duplicate, or erroneous entries.
-                    </InfoCard>
-                )}
-
-                {target.kind === 'emergency' && (
-                    <InfoCard icon={AlertTriangle} tone="crit">
-                        This immediately raises an emergency for this worker and
-                        notifies their emergency contacts and the Control Room.
-                        Continue?
-                    </InfoCard>
-                )}
-
                 {target.kind === 'acknowledge' && (
                     <NotesField
                         label="Notes (optional)"
@@ -385,6 +490,17 @@ export function LoneWorkerActionModal({
     open: boolean;
     onClose: () => void;
 }) {
+    if (isLoneWorkerConfirmAction(target)) {
+        return (
+            <LoneWorkerConfirmAction
+                open={open}
+                target={target}
+                onDone={onClose}
+                onCancel={onClose}
+            />
+        );
+    }
+
     const subject =
         'session' in target
             ? `${target.session.user?.name ?? 'Worker'} · Session #${target.session.id}`

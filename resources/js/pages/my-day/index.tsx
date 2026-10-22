@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { ChecklistConfigProvider } from '@/components/checklists/context';
 import { CategoryIcon, StatusBadge } from '@/components/checklists/primitives';
 import { RunModal } from '@/components/checklists/run-modal';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
@@ -503,19 +504,27 @@ export default function MyDay() {
         );
     }, [loneWorkerSessionId]);
 
+    // "I need help" only opens the confirmation; the emergency check-in is
+    // sent from its confirm button.
+    const [confirmEmergency, setConfirmEmergency] = useState(false);
+    const [sendingEmergency, setSendingEmergency] = useState(false);
     const handleLoneWorkerEmergency = useCallback(() => {
         if (!loneWorkerSessionId) return;
-        if (
-            !confirm(
-                'Send an emergency alert? Your coordinator and the Control Room will be notified immediately that you need help.',
-            )
-        ) {
-            return;
-        }
+        setConfirmEmergency(true);
+    }, [loneWorkerSessionId]);
+    const sendLoneWorkerEmergency = useCallback(() => {
+        if (!loneWorkerSessionId) return;
         router.post(
             `/health-safety/lone-workers/sessions/${loneWorkerSessionId}/check-in`,
             { status: 'emergency' },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onStart: () => setSendingEmergency(true),
+                onFinish: () => {
+                    setSendingEmergency(false);
+                    setConfirmEmergency(false);
+                },
+            },
         );
     }, [loneWorkerSessionId]);
 
@@ -1263,6 +1272,20 @@ export default function MyDay() {
                     />
                 </ChecklistConfigProvider>
             ) : null}
+
+            <ConfirmDialog
+                frontline
+                open={confirmEmergency}
+                onClose={() => {
+                    if (!sendingEmergency) setConfirmEmergency(false);
+                }}
+                onConfirm={sendLoneWorkerEmergency}
+                title="Send an emergency alert?"
+                description="The Control Room gets an urgent alert, and coordinators and managers are told straight away that you need help."
+                confirmText="Send emergency alert"
+                variant="destructive"
+                processing={sendingEmergency}
+            />
         </AppLayout>
     );
 }

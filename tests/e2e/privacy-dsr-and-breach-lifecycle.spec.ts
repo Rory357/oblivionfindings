@@ -80,10 +80,17 @@ test.describe('privacy DSR and breach readiness', () => {
             'pending verification',
         );
 
-        page.once('dialog', (dialog) =>
-            dialog.accept('Photo ID checked by privacy lead.'),
-        );
         await page.getByTestId('privacy-dsr-verify').click();
+        const verifyDialog = page.getByRole('dialog', {
+            name: "Verify Playwright Privacy Subject's identity?",
+        });
+        await verifyDialog
+            .getByLabel('How you checked their identity')
+            .fill('Photo ID checked by privacy lead.');
+        await verifyDialog
+            .getByRole('button', { name: 'Verify identity' })
+            .click();
+        await expect(verifyDialog).toBeHidden();
         await expect(page.getByTestId('privacy-dsr-status')).toContainText(
             'in progress',
         );
@@ -100,10 +107,17 @@ test.describe('privacy DSR and breach readiness', () => {
             .poll(() => dsrExportPath(dsrId))
             .toContain('private/privacy-request-exports/');
 
-        page.once('dialog', (dialog) =>
-            dialog.accept('Export generated and response sent.'),
-        );
         await page.getByTestId('privacy-dsr-complete').click();
+        const completeDialog = page.getByRole('dialog', {
+            name: 'Mark this request as complete?',
+        });
+        await completeDialog
+            .getByLabel('Completion notes')
+            .fill('Export generated and response sent.');
+        await completeDialog
+            .getByRole('button', { name: 'Mark complete' })
+            .click();
+        await expect(completeDialog).toBeHidden();
         await expect(page.getByTestId('privacy-dsr-status')).toContainText(
             'completed',
         );
@@ -153,21 +167,46 @@ test.describe('privacy DSR and breach readiness', () => {
             page.getByTestId('privacy-breach-notify-opc'),
         ).toBeVisible();
 
-        page.once('dialog', (dialog) => dialog.accept('OPC-PW-001'));
         await page.getByTestId('privacy-breach-notify-opc').click();
+        const opcDialog = page.getByRole('dialog', {
+            name: "Record that you've notified the Privacy Commissioner?",
+        });
+        await opcDialog
+            .getByLabel("Privacy Commissioner's reference")
+            .fill('OPC-PW-001');
+        await opcDialog
+            .getByRole('button', { name: 'Record notification' })
+            .click();
+        await expect(opcDialog).toBeHidden();
         await expect(page.getByTestId('privacy-breach-status')).toContainText(
             'notified',
         );
         await expect(page.getByText('OPC Notified').first()).toBeVisible();
 
-        page.once('dialog', (dialog) => dialog.accept('Email and phone'));
         await page.getByTestId('privacy-breach-notify-subjects').click();
+        const subjectsDialog = page.getByRole('dialog', {
+            name: 'Record that the affected people were told?',
+        });
+        await subjectsDialog
+            .getByLabel('How you told them')
+            .fill('Email and phone');
+        await subjectsDialog
+            .getByRole('button', { name: 'Record notification' })
+            .click();
+        await expect(subjectsDialog).toBeHidden();
         await expect(page.getByText('Subjects Notified').first()).toBeVisible();
 
-        page.once('dialog', (dialog) =>
-            dialog.accept('Root cause fixed and monitoring added.'),
-        );
         await page.getByTestId('privacy-breach-resolve').click();
+        const resolveDialog = page.getByRole('dialog', {
+            name: 'Mark this breach as resolved?',
+        });
+        await resolveDialog
+            .getByLabel('Resolution notes')
+            .fill('Root cause fixed and monitoring added.');
+        await resolveDialog
+            .getByRole('button', { name: 'Mark resolved' })
+            .click();
+        await expect(resolveDialog).toBeHidden();
         await expect(page.getByTestId('privacy-breach-status')).toContainText(
             'resolved',
         );

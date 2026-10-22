@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import {
     DateTimeField,
@@ -214,6 +215,18 @@ export function CancelReviewDialog({
 }) {
     const command = useReviewCommand();
     const [reason, setReason] = useState('');
+    // Cancelling closes the review for good (MedicationReviewWorkflow::cancel),
+    // so the wizard's last button asks first (GOOD-CATCHES §3, eMAR row 106).
+    const [confirming, setConfirming] = useState(false);
+    const cancelReview = () => {
+        void command
+            .submit(
+                `/emar/reviews/${review.id}`,
+                { revision: review.revision, reason: reason.trim() },
+                'delete',
+            )
+            .finally(() => setConfirming(false));
+    };
     const steps = [
         {
             key: 'reason',
@@ -229,80 +242,95 @@ export function CancelReviewDialog({
         },
     ];
     return (
-        <ReviewFormShell
-            title={`Cancel the triggered review — ${review.client_name}`}
-            description={`Review ${review.id} · due ${formatDateOnly(review.scheduled_date)}.`}
-            steps={steps}
-            command={command}
-            dirty={!!reason}
-            validate={(step): Record<string, string> =>
-                step === 0 && !reason.trim()
-                    ? {
-                          'cancel-reason':
-                              'Say why this review is no longer needed.',
-                      }
-                    : {}
-            }
-            onSave={() => {
-                if (review.review_type !== 'triggered') {
-                    command.setErrors({
-                        _request:
-                            'Regular reviews are moved with a reason. They cannot be cancelled.',
-                    });
-                    return;
+        <>
+            <ConfirmDialog
+                frontline
+                open={confirming}
+                onClose={() => {
+                    if (!command.processing) setConfirming(false);
+                }}
+                onConfirm={cancelReview}
+                processing={command.processing}
+                title="Cancel this triggered review?"
+                description={`${review.client_name}’s triggered review is closed and can’t be reopened. It stays in their history with your reason, and their regular review is still due.`}
+                confirmText="Cancel the review"
+                cancelText="Keep the review"
+                variant="destructive"
+            />
+            <ReviewFormShell
+                title={`Cancel the triggered review — ${review.client_name}`}
+                description={`Review ${review.id} · due ${formatDateOnly(review.scheduled_date)}.`}
+                steps={steps}
+                command={command}
+                dirty={!!reason}
+                validate={(step): Record<string, string> =>
+                    step === 0 && !reason.trim()
+                        ? {
+                              'cancel-reason':
+                                  'Say why this review is no longer needed.',
+                          }
+                        : {}
                 }
-                command.submit(
-                    `/emar/reviews/${review.id}`,
-                    { revision: review.revision, reason: reason.trim() },
-                    'delete',
-                );
-            }}
-            onClose={onClose}
-            saveLabel="Cancel the review"
-            successTitle="Triggered review cancelled"
-            successBlurb="The review and reason are kept. The regular review cycle continues."
-            body={(step, edit) =>
-                step === 0 ? (
-                    <>
-                        <Notice
-                            warning
-                            title="Only this triggered review is cancelled"
-                        >
-                            It remains in the history with your reason. The
-                            person’s regular review is still due.
-                        </Notice>
-                        <Field
-                            id="cancel-reason"
-                            label="Why it is no longer needed"
-                            required
-                            error={command.errors['cancel-reason']}
-                        >
-                            <Textarea
+                onSave={() => {
+                    if (review.review_type !== 'triggered') {
+                        command.setErrors({
+                            _request:
+                                'Regular reviews are moved with a reason. They cannot be cancelled.',
+                        });
+                        return;
+                    }
+                    setConfirming(true);
+                }}
+                onClose={onClose}
+                saveLabel="Cancel the review"
+                successTitle="Triggered review cancelled"
+                successBlurb="The review and reason are kept. The regular review cycle continues."
+                body={(step, edit) =>
+                    step === 0 ? (
+                        <>
+                            <Notice
+                                warning
+                                title="Only this triggered review is cancelled"
+                            >
+                                It remains in the history with your reason. The
+                                person’s regular review is still due.
+                            </Notice>
+                            <Field
                                 id="cancel-reason"
-                                value={reason}
-                                onChange={(event) =>
-                                    setReason(event.target.value)
-                                }
-                                rows={4}
+                                label="Why it is no longer needed"
+                                required
+                                error={command.errors['cancel-reason']}
+                            >
+                                <Textarea
+                                    id="cancel-reason"
+                                    value={reason}
+                                    onChange={(event) =>
+                                        setReason(event.target.value)
+                                    }
+                                    rows={4}
+                                />
+                            </Field>
+                        </>
+                    ) : (
+                        <ReviewCard
+                            icon={XCircle}
+                            title="Cancel this triggered review"
+                            onEdit={() => edit(0)}
+                        >
+                            <ReviewRow
+                                label="Person"
+                                value={review.client_name}
                             />
-                        </Field>
-                    </>
-                ) : (
-                    <ReviewCard
-                        icon={XCircle}
-                        title="Cancel this triggered review"
-                        onEdit={() => edit(0)}
-                    >
-                        <ReviewRow label="Person" value={review.client_name} />
-                        <ReviewRow
-                            label="Due"
-                            value={formatDateOnly(review.scheduled_date)}
-                        />
-                        <ReviewRow label="Why" value={reason} />
-                    </ReviewCard>
-                )
-            }
-        />
+                            <ReviewRow
+                                label="Due"
+                                value={formatDateOnly(review.scheduled_date)}
+                            />
+                            <ReviewRow label="Why" value={reason} />
+                        </ReviewCard>
+                    )
+                }
+            />
+        </>
     );
 }
 export function AppointmentDialog({

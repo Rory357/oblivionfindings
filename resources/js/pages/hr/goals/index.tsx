@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- The hub hero, segmented cycle selector,
  * objective rows and right-click menu mirror the Goals & OKR design prototype and
  * use styled native controls. Every colour is a semantic design token. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PerformanceTabs } from '@/components/hr';
 import { CheckinWizard } from '@/components/hr/goals/checkin-wizard';
 import { DevelopmentWizard } from '@/components/hr/goals/development-wizard';
@@ -214,6 +215,9 @@ export default function GoalsHub({
     }>({ open: false, obj: null });
     const [devWizard, setDevWizard] = useState(false);
     const [reparent, setReparent] = useState<Objective | null>(null);
+    const [objectiveToDelete, setObjectiveToDelete] =
+        useState<Objective | null>(null);
+    const [deletingObjective, setDeletingObjective] = useState(false);
 
     /* ---- context menu + toast ---- */
     const [ctx, setCtx] = useState<{
@@ -338,13 +342,19 @@ export default function GoalsHub({
                 onSuccess: () => show('Objective duplicated'),
             },
         );
-    const destroy = (o: Objective) => {
-        if (confirm(`Delete “${o.title}”? This cannot be undone.`)) {
-            router.delete(`/hr/goals/${o.id}`, {
-                preserveScroll: true,
-                onSuccess: () => show('Objective deleted', 'warn'),
-            });
-        }
+    // The menu item only opens the confirmation; the request is sent from it.
+    const destroy = (o: Objective) => setObjectiveToDelete(o);
+    const confirmDestroy = () => {
+        if (objectiveToDelete === null) return;
+        router.delete(`/hr/goals/${objectiveToDelete.id}`, {
+            preserveScroll: true,
+            onStart: () => setDeletingObjective(true),
+            onSuccess: () => show('Objective deleted', 'warn'),
+            onFinish: () => {
+                setDeletingObjective(false);
+                setObjectiveToDelete(null);
+            },
+        });
     };
     const bulk = (action: string, extra: Record<string, unknown> = {}) => {
         router.post(
@@ -983,6 +993,26 @@ export default function GoalsHub({
                     }
                 />
             )}
+            <ConfirmDialog
+                open={objectiveToDelete !== null}
+                onClose={() => {
+                    if (!deletingObjective) setObjectiveToDelete(null);
+                }}
+                onConfirm={confirmDestroy}
+                title="Delete this objective?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            “{objectiveToDelete?.title}”
+                        </span>{' '}
+                        and its key results come off Goals for everyone. This
+                        can&apos;t be undone.
+                    </>
+                }
+                confirmText="Delete objective"
+                variant="destructive"
+                processing={deletingObjective}
+            />
         </AppLayout>
     );
 }
