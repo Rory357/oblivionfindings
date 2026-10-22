@@ -539,7 +539,7 @@ function NativeMonitorWizardBody({
                 open
                 onClose={close}
                 title={
-                    editing ? `Update ${monitor.name}` : 'Create direct monitor'
+                    editing ? `Update ${monitor.name}` : 'Add direct monitor'
                 }
                 description="Configure an approved device check. A saved configuration does not prove the connection works."
                 railIcon={Activity}
@@ -602,7 +602,7 @@ function NativeMonitorWizardBody({
                                 ? 'Saving…'
                                 : editing
                                   ? 'Apply monitor update'
-                                  : 'Create direct monitor'}
+                                  : 'Add direct monitor'}
                         </Button>
                     )
                 }

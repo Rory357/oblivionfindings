@@ -181,11 +181,11 @@ describe('native monitoring operator workflows', () => {
         nativeStep('Review');
         await waitFor(() => {
             expect(
-                screen.getByRole('button', { name: 'Create direct monitor' }),
+                screen.getByRole('button', { name: 'Add direct monitor' }),
             ).toBeEnabled();
         });
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         );
 
         await waitFor(() => {
@@ -297,11 +297,11 @@ describe('native monitoring operator workflows', () => {
         });
         await waitFor(() => {
             expect(
-                screen.getByRole('button', { name: 'Create direct scope' }),
+                screen.getByRole('button', { name: 'Add direct scope' }),
             ).toBeEnabled();
         });
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct scope' }),
+            screen.getByRole('button', { name: 'Add direct scope' }),
         );
 
         await waitFor(() => {

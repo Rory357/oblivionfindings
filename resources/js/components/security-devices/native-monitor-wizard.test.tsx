@@ -317,7 +317,7 @@ describe('native monitor wizard intent and recovery', () => {
         );
         fillCreate();
         const save = screen.getByRole('button', {
-            name: 'Create direct monitor',
+            name: 'Add direct monitor',
         });
         fireEvent.click(save);
         fireEvent.click(save);
@@ -351,7 +351,7 @@ describe('native monitor wizard intent and recovery', () => {
         );
         fillCreate();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         );
         await screen.findByText('Use a clearer monitor name.');
         expect(
@@ -367,7 +367,7 @@ describe('native monitor wizard intent and recovery', () => {
         });
         step('Review');
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         );
         await screen.findByRole('heading', {
             name: 'Monitor configuration saved',
@@ -400,11 +400,11 @@ describe('native monitor wizard intent and recovery', () => {
         );
         fillCreate();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         );
         await screen.findByRole('button', { name: 'Check saved request' });
         expect(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         ).toBeDisabled();
         fireEvent.click(
             screen.getByRole('button', { name: 'Check saved request' }),
@@ -470,7 +470,7 @@ describe('native monitor wizard intent and recovery', () => {
         );
         fillCreate();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         );
         const body = vi.mocked(axios.post).mock.calls[0][1] as Record<
             string,
@@ -511,11 +511,11 @@ describe('native monitor wizard intent and recovery', () => {
         );
         fillCreate();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         );
         await screen.findByText(/Your current access or reviewed Site context/);
         expect(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         ).toBeDisabled();
         unmount();
         vi.mocked(axios.patch).mockRejectedValueOnce(serverError(409));
