@@ -77,6 +77,7 @@ export function IncidentResponseRequestDialog({
         'Discard this response request?',
         'Your unsaved request will be discarded. Cancel to keep editing.',
         undefined,
+        false,
         preserveCurrentIncident,
     );
     const requestClose = () => {

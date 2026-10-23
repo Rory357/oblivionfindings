@@ -3,6 +3,7 @@ import {
     draftHistoryNavigation,
     registerDraftHistoryGuard,
 } from '@/lib/draft-history';
+import type { PendingVisit } from '@inertiajs/core';
 import { router } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -13,6 +14,8 @@ export function useSettingsLeaveConfirmation(
     description = 'Your unsaved entries will be discarded. A save already sent may still finish; review the saved settings before retrying it. Cancel to keep editing.',
     onDiscard?: () => void,
     saving = false,
+    /** Let a preserved same-record visit through without asking (e.g. a partial reload of the open record). */
+    allowPreservedVisit?: (visit: PendingVisit) => boolean,
 ) {
     const [pending, setPending] = useState<{
         run: () => void;
@@ -55,7 +58,12 @@ export function useSettingsLeaveConfirmation(
         );
         const remove = router.on('before', (event) => {
             const visit = event.detail.visit;
-            if (approved.current || visit.method !== 'get') return;
+            if (
+                approved.current ||
+                visit.method !== 'get' ||
+                allowPreservedVisit?.(visit)
+            )
+                return;
             event.preventDefault();
             setPending({ run: () => router.visit(visit.url, visit) });
         });
@@ -64,7 +72,7 @@ export function useSettingsLeaveConfirmation(
             removeHistory();
             remove();
         };
-    }, [dirty]);
+    }, [dirty, allowPreservedVisit]);
 
     return {
         request,
