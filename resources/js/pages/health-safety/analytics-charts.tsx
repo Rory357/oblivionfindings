@@ -8,7 +8,6 @@
  *
  * NZ-only: LTIFR / TRIFR, WorkSafe notifiable, Nga Paerewa, ACC.
  */
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
@@ -112,21 +111,13 @@ export function ChartCard({
     className?: string;
 }) {
     return (
-        <Card className={cn('rounded-xl shadow-sm', className)}>
-            <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-1">
-                <div className="min-w-0">
-                    <CardTitle className="text-sm font-bold tracking-tight">
-                        {title}
-                    </CardTitle>
-                    {subtitle ? (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            {subtitle}
-                        </p>
-                    ) : null}
-                </div>
-                {action}
-            </CardHeader>
-            <CardContent className="pt-2">
+        <section className={cn('sg-surface', className)}>
+            <div className="sg-head">
+                <h3>{title}</h3>
+                {subtitle ? <p>{subtitle}</p> : null}
+                {action ? <div className="ml-auto">{action}</div> : null}
+            </div>
+            <div className="px-[18px] pt-2 pb-4">
                 <figure className="m-0" role="group" aria-label={aria}>
                     {children}
                     {table ? (
@@ -151,8 +142,8 @@ export function ChartCard({
                         </table>
                     ) : null}
                 </figure>
-            </CardContent>
-        </Card>
+            </div>
+        </section>
     );
 }
 
@@ -341,7 +332,7 @@ export function SingleAreaChart({
         <ResponsiveContainer width="100%" height={height}>
             <ComposedChart
                 data={trends}
-                margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
+                margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
             >
                 <defs>
                     <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -374,6 +365,7 @@ export function SingleAreaChart({
                     axisLine={false}
                     tickLine={false}
                     width={34}
+                    tickFormatter={(v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))}
                 />
                 <Tooltip content={<ChartTooltip />} />
                 <Area

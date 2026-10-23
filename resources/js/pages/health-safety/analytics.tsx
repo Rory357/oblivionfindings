@@ -6,6 +6,7 @@
  * LTIFR / TRIFR, WorkSafe notifiable events, Nga Paerewa NZS 8134:2021, ACC.
  */
 import { PageLayout } from '@/components/page';
+import { Note, Surface, Tally, type TallyItem } from '@/components/signature/blocks';
 import type {
     RosterTabItem,
     ShiftCtxItem,
@@ -14,7 +15,6 @@ import type {
 import { ShiftContextMenu } from '@/components/rostering';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { WizardStep } from '@/components/wizard/shell';
 import { WizardShell } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
@@ -68,7 +68,6 @@ import {
     AnalyticsHeader,
     AnalyticsPeriodSummary,
 } from './components/analytics-header';
-import { RoleLensBanner } from './components/dashboard-tabs';
 import { FirstAidBreakdowns } from './components/first-aid-breakdowns';
 import {
     participationAccessForViewer,
@@ -211,6 +210,61 @@ export function ScorecardCell({ item }: { item: ScorecardItem }) {
     );
 }
 
+/** The drawing's plain names for the scorecard measures (approved H&S drawing 45); unknown keys keep their label. */
+const PLAIN: Record<string, string> = {
+    near_miss_ratio: 'Near misses for each incident',
+    actions_on_time_pct: 'Corrective actions on time',
+    training_pct: 'Training and audits up to date',
+    worker_engagement: 'Meetings completed',
+    open_hazards: 'Open hazards',
+    worker_consultation: 'Consultations finished',
+    procedures_reviewed_pct: 'Procedures reviewed on time',
+    ltifr: 'Lost-time injury rate',
+    trifr: 'Recordable injury rate',
+    incidents: 'Incidents',
+    injury_severity_rate: 'Injury severity rate',
+    lost_time_days: 'Lost-time days',
+    days_since_lti: 'Days since a lost-time injury',
+};
+
+/**
+ * One scorecard measure as a tally item: the value, its plain name, and the change since last month (or why there
+ * is none). Worker participation measures keep the participation source rules: restricted and unconfirmed values
+ * never show as numbers. A measure moving the wrong way carries the critical ring.
+ */
+function useScorecardItems(items: ScorecardItem[]): TallyItem[] {
+    const viewer = participationViewer(usePage<SharedData>().props.auth);
+    return items.map((item) => {
+        const participation = item.key === 'worker_engagement' || item.key === 'worker_consultation';
+        const value = participation
+            ? participationValue(item.value, item.source_access, item.viewer_id, viewer)
+            : item.value;
+        const delta = participation
+            ? participationValue(item.delta, item.source_access, item.viewer_id, viewer)
+            : item.delta;
+        const sourceAccess = participationAccessForViewer(item.source_access, item.viewer_id, viewer);
+        const unconfirmedParticipation =
+            participation &&
+            (item.source_access !== 'readable' || !participationSourceMatches(item.viewer_id, viewer));
+        return {
+            value: value === null || value === undefined ? '—' : `${value}${item.suffix}`,
+            label: PLAIN[item.key] ?? item.label,
+            tone: item.dir === 'watch' && value !== null ? 'critical' : undefined,
+            sub:
+                delta !== null && delta !== undefined && value !== null
+                    ? `${deltaArrow(item.dir)} ${delta > 0 ? '+' : delta < 0 ? '−' : ''}${Math.abs(delta)} vs last month`
+                    : unconfirmedParticipation
+                      ? sourceAccess === 'restricted'
+                          ? 'Access restricted'
+                          : 'Not confirmed'
+                      : value === null
+                        ? 'Not confirmed'
+                        : 'No earlier data',
+        };
+    });
+}
+
+/** Prevention and harm as two tallies (approved H&S drawing 45). */
 function Scorecard({
     leading,
     lagging,
@@ -218,49 +272,23 @@ function Scorecard({
     leading: ScorecardItem[];
     lagging: ScorecardItem[];
 }) {
+    const leadingItems = useScorecardItems(leading);
+    const laggingItems = useScorecardItems(lagging);
     return (
-        <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-status-success/30 bg-status-success-bg/40 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
-                        <TrendingUp className="h-4 w-4" />
-                    </span>
-                    <div>
-                        <h3 className="text-sm font-bold text-foreground">
-                            Leading indicators
-                        </h3>
-                        <p className="text-[11px] text-muted-foreground">
-                            Recorded prevention and participation measures
-                        </p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {leading.map((it) => (
-                        <ScorecardCell key={it.key} item={it} />
-                    ))}
-                </div>
-            </div>
-            <div className="rounded-xl border border-status-warning/30 bg-status-warning-bg/40 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
-                        <AlertTriangle className="h-4 w-4" />
-                    </span>
-                    <div>
-                        <h3 className="text-sm font-bold text-foreground">
-                            Lagging outcomes
-                        </h3>
-                        <p className="text-[11px] text-muted-foreground">
-                            Reactive — harm already occurred; lower is better
-                        </p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {lagging.map((it) => (
-                        <ScorecardCell key={it.key} item={it} />
-                    ))}
-                </div>
-            </div>
-        </div>
+        <>
+            <Tally
+                title="Prevention"
+                sub="How well we prevent harm and involve staff"
+                keepZeros
+                items={leadingItems}
+            />
+            <Tally
+                title="Harm that has already happened"
+                sub="Lower is better"
+                keepZeros
+                items={laggingItems}
+            />
+        </>
     );
 }
 
@@ -568,9 +596,9 @@ function GovPackCard({
     actionLabel?: string;
 }) {
     return (
-        <Card className="flex flex-col rounded-xl shadow-sm">
-            <CardContent className="flex flex-1 flex-col gap-2 p-4">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-primary">
+        <section className="sg-surface flex flex-col">
+            <div className="flex flex-1 flex-col gap-2 p-4">
+                <span aria-hidden className="sg-av !size-9">
                     <Icon className="h-4 w-4" />
                 </span>
                 <div className="flex-1">
@@ -594,8 +622,8 @@ function GovPackCard({
                     )}
                     {actionLabel}
                 </Button>
-            </CardContent>
-        </Card>
+            </div>
+        </section>
     );
 }
 
@@ -1005,11 +1033,12 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Analytics', href: '/health-safety/analytics' },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Reports & assurance', href: '/health-safety/reports' },
+                { title: 'Health & safety analytics', href: '/health-safety/analytics' },
             ]}
         >
-            <Head title="H&S Analytics" />
+            <Head title="Health & safety analytics" />
 
             <PageLayout
                 hero={
@@ -1035,14 +1064,13 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                     />
                 }
             >
-                <div className="flex min-w-0 flex-col gap-6">
+                <div className="flex min-w-0 flex-col gap-5">
                     <AnalyticsPeriodSummary
                         summary={period_summary}
                         sdsExpiring={sds_expiring}
                         sourceCompleteness={props.source_completeness}
+                        lens={filters.lens}
                     />
-
-                    <RoleLensBanner lens={filters.lens} />
 
                     {tab === 'overview' ? (
                         <OverviewTab
@@ -1098,21 +1126,12 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                     ) : null}
 
                     {tab === 'sites' ? (
-                        <div className="grid gap-4">
-                            <Card className="rounded-xl shadow-sm">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-bold">
-                                        Site comparison league
-                                    </CardTitle>
-                                    <p className="text-xs text-muted-foreground">
-                                        Click a column to sort · click or
-                                        right-click a row to drill in.
-                                        Compliance score reflects NZ obligations
-                                        (incidents, open hazards,
-                                        emergency-drill cadence).
-                                    </p>
-                                </CardHeader>
-                                <CardContent>
+                        <div className="grid gap-5">
+                            <Surface
+                                title="Sites side by side"
+                                sub="Click a column to sort · click or right-click a row to drill in. Compliance score reflects NZ obligations (incidents, open hazards, emergency-drill cadence)."
+                            >
+                                <div className="px-[18px] pt-2 pb-4">
                                     <SiteLeague
                                         sites={site_comparison}
                                         onRow={(s) => openDrill(siteTarget(s))}
@@ -1133,25 +1152,16 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                                             )
                                         }
                                     />
-                                </CardContent>
-                            </Card>
-                            <Card className="rounded-xl shadow-sm">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-bold">
-                                        Hotspot heatmap
-                                    </CardTitle>
-                                    <p className="text-xs text-muted-foreground">
-                                        Sites × burden metrics,
-                                        intensity-shaded.
-                                    </p>
-                                </CardHeader>
-                                <CardContent>
+                                </div>
+                            </Surface>
+                            <Surface title="Where the load sits" sub="Sites × burden measures, shaded by how much each carries">
+                                <div className="px-[18px] pt-2 pb-4">
                                     <Heatmap
                                         sites={site_comparison}
                                         onCell={(s) => openDrill(siteTarget(s))}
                                     />
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </Surface>
                         </div>
                     ) : null}
 
@@ -1169,16 +1179,16 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
 
                     {/* hours-worked honesty footnote — frequency rates need a meaningful exposure basis */}
                     {hours_meta.total_hours < 1000 ? (
-                        <p className="text-[11px] text-muted-foreground">
+                        <Note>
                             LTIFR / TRIFR need ≥1,000 worked hours in the
                             trailing-12-month basis to report a meaningful rate
                             (standard frequency-rate convention); they show “—”
                             until then.
-                        </p>
+                        </Note>
                     ) : null}
 
                     {/* org + NZ framework footer */}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-[11px] text-muted-foreground">
+                    <div className="sg-surface sg-quiet flex-wrap">
                         <span>WorkSafe NZ · HSWA 2015</span>
                         <span aria-hidden>·</span>
                         <span>Ngā Paerewa NZS 8134:2021</span>
@@ -1191,7 +1201,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                             {Math.round(
                                 hours_meta.total_hours,
                             ).toLocaleString()}{' '}
-                            hours worked (12-month basis)
+                            hours worked in the last 12 months
                         </span>
                     </div>
                 </div>
@@ -1253,10 +1263,10 @@ function OverviewTab({
         <Scorecard leading={scorecard.leading} lagging={scorecard.lagging} />
     );
     const headlineTrends = (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-5">
             <ChartCard
-                title="LTIFR & TRIFR"
-                subtitle="Lost-time & total recordable injury frequency (per 1M hrs)"
+                title="Injury rates"
+                subtitle="Lost-time and recordable injuries per million hours worked"
                 aria="LTIFR and TRIFR trend over time"
                 table={{
                     caption: 'LTIFR and TRIFR by month',
@@ -1271,8 +1281,8 @@ function OverviewTab({
                 <LtifrTrifrChart trends={trends} />
             </ChartCard>
             <ChartCard
-                title="Near-miss : incident ratio"
-                subtitle="Higher is healthier — a strong reporting culture trends up"
+                title="Near misses for each incident"
+                subtitle="Higher is better — it means people report problems early"
                 aria="Near-miss to incident ratio over time"
                 table={{
                     caption: 'Near-miss ratio by month',
@@ -1290,10 +1300,10 @@ function OverviewTab({
         </div>
     );
     const threeUp = (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-5">
             <ChartCard
                 title="Incident severity"
-                subtitle="Distribution this period"
+                subtitle="This period"
                 aria="Incident severity distribution"
                 table={{
                     caption: 'Incidents by severity',
@@ -1311,7 +1321,7 @@ function OverviewTab({
             </ChartCard>
             <ChartCard
                 title="Incidents by type"
-                subtitle="Click a bar or row to drill in"
+                subtitle="Click a bar to see those incidents"
                 aria="Incidents by type"
                 table={{
                     caption: 'Incidents by type',
@@ -1329,8 +1339,8 @@ function OverviewTab({
                 />
             </ChartCard>
             <ChartCard
-                title="Hazard burn-down"
-                subtitle="Opened vs closed + running open"
+                title="Open hazards coming down"
+                subtitle="Opened, closed and still open"
                 aria="Hazard burn-down over time"
                 table={{
                     caption: 'Hazards opened, closed and running open by month',
@@ -1351,7 +1361,7 @@ function OverviewTab({
     // role re-weights ordering: governance leads with the board scorecard;
     // frontline leads with the live breakdowns; manager leads with trends.
     return (
-        <div className="grid gap-4">
+        <div className="grid gap-5">
             {lens === 'frontline' ? (
                 <>
                     {threeUp}

@@ -3,13 +3,10 @@ import {
     PageHeader,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
-    PageHeaderMeterDelta,
     PageHeaderPrimaryButton,
     PageHeaderRail,
 } from '@/components/page/page-header';
+import { Tally } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import {
     Popover,
@@ -91,66 +88,12 @@ export function AnalyticsHeader({
         !!formatDateOnly(from, '') && !!formatDateOnly(to, '') && from <= to;
     const siteScope =
         filters.site_id === null
-            ? 'All approved sites'
+            ? 'All sites'
             : (sites.find((site) => site.id === filters.site_id)?.name ??
               'Site access unconfirmed');
-    const metrics =
-        filters.lens === 'governance'
-            ? [
-                  {
-                      key: 'incidents',
-                      label: 'Incidents',
-                      caption: 'Recorded in this period',
-                      view: 'breakdowns',
-                  },
-                  {
-                      key: 'ltifr',
-                      label: 'LTIFR',
-                      caption: 'Recorded rate · per million hours',
-                      view: 'trends',
-                  },
-                  {
-                      key: 'trifr',
-                      label: 'TRIFR',
-                      caption: 'Recorded rate · per million hours',
-                      view: 'trends',
-                  },
-                  {
-                      key: 'days_since_lti',
-                      label: 'Days since LTI',
-                      caption: 'Last readable lost-time injury',
-                      view: 'overview',
-                  },
-              ]
-            : [
-                  {
-                      key: 'near_miss_ratio',
-                      label: 'Near-miss ratio',
-                      caption: 'Recorded ratio',
-                      view: 'trends',
-                  },
-                  {
-                      key: 'actions_on_time_pct',
-                      label: 'Actions on time',
-                      caption: 'Recorded due-action performance',
-                      view: 'overview',
-                  },
-                  {
-                      key: 'training_pct',
-                      label: 'Training',
-                      caption: 'Recorded compliance',
-                      view: 'overview',
-                  },
-                  {
-                      key: 'open_hazards',
-                      label: 'Open hazards',
-                      caption: 'Recorded open work',
-                      view: 'breakdowns',
-                  },
-              ];
     return (
         <PageHeader
-            title="Health & Safety analytics"
+            title="Health & safety analytics"
             icon={BarChart3}
             wrapTitle
             frontline={filters.lens === 'frontline'}
@@ -186,84 +129,6 @@ export function AnalyticsHeader({
                             </PopoverContent>
                         </Popover>
                     )}
-                </>
-            }
-            meters={
-                <>
-                    {metrics.map((metric) => {
-                        const item = [
-                            ...scorecard.leading,
-                            ...scorecard.lagging,
-                        ].find((entry) => entry.key === metric.key);
-                        const hasDelta =
-                            item?.value !== null &&
-                            item?.value !== undefined &&
-                            item?.delta !== null &&
-                            item?.delta !== undefined &&
-                            item.delta !== 0;
-                        return (
-                            <PageHeaderMeterBlock
-                                key={metric.key}
-                                label={metric.label}
-                                onClick={() => onTabChange(metric.view)}
-                            >
-                                <PageHeaderMeterBig>
-                                    {item?.value === null ||
-                                    item?.value === undefined
-                                        ? '—'
-                                        : `${item.value}${item.suffix}`}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    {item?.value === null ||
-                                    item?.value === undefined
-                                        ? 'Not confirmed'
-                                        : metric.caption}
-                                </PageHeaderMeterCaption>
-                                {hasDelta && (
-                                    <PageHeaderMeterDelta
-                                        trend={item!.delta! > 0 ? 'up' : 'down'}
-                                        good={item!.dir === 'improving'}
-                                    >
-                                        <span className="sr-only">
-                                            {item!.delta! > 0
-                                                ? 'Increased'
-                                                : 'Decreased'}{' '}
-                                            by{' '}
-                                        </span>
-                                        {Math.abs(item!.delta!)}
-                                    </PageHeaderMeterDelta>
-                                )}
-                            </PageHeaderMeterBlock>
-                        );
-                    })}
-                    <PageHeaderMeterBlock
-                        label="WorkSafe review"
-                        onClick={() => onTabChange('governance')}
-                        tone={
-                            worksafe_notifiable.awaiting > 0
-                                ? 'warning'
-                                : 'brand'
-                        }
-                    >
-                        <PageHeaderMeterBig>
-                            {worksafe_notifiable.awaiting}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Recorded awaiting review
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Drills"
-                        onClick={() => onTabChange('governance')}
-                    >
-                        <PageHeaderMeterBig>
-                            {period_summary.drills_complete}/
-                            {period_summary.drills_total}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Recorded completed drills
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
                 </>
             }
             filters={
@@ -396,10 +261,9 @@ export function AnalyticsHeader({
             }
             rail={
                 <PageHeaderRail
-                    items={tabs.map(({ id, label, icon }) => ({
+                    items={tabs.map(({ id, label }) => ({
                         key: id,
                         label,
-                        icon,
                     }))}
                     value={tab}
                     onSelect={onTabChange}
@@ -411,66 +275,62 @@ export function AnalyticsHeader({
     );
 }
 
+const LENS_LINE: Record<string, string> = {
+    governance: 'Governance view: rates, notifiable events and assurance come first',
+    manager: 'Manager view: incidents, investigations and overdue actions come first, then trends',
+    frontline: 'Frontline view: hazard alerts and lone-worker check-ins come first',
+};
+
+/**
+ * "This period" (approved H&S drawing 45): activity in the current view as one tally. The header no longer
+ * carries numbers; the prevention and harm measures follow as their own tallies. Unconfirmed values stay
+ * distinct from a recorded zero.
+ */
 export function AnalyticsPeriodSummary({
     summary,
     sdsExpiring,
     sourceCompleteness,
+    lens = 'manager',
 }: {
     summary: AnalyticsProps['period_summary'];
     sdsExpiring: number;
     sourceCompleteness?: 'unknown';
+    lens?: string;
 }) {
-    const [open, setOpen] = useState(true);
+    const drillsIncomplete = summary.drills_complete < summary.drills_total;
     return (
-        <section
+        <Tally
             aria-label="Recorded period activity"
-            className="rounded-xl border bg-card p-4"
-        >
-            {sourceCompleteness === 'unknown' && (
-                <p role="status" className="text-subtle">
-                    These measures cover records you can access. The full
-                    picture may be incomplete.
-                </p>
-            )}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-section-title">Recorded period activity</h2>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    className="frontline-tap"
-                    aria-expanded={open}
-                    aria-controls="analytics-period-activity"
-                    onClick={() => setOpen(!open)}
-                >
-                    {open ? 'Hide activity' : 'Show activity'}
-                </Button>
-            </div>
-            {open && (
-                <div id="analytics-period-activity" className="space-y-2">
-                    <p className="text-subtle">
-                        Recorded activity in the current scope. Open the
-                        registers for outstanding review and safety work.
-                    </p>
-                    <ul className="text-subtle flex flex-wrap gap-x-5 gap-y-2">
-                        <li>{summary.incidents} incidents</li>
-                        <li>{summary.near_misses} near misses</li>
-                        <li>
-                            {summary.worksafe_awaiting} awaiting WorkSafe review
-                        </li>
-                        <li>{summary.open_hazards} open hazards</li>
-                        <li>
-                            {summary.actions_on_time_pct === null
-                                ? 'Actions on time unconfirmed'
-                                : `${summary.actions_on_time_pct}% actions on time`}
-                        </li>
-                        <li>
-                            {summary.drills_complete}/{summary.drills_total}{' '}
-                            drills complete
-                        </li>
-                        <li>{sdsExpiring} expiring safety data sheets</li>
-                    </ul>
-                </div>
-            )}
-        </section>
+            title="This period"
+            sub={[
+                'Activity in your current view. Open the registers for work still to do',
+                LENS_LINE[lens] ?? LENS_LINE.manager,
+                sourceCompleteness === 'unknown'
+                    ? 'These measures cover records you can access. The full picture may be incomplete.'
+                    : null,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            keepZeros
+            items={[
+                { value: String(summary.incidents), label: 'Incidents' },
+                { value: String(summary.near_misses), label: 'Near misses' },
+                {
+                    value: String(summary.worksafe_awaiting),
+                    label: 'WorkSafe reviews to do',
+                    tone: summary.worksafe_awaiting > 0 ? 'critical' : undefined,
+                },
+                {
+                    value: `${summary.drills_complete}/${summary.drills_total}`,
+                    label: 'Drills complete',
+                    tone: drillsIncomplete ? 'warning' : undefined,
+                },
+                {
+                    value: String(sdsExpiring),
+                    label: 'Expiring safety data sheets',
+                    tone: sdsExpiring > 0 ? 'warning' : undefined,
+                },
+            ]}
+        />
     );
 }
