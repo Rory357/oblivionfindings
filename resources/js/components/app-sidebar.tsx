@@ -40,13 +40,18 @@ import {
     governanceHubContainsUrl,
     visibleSectionTabs,
 } from '@/lib/governance-sections';
+import {
+    safetyHubLinkActive,
+    safetySearchEntries,
+    safetySidebar,
+    type SafetyNavigationPermissions,
+} from '@/lib/health-safety/workspace-navigation';
 import { cn, resolveUrl } from '@/lib/utils';
 import { vendorRegisterTab } from '@/lib/vendor-navigation';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
-    AlertOctagon,
     AlertTriangle,
     Banknote,
     BarChart3,
@@ -66,12 +71,9 @@ import {
     Clock,
     DollarSign,
     FileText,
-    FlaskConical,
     GitBranch,
     GraduationCap,
-    HardHat,
     Heart,
-    HeartPulse,
     Home,
     Landmark,
     LayoutDashboard,
@@ -83,7 +85,6 @@ import {
     MessageSquare,
     MessageSquareText,
     Package,
-    PersonStanding,
     PieChart,
     Pill,
     Radio,
@@ -91,20 +92,18 @@ import {
     Server,
     Settings,
     Shield,
-    ShieldAlert,
     ShieldCheck,
-    Siren,
     Smartphone,
     Stethoscope,
     Target,
     Timer,
     Truck,
+    type LucideIcon,
     UserCheck,
     Users,
     Utensils,
     Wrench,
     X,
-    type LucideIcon,
 } from 'lucide-react';
 import {
     useCallback,
@@ -345,6 +344,10 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
             ? 2000 + item.length
             : -1;
     }
+
+    const safetyActive = safetyHubLinkActive(current, item);
+    if (safetyActive !== undefined)
+        return safetyActive ? 2000 + item.length : -1;
 
     const fleetActive = fleetPrimaryLinkActive(
         normalizedCurrentPath,
@@ -755,12 +758,7 @@ function buildIconNavItems({
     }
 
     // Health & Safety
-    const hasSafety =
-        can?.incidents?.viewAny ||
-        can?.incidents?.viewAssigned ||
-        can?.compliance?.view ||
-        can?.hazards?.view ||
-        can?.['health-safety']?.view;
+    const hasSafety = safetySidebar(can).length > 0;
     if (hasSafety) {
         items.push({
             id: 'safety',
@@ -1427,183 +1425,13 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     ];
 }
 
-function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
-
-    // ── 1. Command centre — the H&S home / "start here" ──────────────────
-    const overview: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        overview.push({
-            title: 'H&S Dashboard',
-            href: '/health-safety',
-            icon: ShieldCheck,
-        });
-    if (overview.length > 0)
-        groups.push({ label: 'Command centre', items: overview });
-
-    // ── 2. Report & respond — the front doors. Every safety event is logged
-    //    here (incident / near miss / fleet / safeguarding) before it converges
-    //    into the governance registers below. ─────────────────────────────────
-    const incidents: NavItem[] = [];
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
-        incidents.push({
-            title: 'Incidents',
-            href: '/incidents',
-            icon: ShieldAlert,
-        });
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
-        incidents.push({
-            title: 'Near Misses',
-            href: '/incidents?tab=near_misses',
-            icon: AlertTriangle,
-        });
-    if (can?.fleet?.viewAny || can?.assets?.viewAny || can?.incidents?.viewAny)
-        incidents.push({
-            title: 'Fleet Incidents',
-            href: '/fleet-assets/incidents',
-            icon: Truck,
-        });
-    if (can?.safeguarding?.viewAny || can?.safeguarding?.create)
-        incidents.push({
-            title: 'Safeguarding',
-            href: '/safeguarding',
-            icon: Shield,
-        });
-    if (incidents.length > 0)
-        groups.push({ label: 'Report & respond', items: incidents });
-
-    // ── 3. Investigate & resolve — the governance registers where every event
-    //    converges, is investigated, and is driven to a verified corrective
-    //    action. "Events" is the master register (was mislabelled
-    //    "Investigations"); Corrective Actions is the verification register. ───
-    const investigate: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        investigate.push({
-            title: 'Events',
-            href: '/health-safety/events',
-            icon: ClipboardCheck,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        investigate.push({
-            title: 'Corrective Actions',
-            href: '/health-safety/corrective-actions',
-            icon: Wrench,
-        });
-    if (investigate.length > 0)
-        groups.push({ label: 'Investigate & resolve', items: investigate });
-
-    // ── 4. Analyse & assure — trends, KPIs and board assurance close the loop.
-    //    Sits after the operational registers so the nav reads report →
-    //    investigate → resolve → analyse top-to-bottom. ───────────────────────
-    const analyse: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view || can?.reports?.viewAny)
-        analyse.push({
-            title: 'Analytics',
-            href: '/health-safety/analytics',
-            icon: BarChart3,
-        });
-    if (analyse.length > 0)
-        groups.push({ label: 'Analyse & assure', items: analyse });
-
-    // H&S Management
-    const hsManagement: NavItem[] = [];
-    if (can?.hazards?.view)
-        hsManagement.push({
-            title: 'Hazards',
-            href: '/compliance/hazards',
-            icon: AlertOctagon,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Worker Participation',
-            href: '/health-safety/worker-participation',
-            icon: Users,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Lone Worker Safety',
-            href: '/health-safety/lone-workers',
-            icon: PersonStanding,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Emergency Drills',
-            href: '/health-safety/drills',
-            icon: Siren,
-        });
-    if (hsManagement.length > 0)
-        groups.push({ label: 'H&S Management', items: hsManagement });
-
-    // Registers
-    const registers: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        registers.push({
-            title: 'Chemical Register',
-            href: '/health-safety/substances',
-            icon: FlaskConical,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        registers.push({
-            title: 'PPE & Equipment',
-            href: '/health-safety/ppe',
-            icon: HardHat,
-        });
-    if (can?.hazards?.view || can?.compliance?.view || can?.clinical?.dashboard)
-        registers.push({
-            title: 'First Aid Register',
-            href: '/health-safety/first-aid',
-            icon: HeartPulse,
-        });
-    if (can?.restraints?.view)
-        registers.push({
-            title: 'Restraints & Behaviour Support',
-            href: '/health-safety/restraints',
-            icon: Clipboard,
-        });
-    if (registers.length > 0)
-        groups.push({ label: 'Registers', items: registers });
-
-    // Injury & Recovery
-    const injury: NavItem[] = [];
-    if (can?.hazards?.view || can?.hr?.wellbeing?.view)
-        injury.push({
-            title: 'Workplace Injuries',
-            href: '/health-safety/injuries',
-            icon: Activity,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        injury.push({
-            title: 'Safe Work Procedures',
-            href: '/health-safety/procedures',
-            icon: FileText,
-        });
-    if (injury.length > 0)
-        groups.push({ label: 'Injury & Procedures', items: injury });
-
-    // Compliance & Risk
-    const compliance: NavItem[] = [];
-    if (can?.compliance?.view)
-        compliance.push({
-            title: 'Compliance',
-            href: '/compliance',
-            icon: Shield,
-        });
-    if (can?.risks?.viewAny || can?.risks?.viewAssigned)
-        compliance.push({
-            title: 'Risks',
-            href: '/health-safety/risk-assessments',
-            icon: Target,
-        });
-    if (can?.privacy?.viewRequests)
-        compliance.push({
-            title: 'Privacy',
-            href: '/privacy/dashboard',
-            icon: Shield,
-        });
-    if (compliance.length > 0)
-        groups.push({ label: 'Compliance & Risk', items: compliance });
-
-    return groups;
+export function buildSafetySubPanelGroups({
+    can,
+}: {
+    can?: SafetyNavigationPermissions;
+}): SubPanelGroup[] {
+    const items = safetySidebar(can);
+    return items.length ? [{ label: 'Health & Safety', items }] : [];
 }
 
 function buildFleetAssetsSubPanelGroups({
@@ -3165,6 +2993,11 @@ export function buildNavSearchCatalog(ctx: {
                     icon: entry.icon,
                     keywords: entry.keywords,
                 });
+            }
+        }
+        if (icon.id === 'safety') {
+            for (const entry of safetySearchEntries(can)) {
+                push({ ...entry, section: icon.label });
             }
         }
         if (icon.href && !icon.subPanel) {

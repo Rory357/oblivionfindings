@@ -1,44 +1,41 @@
-/* Health & Safety command-centre hero. Composes the shared `hs-hero-kit` primitives (the gold
- * standard, now extracted): eyebrow status pill + action row (＋Report · Export board summary),
- * medallion + title + NZ compliance badges, the Leading/Lagging stat clusters, and a footer band
- * (period range · site · role lens · "this week" summary strip). Semantic tokens only; plain
- * string URLs. The kit is the single implementation — analytics composes the same pieces. */
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
-import { EntityFilter } from '@/components/rostering';
+/** H&S overview uses the shared PageHeader; attention is separate, source-aware content. */
+import { LeaveCalendarRange } from '@/components/hr/leave-calendar-range';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    type PageHeaderMeterTone,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { type SharedData } from '@/types';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { formatDateOnly, toDateInput, workerDayRange } from '@/lib/datetime';
+import type { SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     BarChart3,
+    CalendarDays,
     ChevronDown,
-    Clock,
     Download,
     Plus,
     ShieldCheck,
-    TrendingDown,
 } from 'lucide-react';
-import { useState } from 'react';
-
-import {
-    fmt,
-    HeroCluster,
-    HeroClusterTile,
-    HeroComplianceBadges,
-    HeroMedallion,
-    type HeroSegItem,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    HeroSummaryMetric,
-    HeroSummaryStrip,
-} from './hs-hero-kit';
+import { useEffect, useState, type ReactNode } from 'react';
+import type { PpeExpiringState } from './worklists';
 
 export type HeroLeadingLagging = {
+    source_scope?: 'readable_subset';
+    source_completeness?: 'unknown';
     lagging: {
         incidents: number;
         ltifr: number | null;
@@ -53,20 +50,36 @@ export type HeroLeadingLagging = {
         open_hazards: number;
     };
 };
-
 export type HeroFilters = {
     from: string;
     to: string;
     site: number | null;
     lens: string;
 };
-
-const LENS_ITEMS: HeroSegItem[] = [
-    { key: 'governance', label: 'Governance' },
-    { key: 'manager', label: 'Manager' },
-    { key: 'frontline', label: 'Frontline' },
-];
-
+type AttentionProps = {
+    expiring: Array<{ type: string }>;
+    ppeState?: PpeExpiringState;
+    worksafePending: number | null;
+    activeAlerts: number | null;
+};
+export type CommandCentreHeroProps = AttentionProps & {
+    sourceCompleteness?: 'unknown';
+    leadingLagging: HeroLeadingLagging;
+    filters: HeroFilters;
+    sites: Array<{ id: number; name: string }>;
+    openSafeguarding: number | null;
+    fleetUnresolved: number | null;
+    fleetIncidents30d: number | null;
+    procedures: {
+        approved: number;
+        review_due: number;
+        coverage_gap_categories: number;
+    };
+    onReport?: () => void;
+    orgName?: string | null;
+    rail?: ReactNode;
+    search?: { value: string; onChange: (value: string) => void };
+};
 const GOV_REPORTS = [
     { label: 'Board summary', href: '/health-safety/reports/board-summary' },
     {
@@ -86,408 +99,563 @@ const GOV_REPORTS = [
         href: '/health-safety/reports/risk-assessment-register',
     },
 ];
-
-function toISODate(d: Date): string {
-    return d.toISOString().slice(0, 10);
+function presetRange(
+    key: string,
+    asAt: Date = new Date(),
+): { from: string; to: string } {
+    if (key !== 'week')
+        return workerDayRange(key === 'quarter' ? 90 : 30, asAt);
+    const to = toDateInput(asAt);
+    const calendar = new Date(to + 'T00:00:00Z');
+    calendar.setUTCDate(
+        calendar.getUTCDate() - ((calendar.getUTCDay() + 6) % 7),
+    );
+    return { from: calendar.toISOString().slice(0, 10), to };
 }
-
-function presetRange(key: string): { from: string; to: string } {
-    const now = new Date();
-    const from = new Date(now);
-    if (key === 'week') {
-        const mondayOffset = (now.getDay() + 6) % 7;
-        from.setDate(now.getDate() - mondayOffset);
-    } else if (key === 'quarter') {
-        from.setDate(now.getDate() - 90);
-    } else {
-        from.setDate(now.getDate() - 30);
-    }
-    return { from: toISODate(from), to: toISODate(now) };
-}
+const fmt = (value: number | null, suffix = '') =>
+    value === null ? '—' : String(value) + suffix;
+type Meter = {
+    label: string;
+    value: string;
+    caption: string;
+    href?: string;
+    ariaLabel?: string;
+    tone?: PageHeaderMeterTone;
+};
 
 export function CommandCentreHero({
+    sourceCompleteness,
     leadingLagging,
     filters,
     sites,
-    expiring,
-    worksafePending,
-    activeAlerts,
     openSafeguarding,
     fleetUnresolved,
     fleetIncidents30d,
     procedures,
     onReport,
     orgName,
-}: {
-    leadingLagging: HeroLeadingLagging;
-    filters: HeroFilters;
-    sites: Array<{ id: number; name: string }>;
-    expiring: Array<{ type: string }>;
-    worksafePending: number;
-    activeAlerts: number;
-    openSafeguarding: number;
-    fleetUnresolved: number;
-    fleetIncidents30d: number;
-    procedures: {
-        approved: number;
-        review_due: number;
-        coverage_gap_categories: number;
-    };
-    onReport?: () => void;
-    orgName?: string | null;
-}) {
-    // The board-summary export targets governance.view-gated report routes; hide
-    // it for register-only roles so they don't hit a 403 from the command centre.
+    rail,
+    search,
+}: CommandCentreHeroProps) {
     const canViewBoardReports =
         usePage<SharedData>().props.auth.can?.governance?.view ?? false;
-
     const [customFrom, setCustomFrom] = useState(filters.from);
     const [customTo, setCustomTo] = useState(filters.to);
-
-    const lagging = leadingLagging.lagging;
-    const leading = leadingLagging.leading;
-
-    const sdsExpiring = expiring.filter((e) => e.type === 'sds').length;
-    const drillsDue = expiring.filter((e) => e.type === 'drill').length;
-    const ppeDue = expiring.filter(
-        (e) => e.type === 'ppe_inspection' || e.type === 'ppe_expiry',
-    ).length;
-
-    const go = (
-        params: Partial<HeroFilters> & { from?: string; to?: string },
-    ) => {
+    const [calendarRevision, setCalendarRevision] = useState(
+        `${filters.from}:${filters.to}`,
+    );
+    const [datesOpen, setDatesOpen] = useState(false);
+    const [fleetAccessNotice, setFleetAccessNotice] = useState(false);
+    useEffect(() => {
+        setCustomFrom(filters.from);
+        setCustomTo(filters.to);
+        setCalendarRevision(`${filters.from}:${filters.to}`);
+    }, [filters.from, filters.to]);
+    const changeDatesOpen = (open: boolean) => {
+        if (open) {
+            setCustomFrom(filters.from);
+            setCustomTo(filters.to);
+        }
+        setDatesOpen(open);
+    };
+    const go = (params: Partial<HeroFilters>) => {
         const merged: Record<string, string | number> = {
             from: filters.from,
             to: filters.to,
             lens: filters.lens,
         };
-        if (filters.site != null) merged.site = filters.site;
-        for (const [k, v] of Object.entries(params)) {
-            if (v == null) delete merged[k];
-            else merged[k] = v as string | number;
+        if (filters.site !== null) merged.site = filters.site;
+        for (const [key, value] of Object.entries(params)) {
+            if (value == null) delete merged[key];
+            else merged[key] = value;
         }
-        router.get('/health-safety', merged, { preserveScroll: true });
+        router.get('/health-safety', merged, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     };
-
-    const activePeriod = ((): string => {
-        for (const key of ['week', '30d', 'quarter']) {
-            if (presetRange(key).from === filters.from) return key;
-        }
-        return 'custom';
-    })();
-
-    const activeSite =
-        filters.site != null ? sites.find((s) => s.id === filters.site) : null;
-    const siteLabel = activeSite ? activeSite.name : 'All sites';
-
-    const periodItems: HeroSegItem[] = [
-        { key: 'week', label: 'This week' },
-        { key: '30d', label: '30 days' },
-        { key: 'quarter', label: 'Quarter' },
+    const period =
+        ['week', '30d', 'quarter'].find((key) => {
+            const range = presetRange(key);
+            return range.from === filters.from && range.to === filters.to;
+        }) ?? 'custom';
+    const activeSite = sites.find((site) => site.id === filters.site);
+    const siteLabel =
+        filters.site === null
+            ? 'All approved sites'
+            : (activeSite?.name ?? 'Site access unconfirmed');
+    const lagging = leadingLagging.lagging;
+    const leading = leadingLagging.leading;
+    // These keys are consumed by the destination controllers. Current-state
+    // registers deliberately receive no occurrence-date filter.
+    const destination = (path: string, params: Record<string, string> = {}) => {
+        const query = new URLSearchParams(params);
+        if (filters.site !== null) query.set('site_id', String(filters.site));
+        return path + (query.size ? '?' + query.toString() : '');
+    };
+    const selectedPeriod = { from: filters.from, to: filters.to };
+    const analytics = destination('/health-safety/analytics', {
+        period: 'custom',
+        ...selectedPeriod,
+        lens: filters.lens,
+    });
+    const outcomes: Meter[] = [
         {
-            key: 'custom',
-            label: 'Custom range',
-            popover: (
-                <>
-                    <div className="flex items-end gap-2">
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            From
-                            <input
-                                type="date"
-                                value={customFrom}
-                                max={customTo}
-                                onChange={(e) => setCustomFrom(e.target.value)}
-                                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            To
-                            <input
-                                type="date"
-                                value={customTo}
-                                min={customFrom}
-                                onChange={(e) => setCustomTo(e.target.value)}
-                                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-                            />
-                        </label>
-                    </div>
-                    <Button
-                        size="sm"
-                        className="w-full"
-                        onClick={() => go({ from: customFrom, to: customTo })}
-                    >
-                        Apply range
-                    </Button>
-                </>
-            ),
+            label: 'Incidents',
+            value: fmt(lagging.incidents),
+            caption: 'selected period · excludes near misses',
+            href: destination('/incidents', {
+                ...selectedPeriod,
+                kind: 'incidents',
+                tab: 'all',
+            }),
+            tone: lagging.incidents > 0 ? 'warning' : 'brand',
+        },
+        {
+            label: 'LTIFR',
+            value: fmt(lagging.ltifr),
+            caption: 'year basis · per million hours',
+            href: analytics,
+        },
+        {
+            label: 'TRIFR',
+            value: fmt(lagging.trifr),
+            caption: 'year basis · per million hours',
+            href: analytics,
+        },
+        {
+            label: 'Days since LTI',
+            value: fmt(lagging.days_since_lti),
+            caption:
+                lagging.days_since_lti === null
+                    ? 'Not confirmed'
+                    : 'last readable lost-time injury',
+            href: analytics,
+        },
+        {
+            label: 'Safeguarding',
+            value: fmt(openSafeguarding),
+            caption:
+                openSafeguarding === null
+                    ? 'Not confirmed'
+                    : 'open concerns now',
+            href: destination('/safeguarding', { tab: 'open' }),
+            tone: (openSafeguarding ?? 0) > 0 ? 'warning' : 'brand',
+        },
+        {
+            label: 'Fleet incidents',
+            value: fmt(fleetUnresolved),
+            caption:
+                fleetUnresolved === null
+                    ? 'Access restricted'
+                    : 'unresolved now',
+            href:
+                fleetUnresolved === null
+                    ? undefined
+                    : destination('/fleet-assets/incidents', { tab: 'open' }),
+            tone: (fleetUnresolved ?? 0) > 0 ? 'warning' : 'brand',
         },
     ];
-
-    const footer = (
-        <>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {/* Period range control */}
-                <HeroSegmented
-                    variant="pill"
-                    label="Period"
-                    ariaLabel="Period range"
-                    items={periodItems}
-                    value={activePeriod}
-                    onChange={(k) => go(presetRange(k))}
-                />
-
-                {/* Site filter + role lens */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <EntityFilter
-                        onDark
-                        label="Site"
-                        allLabel="All sites"
-                        items={sites.map((s) => ({ id: s.id, name: s.name }))}
-                        value={filters.site}
-                        onChange={(v) => go({ site: v ?? undefined })}
-                    />
-                    <HeroSegmented
-                        variant="segmented"
-                        label="Lens"
-                        ariaLabel="Role lens"
-                        items={LENS_ITEMS}
-                        value={filters.lens}
-                        onChange={(k) => go({ lens: k })}
-                    />
-                </div>
-            </div>
-
-            {/* "This week" summary strip */}
-            <HeroSummaryStrip label="This week">
-                <HeroSummaryMetric tone="warning">
-                    {lagging.incidents} incidents
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone="critical">
-                    {worksafePending} WorkSafe-notifiable
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone="warning">
-                    {leading.open_hazards} hazards open
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone="warning">
-                    {drillsDue} drills due
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone={ppeDue > 0 ? 'warning' : 'success'}>
-                    {ppeDue > 0 ? `${ppeDue} PPE due` : 'PPE all current'}
-                </HeroSummaryMetric>
-                <HeroSummaryMetric
-                    tone={activeAlerts > 0 ? 'critical' : 'success'}
-                >
-                    {activeAlerts > 0
-                        ? `${activeAlerts} lone-worker alert${activeAlerts === 1 ? '' : 's'}`
-                        : 'lone-workers all checked in'}
-                </HeroSummaryMetric>
-            </HeroSummaryStrip>
-        </>
-    );
-
+    const prevention: Meter[] = [
+        {
+            label: 'Near-miss ratio',
+            value: fmt(leading.near_miss_ratio, '×'),
+            caption: 'year basis · per recordable injury',
+            href: analytics,
+        },
+        {
+            label: 'Actions on time',
+            value: fmt(leading.actions_on_time_pct, '%'),
+            caption: 'due in selected period',
+            href: destination('/health-safety/corrective-actions', {
+                ...selectedPeriod,
+                tab: 'all',
+            }),
+        },
+        {
+            label: 'Training',
+            value: fmt(leading.training_pct, '%'),
+            caption: 'current recorded compliance',
+            href: analytics,
+        },
+        {
+            label: 'Open hazards',
+            value: fmt(leading.open_hazards),
+            caption: 'open and in progress now',
+            href: destination('/compliance/hazards', { tab: 'active' }),
+            tone: leading.open_hazards > 0 ? 'warning' : 'brand',
+        },
+        {
+            label: 'Procedures',
+            value: fmt(procedures.approved),
+            caption:
+                procedures.review_due > 0
+                    ? String(procedures.review_due) + ' review due'
+                    : procedures.coverage_gap_categories > 0
+                      ? String(procedures.coverage_gap_categories) +
+                        ' coverage gaps'
+                      : 'approved records',
+            href: destination('/health-safety/procedures', { tab: 'approved' }),
+            tone:
+                procedures.coverage_gap_categories > 0
+                    ? 'critical'
+                    : procedures.review_due > 0
+                      ? 'warning'
+                      : 'brand',
+        },
+        // Fleet's register currently accepts civil-date filters, while this
+        // source is a rolling-instant count. Do not invent a matching range.
+        {
+            label: 'Fleet · 30 days',
+            value: fmt(fleetIncidents30d),
+            caption:
+                fleetIncidents30d === null
+                    ? 'Access restricted'
+                    : '30-day count · full register',
+            href:
+                fleetIncidents30d === null
+                    ? undefined
+                    : destination('/fleet-assets/incidents'),
+            ariaLabel: 'Open full fleet incident register',
+        },
+    ];
+    const validRange =
+        !!formatDateOnly(customFrom, '') &&
+        !!formatDateOnly(customTo, '') &&
+        customFrom <= customTo;
     return (
-        <HeroShell footer={footer}>
-            {/* Eyebrow + action row */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <HeroStatusPill>Safety system · synced just now</HeroStatusPill>
-
-                <div className="flex flex-wrap items-center gap-2">
-                    {onReport ? (
-                        <PageHeaderPrimaryButton icon={Plus} onClick={onReport}>
-                            Report
-                        </PageHeaderPrimaryButton>
-                    ) : null}
-                    <Link
-                        href="/health-safety/analytics"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                    >
-                        <BarChart3 className="h-4 w-4" />
-                        View analytics
-                    </Link>
-                    {canViewBoardReports ? (
+        <PageHeader
+            frontline={filters.lens === 'frontline'}
+            wrapTitle
+            icon={ShieldCheck}
+            title="Health & Safety"
+            subline={[
+                siteLabel,
+                orgName,
+                formatDateOnly(filters.from) +
+                    ' – ' +
+                    formatDateOnly(filters.to),
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    {search && (
+                        <PageHeaderSearch
+                            value={search.value}
+                            onChange={search.onChange}
+                            placeholder="Search current overview…"
+                            ariaLabel="Search current safety overview"
+                        />
+                    )}
+                    <PageHeaderGlassButton asChild icon={BarChart3}>
+                        <Link href={analytics}>View analytics</Link>
+                    </PageHeaderGlassButton>
+                    {canViewBoardReports && (
                         <Popover>
                             <PopoverTrigger asChild>
-                                {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                                >
-                                    <Download className="h-4 w-4" />
+                                <PageHeaderGlassButton icon={Download}>
                                     Export board summary
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                </button>
+                                    <ChevronDown className="size-3.5" />
+                                </PageHeaderGlassButton>
                             </PopoverTrigger>
                             <PopoverContent align="end" className="w-60 p-1">
-                                {GOV_REPORTS.map((r) => (
+                                {GOV_REPORTS.map((report) => (
                                     <Link
-                                        key={r.href}
-                                        href={r.href}
-                                        className="block rounded-md px-2.5 py-2 text-[13px] text-foreground transition-colors hover:bg-muted"
+                                        key={report.href}
+                                        href={report.href}
+                                        className="frontline-hit text-subtle block rounded-md px-3 py-2 text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                                     >
-                                        {r.label}
+                                        {report.label}
                                     </Link>
                                 ))}
                             </PopoverContent>
                         </Popover>
-                    ) : null}
-                </div>
-            </div>
-
-            {/* Title block */}
-            <div className="flex items-start gap-4 md:gap-5">
-                <HeroMedallion icon={ShieldCheck} />
-                <div className="min-w-0 flex-1">
-                    <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">
-                        Health &amp; Safety command centre
-                    </h1>
-                    <p className="mt-1 text-sm text-primary-foreground/75">
-                        <span className="underline decoration-primary-foreground/40 underline-offset-4">
-                            {siteLabel}
-                        </span>
-                        {orgName ? ` · ${orgName}` : ''}
-                        {` · ${sites.length} site${sites.length === 1 ? '' : 's'} · PCBU duty-holder view`}
-                    </p>
-                    <HeroComplianceBadges
-                        worksafeAwaiting={worksafePending}
-                        sdsExpiring={sdsExpiring}
-                        drillsDue={drillsDue}
+                    )}
+                    {onReport && (
+                        <PageHeaderPrimaryButton icon={Plus} onClick={onReport}>
+                            Report
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    {(filters.lens === 'governance'
+                        ? outcomes
+                        : prevention
+                    ).map((meter) => (
+                        <PageHeaderMeterBlock
+                            key={meter.label}
+                            label={meter.label}
+                            {...(meter.href
+                                ? { href: meter.href }
+                                : {
+                                      onClick: () => setFleetAccessNotice(true),
+                                  })}
+                            ariaLabel={
+                                meter.href
+                                    ? meter.ariaLabel
+                                    : 'Explain restricted Fleet access'
+                            }
+                            tone={meter.tone}
+                        >
+                            <PageHeaderMeterBig>
+                                {meter.value}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {meter.caption}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ))}
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Period"
+                        value={period}
+                        allValue="30d"
+                        options={[
+                            { value: 'week', label: 'This week' },
+                            { value: '30d', label: '30 days' },
+                            { value: 'quarter', label: '90 days' },
+                            { value: 'custom', label: 'Custom range' },
+                        ]}
+                        onChange={(value) => {
+                            if (value === 'custom') changeDatesOpen(true);
+                            else go(presetRange(value));
+                        }}
                     />
-                </div>
-            </div>
-
-            {/* Stat clusters */}
-            <div className="grid gap-3 lg:grid-cols-2">
-                <HeroCluster title="Lagging · outcomes" icon={TrendingDown}>
-                    <HeroClusterTile
-                        href="/incidents"
-                        label="Incidents"
-                        value={fmt(lagging.incidents)}
-                        caption="this period"
-                        tone={lagging.incidents > 0 ? 'warning' : 'success'}
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/injuries"
-                        label="LTIFR"
-                        value={fmt(lagging.ltifr)}
-                        caption="per M hrs"
-                        tone="neutral"
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/injuries"
-                        label="TRIFR"
-                        value={fmt(lagging.trifr)}
-                        caption="per M hrs"
-                        tone="neutral"
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/injuries"
-                        label="Days LTI-free"
-                        value={fmt(lagging.days_since_lti)}
-                        caption="since last LTI"
-                        tone={
-                            (lagging.days_since_lti ?? 0) >= 30
-                                ? 'success'
-                                : 'warning'
+                    <Popover open={datesOpen} onOpenChange={changeDatesOpen}>
+                        <PopoverTrigger asChild>
+                            <PageHeaderGlassButton icon={CalendarDays}>
+                                Set dates
+                            </PageHeaderGlassButton>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            className="date-picker-popover space-y-3"
+                            data-compact
+                            aria-label="Safety overview period picker"
+                            collisionPadding={16}
+                            align="start"
+                        >
+                            <div
+                                role="group"
+                                aria-label="Safety overview period"
+                                className="space-y-3"
+                            >
+                                <h3 className="text-section-title">
+                                    Safety overview period
+                                </h3>
+                                <p className="text-subtle">
+                                    Choose a start and end day. Select the same
+                                    day twice for one day. Both dates are
+                                    included.
+                                </p>
+                                <div className="date-time-calendar scrollbar-pretty overflow-x-auto [&_button[aria-pressed]]:min-h-11 [&_button[aria-pressed]]:min-w-11">
+                                    <div className="min-w-[308px]">
+                                        <LeaveCalendarRange
+                                            key={calendarRevision}
+                                            start={customFrom || null}
+                                            end={customTo || null}
+                                            required={false}
+                                            onChange={(start, end) => {
+                                                setCustomFrom(start ?? '');
+                                                setCustomTo(end ?? '');
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-caption sm:hidden">
+                                    Scroll sideways to see more days if needed.
+                                </p>
+                                <p
+                                    role="status"
+                                    aria-live="polite"
+                                    className="text-subtle"
+                                >
+                                    {validRange
+                                        ? `${formatDateOnly(customFrom)} – ${formatDateOnly(customTo)} · inclusive`
+                                        : customFrom
+                                          ? `Starts ${formatDateOnly(customFrom)} · choose the end day`
+                                          : 'Choose the start day'}
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="frontline-tap"
+                                    onClick={() => setDatesOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    className="frontline-tap"
+                                    disabled={!validRange}
+                                    onClick={() => {
+                                        go({ from: customFrom, to: customTo });
+                                        setDatesOpen(false);
+                                    }}
+                                >
+                                    Apply range
+                                </Button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                    <PageHeaderFilterSelect
+                        label="Site"
+                        value={
+                            filters.site === null ? 'all' : String(filters.site)
+                        }
+                        options={[
+                            { value: 'all', label: 'All approved sites' },
+                            ...sites.map((site) => ({
+                                value: String(site.id),
+                                label: site.name,
+                            })),
+                        ]}
+                        onChange={(value) =>
+                            go({ site: value === 'all' ? null : Number(value) })
                         }
                     />
-                </HeroCluster>
-
-                <HeroCluster title="Leading · proactive" icon={Clock}>
-                    <HeroClusterTile
-                        href="/incidents?type=near_miss"
-                        label="Near-miss"
-                        value={fmt(leading.near_miss_ratio, '×')}
-                        caption=": incident"
-                        tone={
-                            (leading.near_miss_ratio ?? 0) >= 3
-                                ? 'success'
-                                : 'warning'
-                        }
+                    <PageHeaderFilterSelect
+                        label="Lens"
+                        value={filters.lens}
+                        allValue="manager"
+                        options={[
+                            { value: 'governance', label: 'Governance' },
+                            { value: 'manager', label: 'Manager' },
+                            { value: 'frontline', label: 'Frontline' },
+                        ]}
+                        onChange={(lens) => go({ lens })}
                     />
-                    <HeroClusterTile
-                        href="/health-safety/corrective-actions"
-                        label="Actions on time"
-                        value={fmt(leading.actions_on_time_pct, '%')}
-                        caption="30-day"
-                        tone={
-                            (leading.actions_on_time_pct ?? 0) >= 90
-                                ? 'success'
-                                : 'warning'
-                        }
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/worker-participation"
-                        label="Train / audit"
-                        value={fmt(leading.training_pct, '%')}
-                        caption="compliance"
-                        tone={
-                            (leading.training_pct ?? 0) >= 90
-                                ? 'success'
-                                : 'warning'
-                        }
-                    />
-                    <HeroClusterTile
-                        href="/compliance/hazards"
-                        label="Open hazards"
-                        value={fmt(leading.open_hazards)}
-                        caption="open now"
-                        tone={leading.open_hazards > 0 ? 'warning' : 'success'}
-                    />
-                </HeroCluster>
-            </div>
-
-            {/* Cross-module · related safety workflows reachable from the hub */}
-            <HeroCluster title="Across the safety system" icon={ShieldCheck}>
-                <HeroClusterTile
-                    href="/safeguarding"
-                    label="Safeguarding"
-                    value={fmt(openSafeguarding)}
-                    caption="open concerns"
-                    tone={openSafeguarding > 0 ? 'warning' : 'success'}
-                />
-                <HeroClusterTile
-                    href="/fleet-assets/incidents"
-                    label="Fleet incidents"
-                    value={fmt(fleetUnresolved)}
-                    caption="unresolved"
-                    tone={fleetUnresolved > 0 ? 'warning' : 'success'}
-                />
-                <HeroClusterTile
-                    href="/fleet-assets/incidents"
-                    label="Fleet · 30d"
-                    value={fmt(fleetIncidents30d)}
-                    caption="reported this period"
-                    tone={fleetIncidents30d > 0 ? 'warning' : 'success'}
-                />
-                <HeroClusterTile
-                    href="/health-safety/procedures"
-                    label="Procedures"
-                    value={fmt(procedures.approved)}
-                    caption={
-                        procedures.review_due > 0
-                            ? `${procedures.review_due} review due`
-                            : procedures.coverage_gap_categories > 0
-                              ? `${procedures.coverage_gap_categories} coverage gap${procedures.coverage_gap_categories === 1 ? '' : 's'}`
-                              : 'all in review window'
-                    }
-                    tone={
-                        procedures.coverage_gap_categories > 0
-                            ? 'critical'
-                            : procedures.review_due > 0
-                              ? 'warning'
-                              : 'success'
-                    }
-                />
-                <HeroClusterTile
-                    href="/health-safety/analytics"
-                    label="Analytics"
-                    value="View"
-                    caption="trends & root cause"
-                    tone="neutral"
-                />
-            </HeroCluster>
-        </HeroShell>
+                    {sourceCompleteness === 'unknown' && (
+                        <p
+                            role="status"
+                            className="text-subtle text-band-foreground"
+                        >
+                            These measures cover records you can access. The
+                            full picture may be incomplete.
+                        </p>
+                    )}
+                    {fleetAccessNotice &&
+                        (fleetUnresolved === null ||
+                            fleetIncidents30d === null) && (
+                            <p
+                                role="status"
+                                className="text-subtle text-band-foreground"
+                            >
+                                Fleet access is restricted for the selected
+                                sites. Health & Safety access does not grant
+                                Fleet record access.
+                            </p>
+                        )}
+                </>
+            }
+            mobileSummary="Safety overview · filters and measures"
+            rail={rail}
+        />
     );
 }
 
+/** Recorded counts and capped previews describe attention, never overall safety clearance. */
+export function CommandCentreAttention({
+    expiring,
+    ppeState,
+    worksafePending,
+    activeAlerts,
+}: AttentionProps) {
+    const ppeDue =
+        ppeState?.source_integrity === 'restricted'
+            ? 0
+            : expiring.filter(
+                  (item) =>
+                      item.type === 'ppe_inspection' ||
+                      item.type === 'ppe_expiry',
+              ).length;
+    const ppeLabel =
+        ppeState?.source_integrity === 'restricted'
+            ? 'PPE access restricted'
+            : ppeState?.source_integrity === 'repair_required'
+              ? 'PPE facts need review'
+              : !ppeState
+                ? 'PPE attention unconfirmed'
+                : ppeDue > 0
+                  ? String(ppeDue) +
+                    ' PPE due in preview' +
+                    (ppeState.truncated ? ' · more records' : '')
+                  : ppeState.truncated
+                    ? 'PPE preview incomplete'
+                    : 'No matching PPE due in preview';
+    const notices = [
+        {
+            label:
+                worksafePending === null
+                    ? 'WorkSafe review count unconfirmed'
+                    : String(worksafePending) + ' pending WorkSafe reviews',
+            href: '/health-safety/events',
+            tone: (worksafePending ?? 0) > 0 ? 'critical' : 'neutral',
+        },
+        {
+            label:
+                activeAlerts === null
+                    ? 'Lone-worker alert count unconfirmed'
+                    : String(activeAlerts) +
+                      ' recorded active lone-worker alerts',
+            href: '/health-safety/lone-workers',
+            tone: (activeAlerts ?? 0) > 0 ? 'critical' : 'neutral',
+        },
+        {
+            label:
+                String(expiring.filter((item) => item.type === 'sds').length) +
+                ' SDS reviews in preview',
+            href: '/health-safety/substances',
+            tone: 'neutral',
+        },
+        {
+            label:
+                String(
+                    expiring.filter((item) => item.type === 'drill').length,
+                ) + ' drills in preview',
+            href: '/health-safety/drills',
+            tone: 'neutral',
+        },
+        {
+            label: ppeLabel,
+            href: '/health-safety/ppe',
+            tone:
+                ppeDue > 0 || ppeState?.source_integrity === 'repair_required'
+                    ? 'warning'
+                    : 'neutral',
+        },
+    ] as const;
+    return (
+        <Card>
+            <CardContent className="space-y-3 p-4">
+                <h2 className="text-section-title">Safety attention</h2>
+                <p className="text-subtle">
+                    Recorded open work and due-item previews. Open the register
+                    for the full current scope.
+                </p>
+                <ul className="flex flex-wrap gap-3">
+                    {notices.map((notice) => (
+                        <li key={notice.href}>
+                            <Link
+                                href={notice.href}
+                                className="frontline-hit inline-flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <StatusBadge variant={notice.tone}>
+                                    {notice.label}
+                                </StatusBadge>
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            </CardContent>
+        </Card>
+    );
+}
 export default CommandCentreHero;
