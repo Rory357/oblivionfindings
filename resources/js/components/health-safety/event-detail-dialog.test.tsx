@@ -584,28 +584,182 @@ describe('Permanent safety review workspace', () => {
             />,
         );
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        // The record header (pg-hsn-41): the category and who it concerns, the reference in the sub-line.
         expect(
-            screen.getByRole('heading', { level: 1, name: 'HS-2026-0017' }),
+            screen.getByRole('heading', {
+                level: 1,
+                name: 'Incident — Kauri House',
+            }),
         ).toBeInTheDocument();
+        expect(screen.getByText(/HS-2026-0017 · Kauri House/)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Back/ })).toHaveAttribute(
             'href',
             '/health-safety/events?site_id=3',
         );
-        expect(screen.getByRole('tabpanel')).toHaveAttribute(
-            'aria-labelledby',
-            'safety-review-tab-overview',
+        expect(
+            screen.getByRole('tabpanel', { name: 'Overview' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'Owner' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'To close: 3 of 5 done' }),
+        ).toBeInTheDocument();
+        // Every closure blocker keeps its server wording and its direct link.
+        expect(
+            screen.getByRole('link', {
+                name: 'Accept the H&S handover before closing this event.',
+            }),
+        ).toHaveAttribute(
+            'href',
+            '/health-safety/events/17?action=accept-handover',
+        );
+        fireEvent.click(screen.getByRole('tab', { name: 'Investigation' }));
+        expect(onSectionChange).toHaveBeenCalledWith('investigation');
+        expect(inertia.post).not.toHaveBeenCalled();
+    });
+
+    it('offers each event action once in the record header and opens its pane without posting', () => {
+        const onPaneChange = vi.fn();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail()}
+                onPaneChange={onPaneChange}
+            />,
+        );
+        // Accept handover is the one primary; the signed decision update stays reachable under More.
+        expect(
+            screen.getAllByRole('button', { name: 'Accept handover' }),
+        ).toHaveLength(1);
+        expect(
+            screen.getByRole('button', { name: 'Close safety review' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', {
+                name: 'More safety review actions',
+            }),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Accept handover' }),
+        );
+        expect(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+        ).toBeInTheDocument();
+        expect(onPaneChange).toHaveBeenCalledWith(
+            { kind: 'accept_handover' },
+            'overview',
+        );
+        expect(inertia.post).not.toHaveBeenCalled();
+    });
+
+    it('tells a read-only viewer the next step without offering decisions', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    can: {
+                        manage: false,
+                        close: false,
+                        request_closure_exception: false,
+                        approve_closure_exception: false,
+                        manage_corrective_action_lifecycle: false,
+                        verify_corrective_actions: false,
+                    },
+                    worksafe: { can_decide: false },
+                    handover: {
+                        status: 'accepted',
+                        owner: { id: 8, name: 'Moana Rangi' },
+                        accepted_by: { id: 9, name: 'Tama Lewis' },
+                        accepted_at: '2026-07-14T02:15:00Z',
+                        notes: null,
+                        can_accept: false,
+                    },
+                } as EventDetailOverrides)}
+            />,
         );
         expect(
             screen.getByRole('heading', { name: 'Next step' }),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole('heading', { name: 'Closure requirements' }),
+            screen.getByText(
+                'You can read this review. Specialist decisions show here if you’re allowed to make them.',
+            ),
         ).toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole('button', { name: 'View investigations' }),
+        expect(
+            screen.queryByRole('button', { name: 'Accept handover' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Close safety review' }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('drives a corrective action from the review table menu through its pane, never in one click', () => {
+        const onPaneChange = vi.fn();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    corrective_actions: [
+                        {
+                            id: 62,
+                            reference_number: 'CA-2026-0062',
+                            title: 'Fit the new bathroom rail.',
+                            action_type: 'corrective',
+                            priority: 'high',
+                            status: 'in_progress',
+                            assigned_to_name: 'Moana Rangi',
+                            owner: { id: 8, name: 'Moana Rangi' },
+                            due_date: '2026-07-21',
+                            is_overdue: false,
+                            completed_at: null,
+                            completed_by_user_id: null,
+                            completed_by_name: null,
+                            can_verify: false,
+                            verified_at: null,
+                            verified_by_name: null,
+                            effectiveness_confirmed: null,
+                            hs_investigation_id: null,
+                            recommendation_index: null,
+                            recommendation: null,
+                            source: { type: 'standalone' },
+                            source_task: null,
+                            evidence: {
+                                can_upload: true,
+                                completion_notes: null,
+                                legacy_paths: [],
+                                completed_by: null,
+                                completed_at: null,
+                                load_state: 'loaded',
+                                attachments: [],
+                            },
+                            rework: { latest_reason: null },
+                            history: [],
+                        },
+                    ],
+                })}
+                initialSection="actions"
+                onPaneChange={onPaneChange}
+            />,
         );
-        expect(onSectionChange).toHaveBeenCalledWith('investigation');
+        expect(
+            screen.getByRole('link', { name: 'Fit the new bathroom rail.' }),
+        ).toHaveAttribute(
+            'href',
+            expect.stringContaining('/health-safety/corrective-actions/62'),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Options for CA-2026-0062' }),
+        );
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: /Mark complete/ }),
+        );
+        expect(onPaneChange).toHaveBeenCalledWith(
+            { kind: 'ca_complete', actionId: 62 },
+            'actions',
+        );
+        expect(
+            screen.getByRole('textbox', { name: /What was done/ }),
+        ).toBeInTheDocument();
         expect(inertia.post).not.toHaveBeenCalled();
+        expect(inertia.routerPost).not.toHaveBeenCalled();
     });
 
     it('keeps entered acceptance notes when the user cancels leaving, then discards only on confirmation', () => {
@@ -2348,7 +2502,7 @@ describe('Safety review originating incident return', () => {
         const detail = eventDetail();
         detail.source = { type: 'ClientIncident', id: 42, label: 'INC-2026-0042', url: '/incidents/42', unwired: false };
         render(<EventRecordWorkspace detail={detail} initialSection="overview" />);
-        const origin = screen.getByRole('link', { name: /Originating record.*INC-2026-0042/ });
+        const origin = screen.getByRole('link', { name: /From INC-2026-0042/ });
         const target = new URL(origin.getAttribute('href')!, 'https://example.invalid');
         expect(target.pathname).toBe('/incidents/42');
         expect(target.searchParams.get('return_to')).toBe(`/health-safety/events/${detail.id}?section=overview`);

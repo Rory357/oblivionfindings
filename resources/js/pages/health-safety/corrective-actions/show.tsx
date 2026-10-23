@@ -1,3 +1,6 @@
+/* One corrective action — the approved drawing pg-hsn-43 (Stephan, 23 Oct 2026): the action's five stages with the
+ * independent check as the next step, what we agreed told as a story, people and linked records beside it. The
+ * complete / verify / return / owner panes and their submissions are unchanged. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     ActionOwnerPane,
@@ -9,26 +12,51 @@ import {
     CompleteActionPane,
     ReturnActionPane,
     VerifyActionPane,
+    correctiveActionStage,
     type EventCorrectiveAction,
 } from '@/components/health-safety/event-detail-dialog';
 import {
     PageHeader,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
+import {
+    PageHeaderFacts,
+    PageHeaderStages,
+    type PageHeaderFact,
+    type PageHeaderNextStep,
+    type PageHeaderStage,
+} from '@/components/page/page-header-strip';
+import {
+    FactRows,
+    Log,
+    Note,
+    PeopleCards,
+    QuietLine,
+    RowList,
+    SideColumn,
+    Story,
+    Surface,
+    type PersonCardItem,
+    type SgTone,
+    type StoryFact,
+} from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     SafetyFormDraftContext,
     useSafetyForm,
     useSafetyWorkspaceDrafts,
 } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import {
+    formatDate,
+    formatDateOnly,
+    formatDateTime,
+    toDateInput,
+} from '@/lib/datetime';
 import {
     correctiveActionHref,
     safetyReviewReturn,
@@ -37,15 +65,19 @@ import {
 } from '@/lib/health-safety/navigation';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    CalendarDays,
     CheckCircle2,
     Clock,
-    FileText,
-    History,
+    Info,
     ListChecks,
-    Paperclip,
+    MapPin,
+    Plus,
+    RadioTower,
+    ShieldAlert,
     ShieldCheck,
+    type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 export type CorrectiveActionWorkspace = {
     action: EventCorrectiveAction & {
@@ -63,11 +95,6 @@ export type CorrectiveActionWorkspace = {
     ownership: ActionOwnership;
     can: Record<'start' | 'complete' | 'verify' | 'return' | 'close', boolean>;
 };
-const sections = [
-    { key: 'overview', label: 'Overview', icon: FileText },
-    { key: 'evidence', label: 'Evidence', icon: Paperclip },
-    { key: 'history', label: 'History', icon: History },
-] as const;
 const statuses: Record<string, string> = {
     open: 'Not started',
     in_progress: 'In progress',
@@ -75,6 +102,31 @@ const statuses: Record<string, string> = {
     verified: 'Verified',
     closed: 'Closed',
 };
+const REVIEW_STAGE: Record<string, string> = {
+    open: 'Open',
+    investigating: 'Investigating',
+    corrective_action: 'Corrective action',
+    monitoring: 'Monitoring',
+    closed: 'Closed',
+};
+const PRIORITY_TONE: Record<string, PageHeaderFact['tone']> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'critical',
+    critical: 'critical',
+};
+
+function capitalise(value: string): string {
+    return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
+}
+
+/** Tone of an action-history row, read from its words (returned = attention, added/verified/closed = done). */
+function historyTone(label: string): SgTone {
+    const text = label.toLowerCase();
+    if (/return|rework|reopen/.test(text)) return 'warning';
+    if (/added|created|verified|checked|closed/.test(text)) return 'success';
+    return 'info';
+}
 
 export default function CorrectiveActionShow({
     workspace,
@@ -86,18 +138,18 @@ export default function CorrectiveActionShow({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & Safety', href: '/health-safety' },
+                { title: 'Health & safety', href: '/health-safety' },
                 {
                     title: 'Corrective actions',
                     href: '/health-safety/corrective-actions',
                 },
                 {
-                    title: action.reference_number,
+                    title: action.title,
                     href: correctiveActionHref(action.id),
                 },
             ]}
         >
-            <Head title={`${action.reference_number} · Corrective action`} />
+            <Head title={`${action.title} · ${action.reference_number}`} />
             <ActionRecord
                 key={action.id}
                 workspace={workspace}
@@ -114,7 +166,7 @@ function ActionRecord({
     workspace: CorrectiveActionWorkspace;
     reviewId: number;
 }) {
-    const { action: ca, review, can } = workspace;
+    const { action: ca, review, can, ownership } = workspace;
     const pageUrl = usePage().url;
     const params = new URLSearchParams(
         pageUrl.split('?')[1]?.split('#')[0] ?? '',
@@ -176,7 +228,517 @@ function ActionRecord({
     const done = () => changeView('overview');
     const cancel = () => draft.request(done);
     const canOpenPane =
-        pane === 'owner' ? workspace.ownership.can_assign : pane && can[pane];
+        pane === 'owner' ? ownership.can_assign : pane && can[pane];
+
+    const owner = ca.owner?.name ?? null;
+    const reviewStage = REVIEW_STAGE[review.status] ?? capitalise(review.status);
+    const today = toDateInput(new Date());
+    const dueToday = !!ca.due_date && ca.due_date === today;
+    const overdue =
+        ca.is_overdue && ca.status !== 'verified' && ca.status !== 'closed';
+    const evidenceCount = loaded ? ca.evidence.attachments.length : 0;
+    const historyCount =
+        (loaded ? ca.history.length : 0) + ownership.history.length;
+
+    /* ---- header actions: one primary, the rest glass (each only when it can run) ---- */
+    type HeaderAction = {
+        key: string;
+        label: string;
+        icon?: LucideIcon;
+        run: () => void;
+        disabled?: boolean;
+    };
+    const lifecycle: HeaderAction[] = [
+        ...(can.verify
+            ? [
+                  {
+                      key: 'verify',
+                      label: 'Verify action',
+                      icon: ShieldCheck,
+                      run: () => select('overview', 'verify'),
+                  },
+              ]
+            : []),
+        ...(can.complete
+            ? [
+                  {
+                      key: 'complete',
+                      label: 'Mark complete',
+                      icon: CheckCircle2,
+                      run: () => select('overview', 'complete'),
+                  },
+              ]
+            : []),
+        ...(can.start
+            ? [
+                  {
+                      key: 'start',
+                      label: 'Start action',
+                      icon: Plus,
+                      disabled: command.processing,
+                      run: () => draft.request(() => setConfirmation('start')),
+                  },
+              ]
+            : []),
+        ...(can.close
+            ? [
+                  {
+                      key: 'close',
+                      label: 'Close action',
+                      icon: CheckCircle2,
+                      disabled: command.processing,
+                      run: () => draft.request(() => setConfirmation('close')),
+                  },
+              ]
+            : []),
+    ];
+    const ownerAction: HeaderAction | null = ownership.can_assign
+        ? {
+              key: 'owner',
+              label: ca.owner ? 'Hand over ownership' : 'Assign owner',
+              icon: Plus,
+              run: () => select('overview', 'owner'),
+          }
+        : null;
+    const primary: HeaderAction | null =
+        lifecycle[0] ?? (!ca.owner && ownerAction ? ownerAction : null);
+    const glass: HeaderAction[] = [
+        ...(can.return
+            ? [
+                  {
+                      key: 'return',
+                      label: 'Return for rework',
+                      run: () => select('overview', 'return'),
+                  },
+              ]
+            : []),
+        ...(ownerAction && ownerAction !== primary ? [ownerAction] : []),
+        ...lifecycle.slice(1),
+    ];
+
+    /* ---- the stage line and who does what next ---- */
+    const stage = correctiveActionStage(ca);
+    const stageState = (index: number): PageHeaderStage['state'] =>
+        ca.status === 'closed' || index < stage.stage
+            ? 'done'
+            : index === stage.stage
+              ? 'now'
+              : 'todo';
+    const steps: PageHeaderStage[] = [
+        {
+            label: 'Agreed',
+            meta: `From ${review.reference_number}`,
+            state: stageState(1),
+        },
+        {
+            label: 'Owner',
+            meta: owner ?? 'Needs an owner',
+            state: stageState(2),
+        },
+        {
+            label: 'Done',
+            meta: ca.completed_at
+                ? [
+                      ca.completed_by_name,
+                      formatDate(ca.completed_at),
+                  ]
+                      .filter(Boolean)
+                      .join(' · ')
+                : ca.status === 'in_progress'
+                  ? 'In progress'
+                  : undefined,
+            state: stageState(3),
+        },
+        {
+            label: 'Checked',
+            meta: ca.verified_at
+                ? [ca.verified_by_name, formatDate(ca.verified_at)]
+                      .filter(Boolean)
+                      .join(' · ')
+                : ca.status === 'completed'
+                  ? 'Waiting'
+                  : undefined,
+            state: stageState(4),
+        },
+        {
+            label: 'Closed',
+            meta: ca.closed_at ? formatDate(ca.closed_at) : undefined,
+            state: stageState(5),
+        },
+    ].map((step) => ({
+        ...step,
+        tone:
+            step.state === 'now' && stage.tone !== 'success'
+                ? stage.tone
+                : undefined,
+    }));
+    const dueNote = overdue
+        ? ' · overdue'
+        : dueToday
+          ? ' · due today'
+          : ca.due_date
+            ? ` · due ${formatDateOnly(ca.due_date)}`
+            : '';
+    const next: PageHeaderNextStep | null =
+        ca.status === 'closed'
+            ? null
+            : ownership.state === 'replacement_needed'
+              ? {
+                    label: 'Owner needs replacing',
+                    text: 'Choose a new owner',
+                    meta: 'The recorded owner needs replacement because their current role, employment or site access no longer supports this responsibility.',
+                    tone: 'warning',
+                }
+              : !ca.owner || ownership.state === 'unassigned'
+                ? {
+                      label: 'Needs an owner',
+                      text: 'Choose who owns this action',
+                      meta: 'Assign an accountable owner before starting this action.',
+                      tone: 'critical',
+                  }
+                : ca.status === 'completed'
+                  ? {
+                        label: `Next step${dueNote}`,
+                        text: 'Someone checks the work is done and working',
+                        meta: (
+                            <>
+                                Not <b>{owner}</b> (owner)
+                                {ca.completed_by_name &&
+                                ca.completed_by_name !== owner ? (
+                                    <>
+                                        {' '}
+                                        or <b>{ca.completed_by_name}</b> (did
+                                        it)
+                                    </>
+                                ) : null}{' '}
+                                — an independent check
+                            </>
+                        ),
+                        tone: 'warning',
+                    }
+                  : ca.status === 'verified'
+                    ? {
+                          label: 'Next step',
+                          text: 'Close the action',
+                          meta: ca.verified_by_name
+                              ? `Checked by ${ca.verified_by_name}`
+                              : undefined,
+                      }
+                    : {
+                          label: `Next step${dueNote}`,
+                          text:
+                              ca.status === 'open'
+                                  ? `${owner} starts the action`
+                                  : `${owner} finishes the work and adds evidence`,
+                          meta: 'Someone else checks it once it’s done',
+                          tone: overdue ? 'critical' : undefined,
+                      };
+
+    const facts: PageHeaderFact[] = [
+        {
+            value: capitalise(ca.priority),
+            label: 'Priority',
+            tone: PRIORITY_TONE[ca.priority] ?? 'neutral',
+        },
+        ...(!ca.owner
+            ? [
+                  {
+                      value: 'Needs an owner',
+                      label: 'Owner',
+                      tone: 'warning' as const,
+                  },
+              ]
+            : []),
+        {
+            value: ca.due_date ? formatDateOnly(ca.due_date) : 'Not recorded',
+            label: overdue ? 'Due · overdue' : 'Due',
+            tone: overdue ? 'critical' : dueToday ? 'warning' : undefined,
+        },
+    ];
+
+    /* ---- body ---- */
+    const sourceTask: ReactNode =
+        ca.source.type === 'unavailable' ? (
+            'The source task link needs review. Ask the H&S team to check the linked records.'
+        ) : ca.source.type === 'restricted' ? (
+            'The source operational task requires separate access.'
+        ) : workspace.source_task_url ? (
+            <Link
+                className="font-medium text-primary underline-offset-2 hover:underline"
+                href={workspace.source_task_url}
+            >
+                Open source operational task
+            </Link>
+        ) : null;
+
+    const storyFacts: StoryFact[] = [
+        {
+            icon: ShieldAlert,
+            text: `From ${review.reference_number} · ${reviewStage}`,
+        },
+        ...(review.site_name
+            ? [{ icon: MapPin, text: review.site_name }]
+            : []),
+        ...(ca.due_date
+            ? [
+                  {
+                      icon: CalendarDays,
+                      text: `Due ${formatDateOnly(ca.due_date)}`,
+                  },
+              ]
+            : []),
+        ...(ca.source.type === 'control_room_task'
+            ? [
+                  {
+                      icon: RadioTower,
+                      text: `Transferred from Control Room task: ${ca.source.reference} · ${ca.source.title}`,
+                  },
+              ]
+            : []),
+    ];
+    const storyParas: { h: string; t: ReactNode }[] = [
+        { h: 'The action', t: ca.description ?? ca.title },
+        ...(ca.recommendation ? [{ h: 'Why', t: ca.recommendation }] : []),
+        ...(ca.source.type === 'new_responsibility'
+            ? [
+                  {
+                      h: 'Why',
+                      t: `New responsibility: ${ca.source.reason ?? 'Reason not recorded'}`,
+                  },
+              ]
+            : []),
+        ...(sourceTask ? [{ h: 'Source task', t: sourceTask }] : []),
+        ...(ca.evidence.completion_notes
+            ? [
+                  {
+                      h: 'What was done',
+                      t: `${[
+                          ca.evidence.completed_by?.name ??
+                              ca.completed_by_name,
+                          ca.evidence.completed_at
+                              ? formatDateTime(ca.evidence.completed_at)
+                              : null,
+                      ]
+                          .filter(Boolean)
+                          .join(' · ')}${ca.evidence.completed_by || ca.evidence.completed_at ? ' – ' : ''}${ca.evidence.completion_notes}`,
+                  },
+              ]
+            : []),
+        ...(ca.rework.latest_reason
+            ? [{ h: 'Changes requested', t: ca.rework.latest_reason }]
+            : []),
+        ...(ca.effectiveness_confirmed !== null
+            ? [
+                  {
+                      h: 'Did it work?',
+                      t: `Effectiveness assessment: ${ca.effectiveness_confirmed ? 'Effective' : 'Not effective'}`,
+                  },
+              ]
+            : []),
+    ];
+    const evidenceShows =
+        ca.evidence.load_state === 'unavailable'
+            ? ca.status === 'completed'
+            : ca.evidence.attachments.length > 0 || ca.evidence.can_upload;
+
+    const main =
+        rawAction && !canOpenPane ? (
+            <Surface title="This action is unavailable">
+                <div className="space-y-3 px-[18px] pt-1 pb-4">
+                    <p className="text-sm text-muted-foreground">
+                        The record or your access has changed. Return to the
+                        action to see its current status.
+                    </p>
+                    <Button onClick={() => select('overview')}>
+                        Return to action
+                    </Button>
+                </div>
+            </Surface>
+        ) : pane ? (
+            <Surface aria-label="Current corrective action step">
+                <div className="p-5">
+                    {pane === 'owner' ? (
+                        <ActionOwnerPane
+                            actionId={ca.id}
+                            owner={ca.owner}
+                            ownership={ownership}
+                            onDone={done}
+                            onCancel={cancel}
+                        />
+                    ) : pane === 'complete' ? (
+                        <CompleteActionPane
+                            d={context}
+                            ca={ca}
+                            onDone={done}
+                            onCancel={cancel}
+                        />
+                    ) : pane === 'verify' ? (
+                        <VerifyActionPane
+                            d={context}
+                            ca={ca}
+                            onDone={done}
+                            onCancel={cancel}
+                        />
+                    ) : (
+                        <ReturnActionPane
+                            d={context}
+                            ca={ca}
+                            onDone={done}
+                            onCancel={cancel}
+                        />
+                    )}
+                </div>
+            </Surface>
+        ) : section === 'evidence' ? (
+            <>
+                <Story
+                    title="What was done"
+                    sub={
+                        ca.evidence.completed_by
+                            ? `Submitted by ${ca.evidence.completed_by.name}${ca.evidence.completed_at ? ` · ${formatDateTime(ca.evidence.completed_at)}` : ''}`
+                            : undefined
+                    }
+                    paras={[
+                        {
+                            h: 'Evidence it’s done',
+                            t:
+                                ca.evidence.completion_notes ??
+                                (loaded
+                                    ? 'No completion notes have been recorded.'
+                                    : 'Completion details are unavailable with your current access.'),
+                        },
+                    ]}
+                />
+                {evidenceShows ? (
+                    <Surface title="Files">
+                        <div className="px-[18px] pt-3 pb-4">
+                            <ActionEvidencePanel
+                                d={context}
+                                ca={ca}
+                                allowUpload={ca.evidence.can_upload}
+                            />
+                        </div>
+                    </Surface>
+                ) : (
+                    <QuietLine
+                        title="Files"
+                        text="No completion evidence has been uploaded."
+                    />
+                )}
+            </>
+        ) : section === 'history' ? (
+            <>
+                <ActionOwnershipHistory ownership={ownership} />
+                {ca.history.length ? (
+                    <Log
+                        title="Action history"
+                        limit={ca.history.length}
+                        items={[...ca.history].reverse().map((entry) => ({
+                            time: entry.occurred_at
+                                ? formatDateTime(entry.occurred_at)
+                                : '',
+                            tone: historyTone(entry.label),
+                            title: entry.label,
+                            sub:
+                                entry.actor || entry.detail ? (
+                                    <>
+                                        {entry.actor}
+                                        {entry.actor && entry.detail
+                                            ? ' · '
+                                            : ''}
+                                        {entry.detail ? (
+                                            <span className="whitespace-pre-wrap">
+                                                {entry.detail}
+                                            </span>
+                                        ) : null}
+                                    </>
+                                ) : undefined,
+                        }))}
+                    />
+                ) : ownership.history.length === 0 ? (
+                    <QuietLine
+                        title="Action history"
+                        text={
+                            loaded
+                                ? 'No action history is available.'
+                                : 'Action history is unavailable with your current access.'
+                        }
+                    />
+                ) : null}
+            </>
+        ) : (
+            <Story title="What we agreed" facts={storyFacts} paras={storyParas} />
+        );
+
+    const people: PersonCardItem[] = [
+        ...(owner ? [{ name: owner, sub: 'Accountable owner' }] : []),
+        ...(ca.completed_by_name
+            ? [
+                  {
+                      name: ca.completed_by_name,
+                      sub: `Did the work${ca.completed_at ? ` · ${formatDate(ca.completed_at)}` : ''}`,
+                  },
+              ]
+            : []),
+        ...(ca.verified_by_name
+            ? [
+                  {
+                      name: ca.verified_by_name,
+                      sub: `Checked it${ca.verified_at ? ` · ${formatDate(ca.verified_at)}` : ''}`,
+                  },
+              ]
+            : []),
+    ];
+    const noLifecycle = !Object.values(can).some(Boolean);
+    const side = pane ? (
+        <FactRows
+            title="Next step"
+            sub="Finish or cancel the current form before choosing another step."
+            action={{ label: 'Open safety review', href: review.url }}
+            rows={[
+                ['Safety review', `${review.reference_number} · ${reviewStage}`],
+            ]}
+        />
+    ) : (
+        <>
+            <Note icon={Info}>
+                Completing this action does not close its incident or safety
+                review. Verification remains a separate decision.
+            </Note>
+            {review.status === 'closed' && ca.status !== 'closed' ? (
+                <Note icon={ListChecks}>
+                    The safety review is closed. This action remains open until
+                    its own work and independent verification are finished.
+                </Note>
+            ) : null}
+            {noLifecycle ? (
+                <Note icon={Clock}>
+                    {ca.status === 'closed'
+                        ? 'This corrective action is closed.'
+                        : ca.status === 'completed'
+                          ? 'An authorised person independent of the action must review the completion evidence.'
+                          : 'The responsible H&S team manages the next step.'}
+                </Note>
+            ) : null}
+            {people.length ? (
+                <PeopleCards title="People" cols={1} items={people} />
+            ) : null}
+            <RowList
+                title="Linked records"
+                action={{ label: 'Open safety review', href: review.url }}
+                items={[
+                    {
+                        key: 'review',
+                        title: `Safety review ${review.reference_number}`,
+                        sub: reviewStage,
+                        href: review.url,
+                        leading: <ShieldAlert className="size-4" />,
+                    },
+                ]}
+            />
+        </>
+    );
+
     return (
         <SafetyFormDraftContext.Provider value={draft.register}>
             {draft.confirmation}
@@ -222,10 +784,9 @@ function ActionRecord({
                 hero={
                     <PageHeader
                         variant="profile"
-                        frontline
                         wrapTitle
                         icon={ListChecks}
-                        title={ca.reference_number}
+                        title={ca.title}
                         backHref={returnTo}
                         titleChip={
                             <PageHeaderStatusChip
@@ -246,76 +807,69 @@ function ActionRecord({
                             </PageHeaderStatusChip>
                         }
                         subline={[
+                            ca.reference_number,
                             review.site_name,
-                            ca.priority
-                                ? `${ca.priority[0].toUpperCase()}${ca.priority.slice(1)} priority`
+                            ca.due_date
+                                ? `Due ${formatDateOnly(ca.due_date)}`
                                 : null,
+                            owner ? `Owner ${owner}` : null,
                         ]
                             .filter(Boolean)
                             .join(' · ')}
-                        mobileSummary={status}
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Due date"
-                                    onClick={() => select('overview')}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {ca.due_date
-                                            ? formatDateOnly(ca.due_date)
-                                            : 'Not recorded'}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {ca.is_overdue
-                                            ? 'Overdue'
-                                            : 'Action deadline'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Evidence"
-                                    onClick={() => select('evidence')}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {loaded
-                                            ? ca.evidence.attachments.length
-                                            : 'Unavailable'}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {loaded
-                                            ? 'Retained files'
-                                            : 'Evidence is unavailable'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="History"
-                                    onClick={() => select('history')}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {loaded
-                                            ? ca.history.length +
-                                              workspace.ownership.history.length
-                                            : 'Unavailable'}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Recorded activity
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Safety review"
-                                    href={review.url}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {review.reference_number}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Open linked review
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
+                        actions={
+                            pane || !(primary || glass.length) ? undefined : (
+                                <>
+                                    {glass.map((item) => (
+                                        <PageHeaderGlassButton
+                                            key={item.key}
+                                            disabled={item.disabled}
+                                            onClick={item.run}
+                                        >
+                                            {item.label}
+                                        </PageHeaderGlassButton>
+                                    ))}
+                                    {primary ? (
+                                        <PageHeaderPrimaryButton
+                                            icon={primary.icon}
+                                            disabled={primary.disabled}
+                                            onClick={primary.run}
+                                        >
+                                            {primary.label}
+                                        </PageHeaderPrimaryButton>
+                                    ) : null}
+                                </>
+                            )
+                        }
+                        facts={<PageHeaderFacts items={facts} />}
+                        strip={
+                            !pane && !(rawAction && !canOpenPane) && next ? (
+                                <PageHeaderStages
+                                    steps={steps}
+                                    next={next}
+                                    ariaLabel="Corrective action stage"
+                                />
+                            ) : !pane && ca.status === 'closed' ? (
+                                <PageHeaderStages
+                                    steps={steps}
+                                    ariaLabel="Corrective action stage"
+                                />
+                            ) : undefined
                         }
                         rail={
-                            <PageHeaderRail
-                                items={[...sections]}
+                            <PageHeaderRail<CorrectiveActionSection>
+                                items={[
+                                    { key: 'overview', label: 'Overview' },
+                                    {
+                                        key: 'evidence',
+                                        label: 'Evidence',
+                                        count: evidenceCount || undefined,
+                                    },
+                                    {
+                                        key: 'history',
+                                        label: 'History',
+                                        count: historyCount || undefined,
+                                    },
+                                ]}
                                 value={section}
                                 onSelect={(key) => select(key)}
                                 ariaLabel="Corrective action sections"
@@ -324,358 +878,17 @@ function ActionRecord({
                     />
                 }
             >
-                <div className="grid min-w-0 gap-5 lg:grid-cols-3">
-                    <Card
-                        className={`min-w-0 lg:order-first lg:col-span-2 ${rawAction || section !== 'overview' ? 'order-first' : 'order-last'}`}
+                <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+                    <div className="grid min-w-0 gap-5">{main}</div>
+                    <aside
+                        className="min-w-0"
+                        aria-label="Corrective action people and links"
                     >
-                        <CardContent className="frontline-dialog p-5">
-                            {rawAction && !canOpenPane ? (
-                                <div className="space-y-3">
-                                    <h2 className="text-section-title">
-                                        This action is unavailable
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        The record or your access has changed.
-                                        Return to the action to see its current
-                                        status.
-                                    </p>
-                                    <Button
-                                        className="frontline-tap"
-                                        onClick={() => select('overview')}
-                                    >
-                                        Return to action
-                                    </Button>
-                                </div>
-                            ) : pane === 'owner' ? (
-                                <ActionOwnerPane
-                                    actionId={ca.id}
-                                    owner={ca.owner}
-                                    ownership={workspace.ownership}
-                                    onDone={done}
-                                    onCancel={cancel}
-                                />
-                            ) : pane === 'complete' ? (
-                                <CompleteActionPane
-                                    d={context}
-                                    ca={ca}
-                                    onDone={done}
-                                    onCancel={cancel}
-                                />
-                            ) : pane === 'verify' ? (
-                                <VerifyActionPane
-                                    d={context}
-                                    ca={ca}
-                                    onDone={done}
-                                    onCancel={cancel}
-                                />
-                            ) : pane === 'return' ? (
-                                <ReturnActionPane
-                                    d={context}
-                                    ca={ca}
-                                    onDone={done}
-                                    onCancel={cancel}
-                                />
-                            ) : section === 'evidence' ? (
-                                <div className="space-y-4">
-                                    <h2 className="text-section-title">
-                                        Completion evidence
-                                    </h2>
-                                    <p className="text-sm whitespace-pre-wrap">
-                                        {ca.evidence.completion_notes ??
-                                            (loaded
-                                                ? 'No completion notes have been recorded.'
-                                                : 'Completion details are unavailable with your current access.')}
-                                    </p>
-                                    <ActionEvidencePanel
-                                        d={context}
-                                        ca={ca}
-                                        allowUpload={ca.evidence.can_upload}
-                                    />
-                                    {ca.evidence.completed_by ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            Submitted by{' '}
-                                            {ca.evidence.completed_by.name}
-                                            {ca.evidence.completed_at
-                                                ? ` · ${formatDateTime(ca.evidence.completed_at)}`
-                                                : ''}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            ) : section === 'history' ? (
-                                <div className="space-y-4">
-                                    <h2 className="text-section-title">
-                                        Action history
-                                    </h2>
-                                    <ActionOwnershipHistory
-                                        ownership={workspace.ownership}
-                                    />
-                                    {ca.history.length ? (
-                                        <ol className="space-y-4">
-                                            {ca.history.map((entry, index) => (
-                                                <li
-                                                    key={`${entry.occurred_at}-${index}`}
-                                                >
-                                                    <p className="text-sm font-semibold">
-                                                        {entry.label}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {[
-                                                            entry.actor,
-                                                            entry.occurred_at
-                                                                ? formatDateTime(
-                                                                      entry.occurred_at,
-                                                                  )
-                                                                : null,
-                                                        ]
-                                                            .filter(Boolean)
-                                                            .join(' · ')}
-                                                    </p>
-                                                    {entry.detail ? (
-                                                        <p className="mt-1 text-sm whitespace-pre-wrap">
-                                                            {entry.detail}
-                                                        </p>
-                                                    ) : null}
-                                                </li>
-                                            ))}
-                                        </ol>
-                                    ) : workspace.ownership.history.length ===
-                                      0 ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            {loaded
-                                                ? 'No action history is available.'
-                                                : 'Action history is unavailable with your current access.'}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            ) : (
-                                <div className="space-y-5">
-                                    <h2 className="text-section-title">
-                                        {ca.title}
-                                    </h2>
-                                    {ca.description ? (
-                                        <p className="text-sm whitespace-pre-wrap">
-                                            {ca.description}
-                                        </p>
-                                    ) : null}
-                                    <dl className="grid gap-4 text-sm sm:grid-cols-2">
-                                        <div>
-                                            <dt className="text-muted-foreground">
-                                                Accountable owner
-                                            </dt>
-                                            <dd className="font-semibold">
-                                                {ca.owner?.name ?? 'Unassigned'}
-                                            </dd>
-                                        </div>
-                                        <div>
-                                            <dt className="text-muted-foreground">
-                                                Due date
-                                            </dt>
-                                            <dd>
-                                                {ca.due_date
-                                                    ? formatDateOnly(
-                                                          ca.due_date,
-                                                      )
-                                                    : 'Not recorded'}
-                                            </dd>
-                                        </div>
-                                        <div>
-                                            <dt className="text-muted-foreground">
-                                                Completed by
-                                            </dt>
-                                            <dd>
-                                                {ca.completed_by_name ??
-                                                    'Not recorded'}
-                                            </dd>
-                                        </div>
-                                        <div>
-                                            <dt className="text-muted-foreground">
-                                                Verified by
-                                            </dt>
-                                            <dd>
-                                                {ca.verified_by_name ??
-                                                    'Not verified'}
-                                            </dd>
-                                        </div>
-                                    </dl>
-                                    {ca.recommendation ? (
-                                        <section>
-                                            <h3 className="text-sm font-semibold">
-                                                Source recommendation
-                                            </h3>
-                                            <p className="mt-1 text-sm whitespace-pre-wrap">
-                                                {ca.recommendation}
-                                            </p>
-                                        </section>
-                                    ) : null}
-                                    {ca.source.type === 'unavailable' ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            The source task link needs review.
-                                            Ask the H&S team to check the linked
-                                            records.
-                                        </p>
-                                    ) : ca.source.type === 'restricted' ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            The source operational task requires
-                                            separate access.
-                                        </p>
-                                    ) : workspace.source_task_url ? (
-                                        <Link
-                                            className="frontline-tap inline-flex items-center font-medium text-primary"
-                                            href={workspace.source_task_url}
-                                        >
-                                            Open source operational task
-                                        </Link>
-                                    ) : null}
-                                    {ca.rework.latest_reason ? (
-                                        <section>
-                                            <h3 className="text-sm font-semibold">
-                                                Changes requested
-                                            </h3>
-                                            <p className="mt-1 text-sm whitespace-pre-wrap">
-                                                {ca.rework.latest_reason}
-                                            </p>
-                                        </section>
-                                    ) : null}
-                                    {ca.effectiveness_confirmed !== null ? (
-                                        <p className="text-sm">
-                                            Effectiveness assessment:{' '}
-                                            {ca.effectiveness_confirmed
-                                                ? 'Effective'
-                                                : 'Not effective'}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                    <Card className="min-w-0 self-start">
-                        <CardHeader>
-                            <CardTitle>Next step</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="text-sm font-semibold">{status}</p>
-                            {workspace.ownership.state ===
-                                'replacement_needed' ||
-                            workspace.ownership.state === 'unassigned' ? (
-                                <p className="text-sm text-muted-foreground">
-                                    {workspace.ownership.state ===
-                                    'replacement_needed'
-                                        ? 'The recorded owner needs replacement because their current role, employment or site access no longer supports this responsibility.'
-                                        : 'Assign an accountable owner before starting this action.'}
-                                </p>
-                            ) : null}
-                            {review.status === 'closed' &&
-                            ca.status !== 'closed' ? (
-                                <p className="text-sm text-muted-foreground">
-                                    The safety review is closed. This action
-                                    remains open until its own work and
-                                    independent verification are finished.
-                                </p>
-                            ) : null}
-                            {pane ? (
-                                <p className="text-sm text-muted-foreground">
-                                    Finish or cancel the current form before
-                                    choosing another step.
-                                </p>
-                            ) : (
-                                <>
-                                    {workspace.ownership.can_assign ? (
-                                        <Button
-                                            className="frontline-tap w-full"
-                                            variant="outline"
-                                            onClick={() =>
-                                                select('overview', 'owner')
-                                            }
-                                        >
-                                            {ca.owner
-                                                ? 'Hand over ownership'
-                                                : 'Assign owner'}
-                                        </Button>
-                                    ) : null}
-                                    {can.start ? (
-                                        <Button
-                                            className="frontline-tap w-full"
-                                            disabled={command.processing}
-                                            onClick={() =>
-                                                draft.request(() =>
-                                                    setConfirmation('start'),
-                                                )
-                                            }
-                                        >
-                                            Start action
-                                        </Button>
-                                    ) : null}
-                                    {can.complete ? (
-                                        <Button
-                                            className="frontline-tap w-full"
-                                            onClick={() =>
-                                                select('overview', 'complete')
-                                            }
-                                        >
-                                            Mark complete
-                                        </Button>
-                                    ) : null}
-                                    {can.verify ? (
-                                        <Button
-                                            className="frontline-tap w-full"
-                                            onClick={() =>
-                                                select('overview', 'verify')
-                                            }
-                                        >
-                                            <ShieldCheck className="mr-2 h-4 w-4" />
-                                            Verify action
-                                        </Button>
-                                    ) : null}
-                                    {can.return ? (
-                                        <Button
-                                            variant="outline"
-                                            className="frontline-tap w-full"
-                                            onClick={() =>
-                                                select('overview', 'return')
-                                            }
-                                        >
-                                            Return for rework
-                                        </Button>
-                                    ) : null}
-                                    {can.close ? (
-                                        <Button
-                                            className="frontline-tap w-full"
-                                            disabled={command.processing}
-                                            onClick={() =>
-                                                draft.request(() =>
-                                                    setConfirmation('close'),
-                                                )
-                                            }
-                                        >
-                                            Close action
-                                        </Button>
-                                    ) : null}
-                                    {!Object.values(can).some(Boolean) ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            {ca.status === 'closed'
-                                                ? 'This corrective action is closed.'
-                                                : ca.status === 'completed'
-                                                  ? 'An authorised person independent of the action must review the completion evidence.'
-                                                  : 'The responsible H&S team manages the next step.'}
-                                        </p>
-                                    ) : null}
-                                </>
-                            )}
-                            <Link
-                                href={review.url}
-                                className="frontline-tap inline-flex items-center text-sm font-medium text-primary"
-                            >
-                                Open safety review
-                            </Link>
-                            <p className="text-xs text-muted-foreground">
-                                Completing this action does not close its
-                                incident or safety review. Verification remains
-                                a separate decision.
-                            </p>
-                        </CardContent>
-                    </Card>
+                        <SideColumn>{side}</SideColumn>
+                    </aside>
                 </div>
             </PageLayout>
         </SafetyFormDraftContext.Provider>
     );
 }
+

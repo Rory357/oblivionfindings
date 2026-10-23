@@ -147,9 +147,10 @@ afterEach(() => {
     cleanup();
     vi.clearAllMocks();
     state.reports = true;
+    state.url = '/health-safety/events?site_id=1&q=HS';
 });
 
-it('uses one review header, six linked meters and the shared sibling rail', () => {
+it('uses one review header, four linked numbers and the shared sibling rail', () => {
     const props = reviewProps();
     render(<Reviews {...props} />);
     expect(document.querySelectorAll('header.eh-header')).toHaveLength(1);
@@ -157,7 +158,7 @@ it('uses one review header, six linked meters and the shared sibling rail', () =
     expect(
         screen.getByRole('tablist', { name: 'Actions & reviews views' }),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /^View / })).toHaveLength(6);
+    expect(screen.getAllByRole('button', { name: /^View / })).toHaveLength(4);
     fireEvent.click(
         screen.getByRole('button', { name: 'View investigation needed' }),
     );
@@ -221,7 +222,7 @@ it('retains all action refinements for attention meters and the distinct parent-
         screen.getByRole('link', { name: 'View reviews in monitoring' }),
     ).toHaveAttribute('href', props.monitoringReviewUrl);
     fireEvent.click(
-        screen.getByRole('button', { name: 'View high / critical open' }),
+        screen.getByRole('button', { name: 'View high or critical' }),
     );
     expect(state.get).toHaveBeenCalledWith(
         '/health-safety/corrective-actions',
@@ -316,11 +317,13 @@ it('keeps the review owner, source and workflow flags in readable mobile cards',
     expect(
         within(
             screen.getByRole('region', { name: 'Safety reviews table' }),
-        ).getByText('Review owner: Named review owner'),
+        ).getByText('Named review owner'),
     ).toBeInTheDocument();
 });
 
 it('keeps existing action work accessible after parent-review closure while blocking new actions there', () => {
+    // The register table is the List view; the board (pg-hsn-42) is the default.
+    state.url = '/health-safety/corrective-actions?view=list';
     const props = actionProps();
     const row: ActionRow = {
         id: 9,
@@ -381,4 +384,71 @@ it('keeps existing action work accessible after parent-review closure while bloc
     );
     expect(screen.getByText('Mark complete…')).toBeInTheDocument();
     expect(screen.queryByText('Add corrective action')).not.toBeInTheDocument();
+});
+
+it('shows actions on a board by stage with real column totals and opens the list lens for the rest', () => {
+    const props = actionProps();
+    props.tabCounts = {
+        ...props.tabCounts,
+        open: 4,
+        in_progress: 3,
+        awaiting_verification: 1,
+        unassigned: 1,
+        closed: 0,
+    };
+    props.actions.data = [
+        {
+            id: 12,
+            reference_number: 'CA-BOARD',
+            title: 'Fit an alarm to the laundry door',
+            action_type: 'corrective',
+            priority: 'medium',
+            status: 'in_progress',
+            assigned_to_name: 'Board owner',
+            due_date: '2026-10-30',
+            is_overdue: false,
+            completed_at: null,
+            verified_at: null,
+            completed_by_user_id: null,
+            completed_by_name: null,
+            can_verify: false,
+            evidence: { load_state: 'loaded', attachments: [] },
+            rework: { latest_reason: null },
+            recommendation: null,
+            source: { type: 'standalone' },
+            event: {
+                id: 8,
+                reference_number: 'HS-BOARD',
+                event_category: 'incident',
+                severity: 'medium',
+                status: 'corrective_action',
+                site_name: 'Kauri House',
+                url: '/health-safety/events/8',
+                monitoring: false,
+            },
+        },
+    ];
+    render(<Actions {...props} />);
+    const board = within(
+        screen.getByRole('region', { name: 'Corrective actions board' }),
+    );
+    const progress = within(board.getByRole('region', { name: 'In progress' }));
+    expect(
+        progress.getByText('Fit an alarm to the laundry door'),
+    ).toBeInTheDocument();
+    expect(progress.getByText('3')).toBeInTheDocument();
+    expect(
+        progress.getByRole('button', {
+            name: 'Lifecycle actions for CA-BOARD',
+        }),
+    ).toBeInTheDocument();
+    fireEvent.click(progress.getByRole('button', { name: '2 more' }));
+    expect(state.get).toHaveBeenCalledWith(
+        '/health-safety/corrective-actions',
+        { ...props.filters, tab: 'in_progress', view: 'list' },
+        { preserveScroll: true },
+    );
+    expect(
+        screen.queryByRole('region', { name: 'Corrective actions table' }),
+    ).not.toBeInTheDocument();
 });

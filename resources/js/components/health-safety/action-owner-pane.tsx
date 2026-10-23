@@ -1,8 +1,11 @@
+import { Log, Note } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useSafetyForm } from '@/hooks/use-safety-workspace-drafts';
 import { formatDateTime } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
+import { TriangleAlert, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export type ActionOwnership = {
@@ -20,6 +23,7 @@ export type ActionOwnership = {
 };
 type Person = { id: number; name: string };
 
+/** Owner changes as a log (pg-hsn-43c): when, who to whom, who changed it and the full reason. */
 export function ActionOwnershipHistory({
     ownership,
 }: {
@@ -27,30 +31,32 @@ export function ActionOwnershipHistory({
 }) {
     if (!ownership.history.length) return null;
     return (
-        <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Ownership handovers</h3>
-            <ol className="space-y-4">
-                {ownership.history.map((change) => (
-                    <li key={change.id} className="space-y-1 text-sm">
-                        <p className="font-medium">
-                            {change.previous_owner
-                                ? `${change.previous_owner} → ${change.owner}`
-                                : `Assigned to ${change.owner}`}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            {change.changed_by} ·{' '}
-                            {formatDateTime(change.changed_at)}
-                        </p>
-                        <p className="break-words whitespace-pre-wrap">
+        <Log
+            title="Owner changes"
+            limit={ownership.history.length}
+            items={ownership.history.map((change) => ({
+                time: formatDateTime(change.changed_at),
+                tone: 'info',
+                title: change.previous_owner
+                    ? `${change.previous_owner} → ${change.owner}`
+                    : `Assigned to ${change.owner}`,
+                sub: (
+                    <>
+                        {change.changed_by} ·{' '}
+                        <span className="break-words whitespace-pre-wrap">
                             {change.reason}
-                        </p>
-                    </li>
-                ))}
-            </ol>
-        </section>
+                        </span>
+                    </>
+                ),
+            }))}
+        />
     );
 }
 
+/**
+ * Change the owner (pg-hsn-43g). The submission is unchanged: the chosen person, the revision the user reviewed,
+ * one request identity kept across retries, and the reason.
+ */
 export function ActionOwnerPane({
     actionId,
     owner,
@@ -121,51 +127,53 @@ export function ActionOwnerPane({
                 );
             }}
         >
-            <div className="space-y-2">
-                <h2 className="text-section-title">
-                    Hand over action ownership
-                </h2>
+            {stale ? (
+                <Note tone="warning" icon={TriangleAlert}>
+                    <div role="alert" className="space-y-2">
+                        <p>
+                            Someone changed the owner while you were working.
+                            The new owner is shown below. Your choice and reason
+                            are still here.
+                        </p>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                form.setData(
+                                    'expected_revision',
+                                    ownership.revision,
+                                );
+                                form.setData(
+                                    'request_uuid',
+                                    crypto.randomUUID(),
+                                );
+                                form.clearErrors(
+                                    'expected_revision',
+                                    'request_uuid',
+                                );
+                                setRetry((value) => value + 1);
+                            }}
+                        >
+                            I have reviewed the current owner
+                        </Button>
+                    </div>
+                </Note>
+            ) : null}
+            <div className="space-y-1">
+                <h2 className="text-section-title">Change the owner</h2>
                 <p className="text-sm text-muted-foreground">
-                    The owner remains accountable for follow-through and
-                    evidence. Changing the owner keeps this action’s progress
-                    and the incident’s owner unchanged.
-                </p>
-                <p className="text-sm">
-                    Current owner:{' '}
-                    <strong>{owner?.name ?? 'Not assigned'}</strong>
+                    The owner is responsible for finishing the action and its
+                    evidence. Changing owner keeps the action’s progress and
+                    doesn’t change the incident’s owner.
                 </p>
             </div>
-            {stale ? (
-                <div
-                    role="alert"
-                    className="space-y-2 rounded-lg border p-3 text-sm"
-                >
-                    <p>
-                        Ownership changed while you were working. The current
-                        owner is shown above. Your selected person and reason
-                        have been kept.
-                    </p>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className="frontline-tap"
-                        onClick={() => {
-                            form.setData(
-                                'expected_revision',
-                                ownership.revision,
-                            );
-                            form.setData('request_uuid', crypto.randomUUID());
-                            form.clearErrors(
-                                'expected_revision',
-                                'request_uuid',
-                            );
-                            setRetry((value) => value + 1);
-                        }}
-                    >
-                        I have reviewed the current owner
-                    </Button>
-                </div>
-            ) : null}
+            <div className="space-y-1">
+                <p className="text-sm font-medium">Current owner</p>
+                <p className="text-sm font-semibold">
+                    {owner?.name ?? 'Not assigned'}
+                </p>
+            </div>
             <div className="space-y-2">
                 <label
                     htmlFor="action-owner-search"
@@ -173,9 +181,12 @@ export function ActionOwnerPane({
                 >
                     Find the next owner
                 </label>
+                <p className="text-caption text-muted-foreground">
+                    Search Health &amp; safety staff who can access this site ·
+                    shows up to 30
+                </p>
                 <Input
                     id="action-owner-search"
-                    className="frontline-tap"
                     type="search"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
@@ -183,10 +194,8 @@ export function ActionOwnerPane({
                     disabled={form.processing}
                     autoComplete="off"
                 />
-                <p className="text-xs text-muted-foreground">
-                    Search approved H&S staff with current access to this site.
-                    Up to 30 matches are shown.
-                </p>
+            </div>
+            <div className="space-y-2">
                 {loading ? (
                     <p role="status" className="text-sm">
                         Finding eligible owners…
@@ -199,7 +208,6 @@ export function ActionOwnerPane({
                         </p>
                         <Button
                             type="button"
-                            className="frontline-tap"
                             variant="outline"
                             onClick={() => setRetry((value) => value + 1)}
                         >
@@ -207,34 +215,51 @@ export function ActionOwnerPane({
                         </Button>
                     </div>
                 ) : options.length ? (
-                    <fieldset className="max-h-64 space-y-1 overflow-y-auto rounded-lg border p-2">
-                        <legend className="sr-only">
-                            Eligible action owners
+                    <fieldset className="space-y-2">
+                        <legend className="mb-2 text-sm font-medium">
+                            Who can own it
                         </legend>
-                        {options.map((option) => (
-                            <label
-                                key={option.id}
-                                className="frontline-tap flex cursor-pointer items-center gap-3 rounded-md px-2 text-sm focus-within:ring-2 focus-within:ring-ring"
-                            >
-                                <input
-                                    type="radio"
-                                    name="action-owner"
-                                    value={option.id}
-                                    checked={selected?.id === option.id}
-                                    disabled={form.processing}
-                                    onChange={() => {
-                                        setSelected(option);
-                                        form.setData(
-                                            'owner_user_id',
-                                            String(option.id),
-                                        );
-                                    }}
-                                />
-                                <span className="break-words">
-                                    {option.name}
-                                </span>
-                            </label>
-                        ))}
+                        <div className="grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-3">
+                            {options.map((option) => {
+                                const on = selected?.id === option.id;
+                                return (
+                                    <label
+                                        key={option.id}
+                                        className={cn(
+                                            'flex cursor-pointer items-center gap-3 rounded-lg border bg-card p-3 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-ring hover:bg-muted/50',
+                                            on
+                                                ? 'border-primary bg-primary-fill/10 text-primary'
+                                                : 'border-border',
+                                        )}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="action-owner"
+                                            value={option.id}
+                                            checked={on}
+                                            disabled={form.processing}
+                                            className="sr-only"
+                                            onChange={() => {
+                                                setSelected(option);
+                                                form.setData(
+                                                    'owner_user_id',
+                                                    String(option.id),
+                                                );
+                                            }}
+                                        />
+                                        <span
+                                            aria-hidden="true"
+                                            className="grid size-7 shrink-0 place-items-center rounded-full bg-muted"
+                                        >
+                                            <UserRound className="size-3.5" />
+                                        </span>
+                                        <span className="min-w-0 break-words">
+                                            {option.name}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
                     </fieldset>
                 ) : (
                     <p role="status" className="text-sm">
@@ -242,9 +267,10 @@ export function ActionOwnerPane({
                     </p>
                 )}
                 {selected ? (
-                    <p className="text-sm font-medium">
-                        Selected: {selected.name}
-                    </p>
+                    <div className="space-y-1 pt-1">
+                        <p className="text-sm font-medium">Selected</p>
+                        <p className="text-sm font-semibold">{selected.name}</p>
+                    </div>
                 ) : null}
                 {form.errors.owner_user_id ? (
                     <p role="alert" className="text-sm text-destructive">
@@ -257,10 +283,22 @@ export function ActionOwnerPane({
                     htmlFor="action-owner-reason"
                     className="text-sm font-medium"
                 >
-                    Reason for the handover
+                    Why you’re changing owner
+                    <span aria-hidden="true" className="text-status-critical">
+                        {' '}
+                        *
+                    </span>
                 </label>
+                <p
+                    id="action-owner-reason-hint"
+                    className="text-caption text-muted-foreground"
+                >
+                    Say what the new owner needs to follow up. This reason is
+                    kept in the owner history.
+                </p>
                 <Textarea
                     id="action-owner-reason"
+                    aria-describedby="action-owner-reason-hint"
                     value={form.data.reason}
                     onChange={(event) =>
                         form.setData('reason', event.target.value)
@@ -270,10 +308,6 @@ export function ActionOwnerPane({
                     disabled={form.processing}
                     rows={4}
                 />
-                <p className="text-xs text-muted-foreground">
-                    Include what the next owner needs to follow up. This reason
-                    is retained in the action’s ownership history.
-                </p>
                 {form.errors.reason ? (
                     <p role="alert" className="text-sm text-destructive">
                         {form.errors.reason}
@@ -290,9 +324,16 @@ export function ActionOwnerPane({
                     {form.errors.request_uuid}
                 </p>
             ) : null}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap justify-end gap-2">
                 <Button
-                    className="frontline-tap"
+                    type="button"
+                    variant="outline"
+                    disabled={form.processing}
+                    onClick={onCancel}
+                >
+                    Cancel
+                </Button>
+                <Button
                     type="submit"
                     disabled={
                         form.processing ||
@@ -302,15 +343,6 @@ export function ActionOwnerPane({
                     }
                 >
                     {form.processing ? 'Saving handover…' : 'Confirm handover'}
-                </Button>
-                <Button
-                    className="frontline-tap"
-                    type="button"
-                    variant="outline"
-                    disabled={form.processing}
-                    onClick={onCancel}
-                >
-                    Cancel
                 </Button>
             </div>
         </form>

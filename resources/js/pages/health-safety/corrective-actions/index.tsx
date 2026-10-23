@@ -12,13 +12,15 @@ import {
 } from '@/components/health-safety/workspace-header';
 import {
     PageHeader,
-    PageHeaderFilterCheck,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
 } from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -26,22 +28,34 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
+import {
+    PersonChip,
+    Ring,
+    Surface,
+    type SgTone,
+} from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { Field, SelectInput } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly } from '@/lib/datetime';
+import { formatDate, formatDateOnly, toDateInput } from '@/lib/datetime';
 import {
     correctiveActionHref,
     safetyReviewHref,
 } from '@/lib/health-safety/navigation';
 import { cn } from '@/lib/utils';
-import { fmt, type Tone } from '@/pages/health-safety/components/hs-hero-kit';
+import { type Tone } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     entityTone,
     FlagBadge,
     initials,
-    RegisterTableHeader,
     titleCase,
     TONE_BG,
     TONE_DOT,
@@ -53,6 +67,7 @@ import {
     CheckCircle2,
     ClipboardCheck,
     Clock,
+    Columns3,
     Eye,
     FileText,
     Flame,
@@ -61,10 +76,10 @@ import {
     HeartPulse,
     LayoutList,
     Link2,
+    List,
     ListChecks,
     Lock,
     MoreVertical,
-    MousePointer2,
     Play,
     Plus,
     RotateCcw,
@@ -72,6 +87,7 @@ import {
     Shield,
     ShieldAlert,
     ShieldCheck,
+    SlidersHorizontal,
     Truck,
     UserRound,
     Wrench,
@@ -294,18 +310,38 @@ export default function CorrectiveActionsIndex({
         pane: ActionPane;
     } | null>(null);
 
+    // Board (default, pg-hsn-42) or the register List; the choice rides in the URL with the filters.
+    const view: 'board' | 'list' =
+        new URLSearchParams(pageUrl.split('?')[1]?.split('#')[0] ?? '').get(
+            'view',
+        ) === 'list'
+            ? 'list'
+            : 'board';
+    const keepView = view === 'list' ? { view: 'list' } : {};
+
     const go = (next: Partial<Filters>) =>
         router.get(
             '/health-safety/corrective-actions',
-            { ...filters, ...next },
+            { ...filters, ...next, ...keepView },
             { preserveState: true, preserveScroll: true, replace: true },
         );
 
-    const setTab = (id: string) =>
+    const setTab = (id: string, nextView: 'board' | 'list' = view) =>
         router.get(
             '/health-safety/corrective-actions',
-            { ...filters, tab: id },
+            {
+                ...filters,
+                tab: id,
+                ...(nextView === 'list' ? { view: 'list' } : {}),
+            },
             { preserveScroll: true },
+        );
+
+    const setView = (nextView: 'board' | 'list') =>
+        router.get(
+            '/health-safety/corrective-actions',
+            { ...filters, ...(nextView === 'list' ? { view: 'list' } : {}) },
+            { preserveState: true, preserveScroll: true, replace: true },
         );
 
     // Normal entry opens a permanent page; the filtered register remains the return.
@@ -363,7 +399,7 @@ export default function CorrectiveActionsIndex({
     const clearFilters = () =>
         router.get(
             '/health-safety/corrective-actions',
-            { tab },
+            { tab, ...keepView },
             { preserveState: true, preserveScroll: true, replace: true },
         );
 
@@ -531,14 +567,19 @@ export default function CorrectiveActionsIndex({
         });
     };
 
-    const live = hero.live;
     const attention = hero.attention;
     const tableTitle = TABLE_TITLE[tab] ?? 'Corrective actions';
+    const moreFilterCount = [filters.priority, filters.unassigned].filter(
+        Boolean,
+    ).length;
+    const openAction = (id: number) =>
+        router.visit(correctiveActionHref(id, { returnTo: pageUrl }));
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 {
                     title: 'Corrective actions',
                     href: '/health-safety/corrective-actions',
@@ -548,14 +589,12 @@ export default function CorrectiveActionsIndex({
             <Head title="Corrective actions" />
 
             <div className="flex w-full max-w-full min-w-0 flex-col gap-5">
-                {/* ---- Hero ---- */}
+                {/* ---- Header (pg-hsn-42) ---- */}
                 <PageHeader
-                    frontline
                     wrapTitle
                     icon={ListChecks}
                     title="Corrective actions"
-                    subline="Agree the work, name an owner and verify the outcome"
-                    mobileSummary={`${attention.overdue} overdue · ${live.awaiting_verification} awaiting verification`}
+                    subline="Agree the work, name an owner and check it’s done"
                     actions={
                         <>
                             <SafetyRegisterSearch
@@ -576,79 +615,48 @@ export default function CorrectiveActionsIndex({
                             )}
                         </>
                     }
-                    meters={
-                        <div className="grid w-full grid-cols-2 gap-px lg:grid-cols-3 xl:grid-cols-6">
-                            {[
-                                {
-                                    key: 'open',
-                                    label: 'Open',
-                                    value: live.open,
-                                    caption: 'Not yet started',
-                                },
-                                {
-                                    key: 'awaiting_verification',
-                                    label: 'Awaiting verification',
-                                    value: live.awaiting_verification,
-                                    caption: 'Independent check needed',
-                                },
-                                {
-                                    key: 'overdue',
-                                    label: 'Overdue',
-                                    value: attention.overdue,
-                                    caption: 'Past the due date',
-                                },
-                                {
-                                    key: 'critical_open',
-                                    label: 'High / critical open',
-                                    value: attention.critical_open,
-                                    caption: 'Not verified or closed',
-                                },
-                                {
-                                    key: 'unassigned',
-                                    label: 'Needs an owner',
-                                    value: attention.unassigned,
-                                    caption: 'Open work without an owner',
-                                },
-                            ].map((meter) => (
-                                <PageHeaderMeterBlock
-                                    key={meter.key}
-                                    label={meter.label}
-                                    pressed={tab === meter.key}
-                                    onClick={() => setTab(meter.key)}
-                                    tone={
-                                        ['overdue', 'critical_open'].includes(
-                                            meter.key,
-                                        ) && meter.value > 0
-                                            ? 'critical'
-                                            : meter.key === 'unassigned' &&
-                                                meter.value > 0
-                                              ? 'warning'
-                                              : 'brand'
-                                    }
-                                >
-                                    <PageHeaderMeterBig>
-                                        {fmt(meter.value)}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {meter.caption}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            ))}
-                            <PageHeaderMeterBlock
+                    strip={
+                        <PageHeaderNumbers>
+                            <PageHeaderNumber
+                                value={attention.overdue}
+                                label="Overdue"
+                                caption="Past the due date"
+                                tone={attention.overdue ? 'critical' : undefined}
+                                pressed={tab === 'overdue'}
+                                onClick={() => setTab('overdue')}
+                            />
+                            <PageHeaderNumber
+                                value={attention.critical_open}
+                                label="High or critical"
+                                caption="Not yet checked or closed"
+                                tone={
+                                    attention.critical_open
+                                        ? 'critical'
+                                        : undefined
+                                }
+                                pressed={tab === 'critical_open'}
+                                onClick={() => setTab('critical_open')}
+                            />
+                            <PageHeaderNumber
+                                value={attention.monitoring_events}
                                 label="Reviews in monitoring"
+                                caption="With matching actions"
                                 href={monitoringReviewUrl}
-                            >
-                                <PageHeaderMeterBig>
-                                    {fmt(attention.monitoring_events)}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    With matching actions
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                        </div>
+                            />
+                        </PageHeaderNumbers>
                     }
                     filters={
                         <>
+                            {sites.length > 0 && (
+                                <EntityFilter
+                                    label="Site"
+                                    allLabel="All sites"
+                                    items={sites}
+                                    value={filters.site_id}
+                                    onChange={(site_id) => go({ site_id })}
+                                    onDark
+                                />
+                            )}
                             <PageHeaderFilterSelect
                                 label="Action view"
                                 value={tab}
@@ -666,7 +674,7 @@ export default function CorrectiveActionsIndex({
                                     value: item.id,
                                     label: `${item.label} (${tabCounts[item.id] ?? 0})`,
                                 }))}
-                                onChange={setTab}
+                                onChange={(id) => setTab(id)}
                             />
                             <SafetyDateFilter
                                 label="Due"
@@ -674,46 +682,66 @@ export default function CorrectiveActionsIndex({
                                 to={filters.to}
                                 onChange={go}
                             />
-                            {sites.length > 0 && (
-                                <EntityFilter
-                                    label="Site"
-                                    allLabel="All sites"
-                                    items={sites}
-                                    value={filters.site_id}
-                                    onChange={(site_id) => go({ site_id })}
-                                    onDark
-                                />
-                            )}
-                            <PageHeaderFilterSelect
-                                label="Priority"
-                                value={filters.priority ?? 'all'}
-                                options={[
-                                    { value: 'all', label: 'All priorities' },
-                                    {
-                                        value: 'high,critical',
-                                        label: 'High / critical',
-                                    },
-                                    ...Object.entries(PRI).map(
-                                        ([value, { label }]) => ({
-                                            value,
-                                            label,
-                                        }),
-                                    ),
-                                ]}
-                                onChange={(value) =>
-                                    go({
-                                        priority:
-                                            value === 'all' ? null : value,
-                                    })
-                                }
-                            />
-                            <PageHeaderFilterCheck
-                                label="Without an owner"
-                                checked={!!filters.unassigned}
-                                onChange={(value) =>
-                                    go({ unassigned: value || null })
-                                }
-                            />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <PageHeaderFilterButton
+                                        icon={SlidersHorizontal}
+                                        active={moreFilterCount > 0}
+                                    >
+                                        {moreFilterCount
+                                            ? `More filters · ${moreFilterCount}`
+                                            : 'More filters'}
+                                    </PageHeaderFilterButton>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="start"
+                                    className="w-80 max-w-[calc(100vw-2rem)] space-y-4"
+                                >
+                                    <Field label="Priority">
+                                        <SelectInput
+                                            ariaLabel="Priority"
+                                            placeholder="All priorities"
+                                            value={filters.priority ?? 'all'}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'All priorities',
+                                                },
+                                                {
+                                                    value: 'high,critical',
+                                                    label: 'High / critical',
+                                                },
+                                                ...Object.entries(PRI).map(
+                                                    ([value, { label }]) => ({
+                                                        value,
+                                                        label,
+                                                    }),
+                                                ),
+                                            ]}
+                                            onChange={(value) =>
+                                                go({
+                                                    priority:
+                                                        value === 'all'
+                                                            ? null
+                                                            : value,
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                    <label className="flex items-center gap-2 text-sm font-medium">
+                                        <Checkbox
+                                            checked={!!filters.unassigned}
+                                            onCheckedChange={(value) =>
+                                                go({
+                                                    unassigned:
+                                                        value === true || null,
+                                                })
+                                            }
+                                        />
+                                        Without an owner
+                                    </label>
+                                </PopoverContent>
+                            </Popover>
                             {hasFilters && (
                                 <PageHeaderGlassButton
                                     icon={X}
@@ -729,37 +757,69 @@ export default function CorrectiveActionsIndex({
                     }
                 />
 
-                {/* ---- Table ---- */}
-                <section className="max-w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                    <RegisterTableHeader
-                        icon={Wrench}
-                        title={tableTitle}
-                        subtitle="the verification view"
-                        hint="Right-click or ⋮ for the full lifecycle"
-                        hintIcon={MousePointer2}
-                    />
-                    <ActionTable
-                        rows={actions.data}
-                        canViewReports={!!can.viewReports}
-                        onOpen={(id) =>
-                            router.visit(
-                                correctiveActionHref(id, { returnTo: pageUrl }),
-                            )
-                        }
-                        onMenu={openMenu}
-                    />
-                </section>
+                <TierTwoTabs
+                    tabs={[
+                        { key: 'board', label: 'Board', icon: Columns3 },
+                        { key: 'list', label: 'List', icon: List },
+                    ]}
+                    activeTab={view}
+                    onTab={(key) => setView(key === 'list' ? 'list' : 'board')}
+                    testIdPrefix="corrective-actions-view"
+                    ariaLabel="Corrective action views"
+                    renderLink={() => null}
+                />
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-muted-foreground">
-                        {actions.total > 0
-                            ? `Showing ${actions.from}–${actions.to} of ${actions.total}`
-                            : 'No corrective actions found'}
-                    </p>
-                    {actions.last_page > 1 ? (
-                        <LaravelPagination links={actions.links} />
-                    ) : null}
-                </div>
+                {view === 'board' ? (
+                    actions.data.length ? (
+                        <ActionBoard
+                            rows={actions.data}
+                            tab={tab}
+                            tabCounts={tabCounts}
+                            unassigned={attention.unassigned}
+                            total={actions.total}
+                            morePages={actions.last_page > 1}
+                            onOpen={openAction}
+                            onMenu={openMenu}
+                            onColumn={(id) => setTab(id, 'list')}
+                        />
+                    ) : (
+                        <Surface>
+                            <ActionTable
+                                rows={[]}
+                                canViewReports={!!can.viewReports}
+                                onOpen={openAction}
+                                onMenu={openMenu}
+                            />
+                        </Surface>
+                    )
+                ) : (
+                    <>
+                        <Surface
+                            title={tableTitle}
+                            sub="The verification view · right-click or ⋮ for the full lifecycle"
+                        >
+                            <div className="mt-3">
+                                <ActionTable
+                                    rows={actions.data}
+                                    canViewReports={!!can.viewReports}
+                                    onOpen={openAction}
+                                    onMenu={openMenu}
+                                />
+                            </div>
+                        </Surface>
+
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm text-muted-foreground">
+                                {actions.total > 0
+                                    ? `Showing ${actions.from}–${actions.to} of ${actions.total}`
+                                    : 'No corrective actions found'}
+                            </p>
+                            {actions.last_page > 1 ? (
+                                <LaravelPagination links={actions.links} />
+                            ) : null}
+                        </div>
+                    </>
+                )}
             </div>
 
             {ctx ? (
@@ -778,6 +838,302 @@ export default function CorrectiveActionsIndex({
                 />
             ) : null}
         </AppLayout>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Board (pg-hsn-42)                                                  */
+/* ------------------------------------------------------------------ */
+
+const PRIORITY_VARIANT: Record<string, StatusVariant> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'critical',
+    critical: 'critical',
+};
+
+type BoardColumn = {
+    key: string;
+    title: string;
+    /** The List view lens behind "N more". */
+    tab: string;
+    tone?: SgTone;
+    sub?: string;
+    count: number;
+    match: (action: ActionRow) => boolean;
+};
+
+const DAY_MS = 86_400_000;
+
+function needsOwner(action: ActionRow): boolean {
+    return (
+        !action.assigned_to_name &&
+        action.status !== 'verified' &&
+        action.status !== 'closed'
+    );
+}
+
+/**
+ * The actions by stage — Needs an owner, To do, In progress, Waiting to be checked, Checked and closed — so the
+ * independent check before an action closes is a column you can see. Column counts are the register's real totals
+ * (same filters); the cards are the ones on this page of the register, and "N more" opens the List on that lens.
+ */
+export function ActionBoard({
+    rows,
+    tab,
+    tabCounts,
+    unassigned,
+    total,
+    morePages,
+    onOpen,
+    onMenu,
+    onColumn,
+}: {
+    rows: ActionRow[];
+    tab: string;
+    tabCounts: Record<string, number>;
+    unassigned: number;
+    total: number;
+    morePages: boolean;
+    onOpen: (id: number) => void;
+    onMenu: (action: ActionRow, x: number, y: number) => void;
+    onColumn: (tab: string) => void;
+}) {
+    const today = toDateInput(new Date());
+    // Real totals only on the unfiltered lens; a lens (Overdue, a stage …) counts what it shows.
+    const totals = tab === 'all';
+    const columns: BoardColumn[] = [
+        {
+            key: 'unassigned',
+            title: 'Needs an owner',
+            tab: 'unassigned',
+            tone: 'warning',
+            count: tabCounts.unassigned ?? unassigned,
+            match: needsOwner,
+        },
+        {
+            key: 'open',
+            title: 'To do',
+            tab: 'open',
+            count: tabCounts.open ?? 0,
+            match: (action) => action.status === 'open' && !needsOwner(action),
+        },
+        {
+            key: 'in_progress',
+            title: 'In progress',
+            tab: 'in_progress',
+            count: tabCounts.in_progress ?? 0,
+            match: (action) =>
+                action.status === 'in_progress' && !needsOwner(action),
+        },
+        {
+            key: 'completed',
+            title: 'Waiting to be checked',
+            tab: 'awaiting_verification',
+            tone: 'info',
+            sub: 'Someone other than the owner checks it',
+            count: tabCounts.awaiting_verification ?? 0,
+            match: (action) =>
+                action.status === 'completed' && !needsOwner(action),
+        },
+        {
+            key: 'checked',
+            title: 'Checked and closed',
+            tab:
+                (tabCounts.verified ?? 0) >
+                rows.filter((action) => action.status === 'verified').length
+                    ? 'verified'
+                    : 'closed',
+            tone: 'success',
+            count: (tabCounts.verified ?? 0) + (tabCounts.closed ?? 0),
+            match: (action) =>
+                action.status === 'verified' || action.status === 'closed',
+        },
+    ];
+    const placed = new Set<number>();
+
+    return (
+        <section aria-label="Corrective actions board" className="grid gap-5">
+            {morePages ? (
+                <p className="text-sm text-muted-foreground">
+                    The board shows the first {rows.length} of {total} matching
+                    actions. Open the List for every one.
+                </p>
+            ) : null}
+            <div className="grid items-start gap-5 md:grid-cols-3 xl:grid-cols-5">
+                {columns.map((column) => {
+                    const cards = rows.filter((action) => {
+                        if (placed.has(action.id) || !column.match(action))
+                            return false;
+                        placed.add(action.id);
+                        return true;
+                    });
+                    const count = totals ? column.count : cards.length;
+                    const shown = cards.slice(0, 3);
+                    const more = count - shown.length;
+                    return (
+                        <section
+                            key={column.key}
+                            aria-label={column.title}
+                            className="grid gap-3 rounded-2xl border border-border bg-muted/40 p-3"
+                        >
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    {column.tone ? (
+                                        <Ring tone={column.tone} />
+                                    ) : null}
+                                    <h3 className="min-w-0 flex-1 text-sm font-semibold">
+                                        {column.title}
+                                    </h3>
+                                    <span className="rounded-md bg-card px-1.5 text-caption font-semibold text-muted-foreground tabular-nums">
+                                        {count}
+                                    </span>
+                                </div>
+                                {column.sub ? (
+                                    <p className="mt-1 text-caption text-muted-foreground">
+                                        {column.sub}
+                                    </p>
+                                ) : null}
+                            </div>
+                            {shown.length ? (
+                                <ul className="grid gap-2.5">
+                                    {shown.map((action) => (
+                                        <BoardCard
+                                            key={action.id}
+                                            action={action}
+                                            today={today}
+                                            onOpen={onOpen}
+                                            onMenu={onMenu}
+                                        />
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-caption text-muted-foreground">
+                                    {count ? 'Not on this page' : 'Nothing here'}
+                                </p>
+                            )}
+                            {more > 0 ? (
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto justify-start px-0"
+                                    onClick={() => onColumn(column.tab)}
+                                >
+                                    {more} more
+                                </Button>
+                            ) : null}
+                        </section>
+                    );
+                })}
+            </div>
+        </section>
+    );
+}
+
+function BoardCard({
+    action,
+    today,
+    onOpen,
+    onMenu,
+}: {
+    action: ActionRow;
+    today: string;
+    onOpen: (id: number) => void;
+    onMenu: (action: ActionRow, x: number, y: number) => void;
+}) {
+    const overdue =
+        action.is_overdue &&
+        action.status !== 'verified' &&
+        action.status !== 'closed';
+    const daysOverdue =
+        overdue && action.due_date
+            ? Math.max(
+                  1,
+                  Math.round(
+                      (Date.parse(today) - Date.parse(action.due_date)) /
+                          DAY_MS,
+                  ),
+              )
+            : 0;
+    const context =
+        overdue && daysOverdue
+            ? `${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue`
+            : action.status === 'completed' && action.completed_at
+              ? `done ${formatDate(action.completed_at)}`
+              : (action.status === 'verified' || action.status === 'closed') &&
+                  action.verified_at
+                ? `checked ${formatDate(action.verified_at)}`
+                : (action.event?.site_name ?? null);
+    const due = action.due_date
+        ? action.due_date === today
+            ? 'Today'
+            : formatDate(`${action.due_date}T00:00:00`)
+        : null;
+    const priority = PRI[action.priority] ?? PRI.medium;
+    return (
+        <li
+            className="relative rounded-xl border border-border bg-card shadow-sm transition-colors focus-within:ring-2 focus-within:ring-ring hover:border-primary/40"
+            onContextMenu={(event: ReactMouseEvent) => {
+                event.preventDefault();
+                onMenu(action, event.clientX, event.clientY);
+            }}
+        >
+            {/* eslint-disable-next-line no-restricted-syntax -- the board card body is a custom selector-card layout that opens the action */}
+            <button
+                type="button"
+                onClick={() => onOpen(action.id)}
+                className="block w-full rounded-xl p-3 pr-9 text-left outline-none"
+            >
+                <span className="block text-sm font-semibold [overflow-wrap:anywhere] text-foreground">
+                    {action.title}
+                </span>
+                <span className="mt-1 block text-caption text-muted-foreground">
+                    {action.reference_number}
+                    {context ? ` · ${context}` : ''}
+                </span>
+                <span className="mt-2.5 flex flex-wrap items-center gap-2">
+                    {action.assigned_to_name ? (
+                        <PersonChip name={action.assigned_to_name} />
+                    ) : null}
+                    <StatusBadge
+                        size="sm"
+                        variant={PRIORITY_VARIANT[action.priority] ?? 'neutral'}
+                    >
+                        {priority.label}
+                    </StatusBadge>
+                    {due ? (
+                        <span
+                            // A plain join: tailwind-merge reads text-caption as a colour and would drop it.
+                            className={`ml-auto text-caption ${
+                                overdue
+                                    ? 'font-semibold text-status-critical'
+                                    : due === 'Today'
+                                      ? 'font-semibold text-foreground'
+                                      : 'text-muted-foreground'
+                            }`}
+                        >
+                            {due}
+                        </span>
+                    ) : null}
+                </span>
+            </button>
+            {action.event ? (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Lifecycle actions for ${action.reference_number}`}
+                    onClick={(event) => {
+                        const rect =
+                            event.currentTarget.getBoundingClientRect();
+                        onMenu(action, rect.left, rect.bottom);
+                    }}
+                    className="frontline-hit absolute top-2 right-1.5 size-7 text-muted-foreground"
+                >
+                    <MoreVertical className="size-4" />
+                </Button>
+            ) : null}
+        </li>
     );
 }
 

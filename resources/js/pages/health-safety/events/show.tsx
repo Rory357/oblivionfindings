@@ -1,6 +1,7 @@
 /* Permanent safety review workspace over the canonical event and its workflows. */
 import {
     EventRecordWorkspace,
+    safetyReviewTitle,
     type EventActionKey,
     type EventDetail,
     type EventSectionKey,
@@ -70,17 +71,17 @@ export default function HsEventShow({ detail }: { detail: EventDetail }) {
     const returnTo = safetyReviewReturn(params.get('return_to'));
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Home', href: '/dashboard' },
-        { title: 'Health & Safety', href: '/health-safety' },
+        { title: 'Health & safety', href: '/health-safety' },
         { title: 'Safety reviews', href: '/health-safety/events' },
         {
-            title: detail.reference_number,
+            title: safetyReviewTitle(detail),
             href: `/health-safety/events/${detail.id}`,
         },
     ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`${detail.reference_number} · Safety review`} />
+            <Head title={`${safetyReviewTitle(detail)} · ${detail.reference_number}`} />
             <EventRecordWorkspace
                 key={detail.id}
                 detail={detail}

@@ -74,7 +74,7 @@ describe('Action ownership handover', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         fireEvent.click(await screen.findByRole('radio', { name: next.name }));
         fireEvent.change(
-            screen.getByRole('textbox', { name: 'Reason for the handover' }),
+            screen.getByRole('textbox', { name: /Why you’re changing owner/ }),
             { target: { value: 'Agreed leave cover and evidence follow-up.' } },
         );
         fireEvent.click(
@@ -102,7 +102,7 @@ describe('Action ownership handover', () => {
         const view = render(<ActionOwnerPane {...props} />);
         fireEvent.click(await screen.findByRole('radio', { name: next.name }));
         const reason = screen.getByRole('textbox', {
-            name: 'Reason for the handover',
+            name: /Why you’re changing owner/,
         });
         fireEvent.change(reason, {
             target: { value: 'Keep this handover reason.' },
@@ -137,7 +137,7 @@ describe('Action ownership handover', () => {
         fetchMock.mockRejectedValueOnce(new Error('Unavailable'));
         render(<ActionOwnerPane {...props} />);
         const reason = screen.getByRole('textbox', {
-            name: 'Reason for the handover',
+            name: /Why you’re changing owner/,
         });
         fireEvent.change(reason, {
             target: { value: 'Retained while loading.' },

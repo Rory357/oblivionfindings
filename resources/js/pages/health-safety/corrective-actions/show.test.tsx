@@ -137,9 +137,9 @@ describe('Permanent corrective action', () => {
         ];
         render(<ActionShow workspace={data} />);
         expect(
-            within(
-                screen.getByRole('button', { name: 'View history' }),
-            ).getByText('1'),
+            within(screen.getByRole('tab', { name: /History/ })).getByText(
+                '1',
+            ),
         ).toBeInTheDocument();
         expect(screen.getByText('Agreed cover.')).toBeInTheDocument();
         expect(
@@ -182,11 +182,16 @@ describe('Permanent corrective action', () => {
         state.url +=
             '?return_to=%2Fhealth-safety%2Fcorrective-actions%3Ftab%3Doverdue%26site_id%3D3';
         render(<ActionShow workspace={workspace()} />);
+        // The record header (pg-hsn-43): the action's title, its reference in the sub-line.
         expect(
-            screen.getByRole('heading', { name: 'CA-0042' }),
+            screen.getByRole('heading', {
+                level: 1,
+                name: 'Repair uneven flooring',
+            }),
         ).toBeInTheDocument();
+        expect(screen.getByText(/CA-0042 · Kauri House/)).toBeInTheDocument();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-        expect(screen.getByText('Action Owner')).toBeInTheDocument();
+        expect(screen.getAllByText('Action Owner')).not.toHaveLength(0);
         expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute(
             'href',
             '/health-safety/corrective-actions?tab=overdue&site_id=3',

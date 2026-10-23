@@ -25,3 +25,25 @@ the viewer can be brought up to date later. Newest last.
 | 45 | "This period" also counts incidents | Incidents are the first thing a manager looks for; the drawing listed them only under harm |
 | 45 | "Incidents by type" keeps the clickable rows under the bars | The rows open the drill-in and its right-click menu |
 | 45 (Sites) | The site league is titled "Sites side by side" and the heatmap "Where the load sits" | Same plain words as the overview; the drawing didn't show this tab |
+| 1, 1b–1d, 40, 42 | Filters sit on the right of the header and the date chip reads "Period: all dates" | Shared header and date-filter behaviour on every page |
+| 1 | The register views use the app's tier-two tabs (icons, filled active tab) | DESIGN.md lists the plain underline strip as an anti-pattern |
+| 1, 40 | No "Columns" button | No column chooser exists yet |
+| 1d | No "Take ownership" button ("Assign someone" opens the assign dialog); an "Open incident" button is added; the sub-line reads "Oldest first"; the age is days since it happened | Backend gaps (`ownership.can_take`, `owner_needed_since`); the queue covers every incident the viewer can see, not only "Sites you manage" |
+| 2–2i | The owner card shows no role or Site; the manager review shows no due time | Backend gaps (`ownership.owner.role`/`site`, `review_due_at`) |
+| 2 | "Minute by minute" lists recorded events only, not story steps such as "House and grounds searched" | No invented steps |
+| 2c | Adds "Handover to Health & safety" and "Investigation" surfaces | The page already shows that information |
+| 2, 2e | Safeguarding, evidence and privacy wording stays the code's ("This does not retrieve or preserve footage" …) | Word-for-word rule |
+| 2f | Adds "File added" rows; no "safety review opened" or "safeguarding raised" rows | Those have no timestamps yet (backend gap) |
+| 2j | The compact header that sticks when scrolling isn't built | Not built yet; the state only appears after a lost save response |
+| 3, 4 | Type is a list of incident types (an older free-text type is kept as "(saved type)"); severity has "No default"; blank rows are dropped on save | Safer, consistent choices |
+| 40 | "Where it's up to" uses the existing WorkSafe labels | Same labels as the safety review |
+| 41, 41j, 41k | WorkSafe wording stays the code's ("Notification to WorkSafe NZ is still pending.", "Notify ASAP", "Keep records ≥ 5 years") | Word-for-word rule |
+| 41b | "From the Control room" uses the shared linked-evidence block; the playbook shows as label–value rows | The playbook has no timestamps for a log |
+| 41c | The lifecycle buttons (Submit for review …) sit under the stage line | They belong to the stage, not one block |
+| 41 | No "Hand over" link on the Owner card | No route or permission to reassign a review owner yet (backend gap) |
+| 41h | The title reads "Hazard — Aurora House" | The hazard's own name isn't sent (backend gap) |
+| 41j, 41k | Cancel and submit stay at the bottom of each pane | The panes are shared with the dialog |
+| 41d, 43 | Uploading, downloading and removing an action's evidence happens on that action's Evidence tab, not in the review's action table | One place per action; same permissions |
+| 42 | The third number box is "Reviews in monitoring", not "On time 86%"; cards come from the current page and a note says how many the board shows | Backend gap (`on_time_rate_30d`, first cards per stage, `closed_30d`) |
+| 43 | Linked records list only the safety review, not sibling actions; the due date has no weekday | Backend gap (`review.actions`); the app's date-only format is safe across time zones |
+| 43g | "I have reviewed the current owner" sits in the warning note | Keeps the header's buttons for the page's own actions |
