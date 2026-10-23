@@ -88,9 +88,9 @@ test('Process knowledge projects current public metadata search review and exact
 });
 
 test('news discovery off preserves direct saved and curated page access while featured media search activity and notices respect eligibility', function () {
-    $source = $this->publisher->create($this->editor, 'news', 'An explicitly linked story');
+    $source = $this->publisher->create($this->editor, 'news', 'An explicitly linked story', 'blank');
     $this->publisher->publish($this->editor, $source, 1, null, null);
-    $fallback = $this->publisher->create($this->editor, 'news', 'Eligible fallback story');
+    $fallback = $this->publisher->create($this->editor, 'news', 'Eligible fallback story', 'blank');
     $this->publisher->publish($this->editor, $fallback, 1, null, now()->addHour()->toISOString());
     $page = $this->publisher->create($this->editor, 'page', 'Feature placement', 'blank');
     Storage::disk('private')->put('company-hub/metadata-feature.jpg', 'photo');
@@ -117,7 +117,10 @@ test('news discovery off preserves direct saved and curated page access while fe
         ->and(collect($data['updates'])->pluck('page_id')->all())->not->toContain($source->id)
         ->and($data['heroSummary'][0]['value'])->toBe(1);
     $campaign = $this->publisher->create($this->editor, 'campaign', 'An explicit collection', 'campaign');
-    $campaign = $this->publisher->save($this->editor, $campaign, [...$campaign->draft, 'campaign' => ['steps' => [], 'story_ids' => [$source->id]]], 1);
+    // The campaign template starts with an empty callout, which cannot be published.
+    $draft = $campaign->draft;
+    $draft['sections'][0]['blocks'][0]['body'] = 'Why these stories belong together.';
+    $campaign = $this->publisher->save($this->editor, $campaign, [...$draft, 'campaign' => ['steps' => [], 'story_ids' => [$source->id]]], 1);
     $this->publisher->publish($this->editor, $campaign, 2, null, null);
     $this->get('/company-hub/read/'.$campaign->slug)->assertOk()->assertInertia(fn (Assert $p) => $p->where('campaign.stories.0.id', $source->id));
     $this->travel(2)->hours();

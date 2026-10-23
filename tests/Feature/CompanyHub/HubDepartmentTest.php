@@ -26,7 +26,10 @@ beforeEach(function () {
     ensureCanonicalHrStaffProfile($this->reader, $this->site, ['department_id' => $this->team->id]);
     $this->publisher = app(HubPublishing::class);
     $this->space = $this->publisher->create($this->editor, 'department', 'Learning together', 'team');
-    $this->space = $this->publisher->save($this->editor, $this->space, [...$this->space->draft, 'team_ids' => [$this->team->id], 'audience' => ['type' => 'sites', 'ids' => [$this->site->id]]], 1);
+    // The team template starts with an empty introduction, which cannot be published.
+    $draft = $this->space->draft;
+    $draft['sections'][0]['blocks'][0]['body'] = 'What this team is learning together.';
+    $this->space = $this->publisher->save($this->editor, $this->space, [...$draft, 'team_ids' => [$this->team->id], 'audience' => ['type' => 'sites', 'ids' => [$this->site->id]]], 1);
     $this->release = $this->publisher->publish($this->editor, $this->space, 2, null, null);
     $this->url = '/company-hub/read/'.$this->space->slug;
     $this->followUrl = '/company-hub/pages/'.$this->space->id.'/follow-teams';
@@ -42,7 +45,7 @@ test('department tabs use authorised published related pages and current canonic
     $this->editor = $this->editor->fresh();
     foreach (['visible', 'draft', 'private', 'expired', 'unrelated'] as $status) {
         foreach (['news', 'knowledge'] as $kind) {
-            $item = $this->publisher->create($this->editor, $kind, $status.' '.$kind);
+            $item = $this->publisher->create($this->editor, $kind, $status.' '.$kind, 'blank');
             $item = $this->publisher->save($this->editor, $item, [...$item->draft, 'team_ids' => [$status === 'unrelated' ? $this->otherTeam->id : $this->team->id], 'audience' => $status === 'private' ? ['type' => 'sites', 'ids' => [$elsewhere->id]] : ['type' => 'all', 'ids' => []]], 1);
             if ($status !== 'draft') {
                 $this->publisher->publish($this->editor, $item, 2, null, $status === 'expired' ? now()->addHour()->toIso8601String() : null);
