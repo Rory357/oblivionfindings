@@ -41,6 +41,7 @@ export function RecordTable<T>({
     rows,
     rowKey,
     onOpen,
+    canOpen,
     actionsFor,
     menuTitle,
     menuIcon,
@@ -59,6 +60,8 @@ export function RecordTable<T>({
     rows: T[];
     rowKey: (row: T) => string | number;
     onOpen?: (row: T) => void;
+    /** Rows that may not open (a restricted, need-to-know row) stay plain: no pointer, no focus, no click. */
+    canOpen?: (row: T) => boolean;
     /** The one action list behind both the kebab and the right-click menu. */
     actionsFor?: (row: T) => MenuItem[];
     /** Names the record in the right-click menu and the kebab label. */
@@ -123,18 +126,19 @@ export function RecordTable<T>({
                         {rows.map((row) => {
                             const items = actionsFor?.(row) ?? [];
                             const name = menuTitle?.(row) ?? '';
+                            const open = onOpen && (canOpen?.(row) ?? true) ? onOpen : undefined;
                             return (
                                 <TableRow
                                     key={rowKey(row)}
-                                    tabIndex={onOpen ? 0 : undefined}
-                                    onClick={onOpen ? () => onOpen(row) : undefined}
+                                    tabIndex={open ? 0 : undefined}
+                                    onClick={open ? () => open(row) : undefined}
                                     onKeyDown={
-                                        onOpen
+                                        open
                                             ? (event) => {
                                                   if (event.target !== event.currentTarget) return;
                                                   if (event.key === 'Enter' || event.key === ' ') {
                                                       event.preventDefault();
-                                                      onOpen(row);
+                                                      open(row);
                                                   }
                                               }
                                             : undefined
@@ -144,7 +148,7 @@ export function RecordTable<T>({
                                     }
                                     className={cn(
                                         'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                                        onOpen ? 'cursor-pointer hover:bg-primary/5' : 'hover:bg-transparent',
+                                        open ? 'cursor-pointer hover:bg-primary/5' : 'hover:bg-transparent',
                                     )}
                                 >
                                     {columns.map((column) => (

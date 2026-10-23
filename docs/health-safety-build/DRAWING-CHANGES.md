@@ -47,3 +47,16 @@ the viewer can be brought up to date later. Newest last.
 | 42 | The third number box is "Reviews in monitoring", not "On time 86%"; cards come from the current page and a note says how many the board shows | Backend gap (`on_time_rate_30d`, first cards per stage, `closed_30d`) |
 | 43 | Linked records list only the safety review, not sibling actions; the due date has no weekday | Backend gap (`review.actions`); the app's date-only format is safe across time zones |
 | 43g | "I have reviewed the current owner" sits in the warning note | Keeps the header's buttons for the page's own actions |
+| 21, 21b | The header rail shows the hub's pages (Incidents · Safeguarding · Fleet incidents) and the register views sit in a tier-two strip; External referrals, Closed and Assigned to me are in More filters | Same layout as Incidents, its neighbour in the hub, so the two link to each other; the drawing put the views in the header and left no way across |
+| 21 | The referral warning and the table's sub-line keep the code's wording ("flagged for external referral with no report logged …", "visible only to those who need to know") | Safeguarding referral and need-to-know wording stays word for word |
+| 21 | "Critical concerns" opens Open concerns filtered to Critical | The old tile had no link; every number box is a link |
+| 22 | The header line leaves out the subject's name (it's in the title) and uses the recorded location, not the Site | A header line doesn't repeat the title; the concern payload carries no Site name (backend gap: `site.name`) |
+| 22 | "Where things stand" also shows the current risk level, and a "No lead yet" line when nobody leads it | Both are on the record; the drawing showed neither |
+| 22 | A risk review due today reads "due today"; the next step turns red only once the review date has passed | The review date is a calendar day |
+| 22–22h | A "Sensitive" fact chip shows when the concern is marked sensitive | The old dialog had no sign of it; the drawing didn't show the case |
+| 22b | The timeline also lists "Accessed by · need-to-know" (recent viewings) under the steps | The access log was on the old timeline; kept |
+| 22d, 22e | The outcome and reply forms keep the code's labels and helper text ("Record authority acknowledgement" …) | The forms are unchanged |
+| 22f | Each open action's kebab and right-click carry "Complete" | Same one-step action as the old Complete button |
+| 22g | Access reads "Sensitive", "Restricted" or "Not marked sensitive", not "Everyone working on the concern" | No access rule is claimed that the code doesn't enforce |
+| 22h | "Client record" shows only for a client subject; the incident link opens the incident's own page | The old link opened the legacy register dialog |
+| 22i | The restricted page keeps the code's wording ("It is visible only to the assigned lead, the reporter, and staff cleared to view sensitive concerns.") | Need-to-know wording stays word for word |

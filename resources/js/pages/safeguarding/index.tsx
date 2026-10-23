@@ -1,42 +1,74 @@
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+/**
+ * Safeguarding (approved H&S drawings pg-hsn-21, 21b — Stephan 23 Oct 2026):
+ * one header with four number boxes and the register filters, the register
+ * views as a tier-two strip (like Incidents, its neighbour in Incidents &
+ * concerns), then every concern with where it is up to as six stage dots, or
+ * the reviews that are due. A row opens the concern's own page; its kebab and
+ * right-click carry the same actions, under the same permission and lifecycle
+ * gates as the concern itself. Restricted rows stay need-to-know: no detail,
+ * no actions.
+ */
 import {
-    EntityFilter,
-    ShiftContextMenu,
-    TabStrip,
-    type RosterTabItem,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
+    SafetyDateFilter,
+    SafetyRegisterSearch,
+    SafetyWorkspaceRail,
+} from '@/components/health-safety/workspace-header';
+import {
+    RecordIdentity,
+    RecordPerson,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderPrimaryButton,
+    PageLayout,
+} from '@/components/page';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
+import { EntityFilter } from '@/components/rostering';
 import {
     SafeguardingConcernDialog,
     type ActionKey,
     type ConcernDetail,
     type SectionKey,
 } from '@/components/safeguarding/concern-dialog';
-import { SafeguardingRaiseWizard } from '@/components/safeguarding/raise-wizard';
-import { Card, CardContent } from '@/components/ui/card';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { concernRecordHref } from '@/components/safeguarding/concern-record';
 import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    fmt,
-    type Tone,
-} from '@/pages/health-safety/components/hs-hero-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
-import { Head, router } from '@inertiajs/react';
+    SEVERITY_LABELS,
+    SEVERITY_VARIANT,
+    concernKind,
+    concernRowStage,
+    isTerminal,
+    titleCase,
+    type ConcernRowFlags,
+} from '@/components/safeguarding/concern-stages';
+import { SafeguardingRaiseWizard } from '@/components/safeguarding/raise-wizard';
+import { Note, StageDots } from '@/components/signature/blocks';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { SelectInput } from '@/components/wizard/primitives';
+import AppLayout from '@/layouts/app-layout';
+import { formatDate, formatTime } from '@/lib/datetime';
+import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     BadgeCheck,
-    Bell,
-    Calendar,
     CheckCircle2,
-    CircleSlash,
     ClipboardCheck,
     ClipboardList,
     Clock,
@@ -47,16 +79,16 @@ import {
     Lock,
     Paperclip,
     Plus,
-    RadioTower,
     Search,
     Shield,
     ShieldAlert,
+    SlidersHorizontal,
     UserCheck,
     UserCog,
     User as UserIcon,
     X,
 } from 'lucide-react';
-import { useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useState, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -82,13 +114,7 @@ type ConcernRow = {
     } | null;
     subject_informed: boolean;
     assigned_to: { name: string } | null;
-    flags: {
-        has_alert: boolean;
-        requires_referral: boolean;
-        referral_overdue: boolean;
-        review_due: boolean;
-        action_overdue: boolean;
-    };
+    flags: ConcernRowFlags;
     related_incident_id: number | null;
     related_incident_ref: string | null;
     control_room_alert_id: number | null;
@@ -112,6 +138,9 @@ type Paginated<T> = {
     data: T[];
     links: { url: string | null; label: string; active: boolean }[];
     last_page: number;
+    total?: number;
+    from?: number | null;
+    to?: number | null;
 };
 
 type Filters = {
@@ -155,74 +184,27 @@ type Props = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Token maps                                                          */
+/*  Views and filters                                                  */
 /* ------------------------------------------------------------------ */
 
-const SEV: Record<string, { tone: Tone; label: string }> = {
-    low: { tone: 'success', label: 'Low' },
-    medium: { tone: 'warning', label: 'Medium' },
-    high: { tone: 'critical', label: 'High' },
-    critical: { tone: 'critical', label: 'Critical' },
-};
-
-const TONE_BG: Record<Tone, string> = {
-    success: 'bg-status-success-bg text-status-success',
-    warning: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-    neutral: 'bg-muted text-muted-foreground',
-};
-const TONE_DOT: Record<Tone, string> = {
-    success: 'bg-status-success',
-    warning: 'bg-status-warning',
-    critical: 'bg-status-critical',
-    neutral: 'bg-muted-foreground',
-};
-
-const STATUS: Record<
-    string,
-    { label: string; cls: string; icon: typeof Clock }
-> = {
-    reported: {
-        label: 'Awaiting triage',
-        cls: 'bg-status-warning-bg text-status-warning',
-        icon: ClipboardList,
-    },
-    triaged: {
-        label: 'Triaged',
-        cls: 'bg-status-info-bg text-status-info',
-        icon: ClipboardCheck,
-    },
-    investigating: {
-        label: 'Under investigation',
-        cls: 'bg-primary/10 text-primary',
-        icon: Search,
-    },
-    action_plan: {
-        label: 'Action plan',
-        cls: 'bg-status-info-bg text-status-info',
-        icon: ListTodo,
-    },
-    monitoring: {
-        label: 'Monitoring',
-        cls: 'bg-status-success-bg text-status-success',
-        icon: Activity,
-    },
-    referred_external: {
-        label: 'Referred external',
-        cls: 'bg-status-critical-bg text-status-critical',
-        icon: Landmark,
-    },
-    closed: {
-        label: 'Closed',
-        cls: 'bg-status-success-bg text-status-success',
-        icon: CheckCircle2,
-    },
-    no_action_required: {
-        label: 'No further action',
-        cls: 'bg-muted text-muted-foreground',
-        icon: CircleSlash,
-    },
-};
+/** The register's views. The drawn ones sit on the strip; the rest stay one step away in More filters. */
+const VIEWS: {
+    key: string;
+    label: string;
+    icon: GroupedProfileNavTab['icon'];
+    drawn: boolean;
+}[] = [
+    { key: 'all', label: 'All', icon: LayoutList, drawn: true },
+    { key: 'open', label: 'Open concerns', icon: ClipboardList, drawn: true },
+    { key: 'triage', label: 'Awaiting triage', icon: ClipboardList, drawn: true },
+    { key: 'investigation', label: 'Under investigation', icon: Search, drawn: true },
+    { key: 'action_plan', label: 'Action plan', icon: ListTodo, drawn: true },
+    { key: 'monitoring', label: 'Monitoring', icon: Activity, drawn: true },
+    { key: 'reviews', label: 'Reviews due', icon: Clock, drawn: true },
+    { key: 'referrals', label: 'External referrals', icon: Landmark, drawn: false },
+    { key: 'closed', label: 'Closed', icon: CheckCircle2, drawn: false },
+    { key: 'mine', label: 'Assigned to me', icon: UserCheck, drawn: false },
+];
 
 const CATEGORY_OPTIONS = [
     'physical',
@@ -239,24 +221,7 @@ const CATEGORY_OPTIONS = [
     'other',
 ];
 
-function titleCase(s: string): string {
-    return s.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/* date helpers (browser-local) */
-const todayStr = () => {
-    const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-};
-const daysAgoStr = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-};
+const SEV_ORDER = ['critical', 'high', 'medium', 'low'];
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -277,13 +242,8 @@ export default function SafeguardingIndex({
     can,
     detail,
 }: Props) {
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const registerUrl = usePage().url;
     const [raiseOpen, setRaiseOpen] = useState(raise);
-    // Which pane the detail dialog should open on (set by the row right-click menu).
-    const [pendingOpen, setPendingOpen] = useState<{
-        action?: ActionKey;
-        section?: SectionKey;
-    } | null>(null);
 
     const go = (next: Partial<Filters>) =>
         router.get(
@@ -291,42 +251,22 @@ export default function SafeguardingIndex({
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true, replace: true },
         );
+    const setTab = (id: string) => {
+        if (id === tab) return;
+        router.get('/safeguarding', { ...filters, tab: id }, { preserveScroll: true });
+    };
+    const clearFilters = () =>
+        router.get('/safeguarding', { tab }, { preserveState: true, preserveScroll: true, replace: true });
 
-    const setTab = (id: string) =>
-        router.get(
-            '/safeguarding',
-            { ...filters, tab: id },
-            { preserveScroll: true },
-        );
-
-    // Detail-over-list: fetch only the `detail` prop and open the dialog without
-    // navigating away; closing drops the param so `detail` comes back null.
+    /** A concern opens on its own page; Back returns here with these filters. */
     const openConcern = (
         id: number,
-        opts?: { action?: ActionKey; section?: SectionKey },
-    ) => {
-        setPendingOpen(opts ?? null);
-        router.get(
-            '/safeguarding',
-            { ...filters, concern: id },
-            { preserveState: true, preserveScroll: true, only: ['detail'] },
-        );
-    };
-    const closeDetail = () => {
-        setPendingOpen(null);
-        router.get(
-            '/safeguarding',
-            { ...filters },
-            { preserveState: true, preserveScroll: true, only: ['detail'] },
-        );
-    };
+        options: { section?: SectionKey; action?: ActionKey } = {},
+    ) => router.visit(concernRecordHref(id, { ...options, returnTo: registerUrl }));
 
-    const clearFilters = () =>
-        router.get(
-            '/safeguarding',
-            { tab },
-            { preserveState: true, preserveScroll: true, replace: true },
-        );
+    // Old ?concern= links still open the concern over the list; closing drops the param.
+    const closeDetail = () =>
+        router.get('/safeguarding', { ...filters }, { preserveState: true, preserveScroll: true, only: ['detail'] });
 
     const hasFilters = !!(
         filters.q ||
@@ -337,544 +277,230 @@ export default function SafeguardingIndex({
         filters.from ||
         filters.to
     );
-
-    const ow = hero.openWork;
+    const moreActive = [filters.severity, filters.category].filter(Boolean).length;
     const at = hero.attention;
 
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'all',
-            label: 'All',
-            icon: LayoutList,
-            tone: 'primary',
-            badge: tabCounts.all || undefined,
-        },
-        {
-            id: 'open',
-            label: 'Open concerns',
-            icon: ClipboardList,
-            tone: 'warning',
-            badge: tabCounts.open || undefined,
-        },
-        {
-            id: 'triage',
-            label: 'Awaiting triage',
-            icon: ClipboardList,
-            tone: 'warning',
-            badge: tabCounts.triage || undefined,
-        },
-        {
-            id: 'investigation',
-            label: 'Under investigation',
-            icon: Search,
-            tone: 'primary',
-            badge: tabCounts.investigation || undefined,
-        },
-        {
-            id: 'action_plan',
-            label: 'Action plan',
-            icon: ListTodo,
-            tone: 'info',
-            badge: tabCounts.action_plan || undefined,
-        },
-        {
-            id: 'monitoring',
-            label: 'Monitoring',
-            icon: Activity,
-            tone: 'success',
-            badge: tabCounts.monitoring || undefined,
-        },
-        {
-            id: 'referrals',
-            label: 'External referrals',
-            icon: Landmark,
-            tone: 'critical',
-            badge: tabCounts.referrals || undefined,
-        },
-        {
-            id: 'reviews',
-            label: 'Reviews due',
-            icon: Clock,
-            tone: 'warning',
-            badge: tabCounts.reviews || undefined,
-        },
-        {
-            id: 'closed',
-            label: 'Closed',
-            icon: CheckCircle2,
-            tone: 'success',
-            badge: tabCounts.closed || undefined,
-        },
-        {
-            id: 'mine',
-            label: 'Assigned to me',
-            icon: UserCheck,
-            tone: 'info',
-            badge: tabCounts.mine || undefined,
-        },
-    ];
+    const views: GroupedProfileNavTab[] = VIEWS.filter((view) => view.drawn || view.key === tab).map((view) => ({
+        key: view.key,
+        label: view.label,
+        icon: view.icon,
+        count: tabCounts[view.key],
+    }));
 
-    /* ---- date range (footer pills) ---- */
-    const activeRange = !filters.from
-        ? 'all'
-        : filters.from === daysAgoStr(7)
-          ? 'week'
-          : filters.from === daysAgoStr(30)
-            ? '30d'
-            : filters.from === daysAgoStr(90)
-              ? 'quarter'
-              : 'custom';
-    const RANGE_ITEMS = [
-        { key: 'all', label: 'All' },
-        { key: 'week', label: 'This week' },
-        { key: '30d', label: '30 days' },
-        { key: 'quarter', label: 'Quarter' },
-    ];
-    const onRange = (key: string) => {
-        if (key === 'all') {
-            go({ from: null, to: null });
-            return;
-        }
-        const map: Record<string, number> = { week: 7, '30d': 30, quarter: 90 };
-        go({ from: daysAgoStr(map[key]), to: todayStr() });
-    };
-
-    const SEVERITY_ITEMS = [
-        { key: 'all', label: 'All' },
-        { key: 'low', label: 'Low' },
-        { key: 'medium', label: 'Medium' },
-        { key: 'high', label: 'High' },
-        { key: 'critical', label: 'Critical' },
-    ];
-
-    /* ---- right-click context menu (concern rows) ---- */
-    // The menu mirrors the detail dialog's Options bar 1:1 — same permission + lifecycle
-    // gates — so every item shown maps to a real backend action. Workflow items open the
-    // dialog on the matching pane; "Mark informed" posts directly (no pane needed).
-    const openRowCtx = (e: ReactMouseEvent, c: ConcernRow) => {
-        e.preventDefault();
-        if (c.restricted) return; // need-to-know: no actions exposed on a restricted row
-        const sev = SEV[c.severity] ?? SEV.low;
-        const subjectName = c.subject?.name ?? 'Subject withheld';
-        const can = c.can;
-        const terminal =
-            c.status === 'closed' || c.status === 'no_action_required';
+    const concernActions = (c: ConcernRow): MenuItem[] => {
+        if (c.restricted) return []; // need-to-know: no actions on a restricted row
+        const gate = c.can;
+        const terminal = isTerminal(c.status);
         const reported = c.status === 'reported';
-        const markInformed = () =>
-            router.post(
-                `/safeguarding/${c.id}/subject-informed`,
-                {},
-                { preserveScroll: true },
-            );
-
-        // Navigation (always-available views).
-        const items: ShiftCtxItem[] = [
-            {
-                icon: <Eye className="h-3.5 w-3.5" />,
-                label: 'View concern',
-                sub: c.reference_number,
-                tone: 'primary',
-                onClick: () => openConcern(c.id),
+        return compactMenu([
+            { label: 'View concern', icon: Eye, onClick: () => openConcern(c.id) },
+            c.subject?.href && {
+                label: 'View subject',
+                icon: UserIcon,
+                onClick: () => router.visit(c.subject!.href!),
             },
-            ...(c.subject?.href
-                ? [
-                      {
-                          icon: <UserIcon className="h-3.5 w-3.5" />,
-                          label: 'View subject',
-                          sub: subjectName,
-                          onClick: () => router.visit(c.subject!.href!),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(c.related_incident_id
-                ? [
-                      {
-                          icon: <ShieldAlert className="h-3.5 w-3.5" />,
-                          label: 'View linked incident',
-                          sub:
-                              c.related_incident_ref ??
-                              `INC-${c.related_incident_id}`,
-                          onClick: () =>
-                              router.visit(
-                                  `/incidents?incident=${c.related_incident_id}`,
-                              ),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-        ];
-
-        // Workflow actions — gated identically to the dialog Options bar.
-        const workflow: ShiftCtxItem[] = [];
-        if (can.update && reported)
-            workflow.push({
-                icon: <ClipboardCheck className="h-3.5 w-3.5" />,
-                label: 'Triage',
-                onClick: () => openConcern(c.id, { action: 'triage' }),
-            });
-        if (can.update && !terminal)
-            workflow.push({
-                icon: <UserCog className="h-3.5 w-3.5" />,
-                label: 'Assign lead',
-                onClick: () => openConcern(c.id, { action: 'assign' }),
-            });
-        if (can.update && !terminal)
-            workflow.push({
-                icon: <Activity className="h-3.5 w-3.5" />,
-                label: 'Add risk assessment',
-                onClick: () => openConcern(c.id, { action: 'risk' }),
-            });
-        if (can.investigate && !terminal && !reported)
-            workflow.push({
-                icon: <Search className="h-3.5 w-3.5" />,
-                label: 'Start investigation',
-                onClick: () => openConcern(c.id, { action: 'investigation' }),
-            });
-        if (can.report_external && !terminal && !reported)
-            workflow.push({
-                icon: <Landmark className="h-3.5 w-3.5" />,
-                label: 'Log external referral',
-                onClick: () => openConcern(c.id, { action: 'report' }),
-            });
-        if (can.update && !terminal && !reported)
-            workflow.push({
-                icon: <ListTodo className="h-3.5 w-3.5" />,
-                label: 'Add action',
-                onClick: () => openConcern(c.id, { action: 'action' }),
-            });
-        if (can.update && !terminal)
-            workflow.push({
-                icon: <Paperclip className="h-3.5 w-3.5" />,
-                label: 'Add evidence',
-                onClick: () => openConcern(c.id, { section: 'evidence' }),
-            });
-        if (can.update && !terminal && !c.subject_informed)
-            workflow.push({
-                icon: <BadgeCheck className="h-3.5 w-3.5" />,
-                label: 'Mark subject informed',
-                onClick: markInformed,
-            });
-        if (can.update && c.status === 'action_plan')
-            workflow.push({
-                icon: <Activity className="h-3.5 w-3.5" />,
-                label: 'Move to monitoring',
-                onClick: () =>
-                    router.patch(
-                        `/safeguarding/${c.id}/status`,
-                        { status: 'monitoring' },
-                        { preserveScroll: true },
-                    ),
-            });
-        if (can.update && !terminal && !reported)
-            workflow.push({
-                icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-                label: 'Close concern',
-                tone: 'critical',
-                onClick: () => openConcern(c.id, { action: 'close' }),
-            });
-
-        if (workflow.length) items.push({ sep: true }, ...workflow);
-
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: sev.label.toUpperCase(),
-            meta: `${c.reference_number} · ${titleCase(c.concern_type)}`,
-            items,
-        });
+            c.related_incident_id && {
+                label: 'View linked incident',
+                icon: ShieldAlert,
+                onClick: () => router.visit(incidentWorkspaceHref(c.related_incident_id!)),
+            },
+            { separator: true },
+            gate.update && reported && { label: 'Triage', icon: ClipboardCheck, onClick: () => openConcern(c.id, { action: 'triage' }) },
+            gate.update && !terminal && { label: 'Assign lead', icon: UserCog, onClick: () => openConcern(c.id, { action: 'assign' }) },
+            gate.update && !terminal && { label: 'Add risk assessment', icon: Activity, onClick: () => openConcern(c.id, { action: 'risk' }) },
+            gate.investigate && !terminal && !reported && { label: 'Start investigation', icon: Search, onClick: () => openConcern(c.id, { action: 'investigation' }) },
+            gate.report_external && !terminal && !reported && { label: 'Log external referral', icon: Landmark, onClick: () => openConcern(c.id, { action: 'report' }) },
+            gate.update && !terminal && !reported && { label: 'Add action', icon: ListTodo, onClick: () => openConcern(c.id, { action: 'action' }) },
+            gate.update && !terminal && { label: 'Add evidence', icon: Paperclip, onClick: () => openConcern(c.id, { section: 'evidence' }) },
+            gate.update &&
+                !terminal &&
+                !c.subject_informed && {
+                    label: 'Mark subject informed',
+                    icon: BadgeCheck,
+                    onClick: () => router.post(`/safeguarding/${c.id}/subject-informed`, {}, { preserveScroll: true }),
+                },
+            gate.update &&
+                c.status === 'action_plan' && {
+                    label: 'Move to monitoring',
+                    icon: Activity,
+                    onClick: () =>
+                        router.patch(`/safeguarding/${c.id}/status`, { status: 'monitoring' }, { preserveScroll: true }),
+                },
+            gate.update && !terminal && !reported && { separator: true },
+            gate.update && !terminal && !reported && { label: 'Close concern', icon: CheckCircle2, danger: true, onClick: () => openConcern(c.id, { action: 'close' }) },
+        ]);
     };
 
-    const concernRows =
-        rowsKind === 'concerns' ? (rows.data as ConcernRow[]) : [];
-    const reviewRows = rowsKind === 'reviews' ? (rows.data as ReviewRow[]) : [];
+    const pager = (
+        <>
+            <p className="text-subtle">
+                {rows.total !== undefined
+                    ? rows.from && rows.to
+                        ? `Showing ${rows.from}–${rows.to} of ${rows.total}`
+                        : `Showing ${rows.data.length} of ${rows.total}`
+                    : `Showing ${rows.data.length}`}
+            </p>
+            {rows.last_page > 1 ? <LaravelPagination links={rows.links} /> : null}
+        </>
+    );
 
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Safeguarding', href: '/safeguarding' },
             ]}
         >
             <Head title="Safeguarding" />
-
-            <div className="flex flex-col gap-6 p-6">
-                {/* ---- Hero ---- */}
-                <HeroShell
-                    footer={
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroSegmented
-                                label="Period"
-                                variant="pill"
-                                ariaLabel="Date range"
-                                items={RANGE_ITEMS}
-                                value={activeRange}
-                                onChange={onRange}
-                            />
-                            {sites?.length ? (
-                                <EntityFilter
-                                    label="Site"
-                                    allLabel="All sites"
-                                    items={sites}
-                                    value={filters.site_id}
-                                    onChange={(id) => go({ site_id: id })}
-                                    onDark
+            <PageLayout
+                hero={
+                    <PageHeader
+                        title="Safeguarding"
+                        icon={ShieldAlert}
+                        wrapTitle
+                        subline="Protecting people at risk of abuse, neglect or harm"
+                        actions={
+                            <>
+                                <SafetyRegisterSearch
+                                    key={filters.q}
+                                    query={filters.q ?? ''}
+                                    onSearch={(q) => go({ q: q || null })}
+                                    placeholder="Search concerns"
                                 />
-                            ) : null}
-                            {subjects?.length ? (
-                                <EntityFilter
-                                    label="Subject"
-                                    allLabel="All subjects"
-                                    items={subjects}
-                                    value={filters.subject_id}
-                                    onChange={(id) => go({ subject_id: id })}
-                                    onDark
+                                {can.create ? (
+                                    <PageHeaderPrimaryButton icon={Plus} onClick={() => setRaiseOpen(true)}>
+                                        Raise concern
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
+                            </>
+                        }
+                        strip={
+                            <PageHeaderNumbers>
+                                <PageHeaderNumber
+                                    label="Overdue actions"
+                                    value={at.overdueActions.value}
+                                    caption={at.overdueActions.value > 0 ? 'Past due' : 'All on track'}
+                                    tone={at.overdueActions.value > 0 ? 'critical' : undefined}
+                                    onClick={() => setTab('action_plan')}
+                                    pressed={tab === 'action_plan'}
                                 />
-                            ) : null}
-                            <HeroSegmented
-                                label="Severity"
-                                variant="pill"
-                                ariaLabel="Severity"
-                                items={SEVERITY_ITEMS}
-                                value={filters.severity ?? 'all'}
-                                onChange={(key) =>
-                                    go({ severity: key === 'all' ? null : key })
-                                }
-                            />
-                            <label className="inline-flex items-center gap-1.5">
-                                <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                                    Category
-                                </span>
-                                <select
-                                    value={filters.category ?? ''}
-                                    onChange={(e) =>
-                                        go({ category: e.target.value || null })
-                                    }
-                                    className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2 py-1 text-xs text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none [&>option]:text-foreground"
-                                >
-                                    <option value="">All categories</option>
-                                    {CATEGORY_OPTIONS.map((c) => (
-                                        <option key={c} value={c}>
-                                            {titleCase(c)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                            <div className="relative ml-auto">
-                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                                <input
-                                    type="search"
-                                    placeholder="Search concerns…"
-                                    defaultValue={filters.q ?? ''}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter')
-                                            go({
-                                                q:
-                                                    (
-                                                        e.target as HTMLInputElement
-                                                    ).value || null,
-                                            });
-                                    }}
-                                    className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
+                                <PageHeaderNumber
+                                    label="Risk reviews due"
+                                    value={at.reviewsDue.value}
+                                    caption={at.reviewsDue.value > 0 ? 'Review now' : 'None due'}
+                                    tone={at.reviewsDue.value > 0 ? 'warning' : undefined}
+                                    onClick={() => setTab('reviews')}
+                                    pressed={tab === 'reviews'}
                                 />
-                            </div>
-                            {hasFilters ? (
-                                // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-                                >
-                                    <X className="h-3 w-3" /> Clear
-                                </button>
-                            ) : null}
-                        </div>
-                    }
+                                <PageHeaderNumber
+                                    label="Replies awaited"
+                                    value={at.acksAwaited.value}
+                                    caption="From authorities"
+                                    tone={at.acksAwaited.value > 0 ? 'warning' : undefined}
+                                    onClick={() => setTab('reviews')}
+                                />
+                                <PageHeaderNumber
+                                    label="Critical concerns"
+                                    value={at.criticalOpen.value}
+                                    caption="Still open"
+                                    tone={at.criticalOpen.value > 0 ? 'critical' : undefined}
+                                    onClick={() => go({ tab: 'open', severity: 'critical' })}
+                                    pressed={tab === 'open' && filters.severity === 'critical'}
+                                />
+                            </PageHeaderNumbers>
+                        }
+                        filters={
+                            <>
+                                {sites?.length ? (
+                                    <EntityFilter
+                                        label="Site"
+                                        allLabel="All sites"
+                                        items={sites}
+                                        value={filters.site_id}
+                                        onChange={(id) => go({ site_id: id })}
+                                        onDark
+                                    />
+                                ) : null}
+                                <SafetyDateFilter from={filters.from} to={filters.to} onChange={go} />
+                                {subjects?.length ? (
+                                    <EntityFilter
+                                        label="Subject"
+                                        allLabel="All subjects"
+                                        items={subjects}
+                                        value={filters.subject_id}
+                                        onChange={(id) => go({ subject_id: id })}
+                                        onDark
+                                    />
+                                ) : null}
+                                <MoreFilters
+                                    active={moreActive}
+                                    filters={filters}
+                                    tab={tab}
+                                    tabCounts={tabCounts}
+                                    onTab={setTab}
+                                    onChange={go}
+                                />
+                                {hasFilters ? (
+                                    <PageHeaderFilterButton icon={X} onClick={clearFilters}>
+                                        Clear filters
+                                    </PageHeaderFilterButton>
+                                ) : null}
+                            </>
+                        }
+                        rail={<SafetyWorkspaceRail hub="concerns" current="safeguarding" />}
+                    />
+                }
+                tabs={
+                    <TierTwoTabs
+                        tabs={views}
+                        activeTab={tab}
+                        onTab={setTab}
+                        testIdPrefix="safeguarding-register"
+                        ariaLabel="Safeguarding views"
+                        panelId="safeguarding-register-panel"
+                        // Views carry no href, so the strip renders its own buttons.
+                        renderLink={() => null}
+                    />
+                }
+            >
+                <div
+                    id="safeguarding-register-panel"
+                    role="tabpanel"
+                    aria-label={VIEWS.find((view) => view.key === tab)?.label ?? 'Safeguarding'}
+                    className="grid min-w-0 gap-5"
                 >
-                    <WorkflowRibbon current="report" />
-
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <HeroMedallion icon={ShieldAlert} />
-                            <div className="flex flex-col gap-1.5">
-                                <HeroStatusPill>
-                                    Safeguarding register · need-to-know
-                                </HeroStatusPill>
-                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                    Safeguarding
-                                </h1>
-                                <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    Protecting people at risk of abuse, neglect
-                                    or harm. Every concern is triaged,
-                                    risk-assessed and worked through to a safe
-                                    close — confidential, blame-free, and
-                                    visible only to those who need to know.
-                                </p>
-                            </div>
-                        </div>
-
-                        {can.create ? (
-                            <PageHeaderPrimaryButton
-                                icon={Plus}
-                                onClick={() => setRaiseOpen(true)}
-                            >
-                                Raise concern
-                            </PageHeaderPrimaryButton>
-                        ) : null}
-                    </div>
-
-                    {/* counts-only stat clusters (never subject identities) */}
-                    <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster title="Open work" icon={Shield}>
-                            <HeroClusterTile
-                                href="/safeguarding?tab=all"
-                                label="Open"
-                                value={fmt(ow.open.value)}
-                                caption="not yet closed"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/safeguarding?tab=triage"
-                                label="Awaiting triage"
-                                value={fmt(ow.awaitingTriage.value)}
-                                caption="needs triage"
-                                tone={
-                                    ow.awaitingTriage.value > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/safeguarding?tab=investigation"
-                                label="Under investigation"
-                                value={fmt(ow.investigating.value)}
-                                caption="in progress"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/safeguarding?tab=referrals"
-                                label="Referred external"
-                                value={fmt(ow.referred.value)}
-                                caption="with an authority"
-                                tone={
-                                    ow.referred.value > 0
-                                        ? 'critical'
-                                        : 'neutral'
-                                }
-                            />
-                        </HeroCluster>
-                        <HeroCluster title="Needs attention" icon={Bell}>
-                            <HeroClusterTile
-                                href="/safeguarding?tab=action_plan"
-                                label="Overdue actions"
-                                value={fmt(at.overdueActions.value)}
-                                caption={
-                                    at.overdueActions.value > 0
-                                        ? 'past due'
-                                        : 'all on track'
-                                }
-                                tone={
-                                    at.overdueActions.value > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/safeguarding?tab=reviews"
-                                label="Risk reviews due"
-                                value={fmt(at.reviewsDue.value)}
-                                caption="review now"
-                                tone={
-                                    at.reviewsDue.value > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/safeguarding?tab=reviews"
-                                label="Acks awaited"
-                                value={fmt(at.acksAwaited.value)}
-                                caption="from authorities"
-                                tone={
-                                    at.acksAwaited.value > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                label="Critical · open"
-                                value={fmt(at.criticalOpen.value)}
-                                caption="highest risk"
-                                tone={
-                                    at.criticalOpen.value > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                        </HeroCluster>
-                    </div>
-                </HeroShell>
-
-                {/* ---- Tabs ---- */}
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    items={TABS}
-                    ariaLabel="Safeguarding views"
-                />
-
-                {/* ---- External-referral banner ---- */}
-                {referralOverdueCount > 0 &&
-                (tab === 'all' || tab === 'referrals') ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/50 px-4 py-3">
-                        <Landmark className="h-5 w-5 shrink-0 text-status-critical" />
-                        <p className="text-sm text-foreground">
+                    {referralOverdueCount > 0 && (tab === 'all' || tab === 'referrals') ? (
+                        <Note tone="warning" icon={Landmark}>
                             <b>
                                 {referralOverdueCount} concern
-                                {referralOverdueCount === 1 ? '' : 's'} flagged
-                                for external referral with no report logged.
+                                {referralOverdueCount === 1 ? '' : 's'} flagged for external referral with no report
+                                logged.
                             </b>{' '}
-                            A referral was indicated at triage but no authority
-                            has been notified — log the report to advance the
-                            concern.
-                        </p>
-                    </div>
-                ) : null}
+                            A referral was indicated at triage but no authority has been notified — log the report to
+                            advance the concern.
+                        </Note>
+                    ) : null}
 
-                {/* ---- Rows ---- */}
-                <Card>
-                    <CardContent className="p-0">
-                        {rowsKind === 'concerns' ? (
-                            <ConcernTable
-                                rows={concernRows}
-                                onRowCtx={openRowCtx}
-                                onOpen={openConcern}
-                            />
-                        ) : (
-                            <ReviewTable
-                                rows={reviewRows}
-                                onOpen={openConcern}
-                            />
-                        )}
-                    </CardContent>
-                </Card>
-
-                {rows.last_page > 1 ? (
-                    <LaravelPagination links={rows.links} />
-                ) : null}
-            </div>
-
-            {ctx ? (
-                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
-            ) : null}
+                    {rowsKind === 'concerns' ? (
+                        <ConcernTable
+                            rows={rows.data as ConcernRow[]}
+                            actionsFor={concernActions}
+                            onOpen={(row) => openConcern(row.id)}
+                            footer={pager}
+                        />
+                    ) : (
+                        <ReviewTable
+                            rows={rows.data as ReviewRow[]}
+                            onOpen={(row) => openConcern(row.id, row.open_section ? { section: row.open_section } : {})}
+                            footer={pager}
+                        />
+                    )}
+                </div>
+            </PageLayout>
 
             {detail ? (
-                <SafeguardingConcernDialog
-                    key={detail.id}
-                    detail={detail}
-                    open
-                    onClose={closeDetail}
-                    initialAction={pendingOpen?.action ?? null}
-                    initialSection={pendingOpen?.section ?? 'overview'}
-                />
+                <SafeguardingConcernDialog key={detail.id} detail={detail} open onClose={closeDetail} />
             ) : null}
 
             {raiseOpen && can.create ? (
@@ -894,358 +520,280 @@ export default function SafeguardingIndex({
     );
 }
 
+/** The two quieter filters, plus every register view, in one place. */
+function MoreFilters({
+    active,
+    filters,
+    tab,
+    tabCounts,
+    onTab,
+    onChange,
+}: {
+    active: number;
+    filters: Filters;
+    tab: string;
+    tabCounts: Record<string, number>;
+    onTab: (tab: string) => void;
+    onChange: (next: Partial<Filters>) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <PageHeaderFilterButton icon={SlidersHorizontal} active={active > 0}>
+                    {active > 0 ? `More filters · ${active}` : 'More filters'}
+                </PageHeaderFilterButton>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="grid w-80 max-w-[calc(100vw-2rem)] gap-3">
+                <FilterField label="Safeguarding view">
+                    <SelectInput
+                        ariaLabel="Safeguarding view"
+                        placeholder="Safeguarding view"
+                        value={tab}
+                        onChange={(value) => {
+                            setOpen(false);
+                            onTab(value);
+                        }}
+                        options={VIEWS.map((view) => ({
+                            value: view.key,
+                            label: `${view.label} (${tabCounts[view.key] ?? 0})`,
+                        }))}
+                    />
+                </FilterField>
+                <FilterField label="Severity">
+                    <SelectInput
+                        ariaLabel="Severity"
+                        placeholder="All severities"
+                        value={filters.severity ?? 'all'}
+                        onChange={(value) => onChange({ severity: value === 'all' ? null : value })}
+                        options={[
+                            { value: 'all', label: 'All severities' },
+                            ...SEV_ORDER.map((value) => ({ value, label: SEVERITY_LABELS[value] })),
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Category">
+                    <SelectInput
+                        ariaLabel="Category"
+                        placeholder="All categories"
+                        value={filters.category ?? 'all'}
+                        onChange={(value) => onChange({ category: value === 'all' ? null : value })}
+                        options={[
+                            { value: 'all', label: 'All categories' },
+                            ...CATEGORY_OPTIONS.map((value) => ({ value, label: titleCase(value) })),
+                        ]}
+                    />
+                </FilterField>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="grid gap-1.5">
+            <span className="text-caption font-semibold">{label}</span>
+            {children}
+        </div>
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Concern table                                                      */
 /* ------------------------------------------------------------------ */
 
 function ConcernTable({
     rows,
-    onRowCtx,
+    actionsFor,
     onOpen,
+    footer,
 }: {
     rows: ConcernRow[];
-    onRowCtx: (e: ReactMouseEvent, c: ConcernRow) => void;
-    onOpen: (id: number) => void;
+    actionsFor: (row: ConcernRow) => MenuItem[];
+    onOpen: (row: ConcernRow) => void;
+    footer: ReactNode;
 }) {
-    if (!rows.length) {
-        return (
-            <div className="px-4 py-16 text-center">
-                <Shield className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                <p className="font-medium text-muted-foreground">
-                    No concerns here
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                    Nothing matches this tab and filters.
-                </p>
-            </div>
-        );
-    }
+    const columns: RecordTableColumn<ConcernRow>[] = [
+        {
+            key: 'reference',
+            label: 'Reference',
+            nowrap: true,
+            cell: (c) => (
+                <RecordIdentity
+                    title={c.reference_number}
+                    sub={c.occurred_at ? `${formatDate(c.occurred_at)}, ${formatTime(c.occurred_at)}` : 'Time not recorded'}
+                />
+            ),
+        },
+        {
+            key: 'concern',
+            label: 'Concern',
+            className: 'min-w-[16rem] max-w-[24rem]',
+            cell: (c) =>
+                c.restricted ? (
+                    <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex size-[30px] shrink-0 items-center justify-center rounded-[8px] bg-muted text-muted-foreground">
+                            <Lock aria-hidden="true" className="size-4" />
+                        </span>
+                        <div className="min-w-0">
+                            <b className="block font-semibold text-foreground">Restricted · need-to-know</b>
+                            <span className="text-subtle block">Visible to the assigned lead and reporter only.</span>
+                        </div>
+                    </div>
+                ) : (
+                    <RecordIdentity
+                        title={concernKind(c.concern_type, c.abuse_category)}
+                        sub={c.description ? <span className="line-clamp-2">{c.description}</span> : undefined}
+                    />
+                ),
+        },
+        {
+            key: 'subject',
+            label: 'Subject',
+            nowrap: true,
+            cell: (c) =>
+                !c.restricted && c.subject?.name ? (
+                    <RecordIdentity title={c.subject.name} sub={c.subject.site ?? undefined} />
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
+            key: 'severity',
+            label: 'Severity',
+            nowrap: true,
+            cell: (c) => (
+                <StatusBadge variant={SEVERITY_VARIANT[c.severity] ?? 'neutral'}>
+                    {SEVERITY_LABELS[c.severity] ?? titleCase(c.severity)}
+                </StatusBadge>
+            ),
+        },
+        {
+            key: 'stage',
+            label: 'Where it’s up to',
+            nowrap: true,
+            cell: (c) => {
+                const stage = concernRowStage(c);
+                return <StageDots stage={stage.stage} of={6} label={stage.label} note={stage.note} tone={stage.tone} />;
+            },
+        },
+        {
+            key: 'assigned',
+            label: 'Assigned',
+            nowrap: true,
+            cell: (c) =>
+                c.assigned_to ? <RecordPerson name={c.assigned_to.name} /> : <span className="text-muted-foreground">Unassigned</span>,
+        },
+    ];
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                        <th className="px-4 py-2.5">Reference</th>
-                        <th className="px-4 py-2.5">Concern</th>
-                        <th className="px-4 py-2.5">Subject</th>
-                        <th className="px-4 py-2.5">Severity</th>
-                        <th className="px-4 py-2.5">Stage</th>
-                        <th className="px-4 py-2.5">Assigned</th>
-                        <th className="px-4 py-2.5">Flags</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y">
-                    {rows.map((c) => {
-                        const sev = SEV[c.severity] ?? SEV.low;
-                        const stat = STATUS[c.status] ?? STATUS.reported;
-                        const StatusIcon = stat.icon;
-                        return (
-                            <tr
-                                key={c.id}
-                                onClick={() =>
-                                    c.restricted ? undefined : onOpen(c.id)
-                                }
-                                onContextMenu={(e) => onRowCtx(e, c)}
-                                tabIndex={c.restricted ? -1 : 0}
-                                aria-label={
-                                    c.restricted
-                                        ? undefined
-                                        : `Open concern ${c.reference_number}`
-                                }
-                                onKeyDown={(e) => {
-                                    if (
-                                        !c.restricted &&
-                                        (e.key === 'Enter' || e.key === ' ')
-                                    ) {
-                                        e.preventDefault();
-                                        onOpen(c.id);
-                                    }
-                                }}
-                                className={
-                                    c.restricted
-                                        ? 'bg-[repeating-linear-gradient(45deg,transparent,transparent_9px,var(--muted)_9px,var(--muted)_10px)]'
-                                        : 'cursor-pointer transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'
-                                }
-                            >
-                                <td className="px-4 py-3 align-top whitespace-nowrap">
-                                    <div className="font-medium">
-                                        {c.reference_number}
-                                    </div>
-                                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground/70">
-                                        <Calendar className="h-3 w-3" />
-                                        {c.occurred_at
-                                            ? formatDateTime(c.occurred_at)
-                                            : '—'}
-                                    </div>
-                                </td>
-                                {c.restricted ? (
-                                    <td
-                                        className="px-4 py-3 align-top"
-                                        colSpan={2}
-                                    >
-                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                            <Lock className="h-4 w-4" />
-                                            <span className="text-sm font-medium">
-                                                Restricted · need-to-know
-                                            </span>
-                                        </div>
-                                        <p className="mt-0.5 text-xs text-muted-foreground/70">
-                                            Visible to the assigned lead and
-                                            reporter only.
-                                        </p>
-                                    </td>
-                                ) : (
-                                    <>
-                                        <td className="px-4 py-3 align-top">
-                                            <div className="flex items-center gap-2">
-                                                <span
-                                                    className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`}
-                                                />
-                                                <span className="font-medium">
-                                                    {titleCase(c.concern_type)}
-                                                </span>
-                                                {c.abuse_category ? (
-                                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                                        {titleCase(
-                                                            c.abuse_category,
-                                                        )}
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                            {c.description ? (
-                                                <p className="mt-0.5 line-clamp-1 max-w-[28rem] text-xs text-muted-foreground/80">
-                                                    {c.description}
-                                                </p>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-4 py-3 align-top">
-                                            {c.subject?.name ? (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-                                                        {c.subject.name
-                                                            .split(' ')
-                                                            .map((n) => n[0])
-                                                            .slice(0, 2)
-                                                            .join('')}
-                                                    </span>
-                                                    <span className="min-w-0">
-                                                        <span className="block truncate font-medium">
-                                                            {c.subject.name}
-                                                        </span>
-                                                        {c.subject.site ? (
-                                                            <span className="block truncate text-xs text-muted-foreground">
-                                                                {c.subject.site}
-                                                            </span>
-                                                        ) : null}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground">
-                                                    —
-                                                </span>
-                                            )}
-                                        </td>
-                                    </>
-                                )}
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[sev.tone]}`}
-                                    >
-                                        {sev.label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${stat.cls}`}
-                                    >
-                                        <StatusIcon className="h-3 w-3" />
-                                        {stat.label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    {c.assigned_to ? (
-                                        <span className="text-xs text-foreground">
-                                            {c.assigned_to.name}
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground">
-                                            Unassigned
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                                        {c.flags.has_alert ? (
-                                            <RadioTower
-                                                className="h-3.5 w-3.5 text-status-info"
-                                                aria-label="Active alert"
-                                            />
-                                        ) : null}
-                                        {c.flags.referral_overdue ? (
-                                            <span
-                                                className="inline-flex h-5 w-5 items-center justify-center rounded-full ring-2 ring-status-critical"
-                                                aria-label="Referral indicated, none logged"
-                                            >
-                                                <Landmark className="h-3 w-3 text-status-critical" />
-                                            </span>
-                                        ) : c.flags.requires_referral ? (
-                                            <Landmark
-                                                className="h-3.5 w-3.5 text-status-warning"
-                                                aria-label="External referral"
-                                            />
-                                        ) : null}
-                                        {c.flags.review_due ? (
-                                            <Clock
-                                                className="h-3.5 w-3.5 text-status-warning"
-                                                aria-label="Risk review due"
-                                            />
-                                        ) : null}
-                                        {c.flags.action_overdue ? (
-                                            <ListTodo
-                                                className="h-3.5 w-3.5 text-status-critical"
-                                                aria-label="Overdue action"
-                                            />
-                                        ) : null}
-                                        {c.attachments_count > 0 ? (
-                                            <span
-                                                className="inline-flex items-center gap-0.5"
-                                                aria-label={`${c.attachments_count} evidence file${c.attachments_count === 1 ? '' : 's'}`}
-                                            >
-                                                <Paperclip className="h-3.5 w-3.5" />
-                                                <span className="text-[10px] font-medium">
-                                                    {c.attachments_count}
-                                                </span>
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+        <RecordTable
+            title="Concerns"
+            sub="Every concern is triaged, risk-assessed and worked through to a safe close — confidential, blame-free, and visible only to those who need to know."
+            columns={columns}
+            rows={rows}
+            rowKey={(c) => c.id}
+            onOpen={onOpen}
+            canOpen={(c) => !c.restricted}
+            actionsFor={actionsFor}
+            menuTitle={(c) => c.reference_number}
+            menuIcon={Shield}
+            empty={
+                <p className="sg-quiet px-4 py-6">
+                    <span>
+                        <b>No concerns here.</b> Nothing matches this view and these filters.
+                    </span>
+                </p>
+            }
+            footer={footer}
+        />
     );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Reviews / monitoring worklist                                      */
+/*  Reviews due                                                        */
 /* ------------------------------------------------------------------ */
 
 function ReviewTable({
     rows,
     onOpen,
+    footer,
 }: {
     rows: ReviewRow[];
-    onOpen: (
-        id: number,
-        opts?: { action?: ActionKey; section?: SectionKey },
-    ) => void;
+    onOpen: (row: ReviewRow) => void;
+    footer: ReactNode;
 }) {
-    if (!rows.length) {
-        return (
-            <div className="px-4 py-16 text-center">
-                <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-status-success/50" />
-                <p className="font-medium text-muted-foreground">
-                    Nothing to review
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                    No risk reviews are due and every authority has
-                    acknowledged.
-                </p>
-            </div>
-        );
-    }
+    const columns: RecordTableColumn<ReviewRow>[] = [
+        { key: 'reference', label: 'Reference', nowrap: true, cell: (r) => <b className="font-semibold">{r.reference_number}</b> },
+        {
+            key: 'due-what',
+            label: 'What’s due',
+            className: 'min-w-[14rem]',
+            cell: (r) => (
+                <RecordIdentity
+                    leading={r.kind === 'risk' ? <Clock aria-hidden="true" className="size-4" /> : <Landmark aria-hidden="true" className="size-4" />}
+                    title={r.kind === 'risk' ? 'Risk review' : 'Reply from the authority'}
+                    sub={r.kind === 'risk' ? undefined : r.detail.replace(/^Acknowledgement awaited · /, '')}
+                />
+            ),
+        },
+        {
+            key: 'subject',
+            label: 'Subject',
+            nowrap: true,
+            cell: (r) =>
+                r.restricted ? (
+                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                        <Lock aria-hidden="true" className="size-3.5" /> Restricted
+                    </span>
+                ) : (
+                    (r.subject ?? <span className="text-muted-foreground">—</span>)
+                ),
+        },
+        {
+            key: 'owner',
+            label: 'Owner',
+            nowrap: true,
+            cell: (r) => (r.owner ? <RecordPerson name={r.owner} /> : <span className="text-muted-foreground">Unassigned</span>),
+        },
+        {
+            key: 'due',
+            label: 'Due',
+            nowrap: true,
+            cell: (r) =>
+                !r.due_at ? (
+                    <span className="text-muted-foreground">—</span>
+                ) : r.overdue ? (
+                    <StatusBadge variant="critical">{formatDate(r.due_at)} · overdue</StatusBadge>
+                ) : (
+                    formatDate(r.due_at)
+                ),
+        },
+    ];
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                        <th className="px-4 py-2.5">Reference</th>
-                        <th className="px-4 py-2.5">What's due</th>
-                        <th className="px-4 py-2.5">Subject</th>
-                        <th className="px-4 py-2.5">Owner</th>
-                        <th className="px-4 py-2.5">Due</th>
-                        <th className="px-4 py-2.5"></th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y">
-                    {rows.map((r, i) => {
-                        const open = () =>
-                            onOpen(
-                                r.id,
-                                r.open_section
-                                    ? { section: r.open_section }
-                                    : undefined,
-                            );
-                        const actionLabel =
-                            r.kind === 'risk' ? 'Review' : 'Record ack';
-                        return (
-                            <tr
-                                key={`${r.id}-${r.kind}-${i}`}
-                                onClick={open}
-                                tabIndex={0}
-                                aria-label={`${actionLabel} for ${r.reference_number}`}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        open();
-                                    }
-                                }}
-                                className="cursor-pointer transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-                            >
-                                <td className="px-4 py-3 align-top font-medium whitespace-nowrap">
-                                    {r.reference_number}
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex items-start gap-2">
-                                        {r.kind === 'risk' ? (
-                                            <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
-                                        ) : (
-                                            <Landmark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-info" />
-                                        )}
-                                        <span>{r.detail}</span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    {r.restricted ? (
-                                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                            <Lock className="h-3 w-3" />{' '}
-                                            Restricted
-                                        </span>
-                                    ) : (
-                                        (r.subject ?? '—')
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 align-top text-xs text-muted-foreground">
-                                    {r.owner ?? 'Unassigned'}
-                                </td>
-                                <td className="px-4 py-3 align-top whitespace-nowrap">
-                                    {r.due_at ? (
-                                        <span
-                                            className={`inline-flex items-center gap-1 text-xs ${r.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}
-                                        >
-                                            <Clock className="h-3.5 w-3.5" />
-                                            {formatDateTime(r.due_at)}
-                                            {r.overdue ? ' · overdue' : ''}
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground">
-                                            —
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 text-right align-top">
-                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-                                        <Eye className="h-3.5 w-3.5" />{' '}
-                                        {actionLabel}
-                                    </span>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+        <RecordTable
+            title="Reviews due"
+            sub="Risk reviews, and replies due from authorities · click a row to review it or record the reply"
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => `${r.id}-${r.kind}-${r.due_at ?? ''}`}
+            onOpen={onOpen}
+            actionsFor={(r) => [
+                {
+                    label: r.kind === 'risk' ? 'Review' : 'Record the reply',
+                    icon: r.kind === 'risk' ? Clock : Landmark,
+                    onClick: () => onOpen(r),
+                },
+            ]}
+            menuTitle={(r) => r.reference_number}
+            menuIcon={Clock}
+            empty={
+                <p className="sg-quiet px-4 py-6">
+                    <span>
+                        <b>Nothing to review.</b> No risk reviews are due and every authority has acknowledged.
+                    </span>
+                </p>
+            }
+            footer={footer}
+        />
     );
 }

@@ -66,7 +66,8 @@ function initials(name: string): string {
     return (
         name
             .split(/\s+/)
-            .filter(Boolean)
+            // only words that start with a letter: "Visitor (not staff)" → "VN", not "V("
+            .filter((w) => /^\p{L}/u.test(w))
             .slice(0, 2)
             .map((w) => w[0])
             .join('')
