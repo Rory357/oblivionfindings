@@ -1,3 +1,4 @@
+import { plainLabel } from '@/components/control-room/alert-record/alert-labels';
 import { ControlRoomPage } from '@/components/control-room/control-room-page';
 import {
     ControlRoomRowActions,
@@ -319,7 +320,7 @@ export default function PlaybooksIndex({
                                 <ProcedureRow
                                     key={pb.id}
                                     playbook={pb}
-                                    category={categories[pb.category] ?? pb.category}
+                                    category={categories[pb.category] ?? plainLabel(pb.category)}
                                     canManage={can.manage}
                                     items={rowActions(pb)}
                                     onTurnOff={() => setTurningOff(pb)}

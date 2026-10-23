@@ -165,7 +165,7 @@ function asRow(journey: SafetyJourney): AlertWorklistRow {
         id: journey.alert.id,
         reference_number: journey.alert.reference_number,
         summary: journey.alert.summary,
-        source: { key: 'incident_report', label: 'Incident report' },
+        source: { key: 'incident_report', label: '' },
         status: journey.alert.status as AlertWorklistRow['status'],
         severity: journey.alert.severity as AlertWorklistRow['severity'],
         priority: journey.priority,
@@ -265,7 +265,7 @@ export default function SafetyHandovers({
                     <LiveResponseSearch
                         value={filters.search ?? ''}
                         onApply={(search) => apply({ search: search || undefined })}
-                        placeholder="Search alert, incident or H&S reference"
+                        placeholder="Search alerts"
                     />
                 ),
                 meters: (
@@ -509,7 +509,6 @@ function JourneyRow({
                             ) : null}
                             <span className="tabular-nums">{refs.join(' · ')}</span>
                         </span>
-                        <span className="text-caption mt-1 block">{stage.explanation}</span>
                     </Button>
                     <div className="flex shrink-0 items-center gap-1">
                         <Button type="button" size="sm" variant="outline" onClick={runNext}>

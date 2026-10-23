@@ -387,7 +387,7 @@ export default function ControlRoomStats({
                             <TableBody>
                                 {shift_comparison.map((duty, index) => (
                                     <TableRow key={`${duty.name}-${index}`}>
-                                        <TableHead scope="row" className="font-medium text-foreground">
+                                        <TableHead scope="row" className="font-medium whitespace-normal text-foreground">
                                             {duty.name}
                                         </TableHead>
                                         <TableCell className="text-right tabular-nums">

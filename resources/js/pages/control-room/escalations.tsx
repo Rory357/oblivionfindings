@@ -147,7 +147,7 @@ export default function Escalations({
                     <LiveResponseSearch
                         value={filters.search ?? ''}
                         onApply={(search) => visit({ search: search || null })}
-                        placeholder="Search reference, type or summary"
+                        placeholder="Search alerts"
                     />
                 ),
                 meters: (

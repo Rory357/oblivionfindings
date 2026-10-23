@@ -20,6 +20,7 @@ import {
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
 } from '@/components/page';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
     Table,
@@ -319,6 +320,15 @@ export default function ControlRoomReports({
                 ),
             }}
         >
+            {total === 0 ? (
+                <Card className="min-w-0 px-5 py-10">
+                    <EmptyState
+                        icon={CalendarRange}
+                        title="No alerts in this period"
+                        description="Nothing was raised in the dates chosen. Pick a longer period in the header to see more."
+                    />
+                </Card>
+            ) : (
             <div className="grid min-w-0 gap-5 lg:grid-cols-2">
                 <ReportPanel
                     id="daily-trend"
@@ -526,6 +536,7 @@ export default function ControlRoomReports({
                     )}
                 </ReportPanel>
             </div>
+            )}
         </ControlRoomPage>
     );
 }

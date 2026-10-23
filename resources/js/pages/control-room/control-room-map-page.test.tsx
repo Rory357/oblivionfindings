@@ -153,7 +153,7 @@ function props(
             position_access: true,
             title: 'Location access follows purpose',
             description:
-                'Positions come from the canonical Tracking workspace. Current Site access, source permissions, purpose, consent and collection state must all agree.',
+                'Positions come from Tracking. A position only shows when site access, permission, purpose and consent all allow it.',
             canonical_url: '/security-devices/tracking',
         },
         filters: { site_id: '2', type: null, status: null, alert_only: null },

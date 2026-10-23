@@ -1708,9 +1708,9 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     .cr-live:not(.cr-live--stale) .cr-live-dot::after {
         content: '';
         position: absolute;
-        inset: -3px;
+        inset: -2px;
         border-radius: 50%;
-        border: 2px solid oklch(from var(--live) 0.86 calc(c * 1.4) h);
+        border: 1.5px solid oklch(from var(--live) 0.86 calc(c * 1.4) h);
         animation: cr-live-pulse 2.4s ease-out infinite;
     }
     .cr-lens--late {
@@ -1719,12 +1719,12 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 }
 @keyframes cr-live-pulse {
     0% {
-        opacity: 0.9;
-        transform: scale(0.6);
+        opacity: 0.7;
+        transform: scale(0.8);
     }
     100% {
         opacity: 0;
-        transform: scale(1.9);
+        transform: scale(2.2);
     }
 }
 @keyframes cr-lens-late {

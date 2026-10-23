@@ -47,6 +47,8 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+const SEVERITY_KEYS = new Set(['low', 'medium', 'high', 'critical']);
+
 /** A titled group: icon, title, one line of what it's for, and its own action. */
 function SettingsCard({
     icon: Icon,
@@ -190,8 +192,11 @@ export function RoutingView({
                     </TableHeader>
                     <TableBody>
                         {rules.map((rule) => {
+                            // Severities outside the four levels (e.g. info) read as plain words.
                             const severity = rule.output_severity
-                                ? severityBadge(rule.output_severity)
+                                ? SEVERITY_KEYS.has(rule.output_severity)
+                                    ? severityBadge(rule.output_severity)
+                                    : { label: plainLabel(rule.output_severity), tone: 'neutral' as const }
                                 : null;
                             return (
                                 <RowMenu
@@ -400,12 +405,15 @@ export function SourcesView({ sources }: { sources: SignalSourceOption[] }) {
                     <EmptyState icon={Radio} title="No signal sources" description="Connect a source in Security & Devices." />
                 </div>
             ) : (
-                <ul className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
+                <ul className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
                     {sources.map((source) => {
                         const status = SOURCE_STATUS[source.status] ?? SOURCE_STATUS.inactive;
                         const beat = heartbeat(source.last_heartbeat_at);
                         return (
-                            <li key={source.id} className="grid gap-2 bg-card px-5 py-4">
+                            <li
+                                key={source.id}
+                                className="grid content-start gap-2 rounded-[12px] border border-border px-4 py-3.5"
+                            >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <p className="font-semibold text-foreground">{source.name}</p>
@@ -667,7 +675,6 @@ export function OptionsView({
                         icon={group.key === 'task_category' ? ListChecks : SlidersHorizontal}
                         title={group.title}
                         caption={group.caption}
-                        count={items.length}
                         action={
                             <Button
                                 type="button"

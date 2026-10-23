@@ -618,7 +618,7 @@ export default function ControlRoomMap({
                         >
                             <PageHeaderMeterBig>{stats.total_devices}</PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                governed tracker positions
+                                trackers with a position
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock

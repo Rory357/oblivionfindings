@@ -9,13 +9,7 @@ import {
     ControlRoomRowActions,
     type ControlRoomRowAction,
 } from '@/components/control-room/control-room-row-actions';
-import {
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
-    PageHeaderPrimaryButton,
-} from '@/components/page';
-import { Button } from '@/components/ui/button';
+import { PageHeaderPrimaryButton } from '@/components/page';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -112,18 +106,6 @@ export default function ControlRoomBroadcast({
                         New broadcast
                     </PageHeaderPrimaryButton>
                 ) : undefined,
-                meters: (
-                    <PageHeaderMeterBlock
-                        label="Broadcasts sent"
-                        href={BASE_PATH}
-                        ariaLabel="Show every broadcast, newest first"
-                    >
-                        <PageHeaderMeterBig>{broadcasts.total}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            to staff you can reach
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                ),
             }}
         >
             <Card className="min-w-0 gap-0 overflow-hidden py-0">
@@ -147,17 +129,6 @@ export default function ControlRoomBroadcast({
                             icon={Megaphone}
                             title="No broadcasts yet"
                             description="Broadcasts sent to staff show here with what was delivered."
-                            action={
-                                can.manage ? (
-                                    <Button
-                                        type="button"
-                                        onClick={() => setComposerOpen(true)}
-                                    >
-                                        <Plus aria-hidden="true" />
-                                        New broadcast
-                                    </Button>
-                                ) : undefined
-                            }
                         />
                     </div>
                 ) : (

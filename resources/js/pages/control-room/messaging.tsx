@@ -403,7 +403,13 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                 ),
             }}
         >
-            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(320px,0.42fr)_minmax(0,1fr)]">
+            <div
+                className={
+                    threads.length === 0
+                        ? 'grid min-w-0 gap-5'
+                        : 'grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(320px,0.42fr)_minmax(0,1fr)]'
+                }
+            >
                 <Card className="min-w-0 gap-0 overflow-hidden py-0">
                     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
                         <div className="min-w-0">
@@ -442,6 +448,8 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                     )}
                 </Card>
 
+                {/* No conversations at all: one message, not two empty boxes. */}
+                {threads.length > 0 ? (
                 <Card className="flex h-[640px] min-w-0 flex-col gap-0 overflow-hidden py-0">
                     {activeThread ? (
                         <>
@@ -571,6 +579,7 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                         </div>
                     )}
                 </Card>
+                ) : null}
             </div>
 
             {can.manage ? (

@@ -283,7 +283,7 @@ export default function ControlRoomShifts({
                             ariaLabel="Show critical alerts"
                         >
                             <PageHeaderMeterBig>{criticalAlertsCount}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>act first</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>answer these first</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         {duty ? (
                             <PageHeaderMeterBlock
@@ -364,7 +364,6 @@ export default function ControlRoomShifts({
                             <CurrentDutyCard duty={duty} actions={dutyActions()} />
                             <OperatorNotes
                                 notes={notes}
-                                onAdd={canNote ? () => setNoteOpen(true) : undefined}
                             />
                         </>
                     ) : (

@@ -175,7 +175,13 @@ export default function MyTasks({
                 ),
             }}
         >
-            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+            <div
+                className={
+                    my_alerts.length === 0 && !my_shift
+                        ? 'grid min-w-0 gap-5'
+                        : 'grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]'
+                }
+            >
                 <div className="flex min-w-0 flex-col gap-5">
                     <div id="my-alerts" className="scroll-mt-5">
                         <ResponseWorklist
@@ -268,7 +274,12 @@ export default function MyTasks({
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-5">
-                    <AlertPreview row={selection.row} detail={detail} onRun={actions.run} />
+                    <AlertPreview
+                        row={selection.row}
+                        detail={detail}
+                        onRun={actions.run}
+                        hideWhenEmpty={my_alerts.length === 0}
+                    />
                     {my_shift ? (
                         <Card className="gap-3 px-5 py-5">
                             <div className="flex items-start justify-between gap-3">
