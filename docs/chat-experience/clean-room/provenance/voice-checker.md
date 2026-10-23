@@ -255,10 +255,47 @@ The checker session (`claude/voice-checker-signoff-49310d`) found the code clean
   - The checker's hostile file (400,000 small blocks, then that packet) is a new worst-case test.
 - **F4, fragment sample-description indexes.** `trex` and `tfhd` must now name sample entry 1, the only one in `stsd`. New test: `mp4_sample_entries`.
 
+## Checker recheck (23 October 2026)
+
+By the checker session, on its branch with `98ed39a95` merged in.
+
+**Verdict: not signed off yet.** F1 to F4 are fixed. A second look at the time and memory limits found two more problems in the MP4 parser. They have been there since `39f868e17`; the first pass missed them.
+
+### F1 to F4: fixed
+
+| Finding | Recheck |
+|---|---|
+| F1, Vorbis | The understated 200 s and 600 s files and an honest 600 s libvorbis file are all `blocked`, by the checker alone and with ffprobe. Ogg Opus behaves as before. |
+| F2, the throw with ffprobe | Neither the honest 600 s Vorbis file nor a real 10-minute libopus WebM throws with ffprobe configured. The WebM comes back `blocked`, `voice_too_long`. The output callback never throws, and the stop is guarded. |
+| F3, the padding loop | One 20 MiB padding packet now takes 0.01–0.03 s (it took 1.1–1.2 s). The combined file stops at the 1.5 s budget, about 1.51 s. The early exit only stops sooner on packets that were already invalid. |
+| F4, sample-description indexes | `trex` and `tfhd` must name entry 1. A new bad-file test covers it. |
+
+Similarity re-run on the changed files: the best coverage is still 1.0–5.9 %, and no run is longer than 20 tokens.
+
+### New findings
+
+- **F5: an MP4 can still pass the 2-second limit. Must fix.**
+  - At the end of `Mp4VoiceParser::parse()`, every sample range (one per chunk or track run) is checked against the list of `mdat` boxes by scanning that list from the start. The budget is checked once per 256 ranges.
+  - So a file with many small `mdat` boxes, and chunks whose bytes all sit in the last one, makes each group of 256 ranges scan the whole list.
+  - The probe was a 2.67 MiB file: an otherwise valid `moov` whose 100,000 one-byte chunks sit in the last of 300,000 top-level `mdat` boxes. It took 4.50 s, then 5.09 s on a second run, before it was blocked.
+  - At the part limit the budget trips earlier (about 1.6 s), so the worst case is in the middle.
+  - Direction: `mdat` boxes arrive in file order and cannot overlap, so a range can be found by halving the list; or the inner scan can count against the budget.
+- **F6: an MP4 can make PHP use about 280 MiB. Should fix, or Stephan confirms the server's memory limit.**
+  - `children()` collects every child box of a container into one list before walking it. The `mdat` and range lists also grow with the file.
+  - A valid MP4 whose `moov` holds 900,000 empty `free` boxes (6.9 MiB) passes as ready and peaks at 280 MiB.
+  - The `mdat` probe above peaks at 120–240 MiB.
+  - Herd's limit here is 1024M, but the production limit is not recorded in the repository. Running out of memory is a fatal error that no `catch` stops: the upload request would fail and the upload would stay "scanning".
+  - WebM and Ogg keep no lists that grow with the file.
+  - Direction: walk the boxes one at a time instead of collecting them, and keep the `mdat` and range lists compact. Or run the check in a child process with its own memory cap, as `HubPdfText` already does for PDFs.
+
 ## Open questions
 
 - **Safari.** Real Safari recordings (5 s and 119 s) are still needed from a Mac or an iPhone. The MP4 parser has only seen Chrome's fragmented MP4 and generated files.
 - **Disagreement reporting.** Should a disagreement with ffprobe also show in Settings › Chat › Service health, or get its own error code? Today it is logged, and the person sees "could not be verified".
 - **Unused error code.** `voice_check_unavailable` is no longer produced. The browser still understands it, and it is harmless.
-- **Vorbis (F1).** Stephan decides between refusing Vorbis voice notes, decoding the Vorbis mode table, and accepting Vorbis only with the ffprobe second opinion.
-- **Sign-off.** Once F1 to F3 are fixed, a checker session re-runs the voice tests (with and without ffprobe) and the three probe files from the review: the understated Vorbis file, the long file with ffprobe configured, and the padding file. It then signs off REGISTER.md. The similarity check needs re-running only on the files that change.
+- **Production memory limit (F6).** The PHP `memory_limit` on the servers is not recorded in the repository. F6 matters only if it is below about 300 MiB.
+- **Sign-off.** Once F5 is fixed, and F6 is fixed or the server limit is confirmed, a checker session:
+  - re-runs the voice tests with and without ffprobe;
+  - re-runs the review's probes: the understated Vorbis file, the long file with ffprobe configured, the padding file, and the many-`mdat` and many-`free` MP4 files;
+  - re-runs the similarity check on the files that change;
+  - then signs off REGISTER.md.
