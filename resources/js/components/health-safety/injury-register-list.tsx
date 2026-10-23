@@ -1,14 +1,21 @@
-import { EntityCard } from '@/components/lists/entity-card';
-import { EntityChip, PersonCell } from '@/components/lists/entity-cells';
-import { EntityContextMenu, useEntityContextMenu, type MenuItem } from '@/components/lists/entity-menu';
-import { EntityTable, type EntityTableColumn } from '@/components/lists/entity-table';
-import { ListCaption } from '@/components/lists/list-caption';
+/**
+ * The injury register table (approved H&S drawings pg-hsn-86, 86b — Stephan 23
+ * Oct 2026): each row names the injury first with its reference under it and
+ * shows where it is up to as the five stage dots (Reported › Under treatment ›
+ * Return to work › Recovered › Closed) — the same stages as the injury page.
+ * The kebab and right-click open the same permitted action list.
+ */
+import { dateWithYear } from '@/components/incidents/incident-stages';
+import { RecordIdentity, RecordPerson, RecordTable } from '@/components/incidents/record-table';
+import type { MenuItem } from '@/components/lists/entity-menu';
+import { Ring, StageDots } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { formatTime } from '@/lib/datetime';
 import { injuryHref } from '@/lib/health-safety/injury-navigation';
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { FileText, HeartPulse, History, Link2, Paperclip, Stethoscope } from 'lucide-react';
-import { severityLabel, statusLabel } from './injury-constants';
+import type { ReactNode } from 'react';
+import { SEVERITY_TONE, severityLabel, STATUS_ORDER, statusLabel } from './injury-constants';
 import type { InjuryRow } from './injury-types';
 
 export type InjuryRegisterRow = Omit<InjuryRow, 'rtw_count' | 'capacity_count' | 'attachment_count'> & {
@@ -17,11 +24,20 @@ export type InjuryRegisterRow = Omit<InjuryRow, 'rtw_count' | 'capacity_count' |
     source_integrity?: 'valid' | 'unknown' | 'repair_required';
 };
 
-/** Both list views share one canonical case identity and one permitted action menu. */
-export function InjuryRegisterList({ rows, total, returnTo, medical }: {
+/** Where an injury is up to on its five stages (1-based) — shared with the injury page. */
+export function injuryStage(status: string): { stage: number; label: string; tone?: 'success' } {
+    const index = STATUS_ORDER.indexOf(status as (typeof STATUS_ORDER)[number]);
+    return { stage: index < 0 ? 1 : index + 1, label: statusLabel(status), tone: status === 'closed' ? 'success' : undefined };
+}
+
+/** One canonical case identity and one permitted action menu for every row. */
+export function InjuryRegisterList({ rows, total, returnTo, medical, sub, footer }: {
     rows: InjuryRegisterRow[]; total: number; returnTo: string; medical: boolean;
+    /** The table's sub-line (the WorkSafe caption). */
+    sub?: ReactNode;
+    /** The pages under the table. */
+    footer?: ReactNode;
 }) {
-    const context = useEntityContextMenu<InjuryRegisterRow>();
     const open = (row: InjuryRegisterRow, section: 'overview' | 'recovery' | 'capacity' | 'connections' | 'evidence' | 'history' = 'overview') => router.get(injuryHref(row.id, { section, returnTo }));
     const actions = (row: InjuryRegisterRow): MenuItem[] => [
         { label: 'Open injury', icon: FileText, onClick: () => open(row) },
@@ -34,32 +50,33 @@ export function InjuryRegisterList({ rows, total, returnTo, medical }: {
         { label: 'History', icon: History, onClick: () => open(row, 'history') },
     ];
     const count = (value: number | null) => value === null ? 'Not confirmed' : String(value);
-    const columns: EntityTableColumn<InjuryRegisterRow>[] = [
-        { key: 'worker', label: 'Worker', width: '1.2fr', cell: (row) => <PersonCell name={row.worker?.name} /> },
-        { key: 'site', label: 'Recorded Site', width: '1fr', cell: (row) => <EntityChip>{row.site?.name ?? 'Site unavailable'}</EntityChip> },
-        { key: 'occurred', label: 'Occurred', width: '1.3fr', cell: (row) => <span className="text-subtle whitespace-normal">{formatDateTimeLong(row.injury_date)}</span> },
-        { key: 'severity', label: 'Severity', width: '0.9fr', cell: (row) => <StatusBadge status={row.severity}>{severityLabel(row.severity)}</StatusBadge> },
-        { key: 'status', label: 'Status', width: '1fr', cell: (row) => <StatusBadge status={row.status}>{statusLabel(row.status)}</StatusBadge> },
-        { key: 'lost', label: 'Days lost', width: '72px', cell: (row) => <EntityChip>{row.lost_time_days}</EntityChip> },
-        ...(medical ? [{ key: 'recovery', label: 'Supporting records', width: '1.3fr', cell: (row: InjuryRegisterRow) => <span className="text-caption whitespace-normal">{count(row.rtw_count)} plans · {count(row.capacity_count)} assessments · {count(row.attachment_count)} files</span> }] : []),
-    ];
-    return <div className="space-y-5">
-        <ListCaption title="Matching injuries" caption={`${rows.length} of ${total} shown`} />
-        {rows.length === 0 ? <div className="rounded-xl border border-border bg-card p-5"><h2 className="text-section-title">No injuries match these filters</h2><p className="text-subtle mt-2">Change the filters to find another record.</p></div> : <>
-            <ul className="grid gap-5 md:hidden" aria-label="Workplace injuries">{rows.map((row) => <li key={row.id}>
-                <EntityCard meridian={row.source_integrity === 'repair_required' ? 'warning' : 'neutral'} icon={HeartPulse} name={row.reference} subline={`${row.injury_type_label} · ${row.site?.name ?? 'Site unavailable'}`}
-                    href={injuryHref(row.id, { returnTo })} linkLabel={`Open injury ${row.reference}`} onOpen={() => open(row)}
-                    className="[&_a]:inline-flex [&_a]:min-h-[44px] [&_a]:items-center [&_a]:focus-visible:ring-2 [&_a]:focus-visible:ring-ring"
-                    actions={actions(row)} onContextMenu={(event) => context.open(event, row)}
-                    chips={<><StatusBadge status={row.status}>{statusLabel(row.status)}</StatusBadge><StatusBadge status={row.severity}>{severityLabel(row.severity)}</StatusBadge><EntityChip>{row.lost_time_days} recorded days lost</EntityChip></>}
-                    alerts={<>{row.worksafe_notifiable && <StatusBadge variant="warning">WorkSafe flag recorded</StatusBadge>}{row.source_integrity === 'repair_required' && <StatusBadge variant="warning">Source needs review</StatusBadge>}</>}
-                    footer={{ personName: row.worker?.name, primary: row.worker?.name ?? 'Worker unavailable', secondary: formatDateTimeLong(row.injury_date) }} />
-            </li>)}</ul>
-            <div className="hidden md:block"><EntityTable rows={rows} rowKey={(row) => row.id} identityLabel="Injury" identityWidth="1.3fr" wrapIdentity minWidth={medical ? 1200 : 1000} rowHeight="content"
-                identity={(row) => ({ icon: HeartPulse, name: row.reference, subline: row.injury_type_label, linkLabel: `Open injury ${row.reference}`, extra: <>{row.worksafe_notifiable && <StatusBadge variant="warning">WorkSafe flag</StatusBadge>}{row.source_integrity === 'repair_required' && <StatusBadge variant="warning">Source needs review</StatusBadge>}</> })}
-                columns={columns} actionsFor={actions} onOpen={(row) => open(row)} hrefFor={(row) => injuryHref(row.id, { returnTo })} onRowContextMenu={(event, row) => context.open(event, row)} />
-            </div>
-        </>}
-        {context.ctx && <EntityContextMenu x={context.ctx.x} y={context.ctx.y} icon={HeartPulse} title={context.ctx.record.reference} items={actions(context.ctx.record)} onClose={context.close} />}
-    </div>;
+    return <RecordTable
+        title="Injuries"
+        sub={sub}
+        ariaLabel="Workplace injuries"
+        rows={rows}
+        rowKey={(row) => row.id}
+        onOpen={(row) => open(row)}
+        actionsFor={actions}
+        menuTitle={(row) => `${row.reference} · ${row.injury_type_label}`}
+        menuIcon={HeartPulse}
+        columns={[
+            { key: 'injury', label: 'Injury', className: 'min-w-[12rem]', cell: (row) => <RecordIdentity
+                title={<Link href={injuryHref(row.id, { returnTo })} onClick={(event) => event.stopPropagation()} aria-label={`Open injury ${row.reference}`}
+                    className="rounded-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{row.injury_type_label}</Link>}
+                sub={<>{row.reference}{row.source_integrity === 'repair_required' ? <span className="mt-1 flex"><StatusBadge variant="warning">Source needs review</StatusBadge></span> : null}</>} /> },
+            { key: 'worker', label: 'Worker', nowrap: true, cell: (row) => row.worker?.name ? <RecordPerson name={row.worker.name} /> : <span className="text-muted-foreground">Worker unavailable</span> },
+            { key: 'site', label: 'Site', nowrap: true, cell: (row) => row.site?.name ?? <span className="text-muted-foreground">Site unavailable</span> },
+            { key: 'date', label: 'Date', nowrap: true, cell: (row) => row.injury_date ? <RecordIdentity title={dateWithYear(row.injury_date)} sub={formatTime(row.injury_date)} /> : <span className="text-muted-foreground">Not recorded</span> },
+            { key: 'severity', label: 'Severity', nowrap: true, cell: (row) => <div className="grid justify-items-start gap-1">
+                <StatusBadge variant={SEVERITY_TONE[row.severity] ?? 'neutral'}>{severityLabel(row.severity)}</StatusBadge>
+                {row.worksafe_notifiable ? <span className="text-subtle">WorkSafe flag</span> : null}
+            </div> },
+            { key: 'stage', label: 'Where it’s up to', nowrap: true, cell: (row) => { const stage = injuryStage(row.status); return <StageDots stage={stage.stage} of={STATUS_ORDER.length} label={stage.label} tone={stage.tone} />; } },
+            { key: 'lost', label: 'Days lost', nowrap: true, cell: (row) => <span className="tabular-nums">{row.lost_time_days}</span> },
+            ...(medical ? [{ key: 'linked', label: 'Linked records', nowrap: true, cell: (row: InjuryRegisterRow) => <span className="text-subtle">{count(row.rtw_count)} plans · {count(row.capacity_count)} assessments · {count(row.attachment_count)} files</span> }] : []),
+        ]}
+        empty={<p className="sg-quiet"><Ring tone="none" /><span>No injuries match these filters. Change the filters to find another record.</span></p>}
+        footer={rows.length ? footer ?? <p className="text-subtle">{`${rows.length} of ${total} shown`}</p> : undefined}
+    />;
 }

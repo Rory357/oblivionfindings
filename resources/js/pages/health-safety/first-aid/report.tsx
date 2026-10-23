@@ -1,8 +1,24 @@
-import { FirstAidTreatmentWizard } from '@/components/health-safety/first-aid/treatment-wizard';
+/**
+ * Record first aid (approved H&S drawing pg-hsn-84 — Stephan 23 Oct 2026):
+ * only the header changes — the treatment wizard's five steps run in it as
+ * one line. The wizard itself (its steps, fields, checks and wording) is
+ * unchanged and still opens as the Record first aid pop-up.
+ */
+import {
+    FIRST_AID_TREATMENT_STEPS,
+    FirstAidTreatmentWizard,
+} from '@/components/health-safety/first-aid/treatment-wizard';
 import type { FirstAidPickers } from '@/components/health-safety/first-aid/types';
-import { PageHeader, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+    PageHeader,
+    PageHeaderPrimaryButton,
+    PageLayout,
+} from '@/components/page';
+import {
+    PageHeaderStages,
+    type PageHeaderStage,
+} from '@/components/page/page-header-strip';
+import { Note } from '@/components/signature/blocks';
 import {
     SafetyFormDraftContext,
     useSafetyWorkspaceDrafts,
@@ -13,8 +29,8 @@ import {
     firstAidReturn,
 } from '@/lib/health-safety/first-aid-navigation';
 import { Head, router, usePage } from '@inertiajs/react';
-import { HeartPulse } from 'lucide-react';
-import { useState } from 'react';
+import { HeartPulse, Info, Plus } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 export default function FirstAidReport({
     pickers,
@@ -31,13 +47,37 @@ export default function FirstAidReport({
             ? '/dashboard'
             : selectedReturn;
     const [open, setOpen] = useState(true);
+    const [progress, setProgress] = useState({ step: 0, saved: false });
+    const onStepChange = useCallback(
+        (step: number, saved: boolean) => setProgress({ step, saved }),
+        [],
+    );
     const drafts = useSafetyWorkspaceDrafts();
+    const steps: PageHeaderStage[] = FIRST_AID_TREATMENT_STEPS.map(
+        (item, index) => ({
+            label: item.label,
+            meta: item.blurb,
+            state:
+                progress.saved || index < progress.step
+                    ? 'done'
+                    : index === progress.step
+                      ? 'now'
+                      : 'todo',
+        }),
+    );
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 ...(can.view
-                    ? [{ title: 'First aid', href: FIRST_AID_REGISTER }]
+                    ? [
+                          { title: 'Health & safety', href: '/health-safety' },
+                          {
+                              title: 'Safety registers',
+                              href: '/health-safety/registers',
+                          },
+                          { title: 'First aid', href: FIRST_AID_REGISTER },
+                      ]
                     : []),
                 {
                     title: 'Record first aid',
@@ -51,38 +91,41 @@ export default function FirstAidReport({
                     hero={
                         <PageHeader
                             variant="profile"
-                            frontline
                             wrapTitle
                             icon={HeartPulse}
                             title="Record first aid"
                             backHref={returnTo}
-                            subline="Record treatment, the person involved and what happened next."
+                            subline="Record treatment, the person involved and what happened next"
+                            actions={
+                                !open ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={Plus}
+                                        onClick={() => setOpen(true)}
+                                        disabled={!can.create}
+                                    >
+                                        Record first aid
+                                    </PageHeaderPrimaryButton>
+                                ) : undefined
+                            }
+                            strip={
+                                <PageHeaderStages
+                                    steps={steps}
+                                    ariaLabel="Treatment report steps"
+                                />
+                            }
                         />
                     }
                 >
-                    <Card>
-                        <CardContent className="space-y-4 p-5 sm:p-6">
-                            <h2 className="text-section-title">
-                                Treatment report
-                            </h2>
-                            <p className="text-sm">
-                                Follow the guided form to record the treatment.
-                                A saved treatment has its own page for
-                                follow-ups, evidence and connected work.
-                            </p>
-                            <Button
-                                className="frontline-tap"
-                                onClick={() => setOpen(true)}
-                                disabled={!can.create}
-                            >
-                                Record first aid
-                            </Button>
-                        </CardContent>
-                    </Card>
+                    <Note icon={Info}>
+                        Follow the guided form to record the treatment. A saved
+                        treatment has its own page for follow-ups, evidence and
+                        connected work.
+                    </Note>
                     {open && (
                         <FirstAidTreatmentWizard
                             pickers={pickers}
                             returnTo={returnTo}
+                            onStepChange={onStepChange}
                             onClose={() =>
                                 drafts.request(() => {
                                     setOpen(false);

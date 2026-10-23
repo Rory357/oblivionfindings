@@ -1,31 +1,50 @@
-import { FirstAidFact } from '@/components/health-safety/first-aid/record-panels';
+/**
+ * First aid (approved H&S drawings pg-hsn-83, 83b — Stephan 23 Oct 2026): one
+ * header with the register filters and the five views on the rail, then the
+ * treatments as a table. Each row leads with the person treated; the outcome
+ * is a coloured state with "Ambulance called" under it; the date and first
+ * aider share one cell. The Needs incident review line stays word for word.
+ */
 import { FirstAidTreatmentWizard } from '@/components/health-safety/first-aid/treatment-wizard';
 import type {
     FirstAidPickers,
     FirstAidRecord,
 } from '@/components/health-safety/first-aid/types';
 import {
+    dateWithYear,
+    plural,
+} from '@/components/incidents/incident-stages';
+import {
+    RecordIdentity,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
+import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Note, Ring } from '@/components/signature/blocks';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { SelectInput } from '@/components/wizard/primitives';
 import {
     SafetyFormDraftContext,
     useSafetyWorkspaceDrafts,
 } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { formatTime } from '@/lib/datetime';
 import {
     FIRST_AID_REGISTER,
     firstAidHref,
@@ -34,20 +53,23 @@ import {
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Ambulance,
     ClipboardList,
     Download,
+    Eye,
+    FileText,
     HeartPulse,
-    LayoutList,
     Link2,
     Plus,
+    SlidersHorizontal,
+    X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
     OUTCOMES,
     PERSON_TYPES,
     injuryLabel,
     outcomeLabel,
+    outcomeTone,
     personTypeLabel,
 } from './options';
 
@@ -109,11 +131,11 @@ type Props = {
     report?: boolean;
 };
 const TABS = [
-    { key: 'all', label: 'All treatments', icon: LayoutList },
-    { key: 'ambulance', label: 'Ambulance called', icon: Ambulance },
-    { key: 'linked', label: 'Linked incidents', icon: Link2 },
-    { key: 'reportable', label: 'Needs incident review', icon: AlertTriangle },
-    { key: 'followup', label: 'Open follow-ups', icon: ClipboardList },
+    { key: 'all', label: 'All treatments' },
+    { key: 'ambulance', label: 'Ambulance called' },
+    { key: 'linked', label: 'Linked incidents' },
+    { key: 'reportable', label: 'Needs incident review' },
+    { key: 'followup', label: 'Open follow-ups' },
 ];
 const PERIODS = [
     { value: 'week', label: 'Last 7 days' },
@@ -121,6 +143,8 @@ const PERIODS = [
     { value: 'quarter', label: 'Last 3 months' },
     { value: 'all', label: 'All time' },
 ];
+const titleLink =
+    'rounded-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
 export default function FirstAidIndex({
     records,
@@ -129,7 +153,6 @@ export default function FirstAidIndex({
     filters,
     pickers,
     filterOptions,
-    hero,
     can,
     report = false,
 }: Props) {
@@ -159,8 +182,6 @@ export default function FirstAidIndex({
             preserveScroll: true,
             replace: true,
         });
-    const meterHref = (next: Partial<Filters> & { tab?: string }) =>
-        `${FIRST_AID_REGISTER}?${query(next)}`;
     const closeReport = () =>
         drafts.request(() => {
             setReporting(false);
@@ -170,10 +191,164 @@ export default function FirstAidIndex({
                 preserveScroll: true,
             });
         });
+    const moreActive = [
+        !!filters.treatment_outcome,
+        !!filters.first_aider_id,
+    ].filter(Boolean).length;
+    const filtered = !!(
+        filters.q ||
+        filters.site_id ||
+        filters.treated_person_type ||
+        moreActive ||
+        (filters.period && filters.period !== '30d')
+    );
+    const open = (record: FirstAidRow) =>
+        router.visit(firstAidHref(record.id, { returnTo }));
+    const actionsFor = (record: FirstAidRow): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open treatment record',
+                icon: Eye,
+                onClick: () => open(record),
+            },
+            {
+                label: 'Follow-ups',
+                icon: ClipboardList,
+                onClick: () =>
+                    router.visit(
+                        firstAidHref(record.id, {
+                            section: 'followups',
+                            returnTo,
+                        }),
+                    ),
+            },
+            {
+                label: 'Incident and review',
+                icon: Link2,
+                onClick: () =>
+                    router.visit(
+                        firstAidHref(record.id, {
+                            section: 'incident',
+                            returnTo,
+                        }),
+                    ),
+            },
+            {
+                label: 'Evidence',
+                icon: FileText,
+                onClick: () =>
+                    router.visit(
+                        firstAidHref(record.id, {
+                            section: 'evidence',
+                            returnTo,
+                        }),
+                    ),
+            },
+        ]);
+    const reference = (record: FirstAidRow) =>
+        record.reference ?? `FA-${record.id}`;
+    const columns: RecordTableColumn<FirstAidRow>[] = [
+        {
+            key: 'person',
+            label: 'Person treated',
+            className: 'min-w-[15rem]',
+            cell: (record) => (
+                <RecordIdentity
+                    title={
+                        <Link
+                            href={firstAidHref(record.id, { returnTo })}
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`Open ${reference(record)} · ${record.treated_person_name}`}
+                            className={titleLink}
+                        >
+                            {record.treated_person_name}
+                        </Link>
+                    }
+                    sub={[
+                        reference(record),
+                        personTypeLabel(record.treated_person_type),
+                        record.site?.name ?? 'Site not recorded',
+                    ].join(' · ')}
+                />
+            ),
+        },
+        {
+            key: 'injury',
+            label: 'Injury',
+            nowrap: true,
+            cell: (record) => injuryLabel(record.injury_illness_type),
+        },
+        {
+            key: 'outcome',
+            label: 'Outcome',
+            nowrap: true,
+            cell: (record) => (
+                <div className="grid justify-items-start gap-1">
+                    <StatusBadge
+                        variant={outcomeTone(record.treatment_outcome)}
+                    >
+                        {outcomeLabel(record.treatment_outcome)}
+                    </StatusBadge>
+                    {record.ambulance_called ? (
+                        <span className="text-subtle">Ambulance called</span>
+                    ) : null}
+                </div>
+            ),
+        },
+        {
+            key: 'treated',
+            label: 'Treated',
+            nowrap: true,
+            cell: (record) =>
+                record.treatment_date ? (
+                    <RecordIdentity
+                        title={dateWithYear(record.treatment_date)}
+                        sub={`${formatTime(record.treatment_date)} · ${
+                            record.first_aider_name ?? 'First aider not recorded'
+                        }`}
+                    />
+                ) : (
+                    <RecordIdentity
+                        title="Treatment time not recorded"
+                        sub={
+                            record.first_aider_name ??
+                            'First aider not recorded'
+                        }
+                    />
+                ),
+        },
+        {
+            key: 'followups',
+            label: 'Follow-ups',
+            nowrap: true,
+            cell: (record) => (
+                <RecordIdentity
+                    title={
+                        record.open_followups_count
+                            ? plural(
+                                  record.open_followups_count,
+                                  'open follow-up',
+                              )
+                            : 'No open follow-ups'
+                    }
+                    sub={[
+                        record.attachments_count
+                            ? plural(record.attachments_count, 'file')
+                            : 'No files',
+                        record.incident_reported ? 'Incident reported' : null,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                />
+            ),
+        },
+    ];
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Safety registers', href: '/health-safety/registers' },
                 { title: 'First aid', href: FIRST_AID_REGISTER },
             ]}
         >
@@ -182,11 +357,10 @@ export default function FirstAidIndex({
                 <PageLayout
                     hero={
                         <PageHeader
-                            frontline
                             wrapTitle
                             icon={HeartPulse}
                             title="First aid"
-                            subline="Treatment records, follow-up work and connected incident reviews"
+                            subline="Treatments, follow-up work and linked incident reviews"
                             actions={
                                 <>
                                     <PageHeaderSearch
@@ -202,98 +376,44 @@ export default function FirstAidIndex({
                                         ariaLabel="Search first-aid records"
                                     />
                                     {can.view && (
-                                        <PageHeaderGlassButton asChild>
+                                        <PageHeaderGlassButton
+                                            asChild
+                                            icon={Download}
+                                        >
                                             <a
                                                 href={`${FIRST_AID_REGISTER}/export?${query()}`}
+                                                aria-label="Export filtered records"
                                             >
-                                                <Download className="size-4" />
-                                                Export filtered records
+                                                Export
                                             </a>
                                         </PageHeaderGlassButton>
                                     )}
                                     {can.create && (
-                                        <PageHeaderPrimaryButton asChild>
+                                        <PageHeaderPrimaryButton
+                                            asChild
+                                            icon={Plus}
+                                        >
                                             <Link
                                                 href={`${FIRST_AID_REGISTER}/report?return_to=${encodeURIComponent(returnTo)}`}
                                             >
-                                                <Plus className="size-4" />
                                                 Record first aid
                                             </Link>
                                         </PageHeaderPrimaryButton>
                                     )}
                                 </>
                             }
-                            meters={
-                                <>
-                                    <PageHeaderMeterBlock
-                                        label="Treatments"
-                                        href={meterHref({
-                                            tab: 'all',
-                                            period: '30d',
-                                        })}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {hero.live.treated}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Last 30 days · current filters
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Ambulance called"
-                                        href={meterHref({
-                                            tab: 'ambulance',
-                                            period: '30d',
-                                        })}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {hero.live.ambulance}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Last 30 days · current filters
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Needs incident review"
-                                        href={meterHref({
-                                            tab: 'reportable',
-                                            period: 'all',
-                                        })}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {hero.attention.reportable_unlinked}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Reported incidents or significant
-                                            treatment without a linked incident
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Treatments needing follow-up"
-                                        href={meterHref({
-                                            tab: 'followup',
-                                            period: 'all',
-                                        })}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {hero.attention.followups_open}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            At least one open follow-up · all
-                                            time
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                </>
-                            }
                             filters={
                                 <>
                                     <PageHeaderFilterSelect
-                                        label="Site"
+                                        label="All sites"
                                         value={String(filters.site_id ?? '')}
-                                        options={pickers.sites.map((item) => ({
-                                            value: String(item.id),
-                                            label: item.name,
-                                        }))}
+                                        options={[
+                                            { value: '', label: 'All sites' },
+                                            ...pickers.sites.map((item) => ({
+                                                value: String(item.id),
+                                                label: item.name,
+                                            })),
+                                        ]}
                                         onChange={(value) =>
                                             go({
                                                 site_id: value
@@ -304,11 +424,26 @@ export default function FirstAidIndex({
                                         allValue=""
                                     />
                                     <PageHeaderFilterSelect
-                                        label="Person type"
+                                        label="Last 30 days"
+                                        value={filters.period}
+                                        allValue="30d"
+                                        options={PERIODS}
+                                        onChange={(value) =>
+                                            go({ period: value || '30d' })
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="All person types"
                                         value={
                                             filters.treated_person_type ?? ''
                                         }
-                                        options={PERSON_TYPES}
+                                        options={[
+                                            {
+                                                value: '',
+                                                label: 'All person types',
+                                            },
+                                            ...PERSON_TYPES,
+                                        ]}
                                         onChange={(value) =>
                                             go({
                                                 treated_person_type:
@@ -317,62 +452,30 @@ export default function FirstAidIndex({
                                         }
                                         allValue=""
                                     />
-                                    <PageHeaderFilterSelect
-                                        label="Outcome"
-                                        value={filters.treatment_outcome ?? ''}
-                                        options={OUTCOMES}
-                                        onChange={(value) =>
-                                            go({
-                                                treatment_outcome:
-                                                    value || null,
-                                            })
-                                        }
-                                        allValue=""
+                                    <MoreFilters
+                                        active={moreActive}
+                                        filters={filters}
+                                        firstAiders={filterOptions.first_aiders}
+                                        onChange={go}
                                     />
-                                    <PageHeaderFilterSelect
-                                        label="First aider"
-                                        value={String(
-                                            filters.first_aider_id ?? '',
-                                        )}
-                                        options={filterOptions.first_aiders.map(
-                                            (item) => ({
-                                                value: String(item.id),
-                                                label: item.name,
-                                            }),
-                                        )}
-                                        onChange={(value) =>
-                                            go({
-                                                first_aider_id: value
-                                                    ? Number(value)
-                                                    : null,
-                                            })
-                                        }
-                                        allValue=""
-                                    />
-                                    <PageHeaderFilterSelect
-                                        label="Period"
-                                        value={filters.period}
-                                        allValue="30d"
-                                        options={PERIODS}
-                                        onChange={(value) =>
-                                            go({ period: value || '30d' })
-                                        }
-                                    />
-                                    <PageHeaderGlassButton
-                                        onClick={() =>
-                                            router.get(
-                                                FIRST_AID_REGISTER,
-                                                { tab },
-                                                {
-                                                    preserveState: true,
-                                                    preserveScroll: true,
-                                                    replace: true,
-                                                },
-                                            )
-                                        }
-                                    >
-                                        Clear filters
-                                    </PageHeaderGlassButton>
+                                    {filtered && (
+                                        <PageHeaderFilterButton
+                                            icon={X}
+                                            onClick={() =>
+                                                router.get(
+                                                    FIRST_AID_REGISTER,
+                                                    { tab },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                        replace: true,
+                                                    },
+                                                )
+                                            }
+                                        >
+                                            Clear filters
+                                        </PageHeaderFilterButton>
+                                    )}
                                 </>
                             }
                             rail={
@@ -389,258 +492,53 @@ export default function FirstAidIndex({
                         />
                     }
                 >
-                    <div className="space-y-5">
-                        <p className="text-subtle">
-                            {records.total} treatment records match this view.
-                            {tab === 'reportable'
-                                ? ' Reported incidents, ambulance calls and recorded hospital referrals need review; this list does not determine statutory notification requirements.'
-                                : ''}
-                        </p>
-                        {!records.data.length ? (
-                            <Card>
-                                <CardContent className="space-y-2 p-6">
-                                    <h2 className="text-section-title">
-                                        No treatments match this view
-                                    </h2>
-                                    <p className="text-sm">
-                                        Change the filters to find a record.
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <>
-                                <div className="hidden overflow-x-auto rounded-lg border lg:block">
-                                    <table className="w-full text-left text-sm">
-                                        <caption className="sr-only">
-                                            First-aid treatment records
-                                        </caption>
-                                        <thead className="bg-muted/40">
-                                            <tr>
-                                                {[
-                                                    'Treatment',
-                                                    'Person and Site',
-                                                    'Injury and outcome',
-                                                    'Follow-up work',
-                                                    'Open',
-                                                ].map((label) => (
-                                                    <th
-                                                        key={label}
-                                                        scope="col"
-                                                        className="p-4 font-medium"
-                                                    >
-                                                        {label}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {records.data.map((record) => (
-                                                <tr key={record.id}>
-                                                    <td className="p-4">
-                                                        <p className="font-medium">
-                                                            {record.reference ??
-                                                                `FA-${record.id}`}
-                                                        </p>
-                                                        <p className="text-subtle">
-                                                            {formatDateTimeLong(
-                                                                record.treatment_date,
-                                                                'Treatment time not recorded',
-                                                            )}
-                                                        </p>
-                                                        <p className="text-subtle">
-                                                            {record.first_aider_name
-                                                                ? `First aider: ${record.first_aider_name}`
-                                                                : 'First aider not recorded'}
-                                                        </p>
-                                                    </td>
-                                                    <td className="p-4">
-                                                        <p className="font-medium">
-                                                            {
-                                                                record.treated_person_name
-                                                            }
-                                                        </p>
-                                                        <p className="text-subtle">
-                                                            {personTypeLabel(
-                                                                record.treated_person_type,
-                                                            )}{' '}
-                                                            ·{' '}
-                                                            {record.site
-                                                                ?.name ??
-                                                                'Site not recorded'}
-                                                        </p>
-                                                    </td>
-                                                    <td className="space-y-2 p-4">
-                                                        <p>
-                                                            {injuryLabel(
-                                                                record.injury_illness_type,
-                                                            )}
-                                                        </p>
-                                                        <p>
-                                                            {outcomeLabel(
-                                                                record.treatment_outcome,
-                                                            )}
-                                                        </p>
-                                                        {record.ambulance_called && (
-                                                            <StatusBadge variant="warning">
-                                                                Ambulance called
-                                                            </StatusBadge>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-4">
-                                                        <p>
-                                                            {
-                                                                record.open_followups_count
-                                                            }{' '}
-                                                            open follow-ups
-                                                        </p>
-                                                        <p className="text-subtle">
-                                                            {
-                                                                record.attachments_count
-                                                            }{' '}
-                                                            evidence records
-                                                        </p>
-                                                        {record.incident_reported && (
-                                                            <p className="text-subtle">
-                                                                Incident report
-                                                                recorded
-                                                            </p>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-4">
-                                                        <Button
-                                                            className="frontline-tap"
-                                                            asChild
-                                                            variant="outline"
-                                                        >
-                                                            <Link
-                                                                href={firstAidHref(
-                                                                    record.id,
-                                                                    {
-                                                                        returnTo,
-                                                                    },
-                                                                )}
-                                                            >
-                                                                Open{' '}
-                                                                {record.reference ??
-                                                                    `FA-${record.id}`}
-                                                            </Link>
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <ul className="space-y-4 lg:hidden">
-                                    {records.data.map((record) => (
-                                        <li key={record.id}>
-                                            <Card>
-                                                <CardContent className="space-y-4 p-5">
-                                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                                        <div>
-                                                            <h2 className="text-section-title">
-                                                                {
-                                                                    record.treated_person_name
-                                                                }
-                                                            </h2>
-                                                            <p className="text-subtle">
-                                                                {record.reference ??
-                                                                    `FA-${record.id}`}{' '}
-                                                                ·{' '}
-                                                                {record.site
-                                                                    ?.name ??
-                                                                    'Site not recorded'}
-                                                            </p>
-                                                        </div>
-                                                        {record.ambulance_called && (
-                                                            <StatusBadge variant="warning">
-                                                                Ambulance called
-                                                            </StatusBadge>
-                                                        )}
-                                                    </div>
-                                                    <dl className="grid gap-3 sm:grid-cols-2">
-                                                        <FirstAidFact label="Treatment time">
-                                                            {formatDateTimeLong(
-                                                                record.treatment_date,
-                                                                'Not recorded',
-                                                            )}
-                                                        </FirstAidFact>
-                                                        <FirstAidFact label="Injury or illness">
-                                                            {injuryLabel(
-                                                                record.injury_illness_type,
-                                                            )}
-                                                        </FirstAidFact>
-                                                        <FirstAidFact label="Recorded outcome">
-                                                            {outcomeLabel(
-                                                                record.treatment_outcome,
-                                                            )}
-                                                        </FirstAidFact>
-                                                        <FirstAidFact label="First aider">
-                                                            {
-                                                                record.first_aider_name
-                                                            }
-                                                        </FirstAidFact>
-                                                        <FirstAidFact label="Open follow-ups">
-                                                            {
-                                                                record.open_followups_count
-                                                            }
-                                                        </FirstAidFact>
-                                                        <FirstAidFact label="Evidence records">
-                                                            {
-                                                                record.attachments_count
-                                                            }
-                                                        </FirstAidFact>
-                                                    </dl>
-                                                    <div className="flex flex-wrap gap-3">
-                                                        <Button
-                                                            className="frontline-tap"
-                                                            variant="outline"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={firstAidHref(
-                                                                    record.id,
-                                                                    {
-                                                                        returnTo,
-                                                                    },
-                                                                )}
-                                                            >
-                                                                Open{' '}
-                                                                {record.reference ??
-                                                                    `FA-${record.id}`}
-                                                            </Link>
-                                                        </Button>
-                                                        {record.open_followups_count >
-                                                            0 && (
-                                                            <Button
-                                                                className="frontline-tap"
-                                                                variant="outline"
-                                                                asChild
-                                                            >
-                                                                <Link
-                                                                    href={firstAidHref(
-                                                                        record.id,
-                                                                        {
-                                                                            section:
-                                                                                'followups',
-                                                                            returnTo,
-                                                                        },
-                                                                    )}
-                                                                >
-                                                                    View
-                                                                    follow-ups
-                                                                </Link>
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </>
-                        )}
-                        <LaravelPagination links={records.links} />
+                    <div className="grid min-w-0 gap-5">
+                        {tab === 'reportable' ? (
+                            <Note tone="warning" icon={AlertTriangle}>
+                                Reported incidents, ambulance calls and recorded
+                                hospital referrals need review; this list does
+                                not determine statutory notification
+                                requirements.
+                            </Note>
+                        ) : null}
+                        <RecordTable
+                            title="Treatments"
+                            sub="Newest first · click a row to open it, right-click for more"
+                            ariaLabel="First-aid treatment records"
+                            rows={records.data}
+                            rowKey={(record) => record.id}
+                            onOpen={open}
+                            actionsFor={actionsFor}
+                            menuTitle={(record) =>
+                                `${reference(record)} · ${record.treated_person_name}`
+                            }
+                            menuIcon={HeartPulse}
+                            columns={columns}
+                            empty={
+                                <p className="sg-quiet">
+                                    <Ring tone="none" />
+                                    <span>
+                                        No treatments match this view. Change
+                                        the filters to find a record.
+                                    </span>
+                                </p>
+                            }
+                            footer={
+                                records.data.length ? (
+                                    <>
+                                        <p className="text-subtle">
+                                            Showing {records.data.length} of{' '}
+                                            {records.total}
+                                        </p>
+                                        {records.last_page > 1 ? (
+                                            <LaravelPagination
+                                                links={records.links}
+                                            />
+                                        ) : null}
+                                    </>
+                                ) : undefined
+                            }
+                        />
                     </div>
                     {reporting && (
                         <FirstAidTreatmentWizard
@@ -653,5 +551,89 @@ export default function FirstAidIndex({
                 {drafts.confirmation}
             </SafetyFormDraftContext.Provider>
         </AppLayout>
+    );
+}
+
+/** Outcome and first aider — the two quieter filters, in one place. */
+function MoreFilters({
+    active,
+    filters,
+    firstAiders,
+    onChange,
+}: {
+    active: number;
+    filters: Filters;
+    firstAiders: { id: number; name: string }[];
+    onChange: (next: Partial<Filters>) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <PageHeaderFilterButton
+                    icon={SlidersHorizontal}
+                    active={active > 0}
+                >
+                    {active > 0 ? `More filters · ${active}` : 'More filters'}
+                </PageHeaderFilterButton>
+            </PopoverTrigger>
+            <PopoverContent
+                align="start"
+                className="grid w-80 max-w-[calc(100vw-2rem)] gap-3"
+            >
+                <FilterField label="Outcome">
+                    <SelectInput
+                        ariaLabel="Outcome"
+                        placeholder="All outcomes"
+                        value={filters.treatment_outcome ?? 'all'}
+                        onChange={(value) =>
+                            onChange({
+                                treatment_outcome:
+                                    value === 'all' ? null : value,
+                            })
+                        }
+                        options={[
+                            { value: 'all', label: 'All outcomes' },
+                            ...OUTCOMES,
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="First aider">
+                    <SelectInput
+                        ariaLabel="First aider"
+                        placeholder="All first aiders"
+                        value={String(filters.first_aider_id ?? 'all')}
+                        onChange={(value) =>
+                            onChange({
+                                first_aider_id:
+                                    value === 'all' ? null : Number(value),
+                            })
+                        }
+                        options={[
+                            { value: 'all', label: 'All first aiders' },
+                            ...firstAiders.map((item) => ({
+                                value: String(item.id),
+                                label: item.name,
+                            })),
+                        ]}
+                    />
+                </FilterField>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+function FilterField({
+    label,
+    children,
+}: {
+    label: string;
+    children: ReactNode;
+}) {
+    return (
+        <div className="grid gap-1.5">
+            <span className="text-caption font-semibold">{label}</span>
+            {children}
+        </div>
     );
 }

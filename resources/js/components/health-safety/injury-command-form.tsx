@@ -11,22 +11,24 @@ import { WizardShell } from '@/components/wizard/shell';
 import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
-import { CheckCircle2, ClipboardList, FileText, HeartPulse, Plus, Trash2 } from 'lucide-react';
+import { HeartPulse, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { INJURY_COMMAND_LABELS } from './injury-command-state';
+import { INJURY_COMMAND_LABELS, INJURY_WIZARD_STEPS } from './injury-command-state';
 import { emptyInjuryStage, injuryCommandRequest, injuryFormValues, type InjuryFormValues } from './injury-command-values';
 import { InjuryPeoplePicker } from './injury-people-picker';
 import type { InjuryCaptureOptions, InjuryCommand, InjuryCommandOptions, InjuryRecord, InjuryRecoveryOptions } from './injury-workspace-types';
 import { useInjuryCommand } from './use-injury-command';
 
 const WIZARD_COMMANDS = ['create', 'edit', 'add_rtw', 'edit_rtw', 'add_capacity', 'add_duty', 'upload_evidence'];
-const STEPS = [{ key: 'facts', label: 'Record facts', blurb: 'The person and reported facts', icon: FileText }, { key: 'detail', label: 'Supporting detail', blurb: 'Arrangements, dates and source evidence', icon: ClipboardList }, { key: 'review', label: 'Review and save', blurb: 'Confirm the recorded change', icon: CheckCircle2 }];
+const STEPS = INJURY_WIZARD_STEPS;
 type Options = InjuryCaptureOptions | InjuryCommandOptions | InjuryRecoveryOptions;
 const optionsObject = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
-export function InjuryCommandForm({ detail: d, command, actorId, capture, selected, onDone, onCancel, returnTo }: {
+export function InjuryCommandForm({ detail: d, command, actorId, capture, selected, onDone, onCancel, returnTo, onStepChange }: {
     detail: InjuryRecord | null; command: InjuryCommand | 'create'; actorId: number; capture?: InjuryCaptureOptions;
     selected?: { plan?: number | null; attachment?: number | null }; onDone: (href?: string | null) => void;
     onCancel: () => void; returnTo: string;
+    /** Reports the wizard step (0-based) and whether saving is confirmed — display only. */
+    onStepChange?: (step: number, saved: boolean) => void;
 }) {
     const id = useId();
     const [step, setStep] = useState(0);
@@ -45,6 +47,7 @@ export function InjuryCommandForm({ detail: d, command, actorId, capture, select
     });
     const source = useInjuryCommand({ initial: { ...injuryFormValues(d, selected?.plan), ...(['review', 'upload_evidence'].includes(command) ? { notes: '' } : {}) }, detail: d, command, actorId, selected, captureAllowed: capture?.can.create === true && capture.can.record_reported_details === true });
     const { form, change, save } = source;
+    useEffect(() => onStepChange?.(step, !!source.receipt), [onStepChange, step, source.receipt]);
     const f = form.data;
     const checked = optionsObject(source.checkedResponse) && optionsObject(source.checkedResponse.detail) ? source.checkedResponse.detail : null;
     const reviewed = checked !== null && d !== null && checked.id === d.id && checked.source_version === source.guard.version;
@@ -197,7 +200,7 @@ export function InjuryCommandForm({ detail: d, command, actorId, capture, select
         if (Array.isArray(value)) return value.map((item) => typeof item === 'string' ? item : Object.entries(item).map(([field, part]) => `${field.replaceAll('_', ' ')}: ${reviewValue(field, part)}`).join(' · ')).join('\n');
         return String(value);
     };
-    const review = <div className="space-y-4"><h2 className="text-section-title">Review the recorded change</h2><p className="text-subtle">{title} for {selectedPeople.user_id?.id === Number(f.user_id) ? selectedPeople.user_id.name : d?.worker?.name ?? 'the selected worker'}. Your entries remain in this form until saving is confirmed.</p><dl className="space-y-3">{identityReview.map(({ key, name }) => <div key={key}><dt className="text-caption text-muted-foreground">{({ user_id: 'Injured worker', site_id: 'Recorded Site', coordinator_user_id: 'Incident owner', manager_id: 'Recovery coordinator', assessor_user_id: 'Internal assessor', related_incident_id: 'Connected incident', hr_document_id: 'Assessment document' } as Record<string, string>)[key] ?? key.replaceAll('_', ' ')}</dt><dd className="text-subtle break-words">{name}</dd></div>)}{Object.entries(requested).filter(([key]) => !key.endsWith('_id') && key !== 'file').map(([key, value]) => <div key={key}><dt className="text-caption text-muted-foreground">{key.replaceAll('_', ' ')}</dt><dd className="text-subtle break-words whitespace-pre-wrap">{reviewValue(key, value)}</dd></div>)}</dl>{f.file && <p>{f.file.name}</p></div>;
+    const review = <div className="space-y-4"><h2 className="text-section-title">Review the recorded change</h2><p className="text-subtle">{title} for {selectedPeople.user_id?.id === Number(f.user_id) ? selectedPeople.user_id.name : d?.worker?.name ?? 'the selected worker'}. Your entries remain in this form until saving is confirmed.</p><dl className="space-y-3">{identityReview.map(({ key, name }) => <div key={key}><dt className="text-caption text-muted-foreground">{({ user_id: 'Injured worker', site_id: 'Recorded Site', coordinator_user_id: 'Incident owner', manager_id: 'Recovery coordinator', assessor_user_id: 'Internal assessor', related_incident_id: 'Connected incident', hr_document_id: 'Assessment document' } as Record<string, string>)[key] ?? key.replaceAll('_', ' ')}</dt><dd className="text-subtle break-words">{name}</dd></div>)}{Object.entries(requested).filter(([key]) => !key.endsWith('_id') && key !== 'file').map(([key, value]) => <div key={key}><dt className="text-caption text-muted-foreground">{key.replaceAll('_', ' ')}</dt><dd className="text-subtle break-words whitespace-pre-wrap">{reviewValue(key, value)}</dd></div>)}</dl>{f.file && <p>{f.file.name}</p>}</div>;
     if (WIZARD_COMMANDS.includes(command)) return <WizardShell frontline open onClose={onCancel} title={title} description="Record the facts, review your entries and confirm saving." railIcon={HeartPulse} railTitle={title} railSub={d?.reference ?? 'New injury'} steps={STEPS.map((item) => ({ ...item, disabled: busy }))} stepIndex={step} onStepClick={setStep} pct={Math.round((step + 1) / 3 * 100)} pctLabel="Review progress" footerStart={<Button type="button" variant="outline" className="frontline-tap" disabled={form.processing || source.checking} onClick={onCancel}>Cancel</Button>} footerEnd={source.receipt ? null : <>{step > 0 && <Button type="button" className="frontline-tap" variant="outline" disabled={busy} onClick={() => setStep(step - 1)}>Back</Button>}{step < 2 ? <Button type="button" className="frontline-tap" disabled={busy} onClick={() => setStep(step + 1)}>Review next section</Button> : saveButton}</>} success={source.receipt ? status : undefined}>
         <div className="space-y-5">{notices}{!privateCommandBlocked && (step === 0 ? facts : step === 1 ? supporting : review)}{status}</div>
     </WizardShell>;

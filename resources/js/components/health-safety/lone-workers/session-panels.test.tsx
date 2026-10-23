@@ -31,7 +31,7 @@ it('shows a permitted plan separately when actual tracker location is restricted
         />,
     );
     expect(
-        screen.getByRole('region', { name: 'Planned place' }),
+        screen.getByRole('group', { name: 'Planned place' }),
     ).toHaveTextContent('0, 0');
     expect(screen.getByText('Location is restricted')).toBeInTheDocument();
     expect(screen.queryByText('45, 46')).not.toBeInTheDocument();
@@ -77,13 +77,14 @@ it('uses each historical plan and never backfills the current plan into older ev
             }
         />,
     );
+    // The history reads newest first (drawing pg-hsn-82e).
     const rows = screen.getAllByRole('listitem');
     expect(
-        within(rows[0]).queryByText('Planned location at this change'),
+        within(rows[2]).queryByText('Planned location at this change'),
     ).not.toBeInTheDocument();
     expect(rows[1]).toHaveTextContent('Earlier intended place');
     expect(rows[1]).toHaveTextContent('-36, 174');
-    expect(rows[2]).toHaveTextContent('No planned location recorded');
+    expect(rows[0]).toHaveTextContent('No planned location recorded');
     expect(
         screen.queryByText('Current intended place'),
     ).not.toBeInTheDocument();

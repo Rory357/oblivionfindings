@@ -74,6 +74,8 @@ const STEPS: WizardStep[] = [
         icon: ClipboardCheck,
     },
 ];
+/** The five steps, for a page that mirrors the wizard's progress in its header. */
+export const FIRST_AID_TREATMENT_STEPS: readonly WizardStep[] = STEPS;
 
 export function firstAidTreatmentDraft(record?: FirstAidRecord) {
     const instant = record?.treatment_date ?? new Date().toISOString();
@@ -155,12 +157,15 @@ export function FirstAidTreatmentWizard({
     returnTo,
     onClose,
     onSaved,
+    onStepChange,
 }: {
     pickers: FirstAidPickers;
     detail?: FirstAidRecord;
     returnTo: string;
     onClose: () => void;
     onSaved?: () => void;
+    /** Reports the current step (0-based) and whether the record is saved — display only. */
+    onStepChange?: (step: number, saved: boolean) => void;
 }) {
     const [generation, setGeneration] = useState(0);
     const [freshPickers, setFreshPickers] = useState<FirstAidPickers | null>(
@@ -178,6 +183,7 @@ export function FirstAidTreatmentWizard({
             returnTo={returnTo}
             onClose={onClose}
             onSaved={onSaved}
+            onStepChange={onStepChange}
             refreshing={refreshing}
             refreshError={refreshError}
             onAnother={async () => {
@@ -218,6 +224,7 @@ function TreatmentEntry({
     returnTo,
     onClose,
     onSaved,
+    onStepChange,
     refreshing,
     refreshError,
     onAnother,
@@ -227,6 +234,7 @@ function TreatmentEntry({
     returnTo: string;
     onClose: () => void;
     onSaved?: () => void;
+    onStepChange?: (step: number, saved: boolean) => void;
     refreshing: boolean;
     refreshError: string | null;
     onAnother: () => void;
@@ -241,6 +249,7 @@ function TreatmentEntry({
         id: number;
         href: string | null;
     } | null>(null);
+    useEffect(() => onStepChange?.(step, saved !== null), [onStepChange, step, saved]);
     const [failure, setFailure] = useState<string | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [pickers, setPickers] = useState(initialPickers);

@@ -10,10 +10,11 @@ const row = { id: 9, reference: 'INJ-0009', status: 'closed', severity: 'moderat
     worksafe_notifiable: false, rtw_count: null, capacity_count: 0, attachment_count: 1, source_integrity: 'repair_required' } as InjuryRegisterRow;
 beforeEach(() => vi.clearAllMocks()); afterEach(cleanup);
 
-it('uses the same permanent injury href and full filtered return for both list branches without inferring an open record', () => {
+it('uses the permanent injury href and full filtered return without inferring an open record', () => {
+    // One table on the desktop web app (drawing pg-hsn-86); the phone card list is gone.
     render(<InjuryRegisterList rows={[row]} total={26} returnTo="/health-safety/injuries?q=0&worksafe=0&acc_open=0&page=2" medical={false} />);
     const hrefs = screen.getAllByRole('link', { name: 'Open injury INJ-0009' }).map((link) => link.getAttribute('href'));
-    expect(hrefs).toHaveLength(2); expect(new Set(hrefs).size).toBe(1);
+    expect(hrefs).toHaveLength(1);
     expect(hrefs[0]).toBe('/health-safety/injuries/9?return_to=%2Fhealth-safety%2Finjuries%3Fq%3D0%26worksafe%3D0%26acc_open%3D0%26page%3D2');
     expect(screen.getByText('1 of 26 shown')).toBeInTheDocument();
     expect(screen.queryByText('Supporting records')).not.toBeInTheDocument();

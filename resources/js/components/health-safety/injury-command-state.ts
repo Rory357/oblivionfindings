@@ -1,4 +1,12 @@
+import { CheckCircle2, ClipboardList, FileText } from 'lucide-react';
 import type { InjuryCommand, InjuryRecord } from './injury-workspace-types';
+
+/** The injury wizard's three steps — shared by the wizard and the Report injury page header. */
+export const INJURY_WIZARD_STEPS = [
+    { key: 'facts', label: 'Record facts', blurb: 'The person and reported facts', icon: FileText },
+    { key: 'detail', label: 'Supporting detail', blurb: 'Arrangements, dates and source evidence', icon: ClipboardList },
+    { key: 'review', label: 'Review and save', blurb: 'Confirm the recorded change', icon: CheckCircle2 },
+];
 
 export const INJURY_COMMAND_LABELS: Record<InjuryCommand, string> = {
     start_treatment: 'Record treatment started',

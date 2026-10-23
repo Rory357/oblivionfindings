@@ -152,20 +152,19 @@ it('renders historical facts without substituting the current treatment or follo
             })}
         />,
     );
-    const entries = screen.getAllByRole('listitem');
-    expect(entries[0]).toHaveTextContent('Earlier treatment');
-    expect(within(entries[0]).getByText('No')).toBeInTheDocument();
-    expect(entries[1]).toHaveTextContent('Historical details are incomplete');
+    // The history reads newest first (drawing pg-hsn-85f).
+    const [legacy, earlier] = screen.getAllByRole('listitem');
+    expect(earlier).toHaveTextContent('Earlier treatment');
+    expect(within(earlier).getByText('No')).toBeInTheDocument();
+    expect(legacy).toHaveTextContent('Historical details are incomplete');
     expect(screen.queryByText('Current treatment')).not.toBeInTheDocument();
     expect(screen.queryByText('Never show this')).not.toBeInTheDocument();
     expect(
         screen.queryByText('Never show nested data'),
     ).not.toBeInTheDocument();
-    expect(
-        within(entries[0]).getByText('Attempt recorded'),
-    ).toBeInTheDocument();
-    expect(entries[0]).toHaveTextContent('Earlier unanswered call');
-    expect(within(entries[0]).getByText('2')).toBeInTheDocument();
+    expect(within(earlier).getByText('Attempt recorded')).toBeInTheDocument();
+    expect(earlier).toHaveTextContent('Earlier unanswered call');
+    expect(within(earlier).getByText('2')).toBeInTheDocument();
     expect(screen.queryByText('Contact recorded')).not.toBeInTheDocument();
 });
 it('keeps the report flag separate from an independently unavailable incident', () => {

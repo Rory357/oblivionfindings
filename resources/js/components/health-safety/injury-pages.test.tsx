@@ -20,7 +20,7 @@ vi.mock('@/components/page', () => {
         PageHeaderGlassButton: button, PageHeaderPrimaryButton: button, PageHeaderMeterBlock: slot, PageHeaderMeterBig: slot, PageHeaderMeterCaption: slot, PageHeaderStatusChip: slot,
         PageHeaderRail: ({ items, onSelect }: { items: { key: string; label: string }[]; onSelect: (key: string) => void }) => <nav>{items.map((item) => <button key={item.key} onClick={() => onSelect(item.key)}>{item.label}</button>)}</nav> };
 });
-vi.mock('./injury-record-panels', () => ({ injuryDay: (value: string | null) => value ?? 'Not recorded', injuryTime: (value: string | null) => value ?? 'Not recorded', InjuryRecordPanel: ({ section }: { section: string }) => <p>{section} section</p> }));
+vi.mock('./injury-record-panels', () => ({ injuryDay: (value: string | null) => value ?? 'Not recorded', injuryTime: (value: string | null) => value ?? 'Not recorded', InjuryRecordPanel: ({ section }: { section: string }) => <p>{section} section</p>, InjuryRecordSide: () => null }));
 vi.mock('./injury-command-form', async () => {
     const React = await import('react');
     return { InjuryCommandForm: ({ detail, capture }: { detail: InjuryRecord | null; capture?: InjuryCaptureOptions }) => {

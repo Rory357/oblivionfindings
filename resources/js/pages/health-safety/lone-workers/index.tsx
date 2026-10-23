@@ -1,3 +1,11 @@
+/**
+ * Lone-worker safety (approved H&S drawings pg-hsn-81, 81b — Stephan 23 Oct
+ * 2026): one header with the three coverage numbers and the register filters,
+ * Sessions / Responses on the rail, the safety caveat as a note, then the
+ * register as a table. Two summaries (across your sites, the next 24 hours)
+ * sit side by side under the sessions. The coverage and safety caveats keep
+ * the code's wording.
+ */
 import {
     canonicalControlRoomAlertId,
     type Alert,
@@ -17,25 +25,46 @@ import type {
     SessionPickers,
 } from '@/components/health-safety/lone-workers/types';
 import {
+    dateTimeWithYear,
+    dateWithYear,
+} from '@/components/incidents/incident-stages';
+import {
+    RecordIdentity,
+    RecordPerson,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
+import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
+import {
+    Note,
+    Ring,
+    SideBySide,
+    Surface,
+    Tally,
+} from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import {
     SafetyFormDraftContext,
     useSafetyWorkspaceDrafts,
 } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
+import { formatTime, toDateInput } from '@/lib/datetime';
 import {
     LONE_WORKER_REGISTER,
     loneWorkerHref,
@@ -43,15 +72,18 @@ import {
 } from '@/lib/health-safety/lone-worker-navigation';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    BarChart3,
+    AlertTriangle,
+    ClipboardList,
+    ExternalLink,
+    Eye,
     FileDown,
-    FileText,
-    List,
+    Info,
     Plus,
     Radio,
     Siren,
+    X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 type SessionRow = Pick<
     SafetySession,
@@ -90,8 +122,6 @@ type Props = {
     pickers: SessionPickers;
     can: { manage: boolean; view: boolean; view_control_room: boolean };
 };
-const linkClass =
-    'frontline-tap frontline-focus inline-flex items-center gap-2 break-words text-primary underline';
 const sessionStatuses = [
     { value: 'active', label: 'Active' },
     { value: 'overdue', label: 'Check-in overdue' },
@@ -107,6 +137,8 @@ const responseStatuses = [
     { value: 'closed', label: 'Closed' },
     { value: 'dismissed', label: 'Dismissed' },
 ];
+const titleLink =
+    'rounded-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
 export default function LoneWorkersIndex({
     tab,
@@ -253,7 +285,7 @@ export default function LoneWorkersIndex({
             )
             .join('\r\n');
         const objectUrl = URL.createObjectURL(
-            new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }),
+            new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }),
         );
         const anchor = document.createElement('a');
         anchor.href = objectUrl;
@@ -262,10 +294,48 @@ export default function LoneWorkersIndex({
         anchor.click();
         URL.revokeObjectURL(objectUrl);
     };
+    const filtered = !!(
+        filters.q ||
+        filters.site_id ||
+        filters.user_id ||
+        filters.status ||
+        filters.period !== 'today'
+    );
+    const live = hero.clusters.live;
+    const footer = (
+        <>
+            <p className="text-subtle">
+                {paginator.total
+                    ? `Showing ${(paginator.from ?? 1).toString()}–${(paginator.to ?? paginator.data.length).toString()} of ${paginator.total}`
+                    : 'No records match these filters.'}
+            </p>
+            {paginator.last_page > 1 ? (
+                <LaravelPagination
+                    links={paginator.links}
+                    lastPage={paginator.last_page}
+                    preserveScroll
+                />
+            ) : null}
+        </>
+    );
+    const headActions = (
+        <>
+            <Button asChild variant="outline" size="sm">
+                <Link href="/health-safety/analytics">Safety trends</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+                <Link href="/health-safety/reports/board-summary">
+                    Board summary
+                </Link>
+            </Button>
+        </>
+    );
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Safety registers', href: '/health-safety/registers' },
                 { title: 'Lone-worker safety', href: LONE_WORKER_REGISTER },
             ]}
         >
@@ -274,7 +344,6 @@ export default function LoneWorkersIndex({
                 <PageLayout
                     hero={
                         <PageHeader
-                            frontline
                             icon={Radio}
                             title="Lone-worker safety"
                             subline="Keep contact with workers and follow through when help is needed"
@@ -301,70 +370,73 @@ export default function LoneWorkersIndex({
                                         }
                                     />
                                     <PageHeaderGlassButton
+                                        icon={FileDown}
                                         onClick={exportPage}
                                         disabled={!paginator.data.length}
+                                        aria-label="Export this page"
+                                        title="Export this page as a spreadsheet"
                                     >
-                                        <FileDown className="size-4" />
-                                        Export this page
+                                        Export
                                     </PageHeaderGlassButton>
                                     {can.manage && (
                                         <PageHeaderPrimaryButton
+                                            icon={Plus}
                                             onClick={() => toggleCreation(true)}
                                         >
-                                            <Plus className="size-4" />
                                             Start session
                                         </PageHeaderPrimaryButton>
                                     )}
                                 </>
                             }
-                            meters={
-                                <>
-                                    <PageHeaderMeterBlock
-                                        label="Monitoring required"
+                            strip={
+                                <PageHeaderNumbers>
+                                    <PageHeaderNumber
+                                        label="Shifts needing a session"
+                                        value={
+                                            coverage.expected_count ?? 'Unknown'
+                                        }
+                                        caption={
+                                            coverage.unknown_count
+                                                ? `${coverage.required_count} known · ${coverage.unknown_count} requirements unknown`
+                                                : 'On shift now'
+                                        }
+                                        tone={
+                                            coverage.expected_count === null
+                                                ? 'warning'
+                                                : undefined
+                                        }
                                         onClick={focusCoverage}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {coverage.expected_count ??
-                                                'Unknown'}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            {coverage.unknown_count
-                                                ? coverage.required_count +
-                                                  ' known · ' +
-                                                  coverage.unknown_count +
-                                                  ' requirements unknown'
-                                                : 'Current shifts requiring a session'}
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Sessions in place"
+                                        pressed={coverageOpen}
+                                        ariaLabel="View current shift coverage: shifts needing a session"
+                                    />
+                                    <PageHeaderNumber
+                                        label="Sessions running"
+                                        value={coverage.monitored_count}
+                                        caption="Matched to a shift"
                                         onClick={focusCoverage}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {coverage.monitored_count}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Required shifts with a matching
-                                            session
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
+                                        pressed={coverageOpen}
+                                        ariaLabel="View current shift coverage: sessions matched to a shift"
+                                    />
+                                    <PageHeaderNumber
                                         label="Sessions missing"
+                                        value={coverage.unmonitored_count}
+                                        caption="A shift has no session"
+                                        tone={
+                                            coverage.unmonitored_count > 0
+                                                ? 'critical'
+                                                : undefined
+                                        }
                                         onClick={focusCoverage}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {coverage.unmonitored_count}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Known requirement without a session
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                </>
+                                        pressed={coverageOpen}
+                                        ariaLabel="View current shift coverage: shifts missing a session"
+                                    />
+                                </PageHeaderNumbers>
                             }
                             filters={
                                 <>
                                     <PageHeaderFilterSelect
-                                        label="Site"
+                                        label="All sites"
+                                        allValue=""
                                         value={String(filters.site_id ?? '')}
                                         onChange={(value) =>
                                             go({
@@ -374,19 +446,33 @@ export default function LoneWorkersIndex({
                                             })
                                         }
                                         options={[
-                                            {
-                                                value: '',
-                                                label: 'All approved Sites',
-                                            },
+                                            { value: '', label: 'All sites' },
                                             ...pickers.sites.map((site) => ({
                                                 value: String(site.id),
                                                 label: site.name,
                                             })),
                                         ]}
                                     />
+                                    <PageHeaderFilterSelect
+                                        label="Today"
+                                        allValue="today"
+                                        value={filters.period}
+                                        onChange={(value) =>
+                                            go({
+                                                period: value as Filters['period'],
+                                            })
+                                        }
+                                        options={[
+                                            { value: 'today', label: 'Today' },
+                                            { value: 'week', label: '7 days' },
+                                            { value: '30d', label: '30 days' },
+                                            { value: 'all', label: 'All time' },
+                                        ]}
+                                    />
                                     {tab === 'sessions' && (
                                         <PageHeaderFilterSelect
-                                            label="Worker"
+                                            label="All workers"
+                                            allValue=""
                                             value={String(
                                                 filters.user_id ?? '',
                                             )}
@@ -414,7 +500,8 @@ export default function LoneWorkersIndex({
                                         />
                                     )}
                                     <PageHeaderFilterSelect
-                                        label="Status"
+                                        label="All states"
+                                        allValue=""
                                         value={filters.status ?? ''}
                                         onChange={(value) =>
                                             go({ status: value || null })
@@ -426,27 +513,9 @@ export default function LoneWorkersIndex({
                                                 : responseStatuses),
                                         ]}
                                     />
-                                    <PageHeaderFilterSelect
-                                        label="Period"
-                                        value={filters.period}
-                                        onChange={(value) =>
-                                            go({
-                                                period: value as Filters['period'],
-                                            })
-                                        }
-                                        options={[
-                                            { value: 'today', label: 'Today' },
-                                            { value: 'week', label: '7 days' },
-                                            { value: '30d', label: '30 days' },
-                                            { value: 'all', label: 'All time' },
-                                        ]}
-                                    />
-                                    {(filters.q ||
-                                        filters.site_id ||
-                                        filters.user_id ||
-                                        filters.status ||
-                                        filters.period !== 'today') && (
-                                        <PageHeaderGlassButton
+                                    {filtered && (
+                                        <PageHeaderFilterButton
+                                            icon={X}
                                             onClick={() =>
                                                 go({
                                                     q: null,
@@ -458,24 +527,19 @@ export default function LoneWorkersIndex({
                                             }
                                         >
                                             Clear filters
-                                        </PageHeaderGlassButton>
+                                        </PageHeaderFilterButton>
                                     )}
                                 </>
                             }
                             rail={
                                 <PageHeaderRail
                                     items={[
-                                        {
-                                            key: 'sessions',
-                                            label: 'Sessions',
-                                            icon: List,
-                                        },
+                                        { key: 'sessions', label: 'Sessions' },
                                         ...(can.view_control_room
                                             ? [
                                                   {
                                                       key: 'alerts',
                                                       label: 'Responses',
-                                                      icon: Siren,
                                                   },
                                               ]
                                             : []),
@@ -490,35 +554,31 @@ export default function LoneWorkersIndex({
                         />
                     }
                 >
-                    <div className="space-y-5">
-                        <div className="text-subtle space-y-1">
-                            <p>
-                                Coverage uses current shifts at the selected
-                                Sites. Search,{' '}
-                                {tab === 'sessions' ? 'worker, ' : ''}status and
-                                period filters apply to the register below.
-                            </p>
-                            <p>
-                                {coverage.state === 'no_active_duty'
-                                    ? 'No active duty to assess.'
-                                    : coverage.state === 'configured_zero'
-                                      ? 'No current shift has a recorded monitoring requirement.'
-                                      : coverage.state === 'unknown'
-                                        ? 'Some shift requirements have not been established; total coverage is unknown.'
-                                        : 'A session does not confirm worker safety or a person watching continuously.'}{' '}
-                                Checked {recordedAt(coverage.checked_at)}.
-                            </p>
-                        </div>
+                    <div className="grid min-w-0 gap-5">
+                        <Note
+                            icon={coverage.state === 'unknown' ? AlertTriangle : Info}
+                            tone={
+                                coverage.state === 'unknown'
+                                    ? 'warning'
+                                    : undefined
+                            }
+                        >
+                            {coverage.state === 'no_active_duty'
+                                ? 'No active duty to assess.'
+                                : coverage.state === 'configured_zero'
+                                  ? 'No current shift has a recorded monitoring requirement.'
+                                  : coverage.state === 'unknown'
+                                    ? 'Some shift requirements have not been established; total coverage is unknown.'
+                                    : 'A session does not confirm worker safety or a person watching continuously.'}{' '}
+                            Checked {recordedAt(coverage.checked_at)}.
+                        </Note>
                         {coverageOpen && (
-                            <Card>
-                                <CardContent
+                            <Surface title="Current shift coverage">
+                                <div
                                     ref={coveragePanel}
                                     tabIndex={-1}
-                                    className="space-y-4 p-5 outline-none"
+                                    className="grid gap-4 px-[18px] pt-2 pb-4 outline-none"
                                 >
-                                    <h2 className="text-section-title">
-                                        Current shift coverage
-                                    </h2>
                                     <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                         <SessionFact label="Active duty">
                                             {coverage.active_duty_count}
@@ -549,12 +609,12 @@ export default function LoneWorkersIndex({
                                         freshness and response ownership are
                                         shown on each session.
                                     </p>
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </Surface>
                         )}
                         {creating && can.manage && (
-                            <Card>
-                                <CardContent
+                            <Surface aria-label="Start a safety session">
+                                <div
                                     ref={panel}
                                     tabIndex={-1}
                                     className="p-5 outline-none sm:p-6"
@@ -564,83 +624,81 @@ export default function LoneWorkersIndex({
                                         returnTo={returnTo}
                                         onCancel={() => toggleCreation(false)}
                                     />
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </Surface>
                         )}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h2 className="text-section-title">
-                                {tab === 'sessions'
-                                    ? 'Safety sessions'
-                                    : 'Control Room responses'}
-                            </h2>
-                            <div className="flex flex-wrap gap-4">
-                                <Link
-                                    href="/health-safety/analytics"
-                                    className={linkClass}
-                                >
-                                    <BarChart3 className="size-4" />
-                                    Safety analytics
-                                </Link>
-                                <Link
-                                    href="/health-safety/reports/board-summary"
-                                    className={linkClass}
-                                >
-                                    <FileText className="size-4" />
-                                    Board summary
-                                </Link>
-                            </div>
-                        </div>
-                        <p className="text-subtle">
-                            {paginator.total
-                                ? (paginator.from ?? 1) +
-                                  '–' +
-                                  (paginator.to ?? paginator.data.length) +
-                                  ' of ' +
-                                  paginator.total +
-                                  ' matching records'
-                                : 'No records match these filters.'}{' '}
-                            {tab === 'sessions'
-                                ? 'Live sessions remain visible outside the selected period.'
-                                : 'Assessment, assignment and resolution take place in Control Room.'}
-                        </p>
                         {tab === 'sessions' ? (
                             <SessionRegister
                                 rows={sessions.data}
                                 returnTo={returnTo}
+                                actions={headActions}
+                                footer={footer}
                             />
                         ) : (
                             <ResponseRegister
                                 rows={alerts.data}
                                 returnTo={returnTo}
+                                actions={headActions}
+                                footer={footer}
                             />
                         )}
-                        <LaravelPagination
-                            links={paginator.links}
-                            lastPage={paginator.last_page}
-                            preserveScroll
-                        />
-                        <Card>
-                            <CardContent className="space-y-2 p-4">
-                                <h2 className="font-semibold">
-                                    Across all your approved Sites
-                                </h2>
-                                <p className="text-subtle">
-                                    {hero.clusters.live.overdue} overdue
-                                    sessions · {hero.clusters.live.emergency}{' '}
-                                    sessions with help requested ·{' '}
-                                    {hero.clusters.live.ending_soon} ending
-                                    soon.
-                                </p>
-                                <p className="text-subtle">
-                                    Upcoming in the next 24 hours at the
-                                    selected Sites:{' '}
-                                    {coverage.upcoming_expected_count} shifts
-                                    require monitoring;{' '}
-                                    {coverage.upcoming_unknown_count} have an
-                                    unknown requirement.
-                                </p>
-                            </CardContent>
-                        </Card>
+                        {tab === 'sessions' ? (
+                            <SideBySide>
+                                <Tally
+                                    title="Across all your sites"
+                                    items={[
+                                        {
+                                            label: 'Overdue sessions',
+                                            value: live.overdue,
+                                            tone: 'warning',
+                                        },
+                                        {
+                                            label: 'Help requested',
+                                            value: live.emergency,
+                                            tone: 'critical',
+                                        },
+                                        {
+                                            label: 'Ending soon',
+                                            value: live.ending_soon,
+                                        },
+                                    ]}
+                                    calm={[
+                                        live.overdue === 0 &&
+                                            'No session is overdue',
+                                        live.emergency === 0 &&
+                                            'Nobody has asked for help',
+                                        live.ending_soon === 0 &&
+                                            'None ending soon',
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                />
+                                <Tally
+                                    title={
+                                        filters.site_id
+                                            ? 'Next 24 hours at the selected sites'
+                                            : 'Next 24 hours at your sites'
+                                    }
+                                    keepZeros
+                                    calm=""
+                                    items={[
+                                        {
+                                            label: 'Shifts that need a session',
+                                            value: coverage.upcoming_expected_count,
+                                        },
+                                        {
+                                            label: 'Not known if a session is needed',
+                                            value: coverage.upcoming_unknown_count,
+                                            tone:
+                                                coverage.upcoming_unknown_count >
+                                                0
+                                                    ? 'warning'
+                                                    : undefined,
+                                        },
+                                    ]}
+                                />
+                            </SideBySide>
+                        ) : null}
                     </div>
                 </PageLayout>
                 {drafts.confirmation}
@@ -655,22 +713,21 @@ function sessionState(status: string) {
         words(status)
     );
 }
-function SessionState({ row }: { row: SessionRow }) {
+function sessionOverdue(row: SessionRow) {
     return (
-        <StatusBadge
-            variant={
-                row.status === 'emergency'
-                    ? 'critical'
-                    : row.is_check_in_overdue && !row.ended_at
-                      ? 'warning'
-                      : 'neutral'
-            }
-        >
-            {row.status !== 'emergency' &&
-            row.is_check_in_overdue &&
-            !row.ended_at
-                ? 'Check-in overdue'
-                : sessionState(row.status)}
+        row.status !== 'emergency' && row.is_check_in_overdue && !row.ended_at
+    );
+}
+function SessionState({ row }: { row: SessionRow }) {
+    const variant: StatusVariant =
+        row.status === 'emergency' || sessionOverdue(row)
+            ? 'critical'
+            : row.ended_at || row.status === 'completed'
+              ? 'neutral'
+              : 'info';
+    return (
+        <StatusBadge variant={variant}>
+            {sessionOverdue(row) ? 'Check-in overdue' : sessionState(row.status)}
         </StatusBadge>
     );
 }
@@ -688,223 +745,332 @@ function responseState(row: Alert) {
             ? 'Resolved or closed'
             : words(row.status);
 }
-function SessionTitle({
-    row,
-    returnTo,
-}: {
-    row: SessionRow;
-    returnTo: string;
-}) {
-    return (
-        <div className="space-y-1">
-            <Link
-                href={loneWorkerHref(row.id, { returnTo })}
-                className={linkClass}
-            >
-                {row.reference} · {row.user?.name ?? 'Worker not available'}
-            </Link>
-            <p className="text-subtle break-words">
-                {row.activity_description ?? 'Activity not recorded'}
-            </p>
-        </div>
-    );
+function responseVariant(row: Alert): StatusVariant {
+    const key = row.canonical_status ?? row.status;
+    if (key === 'open' || key === 'active') return 'warning';
+    if (['ack', 'acknowledged', 'triaging', 'confirmed'].includes(key))
+        return 'info';
+    return 'neutral';
 }
-function CheckInSummary({
-    row,
-    returnTo,
-}: {
-    row: SessionRow;
-    returnTo: string;
-}) {
-    return (
-        <div className="space-y-1">
-            <Link
-                href={loneWorkerHref(row.id, {
-                    section: 'check-ins',
-                    returnTo,
-                })}
-                className={linkClass}
-            >
-                {observationLabel(row.observation.state)}
-            </Link>
-            <p className="text-subtle">
-                {row.observation.real_check_in_at
-                    ? recordedAt(row.observation.real_check_in_at)
-                    : 'Starting is not a check-in.'}
-            </p>
-            {!row.ended_at && (
-                <p className="text-subtle">
-                    Next checkpoint: {recordedAt(row.observation.next_due_at)}
-                </p>
-            )}
-        </div>
-    );
+/** A time on the same NZ day as `base` shows as a time only, otherwise with its date. */
+function clock(value: string | null | undefined, base?: string | null) {
+    if (!value) return 'Not recorded';
+    return base && toDateInput(value) === toDateInput(base)
+        ? formatTime(value)
+        : dateTimeWithYear(value);
 }
+
 function SessionRegister({
     rows,
     returnTo,
+    actions,
+    footer,
 }: {
     rows: SessionRow[];
     returnTo: string;
+    actions: ReactNode;
+    footer: ReactNode;
 }) {
+    const open = (row: SessionRow) =>
+        router.visit(loneWorkerHref(row.id, { returnTo }));
+    const actionsFor = (row: SessionRow): MenuItem[] =>
+        compactMenu([
+            { label: 'Open session', icon: Eye, onClick: () => open(row) },
+            {
+                label: 'Open check-ins',
+                icon: ClipboardList,
+                onClick: () =>
+                    router.visit(
+                        loneWorkerHref(row.id, {
+                            section: 'check-ins',
+                            returnTo,
+                        }),
+                    ),
+            },
+            {
+                label: 'Open help request and response',
+                icon: Siren,
+                onClick: () =>
+                    router.visit(
+                        loneWorkerHref(row.id, {
+                            section: 'response',
+                            returnTo,
+                        }),
+                    ),
+            },
+        ]);
+    const columns: RecordTableColumn<SessionRow>[] = [
+        {
+            key: 'session',
+            label: 'Session',
+            className: 'min-w-[16rem] max-w-[24rem]',
+            cell: (row) => (
+                <RecordIdentity
+                    title={
+                        <Link
+                            href={loneWorkerHref(row.id, { returnTo })}
+                            onClick={(event) => event.stopPropagation()}
+                            className={titleLink}
+                        >
+                            {row.user?.name ?? 'Worker not available'}
+                        </Link>
+                    }
+                    sub={
+                        <span className="line-clamp-2 break-words">
+                            {row.reference} ·{' '}
+                            {row.activity_description ??
+                                'Activity not recorded'}
+                        </span>
+                    }
+                />
+            ),
+        },
+        {
+            key: 'site',
+            label: 'Site and client',
+            nowrap: true,
+            cell: (row) => (
+                <RecordIdentity
+                    title={row.site?.name ?? 'Not recorded'}
+                    sub={row.client?.name ?? 'No client available to view'}
+                />
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            nowrap: true,
+            cell: (row) => <SessionState row={row} />,
+        },
+        {
+            key: 'check-ins',
+            label: 'Check-ins',
+            className: 'min-w-[14rem]',
+            cell: (row) => (
+                <RecordIdentity
+                    title={
+                        <Link
+                            href={loneWorkerHref(row.id, {
+                                section: 'check-ins',
+                                returnTo,
+                            })}
+                            onClick={(event) => event.stopPropagation()}
+                            className={titleLink}
+                        >
+                            {observationLabel(row.observation.state)}
+                        </Link>
+                    }
+                    sub={
+                        <>
+                            {row.observation.real_check_in_at
+                                ? dateTimeWithYear(
+                                      row.observation.real_check_in_at,
+                                  )
+                                : 'Starting is not a check-in.'}
+                            {!row.ended_at
+                                ? ` · Next checkpoint: ${clock(
+                                      row.observation.next_due_at,
+                                      row.observation.real_check_in_at ??
+                                          row.started_at,
+                                  )}`
+                                : ''}
+                        </>
+                    }
+                />
+            ),
+        },
+        {
+            key: 'end',
+            label: 'Due to end',
+            nowrap: true,
+            cell: (row) =>
+                row.expected_end_at ? (
+                    <RecordIdentity
+                        title={dateWithYear(row.expected_end_at)}
+                        sub={`${formatTime(row.expected_end_at)}${
+                            row.ended_at
+                                ? ` · ended ${clock(row.ended_at, row.expected_end_at)}`
+                                : ''
+                        }`}
+                    />
+                ) : (
+                    <span className="text-muted-foreground">Not recorded</span>
+                ),
+        },
+    ];
     return (
-        <>
-            <div className="space-y-3 md:hidden">
-                {rows.map((row) => (
-                    <Card key={row.id}>
-                        <CardContent className="space-y-3 p-4">
-                            <SessionTitle row={row} returnTo={returnTo} />
-                            <SessionState row={row} />
-                            <dl className="grid gap-3">
-                                <SessionFact label="Site">
-                                    {row.site?.name}
-                                </SessionFact>
-                                <SessionFact label="Expected end">
-                                    {recordedAt(row.expected_end_at)}
-                                </SessionFact>
-                            </dl>
-                            <CheckInSummary row={row} returnTo={returnTo} />
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-            {!!rows.length && (
-                <Card className="hidden overflow-x-auto md:block">
-                    <table className="w-full text-left text-sm">
-                        <caption className="sr-only">
-                            Safety sessions matching the selected filters
-                        </caption>
-                        <thead className="border-b border-border bg-muted/30">
-                            <tr>
-                                {[
-                                    'Session',
-                                    'Site & client',
-                                    'Expected end',
-                                    'State',
-                                    'Check-ins',
-                                ].map((label) => (
-                                    <th
-                                        key={label}
-                                        scope="col"
-                                        className="px-4 py-3 font-medium"
-                                    >
-                                        {label}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((row) => (
-                                <tr
-                                    key={row.id}
-                                    className="border-b border-border last:border-b-0"
-                                >
-                                    <td className="max-w-sm px-4 py-3">
-                                        <SessionTitle
-                                            row={row}
-                                            returnTo={returnTo}
-                                        />
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        {row.site?.name ?? 'Not recorded'}
-                                        <p className="text-subtle">
-                                            {row.client?.name ??
-                                                'No client available to view'}
-                                        </p>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        {recordedAt(row.expected_end_at)}
-                                        {row.ended_at && (
-                                            <p className="text-subtle">
-                                                Ended {recordedAt(row.ended_at)}
-                                            </p>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <SessionState row={row} />
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <CheckInSummary
-                                            row={row}
-                                            returnTo={returnTo}
-                                        />
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </Card>
-            )}
-        </>
+        <RecordTable
+            title="Sessions"
+            sub="Live sessions remain visible outside the selected period · Coverage uses current shifts at the selected Sites"
+            actions={actions}
+            ariaLabel="Safety sessions matching the selected filters"
+            rows={rows}
+            rowKey={(row) => row.id}
+            onOpen={open}
+            actionsFor={actionsFor}
+            menuTitle={(row) =>
+                `${row.reference} · ${row.user?.name ?? 'Worker not available'}`
+            }
+            menuIcon={Radio}
+            columns={columns}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>No records match these filters.</span>
+                </p>
+            }
+            footer={rows.length ? footer : undefined}
+        />
     );
 }
+
 function ResponseRegister({
     rows,
     returnTo,
+    actions,
+    footer,
 }: {
     rows: Alert[];
     returnTo: string;
+    actions: ReactNode;
+    footer: ReactNode;
 }) {
-    return (
-        <div className="grid gap-3 lg:grid-cols-2">
-            {rows.map((row) => {
+    const responseHref = (row: Alert) => {
+        const id = canonicalControlRoomAlertId(row.id);
+        return id
+            ? '/control-room/alerts/' +
+                  id +
+                  '?return_to=' +
+                  encodeURIComponent(returnTo)
+            : null;
+    };
+    const sessionHref = (row: Alert) =>
+        row.session?.id
+            ? loneWorkerHref(row.session.id, { section: 'response', returnTo })
+            : null;
+    const open = (row: Alert) => {
+        const target = responseHref(row) ?? sessionHref(row);
+        if (target) router.visit(target);
+    };
+    const actionsFor = (row: Alert): MenuItem[] => {
+        const response = responseHref(row);
+        const session = sessionHref(row);
+        return compactMenu([
+            response !== null && {
+                label: 'Open response',
+                icon: ExternalLink,
+                onClick: () => router.visit(response),
+            },
+            session !== null && {
+                label: 'Open source session',
+                icon: Radio,
+                onClick: () => router.visit(session),
+            },
+        ]);
+    };
+    const columns: RecordTableColumn<Alert>[] = [
+        {
+            key: 'response',
+            label: 'Response',
+            className: 'min-w-[16rem] max-w-[26rem]',
+            cell: (row) => {
                 const id = canonicalControlRoomAlertId(row.id);
+                const href = responseHref(row);
                 return (
-                    <Card key={row.id}>
-                        <CardContent className="space-y-3 p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                {id ? (
-                                    <Link
-                                        className={linkClass}
-                                        href={
-                                            '/control-room/alerts/' +
-                                            id +
-                                            '?return_to=' +
-                                            encodeURIComponent(returnTo)
-                                        }
-                                    >
-                                        Response {id} · {words(row.type)}
-                                    </Link>
-                                ) : (
-                                    <span>Response unavailable</span>
-                                )}
-                                <StatusBadge variant="neutral">
-                                    {responseState(row)}
-                                </StatusBadge>
-                            </div>
-                            <dl className="grid gap-3 sm:grid-cols-2">
-                                <SessionFact label="Worker">
-                                    {row.session?.user?.name ??
-                                        'Source not available'}
-                                </SessionFact>
-                                <SessionFact label="Site">
-                                    {row.session?.site?.name ??
-                                        'Source not available'}
-                                </SessionFact>
-                                <SessionFact label="Triggered">
-                                    {recordedAt(row.triggered_at)}
-                                </SessionFact>
-                            </dl>
-                            {row.session?.id && (
+                    <RecordIdentity
+                        title={
+                            href ? (
                                 <Link
-                                    className={linkClass}
-                                    href={loneWorkerHref(row.session.id, {
-                                        section: 'response',
-                                        returnTo,
-                                    })}
+                                    href={href}
+                                    onClick={(event) => event.stopPropagation()}
+                                    className={titleLink}
                                 >
-                                    Open source session
+                                    Response {id} · {words(row.type)}
                                 </Link>
-                            )}
-                            {row.notes && (
-                                <p className="text-sm break-words whitespace-pre-wrap">
+                            ) : (
+                                'Response unavailable'
+                            )
+                        }
+                        sub={
+                            row.notes ? (
+                                <span className="line-clamp-2 break-words whitespace-pre-wrap">
                                     {row.notes}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
+                                </span>
+                            ) : undefined
+                        }
+                    />
                 );
-            })}
-        </div>
+            },
+        },
+        {
+            key: 'worker',
+            label: 'Worker',
+            nowrap: true,
+            cell: (row) =>
+                row.session?.user?.name ? (
+                    <RecordPerson name={row.session.user.name} />
+                ) : (
+                    <span className="text-muted-foreground">
+                        Source not available
+                    </span>
+                ),
+        },
+        {
+            key: 'site',
+            label: 'Site',
+            nowrap: true,
+            cell: (row) =>
+                row.session?.site?.name ?? (
+                    <span className="text-muted-foreground">
+                        Source not available
+                    </span>
+                ),
+        },
+        {
+            key: 'raised',
+            label: 'Raised',
+            nowrap: true,
+            cell: (row) =>
+                row.triggered_at ? (
+                    <RecordIdentity
+                        title={dateWithYear(row.triggered_at)}
+                        sub={formatTime(row.triggered_at)}
+                    />
+                ) : (
+                    <span className="text-muted-foreground">Not recorded</span>
+                ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            nowrap: true,
+            cell: (row) => (
+                <StatusBadge variant={responseVariant(row)}>
+                    {responseState(row)}
+                </StatusBadge>
+            ),
+        },
+    ];
+    return (
+        <RecordTable
+            title="Control room responses"
+            sub="The control room assesses, assigns and resolves each one"
+            actions={actions}
+            ariaLabel="Control room responses matching the selected filters"
+            rows={rows}
+            rowKey={(row) => row.id}
+            onOpen={open}
+            actionsFor={actionsFor}
+            menuTitle={(row) => `Response · ${words(row.type)}`}
+            menuIcon={Siren}
+            columns={columns}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>No records match these filters.</span>
+                </p>
+            }
+            footer={rows.length ? footer : undefined}
+        />
     );
 }

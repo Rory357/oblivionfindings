@@ -27,7 +27,10 @@ it('preserves a real evidence removal command when retained metadata has no retr
         uploaded_by: null, kind: 'document', notes: null, alt_text: null }] });
     render(<InjuryRecordPanel detail={d} section="evidence" open={open} sourceHref="/health-safety/injuries/9" />);
     expect(screen.getByText(/File unavailable/)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: /Preview/ })).not.toBeInTheDocument(); expect(screen.queryByRole('link', { name: /Download/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove evidence' })); expect(open).toHaveBeenCalledWith('remove_evidence', { plan: undefined, attachment: 31 });
+    // Removal lives in the row's menu (kebab and right-click, drawing pg-hsn-88g).
+    fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 70, clientY: 100 });
+    expect(screen.queryByRole('menuitem', { name: /Preview|Download/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove evidence' })); expect(open).toHaveBeenCalledWith('remove_evidence', { plan: undefined, attachment: 31 });
 });
 
 it('shows an actually cleared historical field and withholds a restricted side without relabelling it absent', () => {

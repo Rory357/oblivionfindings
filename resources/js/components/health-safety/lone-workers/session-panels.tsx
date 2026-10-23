@@ -1,7 +1,48 @@
-import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
-import { Link } from '@inertiajs/react';
+/**
+ * The safety session's sections as the approved drawings draw them (pg-hsn-82,
+ * 82b–82f, Stephan 23 Oct 2026): the session as a short story, check-ins,
+ * location readings and history as time lines, tracker and automatic-check
+ * states as rings, connected work as a list. Every "doesn't confirm the worker
+ * is safe" line keeps the code's wording.
+ */
+import { dateTimeWithYear } from '@/components/incidents/incident-stages';
+import {
+    FactRows,
+    Log,
+    Note,
+    PeopleCards,
+    QuietLine,
+    Ring,
+    RingCard,
+    RowList,
+    Story,
+    Surface,
+    type CheckItem,
+    type LogItem,
+    type PersonCardItem,
+    type RowItem,
+    type SgTone,
+    type StoryFact,
+} from '@/components/signature/blocks';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import {
+    formatDateOnly,
+    formatDateTimeLong,
+    formatTime,
+    toDateInput,
+} from '@/lib/datetime';
+import {
+    AlertTriangle,
+    CalendarClock,
+    House,
+    Info,
+    MapPin,
+    RotateCw,
+    Send,
+    ShieldAlert,
+    Siren,
+    User,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { LinkedRecord, SafetySession, SessionDelivery } from './types';
 
@@ -33,6 +74,21 @@ export const monitorLabel = (state: string) =>
         unknown: 'Monitor not confirmed',
     })[state] ?? 'Monitor not confirmed';
 
+/**
+ * A session time: the time alone on the same NZ day as `base` (the session's
+ * start), otherwise with its date and year so a time is never ambiguous.
+ */
+export function sessionClock(
+    value: string | null | undefined,
+    base?: string | null,
+    fallback = 'Not recorded',
+): string {
+    if (!value) return fallback;
+    return base && toDateInput(value) === toDateInput(base)
+        ? formatTime(value)
+        : dateTimeWithYear(value, fallback);
+}
+
 export function SessionFact({
     label,
     children,
@@ -52,359 +108,462 @@ export function SessionFact({
     );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Overview                                                           */
+/* ------------------------------------------------------------------ */
+
 export function SessionOverview({ detail: d }: { detail: SafetySession }) {
+    const plan = plannedPlace(d.planned_location);
+    const facts: StoryFact[] = [
+        {
+            icon: MapPin,
+            text: d.location ?? plan?.description ?? 'Location not recorded',
+        },
+        {
+            icon: User,
+            text: d.client?.name
+                ? `With ${d.client.name}`
+                : 'No client available to view',
+        },
+    ];
     return (
-        <div className="space-y-5">
-            <h2 className="text-section-title">Session details</h2>
-            <dl className="grid gap-4 sm:grid-cols-2">
-                <SessionFact label="Worker">{d.worker?.name}</SessionFact>
-                <SessionFact label="Site">{d.site?.name}</SessionFact>
-                <SessionFact label="Client">
-                    {d.client?.name ?? 'No client available to view'}
-                </SessionFact>
-                <SessionFact label="Started">
-                    {recordedAt(d.started_at)}
-                </SessionFact>
-                <SessionFact label="Expected end">
-                    {recordedAt(d.expected_end_at)}
-                </SessionFact>
-                <SessionFact label="Ended">
-                    {d.ended_at ? recordedAt(d.ended_at) : 'Not ended'}
-                </SessionFact>
-                <SessionFact label="Check-in interval">
-                    {d.check_in_interval_minutes} minutes
-                </SessionFact>
-                <SessionFact label="Location description">
-                    {d.location}
-                </SessionFact>
-            </dl>
-            <dl>
-                <SessionFact label="Activity">
-                    {d.activity_description}
-                </SessionFact>
-            </dl>
-            <p className="text-subtle">
+        <>
+            <Story
+                title="The session"
+                facts={facts}
+                paras={[
+                    {
+                        h: 'Activity',
+                        t: d.activity_description || 'Not recorded',
+                    },
+                ]}
+            />
+            <Note icon={Info}>
                 Starting a session sets its first checkpoint. It does not record
                 a worker check-in or confirm that the worker is safe.
-            </p>
-        </div>
+            </Note>
+        </>
     );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Check-ins                                                          */
+/* ------------------------------------------------------------------ */
+
+const CHECK_TONE: Record<string, SgTone> = {
+    ok: 'success',
+    concern: 'warning',
+    emergency: 'critical',
+};
 
 export function SessionCheckIns({ detail: d }: { detail: SafetySession }) {
     const o = d.observation;
+    const base = d.started_at;
+    const ordered = [...d.check_ins].sort((a, b) =>
+        (a.checked_in_at ?? '').localeCompare(b.checked_in_at ?? ''),
+    );
+    const items: LogItem[] = [
+        ...(!d.ended_at
+            ? [
+                  {
+                      key: 'next',
+                      time: sessionClock(o.next_due_at, base),
+                      tone: (d.is_check_in_overdue
+                          ? 'critical'
+                          : 'none') as SgTone,
+                      title: d.is_check_in_overdue
+                          ? 'Check-in overdue'
+                          : 'Next checkpoint',
+                      sub: observationLabel(o.state),
+                  },
+              ]
+            : []),
+        ...ordered
+            .map((check, index) => ({
+                key: check.id,
+                time: sessionClock(check.checked_in_at, base),
+                tone: CHECK_TONE[check.status] ?? ('info' as SgTone),
+                title: `Check-in ${index + 1} · ${check.status === 'ok' ? 'Reported OK' : words(check.status)}`,
+                sub: (
+                    <>
+                        {check.receipt_source === 'legacy_created_at'
+                            ? 'Historical record created'
+                            : 'Received'}{' '}
+                        {sessionClock(check.received_at, base)} ·{' '}
+                        {check.recorded_by?.name ?? 'Operator not recorded'}
+                        {check.notes ? (
+                            <span className="whitespace-pre-wrap">
+                                {' '}
+                                · {check.notes}
+                            </span>
+                        ) : null}
+                        {check.location_lat != null &&
+                        check.location_lng != null ? (
+                            <span className="block">
+                                Position recorded with this check-in:{' '}
+                                {String(check.location_lat)},{' '}
+                                {String(check.location_lng)}. Historical
+                                check-in position; this does not establish the
+                                worker's current location.
+                            </span>
+                        ) : null}
+                    </>
+                ),
+            }))
+            .reverse(),
+    ];
     return (
-        <div className="space-y-5">
-            <h2 className="text-section-title">Check-ins</h2>
-            <p className="font-medium">{observationLabel(o.state)}</p>
-            <dl className="grid gap-4 sm:grid-cols-2">
-                <SessionFact label="Last check-in occurred">
-                    {recordedAt(o.real_check_in_at)}
-                </SessionFact>
-                <SessionFact label="Received">
-                    {recordedAt(o.received_at)}
-                </SessionFact>
-                <SessionFact label="Next checkpoint">
-                    {d.ended_at ? 'Session ended' : recordedAt(o.next_due_at)}
-                </SessionFact>
-                <SessionFact label="Monitor">
-                    {monitorLabel(o.monitor.state)}
-                </SessionFact>
-                <SessionFact label="Last monitor check">
-                    {recordedAt(o.monitor.checked_at)}
-                </SessionFact>
-                <SessionFact label="Last failed monitor check">
-                    {recordedAt(o.monitor.failed_at)}
-                </SessionFact>
-            </dl>
+        <>
+            {d.check_ins.length || !d.ended_at ? (
+                <Log
+                    title="Check-ins"
+                    sub={`Every ${d.check_in_interval_minutes} minutes · newest first`}
+                    items={items}
+                    limit={items.length}
+                />
+            ) : null}
+            {d.check_ins.length === 0 ? (
+                <QuietLine text="No check-in records are available for this session." />
+            ) : null}
             {o.receipt_source === 'legacy_created_at' && (
-                <p className="text-subtle">
+                <Note icon={Info}>
                     The last receipt time comes from the historical record
                     creation time. A separate delivery receipt was not recorded.
-                </p>
+                </Note>
             )}
-            {d.check_ins.length === 0 ? (
-                <p className="text-subtle">
-                    No check-in records are available for this session.
-                </p>
-            ) : (
-                <ol className="divide-y rounded-lg border">
-                    {d.check_ins.map((check) => (
-                        <li key={check.id} className="space-y-3 p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <h3 className="font-medium">
-                                    Check-in {check.id}
-                                </h3>
-                                <StatusBadge
-                                    variant={
-                                        check.status === 'emergency'
-                                            ? 'critical'
-                                            : check.status === 'concern'
-                                              ? 'warning'
-                                              : 'neutral'
-                                    }
-                                >
-                                    {check.status === 'ok'
-                                        ? 'Reported OK'
-                                        : words(check.status)}
-                                </StatusBadge>
-                            </div>
-                            <dl className="grid gap-3 sm:grid-cols-2">
-                                <SessionFact label="Occurred">
-                                    {recordedAt(check.checked_in_at)}
-                                </SessionFact>
-                                <SessionFact
-                                    label={
-                                        check.receipt_source ===
-                                        'legacy_created_at'
-                                            ? 'Historical record created'
-                                            : 'Received'
-                                    }
-                                >
-                                    {recordedAt(check.received_at)}
-                                </SessionFact>
-                                <SessionFact label="Recorded by">
-                                    {check.recorded_by?.name ??
-                                        'Operator not recorded'}
-                                </SessionFact>
-                                <SessionFact label="Notes">
-                                    {check.notes}
-                                </SessionFact>
-                                {check.location_lat != null &&
-                                    check.location_lng != null && (
-                                        <SessionFact label="Position recorded with this check-in">
-                                            {String(check.location_lat)},{' '}
-                                            {String(check.location_lng)}
-                                            <span className="text-subtle block">
-                                                Historical check-in position;
-                                                this does not establish the
-                                                worker's current location.
-                                            </span>
-                                        </SessionFact>
-                                    )}
-                            </dl>
-                        </li>
-                    ))}
-                </ol>
-            )}
-        </div>
+        </>
     );
 }
 
-function RecordLinks({
-    records,
-    empty,
-}: {
-    records: LinkedRecord[];
-    empty: string;
-}) {
-    if (!records.length) return <p className="text-subtle">{empty}</p>;
+/** The automatic check that marks a check-in overdue, read as a ring. */
+export function SessionMonitorRing({ detail: d }: { detail: SafetySession }) {
+    const m = d.observation.monitor;
+    const checks: CheckItem[] = [
+        {
+            label: 'Last monitor check',
+            state:
+                m.state === 'current'
+                    ? 'success'
+                    : m.state === 'failed'
+                      ? 'critical'
+                      : 'warning',
+            note: sessionClock(m.checked_at, d.started_at),
+        },
+        {
+            label: 'Last failed monitor check',
+            state: m.failed_at ? 'warning' : 'success',
+            note: sessionClock(m.failed_at, d.started_at),
+        },
+    ];
     return (
-        <ul className="divide-y rounded-lg border">
-            {records.map((record) => (
-                <li
-                    key={record.href}
-                    className="flex flex-wrap items-center justify-between gap-3 p-4"
-                >
-                    <div className="min-w-0 space-y-1">
-                        <p className="font-medium break-words">
-                            {record.reference_number ??
-                                record.name ??
-                                `Record ${record.id}`}
-                            {record.title ? ` · ${record.title}` : ''}
-                        </p>
-                        {record.status && (
-                            <p className="text-sm">
-                                {words(record.display_state ?? record.status)}
-                            </p>
-                        )}
-                        {record.due_date && (
-                            <p className="text-subtle">
-                                Due {formatDateOnly(record.due_date)}
-                            </p>
-                        )}
-                    </div>
-                    <Button asChild variant="outline" className="frontline-tap">
-                        <Link href={record.href}>
-                            Open{' '}
-                            {record.reference_number ??
-                                record.name ??
-                                `record ${record.id}`}
-                        </Link>
-                    </Button>
-                </li>
-            ))}
-        </ul>
+        <RingCard
+            value={checks.filter((c) => c.state === 'success').length}
+            of={checks.length}
+            label={monitorLabel(m.state)}
+            checks={checks}
+        />
     );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Response                                                           */
+/* ------------------------------------------------------------------ */
+
+function assignedName(alert: LinkedRecord): string | null {
+    return typeof alert.assigned_to === 'object'
+        ? (alert.assigned_to?.name ?? null)
+        : (alert.assigned_to ?? null);
 }
 
 export function SessionResponse({ detail: d }: { detail: SafetySession }) {
     const delivery = d.source_delivery;
+    const base = d.started_at;
     return (
-        <div className="space-y-5">
-            <h2 className="text-section-title">Help request and response</h2>
-            <dl className="grid gap-4 sm:grid-cols-2">
-                <SessionFact label="Help requested">
-                    {recordedAt(d.emergency_triggered_at)}
-                </SessionFact>
-                <SessionFact label="Delivery">
-                    {deliveryLabel(delivery)}
-                </SessionFact>
-                <SessionFact label="Delivered at">
-                    {recordedAt(delivery?.delivered_at)}
-                </SessionFact>
-                <SessionFact label="Next delivery attempt">
-                    {recordedAt(delivery?.next_attempt_at)}
-                </SessionFact>
-            </dl>
-            <dl>
-                <SessionFact label="Help request notes">
-                    {d.emergency_notes}
-                </SessionFact>
-            </dl>
-            {delivery && (
-                <p className="text-subtle">
-                    Request {delivery.episode_number} · {delivery.attempts}{' '}
-                    delivery {delivery.attempts === 1 ? 'attempt' : 'attempts'}.
-                    Delivery records processing of the request; it does not
-                    confirm that a responder has accepted it.
-                </p>
+        <>
+            <Story
+                title="Help request and response"
+                sub={
+                    delivery
+                        ? `Request ${delivery.episode_number} · ${delivery.attempts} delivery ${delivery.attempts === 1 ? 'attempt' : 'attempts'}. Delivery records processing of the request; it does not confirm that a responder has accepted it.`
+                        : undefined
+                }
+                facts={[
+                    {
+                        icon: Siren,
+                        text: `Help requested: ${recordedAt(d.emergency_triggered_at)}`,
+                    },
+                    {
+                        icon: Send,
+                        text: `${deliveryLabel(delivery)}${delivery?.delivered_at ? ` · ${sessionClock(delivery.delivered_at, base)}` : ''}`,
+                    },
+                    {
+                        icon: RotateCw,
+                        text: `Next delivery attempt: ${recordedAt(delivery?.next_attempt_at)}`,
+                    },
+                ]}
+                paras={[
+                    {
+                        h: 'Help request notes',
+                        t: d.emergency_notes || 'Not recorded',
+                    },
+                ]}
+            />
+            {d.connections.control_room.length ? (
+                d.connections.control_room.map((alert) => (
+                    <FactRows
+                        key={alert.id}
+                        title={alert.reference_number ?? `Response ${alert.id}`}
+                        sub="Operational response"
+                        action={{ label: 'Continue response', href: alert.href }}
+                        rows={[
+                            [
+                                'Response status',
+                                words(alert.status ?? 'unknown'),
+                            ],
+                            [
+                                'Assigned responder',
+                                assignedName(alert) ?? 'Needs an owner',
+                            ],
+                            ['Acknowledged', recordedAt(alert.acknowledged_at)],
+                            ['Resolved', recordedAt(alert.resolved_at)],
+                        ]}
+                    />
+                ))
+            ) : (
+                <QuietLine
+                    title="Operational response"
+                    text="No response record is available to view here. This does not confirm whether a response exists or someone is attending."
+                />
             )}
-            <h3 className="font-medium">Operational response</h3>
-            {!d.connections.control_room.length && (
-                <p className="text-subtle">
-                    No response record is available to view here. This does not
-                    confirm whether a response exists or someone is attending.
-                </p>
-            )}
-            {d.connections.control_room.map((alert) => (
-                <div key={alert.id} className="space-y-3 rounded-lg border p-4">
-                    <h4 className="font-medium">
-                        {alert.reference_number ?? `Response ${alert.id}`}
-                    </h4>
-                    <dl className="grid gap-3 sm:grid-cols-2">
-                        <SessionFact label="Response status">
-                            {words(alert.status ?? 'unknown')}
-                        </SessionFact>
-                        <SessionFact label="Assigned responder">
-                            {typeof alert.assigned_to === 'object'
-                                ? (alert.assigned_to?.name ?? 'Needs an owner')
-                                : (alert.assigned_to ?? 'Needs an owner')}
-                        </SessionFact>
-                        <SessionFact label="Acknowledged">
-                            {recordedAt(alert.acknowledged_at)}
-                        </SessionFact>
-                        <SessionFact label="Resolved">
-                            {recordedAt(alert.resolved_at)}
-                        </SessionFact>
-                    </dl>
-                    <Button asChild variant="outline" className="frontline-tap">
-                        <Link href={alert.href}>Continue response</Link>
-                    </Button>
-                </div>
-            ))}
-            <p className="text-subtle">
+            <Note tone="warning" icon={AlertTriangle}>
                 Acknowledging a response or tracker panic does not record a
                 check-in, confirm worker safety or close linked incident and
                 review work.
-            </p>
+            </Note>
             {d.legacy_alert_history.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="font-medium">Historical alerts</h3>
-                    <p className="text-subtle">
-                        Read-only historical records. These do not confirm a
-                        current operational response.
-                    </p>
-                    <ul className="divide-y rounded-lg border">
-                        {d.legacy_alert_history.map((alert) => (
-                            <li key={alert.id} className="space-y-1 p-4">
-                                <p>
-                                    {words(alert.type)} ·{' '}
-                                    {words(alert.recorded_status)}
-                                </p>
-                                <p className="text-subtle">
-                                    {recordedAt(alert.triggered_at)}
-                                </p>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+                <Log
+                    title="Historical alerts"
+                    sub="Read-only historical records. These do not confirm a current operational response."
+                    limit={d.legacy_alert_history.length}
+                    items={d.legacy_alert_history.map((alert) => ({
+                        key: alert.id,
+                        time: sessionClock(alert.triggered_at, base),
+                        tone: 'none' as SgTone,
+                        title: `${words(alert.type)} · ${words(alert.recorded_status)}`,
+                        sub: recordedAt(alert.triggered_at),
+                    }))}
+                />
             )}
-        </div>
+        </>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Location                                                           */
+/* ------------------------------------------------------------------ */
+
+const TRACKER_STATES: Record<string, string> = {
+    restricted: 'Location is restricted',
+    session_ended: 'Live location is unavailable after this session ended',
+    not_assigned: 'No tracker assigned',
+    integrity_error: 'Tracker assignment needs review',
+    collection_stopped: 'Tracker collection stopped',
+    available: 'Location observation available',
+    stale: 'Location observation is old',
+    unknown: 'No location observation confirmed',
+};
+/** Device contact freshness (the access service's collection_state). */
+const COLLECTION_TONE: Record<string, SgTone> = {
+    current: 'success',
+    stale: 'warning',
+    unknown: 'none',
+};
+const PLAN_METHODS: Record<string, string> = {
+    manual: 'Coordinates entered',
+    selected_address: 'Address selected',
+    site_address: 'Site address',
+    shift_address: 'Shift address',
+};
+
+type PlannedPlace = {
+    description: string | null;
+    point: string;
+    source: string;
+    recordedAt: string | null;
+    by: string;
+};
+
+/** A permitted planned place, or null when none is recorded / it can't be read. */
+function plannedPlace(value: unknown): PlannedPlace | null {
+    if (
+        value == null ||
+        typeof value !== 'object' ||
+        !('kind' in value) ||
+        value.kind !== 'planned'
+    )
+        return null;
+    const place = value as Record<string, unknown>;
+    return {
+        description:
+            typeof place.description === 'string' ? place.description : null,
+        point:
+            typeof place.lat === 'number' && typeof place.lng === 'number'
+                ? `${place.lat}, ${place.lng}`
+                : 'Address only; no map point recorded',
+        source:
+            typeof place.method === 'string'
+                ? (PLAN_METHODS[place.method] ?? 'Source not recorded')
+                : 'Source not recorded',
+        recordedAt:
+            typeof place.recorded_at === 'string' ? place.recorded_at : null,
+        by:
+            place.recorded_by &&
+            typeof place.recorded_by === 'object' &&
+            'name' in place.recorded_by &&
+            typeof place.recorded_by.name === 'string'
+                ? place.recorded_by.name
+                : 'Operator not recorded',
+    };
+}
+
+/** The planned place as one line, or why it can't be shown. */
+function PlannedPlaceText({ value }: { value: unknown }) {
+    if (value == null) return <>No planned location recorded.</>;
+    const place = plannedPlace(value);
+    if (!place) return <>Planned location details are unavailable.</>;
+    return (
+        <>
+            {place.description ?? 'Not recorded'} · {place.point} ·{' '}
+            {place.source} · {place.by} · {recordedAt(place.recordedAt)}
+        </>
     );
 }
 
 export function SessionLocation({ detail: d }: { detail: SafetySession }) {
     const tracker = d.tracker;
-    const states: Record<string, string> = {
-        restricted: 'Location is restricted',
-        session_ended: 'Live location is unavailable after this session ended',
-        not_assigned: 'No tracker assigned',
-        integrity_error: 'Tracker assignment needs review',
-        collection_stopped: 'Tracker collection stopped',
-        available: 'Location observation available',
-        stale: 'Location observation is old',
-        unknown: 'No location observation confirmed',
-    };
+    const base = d.started_at;
+    const plan = plannedPlace(d.planned_location);
+    const items: LogItem[] = [];
+    if (tracker?.last_seen_at)
+        items.push({
+            key: 'contact',
+            time: sessionClock(tracker.last_seen_at, base),
+            tone: COLLECTION_TONE[tracker.collection_state] ?? 'none',
+            title: 'Last device contact',
+            sub: tracker.name ?? 'Tracker',
+        });
+    if (tracker && (tracker.observed_at || tracker.received_at))
+        items.push({
+            key: 'observed',
+            time: sessionClock(tracker.observed_at, base),
+            tone: d.tracker_state === 'available' ? 'success' : 'warning',
+            title: 'Location observed',
+            sub: `Received ${sessionClock(tracker.received_at, base)} · ${
+                tracker.latitude != null && tracker.longitude != null
+                    ? `${tracker.latitude}, ${tracker.longitude}`
+                    : 'No permitted observation available'
+            }`,
+        });
+    items.push({
+        key: 'planned',
+        time: plan ? sessionClock(plan.recordedAt, base, '') : '',
+        tone: 'info',
+        title: plan?.description
+            ? `Planned location — ${plan.description}`
+            : 'Planned location',
+        sub: (
+            <span aria-label="Planned place" role="group" className="block">
+                <span className="block">
+                    This is the intended place for the work, not evidence of
+                    the worker's position.
+                </span>
+                <span className="block">
+                    <PlannedPlaceText value={d.planned_location} />
+                </span>
+            </span>
+        ),
+    });
+    items.push({
+        key: 'recorded',
+        tone: 'none',
+        title: 'Recorded location description',
+        sub: d.location || 'Not recorded',
+    });
     return (
-        <div className="space-y-5">
-            <h2 className="text-section-title">Location evidence</h2>
-            <section className="space-y-3" aria-label="Planned place">
-                <h3 className="font-medium">Planned location</h3>
-                <PlannedPlaceEvidence value={d.planned_location} />
-                <p className="text-subtle">
-                    This is the intended place for the work, not evidence of the
-                    worker's position.
-                </p>
-            </section>
-            <h3 className="font-medium">Tracker observations</h3>
-            <p className="font-medium">
-                {states[d.tracker_state] ??
-                    'Location availability is not confirmed'}
-            </p>
-            <dl>
-                <SessionFact label="Recorded location description">
-                    {d.location}
-                </SessionFact>
-            </dl>
-            {tracker && (
-                <dl className="grid gap-4 sm:grid-cols-2">
-                    <SessionFact label="Tracker">{tracker.name}</SessionFact>
-                    <SessionFact label="Collection">
-                        {words(tracker.collection_state)}
-                    </SessionFact>
-                    <SessionFact label="Location observed">
-                        {recordedAt(tracker.observed_at)}
-                    </SessionFact>
-                    <SessionFact label="Location received">
-                        {recordedAt(tracker.received_at)}
-                    </SessionFact>
-                    <SessionFact label="Coordinates">
-                        {tracker.latitude != null && tracker.longitude != null
-                            ? `${tracker.latitude}, ${tracker.longitude}`
-                            : 'No permitted observation available'}
-                    </SessionFact>
-                    <SessionFact label="Last device contact">
-                        {recordedAt(tracker.last_seen_at)}
-                    </SessionFact>
-                    <SessionFact label="Battery">
-                        {tracker.battery_level == null
-                            ? 'Not recorded'
-                            : `${tracker.battery_level}%`}
-                    </SessionFact>
-                    <SessionFact label="Tracker panic flag">
-                        {tracker.panic_active ? 'Active' : 'Not active'}
-                    </SessionFact>
-                </dl>
-            )}
-            <p className="text-subtle">
+        <>
+            <Log
+                title="Location"
+                sub={
+                    TRACKER_STATES[d.tracker_state] ??
+                    'Location availability is not confirmed'
+                }
+                items={items}
+                limit={items.length}
+            />
+            <Note icon={Info}>
                 Device contact and location observations are separate facts.
                 Neither confirms the worker’s current location or safety without
                 checking the observation time and response.
-            </p>
-        </div>
+            </Note>
+        </>
     );
 }
+
+/** The paired tracker read as a ring: collection, panic flag, battery. */
+export function SessionTrackerRing({ detail: d }: { detail: SafetySession }) {
+    const tracker = d.tracker;
+    if (!tracker)
+        return (
+            <QuietLine
+                title="Tracker"
+                text={
+                    TRACKER_STATES[d.tracker_state] ??
+                    'Location availability is not confirmed'
+                }
+            />
+        );
+    const checks: CheckItem[] = [
+        {
+            label: 'Collection',
+            state: COLLECTION_TONE[tracker.collection_state] ?? 'none',
+            note: words(tracker.collection_state),
+        },
+        {
+            label: 'Tracker panic flag',
+            state: tracker.panic_active ? 'critical' : 'success',
+            note: tracker.panic_active ? 'Active' : 'Not active',
+        },
+        {
+            label: 'Battery',
+            state:
+                tracker.battery_level == null
+                    ? 'none'
+                    : tracker.battery_level < 20
+                      ? 'warning'
+                      : 'success',
+            note:
+                tracker.battery_level == null
+                    ? 'Not recorded'
+                    : `${tracker.battery_level}%`,
+        },
+    ];
+    return (
+        <RingCard
+            value={checks.filter((c) => c.state === 'success').length}
+            of={checks.length}
+            label={tracker.name ?? 'Tracker'}
+            sub={
+                TRACKER_STATES[d.tracker_state] ??
+                'Location availability is not confirmed'
+            }
+            checks={checks}
+        />
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  History                                                            */
+/* ------------------------------------------------------------------ */
 
 const historyLabels: Record<string, string> = {
     status: 'Status',
@@ -424,93 +583,78 @@ const historyLabels: Record<string, string> = {
     episode_id: 'Help request',
     alert_id: 'Response',
 };
+const HISTORY_TONE: Record<string, SgTone> = {
+    'healthSafety.loneWorker.session.start': 'info',
+    'healthSafety.loneWorker.session.checkIn': 'success',
+    'healthSafety.loneWorker.session.emergency': 'critical',
+    'healthSafety.loneWorker.session.trackerPanicAcknowledged': 'warning',
+    'healthSafety.loneWorker.session.responseAcknowledged': 'info',
+    'healthSafety.loneWorker.session.responseResolved': 'success',
+    'healthSafety.loneWorker.session.end': 'none',
+    'healthSafety.loneWorker.session.delete': 'none',
+};
 
 function PlannedPlaceEvidence({ value }: { value: unknown }) {
     if (value == null)
         return <p className="text-subtle">No planned location recorded.</p>;
-    if (
-        typeof value !== 'object' ||
-        !('kind' in value) ||
-        value.kind !== 'planned'
-    )
+    const place = plannedPlace(value);
+    if (!place)
         return (
             <p className="text-subtle">
                 Planned location details are unavailable.
             </p>
         );
-    const place = value as Record<string, unknown>;
-    const methods: Record<string, string> = {
-        manual: 'Coordinates entered',
-        selected_address: 'Address selected',
-        site_address: 'Site address',
-        shift_address: 'Shift address',
-    };
-    const actor =
-        place.recorded_by &&
-        typeof place.recorded_by === 'object' &&
-        'name' in place.recorded_by &&
-        typeof place.recorded_by.name === 'string'
-            ? place.recorded_by.name
-            : 'Operator not recorded';
     return (
         <dl className="grid gap-3 sm:grid-cols-2">
             <SessionFact label="Planned address or description">
-                {typeof place.description === 'string'
-                    ? place.description
-                    : null}
+                {place.description}
             </SessionFact>
-            <SessionFact label="Planned map point">
-                {typeof place.lat === 'number' && typeof place.lng === 'number'
-                    ? `${place.lat}, ${place.lng}`
-                    : 'Address only; no map point recorded'}
-            </SessionFact>
-            <SessionFact label="Plan source">
-                {typeof place.method === 'string'
-                    ? (methods[place.method] ?? 'Source not recorded')
-                    : 'Source not recorded'}
-            </SessionFact>
+            <SessionFact label="Planned map point">{place.point}</SessionFact>
+            <SessionFact label="Plan source">{place.source}</SessionFact>
             <SessionFact label="Plan recorded">
-                {recordedAt(
-                    typeof place.recorded_at === 'string'
-                        ? place.recorded_at
-                        : null,
-                )}
+                {recordedAt(place.recordedAt)}
             </SessionFact>
-            <SessionFact label="Plan recorded by">{actor}</SessionFact>
+            <SessionFact label="Plan recorded by">{place.by}</SessionFact>
         </dl>
     );
 }
+
 export function SessionHistory({ detail: d }: { detail: SafetySession }) {
+    if (!d.history.length)
+        return (
+            <QuietLine
+                title="History"
+                text="No activity history is available for this session."
+            />
+        );
+    // newest first; each entry keeps its own captured details
+    const events = [...d.history].reverse();
     return (
-        <div className="space-y-5">
-            <h2 className="text-section-title">Recorded history</h2>
-            {!d.history.length ? (
-                <p className="text-subtle">
-                    No activity history is available for this session.
-                </p>
-            ) : (
-                <ol className="divide-y rounded-lg border">
-                    {d.history.map((event) => (
-                        <li key={event.id} className="space-y-3 p-4">
-                            <h3 className="font-medium">{event.title}</h3>
-                            <p className="text-subtle">
-                                {recordedAt(event.occurred_at)} ·{' '}
+        <Surface title="History" sub="Open an entry to see its captured details">
+            <ol className="sg-log">
+                {events.map((event) => (
+                    <li key={event.id} className="sg-lr">
+                        <time>{sessionClock(event.occurred_at, d.started_at)}</time>
+                        <Ring tone={HISTORY_TONE[event.action] ?? 'info'} />
+                        <div className="min-w-0">
+                            <b>{event.title}</b>
+                            <small>
                                 {event.actor?.name ?? 'Operator not recorded'}
-                            </p>
+                            </small>
                             {event.note && (
-                                <p className="text-sm whitespace-pre-wrap">
+                                <p className="mt-1 text-sm whitespace-pre-wrap">
                                     {event.note}
                                 </p>
                             )}
                             {event.legacy && (
-                                <p className="text-subtle">
+                                <small>
                                     Historical details are incomplete. Current
                                     values do not replace missing recorded
                                     facts.
-                                </p>
+                                </small>
                             )}
-                            <details>
-                                <summary className="frontline-tap flex cursor-pointer items-center text-sm font-medium">
+                            <details className="mt-1">
+                                <summary className="inline-flex cursor-pointer items-center rounded-sm text-sm font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     Captured details
                                 </summary>
                                 <dl className="grid gap-3 pt-3 sm:grid-cols-2">
@@ -571,7 +715,7 @@ export function SessionHistory({ detail: d }: { detail: SafetySession }) {
                                         className="space-y-3 pt-4"
                                         aria-label="Captured planned location"
                                     >
-                                        <h4 className="font-medium">
+                                        <h4 className="text-sm font-medium">
                                             Planned location at this change
                                         </h4>
                                         <PlannedPlaceEvidence
@@ -582,55 +726,188 @@ export function SessionHistory({ detail: d }: { detail: SafetySession }) {
                                     </section>
                                 )}
                             </details>
-                        </li>
-                    ))}
-                </ol>
-            )}
-        </div>
+                        </div>
+                        <span />
+                    </li>
+                ))}
+            </ol>
+        </Surface>
     );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Connected work                                                     */
+/* ------------------------------------------------------------------ */
+
+function linkedName(record: LinkedRecord): string {
+    return `${record.reference_number ?? record.name ?? `Record ${record.id}`}${record.title ? ` · ${record.title}` : ''}`;
+}
+
+function linkedBadge(record: LinkedRecord): ReactNode {
+    if (!record.status) return null;
+    const key = record.display_state ?? record.status;
+    const variant: StatusVariant = ['open', 'active', 'overdue'].includes(key)
+        ? 'warning'
+        : ['closed', 'resolved', 'completed', 'verified'].includes(key)
+          ? 'neutral'
+          : 'info';
+    return <StatusBadge variant={variant}>{words(key)}</StatusBadge>;
+}
+
+function linkedRow(
+    kind: string,
+    record: LinkedRecord,
+    leading: ReactNode,
+    sub?: string,
+): RowItem {
+    return {
+        key: `${kind}-${record.href}`,
+        title: kind,
+        sub: [
+            sub ?? linkedName(record),
+            record.due_date ? `Due ${formatDateOnly(record.due_date)}` : null,
+        ]
+            .filter(Boolean)
+            .join(' · '),
+        badge: linkedBadge(record),
+        leading,
+        href: record.href,
+    };
+}
+
 export function SessionConnections({ detail: d }: { detail: SafetySession }) {
+    const c = d.connections;
+    const shift = c.shift;
+    const rows: RowItem[] = [
+        ...(shift
+            ? [
+                  linkedRow(
+                      'Workforce shift',
+                      shift,
+                      <CalendarClock className="size-4" />,
+                      [
+                          `Shift ${shift.id}`,
+                          shift.starts_at
+                              ? `${sessionClock(shift.starts_at, null)} – ${sessionClock(shift.ends_at, shift.starts_at)}`
+                              : null,
+                      ]
+                          .filter(Boolean)
+                          .join(' · '),
+                  ),
+              ]
+            : []),
+        ...(c.site
+            ? [linkedRow('Site', c.site, <House className="size-4" />)]
+            : []),
+        ...(c.client
+            ? [linkedRow('Client', c.client, <User className="size-4" />)]
+            : []),
+        ...c.control_room.map((record) =>
+            linkedRow(
+                'Operational response',
+                record,
+                <Siren className="size-4" />,
+            ),
+        ),
+        ...c.incidents.map((record) =>
+            linkedRow('Incident', record, <ShieldAlert className="size-4" />),
+        ),
+        ...c.safety_reviews.map((record) =>
+            linkedRow(
+                'Safety review',
+                record,
+                <ShieldAlert className="size-4" />,
+            ),
+        ),
+        ...c.corrective_actions.map((record) =>
+            linkedRow(
+                'Corrective action',
+                record,
+                <ShieldAlert className="size-4" />,
+            ),
+        ),
+    ];
+    const missing = [
+        !shift && 'Workforce shift',
+        !c.site && !c.client && 'Site and client',
+        !c.control_room.length && 'Operational responses',
+        !c.incidents.length && 'Incidents',
+        !c.safety_reviews.length && 'Safety reviews',
+        !c.corrective_actions.length && 'Corrective actions',
+    ].filter((label): label is string => !!label);
+    const missingTitle = missing.length
+        ? missing.length === 1
+            ? missing[0]
+            : `${missing.slice(0, -1).map((label, i) => (i ? label.toLowerCase() : label)).join(', ')} and ${missing[missing.length - 1].toLowerCase()}`
+        : null;
     return (
-        <div className="space-y-5">
-            <h2 className="text-section-title">Connected work</h2>
-            <p className="text-subtle">
-                Each source keeps its own permissions, owner and completion
-                checks. Records you cannot access are not shown here.
-            </p>
-            {(
-                [
-                    [
-                        'Workforce shift',
-                        d.connections.shift
-                            ? [
-                                  {
-                                      ...d.connections.shift,
-                                      name: `Shift ${d.connections.shift.id}`,
-                                  },
-                              ]
-                            : [],
-                    ],
-                    [
-                        'Site and client',
-                        [d.connections.site, d.connections.client].filter(
-                            (item): item is LinkedRecord => item !== null,
-                        ),
-                    ],
-                    ['Operational responses', d.connections.control_room],
-                    ['Incidents', d.connections.incidents],
-                    ['Safety reviews', d.connections.safety_reviews],
-                    ['Corrective actions', d.connections.corrective_actions],
-                ] as [string, LinkedRecord[]][]
-            ).map(([label, records]) => (
-                <section key={label} className="space-y-3">
-                    <h3 className="font-medium">{label}</h3>
-                    <RecordLinks
-                        records={records}
-                        empty="No linked record is available to view here."
-                    />
-                </section>
-            ))}
-        </div>
+        <>
+            <RowList
+                title="Connected work"
+                sub="Each source keeps its own permissions, owner and completion checks. Records you cannot access are not shown here."
+                items={rows}
+                empty="No linked record is available to view here."
+            />
+            {rows.length && missingTitle ? (
+                <QuietLine
+                    title={missingTitle}
+                    text="No linked record is available to view here."
+                />
+            ) : null}
+        </>
     );
+}
+
+/* ------------------------------------------------------------------ */
+/*  People (the side column)                                           */
+/* ------------------------------------------------------------------ */
+
+const START_ACTION = 'healthSafety.loneWorker.session.start';
+
+/** Who started the session — the actor on its "Session started" history entry. */
+export function sessionStarter(d: SafetySession): string | null {
+    return (
+        d.history.find((event) => event.action === START_ACTION)?.actor?.name ??
+        null
+    );
+}
+
+export function SessionPeople({ detail: d }: { detail: SafetySession }) {
+    const starter = sessionStarter(d);
+    const planner = plannedPlace(d.planned_location)?.by ?? null;
+    const plannerName =
+        planner && planner !== 'Operator not recorded' ? planner : null;
+    const people: PersonCardItem[] = [
+        ...(d.worker?.name
+            ? [
+                  {
+                      name: d.worker.name,
+                      sub: `Working alone${d.site?.name ? ` · ${d.site.name}` : ''}`,
+                      presence:
+                          !d.ended_at && d.status !== 'completed'
+                              ? ('on' as const)
+                              : undefined,
+                  },
+              ]
+            : []),
+        ...(d.client?.name ? [{ name: d.client.name, sub: 'Client' }] : []),
+        ...(starter && starter !== d.worker?.name
+            ? [
+                  {
+                      name: starter,
+                      sub:
+                          plannerName === starter
+                              ? 'Started the session and planned the location'
+                              : 'Started the session',
+                  },
+              ]
+            : []),
+        ...(plannerName &&
+        plannerName !== starter &&
+        plannerName !== d.worker?.name
+            ? [{ name: plannerName, sub: 'Planned the location' }]
+            : []),
+    ];
+    if (!people.length) return null;
+    return <PeopleCards title="People" cols={1} items={people} />;
 }

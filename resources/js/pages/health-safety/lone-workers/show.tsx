@@ -1,3 +1,12 @@
+/**
+ * One safety session (approved H&S drawings pg-hsn-82, 82b–82f — Stephan 23
+ * Oct 2026): one band on every section shows the session's line — started,
+ * check-ins received, where it is now, due to end — with the next step on top
+ * and Record check-in / Request help beside it. While help is requested the
+ * band follows the help request instead (requested › sent › responder ›
+ * acknowledged › resolved). The command forms and their submissions are
+ * unchanged; they open in the main column as before.
+ */
 import {
     SESSION_COMMAND_LABELS,
     SESSION_COMMAND_SECTIONS,
@@ -7,61 +16,96 @@ import {
 import {
     deliveryLabel,
     observationLabel,
+    sessionClock,
     SessionCheckIns,
     SessionConnections,
     SessionHistory,
     SessionLocation,
+    SessionMonitorRing,
     SessionOverview,
+    SessionPeople,
     SessionResponse,
+    sessionStarter,
+    SessionTrackerRing,
+    words,
 } from '@/components/health-safety/lone-workers/session-panels';
 import type {
+    LinkedRecord,
     SafetySession,
     SessionCommand,
     SessionPickers,
     SessionSection,
 } from '@/components/health-safety/lone-workers/types';
+import { dateWithYear } from '@/components/incidents/incident-stages';
 import {
     PageHeader,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+    PageHeaderFacts,
+    PageHeaderStages,
+    type PageHeaderFact,
+    type PageHeaderNextStep,
+    type PageHeaderStage,
+} from '@/components/page/page-header-strip';
+import { SideColumn, Surface } from '@/components/signature/blocks';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     SafetyFormDraftContext,
     useSafetyWorkspaceDrafts,
 } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateLong, formatTime } from '@/lib/datetime';
 import {
+    LONE_WORKER_REGISTER,
     loneWorkerHref,
     loneWorkerReturn,
 } from '@/lib/health-safety/lone-worker-navigation';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    ClipboardList,
-    FileText,
-    History,
-    Link2,
+    BellRing,
+    CheckCircle2,
+    Clock,
     MapPin,
+    MoreHorizontal,
+    Pencil,
+    Plus,
     Radio,
     Siren,
+    Square,
+    Trash2,
+    type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-const REGISTER = '/health-safety/lone-workers';
 const SECTIONS = [
-    { key: 'overview', label: 'Overview', icon: FileText },
-    { key: 'check-ins', label: 'Check-ins', icon: ClipboardList },
-    { key: 'response', label: 'Response', icon: Siren },
-    { key: 'location', label: 'Location', icon: MapPin },
-    { key: 'history', label: 'History', icon: History },
-    { key: 'connections', label: 'Connected work', icon: Link2 },
+    { key: 'overview', label: 'Overview' },
+    { key: 'check-ins', label: 'Check-ins' },
+    { key: 'response', label: 'Response' },
+    { key: 'location', label: 'Location' },
+    { key: 'history', label: 'History' },
+    { key: 'connections', label: 'Connected work' },
 ] as const;
+const COMMAND_ICONS: Record<SessionCommand, LucideIcon> = {
+    edit: Pencil,
+    'check-in': Plus,
+    end: Square,
+    panic: Siren,
+    locate: MapPin,
+    'acknowledge-panic': BellRing,
+    remove: Trash2,
+};
+/** Commands the drawing draws in the header; the rest stay under More. */
+const HEADER_GLASS: SessionCommand[] = ['panic', 'end'];
+const MORE: SessionCommand[] = ['edit', 'locate', 'acknowledge-panic', 'remove'];
 
 export default function LoneWorkerShow({
     detail: d,
@@ -122,20 +166,301 @@ export default function LoneWorkerShow({
     };
     const move = (next: SessionSection, action: SessionCommand | null = null) =>
         drafts.request(() => replace(next, action));
-    const status =
-        d.status === 'emergency'
-            ? 'Help requested'
-            : d.status === 'completed'
-              ? 'Ended'
-              : d.is_check_in_overdue
-                ? 'Checkpoint overdue'
-                : 'Session active';
+    const run = (action: SessionCommand) =>
+        move(SESSION_COMMAND_SECTIONS[action], action);
+
+    const emergency = d.status === 'emergency';
+    const ended = !!d.ended_at || d.status === 'completed';
+    const overdue = !ended && !emergency && d.is_check_in_overdue;
+    const status = emergency
+        ? 'Help requested'
+        : d.status === 'completed'
+          ? 'Ended'
+          : d.is_check_in_overdue
+            ? 'Checkpoint overdue'
+            : 'Session active';
+    const worker = d.worker?.name ?? null;
+    const base = d.started_at;
+    const response: LinkedRecord | null = d.connections.control_room[0] ?? null;
+    const delivery = d.source_delivery;
+
+    /* ---- header actions: Record check-in first, Request help and End session beside it, the rest under More ---- */
+    const allowed = (Object.keys(SESSION_COMMAND_LABELS) as SessionCommand[])
+        .filter((action) => sessionCommandAllowed(d, action));
+    const continueResponse = emergency && response ? response : null;
+    const primaryCommand: SessionCommand | null =
+        !continueResponse && allowed.includes('check-in') ? 'check-in' : null;
+    const glass = [
+        ...HEADER_GLASS.filter((action) => allowed.includes(action)),
+        ...(continueResponse && allowed.includes('check-in')
+            ? (['check-in'] as SessionCommand[])
+            : []),
+    ];
+    const more = MORE.filter((action) => allowed.includes(action));
+
+    /* ---- facts ---- */
+    const facts: PageHeaderFact[] = [
+        ...(!ended
+            ? [
+                  {
+                      value: sessionClock(
+                          d.next_check_in_at,
+                          base,
+                          'Unknown',
+                      ),
+                      label: 'Next check-in',
+                      tone: overdue ? ('critical' as const) : undefined,
+                  },
+              ]
+            : []),
+        {
+            value: d.observation.real_check_in_at
+                ? sessionClock(d.observation.real_check_in_at, base)
+                : observationLabel('no_check_in'),
+            label: 'Last check-in',
+        },
+        ...(d.emergency_triggered_at || delivery
+            ? [
+                  {
+                      value: deliveryLabel(delivery),
+                      label: 'Help request',
+                      tone: emergency ? ('warning' as const) : undefined,
+                  },
+              ]
+            : []),
+    ];
+
+    /* ---- the stage line and the next step ---- */
+    const received = d.check_ins.length;
+    const allOk =
+        received > 0 && d.check_ins.every((check) => check.status === 'ok');
+    const starter = sessionStarter(d);
+    const startedMeta = [base ? sessionClock(base, base) : null, starter]
+        .filter(Boolean)
+        .join(' · ');
+    const checkInsMeta = received
+        ? `${received} received${allOk ? ', all OK' : ''}`
+        : 'None received';
+    const interval = `Check-ins every ${d.check_in_interval_minutes} minutes`;
+    const canCheckIn = allowed.includes('check-in');
+    const canPanic = allowed.includes('panic');
+    const doNext = [
+        canCheckIn ? 'Record a check-in' : null,
+        canPanic ? (canCheckIn ? 'or request help' : 'Request help') : null,
+    ]
+        .filter(Boolean)
+        .join(' ');
+
+    let steps: PageHeaderStage[];
+    let next: PageHeaderNextStep | null = null;
+    if (emergency) {
+        const assigned = response
+            ? typeof response.assigned_to === 'object'
+                ? (response.assigned_to?.name ?? null)
+                : (response.assigned_to ?? null)
+            : null;
+        const sent = delivery?.status === 'delivered';
+        const reached = [
+            true,
+            sent,
+            !!assigned,
+            !!response?.acknowledged_at,
+            !!response?.resolved_at,
+        ];
+        const nowAt = reached.indexOf(false);
+        const state = (index: number): PageHeaderStage['state'] =>
+            reached[index] && (nowAt === -1 || index < nowAt)
+                ? 'done'
+                : index === nowAt
+                  ? 'now'
+                  : 'todo';
+        steps = [
+            {
+                label: 'Help requested',
+                meta: sessionClock(d.emergency_triggered_at, base),
+                state: state(0),
+            },
+            {
+                label: 'Sent',
+                meta: deliveryLabel(delivery),
+                state: state(1),
+                tone:
+                    delivery?.status === 'failed' ? 'critical' : 'warning',
+            },
+            ...(response
+                ? [
+                      {
+                          label: 'Responder',
+                          meta: assigned ?? 'Needs an owner',
+                          state: state(2),
+                          tone: 'critical' as const,
+                      },
+                      {
+                          label: 'Acknowledged',
+                          meta: response.acknowledged_at
+                              ? sessionClock(response.acknowledged_at, base)
+                              : 'Not yet',
+                          state: state(3),
+                          tone: 'warning' as const,
+                      },
+                      {
+                          label: 'Resolved',
+                          meta: response.resolved_at
+                              ? sessionClock(response.resolved_at, base)
+                              : 'Not yet',
+                          state: state(4),
+                          tone: 'warning' as const,
+                      },
+                  ]
+                : [
+                      {
+                          label: 'Response',
+                          meta: 'Not available to view here',
+                          state: sent ? ('now' as const) : ('todo' as const),
+                          tone: 'warning' as const,
+                      },
+                  ]),
+        ];
+        const reference = response
+            ? (response.reference_number ?? `Response ${response.id}`)
+            : null;
+        next = response
+            ? {
+                  label: 'Next step · now',
+                  tone: 'critical',
+                  text: !assigned
+                      ? 'The control room response needs a responder'
+                      : !response.acknowledged_at
+                        ? `${assigned} acknowledges the response`
+                        : 'The control room resolves the response',
+                  meta: [
+                      reference,
+                      words(response.status ?? 'unknown').toLowerCase(),
+                      d.emergency_notes,
+                  ]
+                      .filter(Boolean)
+                      .join(' · '),
+              }
+            : {
+                  label: 'Help requested',
+                  tone: 'critical',
+                  text: deliveryLabel(delivery),
+                  meta: 'No response record is available to view here. This does not confirm whether a response exists or someone is attending.',
+              };
+    } else if (ended) {
+        steps = [
+            { label: 'Started', meta: startedMeta, state: 'done' },
+            { label: 'Check-ins', meta: checkInsMeta, state: 'done' },
+            {
+                label: 'Ended',
+                meta: sessionClock(d.ended_at, base),
+                state: 'done',
+            },
+        ];
+    } else {
+        const nextDue = sessionClock(d.next_check_in_at, base, 'Unknown');
+        steps = [
+            { label: 'Started', meta: startedMeta, state: 'done' },
+            ...(received
+                ? [
+                      {
+                          label: 'Check-ins',
+                          meta: checkInsMeta,
+                          state: 'done' as const,
+                      },
+                  ]
+                : []),
+            overdue
+                ? {
+                      label: 'Check-in overdue',
+                      meta: `Was due ${nextDue}`,
+                      state: 'now',
+                      tone: 'critical',
+                  }
+                : {
+                      label: received ? 'Next check-in' : 'First check-in',
+                      meta: `Due ${nextDue}`,
+                      state: 'now',
+                  },
+            {
+                label: 'Ended',
+                meta: `Expected ${sessionClock(d.expected_end_at, base)}`,
+                state: 'todo',
+            },
+        ];
+        next = overdue
+            ? {
+                  label: 'Next step · now',
+                  tone: 'critical',
+                  text: `${worker ?? 'The worker'} hasn’t checked in`,
+                  meta: [observationLabel(d.observation.state), doNext, interval]
+                      .filter(Boolean)
+                      .join(' · '),
+              }
+            : {
+                  label: `Next step · due ${nextDue}`,
+                  text: d.next_check_in_at
+                      ? `${worker ?? 'The worker'} checks in by ${nextDue}`
+                      : observationLabel(d.observation.state),
+                  meta: [interval, `Expected end ${sessionClock(d.expected_end_at, base)}`]
+                      .filter(Boolean)
+                      .join(' · '),
+              };
+    }
+
+    const historyCount = d.history.length;
+    const main = command ? (
+        <Surface aria-label={SESSION_COMMAND_LABELS[command]}>
+            <div className="p-5 sm:p-6">
+                <SessionCommandForm
+                    key={`${d.id}-${command}`}
+                    detail={d}
+                    pickers={pickers}
+                    command={command}
+                    returnTo={return_to}
+                    onSaved={() => replace(section)}
+                    onCancel={() => move(section)}
+                />
+            </div>
+        </Surface>
+    ) : section === 'check-ins' ? (
+        <SessionCheckIns detail={d} />
+    ) : section === 'response' ? (
+        <SessionResponse detail={d} />
+    ) : section === 'location' ? (
+        <SessionLocation detail={d} />
+    ) : section === 'history' ? (
+        <SessionHistory detail={d} />
+    ) : section === 'connections' ? (
+        <SessionConnections detail={d} />
+    ) : (
+        <SessionOverview detail={d} />
+    );
+    const side = (
+        <>
+            {section === 'check-ins' && !command ? (
+                <SessionMonitorRing detail={d} />
+            ) : null}
+            {section === 'location' && !command ? (
+                <SessionTrackerRing detail={d} />
+            ) : null}
+            <SessionPeople detail={d} />
+        </>
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Lone-worker safety', href: REGISTER },
-                { title: d.reference, href: `${REGISTER}/sessions/${d.id}` },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Safety registers', href: '/health-safety/registers' },
+                { title: 'Lone-worker safety', href: LONE_WORKER_REGISTER },
+                {
+                    title: worker
+                        ? `Lone-worker session — ${worker}`
+                        : d.reference,
+                    href: `${LONE_WORKER_REGISTER}/sessions/${d.id}`,
+                },
             ]}
         >
             <Head title={`${d.reference} · Lone-worker safety`} />
@@ -144,186 +469,165 @@ export default function LoneWorkerShow({
                     hero={
                         <PageHeader
                             variant="profile"
-                            frontline
                             wrapTitle
                             backHref={return_to}
                             icon={Radio}
-                            title={d.reference}
+                            title={
+                                worker
+                                    ? `Lone-worker session — ${worker}`
+                                    : `Lone-worker session ${d.reference}`
+                            }
                             titleChip={
                                 <PageHeaderStatusChip
                                     variant={
-                                        d.status === 'emergency'
+                                        emergency
                                             ? 'critical'
-                                            : d.is_check_in_overdue
-                                              ? 'warning'
-                                              : 'neutral'
+                                            : ended
+                                              ? 'neutral'
+                                              : d.is_check_in_overdue
+                                                ? 'warning'
+                                                : 'info'
+                                    }
+                                    icon={
+                                        emergency
+                                            ? Siren
+                                            : ended
+                                              ? CheckCircle2
+                                              : Clock
                                     }
                                 >
                                     {status}
                                 </PageHeaderStatusChip>
                             }
-                            subline={`${d.worker?.name ?? 'Worker not recorded'} · ${d.site?.name ?? 'Site not recorded'}`}
-                            meters={
-                                <>
-                                    <PageHeaderMeterBlock
-                                        label="Last received"
-                                        href={href('check-ins')}
+                            subline={[
+                                d.reference,
+                                d.site?.name ?? 'Site not recorded',
+                                base ? dateWithYear(base) : null,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            actions={
+                                glass.length ||
+                                more.length ||
+                                primaryCommand ||
+                                continueResponse ? (
+                                    <div
+                                        role="group"
+                                        aria-label="Safety session actions"
+                                        className="contents"
                                     >
-                                        <PageHeaderMeterBig>
-                                            {d.observation.received_at
-                                                ? formatTime(
-                                                      d.observation.received_at,
-                                                  )
-                                                : 'Not recorded'}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            {d.observation.received_at
-                                                ? formatDateLong(
-                                                      d.observation.received_at,
-                                                  )
-                                                : 'No receipt confirmed'}
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Next checkpoint"
-                                        href={href('check-ins')}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {d.ended_at
-                                                ? 'Ended'
-                                                : d.next_check_in_at
-                                                  ? formatTime(
-                                                        d.next_check_in_at,
-                                                    )
-                                                  : 'Unknown'}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            {!d.ended_at && d.next_check_in_at
-                                                ? formatDateLong(
-                                                      d.next_check_in_at,
-                                                  )
-                                                : 'Session schedule'}
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Check-in evidence"
-                                        href={href('check-ins')}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {d.check_ins.length}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            {observationLabel(
-                                                d.observation.state,
-                                            )}
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Help request"
-                                        href={href('response')}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {deliveryLabel(d.source_delivery)}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Delivery is separate from response
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                </>
+                                        {glass.map((action) => (
+                                            <PageHeaderGlassButton
+                                                key={action}
+                                                onClick={() => run(action)}
+                                            >
+                                                {SESSION_COMMAND_LABELS[action]}
+                                            </PageHeaderGlassButton>
+                                        ))}
+                                        {more.length ? (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <PageHeaderGlassButton
+                                                        icon={MoreHorizontal}
+                                                        aria-label="More session actions"
+                                                    />
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    {more.map((action) => {
+                                                        const Icon =
+                                                            COMMAND_ICONS[
+                                                                action
+                                                            ];
+                                                        return (
+                                                            <DropdownMenuItem
+                                                                key={action}
+                                                                onSelect={() =>
+                                                                    run(action)
+                                                                }
+                                                            >
+                                                                <Icon className="size-4" />
+                                                                {
+                                                                    SESSION_COMMAND_LABELS[
+                                                                        action
+                                                                    ]
+                                                                }
+                                                            </DropdownMenuItem>
+                                                        );
+                                                    })}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        ) : null}
+                                        {continueResponse ? (
+                                            <PageHeaderPrimaryButton
+                                                asChild
+                                                icon={Siren}
+                                            >
+                                                <Link href={continueResponse.href}>
+                                                    Continue response
+                                                </Link>
+                                            </PageHeaderPrimaryButton>
+                                        ) : primaryCommand ? (
+                                            <PageHeaderPrimaryButton
+                                                icon={Plus}
+                                                onClick={() =>
+                                                    run(primaryCommand)
+                                                }
+                                            >
+                                                {
+                                                    SESSION_COMMAND_LABELS[
+                                                        primaryCommand
+                                                    ]
+                                                }
+                                            </PageHeaderPrimaryButton>
+                                        ) : null}
+                                    </div>
+                                ) : undefined
+                            }
+                            facts={<PageHeaderFacts items={facts} />}
+                            strip={
+                                <PageHeaderStages
+                                    steps={steps}
+                                    next={next}
+                                    ariaLabel={
+                                        emergency
+                                            ? 'Help request progress'
+                                            : 'Session progress'
+                                    }
+                                />
                             }
                             rail={
-                                <PageHeaderRail
-                                    items={[...SECTIONS]}
+                                <PageHeaderRail<SessionSection>
+                                    items={SECTIONS.map((item) => ({
+                                        ...item,
+                                        count:
+                                            item.key === 'check-ins'
+                                                ? received || undefined
+                                                : item.key === 'history'
+                                                  ? historyCount || undefined
+                                                  : undefined,
+                                    }))}
                                     value={section}
-                                    onSelect={(next) =>
-                                        move(next as SessionSection)
-                                    }
+                                    onSelect={(key) => move(key)}
                                     ariaLabel="Safety session sections"
                                 />
                             }
                         />
                     }
                 >
-                    <div className="space-y-5">
+                    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
                         <div
-                            role="group"
-                            className="flex flex-wrap gap-3"
-                            aria-label="Safety session actions"
+                            ref={panel}
+                            tabIndex={-1}
+                            className="grid min-w-0 gap-5 outline-none"
                         >
-                            {(
-                                Object.keys(
-                                    SESSION_COMMAND_LABELS,
-                                ) as SessionCommand[]
-                            )
-                                .filter((action) =>
-                                    sessionCommandAllowed(d, action),
-                                )
-                                .map((action) => (
-                                    <Button
-                                        key={action}
-                                        className="frontline-tap"
-                                        variant={
-                                            action === 'check-in'
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                        onClick={() =>
-                                            move(
-                                                SESSION_COMMAND_SECTIONS[
-                                                    action
-                                                ],
-                                                action,
-                                            )
-                                        }
-                                    >
-                                        {SESSION_COMMAND_LABELS[action]}
-                                    </Button>
-                                ))}
+                            {main}
                         </div>
-                        <Card>
-                            <CardContent className="p-5 sm:p-6">
-                                <div
-                                    ref={panel}
-                                    tabIndex={-1}
-                                    className="min-w-0 outline-none"
-                                >
-                                    {command ? (
-                                        <SessionCommandForm
-                                            key={`${d.id}-${command}`}
-                                            detail={d}
-                                            pickers={pickers}
-                                            command={command}
-                                            returnTo={return_to}
-                                            onSaved={() => replace(section)}
-                                            onCancel={() => move(section)}
-                                        />
-                                    ) : (
-                                        <>
-                                            {section === 'overview' && (
-                                                <SessionOverview detail={d} />
-                                            )}
-                                            {section === 'check-ins' && (
-                                                <SessionCheckIns detail={d} />
-                                            )}
-                                            {section === 'response' && (
-                                                <SessionResponse detail={d} />
-                                            )}
-                                            {section === 'location' && (
-                                                <SessionLocation detail={d} />
-                                            )}
-                                            {section === 'history' && (
-                                                <SessionHistory detail={d} />
-                                            )}
-                                            {section === 'connections' && (
-                                                <SessionConnections
-                                                    detail={d}
-                                                />
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <aside
+                            className="min-w-0"
+                            aria-label="Session people"
+                        >
+                            <SideColumn>{side}</SideColumn>
+                        </aside>
                     </div>
                     {drafts.confirmation}
                 </PageLayout>
