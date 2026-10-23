@@ -3,17 +3,22 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
-use App\Models\CoverageReservation;
+use App\Http\Requests\JobBoardPositionRequest;
+use App\Http\Requests\JobBoardPostingShiftRequest;
+use App\Models\Client;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
+use App\Models\ShiftReplacementRequest;
+use App\Models\Site;
 use App\Models\User;
-use App\Services\CoverageReservationService;
-use App\Services\Eligibility\AssignmentEligibilityGateway;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Eligibility\EligibilityResult;
-use App\Services\ShiftReplacementService;
+use App\Services\Operations\JobBoardActionCommand;
+use App\Services\Operations\WorkforceMutationGuard;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\UserSiteAccessService;
-use Illuminate\Database\QueryException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -44,6 +49,7 @@ class JobBoardController extends Controller
             'week' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
+        $readAt = Carbon::now();
         $canApprove = $this->canApprovePositions($auth);
 
         $search = trim((string) ($filters['q'] ?? ''));
@@ -54,9 +60,11 @@ class JobBoardController extends Controller
         $weekFilterRequested = ! empty($filters['week']);
         $weekAnchor = $weekFilterRequested
             ? Carbon::createFromFormat('Y-m-d', $filters['week'])->startOfDay()
-            : Carbon::now()->startOfWeek(Carbon::MONDAY);
+            : $readAt->copy()->startOfWeek(Carbon::MONDAY);
         $weekStart = $weekAnchor->copy()->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
+        $dateRangeBounds = ! empty($filters['date_range'])
+            ? $this->jobBoardDateRangeBounds($filters['date_range'], $readAt) : null;
 
         $positions = ShiftOpenPosition::query()
             ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
@@ -72,18 +80,18 @@ class JobBoardController extends Controller
                 'replacementRequest.currentStaff:id,name',
                 'replacementRequest.replacementStaff:id,name',
             ])
-            ->where(function ($query) {
+            ->where(function ($query) use ($readAt) {
                 $query->where('status', '!=', 'open')
                     ->orWhereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
+                    ->orWhere('expires_at', '>', $readAt->copy());
             })
-            ->when($scope === 'mine', function ($query) use ($auth) {
+            ->when($scope === 'mine', function ($query) use ($auth, $readAt) {
                 $query->where('claimed_by', $auth->id)
-                    ->where(function ($nested) {
+                    ->where(function ($nested) use ($readAt) {
                         $nested->where('status', 'claimed')
-                            ->orWhere(function ($filled) {
+                            ->orWhere(function ($filled) use ($readAt) {
                                 $filled->where('status', 'filled')
-                                    ->where('approved_at', '>=', now()->subDays(14));
+                                    ->where('approved_at', '>=', $readAt->copy()->subDays(14));
                             });
                     });
             })
@@ -96,11 +104,11 @@ class JobBoardController extends Controller
                 $query->where('status', 'claimed')
                     ->where('claimed_by', '!=', $auth->id);
             })
-            ->when($scope === 'all' || $scope === 'for-you', function ($query) {
+            ->when($scope === 'all' || $scope === 'for-you', function ($query) use ($readAt) {
                 $query->where('status', 'open')
-                    ->where(function ($nested) {
+                    ->where(function ($nested) use ($readAt) {
                         $nested->whereNull('expires_at')
-                            ->orWhere('expires_at', '>', now());
+                            ->orWhere('expires_at', '>', $readAt->copy());
                     });
             })
             ->when($weekFilterRequested && $scope !== 'mine', function ($query) use ($weekStart, $weekEnd) {
@@ -118,7 +126,7 @@ class JobBoardController extends Controller
                             ->orWhere('last_name', 'like', '%'.$search.'%'));
                 });
             })
-            ->when(! empty($filters['date_range']), fn ($q) => $this->applyDateRangeFilter($q, $filters['date_range']))
+            ->when($dateRangeBounds !== null, fn ($q) => $this->applyDateRangeFilter($q, $filters['date_range'], $dateRangeBounds))
             ->when($skill !== '', fn ($q) => $q->whereJsonContains('required_skills', $skill))
             ->orderBy(
                 Shift::query()
@@ -167,27 +175,27 @@ class JobBoardController extends Controller
         $expiringSoon = (clone $statsQuery)
             ->where('status', 'open')
             ->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [now(), now()->addHour()])
+            ->whereBetween('expires_at', [$readAt->copy(), $readAt->copy()->addHour()])
             ->count();
 
         $myClaimsCount = ShiftOpenPosition::query()
             ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
             ->where('claimed_by', $auth->id)
-            ->where(function ($nested) {
+            ->where(function ($nested) use ($readAt) {
                 $nested->where('status', 'claimed')
-                    ->orWhere(function ($filled) {
+                    ->orWhere(function ($filled) use ($readAt) {
                         $filled->where('status', 'filled')
-                            ->where('approved_at', '>=', now()->subDays(14));
+                            ->where('approved_at', '>=', $readAt->copy()->subDays(14));
                     });
             })
             ->count();
 
         $replacementsCount = (clone $statsQuery)
             ->whereNotNull('replacement_request_id')
-            ->where(function ($query) {
+            ->where(function ($query) use ($readAt) {
                 $query->where('status', '!=', 'open')
                     ->orWhereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
+                    ->orWhere('expires_at', '>', $readAt->copy());
             })
             ->count();
 
@@ -201,9 +209,9 @@ class JobBoardController extends Controller
         $sitesCount = ShiftOpenPosition::query()
             ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
             ->where('shift_open_positions.status', 'open')
-            ->where(function ($query) {
+            ->where(function ($query) use ($readAt) {
                 $query->whereNull('shift_open_positions.expires_at')
-                    ->orWhere('shift_open_positions.expires_at', '>', now());
+                    ->orWhere('shift_open_positions.expires_at', '>', $readAt->copy());
             })
             ->join('shifts', 'shifts.id', '=', 'shift_open_positions.shift_id')
             ->join('clients', 'clients.id', '=', 'shifts.client_id')
@@ -221,6 +229,28 @@ class JobBoardController extends Controller
             ->distinct('clients.site_id')
             ->count('clients.site_id');
 
+        $stats = [
+            'open' => (clone $statsQuery)
+                ->where('status', 'open')
+                ->where(function ($query) use ($readAt) {
+                    $query->whereNull('expires_at')
+                        ->orWhere('expires_at', '>', $readAt->copy());
+                })
+                ->count(),
+            'claimed' => (clone $statsQuery)->where('status', 'claimed')->count(),
+            'filled_today' => (clone $statsQuery)
+                ->where('status', 'filled')
+                ->whereDate('approved_at', $readAt->copy()->toDateString())
+                ->count(),
+            'eligible_for_you' => $eligibleForYou,
+            'expiring_soon' => $expiringSoon,
+            'mine' => $myClaimsCount,
+            'replacements' => $replacementsCount,
+            'pending_approval' => $pendingApprovalCount,
+            'sites' => $sitesCount,
+            'sites_worked_this_week' => $sitesWorkedThisWeek,
+        ];
+
         return inertia('operations/job-board/Index', [
             'jobs' => $formattedJobs,
             'filters' => array_merge($filters, [
@@ -235,108 +265,356 @@ class JobBoardController extends Controller
                 'end_label' => $weekEnd->format('j M'),
                 'prev' => $weekStart->copy()->subWeek()->toDateString(),
                 'next' => $weekStart->copy()->addWeek()->toDateString(),
-                'is_current' => $weekStart->equalTo(Carbon::now()->startOfWeek(Carbon::MONDAY)),
+                'is_current' => $weekStart->equalTo($readAt->copy()->startOfWeek(Carbon::MONDAY)),
             ],
             'viewer' => [
                 'first_name' => $this->viewerFirstName($auth),
+                'can_claim' => $this->canClaimPositions($auth),
                 'can_approve' => $canApprove,
                 'can_post_position' => $this->canCreatePositions($auth),
                 'alerts_enabled' => (bool) ($auth->job_board_alerts_enabled ?? false),
             ],
-            'stats' => [
-                'open' => (clone $statsQuery)
-                    ->where('status', 'open')
-                    ->where(function ($query) {
-                        $query->whereNull('expires_at')
-                            ->orWhere('expires_at', '>', now());
-                    })
-                    ->count(),
-                'claimed' => (clone $statsQuery)->where('status', 'claimed')->count(),
-                'filled_today' => (clone $statsQuery)
-                    ->where('status', 'filled')
-                    ->whereDate('approved_at', now()->toDateString())
-                    ->count(),
-                'eligible_for_you' => $eligibleForYou,
-                'expiring_soon' => $expiringSoon,
-                'mine' => $myClaimsCount,
-                'replacements' => $replacementsCount,
-                'pending_approval' => $pendingApprovalCount,
-                'sites' => $sitesCount,
-                'sites_worked_this_week' => $sitesWorkedThisWeek,
-            ],
+            'provenance' => $this->jobBoardProvenance($auth, $filters, $scope, $weekFilterRequested,
+                $weekStart, $weekEnd, $dateRangeBounds, $readAt, $formattedJobs, $stats, $canApprove),
+            'stats' => $stats,
         ]);
     }
 
-    public function createPosition(Request $request)
+    public function postingShifts(JobBoardPostingShiftRequest $request)
     {
-        $auth = $request->user();
-        abort_unless($this->canCreatePositions($auth), 403);
+        $data = $request->validated();
+        $page = (int) ($data['page'] ?? 1);
+        $perPage = (int) ($data['per_page'] ?? 20);
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $result = DB::transaction(function () use ($request, $data, $page, $perPage, $timezone): array {
+            app(WorkforceMutationGuard::class)->lock();
+            $actor = $this->postingActor($request->user());
 
-        $data = $request->validate([
-            'shift_id' => ['required', 'integer', 'exists:shifts,id'],
-            'required_skills' => ['nullable', 'array'],
-            'required_skills.*' => ['string', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'expires_at' => ['nullable', 'date', 'after:now'],
-        ]);
-
-        $shift = Shift::query()
-            ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
-            ->findOrFail($data['shift_id']);
-
-        $existingActivePosition = ShiftOpenPosition::query()
-            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
-            ->where('shift_id', $shift->id)
-            ->whereIn('status', ['open', 'claimed'])
-            ->exists();
-
-        if ($existingActivePosition) {
-            return redirect()->back()->withErrors([
-                'shift_id' => 'This shift already has an active open position.',
-            ]);
-        }
-
-        try {
-            DB::transaction(function () use ($auth, $data, $shift) {
-                $lockedShift = Shift::query()
-                    ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
-                    ->lockForUpdate()
-                    ->findOrFail($shift->id);
-                $existingActivePosition = ShiftOpenPosition::query()
-                    ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
-                    ->where('shift_id', $lockedShift->id)
-                    ->whereIn('status', ['open', 'claimed'])
-                    ->exists();
-
-                if ($existingActivePosition) {
-                    throw ValidationException::withMessages([
-                        'shift_id' => 'This shift already has an active open position.',
-                    ]);
+            return CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($actor, $data, $page, $perPage, $timezone): array {
+                $siteIds = $this->siteAccess->accessibleSiteIds($actor, ['reports.viewAny'], $reads);
+                $sensitive = $actor->canDo('job_board.approve') || $actor->canDo('shifts.manageAny') || $actor->canDo('shifts.viewAny');
+                $query = Shift::query()->where(function (Builder $sites) use ($siteIds): void {
+                    $sites->whereIn('site_id', $siteIds)->orWhere(function (Builder $fallback) use ($siteIds): void {
+                        $fallback->whereNull('site_id')->whereHas('client', fn (Builder $client) => $client->whereIn('site_id', $siteIds));
+                    });
+                });
+                $this->siteAccess->applyShiftIntegrityScope($query);
+                if (! empty($data['week'])) {
+                    $start = Carbon::createFromFormat('!Y-m-d', $data['week'], $timezone)->startOfWeek(Carbon::MONDAY);
+                    $query->whereBetween('starts_at', [$start->copy()->utc(), $start->copy()->endOfWeek(Carbon::SUNDAY)->utc()]);
+                }
+                $search = trim((string) ($data['q'] ?? ''));
+                if ($search !== '') {
+                    $query->where(function (Builder $matching) use ($search, $sensitive): void {
+                        if (ctype_digit($search)) {
+                            $matching->whereKey((int) $search);
+                        } else {
+                            $matching->whereHas('client', function (Builder $client) use ($search, $sensitive): void {
+                                $client->where(function (Builder $labels) use ($search, $sensitive): void {
+                                    $labels->where('suburb', 'like', '%'.$search.'%')->orWhere('city', 'like', '%'.$search.'%')
+                                        ->orWhereHas('site', fn (Builder $site) => $site->where('name', 'like', '%'.$search.'%')
+                                            ->orWhere('suburb', 'like', '%'.$search.'%')->orWhere('city', 'like', '%'.$search.'%'));
+                                    if ($sensitive) {
+                                        $labels->orWhere('first_name', 'like', '%'.$search.'%')->orWhere('last_name', 'like', '%'.$search.'%');
+                                    }
+                                });
+                            });
+                            if ($sensitive) {
+                                $matching->orWhere('location', 'like', '%'.$search.'%');
+                            }
+                        }
+                    });
+                }
+                $candidates = $this->postingPage($query, $siteIds, $reads, $page, $perPage);
+                $options = [];
+                foreach (array_slice($candidates, 0, $perPage) as $shift) {
+                    [$active, $replacement] = $this->postingLinks($shift, $reads);
+                    $reason = $this->postingRefusal($shift, $active, $replacement);
+                    $display = (new ShiftOpenPosition)->setRelation('shift', $shift);
+                    $options[] = ['id' => (int) $shift->id, 'label' => $this->formatPositionTitle($display, $sensitive),
+                        'location' => $this->formatPositionLocation($display, $sensitive),
+                        'starts_at' => $shift->starts_at?->copy()->utc()->toISOString(), 'ends_at' => $shift->ends_at?->copy()->utc()->toISOString(),
+                        'status' => $shift->status, 'assigned' => $shift->user_id !== null,
+                        'source_revision' => $this->postingSourceRevision($shift, $active, $replacement),
+                        'post_url' => route('operations.job_board.create', ['shift' => $shift->id], false),
+                        'active_position' => $active ? ['id' => (int) $active->id, 'status' => $active->status,
+                            'expired' => $active->expires_at?->lte(now()) ?? false] : null,
+                        'can_post' => $reason === null, 'reason' => $reason];
                 }
 
-                ShiftOpenPosition::create([
-                    'shift_id' => $lockedShift->id,
-                    'replacement_request_id' => app(ShiftReplacementService::class)->activeForShift($lockedShift)?->id,
-                    'status' => 'open',
-                    'required_skills' => array_values($data['required_skills'] ?? []),
-                    'coverage_roles' => $lockedShift->coverage_roles ?? [],
-                    'notes' => $data['notes'] ?? null,
-                    'expires_at' => $data['expires_at'] ?? null,
-                ]);
+                return ['data' => $options, 'page' => $page, 'per_page' => $perPage, 'has_more' => count($candidates) > $perPage];
             });
-        } catch (QueryException $exception) {
-            report($exception);
+        });
 
-            return redirect()->back()->withErrors([
-                'shift_id' => 'This shift already has an active open position.',
-            ]);
+        return response()->json([...$result, 'workerTimezone' => $timezone]);
+    }
+
+    /** Page only current canonical records; hidden rows never consume a public slot. */
+    private function postingPage(Builder $query, array $siteIds, CurrentAuthorizationReads $reads, int $page, int $perPage): array
+    {
+        $skip = ($page - 1) * $perPage;
+        $visible = [];
+        $cursorStart = null;
+        $cursorId = null;
+        while (count($visible) < $perPage + 1) {
+            $batchQuery = clone $query;
+            if ($cursorId !== null) {
+                $batchQuery->where(function (Builder $after) use ($cursorStart, $cursorId): void {
+                    $after->where('starts_at', '<', $cursorStart)
+                        ->orWhere(function (Builder $sameStart) use ($cursorStart, $cursorId): void {
+                            $sameStart->where('starts_at', $cursorStart)->where('id', '<', $cursorId);
+                        });
+                });
+            }
+            $batch = $reads->query($batchQuery->orderByDesc('starts_at')->orderByDesc('id')->limit(100))->get();
+            if ($batch->isEmpty()) {
+                break;
+            }
+            foreach ($batch as $shift) {
+                $cursorStart = $shift->getRawOriginal('starts_at');
+                $cursorId = (int) $shift->id;
+                if (! $this->postingShiftEvidence($shift, $siteIds, $reads)) {
+                    continue;
+                }
+                if ($skip > 0) {
+                    $skip--;
+
+                    continue;
+                }
+                $visible[] = $shift;
+                if (count($visible) === $perPage + 1) {
+                    break;
+                }
+            }
+            if ($batch->count() < 100) {
+                break;
+            }
         }
 
-        // Surface the new position's skills in the filter chips immediately
-        // rather than waiting out the short cache TTL.
-        Cache::forget($this->availableSkillsCacheKey($auth));
+        return $visible;
+    }
 
-        return redirect()->back()->with('success', 'Open position published.');
+    public function createPosition(JobBoardPositionRequest $request, string $shift)
+    {
+        $data = $request->validated();
+        if ((int) $shift !== (int) $data['shift_id']) {
+            throw ValidationException::withMessages(['shift_id' => 'The selected shift does not match this posting. Choose the shift again.']);
+        }
+        $externalTransaction = DB::transactionLevel() === 0 && DB::connection()->getPdo()->inTransaction();
+        abort_if($externalTransaction, 409, 'Posting cannot run inside an externally owned transaction.');
+        $rootEntry = DB::transactionLevel() === 0;
+        $saved = DB::transaction(function () use ($request, $data, $shift): array {
+            app(WorkforceMutationGuard::class)->lock();
+            $actor = $this->postingActor($request->user());
+            $lockedShift = Shift::query()->whereKey((int) $shift)->lockForUpdate()->firstOrFail();
+
+            return CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($lockedShift, $actor, $data): array {
+                $siteIds = $this->siteAccess->accessibleSiteIds($actor, ['reports.viewAny'], $reads);
+                abort_unless($this->postingShiftEvidence($lockedShift, $siteIds, $reads), 404);
+                [$active, $replacement] = $this->postingLinks($lockedShift, $reads);
+                $sourceRevision = $this->postingSourceRevision($lockedShift, $active, $replacement);
+                abort_if(isset($data['source_revision']) && ! hash_equals($sourceRevision, $data['source_revision']),
+                    409, 'The selected posting source changed. Reload the available shifts before posting.');
+                $reason = $this->postingRefusal($lockedShift, $active, $replacement);
+                if ($reason !== null) {
+                    throw ValidationException::withMessages(['shift_id' => match ($reason) {
+                        'duplicate' => 'This shift already has an active open position.',
+                        'terminal_shift' => 'Completed or cancelled shifts cannot be posted for cover.',
+                        default => 'This shift is assigned. Request replacement cover from the shift first.',
+                    }]);
+                }
+                $expires = empty($data['expires_at']) ? null : Carbon::parse($data['expires_at'])->utc()->startOfSecond();
+                if ($expires?->lte(now())) {
+                    throw ValidationException::withMessages(['expires_at' => 'The expiry must still be in the future.']);
+                }
+                $shiftBefore = $lockedShift->getRawOriginal();
+                $replacementBefore = $replacement?->getRawOriginal();
+                $attributes = ['shift_id' => (int) $lockedShift->id, 'replacement_request_id' => $replacement?->id,
+                    'status' => 'open', 'required_skills' => array_values($data['required_skills'] ?? []),
+                    'coverage_roles' => $lockedShift->coverage_roles ?? [], 'notes' => $data['notes'] ?? null, 'expires_at' => $expires,
+                    'claimed_by' => null, 'claimed_at' => null, 'approved_by' => null, 'approved_at' => null];
+                $position = new ShiftOpenPosition($attributes);
+                if (! $position->save()) {
+                    throw ValidationException::withMessages(['shift_id' => 'The open position could not be saved. No position was posted.']);
+                }
+                $stored = ShiftOpenPosition::query()->whereKey($position->id)->lockForUpdate()->first();
+                $actualShift = Shift::query()->whereKey($lockedShift->id)->lockForUpdate()->first();
+                $valid = $stored && $actualShift?->getRawOriginal() === $shiftBefore;
+                foreach (['shift_id', 'replacement_request_id', 'status', 'required_skills', 'coverage_roles', 'notes', 'claimed_by', 'claimed_at', 'approved_by', 'approved_at'] as $field) {
+                    $actual = $stored?->{$field};
+                    if (in_array($field, ['shift_id', 'replacement_request_id'], true)) {
+                        $actual = $actual === null ? null : (int) $actual;
+                    }
+                    $valid = $valid && $actual === $attributes[$field];
+                }
+                $valid = $valid && ($expires === null ? $stored?->expires_at === null : $stored?->expires_at?->equalTo($expires));
+                if ($replacement) {
+                    $valid = $valid && $reads->query(ShiftReplacementRequest::query()->whereKey($replacement->id))->first()?->getRawOriginal() === $replacementBefore;
+                }
+                if (! $valid) {
+                    throw ValidationException::withMessages(['shift_id' => 'The saved open position did not match this request. No position was posted.']);
+                }
+
+                return ['actor_id' => (int) $actor->id, 'source_revision' => $sourceRevision,
+                    'position' => ['id' => (int) $stored->id,
+                        ...array_diff_key($attributes, ['expires_at' => true]), 'expires_at' => $stored->expires_at?->copy()->utc()->toISOString()],
+                    'shift' => ['id' => (int) $lockedShift->id, 'site_id' => $this->siteAccess->shiftSiteId($lockedShift),
+                        'assigned' => $lockedShift->user_id !== null,
+                        'status' => $lockedShift->status, 'starts_at' => $lockedShift->starts_at?->copy()->utc()->toISOString(),
+                        'ends_at' => $lockedShift->ends_at?->copy()->utc()->toISOString()]];
+            });
+        });
+        Cache::forget($this->availableSkillsCacheKey($request->user()));
+        $result = $this->postingResult($rootEntry, $request, $saved);
+        if ($request->expectsJson() && ! empty($data['request_id'])) {
+            return response()->json(['result' => $result], $result ? 201 : 202);
+        }
+
+        return $result ? redirect()->back()->with('success', 'Open position published.') : redirect()->back();
+    }
+
+    private function postingActor(User $actor): User
+    {
+        $current = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($actor, [
+            'job_board.create', 'shifts.manageAny', 'reports.viewAny', 'job_board.approve', 'shifts.viewAny',
+        ]);
+        abort_unless($current->isApproved() && $this->canCreatePositions($current), 403);
+
+        return $current;
+    }
+
+    private function postingShiftEvidence(Shift $shift, array $siteIds, CurrentAuthorizationReads $reads): bool
+    {
+        $client = $shift->client_id === null ? null : $reads->query(Client::query()->whereKey($shift->client_id))->first();
+        $siteId = $shift->site_id ?: $client?->site_id;
+        if (! $siteId || ! in_array((int) $siteId, $siteIds, true)
+            || ($shift->client_id !== null && (! $client || ! $client->site_id || ($shift->site_id !== null && (int) $shift->site_id !== (int) $client->site_id)))) {
+            return false;
+        }
+        $site = $reads->query(Site::query()->whereKey($siteId))->first();
+        if (! $site) {
+            return false;
+        }
+        $client?->setRelation('site', $site);
+        $shift->setRelation('client', $client);
+        $shift->setRelation('site', $site);
+        if ($shift->user_id !== null) {
+            if (! $reads->query(User::query()->whereKey($shift->user_id))->first()) {
+                return false;
+            }
+            $worker = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting((int) $shift->user_id, []);
+            // Preserve the existing Shift query's exact worker predicate.
+            if (! $worker->isApproved() || in_array($worker->role, ['client', 'next_of_kin'], true)
+                || $worker->roles->contains(fn ($role) => in_array($role->name, ['client', 'next_of_kin'], true))
+                || ! in_array((int) $siteId, $this->siteAccess->accessibleSiteIds($worker, [], $reads), true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function postingLinks(Shift $shift, CurrentAuthorizationReads $reads): array
+    {
+        $replacement = $reads->query(ShiftReplacementRequest::query()->where('shift_id', $shift->id)->active()
+            ->orderByDesc('requested_at')->orderByDesc('id'))->get()->first(fn ($row) => $this->postingReplacementIsCanonical($row, $shift, $reads)
+                && ($shift->user_id === null || (int) $row->current_staff_id === (int) $shift->user_id));
+        $active = $reads->query(ShiftOpenPosition::query()->where('shift_id', $shift->id)->whereIn('status', ['open', 'claimed'])->orderBy('id'))
+            ->get()->first(function (ShiftOpenPosition $position) use ($shift, $reads): bool {
+                if (! $this->postingUsersExist([$position->claimed_by, $position->approved_by], $reads)) {
+                    return false;
+                }
+                if ($position->replacement_request_id === null) {
+                    return true;
+                }
+                $row = $reads->query(ShiftReplacementRequest::query()->whereKey($position->replacement_request_id))->first();
+
+                return $row && $this->postingReplacementIsCanonical($row, $shift, $reads);
+            });
+
+        return [$active, $replacement];
+    }
+
+    private function postingReplacementIsCanonical(ShiftReplacementRequest $row, Shift $shift, CurrentAuthorizationReads $reads): bool
+    {
+        return (int) $row->shift_id === (int) $shift->id && $row->current_staff_id !== null
+            && $this->postingUsersExist([$row->current_staff_id, $row->requested_by, $row->replacement_user_id, $row->approved_by, $row->cancelled_by], $reads);
+    }
+
+    private function postingUsersExist(array $ids, CurrentAuthorizationReads $reads): bool
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn ($id) => $id !== null)));
+
+        return $ids === [] || $reads->query(User::query()->whereIn('id', $ids)->orderBy('id'))->get(['id'])->count() === count($ids);
+    }
+
+    private function postingSourceRevision(Shift $shift, ?ShiftOpenPosition $active, ?ShiftReplacementRequest $replacement): string
+    {
+        $nullableId = static fn ($id): ?int => $id === null ? null : (int) $id;
+
+        return hash('sha256', json_encode([
+            'shift' => [
+                'id' => (int) $shift->id,
+                'client_id' => $nullableId($shift->client_id),
+                'site_id' => $nullableId($shift->site_id),
+                'effective_site_id' => $this->siteAccess->shiftSiteId($shift),
+                'service_context_id' => $nullableId($shift->service_context_id),
+                'shift_series_id' => $nullableId($shift->shift_series_id),
+                'respite_booking_id' => $nullableId($shift->respite_booking_id),
+                'user_id' => $nullableId($shift->user_id),
+                'status' => $shift->status,
+                'starts_at' => $shift->getRawOriginal('starts_at'),
+                'ends_at' => $shift->getRawOriginal('ends_at'),
+                'coverage_roles' => $shift->coverage_roles ?? [],
+                'location' => $shift->location,
+            ],
+            'active_position' => $active ? [
+                'id' => (int) $active->id,
+                'status' => $active->status,
+                'expires_at' => $active->getRawOriginal('expires_at'),
+            ] : null,
+            'replacement' => $replacement ? [
+                'id' => (int) $replacement->id,
+                'shift_id' => (int) $replacement->shift_id,
+                'current_staff_id' => $nullableId($replacement->current_staff_id),
+                'replacement_user_id' => $nullableId($replacement->replacement_user_id),
+                'status' => $replacement->status,
+                'requested_at' => $replacement->getRawOriginal('requested_at'),
+            ] : null,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+    }
+
+    private function postingRefusal(Shift $shift, ?ShiftOpenPosition $active, ?ShiftReplacementRequest $replacement): ?string
+    {
+        if ($active) {
+            return 'duplicate';
+        }
+        if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+            return 'terminal_shift';
+        }
+
+        return $shift->user_id !== null && ! $replacement ? 'request_cover_required' : null;
+    }
+
+    protected function postingResult(bool $rootEntry, Request $request, array $saved): ?array
+    {
+        try {
+            if (! $rootEntry || DB::transactionLevel() !== 0 || DB::connection()->getPdo()->inTransaction()
+                || $saved['actor_id'] !== $request->user()?->id) {
+                return null;
+            }
+
+            return ['version' => 1, 'action' => 'post_position', 'outcome' => 'posted', 'changed' => true,
+                'request_id' => $request->input('request_id'), ...$saved,
+                'committed_at' => now('UTC')->startOfSecond()->toISOString()];
+        } catch (\Throwable $exception) {
+            try {
+                Log::warning('Committed job board result could not be presented', ['exception_class' => $exception::class]);
+            } catch (\Throwable) {
+            }
+
+            return null;
+        }
     }
 
     /**
@@ -344,224 +622,17 @@ class JobBoardController extends Controller
      */
     public function toggleAlerts(Request $request)
     {
-        $auth = $request->user();
-        abort_unless($this->canViewJobBoard($auth), 403);
-
-        $enabled = ! ($auth->job_board_alerts_enabled ?? false);
-        $auth->forceFill(['job_board_alerts_enabled' => $enabled])->save();
-
-        return redirect()->back()->with(
-            'success',
-            $enabled
-                ? 'Alerts enabled — we\'ll notify you when matching shifts open.'
-                : 'Alerts disabled.'
-        );
+        return $this->jobBoardActionResponse($request, 'set_alert_preference');
     }
 
     public function claim(Request $request, $position)
     {
-        $auth = $request->user();
-        abort_unless($this->canClaimPositions($auth), 403);
-
-        $position = ShiftOpenPosition::query()
-            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
-            ->with(['shift', 'replacementRequest', 'claimer'])
-            ->findOrFail($position);
-
-        if ($position->status !== 'open') {
-            return redirect()->back()->withErrors([
-                'claim' => $position->status === 'claimed'
-                    ? 'This position was just claimed by another worker.'
-                    : 'This position is no longer open for claims.',
-            ]);
-        }
-
-        if ($position->expires_at && $position->expires_at->lte(now())) {
-            return redirect()->back()->withErrors([
-                'claim' => 'This position has expired and can no longer be claimed.',
-            ]);
-        }
-
-        if ($position->shift && (int) $position->shift->user_id === (int) $auth->id) {
-            return redirect()->back()->withErrors([
-                'claim' => 'You are already assigned to this shift.',
-            ]);
-        }
-
-        if (! $position->shift || in_array($position->shift->status, ['completed', 'cancelled'], true)) {
-            return redirect()->back()->withErrors([
-                'claim' => 'This shift can no longer be claimed from the job board.',
-            ]);
-        }
-
-        $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($position->shift, $auth);
-        if ($eligibility->hasBlocks()) {
-            return redirect()->back()->withErrors([
-                'claim' => $eligibility->blocking_reasons[0] ?? 'You cannot claim this shift.',
-            ]);
-        }
-
-        if ($eligibility->hasWarnings()) {
-            session()->flash('job_board_claim_warnings', $eligibility->warnings);
-        }
-
-        $reservation = app(CoverageReservationService::class)->reserveForAssignment($position->shift, $auth, 'job_board_claim');
-
-        try {
-            DB::transaction(function () use ($position, $auth, $reservation) {
-                $position = ShiftOpenPosition::query()
-                    ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
-                    ->lockForUpdate()
-                    ->findOrFail($position->id);
-                if ($position->status !== 'open') {
-                    throw ValidationException::withMessages([
-                        'claim' => 'This position was just claimed by another worker.',
-                    ]);
-                }
-
-                $position->update([
-                    'claimed_by' => $auth->id,
-                    'claimed_at' => now(),
-                    'status' => 'claimed',
-                ]);
-
-                if ($reservation) {
-                    $reservation->update([
-                        'shift_open_position_id' => $position->id,
-                    ]);
-                }
-            });
-        } catch (\Throwable $e) {
-            app(CoverageReservationService::class)->release($reservation);
-            throw $e;
-        }
-
-        app(ShiftReplacementService::class)->syncClaimFromOpenPosition($position->fresh(['replacementRequest', 'claimer']));
-
-        return redirect()->back()->with('success', 'Position claimed.');
+        return $this->jobBoardActionResponse($request, 'claim', (int) $position);
     }
 
     public function approve(Request $request, $position)
     {
-        $auth = $request->user();
-        abort_unless($this->canApprovePositions($auth), 403);
-
-        $positionRecord = ShiftOpenPosition::query()
-            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
-            ->where('status', 'claimed')
-            ->whereKey($position)
-            ->first(['id', 'shift_id']);
-        abort_unless($positionRecord, 404);
-        $positionId = (int) $positionRecord->id;
-        $shiftId = (int) $positionRecord->shift_id;
-
-        $decision = DB::transaction(function () use ($positionId, $shiftId, $auth) {
-            // Keep the shared mutation lock order: Shift, position, assignee.
-            $shift = Shift::query()
-                ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
-                ->lockForUpdate()
-                ->findOrFail($shiftId);
-
-            $position = ShiftOpenPosition::query()
-                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
-                ->with('replacementRequest')
-                ->lockForUpdate()
-                ->findOrFail($positionId);
-            if ($position->status !== 'claimed' || (int) $position->shift_id !== $shiftId) {
-                throw ValidationException::withMessages([
-                    'position' => 'This claim is no longer active.',
-                ]);
-            }
-
-            $position->setRelation('shift', $shift);
-
-            if (! $position->claimed_by) {
-                throw ValidationException::withMessages([
-                    'position' => 'This claimed position is missing shift or claimant information.',
-                ]);
-            }
-
-            $assignee = User::staff()->lockForUpdate()->find($position->claimed_by);
-            if (! $assignee) {
-                throw ValidationException::withMessages([
-                    'position' => 'The claimed worker is no longer available for assignment.',
-                ]);
-            }
-
-            $shiftSiteId = $this->siteAccess->shiftSiteId($shift);
-            $eligibleAssignee = User::query()->whereKey($assignee->id);
-            if (! $shiftSiteId || ! $this->siteAccess
-                ->applyFleetRecipientEligibility($eligibleAssignee, $shiftSiteId)
-                ->exists()) {
-                throw ValidationException::withMessages([
-                    'position' => 'The claimed worker is no longer eligible to work at this Shift Site.',
-                ]);
-            }
-
-            $decision = app(AssignmentEligibilityGateway::class)->decide($shift, $assignee);
-            if ($decision->result?->hasBlocks()) {
-                session()->flash(
-                    'compliance_warnings',
-                    $decision->result->toArray()['compliance_warnings'] ?? [],
-                );
-            }
-            $decision->assertMayAssign(
-                'position',
-                'Cannot approve this claim for the selected worker.',
-            );
-
-            if (in_array($shift->status, ['completed', 'cancelled'], true)) {
-                throw ValidationException::withMessages([
-                    'position' => 'This shift can no longer be assigned from the job board.',
-                ]);
-            }
-
-            $reservation = CoverageReservation::query()
-                ->where('shift_open_position_id', $position->id)
-                ->where('status', CoverageReservationService::STATUS_ACTIVE)
-                ->latest('id')
-                ->lockForUpdate()
-                ->first();
-
-            if (! $reservation) {
-                $reservation = app(CoverageReservationService::class)
-                    ->reserveForAssignment($shift, $auth, 'job_board_approve');
-            }
-
-            $position->update([
-                'approved_by' => $auth->id,
-                'approved_at' => now(),
-                'status' => 'filled',
-            ]);
-
-            $shift->update([
-                'user_id' => $position->claimed_by,
-                'status' => $shift->status === 'draft' ? 'scheduled' : $shift->status,
-            ]);
-
-            ShiftOpenPosition::query()
-                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
-                ->where('shift_id', $position->shift_id)
-                ->where('id', '!=', $position->id)
-                ->whereIn('status', ['open', 'claimed'])
-                ->update(['status' => 'cancelled']);
-
-            app(CoverageReservationService::class)->fulfill($reservation, $shift, $position);
-
-            app(ShiftReplacementService::class)->approveFromOpenPosition(
-                $position->fresh(['replacementRequest', 'shift.client', 'claimer']),
-                $auth,
-                $decision,
-            );
-
-            return $decision;
-        });
-
-        if ($decision->isWarning()) {
-            session()->flash('compliance_warnings', $decision->result?->warnings ?? []);
-        }
-
-        return redirect()->back()->with('success', 'Claim approved and shift assigned.');
+        return $this->jobBoardActionResponse($request, 'approve', (int) $position);
     }
 
     protected function canViewJobBoard(?User $auth): bool
@@ -959,16 +1030,9 @@ class JobBoardController extends Controller
         return $value === '' ? '' : mb_strtoupper(mb_substr($value, 0, 1)).'.';
     }
 
-    protected function applyDateRangeFilter($query, string $dateRange): void
+    protected function applyDateRangeFilter($query, string $dateRange, ?array $bounds = null): void
     {
-        [$startsAt, $endsAt] = match ($dateRange) {
-            'this_weekend' => $this->weekendRange(),
-            'tonight' => [
-                Carbon::now()->setTime(18, 0),
-                Carbon::tomorrow()->setTime(6, 0),
-            ],
-            default => [now()->startOfDay(), now()->addDays(7)->endOfDay()],
-        };
+        [$startsAt, $endsAt] = $bounds ?? $this->jobBoardDateRangeBounds($dateRange, Carbon::now());
 
         $query->whereHas('shift', fn ($shiftQuery) => $shiftQuery
             ->whereBetween('starts_at', [$startsAt, $endsAt]));
@@ -1181,6 +1245,157 @@ class JobBoardController extends Controller
             'blocked_reasons' => $result->blocking_reasons,
             'warning_count' => count($result->warnings),
             'first_warning' => $result->warnings[0] ?? null,
+        ];
+    }
+
+    public function actionSource(Request $request, $position)
+    {
+        return response()->json(app(JobBoardActionCommand::class)->source($request, (int) $position));
+    }
+
+    public function alertPreference(Request $request)
+    {
+        return response()->json(app(JobBoardActionCommand::class)->source($request));
+    }
+
+    private function jobBoardActionResponse(Request $request, string $action, ?int $position = null)
+    {
+        $outcome = app(JobBoardActionCommand::class)->execute($request, $action, $position);
+        if (JobBoardActionCommand::modern($request)) {
+            return response()->json(['result' => $outcome['confirmed'] ? $outcome['saved'] : null], $outcome['confirmed'] ? 200 : 202);
+        }
+        if (! $outcome['confirmed']) {
+            return redirect()->back(); // A nested or changed commit has no confirmed success.
+        }
+        $result = $outcome['saved'];
+        $warnings = $outcome['legacy_warnings'];
+        if ($warnings !== []) {
+            session()->flash($action === 'claim' ? 'job_board_claim_warnings' : 'compliance_warnings', $warnings);
+        }
+        $message = match ($action) {
+            'claim' => 'Position claimed.',
+            'approve' => 'Claim approved and shift assigned.',
+            default => $result['preference']['enabled']
+                ? 'Alerts enabled — we\'ll notify you when matching shifts open.' : 'Alerts disabled.',
+        };
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    private function jobBoardDateRangeBounds(string $dateRange, Carbon $readAt): array
+    {
+        if ($dateRange === 'this_weekend') {
+            $start = $readAt->copy()->startOfWeek(Carbon::MONDAY)->addDays(5)->startOfDay();
+            $end = $start->copy()->addDay()->endOfDay();
+            if ($readAt->greaterThan($end)) {
+                $start->addWeek();
+                $end->addWeek();
+            }
+
+            return [$start, $end];
+        }
+
+        return $dateRange === 'tonight'
+            ? [$readAt->copy()->setTime(18, 0), $readAt->copy()->addDay()->setTime(6, 0)]
+            : [$readAt->copy()->startOfDay(), $readAt->copy()->addDays(7)->endOfDay()];
+    }
+
+    private function jobBoardProvenance(User $actor, array $filters, string $scope, bool $weekRequested,
+        Carbon $weekStart, Carbon $weekEnd, ?array $dateBounds, Carbon $readAt,
+        $jobs, array $stats, bool $canApprove): array
+    {
+        $weekApplied = $weekRequested && $scope !== 'mine';
+        $applied = ['scope'];
+        foreach (['q', 'status', 'skill', 'date_range'] as $key) {
+            $used = in_array($key, ['q', 'skill'], true)
+                ? trim((string) ($filters[$key] ?? '')) !== '' : ! empty($filters[$key]);
+            if ($used) {
+                $applied[] = $key;
+            }
+        }
+        if ($weekApplied) {
+            $applied[] = 'week';
+        }
+        $ignored = [];
+        if ($weekRequested && ! $weekApplied) {
+            $ignored[] = 'week';
+        }
+        // Existing fit is validated/echoed, but is not an installed SQL or eligibility filter.
+        if (! empty($filters['fit'])) {
+            $ignored[] = 'fit';
+        }
+        $open = collect($jobs->items())->where('status', 'open');
+        $assessed = $open->filter(fn ($job) => is_array($job['viewer_eligibility'] ?? null)
+            && is_bool($job['viewer_eligibility']['is_eligible'] ?? null));
+        $eligible = $assessed->filter(fn ($job) => $job['viewer_eligibility']['is_eligible'])->count();
+        $unassessed = $open->count() - $assessed->count();
+        $status = $open->isEmpty() ? 'empty' : ($unassessed > 0 ? 'partial' : 'complete');
+        $weekWindow = $this->jobBoardSqlWindow([$weekStart, $weekEnd]);
+        $criteria = $scope === 'mine'
+            ? ['claimed_by_actor', 'active_claims_or_filled_approved_since']
+            : match ($scope) {
+                'replacements' => ['replacement_linked', 'open_unexpired_or_non_open'],
+                'approvals' => ['claimed', 'claimed_by_other'],
+                default => ['open_unexpired'],
+            };
+        $allBasis = ['basis' => 'accessible_all_weeks', 'list_filters_applied' => false];
+        $metrics = [];
+        foreach (['open', 'claimed', 'filled_today', 'expiring_soon', 'replacements', 'sites'] as $key) {
+            $metrics[$key] = $allBasis + ['value' => $stats[$key], 'assessment_status' => 'counted'];
+        }
+        $metrics['filled_today'] += ['date_field' => 'approved_at', 'date_value' => $readAt->toDateString(), 'storage_timezone' => 'UTC'];
+        $metrics['expiring_soon'] += ['date_field' => 'expires_at', 'window' => $this->jobBoardSqlWindow([$readAt, $readAt->copy()->addHour()])];
+        $metrics['mine'] = ['basis' => 'actor_claims_active_or_recent_filled', 'list_filters_applied' => false,
+            'value' => $stats['mine'], 'assessment_status' => 'counted',
+            'filled_approved_since_utc' => $this->jobBoardSqlWindow([$readAt->copy()->subDays(14), $readAt])['starts_at_utc']];
+        $metrics['pending_approval'] = ['basis' => 'accessible_other_claims_all_weeks', 'list_filters_applied' => false,
+            'value' => $canApprove ? $stats['pending_approval'] : null,
+            'assessment_status' => $canApprove ? 'counted' : 'not_authorized'];
+        $metrics['sites_worked_this_week'] = ['basis' => 'actor_assigned_shift_starts_in_anchor_week', 'list_filters_applied' => false,
+            'value' => $stats['sites_worked_this_week'], 'assessment_status' => 'counted', 'window' => $weekWindow];
+        $metrics['eligible_for_you'] = ['basis' => 'returned_open_positions', 'list_filters_applied' => true,
+            'value' => $unassessed === 0 ? $eligible : null, 'assessed_eligible' => $eligible, 'assessment_status' => $status];
+
+        return [
+            'version' => 1, 'actor_id' => (int) $actor->id,
+            'read_at_utc' => $readAt->copy()->utc()->toISOString(),
+            'consistency' => 'request_read_not_atomic_snapshot',
+            'worker_timezone' => (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')),
+            'list' => [
+                'scope' => $scope, 'range_kind' => $scope === 'mine' ? 'my_claims' : ($weekApplied ? 'selected_week' : 'all_weeks'),
+                'requested_week' => $weekRequested ? $weekStart->toDateString() : null,
+                'week_applied' => $weekApplied, 'shift_start_window' => $weekApplied ? $weekWindow : null,
+                'date_range' => $dateBounds === null ? null : ['key' => $filters['date_range'], 'window' => $this->jobBoardSqlWindow($dateBounds)],
+                'criteria' => $criteria,
+                'filled_approved_since_utc' => $scope === 'mine' ? $metrics['mine']['filled_approved_since_utc'] : null,
+                'applied_filters' => $applied, 'ignored_filters' => $ignored,
+                'eligibility_filtered' => false,
+            ],
+            'pagination' => ['current_page' => $jobs->currentPage(), 'per_page' => $jobs->perPage(),
+                'returned' => count($jobs->items()), 'total' => $jobs->total(), 'last_page' => $jobs->lastPage(),
+                'has_more' => $jobs->hasMorePages()],
+            'eligibility' => [
+                'basis' => 'returned_open_positions', 'assessment_status' => $status,
+                'open_positions' => $open->count(), 'assessed' => $assessed->count(), 'unassessed' => $unassessed,
+                'assessed_eligible' => $eligible, 'assessed_not_eligible' => $assessed->count() - $eligible,
+                'page_eligible_count' => $unassessed === 0 ? $eligible : null,
+                'filtered_list_eligible_count' => null, 'all_weeks_eligible_count' => null,
+            ],
+            'metrics' => $metrics,
+            'available_skills_basis' => 'accessible_open_positions_all_weeks_cache_60_seconds',
+        ];
+    }
+
+    private function jobBoardSqlWindow(array $bounds): array
+    {
+        $format = DB::connection()->getQueryGrammar()->getDateFormat();
+
+        return [
+            'starts_at_utc' => Carbon::parse($bounds[0]->format($format), 'UTC')->toISOString(),
+            'ends_at_utc' => Carbon::parse($bounds[1]->format($format), 'UTC')->toISOString(),
+            'end_inclusive' => true,
+            'anchor_timezone' => $bounds[0]->getTimezone()->getName(),
+            'storage_timezone' => 'UTC',
         ];
     }
 }

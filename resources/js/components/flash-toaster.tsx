@@ -86,11 +86,15 @@ export default function FlashToaster() {
             'operations/rostering/conflicts',
         ].includes(page.component) &&
         ['Shift created.', 'Shift updated.'].includes(rawSuccess ?? '');
+    const endSessionDialogOwnsResult =
+        page.component === 'attendance/index' &&
+        rawSuccess?.startsWith('Session ended for ');
     const success =
         page.component === 'operations/shift-notes/Index' ||
         timesheetDialogOwnsResult ||
         adjustmentDialogOwnsResult ||
-        shiftDialogOwnsResult
+        shiftDialogOwnsResult ||
+        endSessionDialogOwnsResult
             ? null
             : rawSuccess;
     const error = asToastText(flash?.error);

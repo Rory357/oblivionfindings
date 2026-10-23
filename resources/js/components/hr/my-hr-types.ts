@@ -1,4 +1,5 @@
 import type { MyHrActiveClock } from './my-hr-clock-card';
+import type { MyHrAttendance } from './my-hr-attendance';
 
 /** A teammate in the shell-hosted "Give recognition" wizard directory. */
 export type KudosTeammate = {
@@ -120,6 +121,7 @@ export type MyHrShellData = {
         avatar: string | null;
     };
     activeClock: MyHrActiveClock;
+    attendance?: MyHrAttendance;
     todayTotal: number;
     weekly: {
         total_hours: number;

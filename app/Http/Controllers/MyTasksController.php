@@ -1493,7 +1493,7 @@ class MyTasksController extends Controller
                         'severity' => $incident->severity,
                         'status' => $incident->status,
                         'occurred_at' => $incident->occurred_at?->toIso8601String(),
-                        'url' => '/incidents/'.$incident->id,
+                        'url' => '/incidents/'.$incident->id.'?return_to=%2Fmy-day',
                         'requires_followup' => (bool) $incident->requires_followup,
                     ];
                 })
@@ -1691,7 +1691,7 @@ class MyTasksController extends Controller
                         'description' => $description,
                         'priority' => $incident?->severity ?? 'medium',
                         'status' => 'pending',
-                        'source_url' => '/incidents/'.($followup->client_incident_id),
+                        'source_url' => '/incidents/'.($followup->client_incident_id).'?return_to=%2Fmy-day',
                         'due_at' => $followup->due_at?->toIso8601String(),
                         'created_at' => $followup->created_at->toIso8601String(),
                         'meta' => [

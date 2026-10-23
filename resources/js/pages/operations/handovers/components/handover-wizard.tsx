@@ -42,6 +42,8 @@ import {
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
+import { draftHistoryNavigation, registerDraftHistoryGuard } from '@/lib/draft-history';
 import {
     sanitiseWitnessPin,
     WITNESS_PIN_LENGTH,
@@ -64,6 +66,13 @@ import {
     shiftOptionLabel,
 } from './shared';
 import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
+import { retainHandoverDraft } from './handover-work-lifetime';
+import { useOperationsHandoverCommand } from './use-operations-handover-command';
+import { handoverCommandWeek } from './handover-command-week';
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const SELECT_CLASS =
     'h-10 w-full max-md:min-h-[44px] rounded-lg border border-input bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60';
@@ -333,6 +342,11 @@ export function HandoverWizard({
     onSubmitted,
     basePath = '/operations/handovers',
     medicationFocus = false,
+    checkedCommands = false,
+    submitOnly = false,
+    editingUnavailable = false,
+    addClientActive = false,
+    timeZone = WORKER_TIMEZONE,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -347,12 +361,42 @@ export function HandoverWizard({
     // Operations behaviour.
     basePath?: string;
     medicationFocus?: boolean;
+    checkedCommands?: boolean;
+    submitOnly?: boolean;
+    editingUnavailable?: boolean;
+    addClientActive?: boolean;
+    timeZone?: string;
 }) {
+    // A mounted save owner cannot downgrade to a legacy writer mid-attempt.
+    // Installation readiness is chosen on entry; reopen the page to change it.
+    const [commandMode] = useState(() => checkedCommands && !medicationFocus && basePath === '/operations/handovers');
+    const submissionReview = commandMode && submitOnly && editing !== null;
     const isMobile = useIsMobile();
     const [stepIndex, setStepIndex] = useState(0);
     const [f, setF] = useState<WizForm>(emptyForm);
+    const { session: commandSession, state: commandState } = useOperationsHandoverCommand(commandMode, currentUser.id, {
+        recordId: editing?.id ?? null, version: editing?.version ?? null,
+        shiftId: editing?.outgoing_shift?.id ?? (f.outgoing_shift ? Number(f.outgoing_shift) : null),
+        canRead: !editingUnavailable,
+        canWrite: !editingUnavailable && (!editing || (editing.status === 'draft' &&
+            (submissionReview ? editing.can_submit : editing.can_edit))),
+    });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
+    const [discardOpen, setDiscardOpen] = useState(false);
+    const [initialDraft, setInitialDraft] = useState<string | null>(null);
+    const seededRecord = useRef<string | undefined>(undefined);
+    const commandTargetWeek = useRef<Date | null>(null);
+    const draftKey = JSON.stringify(retainHandoverDraft(f));
+    const dirty = commandMode && initialDraft !== null && draftKey !== initialDraft;
+    const commandBusy = commandMode && !['editing', 'confirmed'].includes(commandState.phase);
+    const historyBlocked = commandMode && open && Boolean(commandSession?.belongsTo(currentUser.id)) &&
+        commandState.phase !== 'unavailable' && (!commandSession?.canClose() || (commandState.phase !== 'confirmed' && dirty));
+    useEffect(() => {
+        if (commandMode && commandState.phase === 'unavailable') {
+            toast.warning('This handover is no longer available in your current view. Reopen Handovers to check your access.');
+        }
+    }, [commandMode, commandState.phase]);
     // eMAR lens: live medication picture for the selected outgoing shift's window.
     const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
     const [snapLoading, setSnapLoading] = useState(false);
@@ -380,6 +424,11 @@ export function HandoverWizard({
 
     const closeWizard = () => {
         clearWitnessCredential();
+        if (commandSession && !commandSession.canClose()) return;
+        if (dirty && commandState.phase !== 'confirmed') {
+            setDiscardOpen(true);
+            return;
+        }
         onOpenChange(false);
     };
 
@@ -395,23 +444,74 @@ export function HandoverWizard({
             );
             return;
         }
-        setStepIndex(0);
+        const seedKey = `${editing?.id ?? 'new'}:${submissionReview}`;
+        if (commandMode && seededRecord.current === seedKey && commandState.phase !== 'confirmed') return;
+        if (commandSession && !commandSession.reset()) return;
+        setStepIndex(submissionReview ? 3 : 0);
         setErrors({});
-        setF(
-            editing
+        const seeded = editing
                 ? initFromEditing(
                       editing,
                       medicationFocus && catalogue.capabilities.view_controlled,
                   )
-                : emptyForm(),
-        );
+                : emptyForm();
+        setInitialDraft(JSON.stringify(retainHandoverDraft(seeded)));
+        seededRecord.current = seedKey;
+        setF(seeded);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         open,
         editing?.id,
         medicationFocus,
         catalogue.capabilities.view_controlled,
+        submissionReview,
     ]);
+
+    useEffect(() => {
+        if (!commandMode || !open) return;
+        const blocked = () => {
+            if (!commandSession || !commandSession.belongsTo(currentUser.id) || commandSession.snapshot().phase === 'unavailable') return false;
+            return !commandSession.canClose() || (commandSession.snapshot().phase !== 'confirmed' && dirty);
+        };
+        const unload = (event: BeforeUnloadEvent) => {
+            if (!blocked()) return;
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        const removeVisit = router.on('before', (event) => {
+            // Adding a client refreshes only the permitted catalogue, without
+            // replacing this page or its retained handover work.
+            const visit = event.detail.visit;
+            const currentUrl = new URL(window.location.href);
+            const samePage = visit.url.origin === currentUrl.origin && visit.url.pathname === currentUrl.pathname &&
+                visit.url.search === currentUrl.search;
+            if (visit.method === 'get' && samePage && visit.preserveState === true && visit.only.length === 1 &&
+                visit.only[0] === 'catalogue' && commandSession?.canEdit()) return;
+            if (addClientActive && visit.method === 'post' && visit.url.origin === currentUrl.origin &&
+                visit.url.pathname === '/operations/clients' && visit.preserveState === true &&
+                commandSession?.canEdit()) return;
+            if (blocked()) {
+                event.preventDefault();
+                toast.warning(commandSession?.canClose()
+                    ? 'Save or discard your handover typing before leaving.'
+                    : 'Check the original handover save before leaving.');
+            }
+        });
+        window.addEventListener('beforeunload', unload);
+        return () => { removeVisit(); window.removeEventListener('beforeunload', unload); };
+    }, [commandMode, commandSession, open, dirty, currentUser.id, addClientActive]);
+
+    useEffect(() => {
+        if (!historyBlocked) return;
+        return registerDraftHistoryGuard((_continueHistory, cancelHistory) => {
+            // Retain the original work, without capturing a destination to replay later.
+            cancelHistory();
+            if (!commandSession?.belongsTo(currentUser.id)) return;
+            toast.warning(commandSession.canClose()
+                ? 'Save or discard your handover typing before using Back or Forward.'
+                : 'Check the original handover save before leaving.');
+        });
+    }, [historyBlocked, commandSession, currentUser.id]);
 
     // A client added via the inline Add Client dialog selects itself here.
     useEffect(() => {
@@ -549,12 +649,12 @@ export function HandoverWizard({
     const canGovernControlled =
         canViewControlled && catalogue.capabilities.record_controlled;
     const immutable = Boolean(
-        editing && (editing.status !== 'draft' || !editing.can_edit),
+        editing && (editing.status !== 'draft' || !(submissionReview ? editing.can_submit : editing.can_edit)),
     );
     const editLockUnavailable = Boolean(
         editing && medicationFocus && editLockState !== 'acquired',
     );
-    const mutationDisabled = immutable || editLockUnavailable;
+    const mutationDisabled = immutable || editLockUnavailable || commandBusy;
 
     const siteName = (siteId: number | null) =>
         catalogue.sites.find((s) => s.id === siteId)?.name ?? '';
@@ -683,14 +783,19 @@ export function HandoverWizard({
     }
 
     const goNext = () => {
+        if (submissionReview || (commandSession && !commandSession.canEdit())) return;
         const e = validate(cur.key);
         setErrors(e);
         if (Object.keys(e).length) return;
         setStepIndex((i) => Math.min(i + 1, WIZ_STEPS.length - 1));
     };
-    const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
+    const goBack = () => {
+        if (submissionReview || (commandSession && !commandSession.canEdit())) return;
+        setStepIndex((i) => Math.max(i - 1, 0));
+    };
 
     const submit = (asDraft: boolean) => {
+        if (commandSession && !commandSession.canEdit()) return;
         if (mutationDisabled) {
             toast.error(
                 immutable
@@ -700,12 +805,12 @@ export function HandoverWizard({
             return;
         }
 
-        const all = {
+        const all: Record<string, string> = submissionReview ? {} : {
             ...validate('shift'),
             ...validate('narrative'),
             ...validate('lists'),
         };
-        if (!asDraft && f.leave_open) {
+        if (!submissionReview && !asDraft && f.leave_open) {
             all.incoming_shift =
                 'Assign the bounded incoming shift before submitting. You can keep this as a draft while cover is arranged.';
         }
@@ -751,7 +856,15 @@ export function HandoverWizard({
         const targetShift = catalogue.shifts.find(
             (s) => String(s.id) === f.outgoing_shift,
         );
-        const targetWeek = startOfWeek(
+        const commandStartsAt = editing?.outgoing_shift && String(editing.outgoing_shift.id) === f.outgoing_shift
+            ? editing.outgoing_shift.starts_at : targetShift?.starts_at;
+        const commandWeek = commandMode ? handoverCommandWeek(commandStartsAt, timeZone) : null;
+        if (commandMode && !commandWeek) {
+            clearWitnessCredential();
+            toast.error('This shift needs a valid start time before its handover can be saved. Your typing is still here.');
+            return;
+        }
+        const targetWeek = commandWeek ? new Date(`${commandWeek}T12:00:00`) : startOfWeek(
             targetShift?.starts_at
                 ? new Date(targetShift.starts_at)
                 : new Date(),
@@ -761,6 +874,21 @@ export function HandoverWizard({
         // input/state before the network round-trip so retries require the witness
         // to authenticate again and no secret lingers in the open wizard.
         clearWitnessCredential();
+        if (commandSession) {
+            commandTargetWeek.current = targetWeek;
+            const { cd_witness_credential: credential, ...fields } = payload as typeof payload & { cd_witness_credential?: string | null };
+            void commandSession.save(Number(f.outgoing_shift), editing?.id ?? null,
+                editing?.version ?? null, submissionReview ? {} : Object.freeze(fields),
+                submissionReview ? null : credential, submissionReview).then((saved) => {
+                if (!saved || !commandSession.confirmedFor(saved, currentUser.id)) return;
+                setInitialDraft(draftKey);
+                clearWitnessCredential();
+                onOpenChange(false);
+                toast.success(saved.status === 'draft' ? 'Handover saved as draft' : 'Handover submitted');
+                onSubmitted(targetWeek);
+            });
+            return;
+        }
         setSubmitting(true);
         const opts = {
             preserveScroll: true,
@@ -818,7 +946,7 @@ export function HandoverWizard({
     };
 
     const footerStart =
-        !mutationDisabled && stepIndex > 0 ? (
+        !mutationDisabled && !submissionReview && stepIndex > 0 ? (
             <Button
                 variant="ghost"
                 className="max-md:min-h-[44px] max-md:min-w-[44px]"
@@ -835,12 +963,13 @@ export function HandoverWizard({
                 variant="outline"
                 className="max-md:min-h-[44px] max-md:min-w-[44px]"
                 onClick={closeWizard}
+                disabled={commandBusy}
             >
                 {immutable ? 'Close' : 'Cancel'}
             </Button>
             {!mutationDisabled && cur.key === 'review' ? (
                 <>
-                    {!editing || editing.status === 'draft' ? (
+                    {!submissionReview && (!editing || editing.status === 'draft') ? (
                         <Button
                             variant="secondary"
                             className="max-md:min-h-[44px] max-md:min-w-[44px]"
@@ -880,14 +1009,16 @@ export function HandoverWizard({
         </>
     );
 
+    if (commandState.phase === 'unavailable' || (commandSession && !commandSession.belongsTo(currentUser.id))) return null;
     return (
+        <>
         <WizardShell
             open={open}
             onClose={closeWizard}
-            title={editing ? 'Edit handover' : 'New handover'}
-            description="A guided wizard to record a shift-to-shift handover."
+            title={submissionReview ? 'Submit handover' : editing ? 'Edit handover' : 'New handover'}
+            description={submissionReview ? 'Review this saved draft before submitting it to the incoming worker.' : 'A guided wizard to record a shift-to-shift handover.'}
             railIcon={editing ? FileText : ArrowLeftRight}
-            railTitle={editing ? 'Edit handover' : 'New handover'}
+            railTitle={submissionReview ? 'Submit handover' : editing ? 'Edit handover' : 'New handover'}
             railSub={
                 editing
                     ? `${clientName(editing.client)} · update`
@@ -895,7 +1026,9 @@ export function HandoverWizard({
             }
             steps={WIZ_STEPS}
             stepIndex={stepIndex}
-            onStepClick={setStepIndex}
+            onStepClick={(step) => {
+                if (!submissionReview && (!commandSession || commandSession.canEdit())) setStepIndex(step);
+            }}
             pct={pct}
             pctLabel="Handover readiness"
             maxWidth={
@@ -907,6 +1040,27 @@ export function HandoverWizard({
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
+            {historyBlocked && !draftHistoryNavigation() ? (
+                <div role="status" className="mb-4 rounded-lg border border-border bg-muted p-3 text-sm">
+                    Browser Back and Forward cannot protect this handover here. Use the page controls until you save, discard unsent typing, or check the original save.
+                </div>
+            ) : null}
+            {commandMode && commandState.message ? (
+                <div role="status" className="mb-4 rounded-lg border border-border bg-muted p-3 text-sm">
+                    <p>{commandState.message}</p>
+                    {commandState.phase === 'uncertain' ? (
+                        <Button className="mt-2" variant="outline" onClick={() => {
+                            void commandSession?.recover().then((saved) => {
+                                if (!saved || !commandSession?.confirmedFor(saved, currentUser.id)) return;
+                                setInitialDraft(draftKey);
+                                onOpenChange(false);
+                                toast.success('Original handover save confirmed');
+                                if (commandTargetWeek.current) onSubmitted(commandTargetWeek.current);
+                            });
+                        }}>Check original save</Button>
+                    ) : null}
+                </div>
+            ) : null}
             {errors.handover ? (
                 <div
                     role="alert"
@@ -1435,12 +1589,34 @@ export function HandoverWizard({
                             canViewControlled={canViewControlled}
                             canGovernControlled={canGovernControlled}
                             editing={editing}
-                            editable={!mutationDisabled}
+                            editable={!mutationDisabled && !submissionReview}
                         />
                     </div>
                 </WizardStepPane>
             ) : null}
         </WizardShell>
+        <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Discard unsaved handover typing?</AlertDialogTitle>
+                    <AlertDialogDescription>Your changes have not been sent. Save as a draft to keep them, or discard them to close this window.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Keep editing</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => {
+                        if (!commandSession?.canClose() || commandSession.snapshot().phase !== 'editing') return;
+                        seededRecord.current = undefined;
+                        setInitialDraft(null);
+                        clearWitnessCredential();
+                        setF(emptyForm());
+                        setStepIndex(0);
+                        setErrors({});
+                        onOpenChange(false);
+                    }}>Discard typing</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     );
 }
 

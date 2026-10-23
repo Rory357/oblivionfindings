@@ -2,8 +2,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 /* Attendance — shared page header and connected Sessions / On the clock / Handovers views, with
  * right-click context menus on every list row. Clock workflows are multi-step
- * wizards on the shared wizard shell; the Handover wizard and ReasonDialog are
- * the existing shared components, not duplicates. */
+ * wizards on the shared wizard shell; manager session closure uses the shared
+ * attendance command feedback and recovery controls. */
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
 import {
     PageHeaderFilterButton,
@@ -15,7 +15,6 @@ import {
 } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
-import { ReasonDialog } from '@/components/reason-dialog';
 import {
     ShiftContextMenu,
     WeekPicker,
@@ -53,6 +52,8 @@ import {
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { AttendanceBreakFeedback } from '@/components/attendance-break-feedback';
+import { useAttendanceBreak } from '@/hooks/use-attendance-break';
 import {
     AlertTriangle,
     ArrowLeftRight,
@@ -77,7 +78,7 @@ import {
     Users,
     Wrench,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useInsertionEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { openHoursInPeriod } from './components/period-hours';
 
@@ -91,6 +92,7 @@ import {
 
 import { ClockInWizard } from './components/clock-in-wizard';
 import { ClockOutWizard } from './components/clock-out-wizard';
+import { EndSessionDialog } from './components/end-session-dialog';
 import { FixClockOutWizard } from './components/fix-clock-out-wizard';
 import {
     STALE_MS,
@@ -166,6 +168,7 @@ type Props = {
     canCreateHandovers: boolean;
     currentUser: { id: number; name: string };
     catalogue?: Catalogue;
+    handoverCommandProtocol?: 1 | null;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -446,12 +449,14 @@ function OnClockBoard({
     now,
     onView,
     onEnd,
+    blocksSession,
     onContext,
 }: {
     rows: OnClockRow[];
     now: Date;
     onView: (userId: number) => void;
     onEnd: (row: OnClockRow) => void;
+    blocksSession: (sessionId: number) => boolean;
     onContext: (e: React.MouseEvent, row: OnClockRow) => void;
 }) {
     const staleCount = rows.filter((r) => r.is_stale).length;
@@ -532,6 +537,7 @@ function OnClockBoard({
                                                 'border-status-critical/30 text-status-critical hover:bg-status-critical-bg',
                                         )}
                                         onClick={() => onEnd(s)}
+                                        disabled={blocksSession(s.id)}
                                     >
                                         End session
                                     </Button>
@@ -757,7 +763,11 @@ function HandoversList({
 
 /* ─────────────────────────── The page ─────────────────────────── */
 
-export default function AttendanceIndex({
+export default function AttendanceIndex(props: Props) {
+    return <AttendanceBody key={props.currentUser.id} {...props} />;
+}
+
+function AttendanceBody({
     sessions,
     totalSessions,
     sessionPagination,
@@ -777,8 +787,10 @@ export default function AttendanceIndex({
     canCreateHandovers,
     currentUser,
     catalogue,
+    handoverCommandProtocol = null,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
+    const [checkedHandoverCommands] = useState(() => handoverCommandProtocol === 1);
 
     const [now, setNow] = useState(() => new Date());
     const [tab, setTab] = useState('sessions');
@@ -790,6 +802,12 @@ export default function AttendanceIndex({
     const [clockOutOpen, setClockOutOpen] = useState(false);
     const [fixSessions, setFixSessions] = useState<FixCandidate[] | null>(null);
     const [handoverOpen, setHandoverOpen] = useState(false);
+    const handoverLaunch = useRef({ active: true, generation: 0 });
+    useInsertionEffect(() => () => {
+        handoverLaunch.current.active = false;
+        ++handoverLaunch.current.generation;
+    }, []);
+    const [submitHandoverOnly, setSubmitHandoverOnly] = useState(false);
     const [editingHandover, setEditingHandover] = useState<Handover | null>(
         null,
     );
@@ -871,6 +889,31 @@ export default function AttendanceIndex({
 
     /* ── live derived state ── */
     const onBreak = !!openSession?.on_break;
+    const breakCommand = useAttendanceBreak(
+        {
+            actorId: auth?.user?.id ?? null,
+            sessionId: openSession?.id ?? null,
+            shiftId: openSession?.shift_id ?? null,
+            canAct: canClock && (!selectedUserId || selectedUserId === auth?.user?.id),
+            onBreak,
+        },
+        (raw) => {
+            if (!raw || typeof raw !== 'object') return null;
+            const fresh = raw as Props & { auth?: SharedData['auth'] };
+            if (typeof fresh.openSession?.on_break !== 'boolean') return null;
+            if (!(fresh.openSession.shift_id === null ||
+                (Number.isSafeInteger(fresh.openSession.shift_id) && fresh.openSession.shift_id > 0)))
+                return null;
+            return {
+                actorId: fresh.auth?.user?.id ?? null,
+                sessionId: fresh.openSession?.id ?? null,
+                shiftId: fresh.openSession?.shift_id ?? null,
+                canAct: fresh.canClock === true &&
+                    (!fresh.filters?.user_id || fresh.filters.user_id === fresh.auth?.user?.id),
+                onBreak: fresh.openSession?.on_break === true,
+            };
+        },
+    );
     const trackedBreakM = useMemo(() => {
         if (!openSession) return 0;
         return openSession.breaks.reduce(
@@ -955,33 +998,16 @@ export default function AttendanceIndex({
           ? [ownFixCandidate]
           : [];
 
-    /* ── actions (success toasts come from the global FlashToaster) ── */
-    const startBreak = () => {
-        if (!openSession) return;
-        router.post(
-            '/attendance/break/start',
-            { session_id: openSession.id },
-            {
-                preserveScroll: true,
-                onError: (errs) =>
-                    toast.error(errs.break ?? 'Could not start the break.'),
-            },
-        );
+    const openFixSessions = (candidates: FixCandidate[]) => {
+        const available = candidates.filter((candidate) => !breakCommand.blocksSession(candidate.id));
+        if (available.length) setFixSessions(available);
     };
-
-    const endBreak = () => {
-        if (!openSession) return;
-        router.post(
-            '/attendance/break/end',
-            { session_id: openSession.id },
-            {
-                preserveScroll: true,
-                onError: (errs) =>
-                    toast.error(errs.break ?? 'Could not end the break.'),
-            },
-        );
+    const openEndSession = (session: OnClockRow) => {
+        if (!breakCommand.blocksSession(session.id)) setEndTarget(session);
     };
+    const availableFixCandidates = fixCandidates.filter((candidate) => !breakCommand.blocksSession(candidate.id));
 
+    /* ── actions ── */
     const acknowledgeHandover = (h: AttendanceHandover) => {
         router.patch(
             `/attendance/handover/${h.id}/acknowledge`,
@@ -996,10 +1022,13 @@ export default function AttendanceIndex({
         );
     };
 
-    const openHandoverWizard = (editing: Handover | null = null) => {
+    const openHandoverWizard = (editing: Handover | null = null, submitOnly = false) => {
         if (!editing && !canCreateHandovers) return;
         setDetailId(null);
+        const generation = ++handoverLaunch.current.generation;
         const launch = () => {
+            if (!handoverLaunch.current.active || handoverLaunch.current.generation !== generation) return;
+            setSubmitHandoverOnly(submitOnly);
             setEditingHandover(editing);
             setHandoverOpen(true);
         };
@@ -1011,6 +1040,9 @@ export default function AttendanceIndex({
     };
 
     const detailHandover = handovers.find((h) => h.id === detailId) ?? null;
+    const currentEditingHandover = editingHandover
+        ? handovers.find((h) => h.id === editingHandover.id) ?? null
+        : null;
 
     /* ── context menus (ShiftContextMenu host) ── */
     const openCtx = (
@@ -1066,8 +1098,9 @@ export default function AttendanceIndex({
                 : {
                       icon: <Wrench className="h-3.5 w-3.5" />,
                       label: 'Correct times…',
-                      onClick: () =>
-                          setFixSessions([
+                      sub: breakCommand.blocksSession(s.id) ? 'Check your break result first' : undefined,
+                      onClick: breakCommand.blocksSession(s.id) ? undefined : () =>
+                          openFixSessions([
                               {
                                   id: s.id,
                                   user_name: viewedStaff?.name ?? 'You',
@@ -1105,8 +1138,9 @@ export default function AttendanceIndex({
                 {
                     icon: <Wrench className="h-3.5 w-3.5" />,
                     label: 'Correct clock-out…',
-                    onClick: () =>
-                        setFixSessions([
+                    sub: breakCommand.blocksSession(s.id) ? 'Check your break result first' : undefined,
+                    onClick: breakCommand.blocksSession(s.id) ? undefined : () =>
+                        openFixSessions([
                             {
                                 id: s.id,
                                 user_name: s.user_name ?? `User #${s.user_id}`,
@@ -1124,7 +1158,8 @@ export default function AttendanceIndex({
                     icon: <LogOut className="h-3.5 w-3.5" />,
                     label: 'End session…',
                     tone: 'critical',
-                    onClick: () => setEndTarget(s),
+                    sub: breakCommand.blocksSession(s.id) ? 'Check your break result first' : undefined,
+                    onClick: breakCommand.blocksSession(s.id) ? undefined : () => openEndSession(s),
                 },
             ],
         );
@@ -1201,7 +1236,9 @@ export default function AttendanceIndex({
                       icon: AlertTriangle,
                       label: 'Open 16h+ — likely missed clock-out',
                       tone: 'warning' as const,
-                      onClick: () => setClockOutOpen(true),
+                      onClick: breakCommand.blocked ? undefined : () => {
+                          if (!breakCommand.isBlocked()) setClockOutOpen(true);
+                      },
                   },
               ]
             : []),
@@ -1229,7 +1266,7 @@ export default function AttendanceIndex({
                       icon: AlertTriangle,
                       label: `${staleRows.length} likely missed clock-out${staleRows.length === 1 ? '' : 's'}`,
                       tone: 'warning' as const,
-                      onClick: () => setFixSessions(fixCandidates),
+                      onClick: availableFixCandidates.length ? () => openFixSessions(availableFixCandidates) : undefined,
                   },
               ]
             : []),
@@ -1282,7 +1319,10 @@ export default function AttendanceIndex({
         viewedStaff || !canClock ? null : openSession ? (
             <PageHeaderPrimaryButton
                 icon={LogOut}
-                onClick={() => setClockOutOpen(true)}
+                onClick={() => {
+                    if (!breakCommand.isBlocked()) setClockOutOpen(true);
+                }}
+                disabled={breakCommand.blocked}
                 data-test="attendance-clock-out"
             >
                 Clock out
@@ -1290,7 +1330,10 @@ export default function AttendanceIndex({
         ) : (
             <PageHeaderPrimaryButton
                 icon={LogIn}
-                onClick={() => setClockInOpen(true)}
+                onClick={() => {
+                    if (!breakCommand.isBlocked()) setClockInOpen(true);
+                }}
+                disabled={breakCommand.blocked}
                 data-test="attendance-clock-in"
             >
                 Clock in
@@ -1302,7 +1345,8 @@ export default function AttendanceIndex({
                 {openSession ? (
                     <>
                         <PageHeaderGlassButton
-                            onClick={onBreak ? endBreak : startBreak}
+                            onClick={breakCommand.submit}
+                            disabled={breakCommand.blocked}
                             data-test={
                                 onBreak
                                     ? 'attendance-end-break'
@@ -1310,7 +1354,7 @@ export default function AttendanceIndex({
                             }
                         >
                             <Coffee className="mr-1 h-4 w-4" />
-                            {onBreak ? 'End break' : 'Start break'}
+                            {breakCommand.pending ? 'Saving break…' : onBreak ? 'End break' : 'Start break'}
                         </PageHeaderGlassButton>
                         {canCreateHandovers ? (
                             <PageHeaderGlassButton
@@ -1326,12 +1370,12 @@ export default function AttendanceIndex({
                 <PageHeaderGlassButton
                     aria-label="Fix a missed clock-out"
                     title={
-                        fixCandidates.length
+                        availableFixCandidates.length
                             ? 'Fix a missed clock-out'
                             : 'No open sessions to correct'
                     }
-                    disabled={!fixCandidates.length}
-                    onClick={() => setFixSessions(fixCandidates)}
+                    disabled={!availableFixCandidates.length}
+                    onClick={() => openFixSessions(availableFixCandidates)}
                     data-test="attendance-fix-clock-out"
                 >
                     <Wrench className="h-4 w-4" />
@@ -1425,7 +1469,8 @@ export default function AttendanceIndex({
                                     if (
                                         !viewedStaff &&
                                         canClock &&
-                                        !openSession
+                                        !openSession &&
+                                        !breakCommand.isBlocked()
                                     )
                                         setClockInOpen(true);
                                     else setTab('sessions');
@@ -1553,6 +1598,7 @@ export default function AttendanceIndex({
                     }
                 />
 
+                <AttendanceBreakFeedback command={breakCommand} checkHref="/attendance" />
                 <div className="text-caption flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
                     <p>
                         {tab === 'sessions'
@@ -1625,7 +1671,8 @@ export default function AttendanceIndex({
                             viewStaff(userId);
                             setTab('sessions');
                         }}
-                        onEnd={setEndTarget}
+                        onEnd={openEndSession}
+                        blocksSession={breakCommand.blocksSession}
                         onContext={onClockCtx}
                     />
                 ) : null}
@@ -1670,38 +1717,40 @@ export default function AttendanceIndex({
                 open={detailId != null}
                 onOpenChange={(open) => !open && setDetailId(null)}
                 onEdit={(h) => openHandoverWizard(h)}
-                onSubmit={(h) =>
-                    router.patch(
-                        `/operations/handovers/${h.id}/submit`,
-                        {},
-                        {
-                            preserveScroll: true,
-                            onSuccess: () => setDetailId(null),
-                        },
-                    )
-                }
+                onSubmit={(h) => {
+                    if (checkedHandoverCommands) { openHandoverWizard(h, true); return; }
+                    router.patch(`/operations/handovers/${h.id}/submit`, {}, {
+                        preserveScroll: true, onSuccess: () => setDetailId(null),
+                    });
+                }}
                 onAcknowledge={(h) => {
                     setDetailId(null);
                     acknowledgeHandover(h as AttendanceHandover);
                 }}
             />
 
-            {handoverOpen && catalogue ? (
+            {catalogue ? (
                 <HandoverWizard
+                    checkedCommands={checkedHandoverCommands}
+                    timeZone={evidence.timezone}
+                    submitOnly={submitHandoverOnly}
                     open={handoverOpen}
                     onOpenChange={(open) => {
                         if (!open) {
+                            ++handoverLaunch.current.generation;
                             setHandoverOpen(false);
                             setEditingHandover(null);
                         }
                     }}
-                    editing={editingHandover}
+                    editing={currentEditingHandover}
+                    editingUnavailable={editingHandover !== null && currentEditingHandover === null}
                     catalogue={catalogue}
                     currentUser={currentUser}
                     preselectClientId={
                         pendingClientId ?? openSession?.client_id ?? null
                     }
                     onAddClient={() => setAddClientOpen(true)}
+                    addClientActive={addClientOpen}
                     onSubmitted={() => {
                         setTab('handovers');
                         router.reload({ only: ['handovers'] });
@@ -1737,35 +1786,16 @@ export default function AttendanceIndex({
                 />
             ) : null}
 
-            <ReasonDialog
+            <EndSessionDialog
                 open={endTarget !== null}
-                onClose={() => setEndTarget(null)}
-                title={
-                    endTarget?.user_name
-                        ? `End ${endTarget.user_name}'s session?`
-                        : 'End this session?'
+                session={endTarget}
+                currentSession={
+                    onClockNow.find((row) => row.id === endTarget?.id) ?? null
                 }
-                description="This closes the open attendance session, ends any running break, and syncs a draft timesheet. The reason is recorded in the audit log."
-                label="Reason"
-                placeholder="e.g. Missed clock-out on Monday"
-                confirmLabel="End session"
-                onConfirm={(reason, done) => {
-                    if (!endTarget) return;
-                    router.post(
-                        `/attendance/sessions/${endTarget.id}/end`,
-                        { reason },
-                        {
-                            preserveScroll: true,
-                            onSuccess: () => setEndTarget(null),
-                            onError: (errs) =>
-                                toast.error(
-                                    errs.end_session ??
-                                        'Could not end the session.',
-                                ),
-                            onFinish: done,
-                        },
-                    );
-                }}
+                viewerId={auth?.user?.id ?? null}
+                canManage={canManageAny}
+                timezone={evidence?.timezone}
+                onClose={() => setEndTarget(null)}
             />
 
             {/* right-click menu host */}

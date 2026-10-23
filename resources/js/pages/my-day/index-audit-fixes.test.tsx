@@ -179,6 +179,23 @@ describe('My Day audit wiring', () => {
         mocks.props = baseProps();
     });
 
+    it('keeps a My Day return when reporting for the active shift', () => {
+        render(<MyDay />);
+        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
+        expect(mocks.routerVisit).toHaveBeenCalledWith(
+            '/incidents/create?shift_id=44&return_to=%2Fmy-day',
+        );
+    });
+
+    it('keeps a My Day return without inventing a shift when none is active', () => {
+        mocks.props = { ...baseProps(), active_shift: null };
+        render(<MyDay />);
+        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
+        expect(mocks.routerVisit).toHaveBeenCalledWith(
+            '/incidents/create?return_to=%2Fmy-day',
+        );
+    });
+
     it('keeps an ordinary due task in the work list without a duplicate warning banner', () => {
         const base = baseProps();
         mocks.props = {

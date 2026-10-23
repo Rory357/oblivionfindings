@@ -220,24 +220,33 @@ class ShiftReplacementService
         return $this->cancel($replacement, $actor);
     }
 
-    public function syncClaimFromOpenPosition(ShiftOpenPosition $position): void
+    public function syncClaimFromOpenPosition(ShiftOpenPosition $position,
+        ?array $currentEvidence = null, ?\Closure $checkedUpdate = null, ?\Closure $checkedTimeline = null): void
     {
-        $position = ShiftOpenPosition::query()
-            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
-            ->with(['replacementRequest', 'claimer', 'shift.client'])
-            ->find($position->id);
+        if ($currentEvidence === null) {
+            $position = ShiftOpenPosition::query()
+                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
+                ->with(['replacementRequest', 'claimer', 'shift.client'])
+                ->find($position->id);
+        } else {
+            $this->assertJobBoardEvidence($position, $currentEvidence, 'claim');
+        }
         if (! $position || ! $position->claimer || ! $position->shift) {
             return;
         }
 
-        $this->assertStaffEligibleForShiftSite($position->shift, $position->claimer);
+        if ($currentEvidence === null) {
+            $this->assertStaffEligibleForShiftSite($position->shift, $position->claimer);
+        }
 
         $replacement = $position->replacementRequest;
         if (! $replacement || ! in_array($replacement->status, [self::REQUESTED, self::CLAIMED], true)) {
             return;
         }
 
-        $eligibility = $this->eligibility->evaluate($position->shift, $position->claimer);
+        $eligibility = $currentEvidence === null
+            ? $this->eligibility->evaluate($position->shift, $position->claimer)
+            : $currentEvidence['decision']->result;
         if ($eligibility->hasBlocks()) {
             throw ValidationException::withMessages([
                 'claim' => $eligibility->blocking_reasons[0] ?? 'The claimant is no longer eligible for this Shift.',
@@ -253,7 +262,8 @@ class ShiftReplacementService
 
         $replacement->loadMissing(['shift.client:id,first_name,last_name,site_id', 'requester:id,name']);
 
-        $replacement->update([
+        $write = $checkedUpdate ?? static fn ($model, array $values) => $model->update($values);
+        $write($replacement, [
             'status' => self::CLAIMED,
             'replacement_user_id' => $position->claimed_by,
             'claimed_at' => $position->claimed_at ?? now(),
@@ -267,7 +277,8 @@ class ShiftReplacementService
             'Replacement claim submitted',
             $claimer?->name
                 ? $claimer->name.' has claimed this replacement request and is awaiting approval.'
-                : 'A replacement claim was submitted and is awaiting approval.'
+                : 'A replacement claim was submitted and is awaiting approval.',
+            $checkedTimeline
         );
 
         $freshReplacement = $replacement->fresh(['shift.client', 'requester', 'currentStaff', 'replacementStaff']);
@@ -293,8 +304,15 @@ class ShiftReplacementService
         ShiftOpenPosition $position,
         User $actor,
         ?AssignmentEligibilityDecision $eligibilityDecision = null,
+        ?array $currentEvidence = null,
+        ?\Closure $checkedUpdate = null,
+        ?\Closure $checkedTimeline = null,
     ): void {
-        $this->siteAccess->assertCanAccessShiftOpenPosition($actor, $position, ['reports.viewAny']);
+        if ($currentEvidence === null) {
+            $this->siteAccess->assertCanAccessShiftOpenPosition($actor, $position, ['reports.viewAny']);
+        } else {
+            $this->assertJobBoardEvidence($position, $currentEvidence, 'approve');
+        }
         if (! ($actor->canDo('job_board.approve') || $actor->canDo('shifts.manageAny'))) {
             throw ValidationException::withMessages([
                 'replacement' => 'You are not authorized to approve replacement claims.',
@@ -309,14 +327,16 @@ class ShiftReplacementService
         $replacement->loadMissing(['shift.client:id,first_name,last_name,site_id', 'currentStaff:id,name']);
         $this->assertReplacementStillActionable($replacement->shift);
 
-        $replacementUser = User::query()->find($position->claimed_by);
+        $replacementUser = $currentEvidence === null ? User::query()->find($position->claimed_by) : $currentEvidence['staff'];
         if (! $replacementUser) {
             throw ValidationException::withMessages([
                 'replacement' => 'The claimed staff member is no longer available.',
             ]);
         }
 
-        $this->assertStaffEligibleForShiftSite($replacement->shift, $replacementUser);
+        if ($currentEvidence === null) {
+            $this->assertStaffEligibleForShiftSite($replacement->shift, $replacementUser);
+        }
         $eligibilityDecision = $this->currentAssignmentDecision(
             $replacement->shift,
             $replacementUser,
@@ -334,14 +354,17 @@ class ShiftReplacementService
             return;
         }
 
-        $replacement->update([
+        $write = $checkedUpdate ?? static fn ($model, array $values) => $model->update($values);
+        $write($replacement, [
             'status' => self::APPROVED,
             'replacement_user_id' => $position->claimed_by,
             'approved_by' => $actor->id,
             'approved_at' => now(),
         ]);
 
-        $this->cancelOtherPositionsForShift($position->shift_id, $position->id);
+        if ($currentEvidence === null) {
+            $this->cancelOtherPositionsForShift($position->shift_id, $position->id);
+        } // The opt-in command already checked the exact canonical sibling cohort.
 
         $this->logTimelineEvent(
             $replacement->fresh(['shift.client', 'requester', 'currentStaff', 'replacementStaff']),
@@ -350,7 +373,8 @@ class ShiftReplacementService
             'Replacement approved',
             $replacementUser?->name
                 ? $replacementUser->name.' was approved as the replacement staff member.'
-                : 'The replacement request was approved.'
+                : 'The replacement request was approved.',
+            $checkedTimeline
         );
 
         $client = $replacement->shift?->client;
@@ -580,7 +604,8 @@ class ShiftReplacementService
         string $type,
         ?User $actor,
         string $subject,
-        ?string $body = null
+        ?string $body = null,
+        ?\Closure $checkedRecord = null
     ): void {
         $replacement->loadMissing([
             'shift.client:id,first_name,last_name,site_id',
@@ -594,7 +619,9 @@ class ShiftReplacementService
         $shift = $replacement->shift;
         $client = $shift?->client;
 
-        app(TimelineEmitter::class)->record([
+        $write = $checkedRecord ?? static fn (array $values) => app(TimelineEmitter::class)->record($values);
+
+        $write([
             'source_type' => ShiftReplacementRequest::class,
             'source_id' => $replacement->id,
             'occurred_at' => now(),
@@ -622,5 +649,25 @@ class ShiftReplacementService
             'visibility' => 'internal',
             'created_by' => $actor?->id,
         ]);
+    }
+
+    /** Internal opt-in only; transports cannot manufacture this locked model tuple. */
+    private function assertJobBoardEvidence(ShiftOpenPosition $position, array $evidence, string $action): void
+    {
+        if (DB::transactionLevel() < 1 || ! DB::connection()->getPdo()->inTransaction()
+            || ($evidence['connection'] ?? null) !== DB::connection() || ($evidence['pdo'] ?? null) !== DB::connection()->getPdo()
+            || ($evidence['position'] ?? null) !== $position || ($evidence['shift'] ?? null) !== $position->shift
+            || ($evidence['replacement'] ?? null) !== $position->replacementRequest
+            || ! (($evidence['actor'] ?? null) instanceof User) || ! (($evidence['staff'] ?? null) instanceof User)
+            || ! (($evidence['decision'] ?? null) instanceof AssignmentEligibilityDecision)
+            || ! $evidence['decision']->matches($position->shift, $evidence['staff'])
+            || ! $evidence['decision']->result || $evidence['decision']->result->hasBlocks()
+            || (int) $position->claimed_by !== (int) $evidence['staff']->id
+            || ! $evidence['actor']->isApproved()
+            || ($action === 'claim' && ((int) $evidence['actor']->id !== (int) $evidence['staff']->id
+                || ! ($evidence['actor']->canDo('job_board.claim') || $evidence['actor']->canDo('shifts.viewAssigned') || $evidence['actor']->canDo('shifts.manageAny'))))
+            || ($action === 'approve' && ! ($evidence['actor']->canDo('job_board.approve') || $evidence['actor']->canDo('shifts.manageAny')))) {
+            throw new \LogicException('Job Board replacement evidence is not the current command tuple.');
+        }
     }
 }
