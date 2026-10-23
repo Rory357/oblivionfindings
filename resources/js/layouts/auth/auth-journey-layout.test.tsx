@@ -14,7 +14,7 @@ vi.mock('@inertiajs/react', () => ({
     Link: ({
         href,
         ...props
-    }: AnchorHTMLAttributes<HTMLAnchorElement> & {
+    }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
         href: string | { url: string };
     }) => <a href={typeof href === 'string' ? href : href.url} {...props} />,
 }));

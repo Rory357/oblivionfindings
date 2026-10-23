@@ -29,7 +29,7 @@ vi.mock('@inertiajs/react', () => ({
     Link: ({
         href,
         ...props
-    }: AnchorHTMLAttributes<HTMLAnchorElement> & {
+    }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
         href: string | { url: string };
     }) => <a href={typeof href === 'string' ? href : href.url} {...props} />,
     Head: () => null,
@@ -136,6 +136,16 @@ it('retains the selected service when moving from its page into funding help', (
     // The three kinds of support, each reachable from the footer and cards.
     for (const id of ['home', 'community', 'respite'])
         expect(document.getElementById(id)).toBeInTheDocument();
+    // A section preselects its service only when the provider offers it.
+    expect(
+        screen.getByRole('link', { name: /Ask about support at home/ }),
+    ).toHaveAttribute(
+        'href',
+        '/referrals/new?purpose=support&service=supported_living',
+    );
+    expect(
+        screen.getByRole('link', { name: /Ask about in the community/ }),
+    ).toHaveAttribute('href', '/referrals/new?purpose=support');
 });
 
 it('shows the client photo in the home hero, a plain brand panel without one, and the islands only with no client branding', () => {

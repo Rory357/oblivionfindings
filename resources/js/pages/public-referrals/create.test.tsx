@@ -205,8 +205,9 @@ it('keeps website funding and service choices, requires safe contact, then saves
         data: { status: 'received', reference: 'REF-PREVIEW' },
     });
     begin();
+    // The page sits behind the open wizard (hidden from the a11y tree).
     expect(
-        screen.getByRole('radio', { name: /Help with funding/ }),
+        screen.getByRole('radio', { name: /Help with funding/, hidden: true }),
     ).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(screen.getByLabelText(/Your name/)).toHaveAttribute(

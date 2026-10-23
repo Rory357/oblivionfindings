@@ -423,6 +423,10 @@ function SupportPage({
     const { demo: isDemo } = usePublicSite();
     const servicePhoto = useServicePhoto();
     const { url } = usePage();
+    // A section's "Ask about …" preselects its service in the enquiry, but
+    // only when the provider's published settings offer that service.
+    const offeredServiceId = (id: string) =>
+        provider.services.some((offered) => offered.id === id) ? id : undefined;
 
     // /services#respite (footer and card links) lands on that section.
     useEffect(() => {
@@ -563,7 +567,7 @@ function SupportPage({
                                     <Link
                                         href={enquiryUrl(
                                             'support',
-                                            service?.id,
+                                            offeredServiceId(item.serviceId),
                                         )}
                                     >
                                         Ask about{' '}

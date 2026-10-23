@@ -120,6 +120,9 @@ export const journey = [
 export const services = [
     {
         key: 'home',
+        // The referral settings service this section asks about, when the
+        // provider offers it (the demo's ids; a client's own may differ).
+        serviceId: 'supported_living',
         title: 'Support at home',
         icon: 'Home',
         summary:
@@ -137,6 +140,7 @@ export const services = [
     },
     {
         key: 'community',
+        serviceId: 'community_support',
         title: 'In the community',
         icon: 'Trees',
         summary:
@@ -154,6 +158,7 @@ export const services = [
     },
     {
         key: 'respite',
+        serviceId: 'short_breaks',
         title: 'Short breaks (respite)',
         icon: 'BedDouble',
         summary:

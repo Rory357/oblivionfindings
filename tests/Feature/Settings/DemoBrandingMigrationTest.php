@@ -104,7 +104,8 @@ it('fills only the empty settings on an unbranded install, keeping a colour a pe
 
     $settings = demoBrandingSettings();
     expect($settings['branding.name'])->toBe('Oblivion Living')
-        ->and($settings['theme.light'])->toBe(['--primary' => '#a16207', '--radius' => '0.5rem'])
+        // MySQL reorders JSON object keys, so compare without order.
+        ->and($settings['theme.light'])->toEqual(['--primary' => '#a16207', '--radius' => '0.5rem'])
         ->and($settings)->not->toHaveKey('theme.dark')
         ->and($settings[BrandHeroPhoto::PATH_SETTING])->toStartWith('branding/hero-');
 });

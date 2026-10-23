@@ -1,6 +1,7 @@
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import { usePublicSite, type SiteNavKey } from '@/components/public-site/site';
+import { ownTitle } from '@/lib/page-title';
 import { Head } from '@inertiajs/react';
 import { useRef, type ReactNode } from 'react';
 
@@ -37,7 +38,8 @@ export default function PublicSiteLayout({
     return (
         <div className="journey-site">
             <Head>
-                <title>{fullTitle}</title>
+                {/* The client's own site: no app-name suffix. */}
+                <title>{ownTitle(fullTitle)}</title>
                 <meta name="description" content={description} />
                 <meta property="og:title" content={fullTitle} />
                 <meta property="og:description" content={description} />
