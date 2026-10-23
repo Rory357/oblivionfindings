@@ -467,7 +467,7 @@ export default function HandoversShow({ handover }: Props) {
                                     {personName(handover.submitter)}
                                 </Fact>
                                 <Fact label="Acknowledged by">
-                                    {personName(handover.acknowledger)}
+                                    {handover.acknowledger?.name ?? 'Not yet'}
                                 </Fact>
                             </CardContent>
                         </Card>
