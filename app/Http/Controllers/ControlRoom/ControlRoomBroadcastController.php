@@ -7,8 +7,10 @@ use App\Jobs\Notifications\DeliverBroadcastCommunicationJob;
 use App\Models\ControlRoom\Communication;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\BroadcastRecipientLedger;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -165,12 +167,24 @@ class ControlRoomBroadcastController extends Controller
             }
         }
 
-        // Bulk insert in chunks, then dispatch a delivery job for each row.
-        // We query the freshly-inserted IDs instead of relying on insertGetId()
-        // because bulk insert doesn't return IDs reliably across DB drivers.
-        foreach (array_chunk($records, 500) as $chunk) {
-            Communication::insert($chunk);
-        }
+        // Bulk insert in chunks and record the broadcast intent ledger in the same
+        // transaction (in-app recipients read their message through it), then
+        // dispatch a delivery job for each row. We query the freshly-inserted IDs
+        // instead of relying on insertGetId() because bulk insert doesn't return
+        // IDs reliably across DB drivers.
+        DB::transaction(function () use ($records, $user, $broadcastGroupId, $validated, $channels, $targetRoles, $sendToAll, $forceDelivery, $targetUsers, $now): void {
+            foreach (array_chunk($records, 500) as $chunk) {
+                Communication::insert($chunk);
+            }
+            app(BroadcastRecipientLedger::class)->record($user, $broadcastGroupId, [
+                'content' => $validated['content'],
+                'channels' => $channels,
+                'target_roles' => $targetRoles,
+                'send_to_all' => $sendToAll,
+                'template' => $validated['template'] ?? null,
+                'force_delivery' => $forceDelivery,
+            ], $targetUsers, $now);
+        });
 
         Communication::query()
             ->where('broadcast_group_id', $broadcastGroupId)

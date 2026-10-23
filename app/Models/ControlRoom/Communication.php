@@ -46,6 +46,11 @@ class Communication extends Model
         'superseded_at' => 'datetime',
         'notification_payload' => 'array',
         'force_delivery' => 'boolean',
+        'broadcast_attempt_count' => 'integer',
+        'broadcast_attempt_started_at' => 'immutable_datetime',
+        'broadcast_outcome_at' => 'immutable_datetime',
+        'broadcast_next_attempt_at' => 'immutable_datetime',
+        'broadcast_outcome' => 'array',
     ];
 
     /**
@@ -84,3 +89,4 @@ class Communication extends Model
         return $this->belongsTo(User::class, 'initiated_by_user_id');
     }
 }
+

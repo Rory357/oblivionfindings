@@ -78,6 +78,8 @@ interface Course {
     cost: number | null;
     is_mandatory: boolean;
     is_active: boolean;
+    /** Its certificates prove first-aid cover, so archiving it needs a warning. */
+    counts_for_first_aid: boolean;
     requires_renewal: boolean;
     validity_period_months: number | null;
     cpd_points: number | null;
@@ -246,6 +248,10 @@ type SheetSession = SheetData['sessions'][number];
 
 /** TrainingController::cancelSession — reason nullable, max 500. */
 const SESSION_CANCEL_REASON_MAX = 500;
+
+/** NzsAssuranceResolver only counts certificates from active first-aid courses. */
+const FIRST_AID_ARCHIVE_WARNING =
+    "Certificates from this course stop counting towards first-aid cover, so Sites will show first-aid cover as needing action until it's active again.";
 
 export default function TrainingHub({
     summary,
@@ -527,6 +533,15 @@ export default function TrainingHub({
         window.location.href = `/hr/training/export?type=${type}`;
     };
     const bulkArchive = () => setBulkArchiveIds(selected);
+    // Active first-aid courses in the selection; archiving them drops cover.
+    const bulkFirstAidTitles = courses
+        .filter(
+            (c) =>
+                bulkArchiveIds?.includes(c.id) &&
+                c.is_active &&
+                c.counts_for_first_aid,
+        )
+        .map((c) => c.title);
     const confirmBulkArchive = () => {
         if (bulkArchiveIds === null) return;
         router.post(
@@ -2000,15 +2015,21 @@ export default function TrainingHub({
                 onConfirm={confirmArchiveCourse}
                 title="Archive this course?"
                 description={
-                    <>
-                        <span className="font-medium text-foreground">
-                            {courseToArchive?.title}
-                        </span>{' '}
-                        is marked inactive. It stays in the catalogue, and its
-                        sessions, assignments and training records are kept. New
-                        starters are no longer enrolled in it during induction.
-                        You can activate it again from its menu.
-                    </>
+                    <div className="space-y-2">
+                        <p>
+                            <span className="font-medium text-foreground">
+                                {courseToArchive?.title}
+                            </span>{' '}
+                            is marked inactive. It stays in the catalogue, and
+                            its sessions, assignments and training records are
+                            kept. New starters are no longer enrolled in it
+                            during induction.
+                        </p>
+                        {courseToArchive?.counts_for_first_aid ? (
+                            <p>{FIRST_AID_ARCHIVE_WARNING}</p>
+                        ) : null}
+                        <p>You can activate it again from its menu.</p>
+                    </div>
                 }
                 confirmText="Archive course"
                 variant="destructive"
@@ -2026,9 +2047,40 @@ export default function TrainingHub({
                         : `Archive ${bulkArchiveIds?.length ?? 0} courses?`
                 }
                 description={
-                    bulkArchiveIds?.length === 1
-                        ? 'The selected course is marked inactive. It stays in the catalogue, and its sessions, assignments and training records are kept. New starters are no longer enrolled in it during induction. You can activate it again from its menu.'
-                        : `The ${bulkArchiveIds?.length ?? 0} selected courses are marked inactive. They stay in the catalogue, and their sessions, assignments and training records are kept. New starters are no longer enrolled in them during induction. You can activate each one again from its menu.`
+                    bulkArchiveIds?.length === 1 ? (
+                        <div className="space-y-2">
+                            <p>
+                                The selected course is marked inactive. It stays
+                                in the catalogue, and its sessions, assignments
+                                and training records are kept. New starters are
+                                no longer enrolled in it during induction.
+                            </p>
+                            {bulkFirstAidTitles.length > 0 ? (
+                                <p>{FIRST_AID_ARCHIVE_WARNING}</p>
+                            ) : null}
+                            <p>You can activate it again from its menu.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <p>
+                                The {bulkArchiveIds?.length ?? 0} selected
+                                courses are marked inactive. They stay in the
+                                catalogue, and their sessions, assignments and
+                                training records are kept. New starters are no
+                                longer enrolled in them during induction.
+                            </p>
+                            {bulkFirstAidTitles.length > 0 ? (
+                                <p>
+                                    {bulkFirstAidTitles.length === 1
+                                        ? `${bulkFirstAidTitles[0]} counts towards first-aid cover. Its certificates stop counting, so Sites will show first-aid cover as needing action until it's active again.`
+                                        : `${bulkFirstAidTitles.join(', ')} count towards first-aid cover. Their certificates stop counting, so Sites will show first-aid cover as needing action until they're active again.`}
+                                </p>
+                            ) : null}
+                            <p>
+                                You can activate each one again from its menu.
+                            </p>
+                        </div>
+                    )
                 }
                 confirmText={
                     bulkArchiveIds?.length === 1
