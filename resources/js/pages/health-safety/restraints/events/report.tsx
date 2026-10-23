@@ -1,14 +1,23 @@
+/**
+ * Record a restrictive intervention, or add a behaviour-support plan, as a
+ * full page (approved H&S drawings pg-hsn-103, 103b). The capture forms are
+ * unchanged — their fields, checks, prescoping (a Respite stay locks the
+ * person and Site) and unsaved-draft guard all stay; this page only frames
+ * them: the header, the switch between the two (for people who may create
+ * plans) and one card.
+ */
 import { RestraintEventCommandForm } from '@/components/health-safety/restraints/event-command-form';
 import { BehaviourSupportPlanCommandForm } from '@/components/health-safety/restraints/plan-command-form';
 import type { RestraintPickers } from '@/components/health-safety/restraints/types';
 import { PageHeader, PageHeaderRail, PageLayout } from '@/components/page';
-import { Card, CardContent } from '@/components/ui/card';
+import { Surface } from '@/components/signature/blocks';
 import {
     SafetyFormDraftContext,
     useSafetyWorkspaceDrafts,
 } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
 import {
+    RESTRAINT_REGISTER,
     restraintPositive,
     restraintReturn,
 } from '@/lib/health-safety/restraint-navigation';
@@ -56,89 +65,89 @@ export default function RestraintReport({
         locked: !!capture_context,
     };
     const checkHref =
-        path +
-        '?' +
-        new URLSearchParams({ ...Object.fromEntries(query), kind });
+        path + '?' + new URLSearchParams({ ...Object.fromEntries(query), kind });
     const cancel = () => drafts.request(() => router.get(returnTo));
+    const title =
+        kind === 'plan'
+            ? 'Add behaviour-support plan'
+            : 'Record restrictive intervention';
+    // The register crumb only when the person came from it (reporters may not have register access).
+    const fromRegister = returnTo.startsWith(RESTRAINT_REGISTER);
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title:
-                        kind === 'plan'
-                            ? 'Create behaviour-support plan'
-                            : 'Record restrictive intervention',
-                    href: url,
-                },
+                ...(fromRegister
+                    ? [
+                          { title: 'Health & safety', href: '/health-safety' },
+                          {
+                              title: 'Safety registers',
+                              href: '/health-safety/registers',
+                          },
+                          {
+                              title: 'Restrictive interventions',
+                              href: returnTo,
+                          },
+                      ]
+                    : []),
+                { title, href: url },
             ]}
         >
-            <Head
-                title={
-                    kind === 'plan'
-                        ? 'Create behaviour-support plan'
-                        : 'Record restrictive intervention'
-                }
-            />
+            <Head title={title} />
             <SafetyFormDraftContext.Provider value={drafts.register}>
                 <PageLayout
                     hero={
                         <PageHeader
                             variant="profile"
-                            frontline
                             wrapTitle
                             backHref={returnTo}
                             icon={kind === 'plan' ? BookOpen : ShieldAlert}
-                            title={
-                                kind === 'plan'
-                                    ? 'Create behaviour-support plan'
-                                    : 'Record restrictive intervention'
-                            }
+                            title={title}
                             subline={
                                 capture_context
                                     ? 'Record facts for this person’s current Respite stay. Review and approval retain their own permissions.'
-                                    : 'Record actual facts, then continue each review and approval in its own workspace.'
+                                    : kind === 'plan'
+                                      ? 'Saves a draft · review and approval happen on the plan’s own page'
+                                      : 'Record actual facts, then continue each review and approval in its own workspace.'
                             }
                             rail={
-                                <PageHeaderRail
-                                    items={[
-                                        {
-                                            key: 'event',
-                                            label: 'Intervention',
-                                            icon: ShieldAlert,
-                                        },
-                                        ...(can.create_plan
-                                            ? [
-                                                  {
-                                                      key: 'plan',
-                                                      label: 'Behaviour-support plan',
-                                                      icon: BookOpen,
-                                                  },
-                                              ]
-                                            : []),
-                                    ]}
-                                    value={kind}
-                                    onChange={(next) =>
-                                        drafts.request(() => {
-                                            const target = new URLSearchParams(
-                                                query,
-                                            );
-                                            target.set('kind', next);
-                                            router.replace({
-                                                url: path + '?' + target,
-                                                preserveState: true,
-                                                preserveScroll: true,
-                                            });
-                                        })
-                                    }
-                                    ariaLabel="Safety capture type"
-                                />
+                                can.create_plan ? (
+                                    <PageHeaderRail
+                                        items={[
+                                            {
+                                                key: 'event',
+                                                label: 'Intervention',
+                                                icon: ShieldAlert,
+                                            },
+                                            {
+                                                key: 'plan',
+                                                label: 'Behaviour-support plan',
+                                                icon: BookOpen,
+                                            },
+                                        ]}
+                                        value={kind}
+                                        showFind={false}
+                                        onSelect={(next) =>
+                                            drafts.request(() => {
+                                                const target =
+                                                    new URLSearchParams(query);
+                                                target.set('kind', next);
+                                                router.replace({
+                                                    url: path + '?' + target,
+                                                    preserveState: true,
+                                                    preserveScroll: true,
+                                                });
+                                            })
+                                        }
+                                        ariaLabel="Safety capture type"
+                                    />
+                                ) : undefined
                             }
                         />
                     }
                 >
-                    <Card>
-                        <CardContent className="p-5 sm:p-6">
+                    <Surface aria-label={title}>
+                        <div className="p-5 sm:p-6">
                             {kind === 'plan' ? (
                                 <BehaviourSupportPlanCommandForm
                                     key="create-plan"
@@ -151,9 +160,7 @@ export default function RestraintReport({
                                     returnTo={returnTo}
                                     onCancel={cancel}
                                     onDone={(href) =>
-                                        router.get(
-                                            href ?? plan_href ?? returnTo,
-                                        )
+                                        router.get(href ?? plan_href ?? returnTo)
                                     }
                                 />
                             ) : (
@@ -174,8 +181,8 @@ export default function RestraintReport({
                                     }
                                 />
                             )}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </Surface>
                 </PageLayout>
                 {drafts.confirmation}
             </SafetyFormDraftContext.Provider>

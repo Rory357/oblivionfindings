@@ -40,6 +40,7 @@ export function RecordTable<T>({
     columns,
     rows,
     rowKey,
+    rowId,
     onOpen,
     canOpen,
     actionsFor,
@@ -59,6 +60,8 @@ export function RecordTable<T>({
     columns: RecordTableColumn<T>[];
     rows: T[];
     rowKey: (row: T) => string | number;
+    /** A DOM id per row, so a link can focus one record (`#restraint-followup-4`). */
+    rowId?: (row: T) => string;
     onOpen?: (row: T) => void;
     /** Rows that may not open (a restricted, need-to-know row) stay plain: no pointer, no focus, no click. */
     canOpen?: (row: T) => boolean;
@@ -130,7 +133,8 @@ export function RecordTable<T>({
                             return (
                                 <TableRow
                                     key={rowKey(row)}
-                                    tabIndex={open ? 0 : undefined}
+                                    id={rowId?.(row)}
+                                    tabIndex={open ? 0 : rowId ? -1 : undefined}
                                     onClick={open ? () => open(row) : undefined}
                                     onKeyDown={
                                         open
