@@ -131,7 +131,7 @@ The last run, through the heavy-lock with ffprobe 8.1.1 configured, passed 203 t
   - 67 hand-built bad files, one per rule, each asserting the rule that failed (Vorbis included);
   - Opus R1 to R7 cases;
   - the parts and time limits;
-  - four hostile 20 MiB files, each blocked in under 2 s (one is the checker's padding file from F3);
+  - eight hostile files of up to 20 MiB, each finished in under 2 s with under 48 MiB of working memory. They include the checker's padding file (F3), many-`mdat` file (F5) and many-`free`-box file (F6);
   - CRC equality.
 - **Mutation test:** `ChatVoiceMutationTest` runs 10,000 cases with a fixed seed, in about 50 s. None threw, the slowest file took 0.03 s, and no provably broken file passed. A file counts as provably broken when:
   - any Ogg file is changed (CRCs plus the end page);
@@ -160,6 +160,19 @@ The checker session (`claude/voice-checker-signoff-49310d`) found the code clean
   - A 20 MiB packet of 0xFF padding bytes took 1.1–1.2 s; it now takes 0.01 s.
   - The checker's hostile file (400,000 small blocks, then that packet) is a new worst-case test.
 - **F4, fragment sample-description indexes.** `trex` and `tfhd` must now name sample entry 1, the only one in `stsd`. New test: `mp4_sample_entries`.
+
+The recheck after `98ed39a95` confirmed F1–F4 and found two older MP4 problems, fixed after it:
+
+- **F5, an MP4 could pass the 2-second limit.** Each sample range was matched against the `mdat` list by scanning it from the start: 4.5–5.1 s for 100,000 chunks in the last of 300,000 `mdat` boxes.
+  - Top-level boxes come in file order and cannot overlap, so the right `mdat` is now found by halving the list.
+  - Plain files check each chunk as soon as it is read; only fragment runs wait for the end of the file.
+  - The same file now takes 0.3–0.5 s.
+- **F6, an MP4 could use about 280 MiB.** Child boxes were collected into a list before they were walked.
+  - Children are now walked one at a time.
+  - `mdat` positions and waiting fragment ranges are packed into strings, 16 bytes each.
+  - The checker's 900,000-`free`-box file now needs 0.4 MiB of working memory. The worst MP4 the parts limit allows, about a million `mdat` boxes, needs 16 MiB.
+- **New limit in the tests:** every hostile 20 MiB test file now asserts under 2 s and under 48 MiB of working memory beyond the file itself. The most any of them uses is 20 MiB: an Ogg file whose single packet spans every page.
+- **Test repair:** the five-million-entry size-table file had been refused before reaching its table, because it lacked the `smhd`/`dinf` boxes made mandatory under decision 20. It is rebuilt on a complete movie.
 
 ## Open questions
 
