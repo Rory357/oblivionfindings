@@ -77,7 +77,7 @@ New status key? Add it to `status-colors.ts` once; it's used on 50+ pages.
 | Frontline/staff mobile pages | `layouts/staff-page-shell.tsx` (+ `staff-bottom-nav`, `.staff-shell-content`, `.frontline-sticky-footer`, `.frontline-header-inset` safe-area helpers from `app.css`) |
 | Auth screens | `layouts/auth/auth-journey-layout.tsx` (the Journey half-and-half; see Recurring patterns) |
 | Settings pages | `layouts/settings/layout.tsx` |
-| Marketing pages | `layouts/marketing-layout.tsx` |
+| Public website (the client's own site) | `layouts/marketing-layout.tsx` (`PublicSiteLayout`) with `components/public-site/` and `resources/css/journey-site.css` — see Recurring patterns |
 
 **The global shell chrome (approved 2026-09-05).** The top bar +
 sidebar follow `design_styles/APP_SHELL_STYLE_GUIDE.md` — the "Event
@@ -161,12 +161,43 @@ meter row).
   Settings › Branding recolours them. Identity follows branding: no custom
   branding shows the Journey mark and "oblivion care"; an uploaded logo shows
   that logo (its "logo for dark backgrounds" version on ink); a custom name
-  alone shows the name without our mark, with "Powered by oblivion care". The
-  islands artwork stays for every client. Staff sign-in asks for the email
-  first and sends organisation domains to their provider. Family sign-in
-  offers the emailed sign-in link first. The journey animation plays once,
-  only while a sign-in is sent. Mockups: the "Sign-in redesign" canvas
-  (claude.ai/artifact/TKAEX7134Dgt5zp7ehDuHn), boards marked "chosen".
+  alone shows the name without our mark, with "Powered by oblivion care".
+  **With client branding the brand half is the client's (Stephan, 21 Oct
+  2026, mockup v2):** their website and sign-in photo from Settings ›
+  Branding under two ink scrims (≥ 72 % behind the top band, ≥ 90 % behind
+  the welcome block), or a plain brand-colour panel when there is no photo.
+  The islands artwork and its journey animation are only Oblivion's own
+  default, with no client branding at all. Over a photo the family headline
+  is "Kia ora, whānau. / Good to see you." Both sign-in pages have "Back to
+  website" at the top (at the top of the form on phones). Staff sign-in asks
+  for the email first ("Your work email") and sends organisation domains to
+  their provider. Family sign-in offers the emailed sign-in link first. The
+  journey animation plays once, only while a sign-in is sent. Mockups: the
+  "Sign-in redesign" canvas (claude.ai/artifact/TKAEX7134Dgt5zp7ehDuHn),
+  boards marked "chosen"; `docs/referrals/mockup-v2/` for the photo half.
+
+- **The public website is the client's own site (approved by Stephan
+  23 Oct 2026, mockup v2 in `docs/referrals/mockup-v2/`).** It speaks as the
+  provider ("we"), never as Oblivion Care. Every public page — home, Our
+  support, Funding help, About us, Careers, Contact us, Make a referral,
+  secure upload and the footer pages — uses `PublicSiteLayout`
+  (`layouts/marketing-layout.tsx`): one ink band holding the site header and
+  the page intro (`PageIntro`), and one footer. Header: Our support · Funding
+  help · About us · Careers · Contact us, then Sign in and the primary "Make
+  a referral"; the full nav from 1280 px, a menu with the horizon line below
+  that. The footer carries one small "Powered by oblivion care" line when the
+  site has client branding. Build pages from `components/public-site/`
+  (`SitePhoto`, `Lens`, `RadioTiles` tile pickers, `Pathway`, `PlanPathway`,
+  `SafeContactBand`, `EmergencyNote`) and the `.journey-site-*` classes in
+  `resources/css/journey-site.css`. The provider's name comes from
+  `usePublicSite()` (Settings › Branding, then Settings › Referrals) and is
+  null rather than "Oblivion Care". Photos: the home hero and sign-in use the
+  Settings › Branding photo; a client without one gets a plain brand-colour
+  panel (`.journey-site-panel`). Our demo photos and the fictional provider's
+  facts (`content.ts` `demo`) show only on a demo server
+  (`config('demo.site')`, shared as `demoSite`). Public tap targets are 44 px
+  (`.frontline-tap` or `min-h-[44px]`), and Make a referral is tile pickers
+  on the page, then the 1100 px `WizardShell`.
 
 - **Calendars — always the Site Calendar style** (approved 2026-09-13).
   `resources/js/pages/sites/calendar/SiteCalendar.tsx` and `_parts.tsx`
@@ -377,7 +408,20 @@ before.
   photo background, plain token cards or the shell's ring wordmark. Brand-facing
   screens use the Oblivion Care Journey identity through
   `auth-journey-layout.tsx` (Recurring patterns). Don't add a giant stacked
-  wordmark (rejected as Option D) or looping decorative motion.
+  wordmark (rejected as Option D) or looping decorative motion. The one photo
+  allowed is the client's own website and sign-in photo, which the layout
+  draws in its brand half under the approved scrims (Stephan, 21 Oct 2026).
+- **Oblivion identity on a client's site** (corrected 20–23 Oct 2026, client
+  demo website) — "Oblivion Care" as a fallback provider name, an
+  `@oblivioncare.co.nz` placeholder, our demo photos, or the NZ islands art on
+  a site or sign-in page that carries a client's branding. The public website
+  and the sign-in pages are the client's: the name comes from Settings ›
+  Branding or Settings › Referrals and reads neutrally when unset; a client
+  without a photo gets a plain brand-colour panel; the islands are only
+  Oblivion's own default; "Powered by oblivion care" is the one mention.
+  ESLint (`design/no-oblivion-fallback`) blocks an "Oblivion Care" string in
+  the public site and sign-in layout files (the screen-reader text of the
+  Powered by line is JSX text, which it allows).
 - **Raw palette classes / inline hex** — bypasses rebranding; ESLint blocks it.
 - **Hardcoded hues inside CSS utilities** — ESLint only sees classNames, so
   hex hiding in `app.css` rules or `style={{}}` props escapes it. Known

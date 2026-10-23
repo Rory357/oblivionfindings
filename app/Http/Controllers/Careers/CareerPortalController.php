@@ -11,6 +11,7 @@ use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\RecruitmentService;
+use App\Domain\Referrals\Services\PublicProviderWebsite;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
@@ -90,6 +91,7 @@ class CareerPortalController extends Controller
             ->values();
 
         return Inertia::render('careers/index', [
+            'provider' => $this->provider(),
             'jobs' => $jobs,
             'options' => [
                 'position_roles' => $roleOptions,
@@ -105,7 +107,19 @@ class CareerPortalController extends Controller
         ]);
     }
 
+    /** The public job page. The apply wizard opens from it. */
+    public function show(Request $request, HrJobRequisition $job)
+    {
+        return $this->renderJob($request, $job, openApply: false);
+    }
+
+    /** The same job page with the apply wizard already open. */
     public function showApply(Request $request, HrJobRequisition $job)
+    {
+        return $this->renderJob($request, $job, openApply: true);
+    }
+
+    private function renderJob(Request $request, HrJobRequisition $job, bool $openApply)
     {
         if ($job->status !== 'published') {
             abort(404);
@@ -118,6 +132,7 @@ class CareerPortalController extends Controller
         $job->load('site:id,name');
 
         return Inertia::render('careers/apply', [
+            'provider' => $this->provider(),
             'job' => [
                 'id' => $job->id,
                 'title' => $job->title,
@@ -137,12 +152,46 @@ class CareerPortalController extends Controller
                     'id' => $job->site->id,
                     'name' => $job->site->name,
                 ] : null,
+                'pay' => $this->publicPay($job),
                 'closing_at' => optional($job->closing_at)->toDateString(),
             ],
+            'openApply' => $openApply,
             'trackingDefaults' => [
                 'source_channel' => (string) $request->query('source', 'career_page'),
             ],
         ]);
+    }
+
+    /** The provider's public details for the site header and footer. */
+    private function provider(): array
+    {
+        return app(PublicProviderWebsite::class)->content();
+    }
+
+    /**
+     * The pay line for the public job page, only when the requisition is set
+     * to show its salary on the ad. Requisitions store a bare amount, so the
+     * unit is read from its size: an amount under $500 is an hourly rate.
+     */
+    private function publicPay(HrJobRequisition $job): ?string
+    {
+        if (! $job->show_salary) {
+            return null;
+        }
+
+        $min = $job->salary_range_min !== null ? (float) $job->salary_range_min : null;
+        $max = $job->salary_range_max !== null ? (float) $job->salary_range_max : null;
+        if ($min === null && $max === null) {
+            return null;
+        }
+
+        $hourly = max($min ?? 0, $max ?? 0) < 500;
+        $format = fn (float $amount) => '$'.number_format($amount, $hourly ? 2 : 0);
+        $range = $min !== null && $max !== null && $min !== $max
+            ? $format($min).' to '.$format($max)
+            : $format($min ?? $max);
+
+        return $range.($hourly ? ' an hour' : ' a year');
     }
 
     public function submitApplication(Request $request, HrJobRequisition $job)
@@ -169,6 +218,12 @@ class CareerPortalController extends Controller
             'screening_answers' => ['nullable', 'array', 'max:50'],
             'screening_answers.*.question' => ['required_with:screening_answers', 'string', 'max:1000'],
             'screening_answers.*.answer' => ['nullable', 'string', 'max:5000'],
+            // Work readiness (the apply wizard's Experience and Right to work
+            // steps). Optional, so older forms and API callers keep working.
+            'experience_summary' => ['nullable', 'string', 'max:2000'],
+            'years_of_experience' => ['nullable', 'string', Rule::in(HrApplication::YEARS_OF_EXPERIENCE)],
+            'right_to_work_status' => ['nullable', 'string', Rule::in(HrApplication::RIGHT_TO_WORK_STATUSES)],
+            'driver_licence_class' => ['nullable', 'string', Rule::in(HrApplication::DRIVER_LICENCE_CLASSES)],
         ]);
 
         // Keep only configured questions, in the requisition's order — never trust
@@ -208,6 +263,10 @@ class CareerPortalController extends Controller
                 'position_role' => $job->position_role,
                 'target_site_id' => $job->site_id,
                 'cover_letter' => $validated['cover_letter'] ?? null,
+                'experience_summary' => $validated['experience_summary'] ?? null,
+                'years_of_experience' => $validated['years_of_experience'] ?? null,
+                'right_to_work_status' => $validated['right_to_work_status'] ?? null,
+                'driver_licence_class' => $validated['driver_licence_class'] ?? null,
                 'requisition_id' => $job->id,
                 'interview_kit_id' => $job->default_interview_kit_id,
                 'screening_answers' => $screeningAnswers !== [] ? $screeningAnswers : null,
