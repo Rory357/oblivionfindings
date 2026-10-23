@@ -93,9 +93,11 @@ class MyHrScheduleReadTest extends TestCase
 
     public function test_worker_timezone_falls_back_to_app_timezone_with_an_exclusive_next_midnight(): void
     {
-        config(['app.worker_timezone' => null, 'app.timezone' => 'UTC']);
         Carbon::setTestNow(Carbon::parse('2026-10-21 23:00:00', 'UTC'));
         $next = $this->shift($this->worker, '2026-10-22 13:00', '2026-10-22 14:00');
+        // Only the My HR read runs without a worker timezone; saving a Shift runs
+        // app-wide observers that rely on the configured one (always set in production).
+        config(['app.worker_timezone' => null, 'app.timezone' => 'UTC']);
         // These are 00:00 and 01:00 UTC on 22 Oct: the next UTC day.
         $response = $this->overview();
         $this->assertNull($response->inertiaProps('overview.todayShift'));
