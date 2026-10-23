@@ -22,9 +22,10 @@ export default function SafeWorkProcedureShow({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Safe work procedures', href: PROCEDURE_REGISTER },
                 {
-                    title: detail.reference_number ?? 'Procedure',
+                    title: detail.title || detail.reference_number || 'Procedure',
                     href: procedureHref(detail.id),
                 },
             ]}

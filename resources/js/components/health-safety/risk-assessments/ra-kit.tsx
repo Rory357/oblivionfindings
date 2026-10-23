@@ -198,6 +198,71 @@ export function AcceptableBadge({ value }: { value: boolean | null }) {
     return <StatusBadge variant={tone}>{value ? 'Yes' : 'No'}</StatusBadge>;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Drawn register parts (pg-hsn-61, 62)                               */
+/* ------------------------------------------------------------------ */
+
+/** The drawings' plain status words ("Replaced" for a superseded version). */
+export function raStatusLabel(status: RaStatus): string {
+    return status === 'superseded' ? 'Replaced' : statusMeta(status).label;
+}
+
+/** One status badge in the drawing's words. */
+export function RaStatusBadge({ status }: { status: RaStatus }) {
+    return (
+        <StatusBadge variant={statusMeta(status).tone}>
+            {raStatusLabel(status)}
+        </StatusBadge>
+    );
+}
+
+export function attachTypeLabel(type: AttachType): string {
+    return {
+        site: 'Site',
+        client: 'Client',
+        event: 'Safety review',
+        standalone: 'Standalone',
+    }[type];
+}
+
+/** A score and its band in one badge ("16 · Extreme"). */
+export function LevelBadge({ score, level }: { score: number; level: RaLevel }) {
+    return (
+        <StatusBadge variant={levelTone(level)}>
+            <span className="tabular-nums">{score}</span> · {cap(level)}
+        </StatusBadge>
+    );
+}
+
+/** When the next review is due, as one badge or a plain date. */
+export function ReviewDue({
+    state,
+    dueAt,
+    status,
+}: {
+    state: ReviewState;
+    dueAt: string | null;
+    status?: RaStatus;
+}) {
+    if (status === 'superseded' || status === 'archived')
+        return <span className="text-muted-foreground">—</span>;
+    if (state.kind === 'overdue')
+        return <StatusBadge variant="critical">Overdue</StatusBadge>;
+    if (state.kind === 'today')
+        return <StatusBadge variant="warning">Due today</StatusBadge>;
+    if (state.kind === 'soon')
+        return (
+            <StatusBadge variant="warning">
+                {state.days === 1 ? 'Due in 1 day' : `Due in ${state.days} days`}
+            </StatusBadge>
+        );
+    return (
+        <span className="text-foreground">
+            {dueAt ? fmtDate(dueAt) : 'Not scheduled'}
+        </span>
+    );
+}
+
 /** Review-due flag: red overdue / amber due-soon / plain date / em-dash. */
 export function ReviewBadge({
     state,

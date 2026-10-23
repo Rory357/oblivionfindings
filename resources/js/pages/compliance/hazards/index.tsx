@@ -13,6 +13,7 @@ export default function ComplianceHazardsIndex(props: HazardRegisterData) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Hazards', href: '/compliance/hazards' },
             ]}
         >

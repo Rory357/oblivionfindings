@@ -22,9 +22,10 @@ export default function DrillShow({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Emergency drills', href: DRILL_REGISTER },
                 {
-                    title: detail.reference,
+                    title: detail.title || detail.reference,
                     href: drillHref(detail.id),
                 },
             ]}

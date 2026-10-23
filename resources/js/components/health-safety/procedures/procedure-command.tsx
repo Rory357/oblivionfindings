@@ -1,7 +1,8 @@
+import { Note, Surface } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Field, InfoCard } from '@/components/wizard/primitives';
+import { Field } from '@/components/wizard/primitives';
 import { useSafetyForm } from '@/hooks/use-safety-workspace-drafts';
 import {
     PROCEDURE_REGISTER,
@@ -75,7 +76,7 @@ export function ProcedureCommand({
     const hasNote = noteRequired || command === 'approve';
     return (
         <form
-            className="space-y-5"
+            className="grid min-w-0 gap-5"
             onSubmit={(event) => {
                 event.preventDefault();
                 if (form.processing || !procedureCommandAllowed(d, command))
@@ -148,10 +149,11 @@ export function ProcedureCommand({
                 );
             }}
         >
-            <h2 className="text-section-title">
-                {PROCEDURE_COMMAND_LABELS[command]}
-            </h2>
-            <InfoCard icon={Info}>{descriptions[command]}</InfoCard>
+            <Note tone={command === 'archive' ? 'warning' : undefined} icon={Info}>
+                {descriptions[command]}
+            </Note>
+            <Surface title={PROCEDURE_COMMAND_LABELS[command]}>
+            <div className="grid gap-4 px-[18px] pt-3 pb-4">
             {hasNote && (
                 <Field
                     label={
@@ -214,10 +216,19 @@ export function ProcedureCommand({
                     ))}
                 </div>
             )}
-            <div className="flex flex-wrap gap-3">
+            </div>
+            <div className="sg-actions">
                 <Button
-                    className="frontline-tap"
+                    type="button"
+                    variant="outline"
+                    disabled={form.processing}
+                    onClick={onCancel}
+                >
+                    Cancel
+                </Button>
+                <Button
                     type="submit"
+                    variant={command === 'archive' ? 'destructive' : 'default'}
                     disabled={
                         form.processing || !procedureCommandAllowed(d, command)
                     }
@@ -226,16 +237,8 @@ export function ProcedureCommand({
                         ? 'Saving…'
                         : PROCEDURE_COMMAND_LABELS[command]}
                 </Button>
-                <Button
-                    className="frontline-tap"
-                    type="button"
-                    variant="outline"
-                    disabled={form.processing}
-                    onClick={onCancel}
-                >
-                    Cancel
-                </Button>
             </div>
+            </Surface>
         </form>
     );
 }

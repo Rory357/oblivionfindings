@@ -1,18 +1,34 @@
+/**
+ * Emergency drills (approved H&S drawings pg-hsn-65, 65b — Stephan 23 Oct
+ * 2026): one header with four filter chips, the drill views as a tier-two
+ * strip, the planning form above the register when scheduling, then every
+ * drill by name with where it is up to as the record's stages (scheduled,
+ * run, completed, findings resolved) and the follow-up tally.
+ */
 import { DrillPlanningForm } from '@/components/health-safety/drills/drill-planning-form';
 import type { DrillPickers } from '@/components/health-safety/drills/types';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import {
+    RecordIdentity,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import { Ring, StageDots, Surface, Tally } from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -20,7 +36,7 @@ import {
     useSafetyWorkspaceDrafts,
 } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { formatDate, formatTime, toDateInput } from '@/lib/datetime';
 import {
     DRILL_REGISTER,
     drillHref,
@@ -28,8 +44,8 @@ import {
 } from '@/lib/health-safety/drill-navigation';
 import {
     DRILL_TYPE_OPTIONS,
+    drillStage,
     outcomeMeta,
-    statusMeta,
     type DrillFilters,
     type DrillHero,
     type DrillRow,
@@ -37,15 +53,16 @@ import {
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlarmClock,
-    BarChart3,
     CalendarClock,
     CheckCircle2,
     ClipboardList,
-    FileDown,
+    Copy,
+    Eye,
     LayoutList,
     Play,
     Plus,
     Siren,
+    X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -67,6 +84,25 @@ type Props = {
     can: { manage: boolean; schedule: boolean };
     exports: { register_href: string };
 };
+
+const VIEWS: {
+    key: string;
+    label: string;
+    icon: GroupedProfileNavTab['icon'];
+}[] = [
+    { key: 'all', label: 'All', icon: LayoutList },
+    { key: 'scheduled', label: 'Scheduled', icon: CalendarClock },
+    { key: 'overdue', label: 'Overdue', icon: AlarmClock },
+    { key: 'in_progress', label: 'In progress', icon: Play },
+    { key: 'completed', label: 'Completed', icon: CheckCircle2 },
+    { key: 'findings', label: 'Findings open', icon: ClipboardList },
+];
+
+/** "Thu 22 Oct 2026" — the drill's day, on the worker's NZ calendar. */
+function drillDay(iso: string): string {
+    return `${formatDate(iso)} ${toDateInput(iso).slice(0, 4)}`;
+}
+
 export default function DrillsIndex({
     drills,
     filters,
@@ -107,13 +143,6 @@ export default function DrillsIndex({
                 ([, value]) => value != null && value !== '',
             ),
         ) as Record<string, string | number>;
-    const query = (next: Partial<DrillFilters> = {}) =>
-        new URLSearchParams(
-            Object.entries(params(next)).map(([key, value]) => [
-                key,
-                String(value),
-            ]),
-        );
     const go = (next: Partial<DrillFilters>) =>
         router.get(DRILL_REGISTER, params(next), {
             preserveState: true,
@@ -141,18 +170,185 @@ export default function DrillsIndex({
                 onSuccess: () => setCreating(false),
             }),
         );
-    const tabs = [
-        { key: 'all', label: 'All', icon: LayoutList },
-        { key: 'scheduled', label: 'Scheduled', icon: CalendarClock },
-        { key: 'overdue', label: 'Overdue', icon: AlarmClock },
-        { key: 'in_progress', label: 'In progress', icon: Play },
-        { key: 'completed', label: 'Completed', icon: CheckCircle2 },
-        { key: 'findings', label: 'Findings open', icon: ClipboardList },
+    const views: GroupedProfileNavTab[] = VIEWS.map((view) => ({
+        key: view.key,
+        label: view.label,
+        icon: view.icon,
+        count: tabCounts[view.key] ?? 0,
+    }));
+    const filtered = !!(
+        filters.q ||
+        filters.site_id ||
+        filters.drill_type ||
+        filters.outcome ||
+        filters.period !== '6mo'
+    );
+
+    const open = (row: Row, section?: 'findings') =>
+        router.visit(drillHref(row.id, { section, returnTo }));
+    const actionsFor = (row: Row): MenuItem[] =>
+        compactMenu([
+            { label: 'Open drill', icon: Eye, onClick: () => open(row) },
+            {
+                label: 'Open findings',
+                icon: ClipboardList,
+                onClick: () => open(row, 'findings'),
+            },
+            { separator: true },
+            {
+                label: 'Copy link',
+                icon: Copy,
+                onClick: () =>
+                    void navigator.clipboard?.writeText(
+                        window.location.origin + drillHref(row.id),
+                    ),
+            },
+        ]);
+
+    const columns: RecordTableColumn<Row>[] = [
+        {
+            key: 'drill',
+            label: 'Drill',
+            className: 'min-w-[14rem] max-w-[20rem]',
+            cell: (row) => (
+                <RecordIdentity
+                    title={
+                        <Link
+                            href={drillHref(row.id, { returnTo })}
+                            onClick={(event) => event.stopPropagation()}
+                            className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            {row.title}
+                        </Link>
+                    }
+                    sub={`${row.reference} · ${row.type_label}`}
+                />
+            ),
+        },
+        {
+            key: 'site',
+            label: 'Site',
+            nowrap: true,
+            cell: (row) =>
+                row.site?.name ?? (
+                    <span className="text-muted-foreground">Not recorded</span>
+                ),
+        },
+        {
+            key: 'date',
+            label: 'Date',
+            nowrap: true,
+            cell: (row) =>
+                row.scheduled_at ? (
+                    <RecordIdentity
+                        title={drillDay(row.scheduled_at)}
+                        sub={formatTime(row.scheduled_at)}
+                    />
+                ) : (
+                    <span className="text-muted-foreground">Not recorded</span>
+                ),
+        },
+        {
+            key: 'stage',
+            label: 'Where it’s up to',
+            nowrap: true,
+            cell: (row) => {
+                const stage = drillStage({
+                    status: row.status,
+                    findings_open: row.findings_open,
+                    finding_overdue: row.flags.finding_overdue,
+                });
+                return stage ? (
+                    <StageDots
+                        stage={stage.stage}
+                        of={4}
+                        label={stage.label}
+                        note={stage.note}
+                        tone={stage.tone}
+                    />
+                ) : (
+                    <StatusBadge variant="neutral">Cancelled</StatusBadge>
+                );
+            },
+        },
+        {
+            key: 'outcome',
+            label: 'Outcome',
+            nowrap: true,
+            cell: (row) => {
+                const outcome = outcomeMeta(row.outcome);
+                return outcome ? (
+                    <StatusBadge variant={outcome.tone}>
+                        {outcome.label}
+                    </StatusBadge>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                );
+            },
+        },
+        {
+            key: 'attendance',
+            label: 'Attendance',
+            nowrap: true,
+            cell: (row) => (
+                <RecordIdentity
+                    title={`${row.attended_count} confirmed`}
+                    sub={`${row.participants_count} assigned`}
+                />
+            ),
+        },
+        {
+            key: 'findings',
+            label: 'Findings',
+            nowrap: true,
+            cell: (row) => (
+                <Link
+                    href={drillHref(row.id, { section: 'findings', returnTo })}
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label={`${row.findings_open} open findings for ${row.reference}${row.flags.finding_overdue ? ', overdue work' : ''}`}
+                    className="rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                    {row.findings_open > 0 ? (
+                        <StatusBadge
+                            variant={
+                                row.flags.finding_overdue
+                                    ? 'critical'
+                                    : 'warning'
+                            }
+                        >
+                            {row.findings_open} open
+                            {row.flags.finding_overdue ? ' · overdue work' : ''}
+                        </StatusBadge>
+                    ) : (
+                        <span className="text-foreground underline-offset-4 hover:underline">
+                            0 open
+                        </span>
+                    )}
+                </Link>
+            ),
+        },
     ];
+
+    const pager = (
+        <>
+            <p className="text-subtle">
+                Showing {drills.data.length} of {drills.total}
+            </p>
+            {drills.last_page > 1 ? (
+                <LaravelPagination
+                    links={drills.links}
+                    lastPage={drills.last_page}
+                    preserveScroll
+                />
+            ) : null}
+        </>
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Emergency drills', href: DRILL_REGISTER },
             ]}
         >
@@ -161,7 +357,7 @@ export default function DrillsIndex({
                 <PageLayout
                     hero={
                         <PageHeader
-                            frontline
+                            wrapTitle
                             icon={Siren}
                             title="Emergency drills"
                             subline="Plan drills, record what happened and follow through on findings"
@@ -181,75 +377,47 @@ export default function DrillsIndex({
                                     />
                                     <PageHeaderGlassButton asChild>
                                         <a href={exports.register_href}>
-                                            <FileDown className="size-4" />
                                             Export
                                         </a>
                                     </PageHeaderGlassButton>
                                     {can.schedule && (
                                         <PageHeaderPrimaryButton
+                                            icon={Plus}
                                             onClick={openCreation}
                                         >
-                                            <Plus className="size-4" />
                                             Schedule drill
                                         </PageHeaderPrimaryButton>
                                     )}
                                 </>
                             }
-                            meters={
-                                <>
-                                    {[
-                                        {
-                                            key: 'scheduled',
-                                            label: 'Scheduled',
-                                            caption: 'Upcoming drills',
-                                        },
-                                        {
-                                            key: 'overdue',
-                                            label: 'Overdue',
-                                            caption:
-                                                'Start time passed',
-                                        },
-                                        {
-                                            key: 'in_progress',
-                                            label: 'In progress',
-                                            caption:
-                                                'Completion needed',
-                                        },
-                                        {
-                                            key: 'findings',
-                                            label: 'Findings open',
-                                            caption:
-                                                'Drills needing follow-up',
-                                        },
-                                    ].map((item) => (
-                                        <PageHeaderMeterBlock
-                                            key={item.key}
-                                            label={item.label}
-                                            href={
-                                                DRILL_REGISTER +
-                                                '?' +
-                                                query({
-                                                    tab: item.key,
-                                                    q: null,
-                                                    drill_type: null,
-                                                    outcome: null,
-                                                })
-                                            }
-                                        >
-                                            <PageHeaderMeterBig>
-                                                {tabCounts[item.key] ?? 0}
-                                            </PageHeaderMeterBig>
-                                            <PageHeaderMeterCaption>
-                                                {item.caption}
-                                            </PageHeaderMeterCaption>
-                                        </PageHeaderMeterBlock>
-                                    ))}
-                                </>
-                            }
                             filters={
                                 <>
                                     <PageHeaderFilterSelect
-                                        label="Period"
+                                        label="All sites"
+                                        allValue=""
+                                        value={
+                                            filters.site_id
+                                                ? String(filters.site_id)
+                                                : ''
+                                        }
+                                        onChange={(value) =>
+                                            go({
+                                                site_id: value
+                                                    ? Number(value)
+                                                    : null,
+                                            })
+                                        }
+                                        options={[
+                                            { value: '', label: 'All sites' },
+                                            ...pickers.sites.map((site) => ({
+                                                value: String(site.id),
+                                                label: site.name,
+                                            })),
+                                        ]}
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="6 months"
+                                        allValue="6mo"
                                         value={filters.period}
                                         onChange={(value) =>
                                             go({ period: value })
@@ -268,32 +436,8 @@ export default function DrillsIndex({
                                         ]}
                                     />
                                     <PageHeaderFilterSelect
-                                        label="Site"
-                                        value={
-                                            filters.site_id
-                                                ? String(filters.site_id)
-                                                : ''
-                                        }
-                                        onChange={(value) =>
-                                            go({
-                                                site_id: value
-                                                    ? Number(value)
-                                                    : null,
-                                            })
-                                        }
-                                        options={[
-                                            {
-                                                value: '',
-                                                label: 'All accessible sites',
-                                            },
-                                            ...pickers.sites.map((site) => ({
-                                                value: String(site.id),
-                                                label: site.name,
-                                            })),
-                                        ]}
-                                    />
-                                    <PageHeaderFilterSelect
-                                        label="Type"
+                                        label="All drill types"
+                                        allValue=""
                                         value={filters.drill_type ?? ''}
                                         onChange={(value) =>
                                             go({ drill_type: value || null })
@@ -307,7 +451,8 @@ export default function DrillsIndex({
                                         ]}
                                     />
                                     <PageHeaderFilterSelect
-                                        label="Outcome"
+                                        label="All outcomes"
+                                        allValue=""
                                         value={filters.outcome ?? ''}
                                         onChange={(value) =>
                                             go({ outcome: value || null })
@@ -327,12 +472,9 @@ export default function DrillsIndex({
                                             ),
                                         ]}
                                     />
-                                    {(filters.q ||
-                                        filters.site_id ||
-                                        filters.drill_type ||
-                                        filters.outcome ||
-                                        filters.period !== '6mo') && (
-                                        <PageHeaderGlassButton
+                                    {filtered && (
+                                        <PageHeaderFilterButton
+                                            icon={X}
                                             onClick={() =>
                                                 go({
                                                     q: null,
@@ -344,32 +486,48 @@ export default function DrillsIndex({
                                             }
                                         >
                                             Clear filters
-                                        </PageHeaderGlassButton>
+                                        </PageHeaderFilterButton>
                                     )}
                                 </>
                             }
                             rail={
-                                <PageHeaderRail
-                                    items={tabs}
-                                    value={tab}
-                                    onSelect={(value) => go({ tab: value })}
-                                    ariaLabel="Drill views"
+                                <SafetyWorkspaceRail
+                                    hub="prevention"
+                                    current="drills"
                                 />
                             }
                         />
                     }
+                    tabs={
+                        <TierTwoTabs
+                            tabs={views}
+                            activeTab={tab}
+                            onTab={(value) => {
+                                if (value !== tab) go({ tab: value });
+                            }}
+                            testIdPrefix="drill-register"
+                            ariaLabel="Drill views"
+                            panelId="drill-register-panel"
+                            // Views carry no href, so the strip renders its own buttons.
+                            renderLink={() => null}
+                        />
+                    }
                 >
-                    <div className="space-y-5">
-                        <p className="text-subtle">
-                            Summary counts cover the selected Sites and period,
-                            before search, type and outcome filters.
-                        </p>
+                    <div
+                        id="drill-register-panel"
+                        role="tabpanel"
+                        aria-label={
+                            VIEWS.find((view) => view.key === tab)?.label ??
+                            'Drills'
+                        }
+                        className="grid min-w-0 gap-5"
+                    >
                         {creating && can.schedule && (
-                            <Card>
-                                <CardContent
+                            <Surface aria-label="Schedule drill">
+                                <div
                                     ref={creationPanel}
                                     tabIndex={-1}
-                                    className="p-5 outline-none sm:p-6"
+                                    className="p-[18px] outline-none"
                                 >
                                     <DrillPlanningForm
                                         detail={null}
@@ -379,231 +537,79 @@ export default function DrillsIndex({
                                         onSaved={() => setCreating(false)}
                                         onCancel={closeCreation}
                                     />
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </Surface>
                         )}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h2 className="text-section-title">
-                                Drill register
-                            </h2>
-                            <Link
-                                href="/health-safety/analytics"
-                                className="frontline-tap frontline-focus inline-flex items-center gap-2 text-primary underline"
-                            >
-                                <BarChart3 className="size-4" />
-                                Drill analytics
-                            </Link>
-                        </div>
-                        <p className="text-subtle">
-                            {drills.total
-                                ? (drills.from ?? 1) +
-                                  '–' +
-                                  (drills.to ?? drills.data.length) +
-                                  ' of ' +
-                                  drills.total +
-                                  ' matching drills'
-                                : 'No drills match these filters.'}
-                        </p>
-                        <div className="space-y-3 md:hidden">
-                            {drills.data.map((row) => (
-                                <Card key={row.id}>
-                                    <CardContent className="space-y-3 p-4">
-                                        <DrillTitle
-                                            row={row}
-                                            returnTo={returnTo}
-                                        />
-                                        <DrillState row={row} />
-                                        <dl className="grid grid-cols-1 gap-2 text-sm">
-                                            <div>
-                                                <dt className="text-subtle">
-                                                    Site
-                                                </dt>
-                                                <dd>
-                                                    {row.site?.name ??
-                                                        'Not recorded'}
-                                                </dd>
-                                            </div>
-                                            <div>
-                                                <dt className="text-subtle">
-                                                    Scheduled for
-                                                </dt>
-                                                <dd>
-                                                    {formatDateTimeLong(
-                                                        row.scheduled_at,
-                                                        'Not recorded',
-                                                    )}
-                                                </dd>
-                                            </div>
-                                            <div>
-                                                <dt className="text-subtle">
-                                                    Attendance
-                                                </dt>
-                                                <dd>
-                                                    {row.attended_count}{' '}
-                                                    confirmed ·{' '}
-                                                    {row.participants_count}{' '}
-                                                    assigned
-                                                </dd>
-                                            </div>
-                                            <div>
-                                                <dt className="text-subtle">
-                                                    Findings
-                                                </dt>
-                                                <dd>
-                                                    {row.findings_open} open
-                                                    {row.flags.finding_overdue
-                                                        ? ' · overdue work'
-                                                        : ''}
-                                                </dd>
-                                            </div>
-                                        </dl>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-                        {drills.data.length > 0 && (
-                            <Card className="hidden overflow-x-auto md:block">
-                                <table className="w-full text-left text-sm">
-                                    <caption className="sr-only">
-                                        Emergency drills matching the selected
-                                        filters
-                                    </caption>
-                                    <thead className="border-b border-border bg-muted/30">
-                                        <tr>
-                                            {[
-                                                'Drill',
-                                                'Site',
-                                                'Scheduled for',
-                                                'Status & outcome',
-                                                'Attendance',
-                                                'Findings',
-                                            ].map((label) => (
-                                                <th
-                                                    key={label}
-                                                    scope="col"
-                                                    className="px-4 py-3 font-medium"
-                                                >
-                                                    {label}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {drills.data.map((row) => (
-                                            <tr
-                                                key={row.id}
-                                                className="border-b border-border last:border-b-0"
-                                            >
-                                                <td className="max-w-sm px-4 py-3">
-                                                    <DrillTitle
-                                                        row={row}
-                                                        returnTo={returnTo}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {row.site?.name ??
-                                                        'Not recorded'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {formatDateTimeLong(
-                                                        row.scheduled_at,
-                                                        'Not recorded',
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <DrillState row={row} />
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {row.attended_count}{' '}
-                                                    confirmed
-                                                    <br />
-                                                    <span className="text-subtle">
-                                                        {row.participants_count}{' '}
-                                                        assigned
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <Link
-                                                        className="frontline-tap frontline-focus inline-flex items-center text-primary underline"
-                                                        href={drillHref(
-                                                            row.id,
-                                                            {
-                                                                section:
-                                                                    'findings',
-                                                                returnTo,
-                                                            },
-                                                        )}
-                                                    >
-                                                        {row.findings_open} open
-                                                    </Link>
-                                                    {row.flags
-                                                        .finding_overdue && (
-                                                        <p className="text-sm text-status-critical">
-                                                            Overdue work
-                                                        </p>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </Card>
-                        )}
-                        <LaravelPagination
-                            links={drills.links}
-                            lastPage={drills.last_page}
-                            preserveScroll
+                        <RecordTable
+                            title="Drills"
+                            sub={
+                                (drills.total
+                                    ? `Showing ${drills.from ?? 1}–${drills.to ?? drills.data.length} of ${drills.total}`
+                                    : 'No drills match these filters') +
+                                ' · Summary counts cover the selected Sites and period, before search, type and outcome filters.'
+                            }
+                            actions={
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href="/health-safety/analytics">
+                                        Drill trends
+                                    </Link>
+                                </Button>
+                            }
+                            ariaLabel="Drills table"
+                            rows={drills.data}
+                            rowKey={(row) => row.id}
+                            onOpen={(row) => open(row)}
+                            actionsFor={actionsFor}
+                            menuTitle={(row) => `${row.reference} · ${row.title}`}
+                            menuIcon={Siren}
+                            columns={columns}
+                            footer={drills.data.length ? pager : undefined}
+                            empty={
+                                <p className="sg-quiet">
+                                    <Ring tone="none" />
+                                    <span>No drills match these filters.</span>
+                                </p>
+                            }
                         />
-                        <Card>
-                            <CardContent className="space-y-2 p-4">
-                                <h2 className="font-semibold">
-                                    Drill cadence and follow-up
-                                </h2>
-                                <p className="text-subtle">
-                                    {hero.attention.sites_overdue} Sites overdue
-                                    under the current drill schedule ·{' '}
-                                    {hero.attention.findings_open} open findings
-                                    · {hero.attention.findings_overdue} overdue
-                                    findings.
-                                </p>
-                                <p className="text-subtle">
-                                    {hero.badges.fenz_reviews_due}{' '}
-                                    evacuation-scheme reviews due. Drill recency
-                                    and recorded outcomes remain separate.
-                                </p>
-                            </CardContent>
-                        </Card>
+                        <Tally
+                            title="Drills due and follow-up"
+                            sub="Drill recency and recorded outcomes remain separate"
+                            items={[
+                                {
+                                    value: hero.attention.sites_overdue,
+                                    label: 'Sites overdue for a drill',
+                                    tone:
+                                        hero.attention.sites_overdue > 0
+                                            ? 'critical'
+                                            : undefined,
+                                },
+                                {
+                                    value: hero.attention.findings_open,
+                                    label: 'Open findings',
+                                    href: `${DRILL_REGISTER}?${new URLSearchParams({ ...(params({ tab: 'findings' }) as Record<string, string>) })}`,
+                                },
+                                {
+                                    value: hero.attention.findings_overdue,
+                                    label: 'Overdue findings',
+                                    tone:
+                                        hero.attention.findings_overdue > 0
+                                            ? 'critical'
+                                            : undefined,
+                                },
+                                {
+                                    value: hero.badges.fenz_reviews_due,
+                                    label: 'Evacuation-scheme reviews due',
+                                    tone:
+                                        hero.badges.fenz_reviews_due > 0
+                                            ? 'warning'
+                                            : undefined,
+                                },
+                            ]}
+                        />
                     </div>
                 </PageLayout>
                 {drafts.confirmation}
             </SafetyFormDraftContext.Provider>
         </AppLayout>
-    );
-}
-function DrillTitle({ row, returnTo }: { row: Row; returnTo: string }) {
-    return (
-        <div className="space-y-1">
-            <Link
-                href={drillHref(row.id, { returnTo })}
-                className="frontline-tap frontline-focus inline-flex items-center font-medium break-words text-primary underline"
-            >
-                {row.reference} · {row.title}
-            </Link>
-            <p className="text-subtle">{row.type_label}</p>
-        </div>
-    );
-}
-function DrillState({ row }: { row: Row }) {
-    const status = statusMeta(row.status);
-    const outcome = outcomeMeta(row.outcome);
-    return (
-        <div className="flex flex-wrap gap-2">
-            <StatusBadge variant={status.tone}>{status.label}</StatusBadge>
-            {outcome && (
-                <StatusBadge variant={outcome.tone}>
-                    {outcome.label}
-                </StatusBadge>
-            )}
-        </div>
     );
 }

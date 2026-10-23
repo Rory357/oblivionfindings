@@ -1,25 +1,42 @@
+/**
+ * Safe work procedures (approved H&S drawing pg-hsn-63 — Stephan 23 Oct
+ * 2026): one header with four filter chips, the register views as a
+ * tier-two strip, then every procedure by its plain name with where it is up
+ * to as stage dots (draft, under review, published) — the same stages its
+ * record shows — its review date, owner, version and documents.
+ */
 import { ProcedureWizardDialog } from '@/components/health-safety/procedure-wizard-dialog';
 import {
-    ProcedureReviewDate,
-    ProcedureStatus,
+    ProcedureReviewWords,
     procedureCategory,
+    procedureStage,
 } from '@/components/health-safety/procedures/procedure-kit';
 import type { ProcedurePickers } from '@/components/health-safety/procedures/types';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import {
+    RecordIdentity,
+    RecordPerson,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import { Ring, StageDots } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     SafetyFormDraftContext,
     useSafetyWorkspaceDrafts,
@@ -35,11 +52,13 @@ import {
     Archive,
     CheckCircle2,
     Clock,
-    FileDown,
+    Copy,
+    Eye,
     FileEdit,
     FileText,
     LayoutGrid,
     Plus,
+    X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -81,6 +100,21 @@ type Props = ProcedurePickers & {
     tabCounts: Record<string, number>;
     can: { view: boolean; create: boolean; manage: boolean; approve: boolean };
 };
+
+const VIEWS: {
+    key: string;
+    label: string;
+    title: string;
+    icon: GroupedProfileNavTab['icon'];
+}[] = [
+    { key: 'all', label: 'All', title: 'All procedures', icon: LayoutGrid },
+    { key: 'approved', label: 'Published', title: 'Published procedures', icon: CheckCircle2 },
+    { key: 'under_review', label: 'Under review', title: 'Under review', icon: Clock },
+    { key: 'draft', label: 'Drafts', title: 'Drafts', icon: FileEdit },
+    { key: 'review_due', label: 'Review due', title: 'Review due', icon: Clock },
+    { key: 'archived', label: 'Archived', title: 'Archived procedures', icon: Archive },
+];
+
 export default function ProceduresIndex({
     procedures,
     filters,
@@ -125,14 +159,12 @@ export default function ProceduresIndex({
             preserveScroll: true,
             replace: true,
         });
-    const tabs = [
-        { key: 'all', label: 'All', icon: LayoutGrid },
-        { key: 'approved', label: 'Published', icon: CheckCircle2 },
-        { key: 'under_review', label: 'Under review', icon: Clock },
-        { key: 'draft', label: 'Drafts', icon: FileEdit },
-        { key: 'review_due', label: 'Review due', icon: Clock },
-        { key: 'archived', label: 'Archived', icon: Archive },
-    ].map((item) => ({ ...item, count: tabCounts[item.key] ?? 0 }));
+    const views: GroupedProfileNavTab[] = VIEWS.map((view) => ({
+        key: view.key,
+        label: view.label,
+        icon: view.icon,
+        count: tabCounts[view.key] ?? 0,
+    }));
     const href = (id: number) => procedureHref(id, { returnTo });
     const pickers = {
         sites,
@@ -142,10 +174,145 @@ export default function ProceduresIndex({
         categories,
         can_apply_organisation_wide,
     };
+    const filtered = Object.entries(filters).some(
+        ([key, value]) => key !== 'tab' && value,
+    );
+
+    const actionsFor = (row: Row): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open procedure',
+                icon: Eye,
+                onClick: () => router.visit(href(row.id)),
+            },
+            !!row.working_status &&
+                row.working_status !== row.status && {
+                    label:
+                        row.working_status === 'under_review'
+                            ? 'Open the draft under review'
+                            : 'Open the working draft',
+                    icon: FileEdit,
+                    onClick: () =>
+                        router.visit(
+                            procedureHref(row.id, {
+                                revision: 'working',
+                                returnTo,
+                            }),
+                        ),
+                },
+            { separator: true },
+            {
+                label: 'Copy link',
+                icon: Copy,
+                onClick: () =>
+                    void navigator.clipboard?.writeText(
+                        window.location.origin + procedureHref(row.id),
+                    ),
+            },
+        ]);
+
+    const columns: RecordTableColumn<Row>[] = [
+        {
+            key: 'procedure',
+            label: 'Procedure',
+            className: 'min-w-[16rem] max-w-[24rem]',
+            cell: (row) => (
+                <RecordIdentity
+                    title={
+                        <Link
+                            href={href(row.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            {row.title}
+                        </Link>
+                    }
+                    sub={[row.reference_number, procedureCategory(row.category)]
+                        .filter(Boolean)
+                        .join(' · ')}
+                />
+            ),
+        },
+        {
+            key: 'stage',
+            label: 'Where it’s up to',
+            nowrap: true,
+            cell: (row) => {
+                const stage = procedureStage(row);
+                return stage ? (
+                    <StageDots
+                        stage={stage.stage}
+                        of={3}
+                        label={stage.label}
+                        note={stage.note}
+                        tone={stage.tone}
+                    />
+                ) : (
+                    <StatusBadge variant="neutral">
+                        <Archive className="size-3" aria-hidden="true" />
+                        Archived
+                    </StatusBadge>
+                );
+            },
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            nowrap: true,
+            cell: (row) =>
+                row.status === 'archived' ? (
+                    <span className="text-muted-foreground">
+                        Review not scheduled
+                    </span>
+                ) : (
+                    <ProcedureReviewWords date={row.review_date} />
+                ),
+        },
+        {
+            key: 'owner',
+            label: 'Owner',
+            nowrap: true,
+            cell: (row) =>
+                row.owner ? (
+                    <RecordPerson name={row.owner.name} />
+                ) : (
+                    <span className="text-muted-foreground">No owner</span>
+                ),
+        },
+        {
+            key: 'version',
+            label: 'Version',
+            nowrap: true,
+            cell: (row) => <span className="tabular-nums">{row.version}</span>,
+        },
+        {
+            key: 'documents',
+            label: 'Documents',
+            nowrap: true,
+            cell: (row) => (
+                <span className="tabular-nums">{row.documents_count}</span>
+            ),
+        },
+    ];
+
+    const total = procedures.total ?? procedures.data.length;
+    const current = VIEWS.find((view) => view.key === filters.tab);
+    const pager = (
+        <>
+            <p className="text-subtle">
+                Showing {procedures.data.length} of {total}
+            </p>
+            {procedures.last_page > 1 ? (
+                <LaravelPagination links={procedures.links} />
+            ) : null}
+        </>
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Safe work procedures', href: PROCEDURE_REGISTER },
             ]}
         >
@@ -154,10 +321,10 @@ export default function ProceduresIndex({
                 <PageLayout
                     hero={
                         <PageHeader
-                            frontline
+                            wrapTitle
                             icon={FileText}
                             title="Safe work procedures"
-                            subline="Current instructions, controlled revisions and staff acknowledgement"
+                            subline="Current instructions, controlled revisions and staff sign-off"
                             actions={
                                 <>
                                     <PageHeaderSearch
@@ -176,80 +343,24 @@ export default function ProceduresIndex({
                                         <a
                                             href={`${PROCEDURE_REGISTER}/export?${query()}`}
                                         >
-                                            <FileDown className="size-4" />
                                             Export
                                         </a>
                                     </PageHeaderGlassButton>
                                     {can.create && (
                                         <PageHeaderPrimaryButton
+                                            icon={Plus}
                                             onClick={() => setCreating(true)}
                                         >
-                                            <Plus className="size-4" />
-                                            New procedure
+                                            Add procedure
                                         </PageHeaderPrimaryButton>
                                     )}
-                                </>
-                            }
-                            meters={
-                                <>
-                                    {[
-                                        {
-                                            key: 'approved',
-                                            label: 'Published',
-                                            caption:
-                                                'Current staff instructions',
-                                        },
-                                        {
-                                            key: 'under_review',
-                                            label: 'Under review',
-                                            caption:
-                                                'Working revisions awaiting review',
-                                        },
-                                        {
-                                            key: 'review_due',
-                                            label: 'Review due',
-                                            caption:
-                                                'Published review deadlines',
-                                        },
-                                        {
-                                            key: 'draft',
-                                            label: 'Drafts',
-                                            caption: 'Working drafts',
-                                        },
-                                    ].map((item) => (
-                                        <PageHeaderMeterBlock
-                                            key={item.key}
-                                            label={item.label}
-                                            href={`${PROCEDURE_REGISTER}?${query({ tab: item.key })}`}
-                                        >
-                                            <PageHeaderMeterBig>
-                                                {tabCounts[item.key] ?? 0}
-                                            </PageHeaderMeterBig>
-                                            <PageHeaderMeterCaption>
-                                                {item.caption}
-                                            </PageHeaderMeterCaption>
-                                        </PageHeaderMeterBlock>
-                                    ))}
                                 </>
                             }
                             filters={
                                 <>
                                     <PageHeaderFilterSelect
-                                        label="Category"
-                                        value={filters.category ?? ''}
-                                        onChange={(value) =>
-                                            go({ category: value || null })
-                                        }
-                                        options={[
-                                            {
-                                                value: '',
-                                                label: 'All categories',
-                                            },
-                                            ...categories,
-                                        ]}
-                                    />
-                                    <PageHeaderFilterSelect
-                                        label="Site"
+                                        label="All sites"
+                                        allValue=""
                                         value={
                                             filters.site_id
                                                 ? String(filters.site_id)
@@ -263,10 +374,7 @@ export default function ProceduresIndex({
                                             })
                                         }
                                         options={[
-                                            {
-                                                value: '',
-                                                label: 'All accessible sites',
-                                            },
+                                            { value: '', label: 'All sites' },
                                             ...sites.map((site) => ({
                                                 value: String(site.id),
                                                 label: site.name,
@@ -274,7 +382,23 @@ export default function ProceduresIndex({
                                         ]}
                                     />
                                     <PageHeaderFilterSelect
-                                        label="State"
+                                        label="All categories"
+                                        allValue=""
+                                        value={filters.category ?? ''}
+                                        onChange={(value) =>
+                                            go({ category: value || null })
+                                        }
+                                        options={[
+                                            {
+                                                value: '',
+                                                label: 'All categories',
+                                            },
+                                            ...categories,
+                                        ]}
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="All states"
+                                        allValue=""
                                         value={filters.status ?? ''}
                                         onChange={(value) =>
                                             go({ status: value || null })
@@ -297,7 +421,8 @@ export default function ProceduresIndex({
                                         ]}
                                     />
                                     <PageHeaderFilterSelect
-                                        label="Review"
+                                        label="All review dates"
+                                        allValue=""
                                         value={filters.review_state ?? ''}
                                         onChange={(value) =>
                                             go({ review_state: value || null })
@@ -329,11 +454,9 @@ export default function ProceduresIndex({
                                             },
                                         ]}
                                     />
-                                    {Object.entries(filters).some(
-                                        ([key, value]) =>
-                                            key !== 'tab' && value,
-                                    ) && (
-                                        <PageHeaderGlassButton
+                                    {filtered && (
+                                        <PageHeaderFilterButton
+                                            icon={X}
                                             onClick={() =>
                                                 go({
                                                     q: null,
@@ -345,195 +468,79 @@ export default function ProceduresIndex({
                                             }
                                         >
                                             Clear filters
-                                        </PageHeaderGlassButton>
+                                        </PageHeaderFilterButton>
                                     )}
                                 </>
                             }
                             rail={
-                                <PageHeaderRail
-                                    items={tabs}
-                                    value={filters.tab}
-                                    onSelect={(tab) => go({ tab })}
-                                    ariaLabel="Procedure views"
+                                <SafetyWorkspaceRail
+                                    hub="prevention"
+                                    current="procedures"
                                 />
                             }
                         />
                     }
+                    tabs={
+                        <TierTwoTabs
+                            tabs={views}
+                            activeTab={filters.tab}
+                            onTab={(tab) => {
+                                if (tab !== filters.tab) go({ tab });
+                            }}
+                            testIdPrefix="procedure-register"
+                            ariaLabel="Procedure views"
+                            panelId="procedure-register-panel"
+                            // Views carry no href, so the strip renders its own buttons.
+                            renderLink={() => null}
+                        />
+                    }
                 >
-                    {procedures.data.length ? (
-                        <>
-                            <ul className="space-y-3 md:hidden">
-                                {procedures.data.map((row) => (
-                                    <li
-                                        key={row.id}
-                                        className="space-y-3 rounded-xl border border-border bg-card p-4"
-                                    >
-                                        <Link
-                                            className="frontline-tap frontline-focus block font-semibold break-words text-primary underline"
-                                            href={href(row.id)}
+                    <div
+                        id="procedure-register-panel"
+                        role="tabpanel"
+                        aria-label={current?.title ?? 'Procedures'}
+                        className="min-w-0"
+                    >
+                        <RecordTable
+                            title={current?.title ?? 'Procedures'}
+                            sub={
+                                procedures.from && procedures.to
+                                    ? `Showing ${procedures.from}–${procedures.to} of ${total}`
+                                    : `Showing ${procedures.data.length} of ${total}`
+                            }
+                            ariaLabel="Procedure register table"
+                            rows={procedures.data}
+                            rowKey={(row) => row.id}
+                            onOpen={(row) => router.visit(href(row.id))}
+                            actionsFor={actionsFor}
+                            menuTitle={(row) =>
+                                row.reference_number
+                                    ? `${row.reference_number} · ${row.title}`
+                                    : row.title
+                            }
+                            menuIcon={FileText}
+                            columns={columns}
+                            footer={procedures.data.length ? pager : undefined}
+                            empty={
+                                <div className="grid justify-items-start gap-3 p-4">
+                                    <p className="sg-quiet">
+                                        <Ring tone="none" />
+                                        <span>
+                                            No procedures match this view. Try
+                                            another view or clear the filters.
+                                        </span>
+                                    </p>
+                                    {can.create ? (
+                                        <Button
+                                            onClick={() => setCreating(true)}
                                         >
-                                            {row.reference_number
-                                                ? `${row.reference_number} · `
-                                                : ''}
-                                            {row.title}
-                                        </Link>
-                                        <div className="flex flex-wrap gap-2">
-                                            <ProcedureStatus
-                                                status={row.status}
-                                                legacy={
-                                                    row.provenance ===
-                                                    'legacy_current_capture'
-                                                }
-                                            />
-                                            <ProcedureReviewDate
-                                                date={row.review_date}
-                                            />
-                                        </div>
-                                        <p className="text-sm">
-                                            Version {row.version} ·{' '}
-                                            {procedureCategory(row.category)}
-                                        </p>
-                                        <p className="text-subtle">
-                                            Document owner:{' '}
-                                            {row.owner?.name ?? 'Unassigned'}
-                                        </p>
-                                        {row.working_status &&
-                                            row.working_status !==
-                                                row.status && (
-                                                <p className="text-subtle">
-                                                    A working revision is{' '}
-                                                    {row.working_status.replaceAll(
-                                                        '_',
-                                                        ' ',
-                                                    )}
-                                                    .
-                                                </p>
-                                            )}
-                                    </li>
-                                ))}
-                            </ul>
-                            <Card className="hidden gap-0 overflow-hidden py-0 md:block">
-                                <div
-                                    role="region"
-                                    aria-label="Procedure register table"
-                                    tabIndex={0}
-                                    className="frontline-focus overflow-x-auto"
-                                >
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="border-b border-border bg-muted/40">
-                                            <tr>
-                                                {[
-                                                    'Procedure',
-                                                    'State & review',
-                                                    'Owner',
-                                                    'Version',
-                                                    'Documents',
-                                                ].map((label) => (
-                                                    <th
-                                                        key={label}
-                                                        scope="col"
-                                                        className="px-4 py-3 font-semibold"
-                                                    >
-                                                        {label}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border">
-                                            {procedures.data.map((row) => (
-                                                <tr
-                                                    key={row.id}
-                                                    className="align-top hover:bg-muted/20"
-                                                >
-                                                    <td className="min-w-64 px-4 py-3">
-                                                        <Link
-                                                            className="frontline-tap frontline-focus inline-flex items-center font-semibold text-primary underline"
-                                                            href={href(row.id)}
-                                                        >
-                                                            {row.reference_number ??
-                                                                row.title}
-                                                        </Link>
-                                                        <p className="max-w-md break-words">
-                                                            {row.title}
-                                                        </p>
-                                                        <p className="text-subtle mt-1">
-                                                            {procedureCategory(
-                                                                row.category,
-                                                            )}
-                                                        </p>
-                                                    </td>
-                                                    <td className="min-w-48 space-y-2 px-4 py-4">
-                                                        <ProcedureStatus
-                                                            status={row.status}
-                                                            legacy={
-                                                                row.provenance ===
-                                                                'legacy_current_capture'
-                                                            }
-                                                        />
-                                                        <div>
-                                                            <ProcedureReviewDate
-                                                                date={
-                                                                    row.review_date
-                                                                }
-                                                            />
-                                                        </div>
-                                                        {row.working_status &&
-                                                            row.working_status !==
-                                                                row.status && (
-                                                                <p className="text-subtle">
-                                                                    Working
-                                                                    revision:{' '}
-                                                                    {row.working_status.replaceAll(
-                                                                        '_',
-                                                                        ' ',
-                                                                    )}
-                                                                </p>
-                                                            )}
-                                                    </td>
-                                                    <td className="px-4 py-4">
-                                                        {row.owner?.name ??
-                                                            'Unassigned'}
-                                                    </td>
-                                                    <td className="px-4 py-4">
-                                                        {row.version}
-                                                    </td>
-                                                    <td className="px-4 py-4">
-                                                        {row.documents_count}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            Add procedure
+                                        </Button>
+                                    ) : null}
                                 </div>
-                            </Card>
-                            {procedures.total != null && (
-                                <p className="text-subtle mt-3">
-                                    {procedures.from ?? 0}–{procedures.to ?? 0}{' '}
-                                    of {procedures.total} procedures
-                                </p>
-                            )}
-                        </>
-                    ) : (
-                        <Card className="space-y-4 p-8 text-center">
-                            <h2 className="text-section-title">
-                                No procedures match this view
-                            </h2>
-                            <p className="text-subtle">
-                                Try another view or clear the filters.
-                            </p>
-                            {can.create && (
-                                <Button
-                                    className="frontline-tap"
-                                    onClick={() => setCreating(true)}
-                                >
-                                    New procedure
-                                </Button>
-                            )}
-                        </Card>
-                    )}
-                    {procedures.last_page > 1 && (
-                        <LaravelPagination links={procedures.links} />
-                    )}
+                            }
+                        />
+                    </div>
                 </PageLayout>
                 {creating && (
                     <ProcedureWizardDialog

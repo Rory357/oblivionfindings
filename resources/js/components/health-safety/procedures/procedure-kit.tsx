@@ -86,6 +86,78 @@ export function ProcedureReviewDate({ date }: { date: string | null }) {
         </span>
     );
 }
+/**
+ * Where a procedure is up to as stage dots (pg-hsn-63, 64): draft, under
+ * review, published. Archived records have no stage; a working draft beside
+ * a published version is named as the note.
+ */
+export function procedureStage(row: {
+    status: string;
+    working_status?: string | null;
+    provenance?: string | null;
+}): {
+    stage: number;
+    label: string;
+    note?: string;
+    tone?: 'warning' | 'success';
+} | null {
+    if (row.status === 'archived') return null;
+    const note =
+        row.status === 'approved' &&
+        row.working_status &&
+        row.working_status !== row.status
+            ? row.working_status === 'under_review'
+                ? 'New draft under review'
+                : 'New draft in progress'
+            : undefined;
+    if (row.status === 'approved')
+        return {
+            stage: 4,
+            label:
+                row.provenance === 'legacy_current_capture'
+                    ? 'Approved (older record)'
+                    : 'Published',
+            note,
+        };
+    if (row.status === 'under_review')
+        return { stage: 2, label: 'Under review', tone: 'warning' };
+    if (row.status === 'draft') return { stage: 1, label: 'Draft' };
+    return { stage: 1, label: procedureStatus(row.status).label };
+}
+
+/** The review date in words: a badge when due soon or overdue, a plain date otherwise. */
+export function ProcedureReviewWords({
+    date,
+    today = toDateInput(new Date()),
+}: {
+    date: string | null;
+    today?: string;
+}) {
+    if (!formatDateOnly(date, ''))
+        return <span className="text-muted-foreground">Review not scheduled</span>;
+    const days = Math.round(
+        (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) /
+            86400000,
+    );
+    if (days < 0)
+        return (
+            <StatusBadge variant="critical">
+                {days === -1
+                    ? 'Review 1 day overdue'
+                    : `Review ${Math.abs(days)} days overdue`}
+            </StatusBadge>
+        );
+    if (days === 0)
+        return <StatusBadge variant="warning">Review due today</StatusBadge>;
+    if (days <= 30)
+        return (
+            <StatusBadge variant="warning">
+                {days === 1 ? 'Review due in 1 day' : `Review due in ${days} days`}
+            </StatusBadge>
+        );
+    return <span>Review {formatDateOnly(date)}</span>;
+}
+
 export function procedureCategory(value: string) {
     return (
         (

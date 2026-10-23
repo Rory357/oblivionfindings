@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DrillRunFacts } from './drill-facts';
+import { DrillChecks, DrillRunFacts } from './drill-facts';
 
 const detail = {
     status: 'completed',
@@ -20,36 +20,50 @@ const detail = {
 };
 describe('drill recorded facts', () => {
     it('never infers every resident was evacuated from matching mixed participant counts or completed roll-call', () => {
-        render(<DrillRunFacts detail={detail} />);
+        render(
+            <>
+                <DrillRunFacts detail={detail} />
+                <DrillChecks detail={detail} />
+            </>,
+        );
         expect(
             screen.queryByText('All residents evacuated', { exact: true }),
         ).not.toBeInTheDocument();
         expect(
-            screen.getByText('Residents evacuated — recorded count'),
+            screen.getByText(/Residents evacuated — recorded count: 8/),
+        ).toBeVisible();
+        expect(
+            screen.getByText(/These counts alone do not establish that every resident was safely evacuated\./),
         ).toBeVisible();
         expect(screen.getByText('Passed with actions')).toBeVisible();
-        expect(screen.getByText('Not confirmed')).toBeVisible();
+        expect(
+            screen.getByText('All areas checked · Not confirmed'),
+        ).toBeVisible();
+        expect(screen.getByText('Drill checks — 2 of 3 confirmed')).toBeVisible();
         expect(screen.getByText('Improve the exit signage.')).toBeVisible();
         expect(screen.getAllByText(/8 October 2026/)).toHaveLength(2);
     });
     it('keeps missing values and an unrecorded run distinct from zero or a failed check', () => {
+        const unrecorded = {
+            ...detail,
+            status: 'scheduled',
+            started_at: null,
+            completed_at: null,
+            duration_minutes: null,
+            evacuation_time_seconds: null,
+            total_participants: null,
+            residents_evacuated: null,
+            outcome: null,
+        };
         render(
-            <DrillRunFacts
-                detail={{
-                    ...detail,
-                    status: 'scheduled',
-                    started_at: null,
-                    completed_at: null,
-                    duration_minutes: null,
-                    evacuation_time_seconds: null,
-                    total_participants: null,
-                    residents_evacuated: null,
-                    outcome: null,
-                }}
-            />,
+            <>
+                <DrillRunFacts detail={unrecorded} />
+                <DrillChecks detail={unrecorded} />
+            </>,
         );
-        expect(screen.queryByText('Not confirmed')).not.toBeInTheDocument();
+        expect(screen.queryByText(/Not confirmed/)).not.toBeInTheDocument();
         expect(screen.queryByText('0')).not.toBeInTheDocument();
-        expect(screen.getAllByText('Not recorded').length).toBeGreaterThan(5);
+        expect(screen.getByText('Drill checks — not recorded yet')).toBeVisible();
+        expect(screen.getAllByText(/Not recorded/).length).toBeGreaterThan(5);
     });
 });

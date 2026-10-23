@@ -184,12 +184,35 @@ it('uses the shared header and exact filtered attention views without the old ri
         { ...props.filters, tab: 'unassigned' },
         expect.anything(),
     );
-    fireEvent.click(headerQueries.getByRole('button', { name: /Hazard view/ }));
+    // Only the two drawn numbers sit in the header; the rest are views.
     expect(
-        screen.getByRole('button', { name: 'Awaiting closure (3)' }),
+        headerQueries.queryByRole('button', { name: 'View open' }),
+    ).not.toBeInTheDocument();
+    const views = within(screen.getByRole('tablist', { name: 'Hazard views' }));
+    expect(
+        views.getAllByRole('tab').map((tab) => tab.textContent),
+    ).toEqual(['All8', 'Open', 'Overdue1', 'Critical1', 'Closed & mitigated4']);
+    fireEvent.click(views.getByRole('tab', { name: /Overdue/ }));
+    expect(state.get).toHaveBeenLastCalledWith(
+        '/compliance/hazards',
+        { ...props.filters, tab: 'overdue' },
+        expect.anything(),
+    );
+    expect(
+        headerQueries.getByRole('button', { name: /More filters · 1/ }),
+    ).toBeInTheDocument();
+});
+
+it('keeps a chosen view outside the drawn strip visible as its own tab', () => {
+    const props = data();
+    props.tab = 'mitigated';
+    render(<HazardRegister baseUrl="/compliance/hazards" data={props} />);
+    const views = within(screen.getByRole('tablist', { name: 'Hazard views' }));
+    expect(
+        views.getByRole('tab', { name: /Awaiting closure/, selected: true }),
     ).toBeInTheDocument();
     expect(
-        screen.getByRole('button', { name: 'Closed only (1)' }),
+        screen.getByRole('tabpanel', { name: 'Awaiting closure' }),
     ).toBeInTheDocument();
 });
 
@@ -233,46 +256,41 @@ it('retains Site and period in exports and uses readable Site-scoped report page
     ).not.toBeInTheDocument();
 });
 
-it('shows a real phone card with owner due date controls and no automatic notification decision', () => {
-    const onOpen = vi.fn(),
-        onRowCtx = vi.fn();
+it('shows owner, due date and flags in the table, with one action list on the kebab and right-click, and no automatic notification decision', () => {
+    const onOpen = vi.fn();
+    const view = vi.fn();
+    const actionsFor = vi.fn(() => [{ label: 'View hazard', onClick: view }]);
     render(
         <HazardTable
             rows={[row()]}
             scoped={false}
             onOpen={onOpen}
-            onRowCtx={onRowCtx}
+            actionsFor={actionsFor}
         />,
     );
-    const cards = within(screen.getByRole('list', { name: 'Hazards' }));
-    for (const label of [
-        'Named hazard owner',
-        'Kauri House',
-        'Synthetic loose carpet by the doorway',
-        'Critical rating',
-        'Due ≤7d',
-    ])
-        expect(cards.getByText(label)).toBeInTheDocument();
-    expect(cards.getByText(/8 Oct, 12:30 am/)).toBeInTheDocument();
-    expect(cards.queryByText(/WorkSafe-notifiable/)).not.toBeInTheDocument();
-    fireEvent.click(
-        cards.getByRole('button', { name: 'Open hazard HZ-SYNTHETIC' }),
-    );
-    expect(onOpen).toHaveBeenCalledWith(1);
-    fireEvent.click(
-        cards.getByRole('button', { name: 'Options for HZ-SYNTHETIC' }),
-    );
-    expect(onRowCtx).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ id: 1 }),
-    );
     const table = within(screen.getByRole('region', { name: 'Hazards table' }));
-    expect(table.getByText('Owner: Named hazard owner')).toBeInTheDocument();
-    fireEvent.keyDown(
-        table.getByRole('button', { name: 'Options for HZ-SYNTHETIC' }),
-        { key: 'Enter' },
-    );
-    expect(onOpen).toHaveBeenCalledTimes(1);
+    for (const label of ['Kauri House', 'Rated critical', 'Due within 7 days'])
+        expect(table.getByText(label)).toBeInTheDocument();
+    expect(
+        table.getByText(
+            /Synthetic loose carpet by the doorway · Owner: Named hazard owner/,
+        ),
+    ).toBeInTheDocument();
+    expect(table.getByText(/HZ-SYNTHETIC · Due 8 Oct 2026/)).toBeInTheDocument();
+    expect(table.getByText('8 Oct 2026')).toBeInTheDocument();
+    expect(table.getByText('2 open actions')).toBeInTheDocument();
+    expect(table.queryByText(/WorkSafe-notifiable/)).not.toBeInTheDocument();
+    fireEvent.click(table.getByText('Kauri House'));
+    expect(onOpen).toHaveBeenCalledWith(1);
+    fireEvent.contextMenu(table.getAllByRole('row')[1]);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'View hazard' }));
+    expect(view).toHaveBeenCalledTimes(1);
+    expect(actionsFor).toHaveBeenCalledWith(row());
+    expect(
+        table.getByRole('button', {
+            name: 'Actions for HZ-SYNTHETIC · Slip / trip / fall',
+        }),
+    ).toBeInTheDocument();
 });
 
 it('does not turn missing severity risk or status into a reassuring known state', () => {

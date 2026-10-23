@@ -1,6 +1,13 @@
 /* eslint-disable no-restricted-syntax -- Risk Assessment register table built on the
  * shared register-row-kit; bespoke row chrome (keyboard-openable rows, right-click
  * context menu) with semantic design tokens only. */
+import {
+    RecordIdentity,
+    RecordPerson,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import type { ShiftCtxItem } from '@/components/rostering';
 import { riskHref } from '@/lib/health-safety/risk-navigation';
 import { cn } from '@/lib/utils';
@@ -25,9 +32,14 @@ import type { MouseEvent, ReactNode } from 'react';
 import {
     AcceptableBadge,
     AttachChip,
+    attachMeta,
+    attachTypeLabel,
+    LevelBadge,
     LevelCell,
     RA_TONE_SOLID,
+    RaStatusBadge,
     ReviewBadge,
+    ReviewDue,
     StatusChip,
 } from './ra-kit';
 import type { RaRow } from './types';
@@ -160,6 +172,220 @@ export function buildRaCtxItems(
         },
     );
     return items;
+}
+
+/**
+ * The same actions as `buildRaCtxItems`, as the shared list menu: one list
+ * behind the row's kebab and its right-click (DESIGN.md entity rows).
+ */
+export function raMenuItems(
+    row: RaRow,
+    canManage: boolean,
+    h: RaCtxHandlers,
+): MenuItem[] {
+    const editable =
+        row.status === 'draft' ||
+        row.status === 'active' ||
+        row.status === 'under_review';
+    return compactMenu([
+        { label: 'View assessment', icon: Eye, onClick: () => h.onView(row) },
+        canManage &&
+            row.status === 'draft' && {
+                label: 'Edit draft',
+                icon: Pencil,
+                onClick: () => h.onEdit(row),
+            },
+        canManage &&
+            row.status === 'draft' && {
+                label: 'Approve & activate',
+                icon: ShieldCheck,
+                onClick: () => h.onApprove(row),
+            },
+        canManage &&
+            row.status === 'active' && {
+                label: 'Mark for review',
+                icon: RefreshCw,
+                onClick: () => h.onReview(row),
+            },
+        canManage &&
+            (row.status === 'active' || row.status === 'under_review') && {
+                label: 'Record residual risk',
+                icon: RefreshCw,
+                onClick: () => h.onResidual(row),
+            },
+        canManage &&
+            (row.status === 'active' || row.status === 'under_review') && {
+                label: 'Supersede',
+                icon: Layers,
+                onClick: () => h.onSupersede(row),
+            },
+        canManage && editable && { separator: true },
+        canManage &&
+            editable && {
+                label: 'Archive',
+                icon: Archive,
+                danger: true,
+                onClick: () => h.onArchive(row),
+            },
+        (row.status === 'superseded' || row.status === 'archived') &&
+            !!row.superseded_by_id &&
+            !!h.onOpenCurrent && {
+                label: 'Open current version',
+                icon: ExternalLink,
+                onClick: () => h.onOpenCurrent!(row.superseded_by_id!),
+            },
+        { separator: true },
+        { label: 'Copy link', icon: Link2, onClick: () => h.onCopyLink(row) },
+    ]);
+}
+
+/**
+ * The drawn register (pg-hsn-61): reference, the risk, what it applies to,
+ * status, review due, the score before and after controls, and the assessor.
+ * The row opens the assessment; the kebab and right-click share one list.
+ */
+export function RaRegisterTable({
+    rows,
+    title = 'Risk assessment register',
+    sub,
+    footer,
+    empty,
+    onOpen,
+    actionsFor,
+    hrefFor = riskHref,
+}: {
+    rows: RaRow[];
+    title?: string;
+    sub?: ReactNode;
+    footer?: ReactNode;
+    empty?: ReactNode;
+    onOpen: (id: number) => void;
+    actionsFor: (row: RaRow) => MenuItem[];
+    hrefFor?: (id: number) => string;
+}) {
+    const columns: RecordTableColumn<RaRow>[] = [
+        {
+            key: 'reference',
+            label: 'Reference',
+            nowrap: true,
+            cell: (r) => (
+                <Link
+                    href={hrefFor(r.id)}
+                    onClick={(event) => event.stopPropagation()}
+                    className="rounded-sm font-medium text-foreground tabular-nums underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                    {r.reference_number}
+                </Link>
+            ),
+        },
+        {
+            key: 'risk',
+            label: 'Risk',
+            className: 'min-w-[12rem] max-w-[16rem]',
+            cell: (r) => (
+                <RecordIdentity
+                    title={r.title}
+                    sub={
+                        r.risk_description ? (
+                            <span className="line-clamp-2">
+                                {r.risk_description}
+                            </span>
+                        ) : undefined
+                    }
+                />
+            ),
+        },
+        {
+            key: 'applies',
+            label: 'Applies to',
+            className: 'min-w-[10rem]',
+            cell: (r) => {
+                const Icon = attachMeta(r.attached_to.type).icon;
+                return (
+                    <RecordIdentity
+                        leading={<Icon className="size-3.5" />}
+                        title={r.attached_to.name}
+                        sub={attachTypeLabel(r.attached_to.type)}
+                    />
+                );
+            },
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            nowrap: true,
+            cell: (r) => <RaStatusBadge status={r.status} />,
+        },
+        {
+            key: 'review',
+            label: 'Review due',
+            nowrap: true,
+            cell: (r) => (
+                <ReviewDue
+                    state={r.review_state}
+                    dueAt={r.review_due_at}
+                    status={r.status}
+                />
+            ),
+        },
+        {
+            key: 'before',
+            label: 'Before controls',
+            nowrap: true,
+            cell: (r) => <LevelBadge score={r.risk_score} level={r.risk_level} />,
+        },
+        {
+            key: 'after',
+            label: 'After controls',
+            cell: (r) => (
+                <div className="grid justify-items-start gap-1">
+                    {r.residual_risk_score != null && r.residual_risk_level ? (
+                        <LevelBadge
+                            score={r.residual_risk_score}
+                            level={r.residual_risk_level}
+                        />
+                    ) : (
+                        <span className="text-muted-foreground">—</span>
+                    )}
+                    <span className="text-subtle">
+                        Acceptable:{' '}
+                        {r.risk_acceptable === null
+                            ? 'Not recorded'
+                            : r.risk_acceptable
+                              ? 'Yes'
+                              : 'No'}
+                    </span>
+                </div>
+            ),
+        },
+        {
+            key: 'assessor',
+            label: 'Assessed by',
+            nowrap: true,
+            cell: (r) =>
+                r.assessed_by_name ? (
+                    <RecordPerson name={r.assessed_by_name} />
+                ) : (
+                    <span className="text-muted-foreground">Not recorded</span>
+                ),
+        },
+    ];
+    return (
+        <RecordTable
+            title={title}
+            sub={sub}
+            ariaLabel="Risk assessments table"
+            rows={rows}
+            rowKey={(r) => r.id}
+            onOpen={(r) => onOpen(r.id)}
+            actionsFor={actionsFor}
+            menuTitle={(r) => `${r.reference_number} · ${r.title}`}
+            menuIcon={ShieldAlert}
+            columns={columns}
+            empty={empty}
+            footer={rows.length ? footer : undefined}
+        />
+    );
 }
 
 export function RaTable({

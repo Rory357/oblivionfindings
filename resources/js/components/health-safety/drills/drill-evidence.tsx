@@ -1,3 +1,11 @@
+import {
+    EntityContextMenu,
+    EntityKebab,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
+import { Ring, Surface } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { FileDropzone, formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -7,9 +15,12 @@ import { useSafetyDraftState } from '@/hooks/use-safety-workspace-drafts';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { DRILL_REGISTER } from '@/lib/health-safety/drill-navigation';
 import { router } from '@inertiajs/react';
+import { Download, FileText, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { DrillCommandFooter, useDrillCommandForm } from './drill-command-form';
 import type { DrillWorkspaceDetail } from './types';
+
+type Attachment = DrillWorkspaceDetail['attachments'][number];
 
 type Upload = {
     key: string;
@@ -334,83 +345,113 @@ export function DrillEvidence({
     returnTo: string;
 }) {
     const [selected, setSelected] = useState<number | null>(null);
+    const fileMenu = useEntityContextMenu<Attachment>();
+    const menuFor = (item: Attachment): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Download',
+                icon: Download,
+                onClick: () => window.location.assign(item.url),
+            },
+            item.can.remove && { separator: true },
+            item.can.remove && {
+                label: `Remove ${item.original_name}`,
+                icon: Trash2,
+                danger: true,
+                onClick: () => setSelected(item.id),
+            },
+        ]);
     return (
-        <div className="space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-section-title">Evidence</h2>
-                {d.exports.evidence_href && (
-                    <a
-                        href={d.exports.evidence_href}
-                        className="frontline-tap frontline-focus inline-flex items-center text-primary underline"
-                    >
-                        Export evidence list
-                    </a>
-                )}
-            </div>
-            {d.can.add_evidence && (
-                <DrillEvidenceUpload detail={d} returnTo={returnTo} />
-            )}
+        <>
             {selected !== null && (
-                <RemoveEvidence
-                    key={selected}
-                    detail={d}
-                    attachmentId={selected}
-                    returnTo={returnTo}
-                    onClose={() => setSelected(null)}
-                />
+                <Surface tone="critical">
+                    <div className="p-[18px]">
+                        <RemoveEvidence
+                            key={selected}
+                            detail={d}
+                            attachmentId={selected}
+                            returnTo={returnTo}
+                            onClose={() => setSelected(null)}
+                        />
+                    </div>
+                </Surface>
             )}
-            {d.attachments.length ? (
-                <ul className="space-y-3">
-                    {d.attachments.map((item) => (
-                        <li
-                            key={item.id}
-                            className="space-y-2 rounded-lg border border-border p-4"
-                        >
-                            <a
-                                href={item.url}
-                                className="frontline-tap frontline-focus inline-flex items-center break-all text-primary underline"
+            <Surface title="Evidence">
+                {d.attachments.length ? (
+                    <ul className="sg-list mt-2">
+                        {d.attachments.map((item) => (
+                            <li
+                                key={item.id}
+                                className="flex items-center"
+                                onContextMenu={(event) =>
+                                    fileMenu.open(event, item)
+                                }
                             >
-                                {item.original_name}
-                            </a>
-                            <p className="text-subtle">
-                                {formatFileSize(item.size ?? 0)}
-                                {item.kind ? ` · ${item.kind}` : ''}
-                                {item.uploaded_by_name
-                                    ? ` · ${item.uploaded_by_name}`
-                                    : ''}{' '}
-                                ·{' '}
-                                {formatDateTimeLong(
-                                    item.created_at,
-                                    'Upload time not recorded',
-                                )}
-                            </p>
-                            {item.notes && (
-                                <p className="text-sm whitespace-pre-wrap">
-                                    {item.notes}
-                                </p>
-                            )}
-                            {item.alt_text && (
-                                <p className="text-subtle">
-                                    Image description: {item.alt_text}
-                                </p>
-                            )}
-                            {item.can.remove && (
-                                <Button
-                                    className="frontline-tap"
-                                    variant="outline"
-                                    onClick={() => setSelected(item.id)}
+                                <a
+                                    href={item.url}
+                                    className="sg-li min-w-0 flex-1"
                                 >
-                                    Remove {item.original_name}
-                                </Button>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-            ) : (
-                <p className="text-subtle">
-                    No evidence files are recorded for this drill.
-                </p>
+                                    <span
+                                        className="sg-li-lead"
+                                        aria-hidden="true"
+                                    >
+                                        <FileText className="size-4" />
+                                    </span>
+                                    <span className="sg-li-t">
+                                        <b className="break-all">
+                                            {item.original_name}
+                                        </b>
+                                        <small className="!whitespace-normal">
+                                            {[
+                                                formatFileSize(item.size ?? 0),
+                                                item.kind,
+                                                item.uploaded_by_name,
+                                                formatDateTimeLong(
+                                                    item.created_at,
+                                                    'Upload time not recorded',
+                                                ),
+                                                item.notes,
+                                                item.alt_text
+                                                    ? `Image description: ${item.alt_text}`
+                                                    : null,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </small>
+                                    </span>
+                                </a>
+                                <EntityKebab
+                                    actions={menuFor(item)}
+                                    label={`Actions for ${item.original_name}`}
+                                    className="mr-3"
+                                />
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="sg-quiet">
+                        <Ring tone="none" />
+                        <span>No evidence files are recorded for this drill.</span>
+                    </p>
+                )}
+            </Surface>
+            {d.can.add_evidence && (
+                <Surface>
+                    <div className="p-[18px]">
+                        <DrillEvidenceUpload detail={d} returnTo={returnTo} />
+                    </div>
+                </Surface>
             )}
-        </div>
+            {fileMenu.ctx ? (
+                <EntityContextMenu
+                    x={fileMenu.ctx.x}
+                    y={fileMenu.ctx.y}
+                    icon={FileText}
+                    title={fileMenu.ctx.record.original_name}
+                    items={menuFor(fileMenu.ctx.record)}
+                    onClose={fileMenu.close}
+                />
+            ) : null}
+        </>
     );
 }

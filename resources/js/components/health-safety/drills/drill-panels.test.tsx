@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    within,
+} from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
     DrillConnections,
@@ -151,10 +157,15 @@ it('shows captured history dates and facts rather than substituting current valu
             }}
         />,
     );
-    expect(screen.getByText('Original drill')).toBeTruthy();
-    expect(screen.getByText('Original description')).toBeTruthy();
-    expect(screen.getByText('6 Apr 2025')).toBeTruthy();
-    expect(screen.getByText('7 Apr 2025')).toBeTruthy();
+    // Each entry opens its recorded details (pg-hsn-66f "Details").
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
+    const recorded = within(
+        screen.getByRole('region', { name: 'Recorded details' }),
+    );
+    expect(recorded.getByText('Original drill')).toBeTruthy();
+    expect(recorded.getByText('Original description')).toBeTruthy();
+    expect(recorded.getByText('6 Apr 2025')).toBeTruthy();
+    expect(recorded.getByText('7 Apr 2025')).toBeTruthy();
     expect(screen.queryByText('Current drill')).toBeNull();
     expect(screen.queryByText('/private/do-not-render')).toBeNull();
 });
