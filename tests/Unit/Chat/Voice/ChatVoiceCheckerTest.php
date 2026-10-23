@@ -65,7 +65,6 @@ final class ChatVoiceCheckerTest extends TestCase
                 $cases["WebM $style $seconds s"] = [fn () => WebmFixtures::file(['style' => $style, 'seconds' => $seconds])];
             }
             $cases["Ogg Opus $seconds s"] = [fn () => OggFixtures::file(['seconds' => $seconds])];
-            $cases["Ogg Vorbis $seconds s"] = [fn () => OggFixtures::file(['codec' => 'vorbis', 'seconds' => $seconds])];
             $cases["MP4 moov first $seconds s"] = [fn () => Mp4Fixtures::file(['seconds' => $seconds])];
             $cases["MP4 mdat first $seconds s"] = [fn () => Mp4Fixtures::file(['seconds' => $seconds, 'movieFirst' => false])];
             $cases["MP4 fragmented $seconds s"] = [fn () => Mp4Fixtures::file(['seconds' => $seconds, 'fragmented' => true])];
@@ -169,7 +168,8 @@ final class ChatVoiceCheckerTest extends TestCase
             'Ogg two streams' => [$ogg(['secondStream' => true]), 'voice_file_invalid', 'ogg_two_streams'],
             'Ogg wrong codec' => [$ogg(['codec' => 'speex']), 'voice_file_invalid', 'ogg_codec'],
             'Ogg too long' => [$ogg(['seconds' => 121.0]), 'voice_too_long', null],
-            'Ogg Vorbis too long' => [$ogg(['codec' => 'vorbis', 'seconds' => 121.0]), 'voice_too_long', null],
+            // Vorbis is refused (Stephan, 23 October 2026): its length can't be read without its setup header.
+            'Ogg Vorbis' => [$ogg(['codec' => 'vorbis']), 'voice_file_invalid', 'ogg_vorbis'],
             'Ogg too short' => [$ogg(['seconds' => 0.02]), 'voice_file_invalid', null],
             'Ogg cut inside a page' => [$cut(fn () => OggFixtures::file()->bytes, 0.5), 'voice_file_invalid', 'truncated'],
             'Ogg bad CRC' => [function () {
@@ -189,11 +189,6 @@ final class ChatVoiceCheckerTest extends TestCase
             'Ogg identification header not alone' => [$ogg(['tagsOnFirstPage' => true]), 'voice_file_invalid', 'ogg_first_page'],
             'Ogg page missing from the sequence' => [$ogg(['sequenceGap' => 5]), 'voice_file_invalid', 'ogg_page_sequence'],
             'Ogg continued flag without a continued packet' => [$ogg(['pageFlags' => [4 => 0x01]]), 'voice_file_invalid', 'ogg_continuation'],
-            'Ogg Vorbis position the packets cannot reach' => [$ogg(['codec' => 'vorbis', 'pages' => function ($pages) {
-                $pages[array_key_last($pages)]['granule'] += 1_000_000;
-
-                return $pages;
-            }]), 'voice_file_invalid', 'ogg_granule_range'],
 
             'MP4 two tracks' => [$mp4(['tracks' => 2]), 'voice_file_invalid', 'mp4_two_tracks'],
             'MP4 video track' => [$mp4(['handler' => 'vide']), 'voice_file_invalid', 'mp4_not_audio'],
@@ -228,6 +223,7 @@ final class ChatVoiceCheckerTest extends TestCase
 
                 return $boxes;
             }]), 'voice_file_invalid', 'mp4_fragment_order'],
+            'MP4 fragments describe a sample entry that does not exist' => [$mp4(['fragmented' => true, 'sampleDescription' => 2]), 'voice_file_invalid', 'mp4_sample_entries'],
             'MP4 missing sample table' => [$mp4(['trak' => function ($children) {
                 $children[1]['content'][2]['content'][2]['content'] = array_slice($children[1]['content'][2]['content'][2]['content'], 0, 4);
 
@@ -301,6 +297,17 @@ final class ChatVoiceCheckerTest extends TestCase
                 $block = "\xA3\x85\x81\x00\x00\x80\xFC";
 
                 return $head."\x1F\x43\xB6\x75\x01\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xE7\x81\x00".str_repeat($block, intdiv(20 * 1024 * 1024 - strlen($head) - 15, 7));
+            }],
+            'WebM of one-byte packets ending in a 20 MiB run of Opus padding bytes' => [function () {
+                // Found by the checker session: about a second of small blocks, then one packet whose
+                // padding-length bytes are 0xFF all the way to the end of the file.
+                $head = substr($bytes = WebmFixtures::file()->bytes, 0, strpos($bytes, "\x1F\x43\xB6\x75"));
+                $cluster = "\x1F\x43\xB6\x75\x01\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xE7\x81\x00".str_repeat("\xA3\x85\x81\x00\x00\x80\xFC", 400_000);
+                // 15 bytes of block header and packet start (ID, 8-byte size, track, time, flags, TOC, count).
+                $padding = 20 * 1024 * 1024 - strlen($head) - strlen($cluster) - 15;
+                $packet = "\x81\x00\x00\x80".chr((31 << 3) | 3)."\x41".str_repeat("\xFF", $padding);
+
+                return $head.$cluster."\xA3".WebmFixtures::size(strlen($packet), 8).$packet;
             }],
             'Ogg of 20 MiB of the smallest pages' => [function () {
                 $pages = OggFixtures::page(0x02, 0, 5, 0, [19], OpusFrames::head(1)).OggFixtures::page(0, 0, 5, 1, [16], 'OpusTags'.pack('V2', 0, 0));
@@ -390,6 +397,7 @@ final class ChatVoiceCheckerTest extends TestCase
             'code 3, VBR' => [$toc(31, 3)."\x83\x01\x02abcdef", 2880],
             'R7 code 3, VBR lengths past the end' => [$toc(31, 3)."\x83\x05\x05abc", null],
             'code 3, padding of 254 + 3' => [$toc(31, 3)."\x41\xFF\x03".'ab'.str_repeat("\0", 257), 960],
+            'R6 code 3, padding lengths that cannot fit' => [$toc(31, 3)."\x41".str_repeat("\xFF", 4000), null],
         ];
     }
 

@@ -94,7 +94,7 @@ final class Mp4Fixtures
         $children = [self::box('mvhd', self::full(0).pack('N3', 0, 0, 1000).pack('N', intdiv($ticks, 48))
             .pack('N', 0x00010000).pack('n', 0x0100).str_repeat("\0", 10).self::matrix().str_repeat("\0", 24).pack('N', 2)), ...$tracks];
         if ($fragmented) {
-            $children[] = self::box('mvex', [self::box('trex', self::full(0).pack('N5', 1, 1, 1024, 0, 0), ['ranges' => [[4, 8]]])]);
+            $children[] = self::box('mvex', [self::box('trex', self::full(0).pack('N5', 1, $o['sampleDescription'] ?? 1, 1024, 0, 0), ['ranges' => [[4, 8]]])]);
         }
 
         return self::box('moov', $children);

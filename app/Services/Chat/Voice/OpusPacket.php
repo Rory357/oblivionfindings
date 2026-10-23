@@ -71,6 +71,11 @@ final class OpusPacket
                         }
                         $value = ord($data[$position++]);
                         $padding += $value === 255 ? 254 : $value;
+                        // Stop as soon as the padding cannot fit in what is left: each 255 adds 254 bytes,
+                        // so a hostile run of them ends after about 1/255 of the packet.
+                        if ($padding > $end - $position) {
+                            throw new VoiceFormatException('opus_packet_padding'); // R6, R7
+                        }
                     } while ($value === 255);
                 }
                 $frameEnd = $end - $padding;

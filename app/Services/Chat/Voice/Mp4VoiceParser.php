@@ -586,7 +586,11 @@ final class Mp4VoiceParser
             if ($type === 'trex') {
                 $this->once($seen, 'trex');
                 $this->full($s, $e, 20);
-                ['track' => $track, 'duration' => $duration, 'size' => $size] = unpack('Ntrack/Ndescription/Nduration/Nsize', $this->b->data, $s + 4);
+                ['track' => $track, 'description' => $description, 'duration' => $duration, 'size' => $size] = unpack('Ntrack/Ndescription/Nduration/Nsize', $this->b->data, $s + 4);
+                // 'stsd' holds exactly one sample entry, so fragments can only describe entry 1.
+                if ($description !== 1) {
+                    throw new VoiceFormatException('mp4_sample_entries');
+                }
                 $this->trex = ['track' => $track, 'duration' => $duration, 'size' => $size];
             } elseif ($type === 'mehd') {
                 $this->once($seen, 'mehd');
@@ -642,6 +646,9 @@ final class Mp4VoiceParser
             $base = $moofStart;
         }
         if ($flags & 0x000002) {
+            if ($this->b->u32be($q, $e) !== 1) {
+                throw new VoiceFormatException('mp4_sample_entries');
+            }
             $q += 4;
         }
         $duration = $this->trex['duration'];
