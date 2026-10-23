@@ -1,6 +1,7 @@
 import { type ClientSafety } from '@/components/client-safety-ribbon';
 import ShiftClinicalEventCard from '@/components/clinical/shift-clinical-event-card';
 import ShiftObservationsDueCard from '@/components/clinical/shift-observations-due-card';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
 import {
     EligibilityStatusBadge,
@@ -10,10 +11,14 @@ import type { OverrideableWarning } from '@/components/eligibility/override-conf
 import { OverrideConfirmationDialog } from '@/components/eligibility/override-confirmation-dialog';
 import ShiftFormsCard from '@/components/operations/shift-forms-card';
 import ShiftMedicationCard from '@/components/operations/shift-medication-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import {
+    PageHeaderGlassButton,
+    PageHeaderMeterBlock,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageLayout,
+} from '@/components/page';
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
-import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,6 +48,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
@@ -50,7 +56,6 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
-    Building2,
     CalendarDays,
     Car,
     Check,
@@ -58,14 +63,13 @@ import {
     Clock,
     FileText,
     Handshake,
+    Info,
     ListChecks,
-    MapPin,
     MoreHorizontal,
     Pencil,
     Plus,
     Repeat,
     Shield,
-    User,
     UserPlus,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -73,7 +77,6 @@ import {
     CreateShiftDialog,
     type EditableShift,
 } from './components/create-shift-dialog';
-import { DonutCard } from './components/donut-card';
 import {
     ShiftAuditTimeline,
     type ShiftAuditTimelineEntry,
@@ -907,12 +910,49 @@ export default function ShiftShow({
         }
     }
 
-    // Hero footer button treatments — mirrors the redesign's heroPrimary (solid
-    // white) vs heroGhost (transparent, white outline) variants on the gradient.
-    const heroPrimaryButton =
-        'border border-transparent bg-white text-primary-strong shadow-sm hover:bg-white/90 hover:text-primary-strong';
-    const heroGhostButton =
-        'border border-white/30 bg-transparent text-white shadow-none hover:bg-white/10 hover:text-white';
+    // Second header line: where and how the shift runs, plus its timesheet.
+    const humanise = (value: string) => {
+        const words = value.split('_').join(' ');
+        return words.charAt(0).toUpperCase() + words.slice(1);
+    };
+    const shiftFacts = [
+        shift.site?.name,
+        shift.service_context?.name,
+        shift.is_sleepover ? 'Sleepover' : null,
+        shift.is_on_call ? 'On-call' : null,
+        shift.shift_type ? humanise(shift.shift_type) : null,
+        ...(shift.coverage_roles ?? []).map(humanise),
+        linkedTimesheet
+            ? `Timesheet #${linkedTimesheet.id} · ${humanise(linkedTimesheet.status)}`
+            : null,
+    ].filter((fact): fact is string => Boolean(fact));
+    const medicationRoundsGiven = Number(
+        medications?.stats?.scheduled?.completed ?? 0,
+    );
+    const medicationRoundsTotal =
+        medicationRoundsGiven + outstandingMedicationCount;
+
+    // Cancelling or reopening one shift changes cover, timesheets and
+    // medication rounds, so it is confirmed first.
+    const [occurrenceConfirm, setOccurrenceConfirm] = useState<
+        'cancel' | 'reopen' | null
+    >(null);
+    const [occurrenceSaving, setOccurrenceSaving] = useState(false);
+    const confirmOccurrence = () => {
+        if (occurrenceConfirm === null) return;
+        router.patch(
+            `/operations/shifts/${shift.id}/${occurrenceConfirm}`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setOccurrenceSaving(true),
+                onFinish: () => {
+                    setOccurrenceSaving(false);
+                    setOccurrenceConfirm(null);
+                },
+            },
+        );
+    };
 
     // Lower-priority manage actions collapse into the footer overflow menu.
     const canManageOccurrence = Boolean(auth?.can?.shifts?.manageAny);
@@ -933,9 +973,27 @@ export default function ShiftShow({
                 ...(returnContext
                     ? [
                           { title: 'Workforce', href: '/operations/rostering' },
-                          { title: returnContext.label, href: returnContext.href },
+                          {
+                              title: returnContext.label,
+                              href: returnContext.href,
+                          },
                       ]
-                    : [{ title: 'Shifts', href: '/operations/shifts' }]),
+                    : auth?.can?.rostering?.viewAny
+                      ? [
+                            {
+                                title: 'Workforce',
+                                href: '/operations/rostering',
+                            },
+                            {
+                                title: 'Rostering',
+                                href: '/operations/rostering',
+                            },
+                            { title: 'Shifts', href: '/operations/shifts' },
+                        ]
+                      : [
+                            { title: 'Workforce', href: '/operations/shifts' },
+                            { title: 'Shifts', href: '/operations/shifts' },
+                        ]),
                 {
                     title: `${name} (${formatDate(shift.starts_at)})`,
                     href: `/operations/shifts/${shift.id}`,
@@ -944,237 +1002,149 @@ export default function ShiftShow({
         >
             <Head title={`Shift — ${name}`} />
 
-            <PageShell>
-                {/* Hero header */}
-                <PageHero
-                    title={name}
-                    description={formatDate(shift.starts_at)}
-                    avatar={{ fallback: buildShiftHeroInitials(name) }}
-                    backHref={returnContext?.href ?? '/operations/shifts'}
-                    backLabel={returnContext?.label ?? 'All shifts'}
-                    meta={[
-                        {
-                            icon: Clock,
-                            label: `${formatTime(shift.starts_at)} – ${formatTime(shift.ends_at)}`,
-                        },
-                        ...(shift.location
-                            ? [{ icon: MapPin, label: shift.location }]
-                            : []),
-                        {
-                            icon: User,
-                            label: shift.staff?.name ?? 'Unassigned',
-                        },
-                        ...(shift.actual_starts_at
-                            ? [
-                                  {
-                                      label: `Actual in: ${formatTime(shift.actual_starts_at)}${
-                                          shift.actual_ends_at
-                                              ? ` – ${formatTime(shift.actual_ends_at)}`
-                                              : ''
-                                      }`,
-                                  },
-                              ]
-                            : []),
-                    ]}
-                    badges={[
-                        ...(shift.site
-                            ? [{ icon: Building2, label: shift.site.name }]
-                            : []),
-                        ...(shift.service_context
-                            ? [{ label: shift.service_context.name }]
-                            : []),
-                        ...(shift.is_sleepover ? [{ label: 'Sleepover' }] : []),
-                        ...(shift.is_on_call ? [{ label: 'On-call' }] : []),
-                        ...(shift.shift_type
-                            ? [{ label: shift.shift_type.split('_').join(' ') }]
-                            : []),
-                        ...(shift.coverage_roles ?? []).map((role) => ({
-                            label: role.split('_').join(' '),
-                        })),
-                    ]}
-                    actions={
-                        <div className="flex flex-wrap items-center justify-end gap-2">
+            <PageLayout
+                hero={
+                    <WorkforcePageHeader
+                        variant="profile"
+                        backHref={returnContext?.href ?? '/operations/shifts'}
+                        mark={
+                            <span className="eh-mark-ring text-lg font-bold tracking-tight">
+                                {buildShiftHeroInitials(name)}
+                            </span>
+                        }
+                        title={name}
+                        wrapTitle
+                        titleChip={
                             <ShiftStatusBadge
                                 status={shift.status}
                                 showIcon
-                                className="border-white/30 bg-white/10 text-white"
+                                className="rounded-[8px] font-semibold"
                             />
-                            {linkedTimesheet ? (
-                                <Button asChild size="sm" variant="secondary">
-                                    <Link
-                                        href={`/operations/timesheets?view=${linkedTimesheet.id}`}
-                                        className="gap-1.5"
-                                    >
-                                        <FileText className="h-4 w-4" />
-                                        <span>
-                                            Timesheet #{linkedTimesheet.id}
-                                        </span>
-                                        <TimesheetStatusBadge
-                                            status={linkedTimesheet.status}
-                                            className="ml-1 border-white/30 bg-white/15 text-[10px] text-white uppercase"
-                                        />
-                                    </Link>
-                                </Button>
-                            ) : null}
-                            {shift.respite_booking ? (
-                                <Button asChild size="sm" variant="secondary">
-                                    <Link
-                                        href={`/respite/bookings/${shift.respite_booking.id}`}
-                                        className="gap-1.5"
-                                    >
-                                        <CalendarDays className="h-4 w-4" />
-                                        Booking #{shift.respite_booking.id}
-                                    </Link>
-                                </Button>
-                            ) : null}
-                            {can.edit_shift === true ? (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => setEditOpen(true)}
-                                >
-                                    <Pencil className="h-4 w-4" />
-                                    Edit shift
-                                </Button>
-                            ) : null}
-                            {can.view_client_profile === true &&
-                            links.client_care ? (
-                                <Button asChild size="sm" variant="secondary">
-                                    <Link
-                                        href={links.client_care}
-                                        className="gap-1.5"
-                                    >
-                                        <Shield className="h-4 w-4" />
-                                        View client profile
-                                    </Link>
-                                </Button>
-                            ) : null}
-                        </div>
-                    }
-                    footer={
-                        <div className="flex flex-col items-stretch gap-2.5 py-3 md:flex-row md:items-center md:justify-between">
-                            <span className="inline-flex items-center gap-2 text-xs font-medium text-white/85">
-                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                {buildShiftHeroWorkflowNote(
-                                    shift.status,
-                                    linkedTimesheet?.id,
-                                )}
-                            </span>
-
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                {canStartShift ? (
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        className={heroGhostButton}
-                                        onClick={() =>
-                                            router.patch(
-                                                `/operations/shifts/${shift.id}/start`,
-                                                {},
-                                                { preserveScroll: true },
-                                            )
-                                        }
-                                    >
-                                        <ArrowRight className="h-4 w-4" />
-                                        Start shift
-                                    </Button>
+                        }
+                        subline={
+                            <>
+                                <span className="block">
+                                    {[
+                                        formatDate(shift.starts_at),
+                                        `${formatTime(shift.starts_at)} – ${formatTime(shift.ends_at)}`,
+                                        shift.staff?.name ?? 'Unassigned',
+                                        shift.location,
+                                        shift.actual_starts_at
+                                            ? `Actual ${formatTime(shift.actual_starts_at)}${
+                                                  shift.actual_ends_at
+                                                      ? ` – ${formatTime(shift.actual_ends_at)}`
+                                                      : ''
+                                              }`
+                                            : null,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                </span>
+                                {shiftFacts.length > 0 ? (
+                                    <span className="block">
+                                        {shiftFacts.join(' · ')}
+                                    </span>
                                 ) : null}
-                                {canCompleteShift ? (
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        className={heroPrimaryButton}
-                                        onClick={() => setCompleteOpen(true)}
-                                    >
-                                        <CheckCircle2 className="h-4 w-4" />
-                                        Complete shift
-                                    </Button>
-                                ) : null}
-                                {can.create_incident ? (
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        className={heroGhostButton}
-                                        onClick={() => setIncidentOpen(true)}
-                                    >
-                                        <AlertTriangle className="h-4 w-4" />
-                                        Report incident
-                                    </Button>
-                                ) : null}
+                            </>
+                        }
+                        mobileSummary="Shift"
+                        actions={
+                            <>
                                 {linkedTimesheet ? (
-                                    <Button
+                                    <PageHeaderGlassButton
                                         asChild
-                                        size="sm"
-                                        variant="secondary"
-                                        className={heroGhostButton}
+                                        icon={FileText}
+                                        title={`Timesheet #${linkedTimesheet.id}`}
                                     >
                                         <Link
                                             href={`/operations/timesheets?view=${linkedTimesheet.id}`}
-                                            className="gap-1.5"
                                         >
-                                            <FileText className="h-4 w-4" />
                                             Open timesheet
                                         </Link>
-                                    </Button>
+                                    </PageHeaderGlassButton>
                                 ) : auth?.can?.timesheets?.create ||
                                   auth?.can?.timesheets?.manageAny ? (
-                                    <Button
+                                    <PageHeaderGlassButton
                                         asChild
-                                        size="sm"
-                                        variant="secondary"
-                                        className={heroGhostButton}
+                                        icon={FileText}
                                     >
                                         <Link
                                             href={`/operations/timesheets/create?shift_id=${shift.id}`}
-                                            className="gap-1.5"
                                         >
-                                            <FileText className="h-4 w-4" />
                                             Create timesheet
                                         </Link>
-                                    </Button>
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {shift.respite_booking ? (
+                                    <PageHeaderGlassButton
+                                        asChild
+                                        icon={CalendarDays}
+                                    >
+                                        <Link
+                                            href={`/respite/bookings/${shift.respite_booking.id}`}
+                                        >
+                                            Booking #{shift.respite_booking.id}
+                                        </Link>
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {can.view_client_profile === true &&
+                                links.client_care ? (
+                                    <PageHeaderGlassButton
+                                        asChild
+                                        icon={Shield}
+                                    >
+                                        <Link href={links.client_care}>
+                                            Client profile
+                                        </Link>
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {can.create_incident ? (
+                                    <PageHeaderGlassButton
+                                        icon={AlertTriangle}
+                                        onClick={() => setIncidentOpen(true)}
+                                    >
+                                        Report incident
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {can.edit_shift === true ? (
+                                    <PageHeaderGlassButton
+                                        icon={Pencil}
+                                        onClick={() => setEditOpen(true)}
+                                    >
+                                        Edit shift
+                                    </PageHeaderGlassButton>
                                 ) : null}
                                 {showOverflowMenu ? (
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button
-                                                size="icon"
-                                                variant="secondary"
+                                            <PageHeaderGlassButton
+                                                icon={MoreHorizontal}
                                                 aria-label="More shift actions"
-                                                className={heroGhostButton}
-                                            >
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
+                                                title="More shift actions"
+                                            />
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             {showCancelOccurrence ? (
                                                 <DropdownMenuItem
+                                                    className="text-status-critical focus:text-status-critical"
                                                     onSelect={() =>
-                                                        router.patch(
-                                                            `/operations/shifts/${shift.id}/cancel`,
-                                                            {},
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
+                                                        setOccurrenceConfirm(
+                                                            'cancel',
                                                         )
                                                     }
                                                 >
-                                                    Cancel occurrence
+                                                    Cancel this shift…
                                                 </DropdownMenuItem>
                                             ) : null}
                                             {showReopenOccurrence ? (
                                                 <DropdownMenuItem
                                                     onSelect={() =>
-                                                        router.patch(
-                                                            `/operations/shifts/${shift.id}/reopen`,
-                                                            {},
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
+                                                        setOccurrenceConfirm(
+                                                            'reopen',
                                                         )
                                                     }
                                                 >
-                                                    Reopen occurrence
+                                                    Reopen this shift…
                                                 </DropdownMenuItem>
                                             ) : null}
                                             {showRecurringSeries ? (
@@ -1189,64 +1159,121 @@ export default function ShiftShow({
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 ) : null}
-                            </div>
-                        </div>
-                    }
-                />
-
-                <div className="grid gap-3 lg:grid-cols-3">
-                    <DonutCard
-                        tone="primary"
-                        title="Task progress"
-                        subtitle="This shift"
-                        segments={taskSegments}
-                        centerValue={`${tasksDone}/${taskCount}`}
-                        centerLabel="done"
-                        accentKeys={['done']}
-                        cta="View tasks"
-                        active={resolvedActiveTab === 'tasks'}
-                        onClick={() => setActiveTab('tasks')}
+                                {canStartShift ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={ArrowRight}
+                                        onClick={() =>
+                                            router.patch(
+                                                `/operations/shifts/${shift.id}/start`,
+                                                {},
+                                                { preserveScroll: true },
+                                            )
+                                        }
+                                    >
+                                        Start shift
+                                    </PageHeaderPrimaryButton>
+                                ) : canCompleteShift ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={CheckCircle2}
+                                        onClick={() => setCompleteOpen(true)}
+                                    >
+                                        Complete shift
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Task progress"
+                                    value={`${tasksDone}/${taskCount}`}
+                                    ariaLabel="View tasks"
+                                    pressed={resolvedActiveTab === 'tasks'}
+                                    onClick={() => setActiveTab('tasks')}
+                                >
+                                    <PageHeaderMeterDonut
+                                        percent={
+                                            taskCount > 0
+                                                ? (tasksDone / taskCount) * 100
+                                                : 0
+                                        }
+                                        caption={
+                                            taskCount > 0
+                                                ? `${tasksDone} of ${taskCount} done`
+                                                : 'No tasks on this shift'
+                                        }
+                                    />
+                                </PageHeaderMeterBlock>
+                                {showMedications ? (
+                                    <PageHeaderMeterBlock
+                                        label="Medications"
+                                        value={outstandingMedicationCount}
+                                        tone={
+                                            outstandingMedicationCount > 0
+                                                ? 'warning'
+                                                : 'brand'
+                                        }
+                                        ariaLabel="View medications"
+                                        pressed={
+                                            resolvedActiveTab === 'medications'
+                                        }
+                                        onClick={() =>
+                                            setActiveTab('medications')
+                                        }
+                                    >
+                                        <PageHeaderMeterDonut
+                                            percent={
+                                                medicationRoundsTotal > 0
+                                                    ? (medicationRoundsGiven /
+                                                          medicationRoundsTotal) *
+                                                      100
+                                                    : 0
+                                            }
+                                            caption={
+                                                medicationRoundsTotal > 0
+                                                    ? `${outstandingMedicationCount} outstanding today`
+                                                    : 'No rounds scheduled today'
+                                            }
+                                        />
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {coverage ? (
+                                    <PageHeaderMeterBlock
+                                        label="Site coverage"
+                                        value={`${coverageRate}%`}
+                                        tone={
+                                            coverage.has_actionable_gap
+                                                ? 'critical'
+                                                : 'brand'
+                                        }
+                                        ariaLabel="View coverage"
+                                        pressed={
+                                            resolvedActiveTab === 'coverage'
+                                        }
+                                        onClick={() => setActiveTab('coverage')}
+                                    >
+                                        <PageHeaderMeterDonut
+                                            percent={coverageRate}
+                                            caption={`${coverage.assigned_staff} of ${coverage.required_staff} staff · ${coverage.window_label}`}
+                                        />
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                            </>
+                        }
+                        details={
+                            <span className="inline-flex items-center gap-2">
+                                <Info className="size-3.5 shrink-0" />
+                                {buildShiftHeroWorkflowNote(
+                                    shift.status,
+                                    linkedTimesheet?.id,
+                                )}
+                            </span>
+                        }
                     />
-                    {showMedications ? (
-                        <DonutCard
-                            tone={
-                                outstandingMedicationCount > 0
-                                    ? 'warning'
-                                    : 'success'
-                            }
-                            title="Medications"
-                            subtitle="Scheduled rounds today"
-                            segments={medicationSegments}
-                            centerValue={outstandingMedicationCount}
-                            centerLabel="outstanding"
-                            accentKeys={['due', 'late']}
-                            cta="View medications"
-                            active={resolvedActiveTab === 'medications'}
-                            onClick={() => setActiveTab('medications')}
-                        />
-                    ) : null}
-                    {coverage ? (
-                        <DonutCard
-                            tone={
-                                coverage.has_actionable_gap
-                                    ? 'critical'
-                                    : 'success'
-                            }
-                            title="Site coverage"
-                            subtitle={coverage.window_label}
-                            segments={coverageSegments}
-                            centerValue={`${coverageRate}%`}
-                            centerLabel="covered"
-                            accentKeys={['gap', 'open']}
-                            cta="View coverage"
-                            active={resolvedActiveTab === 'coverage'}
-                            onClick={() => setActiveTab('coverage')}
-                        />
-                    ) : null}
-                </div>
-
-                <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
-                    <main className="min-w-0 space-y-4">
+                }
+            >
+                <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+                    <main className="min-w-0 space-y-5">
                         <ShiftTabStrip
                             tabs={shiftTabs}
                             activeTab={resolvedActiveTab}
@@ -1266,7 +1293,7 @@ export default function ShiftShow({
                             <Card>
                                 <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 border-b">
                                     <div className="min-w-0">
-                                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                        <div className="mb-0.5 text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                             Care plan
                                         </div>
                                         <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
@@ -1344,7 +1371,7 @@ export default function ShiftShow({
                                 <Card>
                                     <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 border-b">
                                         <div className="min-w-0">
-                                            <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                            <div className="mb-0.5 text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                                 {coverage.site_name} ·{' '}
                                                 {coverage.window_label}
                                             </div>
@@ -1392,7 +1419,7 @@ export default function ShiftShow({
 
                                         <div className="grid gap-3 sm:grid-cols-3">
                                             <div className="rounded-lg border p-3">
-                                                <div className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                <div className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                                     Required
                                                 </div>
                                                 <div className="mt-1 text-lg font-bold tabular-nums">
@@ -1400,7 +1427,7 @@ export default function ShiftShow({
                                                 </div>
                                             </div>
                                             <div className="rounded-lg border p-3">
-                                                <div className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                <div className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                                     Assigned
                                                 </div>
                                                 <div className="mt-1 text-lg font-bold tabular-nums">
@@ -1408,7 +1435,7 @@ export default function ShiftShow({
                                                 </div>
                                             </div>
                                             <div className="rounded-lg border p-3">
-                                                <div className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                <div className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                                     Open shifts
                                                 </div>
                                                 <div
@@ -1860,7 +1887,7 @@ export default function ShiftShow({
                             {can.assign_shift ? (
                                 <Card>
                                     <CardHeader className="border-b">
-                                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                        <div className="mb-0.5 text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                             Ranked by fit &amp; eligibility
                                         </div>
                                         <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
@@ -2044,7 +2071,7 @@ export default function ShiftShow({
                                                             {candidate
                                                                 .blocked_reasons
                                                                 .length > 0 ? (
-                                                                <div className="mt-2 space-y-1 text-xs text-status-critical dark:text-status-critical">
+                                                                <div className="mt-2 space-y-1 text-xs text-status-critical">
                                                                     {candidate.blocked_reasons.map(
                                                                         (
                                                                             reason,
@@ -2066,7 +2093,7 @@ export default function ShiftShow({
                                                             {candidate
                                                                 .warning_reasons
                                                                 .length > 0 ? (
-                                                                <div className="mt-2 space-y-1 text-xs text-status-warning dark:text-status-warning">
+                                                                <div className="mt-2 space-y-1 text-xs text-status-warning">
                                                                     {candidate.warning_reasons.map(
                                                                         (
                                                                             reason,
@@ -2167,7 +2194,7 @@ export default function ShiftShow({
                                                                         }
                                                                         className={
                                                                             !isAlreadyAssigned
-                                                                                ? 'bg-status-warning hover:bg-status-warning dark:hover:bg-status-warning'
+                                                                                ? 'bg-status-warning hover:bg-status-warning'
                                                                                 : ''
                                                                         }
                                                                         onClick={() => {
@@ -2379,7 +2406,7 @@ export default function ShiftShow({
                             (can.request_replacement && shift.user_id) ? (
                                 <Card>
                                     <CardHeader className="border-b">
-                                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                        <div className="mb-0.5 text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                             {replacementRequest?.is_active
                                                 ? 'Active request'
                                                 : 'No active request'}
@@ -2480,7 +2507,7 @@ export default function ShiftShow({
                                                                 <Badge
                                                                     key={skill}
                                                                     variant="outline"
-                                                                    className="text-[10px]"
+                                                                    className="text-xs"
                                                                 >
                                                                     {skill}
                                                                 </Badge>
@@ -2795,7 +2822,7 @@ export default function ShiftShow({
                             {handover.length ? (
                                 <Card>
                                     <CardHeader className="border-b">
-                                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                        <div className="mb-0.5 text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                             Continuity of care
                                         </div>
                                         <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
@@ -3248,7 +3275,13 @@ export default function ShiftShow({
                 {createShiftLauncher.dialog}
 
                 <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
-                    <DialogContent className="sm:max-w-2xl">
+                    <DialogContent
+                        className="max-h-[90vh] overflow-y-auto"
+                        style={{
+                            maxWidth: 'min(92vw, 720px)',
+                            width: 'min(92vw, 720px)',
+                        }}
+                    >
                         <DialogHeader>
                             <DialogTitle>Complete shift</DialogTitle>
                             <DialogDescription>
@@ -3522,7 +3555,13 @@ export default function ShiftShow({
                 </Dialog>
 
                 <Dialog open={incidentOpen} onOpenChange={setIncidentOpen}>
-                    <DialogContent className="sm:max-w-2xl">
+                    <DialogContent
+                        className="max-h-[90vh] overflow-y-auto"
+                        style={{
+                            maxWidth: 'min(92vw, 720px)',
+                            width: 'min(92vw, 720px)',
+                        }}
+                    >
                         <DialogHeader>
                             <DialogTitle>Report incident</DialogTitle>
                             <DialogDescription>
@@ -3701,7 +3740,47 @@ export default function ShiftShow({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </PageShell>
+                <ConfirmDialog
+                    open={occurrenceConfirm !== null}
+                    onClose={() => {
+                        if (!occurrenceSaving) setOccurrenceConfirm(null);
+                    }}
+                    onConfirm={confirmOccurrence}
+                    processing={occurrenceSaving}
+                    variant={
+                        occurrenceConfirm === 'cancel'
+                            ? 'destructive'
+                            : 'default'
+                    }
+                    title={
+                        occurrenceConfirm === 'cancel'
+                            ? 'Cancel this shift?'
+                            : 'Reopen this shift?'
+                    }
+                    confirmText={
+                        occurrenceConfirm === 'cancel'
+                            ? 'Cancel shift'
+                            : 'Reopen shift'
+                    }
+                    cancelText="Keep as it is"
+                    description={
+                        <div className="space-y-2">
+                            <p className="font-medium text-foreground">
+                                {[
+                                    name,
+                                    formatDateTime(shift.starts_at),
+                                    shift.staff?.name ?? 'Unassigned',
+                                ].join(' · ')}
+                            </p>
+                            <p>
+                                {occurrenceConfirm === 'cancel'
+                                    ? 'The shift comes off the roster. Check its cover, timesheet and any medication rounds afterwards.'
+                                    : 'The shift goes back on the roster as scheduled. Check who is assigned and whether cover is still needed.'}
+                            </p>
+                        </div>
+                    }
+                />
+            </PageLayout>
         </AppLayout>
     );
 }

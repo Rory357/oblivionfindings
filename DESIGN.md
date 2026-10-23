@@ -641,6 +641,13 @@ before.
   the sidebar entry staying lit across the hub). Don't orphan a module
   that has no other entry (Roadmap became a Strategy hub tab), and never
   use hidden nav as the security boundary.
+  Reinforced 2026-10-12 for **Workforce**: six destinations — Rostering,
+  Available shifts, Attendance, Timesheets, Handovers, Settings. The Shifts
+  list, Conflict queue, Qualifications and Availability open from
+  Rostering's header (the Rostering entry stays lit on them); Shift notes
+  is a tab in the Handovers header. Their routes, permissions and command
+  search entries stay; someone who can't open Rostering (or the Shift notes
+  tab) keeps a direct entry instead (`buildWorkforceSubPanelGroups`).
 - **Auditor and developer language in member-facing copy** (corrected
   2026-09-14, Governance: "for a normal person it is difficult to
   understand") — reference codes used as names (`RES-2026-004` as a title

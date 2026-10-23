@@ -466,7 +466,17 @@ export default function PayrollAdjustmentsPending({
         }
     };
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/timesheets' },
+                { title: 'Timesheets', href: '/operations/timesheets' },
+                {
+                    title: 'Payroll adjustments',
+                    href: '/operations/timesheets/payroll-adjustments',
+                },
+            ]}
+        >
             <Head title="Payroll adjustments" />
             <PageShell>
                 <PageHeader

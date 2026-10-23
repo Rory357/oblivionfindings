@@ -35,6 +35,7 @@ import {
 } from '@/components/page';
 import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
 import AppLayout from '@/layouts/app-layout';
+import { index as rosteringIndex } from '@/routes/operations/rostering';
 import {
     cancel as cancelShift,
     complete as completeShift,
@@ -712,7 +713,7 @@ export default function ShiftsIndex({
                         value={heroSiteIds}
                         onChange={(next) => handleHeroFilter('site_ids', next)}
                         onDark
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <MultiEntityFilter
                         label="Staff"
@@ -722,7 +723,7 @@ export default function ShiftsIndex({
                         value={heroUserIds}
                         onChange={(next) => handleHeroFilter('user_ids', next)}
                         onDark
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <MultiEntityFilter
                         label="Client"
@@ -734,7 +735,7 @@ export default function ShiftsIndex({
                             handleHeroFilter('client_ids', next)
                         }
                         onDark
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <PageHeaderViewToggle
                         value={viewMode}
@@ -766,7 +767,12 @@ export default function ShiftsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Workforce', href: shiftsIndex.url() },
+                ...(auth?.can?.rostering?.viewAny
+                    ? [
+                          { title: 'Workforce', href: rosteringIndex.url() },
+                          { title: 'Rostering', href: rosteringIndex.url() },
+                      ]
+                    : [{ title: 'Workforce', href: shiftsIndex.url() }]),
                 { title: shiftPlural, href: shiftsIndex.url() },
             ]}
         >

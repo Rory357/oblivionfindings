@@ -55,7 +55,7 @@ export function MicroStats({
                         {s.value}
                         {s.suffix ?? ''}
                     </div>
-                    <div className="mt-0.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    <div className="mt-0.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                         {s.label}
                     </div>
                 </div>

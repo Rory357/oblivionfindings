@@ -394,7 +394,7 @@ export default function ShiftSeriesShow({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: '/operations/rostering' },
                 { title: 'Rostering', href: '/operations/rostering' },
                 {
                     title: 'Recurring series',
@@ -497,51 +497,8 @@ export default function ShiftSeriesShow({
                     </CardContent>
                 </Card>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-4">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground uppercase">
-                                Total
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">
-                                {stats.occurrences_total}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground uppercase">
-                                Remaining
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">
-                                {stats.remaining_occurrences}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground uppercase">
-                                Open
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">
-                                {stats.open_occurrences}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground uppercase">
-                                Replacements
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">
-                                {stats.active_replacements}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                    <div className="space-y-4">
+                <div className="mt-5 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="space-y-5">
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-base">
@@ -772,7 +729,7 @@ export default function ShiftSeriesShow({
                         </Card>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-base">
@@ -1036,10 +993,10 @@ export default function ShiftSeriesShow({
                             .
                         </p>
                         <p>
-                            Any cover requests or open-shift offers for them
-                            are closed. Staff aren&apos;t sent a notification,
-                            so let them know. You can still reopen single
-                            shifts afterwards.
+                            Any cover requests or open-shift offers for them are
+                            closed. Staff aren&apos;t sent a notification, so
+                            let them know. You can still reopen single shifts
+                            afterwards.
                         </p>
                     </div>
                 }

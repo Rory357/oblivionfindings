@@ -97,7 +97,12 @@ export function ResolveConflictDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <AlertTriangle className="h-5 w-5 text-status-critical" />
@@ -158,10 +163,10 @@ function ConflictShiftCard({
                         <span className="text-sm font-bold">
                             {shift.client ?? 'Shift'}
                         </span>
-                        <span className="rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                        <span className="rounded bg-background/80 px-1.5 py-0.5 text-xs font-semibold text-muted-foreground uppercase">
                             {primary ? 'Selected' : 'Overlaps'}
                         </span>
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground uppercase">
                             {statusLabel(shift.status)}
                         </span>
                     </div>

@@ -319,7 +319,7 @@ export function TypeBadge({
     return (
         <span
             className={cn(
-                'inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-foreground',
+                'inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-xs font-semibold text-foreground',
                 className,
             )}
             style={{ borderInlineStart: `3px solid ${meta.color}` }}

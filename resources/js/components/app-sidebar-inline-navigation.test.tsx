@@ -71,7 +71,7 @@ describe('inline application navigation', () => {
     it.each([
         [
             '/operations/workforce-settings?tab=safety',
-            'Workforce settings',
+            'Settings',
             { rostering: { viewAny: true } },
         ],
         [
@@ -81,13 +81,18 @@ describe('inline application navigation', () => {
         ],
         [
             '/operations/qualifications?site_id=3',
-            'Qualifications',
+            'Rostering',
             { rostering: { viewAny: true } },
         ],
         [
             '/operations/qualifications/check/17',
-            'Qualifications',
+            'Rostering',
             { rostering: { viewAny: true } },
+        ],
+        [
+            '/operations/shift-notes?site_id=3',
+            'Handovers',
+            { shifts: { viewAny: true }, rostering: { viewAny: true } },
         ],
     ])(
         'opens only Workforce automatically on %s',

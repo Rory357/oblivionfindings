@@ -16,6 +16,7 @@ import {
     Eye,
     FilePenLine,
     Flag,
+    MoreVertical,
     Pill,
     Send,
     User,
@@ -157,8 +158,7 @@ export function buildItems(
 export function useHandoverContextMenu(handlers: HandoverCtxHandlers) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
-    const openCtx = (e: ReactMouseEvent, h: Handover) => {
-        e.preventDefault();
+    const openAt = (x: number, y: number, h: Handover) => {
         const tag = STATUS_TAG[h.status] ?? STATUS_TAG.draft;
         const meta = [
             clientName(h.client),
@@ -168,8 +168,8 @@ export function useHandoverContextMenu(handlers: HandoverCtxHandlers) {
             .filter(Boolean)
             .join(' · ');
         setCtx({
-            x: e.clientX,
-            y: e.clientY,
+            x,
+            y,
             tag: statusLabel(h.status),
             tagBg: tag.bg,
             tagColor: tag.color,
@@ -178,9 +178,48 @@ export function useHandoverContextMenu(handlers: HandoverCtxHandlers) {
         });
     };
 
+    /** Right-click on a card or row. */
+    const openCtx = (e: ReactMouseEvent, h: Handover) => {
+        e.preventDefault();
+        openAt(e.clientX, e.clientY, h);
+    };
+
+    /** The ⋯ button: the same menu, anchored under the button (keyboard too). */
+    const openFromButton = (e: ReactMouseEvent<HTMLElement>, h: Handover) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        openAt(rect.left, rect.bottom + 4, h);
+    };
+
     const menu = ctx ? (
         <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
     ) : null;
 
-    return { openCtx, menu };
+    return { openCtx, openFromButton, menu };
+}
+
+/**
+ * The card/row actions button (LIST_STYLE_GUIDE: kebab AND right-click,
+ * one item set). Same geometry as the shared EntityKebab.
+ */
+export function HandoverActionsButton({
+    handover,
+    onOpen,
+}: {
+    handover: Handover;
+    onOpen: (e: ReactMouseEvent<HTMLElement>, h: Handover) => void;
+}) {
+    return (
+        // eslint-disable-next-line no-restricted-syntax -- Icon-only list kebab with the shared EntityKebab geometry (LIST_STYLE_GUIDE).
+        <button
+            type="button"
+            aria-haspopup="menu"
+            aria-label={`Actions for the handover for ${clientName(handover.client)}`}
+            className="frontline-hit flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={(e) => onOpen(e, handover)}
+            onKeyDown={(e) => e.stopPropagation()}
+        >
+            <MoreVertical className="size-4" />
+        </button>
+    );
 }

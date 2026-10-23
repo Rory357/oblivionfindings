@@ -12,6 +12,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { communicationAccess } from '@/components/workforce/communication-workspace-rail';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
 import {
@@ -370,15 +371,12 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
         return -1;
     }
 
-    // The Conflict Queue has its own Workforce entry; select that destination.
-    const conflictQueuePath = '/operations/rostering/conflicts';
-    if (
-        normalizedItemPath === '/operations/rostering' &&
-        (normalizedCurrentPath === conflictQueuePath ||
-            normalizedCurrentPath.startsWith(`${conflictQueuePath}/`))
-    ) {
-        return -1;
-    }
+    const workforceActive = workforcePrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (workforceActive !== undefined)
+        return workforceActive ? 2000 + item.length : -1;
 
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
@@ -1312,38 +1310,31 @@ function buildOperationsSubPanelGroups({
     return groups;
 }
 
+/**
+ * Workforce shows six destinations (Stephan, 12 Oct 2026): Rostering,
+ * Available shifts, Attendance, Timesheets, Handovers and Settings. The
+ * full Shifts list, Conflict queue, Qualifications and Availability are
+ * reached from Rostering's header; Shift notes is a tab in the Handovers
+ * header. Their routes and permissions are unchanged, and they stay in
+ * command search (`workforceSearchEntries`).
+ */
 function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const workforce: NavItem[] = [];
 
-    // The Shifts table is the scheduler view. Frontline staff still use
-    // `/my-day` for their assigned shifts rather than this manager surface.
-    if (can?.shifts?.viewAny)
-        workforce.push({
-            title: 'Shifts',
-            href: '/operations/shifts',
-            icon: CalendarDays,
-        });
-    if (
-        can?.job_board?.viewAny ||
-        can?.job_board?.claim ||
-        can?.shifts?.viewAny ||
-        can?.shifts?.viewAssigned
-    )
-        workforce.push({
-            title: 'Job Board',
-            href: '/operations/job-board',
-            icon: ClipboardList,
-            badge: can?.job_board?.open_count,
-        });
-    // Rostering's own TabStrip is the navigation for its Calendar tab
-    // (/operations/rostering?tab=calendar) — no separate sidebar item.
     if (can?.rostering?.viewAny)
         workforce.push({
             title: 'Rostering',
             href: '/operations/rostering',
             icon: CalendarDays,
         });
-    // Roster readers already reach this workspace through its Availability tab.
+    // Without roster access there is no Rostering header to reach these
+    // from, so shift readers and availability editors keep a direct entry.
+    if (!can?.rostering?.viewAny && can?.shifts?.viewAny)
+        workforce.push({
+            title: 'Shifts',
+            href: '/operations/shifts',
+            icon: CalendarDays,
+        });
     if (
         !can?.rostering?.viewAny &&
         (can?.staff?.viewAny ||
@@ -1355,23 +1346,17 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/operations/availability',
             icon: Clock,
         });
-    if (canAccessShiftHandovers(can))
+    if (
+        can?.job_board?.viewAny ||
+        can?.job_board?.claim ||
+        can?.shifts?.viewAny ||
+        can?.shifts?.viewAssigned
+    )
         workforce.push({
-            title: 'Handovers',
-            href: '/operations/handovers',
-            icon: GitBranch,
-        });
-    if (can?.shifts?.viewAny)
-        workforce.push({
-            title: 'Shift Notes',
-            href: '/operations/shift-notes',
-            icon: BookOpen,
-        });
-    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
-        workforce.push({
-            title: 'Timesheets',
-            href: '/operations/timesheets',
-            icon: Clock,
+            title: 'Available shifts',
+            href: '/operations/job-board',
+            icon: ClipboardList,
+            badge: can?.job_board?.open_count,
         });
     // Attendance (clock sessions ↔ timesheet sync) sits between Shifts and
     // Timesheets in the workflow; the route also admits frontline workers
@@ -1387,21 +1372,29 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/attendance',
             icon: Timer,
         });
-    if (can?.rostering?.viewAny)
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
         workforce.push({
-            title: 'Conflict Queue',
-            href: '/operations/rostering/conflicts',
-            icon: AlertTriangle,
+            title: 'Timesheets',
+            href: '/operations/timesheets',
+            icon: Clock,
+        });
+    if (canAccessShiftHandovers(can))
+        workforce.push({
+            title: 'Handovers',
+            href: '/operations/handovers',
+            icon: GitBranch,
+        });
+    // Shift notes keeps its own entry only for a shift reader whose Handovers
+    // header doesn't offer the Shift notes tab (that tab is shown to managers).
+    if (can?.shifts?.viewAny && !communicationAccess(can).notes)
+        workforce.push({
+            title: 'Shift notes',
+            href: '/operations/shift-notes',
+            icon: BookOpen,
         });
     if (can?.rostering?.viewAny)
         workforce.push({
-            title: 'Qualifications',
-            href: '/operations/qualifications',
-            icon: ShieldCheck,
-        });
-    if (can?.rostering?.viewAny)
-        workforce.push({
-            title: 'Workforce settings',
+            title: 'Settings',
             href: '/operations/workforce-settings',
             icon: Settings,
         });
@@ -1409,6 +1402,99 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     return workforce.length > 0
         ? [{ label: 'Workforce', items: workforce }]
         : [];
+}
+
+/** Former sidebar names stay searchable after the six-entry rename. */
+const WORKFORCE_SEARCH_KEYWORDS: Record<string, string[]> = {
+    '/operations/job-board': ['job board', 'open shifts', 'claim a shift'],
+    '/operations/workforce-settings': ['workforce settings'],
+};
+
+/**
+ * Workforce pages that are reached from a header rather than the sidebar,
+ * kept in command search under the entry that leads to them.
+ */
+function workforceSearchEntries(can?: any): Array<{
+    label: string;
+    href: string;
+    group: string;
+    icon: LucideIcon;
+    keywords?: string[];
+}> {
+    const entries: Array<{
+        label: string;
+        href: string;
+        group: string;
+        icon: LucideIcon;
+        keywords?: string[];
+    }> = [];
+    if (canAccessShiftHandovers(can) && communicationAccess(can).notes)
+        entries.push({
+            label: 'Shift notes',
+            href: '/operations/shift-notes',
+            group: 'Handovers',
+            icon: BookOpen,
+            keywords: ['progress notes', 'shift documentation'],
+        });
+    if (!can?.rostering?.viewAny) return entries;
+    entries.push({
+        label: 'Availability',
+        href: '/operations/rostering?tab=availability',
+        group: 'Rostering',
+        icon: Clock,
+    });
+    if (can?.shifts?.viewAny)
+        entries.push({
+            label: 'Shifts',
+            href: '/operations/shifts',
+            group: 'Rostering',
+            icon: CalendarDays,
+            keywords: ['shift list', 'all shifts'],
+        });
+    entries.push(
+        {
+            label: 'Conflict queue',
+            href: '/operations/rostering/conflicts',
+            group: 'Rostering',
+            icon: AlertTriangle,
+            keywords: ['conflicts', 'coverage problems'],
+        },
+        {
+            label: 'Qualifications',
+            href: '/operations/qualifications',
+            group: 'Rostering',
+            icon: ShieldCheck,
+            keywords: ['requirements', 'skills'],
+        },
+    );
+    return entries;
+}
+
+/**
+ * Keep the sidebar entry lit for the pages reached from its header:
+ * Rostering for the Shifts list, Conflict queue, Qualifications and
+ * Availability; Handovers for Shift notes.
+ */
+function workforcePrimaryLinkActive(
+    currentPath: string,
+    itemPath: string,
+): boolean | undefined {
+    const within = (prefix: string) =>
+        currentPath === prefix || currentPath.startsWith(`${prefix}/`);
+    if (itemPath === '/operations/rostering') {
+        return [
+            '/operations/rostering',
+            '/operations/shifts',
+            '/operations/qualifications',
+            '/operations/availability',
+        ].some(within);
+    }
+    if (itemPath === '/operations/handovers') {
+        return ['/operations/handovers', '/operations/shift-notes'].some(
+            within,
+        );
+    }
+    return undefined;
 }
 
 /** The Medication module's hubs (lib/emar-navigation.ts), each at its first permitted view. */
@@ -3124,15 +3210,18 @@ export function buildNavSearchCatalog(ctx: {
     };
 
     for (const icon of iconNavItems) {
-        if (icon.id === 'workforce' && can?.rostering?.viewAny) {
-            push({
-                id: 'workforce:rostering:availability',
-                label: 'Availability',
-                href: '/operations/rostering?tab=availability',
-                section: icon.label,
-                group: 'Rostering',
-                icon: Clock,
-            });
+        if (icon.id === 'workforce') {
+            for (const entry of workforceSearchEntries(can)) {
+                push({
+                    id: `workforce:rostering:${entry.href}`,
+                    label: entry.label,
+                    href: entry.href,
+                    section: icon.label,
+                    group: entry.group,
+                    icon: entry.icon,
+                    ...(entry.keywords ? { keywords: entry.keywords } : {}),
+                });
+            }
         }
         // Keep relocated Fleet pages discoverable in command search as well as
         // their workspace menus; consolidation only shortens the left rail.
@@ -3199,6 +3288,10 @@ export function buildNavSearchCatalog(ctx: {
                         icon: sub.icon ?? icon.icon,
                         ...(icon.id === 'emar'
                             ? { keywords: EMAR_SEARCH_KEYWORDS }
+                            : {}),
+                        ...(icon.id === 'workforce' &&
+                        WORKFORCE_SEARCH_KEYWORDS[href]
+                            ? { keywords: WORKFORCE_SEARCH_KEYWORDS[href] }
                             : {}),
                     });
                 }

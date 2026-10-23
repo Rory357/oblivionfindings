@@ -2,21 +2,23 @@ import {
     CalendarPlus,
     Copy,
     LayoutTemplate,
-    MoreVertical,
     Pencil,
     Plus,
     Search,
     Trash2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+
+import {
+    EntityContextMenu,
+    EntityKebab,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
 
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
@@ -129,7 +131,7 @@ function WeekStrip({ shifts }: { shifts: RosterTemplateShiftRow[] }) {
                         key={day}
                         title={`${day}: ${count} shift${count === 1 ? '' : 's'}`}
                         className={cn(
-                            'flex h-10 flex-1 flex-col items-center justify-center rounded-md border text-[10px] font-semibold',
+                            'flex h-10 flex-1 flex-col items-center justify-center rounded-md border text-xs font-semibold',
                             count
                                 ? 'border-primary/30 bg-primary/10 text-primary'
                                 : 'border-border bg-muted/40 text-muted-foreground',
@@ -154,22 +156,20 @@ function TemplateCard({
     canEdit,
     canDuplicate,
     canApply,
-    canDelete,
     onView,
     onEdit,
-    onDelete,
-    onDuplicate,
+    actions,
+    onContextMenu,
 }: {
     template: RosterTemplateRow;
     actionsBlocked: boolean;
     canEdit: boolean;
-    canDuplicate: boolean;
     canApply: boolean;
-    canDelete: boolean;
     onView: () => void;
     onEdit: () => void;
-    onDelete: () => void;
-    onDuplicate: () => void;
+    /** One item set for the ⋯ menu and the pane's right-click menu. */
+    actions: MenuItem[];
+    onContextMenu: (e: ReactMouseEvent) => void;
 }) {
     const assignedRows = template.template_shifts.filter(
         (s) => s.user_id != null,
@@ -189,6 +189,9 @@ function TemplateCard({
             tabIndex={0}
             data-test={`template-card-${template.id}`}
             onClick={onView}
+            onContextMenu={(e) => {
+                if (actions.length > 0) onContextMenu(e);
+            }}
             onKeyDown={(e) => {
                 if (
                     e.target === e.currentTarget &&
@@ -210,7 +213,7 @@ function TemplateCard({
                         {template.name}
                     </h3>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary capitalize">
+                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary capitalize">
                             {template.template_type}
                         </span>
                         <StatusBadge
@@ -221,63 +224,18 @@ function TemplateCard({
                     </div>
                 </div>
 
-                {canEdit || canDuplicate || canDelete ? (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="frontline-hit h-7 w-7 shrink-0 text-muted-foreground"
-                                aria-label="Template actions"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <MoreVertical className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                            align="end"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {canEdit ? (
-                                <DropdownMenuItem
-                                    disabled={actionsBlocked}
-                                    onSelect={() => onEdit()}
-                                >
-                                    <Pencil className="h-3.5 w-3.5" /> Edit
-                                    template
-                                </DropdownMenuItem>
-                            ) : null}
-                            {canDuplicate ? (
-                                <DropdownMenuItem
-                                    disabled={actionsBlocked}
-                                    onSelect={() => onDuplicate()}
-                                >
-                                    <Copy className="h-3.5 w-3.5" /> Duplicate
-                                </DropdownMenuItem>
-                            ) : null}
-                            {canDelete ? (
-                                <DropdownMenuItem
-                                    variant="destructive"
-                                    disabled={actionsBlocked}
-                                    onSelect={() => onDelete()}
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" /> Delete
-                                </DropdownMenuItem>
-                            ) : null}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                ) : null}
+                <EntityKebab label="Template actions" actions={actions} />
             </div>
 
             {template.description ? (
-                <p className="line-clamp-2 text-[13px] leading-snug [overflow-wrap:anywhere] text-muted-foreground">
+                <p className="line-clamp-2 text-sm leading-snug [overflow-wrap:anywhere] text-muted-foreground">
                     {template.description}
                 </p>
             ) : null}
 
             <WeekStrip shifts={template.template_shifts} />
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span>
                     <span className="font-semibold text-foreground tabular-nums">
                         {template.template_shifts_count}
@@ -358,6 +316,63 @@ export function TemplatesPane({
 }: TemplatesPaneProps) {
     const [search, setSearch] = useState('');
     const [localActiveOnly, setActiveOnly] = useState(false);
+    const rowMenu = useEntityContextMenu<RosterTemplateRow>();
+    const allowed = (template: RosterTemplateRow) => ({
+        canEdit: Boolean(
+            template.capabilities?.can_edit &&
+            capabilities.can_edit &&
+            template.urls?.update,
+        ),
+        canDuplicate: Boolean(
+            template.capabilities?.can_duplicate &&
+            capabilities.can_duplicate &&
+            template.urls?.duplicate,
+        ),
+        canApply: Boolean(
+            template.capabilities?.can_apply &&
+            capabilities.can_apply &&
+            template.urls?.apply,
+        ),
+        canDelete: Boolean(
+            template.capabilities?.can_delete &&
+            capabilities.can_delete &&
+            template.urls?.delete,
+        ),
+    });
+    const templateActions = (template: RosterTemplateRow): MenuItem[] => {
+        const can = allowed(template);
+        const wait = actionsBlocked
+            ? { disabled: 'Wait for the current template change to finish.' }
+            : {};
+        return compactMenu([
+            can.canEdit
+                ? {
+                      label: 'Edit template',
+                      icon: Pencil,
+                      onClick: () => onEdit(template),
+                      ...wait,
+                  }
+                : null,
+            can.canDuplicate
+                ? {
+                      label: 'Duplicate',
+                      icon: Copy,
+                      onClick: () => onDuplicate(template),
+                      ...wait,
+                  }
+                : null,
+            can.canDelete ? { separator: true } : null,
+            can.canDelete
+                ? {
+                      label: 'Delete template',
+                      icon: Trash2,
+                      danger: true,
+                      onClick: () => onDelete(template),
+                      ...wait,
+                  }
+                : null,
+        ]);
+    };
     const activeOnly = activeFilter ?? localActiveOnly;
 
     const list = useMemo(() => templates ?? [], [templates]);
@@ -450,7 +465,7 @@ export function TemplatesPane({
                                         aria-pressed={activeOnly === opt.key}
                                         onClick={() => setActiveOnly(opt.key)}
                                         className={cn(
-                                            'rounded-md px-3 py-1 text-[13px] font-semibold transition-colors',
+                                            'rounded-md px-3 py-1 text-sm font-semibold transition-colors',
                                             activeOnly === opt.key
                                                 ? 'bg-card text-foreground shadow-sm'
                                                 : 'text-muted-foreground hover:text-foreground',
@@ -480,61 +495,51 @@ export function TemplatesPane({
                             actionsBlocked={actionsBlocked}
                             key={template.id}
                             template={template}
-                            canEdit={Boolean(
-                                template.capabilities?.can_edit &&
-                                capabilities.can_edit &&
-                                template.urls?.update,
-                            )}
-                            canDuplicate={Boolean(
-                                template.capabilities?.can_duplicate &&
-                                capabilities.can_duplicate &&
-                                template.urls?.duplicate,
-                            )}
-                            canApply={Boolean(
-                                template.capabilities?.can_apply &&
-                                capabilities.can_apply &&
-                                template.urls?.apply,
-                            )}
-                            canDelete={Boolean(
-                                template.capabilities?.can_delete &&
-                                capabilities.can_delete &&
-                                template.urls?.delete,
-                            )}
+                            canEdit={allowed(template).canEdit}
+                            canApply={allowed(template).canApply}
                             onView={() => onView(template)}
                             onEdit={() => onEdit(template)}
-                            onDelete={() => onDelete(template)}
-                            onDuplicate={() => onDuplicate(template)}
+                            actions={templateActions(template)}
+                            onContextMenu={(e) => rowMenu.open(e, template)}
                         />
                     ))}
-                </div>
-            ) : (
-                <div className="flex flex-col items-center gap-3 rounded-[14px] border border-dashed border-border bg-card p-10 text-center shadow-sm">
-                    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
-                        <LayoutTemplate className="h-6 w-6" />
-                    </span>
-                    <div>
-                        <p className="text-sm font-semibold">
-                            {list.length === 0
-                                ? 'No roster templates yet'
-                                : 'No templates match your filters'}
-                        </p>
-                        <p className="mt-0.5 text-[13px] text-muted-foreground">
-                            {list.length === 0
-                                ? 'Save a reusable weekly pattern, then apply it to any week in a couple of clicks.'
-                                : 'Try clearing the search or the Active filter.'}
-                        </p>
-                    </div>
-                    {capabilities.can_create && list.length === 0 ? (
-                        <Button
-                            size="sm"
-                            disabled={actionsBlocked}
-                            onClick={onCreate}
-                        >
-                            <Plus className="h-4 w-4" /> Create your first
-                            template
-                        </Button>
+                    {rowMenu.ctx ? (
+                        <EntityContextMenu
+                            x={rowMenu.ctx.x}
+                            y={rowMenu.ctx.y}
+                            icon={LayoutTemplate}
+                            title={rowMenu.ctx.record.name}
+                            items={templateActions(rowMenu.ctx.record)}
+                            onClose={rowMenu.close}
+                        />
                     ) : null}
                 </div>
+            ) : (
+                <EmptyState
+                    icon={LayoutTemplate}
+                    title={
+                        list.length === 0
+                            ? 'No roster templates yet'
+                            : 'No templates match your filters'
+                    }
+                    description={
+                        list.length === 0
+                            ? 'Save a reusable weekly pattern, then apply it to any week in a couple of clicks.'
+                            : 'Try clearing the search or the Active filter.'
+                    }
+                    action={
+                        capabilities.can_create && list.length === 0 ? (
+                            <Button
+                                size="sm"
+                                disabled={actionsBlocked}
+                                onClick={onCreate}
+                            >
+                                <Plus className="size-4" /> Create your first
+                                template
+                            </Button>
+                        ) : undefined
+                    }
+                />
             )}
         </div>
     );

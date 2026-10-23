@@ -1,12 +1,20 @@
 import type { HandoverWorkerNotes } from '@/components/handover-person-notes';
 import HandoverPersonNotes from '@/components/handover-person-notes';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import { PageLayout } from '@/components/page';
+import {
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { StatusVariant } from '@/components/ui/status-badge';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
+    ArrowLeftRight,
     CheckCircle2,
     ClipboardList,
     Clock,
@@ -14,9 +22,9 @@ import {
     GitBranch,
     Pill,
     ShieldAlert,
-    User2,
     Users,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 type Person = { id: number; name: string } | null;
 
@@ -59,7 +67,7 @@ type Props = {
 
 function formatDateTime(value: string | null | undefined): string {
     if (!value) {
-        return '---';
+        return 'Not yet';
     }
 
     return new Date(value).toLocaleString('en-NZ', {
@@ -68,30 +76,31 @@ function formatDateTime(value: string | null | undefined): string {
     });
 }
 
-function statusBadge(status: string) {
-    switch (status) {
-        case 'acknowledged':
-            return (
-                <Badge className="gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Acknowledged
-                </Badge>
-            );
-        case 'submitted':
-            return (
-                <Badge
-                    variant="outline"
-                    className="gap-1 border-status-warning/30 text-status-warning"
-                >
-                    <Clock className="h-3 w-3" />
-                    Submitted
-                </Badge>
-            );
-        case 'draft':
-            return <Badge variant="secondary">Draft</Badge>;
-        default:
-            return <Badge variant="outline">{status.replace(/_/g, ' ')}</Badge>;
-    }
+const STATUS: Record<
+    string,
+    { label: string; variant: StatusVariant; icon?: typeof Clock }
+> = {
+    acknowledged: {
+        label: 'Acknowledged',
+        variant: 'success',
+        icon: CheckCircle2,
+    },
+    submitted: {
+        label: 'Waiting for acknowledgement',
+        variant: 'warning',
+        icon: Clock,
+    },
+    draft: { label: 'Draft', variant: 'neutral' },
+};
+
+function statusFor(status: string) {
+    const known = STATUS[status];
+    if (known) return known;
+    const words = status.replace(/_/g, ' ');
+    return {
+        label: words.charAt(0).toUpperCase() + words.slice(1),
+        variant: 'neutral' as StatusVariant,
+    };
 }
 
 function displayListItem(item: unknown): string {
@@ -127,40 +136,42 @@ function displayListItem(item: unknown): string {
     return String(item ?? '');
 }
 
-function DetailList({
-    title,
-    icon: Icon,
-    items,
-    emptyLabel,
-}: {
-    title: string;
-    icon: typeof ClipboardList;
-    items: unknown[] | null;
-    emptyLabel: string;
-}) {
-    const values = (items ?? [])
+function listValues(items: unknown[] | null): string[] {
+    return (items ?? [])
         .map(displayListItem)
         .map((value) => value.trim())
         .filter(Boolean);
+}
 
+function DetailList({
+    id,
+    title,
+    icon: Icon,
+    values,
+    emptyLabel,
+}: {
+    id: string;
+    title: string;
+    icon: typeof ClipboardList;
+    values: string[];
+    emptyLabel: string;
+}) {
     return (
-        <Card>
+        <Card id={id} className="scroll-mt-5">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                    <Icon className="h-4 w-4" />
+                    <Icon className="size-4" />
                     {title}
                 </CardTitle>
             </CardHeader>
             <CardContent>
                 {values.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        {emptyLabel}
-                    </p>
+                    <p className="text-subtle">{emptyLabel}</p>
                 ) : (
                     <ul className="space-y-2 text-sm">
                         {values.map((value, index) => (
                             <li
-                                key={`${title}-${index}`}
+                                key={`${id}-${index}`}
                                 className="rounded-md border bg-muted/20 px-3 py-2"
                             >
                                 {value}
@@ -170,6 +181,15 @@ function DetailList({
                 )}
             </CardContent>
         </Card>
+    );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div>
+            <div className="text-caption">{label}</div>
+            <div className="mt-1 text-sm font-medium">{children}</div>
+        </div>
     );
 }
 
@@ -183,33 +203,160 @@ function clientName(client: Client): string {
         : 'No client linked';
 }
 
-export default function HandoversShow({ handover }: Props) {
+function scrollToSection(id: string) {
+    document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function ShiftLink({
+    label,
+    shift,
+    fallbackStaff,
+    emptyLabel,
+}: {
+    label: string;
+    shift: ShiftSummary;
+    fallbackStaff: Person;
+    emptyLabel: string;
+}) {
     return (
-        <AppLayout>
-            <Head title={`Shift Handover #${handover.id}`} />
-            <PageHero
-                variant="compact"
-                title={`Shift Handover #${handover.id}`}
-                description="Review outgoing notes, pending work, and the shift-to-shift handover trail."
-                backHref="/operations/handovers"
-            />
-            <PageShell>
-                <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-                    <div className="space-y-4">
+        <div className="rounded-md border bg-muted/20 p-3">
+            <div className="text-caption">{label}</div>
+            {shift ? (
+                <div className="mt-1 space-y-1">
+                    <Link
+                        href={`/operations/shifts/${shift.id}`}
+                        className="font-medium hover:underline"
+                    >
+                        {formatDateTime(shift.starts_at)} to{' '}
+                        {formatDateTime(shift.ends_at)}
+                    </Link>
+                    <div className="text-muted-foreground">
+                        Staff: {personName(shift.staff ?? fallbackStaff)}
+                        <span className="text-caption">
+                            {' '}
+                            · Shift #{shift.id}
+                        </span>
+                    </div>
+                </div>
+            ) : (
+                <div className="mt-1 text-muted-foreground">{emptyLabel}</div>
+            )}
+        </div>
+    );
+}
+
+export default function HandoversShow({ handover }: Props) {
+    const status = statusFor(handover.status);
+    const client = clientName(handover.client);
+    const title = handover.client ? `Handover for ${client}` : 'Shift handover';
+    const tasks = listValues(handover.tasks_pending);
+    const followUps = listValues(handover.follow_up_items);
+    const medications = listValues(handover.medications_due);
+    const incidents = listValues(handover.incidents_to_note);
+    const observations = listValues(handover.observations_summary);
+
+    const meters: Array<{
+        id: string;
+        label: string;
+        values: string[];
+        caption: string;
+        tone?: 'warning';
+    }> = [
+        {
+            id: 'pending-tasks',
+            label: 'Pending tasks',
+            values: tasks,
+            caption: 'Carried to the next shift',
+        },
+        {
+            id: 'follow-up-items',
+            label: 'Follow-ups',
+            values: followUps,
+            caption: 'Items to check on',
+        },
+        {
+            id: 'medications-due',
+            label: 'Medications due',
+            values: medications,
+            caption: 'Prompts attached',
+        },
+        {
+            id: 'incidents-to-note',
+            label: 'Incidents to note',
+            values: incidents,
+            caption: 'Flagged in this handover',
+            ...(incidents.length > 0 ? { tone: 'warning' as const } : {}),
+        },
+    ];
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/handovers' },
+                { title: 'Handovers', href: '/operations/handovers' },
+                { title, href: `/operations/handovers/${handover.id}` },
+            ]}
+        >
+            <Head title={title} />
+            <PageLayout
+                hero={
+                    <WorkforcePageHeader
+                        variant="profile"
+                        mobileSummary="Handover"
+                        backHref="/operations/handovers"
+                        icon={ArrowLeftRight}
+                        title={title}
+                        wrapTitle
+                        titleChip={
+                            <PageHeaderStatusChip
+                                variant={status.variant}
+                                icon={status.icon}
+                            >
+                                {status.label}
+                            </PageHeaderStatusChip>
+                        }
+                        subline={`${personName(handover.outgoing_staff)} to ${personName(handover.incoming_staff)} · Submitted ${formatDateTime(handover.submitted_at)}`}
+                        meters={
+                            <>
+                                {meters.map((meter) => (
+                                    <PageHeaderMeterBlock
+                                        key={meter.id}
+                                        label={meter.label}
+                                        tone={meter.tone}
+                                        ariaLabel={`Go to ${meter.label.toLowerCase()}`}
+                                        onClick={() =>
+                                            scrollToSection(meter.id)
+                                        }
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {meter.values.length}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {meter.caption}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ))}
+                            </>
+                        }
+                    />
+                }
+            >
+                <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
+                    <div className="flex min-w-0 flex-col gap-5">
                         <Card>
                             <CardHeader>
                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <CardTitle className="text-lg">
-                                        Handover Notes
+                                    <CardTitle className="text-base">
+                                        Handover notes
                                     </CardTitle>
-                                    <div className="flex items-center gap-2">
-                                        {statusBadge(handover.status)}
-                                        {handover.client_mood ? (
-                                            <Badge variant="outline">
-                                                Mood: {handover.client_mood}
-                                            </Badge>
-                                        ) : null}
-                                    </div>
+                                    {handover.client_mood ? (
+                                        <Badge variant="outline">
+                                            Mood: {handover.client_mood}
+                                        </Badge>
+                                    ) : null}
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -223,255 +370,133 @@ export default function HandoversShow({ handover }: Props) {
                                     </p>
                                 )}
                                 <div className="grid gap-3 sm:grid-cols-3">
-                                    <div className="rounded-md border bg-muted/20 p-3">
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Created
-                                        </div>
-                                        <div className="mt-1 text-sm font-medium">
-                                            {formatDateTime(
-                                                handover.created_at,
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-md border bg-muted/20 p-3">
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Submitted
-                                        </div>
-                                        <div className="mt-1 text-sm font-medium">
-                                            {formatDateTime(
+                                    {(
+                                        [
+                                            ['Created', handover.created_at],
+                                            [
+                                                'Submitted',
                                                 handover.submitted_at,
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-md border bg-muted/20 p-3">
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Acknowledged
-                                        </div>
-                                        <div className="mt-1 text-sm font-medium">
-                                            {formatDateTime(
+                                            ],
+                                            [
+                                                'Acknowledged',
                                                 handover.acknowledged_at,
-                                            )}
+                                            ],
+                                        ] as const
+                                    ).map(([label, value]) => (
+                                        <div
+                                            key={label}
+                                            className="rounded-md border bg-muted/20 p-3"
+                                        >
+                                            <Fact label={label}>
+                                                {formatDateTime(value)}
+                                            </Fact>
                                         </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </CardContent>
                         </Card>
 
-                        <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="grid gap-5 xl:grid-cols-2">
                             <DetailList
-                                title="Pending Tasks"
+                                id="pending-tasks"
+                                title="Pending tasks"
                                 icon={ClipboardList}
-                                items={handover.tasks_pending}
+                                values={tasks}
                                 emptyLabel="No pending tasks were captured for this handover."
                             />
                             <DetailList
-                                title="Follow-up Items"
+                                id="follow-up-items"
+                                title="Follow-up items"
                                 icon={FileText}
-                                items={handover.follow_up_items}
+                                values={followUps}
                                 emptyLabel="No follow-up items were captured for this handover."
                             />
                             <DetailList
-                                title="Medications Due"
+                                id="medications-due"
+                                title="Medications due"
                                 icon={Pill}
-                                items={handover.medications_due}
+                                values={medications}
                                 emptyLabel="No medication prompts were attached to this handover."
                             />
                             <DetailList
-                                title="Incidents To Note"
+                                id="incidents-to-note"
+                                title="Incidents to note"
                                 icon={ShieldAlert}
-                                items={handover.incidents_to_note}
+                                values={incidents}
                                 emptyLabel="No incidents were flagged in this handover."
                             />
                         </div>
 
                         <DetailList
-                            title="Observations Summary"
+                            id="observations-summary"
+                            title="Observations summary"
                             icon={ClipboardList}
-                            items={handover.observations_summary}
+                            values={observations}
                             emptyLabel="No structured observations were recorded."
                         />
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="flex min-w-0 flex-col gap-5">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <Users className="h-4 w-4" />
+                                    <Users className="size-4" />
                                     People
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                                <div>
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Outgoing staff
-                                    </div>
-                                    <div className="mt-1 font-medium">
-                                        {personName(handover.outgoing_staff)}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Incoming staff
-                                    </div>
-                                    <div className="mt-1 font-medium">
-                                        {personName(handover.incoming_staff)}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Client
-                                    </div>
-                                    <div className="mt-1 font-medium">
-                                        {handover.client ? (
-                                            <Link
-                                                href={`/operations/clients/${handover.client.id}`}
-                                                className="hover:underline"
-                                            >
-                                                {clientName(handover.client)}
-                                            </Link>
-                                        ) : (
-                                            clientName(handover.client)
-                                        )}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Submitted by
-                                    </div>
-                                    <div className="mt-1 font-medium">
-                                        {personName(handover.submitter)}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Acknowledged by
-                                    </div>
-                                    <div className="mt-1 font-medium">
-                                        {personName(handover.acknowledger)}
-                                    </div>
-                                </div>
+                            <CardContent className="space-y-3">
+                                <Fact label="Outgoing staff">
+                                    {personName(handover.outgoing_staff)}
+                                </Fact>
+                                <Fact label="Incoming staff">
+                                    {personName(handover.incoming_staff)}
+                                </Fact>
+                                <Fact label="Client">
+                                    {handover.client ? (
+                                        <Link
+                                            href={`/operations/clients/${handover.client.id}`}
+                                            className="hover:underline"
+                                        >
+                                            {client}
+                                        </Link>
+                                    ) : (
+                                        client
+                                    )}
+                                </Fact>
+                                <Fact label="Submitted by">
+                                    {personName(handover.submitter)}
+                                </Fact>
+                                <Fact label="Acknowledged by">
+                                    {personName(handover.acknowledger)}
+                                </Fact>
                             </CardContent>
                         </Card>
 
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <GitBranch className="h-4 w-4" />
-                                    Shift Links
+                                    <GitBranch className="size-4" />
+                                    Shifts
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3 text-sm">
-                                <div className="rounded-md border bg-muted/20 p-3">
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Outgoing shift
-                                    </div>
-                                    {handover.outgoing_shift ? (
-                                        <div className="mt-1 space-y-1">
-                                            <Link
-                                                href={`/operations/shifts/${handover.outgoing_shift.id}`}
-                                                className="font-medium hover:underline"
-                                            >
-                                                Shift #
-                                                {handover.outgoing_shift.id}
-                                            </Link>
-                                            <div>
-                                                {formatDateTime(
-                                                    handover.outgoing_shift
-                                                        .starts_at,
-                                                )}{' '}
-                                                to{' '}
-                                                {formatDateTime(
-                                                    handover.outgoing_shift
-                                                        .ends_at,
-                                                )}
-                                            </div>
-                                            <div className="text-muted-foreground">
-                                                Staff:{' '}
-                                                {personName(
-                                                    handover.outgoing_shift
-                                                        .staff ??
-                                                        handover.outgoing_staff,
-                                                )}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="mt-1 text-muted-foreground">
-                                            No outgoing shift linked.
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="rounded-md border bg-muted/20 p-3">
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Incoming shift
-                                    </div>
-                                    {handover.incoming_shift ? (
-                                        <div className="mt-1 space-y-1">
-                                            <Link
-                                                href={`/operations/shifts/${handover.incoming_shift.id}`}
-                                                className="font-medium hover:underline"
-                                            >
-                                                Shift #
-                                                {handover.incoming_shift.id}
-                                            </Link>
-                                            <div>
-                                                {formatDateTime(
-                                                    handover.incoming_shift
-                                                        .starts_at,
-                                                )}{' '}
-                                                to{' '}
-                                                {formatDateTime(
-                                                    handover.incoming_shift
-                                                        .ends_at,
-                                                )}
-                                            </div>
-                                            <div className="text-muted-foreground">
-                                                Staff:{' '}
-                                                {personName(
-                                                    handover.incoming_shift
-                                                        .staff ??
-                                                        handover.incoming_staff,
-                                                )}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="mt-1 text-muted-foreground">
-                                            No incoming shift linked.
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <User2 className="h-4 w-4" />
-                                    Quick Summary
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm text-muted-foreground">
-                                <p>
-                                    {personName(handover.outgoing_staff)} handed
-                                    over to{' '}
-                                    {personName(handover.incoming_staff)}.
-                                </p>
-                                <p>
-                                    Current status:{' '}
-                                    <span className="font-medium text-foreground">
-                                        {handover.status.replace(/_/g, ' ')}
-                                    </span>
-                                </p>
-                                <p>
-                                    Client context:{' '}
-                                    <span className="font-medium text-foreground">
-                                        {clientName(handover.client)}
-                                    </span>
-                                </p>
+                                <ShiftLink
+                                    label="Outgoing shift"
+                                    shift={handover.outgoing_shift}
+                                    fallbackStaff={handover.outgoing_staff}
+                                    emptyLabel="No outgoing shift linked."
+                                />
+                                <ShiftLink
+                                    label="Incoming shift"
+                                    shift={handover.incoming_shift}
+                                    fallbackStaff={handover.incoming_staff}
+                                    emptyLabel="No incoming shift linked."
+                                />
                             </CardContent>
                         </Card>
                     </div>
                 </div>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }
