@@ -16,3 +16,9 @@ the viewer can be brought up to date later. Newest last.
 | 44 | Hub cards use the code's names ("Corrective action traceability"); descriptions are the drawing's | Keeps the hub and the report tabs named the same |
 | 80, 44 | Register and report cards show their flag and facts only when the source sends them | No invented counts (backend gaps: `register_status`, `attention`, `hub_status`) |
 | 20 | Each tab can be opened from a link (`?tab=leading` …) | Shareable links; not visible in the drawing |
+| 24 | The two approval choices keep the code's names and wording ("Separate specialist decision", "Authorised reviewer decision") | The approval dialog uses that wording; who can approve a plan stays described exactly as the code enforces it |
+| 24, 24c | "Good to know" lines keep the code's wording (ownership, consent, qualification) | Ownership and consent wording stays word for word; the drawing had plainer rewrites |
+| 24c | Routing and independent review each keep their own "Good to know" and change log | They are separate settings with separate histories; the drawing merged them into one |
+| 24c | Route lanes show a person icon, not initials | The lead's name is looked up from current access after the page loads |
+| 24e | The consent caveat sits as a note under the time bars; the history has its own card | The drawing didn't show the caveat or the history |
+| 24–24e | Each section can be opened from a link (`?view=routing` …) | Shareable links; not visible in the drawing |
