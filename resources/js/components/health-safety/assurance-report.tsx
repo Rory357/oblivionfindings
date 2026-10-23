@@ -1,5 +1,7 @@
+import { FactRows, Tally, type TallyItem } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import type { ReactNode } from 'react';
 
 type Value = string | number | boolean | null | Record<string, number>;
 type Row = Record<string, Value>;
@@ -30,24 +32,24 @@ const labels: Record<string, string> = {
     awaiting_review: 'Awaiting review',
     by_type: 'By type',
     open: 'Open actions',
-    awaiting_verification: 'Awaiting verification',
-    verified_period: 'Currently verified',
+    awaiting_verification: 'Waiting to be checked',
+    verified_period: 'Checked',
     by_priority: 'By priority',
     total_active: 'Active assessments',
     by_level: 'By risk level',
     extreme_risks: 'Extreme risks',
     high_risks: 'High risks',
-    unacceptable_risks: 'Risks recorded as unacceptable',
+    unacceptable_risks: 'Risks marked unacceptable',
     due_for_review: 'Due for review',
-    notifiable_period: 'Notifiable reviews reported in this period',
+    notifiable_period: 'Notifiable reviews this period',
     notifiable_open: 'Open notifiable reviews',
     pending_notification: 'Awaiting notification',
     notified: 'Notified',
     acknowledged: 'Acknowledged',
-    days_since_last_notifiable: 'Days since the last recorded notifiable event',
-    total_requirements: 'Training requirements configured',
+    days_since_last_notifiable: 'Days since the last notifiable event',
+    total_requirements: 'Training requirements set up',
     blocking_count: 'Requirements that block work',
-    non_compliant_staff: 'Staff recorded as expired or not started',
+    non_compliant_staff: 'Staff expired or not started',
     total_completed: 'Completed investigations',
     by_methodology: 'By methodology',
     total_recommendations: 'Recommendations',
@@ -155,35 +157,6 @@ function DisplayValue({ name, value }: { name: string; value: Value }) {
     );
 }
 
-function Facts({
-    row,
-    omitReference = false,
-}: {
-    row: Row;
-    omitReference?: boolean;
-}) {
-    return (
-        <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {Object.entries(row)
-                .filter(
-                    ([key]) =>
-                        labels[key] &&
-                        !(omitReference && key === 'reference_number'),
-                )
-                .map(([key, value]) => (
-                    <div key={key} className="min-w-0">
-                        <dt className="text-caption text-muted-foreground">
-                            {labels[key]}
-                        </dt>
-                        <dd className="mt-1 text-sm break-words whitespace-pre-wrap">
-                            <DisplayValue name={key} value={value} />
-                        </dd>
-                    </div>
-                ))}
-        </dl>
-    );
-}
-
 /** Only explicitly labelled measures are presented; legacy empty-denominator
  * percentages and computed overall assurance are not evidence of safety. */
 export function AssuranceReport({
@@ -211,55 +184,50 @@ export function AssuranceReport({
         ),
     );
     return (
-        <div className="space-y-5">
-            {report.generated_at && (
-                <p className="text-caption text-muted-foreground">
-                    Generated {formatDateTime(report.generated_at)}
-                </p>
-            )}
+        <div className="flex flex-col gap-5">
             {report.summary && (
-                <section
-                    aria-label="Report summary"
-                    className="rounded-xl border bg-card p-5"
-                >
-                    <Facts row={report.summary} />
-                </section>
+                <FactRows aria-label="Report summary" rows={factRows(report.summary)} />
             )}
-            {boardSections.map(
-                ([key, title]) =>
-                    report[key] && (
-                        <section
-                            key={key}
-                            className="rounded-xl border bg-card p-5"
-                            aria-label={title}
-                        >
-                            <h2 className="text-section-title mb-4">{title}</h2>
-                            <Facts row={report[key]} />
-                            {key === 'training_compliance' && (
-                                <p className="mt-4 text-sm text-muted-foreground">
-                                    These are recorded training checks. Missing
-                                    or unassessed records do not establish
-                                    compliance.
-                                </p>
-                            )}
-                        </section>
-                    ),
-            )}
+            {boardSections.map(([key, title]) => {
+                const section = report[key];
+                if (!section) return null;
+                const { items, breakdown } = boardMeasures(section);
+                const notifiedNone =
+                    key === 'worksafe_status' &&
+                    section.notified === 0 &&
+                    section.acknowledged === 0;
+                return (
+                    <Tally
+                        key={key}
+                        aria-label={title}
+                        title={title}
+                        sub={
+                            key === 'training_compliance'
+                                ? 'Training checks on record. Missing or unchecked records don’t prove compliance.'
+                                : breakdown || undefined
+                        }
+                        keepZeros
+                        items={
+                            notifiedNone
+                                ? items.filter((i) => i.label !== labels.notified && i.label !== labels.acknowledged)
+                                : items
+                        }
+                        calm={notifiedNone ? 'None notified in this period' : undefined}
+                    />
+                );
+            })}
             {rows && (
                 <>
                     <p className="text-sm text-muted-foreground" role="status">
                         {rows.length} of {report.items?.length} records
                     </p>
-                    <ul aria-label="Report records" className="space-y-3">
+                    <ul aria-label="Report records" className="grid gap-4">
                         {rows.map((row, index) => (
-                            <li
-                                key={`${row.reference_number ?? 'record'}:${index}`}
-                                className="rounded-xl border bg-card p-5"
-                            >
-                                <h2 className="text-section-title mb-4">
-                                    {String(row.reference_number ?? 'Record')}
-                                </h2>
-                                <Facts row={row} omitReference />
+                            <li key={`${row.reference_number ?? 'record'}:${index}`}>
+                                <FactRows
+                                    title={String(row.reference_number ?? 'Record')}
+                                    rows={factRows(row, true)}
+                                />
                             </li>
                         ))}
                     </ul>
@@ -274,4 +242,48 @@ export function AssuranceReport({
             )}
         </div>
     );
+}
+
+/** Measures whose number calls for attention when above zero (fixed status tones, never the brand). */
+const TONE: Record<string, 'critical' | 'warning'> = {
+    open_high_critical: 'critical',
+    overdue: 'critical',
+    awaiting_review: 'warning',
+    awaiting_verification: 'warning',
+    extreme_risks: 'critical',
+    high_risks: 'warning',
+    unacceptable_risks: 'critical',
+    due_for_review: 'warning',
+    pending_notification: 'critical',
+    non_compliant_staff: 'warning',
+};
+
+/** A board section as tally items (numbers) and one breakdown line ("By category: Incident 5 · Injury 3"). */
+function boardMeasures(section: Row): { items: TallyItem[]; breakdown: string } {
+    const items: TallyItem[] = [];
+    const parts: string[] = [];
+    for (const [key, value] of Object.entries(section)) {
+        if (!labels[key]) continue;
+        if (typeof value === 'number') {
+            items.push({
+                value: value.toLocaleString('en-NZ'),
+                label: labels[key],
+                tone: value > 0 ? TONE[key] : undefined,
+            });
+        } else if (value && typeof value === 'object') {
+            const entries = Object.entries(value);
+            if (entries.length)
+                parts.push(
+                    `${labels[key]}: ${entries.map(([k, n]) => `${phrase(k)} ${n.toLocaleString('en-NZ')}`).join(' · ')}`,
+                );
+        }
+    }
+    return { items, breakdown: parts.join(' · ') };
+}
+
+/** A record (or the summary) as label and value rows; only explicitly labelled fields are shown. */
+function factRows(row: Row, omitReference = false): [string, ReactNode][] {
+    return Object.entries(row)
+        .filter(([key]) => labels[key] && !(omitReference && key === 'reference_number'))
+        .map(([key, value]) => [labels[key], <DisplayValue key={key} name={key} value={value} />]);
 }

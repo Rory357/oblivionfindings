@@ -157,13 +157,13 @@ export interface TallyItem {
 }
 
 /** Related numbers on one line. Zeros fold into one calm sentence ("Nothing overdue or unassigned"). */
-export function Tally({ title, sub, action, items, calm, keepZeros = false }: Omit<SurfaceProps, 'children'> & { items: TallyItem[]; calm?: string; /** Measures where zero is a fact to show (rates, days since). */ keepZeros?: boolean }) {
+export function Tally({ title, sub, action, items, calm, keepZeros = false, ...rest }: Omit<SurfaceProps, 'children'> & { items: TallyItem[]; calm?: string; /** Measures where zero is a fact to show (rates, days since). */ keepZeros?: boolean }) {
     const isZero = (v: ReactNode) => !keepZeros && String(v).trim() === '0';
     const zeros = items.filter((i) => isZero(i.value));
     const shown = items.filter((i) => !isZero(i.value));
     const sentence = calm ?? (zeros.length ? `Nothing ${zeros.map((z) => z.label.toLowerCase()).join(' or ')}` : '');
     return (
-        <Surface title={title} sub={sub} action={action}>
+        <Surface title={title} sub={sub} action={action} aria-label={rest['aria-label']}>
             <div className="sg-tally">
                 {shown.map((i) => {
                     const body = (
@@ -1098,9 +1098,9 @@ export function RowList({ title, sub, action, items, empty, limit }: Omit<Surfac
 }
 
 /** Facts as label and value rows. */
-export function FactRows({ title, sub, action, rows }: Omit<SurfaceProps, 'children'> & { rows: [ReactNode, ReactNode][] }) {
+export function FactRows({ title, sub, action, rows, ...rest }: Omit<SurfaceProps, 'children'> & { rows: [ReactNode, ReactNode][] }) {
     return (
-        <Surface title={title} sub={sub} action={action}>
+        <Surface title={title} sub={sub} action={action} aria-label={rest['aria-label']}>
             <dl className={cn('sg-kv', title && 'mt-1')}>
                 {rows.map(([k, v], i) => (
                     <Fragment key={i}>

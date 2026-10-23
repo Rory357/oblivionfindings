@@ -1,7 +1,7 @@
 import { PageHeaderSearch } from '@/components/page';
+import { PlaceCards, SectionHead, type SgTone } from '@/components/signature/blocks';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { type SafetyView } from '@/lib/health-safety/workspace-navigation';
-import { Link } from '@inertiajs/react';
-import { ArrowRight } from 'lucide-react';
 
 export function SafetyDirectorySearch({
     value,
@@ -36,42 +36,48 @@ export function filterSafetyDirectory(views: SafetyView[], query: string) {
     );
 }
 
+/**
+ * What a register shows on its card (approved H&S drawings, 23 Oct): one flag and up to two facts, each from the
+ * register's own source. Optional — a card without status shows its description only, never invented counts.
+ */
+export type SafetyDirectoryStatus = {
+    flag?: { tone: 'critical' | 'warning' | 'success' | 'info' | 'neutral'; label: string } | null;
+    facts?: Array<{ tone: SgTone; text: string }>;
+};
+
+/** Each register (or report) as a card: its name, what it holds, its flag and facts; the whole card opens it. */
 export function SafetyDirectory({
     views,
     label,
+    status = {},
+    cols = 2,
 }: {
     views: SafetyView[];
     label: string;
+    status?: Record<string, SafetyDirectoryStatus | undefined>;
+    cols?: number;
 }) {
     return views.length ? (
-        <ul
-            aria-label={label}
-            className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
-        >
-            {views.map(({ key, icon: Icon, href, label, description }) => (
-                <li key={key}>
-                    <Link
-                        href={href}
-                        className="frontline-focus flex h-full min-h-28 items-start gap-3 rounded-xl border border-border bg-card p-5 transition-colors hover:bg-accent"
-                    >
-                        <Icon
-                            aria-hidden
-                            className="mt-0.5 size-5 shrink-0 text-primary"
-                        />
-                        <span className="min-w-0 flex-1">
-                            <span className="block font-semibold">{label}</span>
-                            <span className="mt-1 block text-sm text-muted-foreground">
-                                {description}
-                            </span>
-                        </span>
-                        <ArrowRight
-                            aria-hidden
-                            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                        />
-                    </Link>
-                </li>
-            ))}
-        </ul>
+        <section aria-label={label}>
+            <SectionHead title={label} />
+            <PlaceCards
+                cols={cols}
+                items={views.map((view) => {
+                    const s = status[view.key];
+                    return {
+                        name: view.label,
+                        sub: view.description,
+                        href: view.href,
+                        flag: s?.flag ? (
+                            <StatusBadge variant={s.flag.tone} size="sm">
+                                {s.flag.label}
+                            </StatusBadge>
+                        ) : undefined,
+                        facts: s?.facts,
+                    };
+                })}
+            />
+        </section>
     ) : (
         <p role="status" className="py-8 text-sm text-muted-foreground">
             No matching destinations. Try another search.
