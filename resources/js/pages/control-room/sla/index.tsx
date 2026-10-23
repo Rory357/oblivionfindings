@@ -1,6 +1,6 @@
 import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
 import { AlertStatusChip } from '@/components/control-room/alert-worklist/alert-status';
-import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
+import { ConfirmChip } from '@/components/control-room/alert-record/alert-sections';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

@@ -31,6 +31,8 @@ vi.mock('@inertiajs/react', async () => {
         router: {
             post: vi.fn(),
             delete: vi.fn(),
+            reload: vi.fn(),
+            get: vi.fn(),
         },
         usePage: () => ({ props: { flash: {}, auth: { user: { id: 7 } } } }),
         useForm: (initial: Record<string, unknown>) => {
@@ -92,15 +94,29 @@ vi.mock('@inertiajs/react', async () => {
 
 import {
     AddNoteForm,
-    ClosePane,
-    CreateIncidentPane,
     EvidenceSection,
     LinkedSection,
-    ResolvePane,
-    SensorConfirmPane,
-    WatchToggle,
     type AlertWorkspaceDetail,
-} from './alert-workspace-dialog';
+} from '@/components/control-room/alert-record/alert-sections';
+import {
+    useAlertActions,
+    type AlertActionKey,
+} from '@/components/control-room/alert-record/alert-actions';
+import { alertDetail } from '@/components/control-room/alert-record/test-fixtures';
+import { useEffect } from 'react';
+
+/** Opens one action's pop-up exactly as the alert page does. */
+function ActionHarness({
+    d,
+    action,
+}: {
+    d: AlertWorkspaceDetail;
+    action: AlertActionKey;
+}) {
+    const actions = useAlertActions(d);
+    useEffect(() => actions.run(action), []); // eslint-disable-line react-hooks/exhaustive-deps
+    return <>{actions.host}</>;
+}
 
 function detail(
     handover: AlertWorkspaceDetail['linked_hs_event'] extends infer T
@@ -336,31 +352,9 @@ describe('Control Room linked H&S handover', () => {
     });
 });
 
-describe('Control Room workspace permissions', () => {
-    it('does not render the manage-only watcher action for a read-only viewer', () => {
-        render(
-            <WatchToggle
-                d={
-                    {
-                        alert: { id: 41 },
-                        can: { manage: false, watch: false },
-                        watchers: [],
-                        staff: [],
-                        is_watching: false,
-                    } as unknown as AlertWorkspaceDetail
-                }
-            />,
-        );
-
-        expect(
-            screen.queryByRole('button', { name: /Watch this alert/ }),
-        ).not.toBeInTheDocument();
-    });
-});
-
 describe('Control Room journey gates', () => {
     function gateDetail(): AlertWorkspaceDetail {
-        return {
+        return alertDetail({
             alert: {
                 id: 41,
                 reference_number: 'CR-2026-0041',
@@ -368,20 +362,9 @@ describe('Control Room journey gates', () => {
                 alert_type: 'incident.fall',
                 severity: 'high',
                 status: 'triaging',
-                context: {},
                 notes: 'Resident found beside the bed.',
-                resolution_code: null,
-                triggered_at: '2026-07-16T05:30:00Z',
             },
             client: { id: 7, name: 'Aroha Rangi' },
-            tasks: [
-                {
-                    id: 81,
-                    title: 'Confirm the temporary control remains effective',
-                    status: 'in_progress',
-                },
-            ],
-            config_options: { resolution_codes: [] },
             resolve_gate: {
                 allowed: false,
                 requirements: [
@@ -404,16 +387,15 @@ describe('Control Room journey gates', () => {
                     },
                 ],
             },
-            journey_state: 'Operational response active',
-        } as unknown as AlertWorkspaceDetail;
+        } as Partial<AlertWorkspaceDetail>);
     }
 
-    it('blocks resolve on the server gate and removes the false open-task promise', () => {
-        render(<ResolvePane d={gateDetail()} onDone={vi.fn()} />);
+    it('blocks resolve on the server gate and says a linked incident stays open', () => {
+        render(<ActionHarness d={gateDetail()} action="resolve" />);
 
         expect(
             screen.getByText(
-                'Resolve ends the live operational response. It does not close the linked incident or H&S governance.',
+                'Ends the live response. A linked incident or H&S work stays open with its own owner.',
             ),
         ).toBeInTheDocument();
         expect(
@@ -421,31 +403,25 @@ describe('Control Room journey gates', () => {
                 name: /Complete, cancel with a reason, or transfer/,
             }),
         ).toHaveAttribute('href', '/control-room/alerts/41');
-        expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
-        expect(
-            screen.queryByText(/they stay open after resolving/i),
-        ).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Review resolution' })).toBeDisabled();
+        expect(screen.queryByText(/they stay open after resolving/i)).not.toBeInTheDocument();
     });
 
     it('blocks final alert closure until the linked journey gate is complete', () => {
         const d = gateDetail();
         d.alert.status = 'resolved';
 
-        render(<ClosePane d={d} onDone={vi.fn()} />);
+        render(<ActionHarness d={d} action="close" />);
 
         expect(
             screen.getByText(
-                'Close is available only when the incident and H&S governance are closed.',
+                'Closes the response record. This is only possible once the linked incident and H&S work are closed.',
             ),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole('link', {
-                name: 'Close linked incident INC-2026-0042',
-            }),
+            screen.getByRole('link', { name: 'Close linked incident INC-2026-0042' }),
         ).toHaveAttribute('href', '/incidents/42');
-        expect(
-            screen.getByRole('button', { name: 'Close alert' }),
-        ).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Close alert' })).toBeDisabled();
     });
 });
 
@@ -454,216 +430,131 @@ describe('Control Room immediate-control capture', () => {
         render(<AddNoteForm alertId={41} />);
 
         fireEvent.click(screen.getByRole('combobox', { name: 'Note purpose' }));
-        fireEvent.click(
-            await screen.findByRole('option', { name: 'Immediate controls' }),
-        );
+        fireEvent.click(await screen.findByRole('option', { name: 'Immediate controls' }));
         fireEvent.change(screen.getByPlaceholderText('Add an operator note…'), {
-            target: {
-                value: 'Area isolated and the resident checked.',
-            },
+            target: { value: 'Area isolated and the resident checked.' },
         });
         fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
 
         await waitFor(() =>
-            expect(inertia.post).toHaveBeenCalledWith(
-                '/control-room/alerts/41/note',
-                {
-                    note: 'Area isolated and the resident checked.',
-                    purpose: 'immediate_controls',
-                },
-            ),
+            expect(inertia.post).toHaveBeenCalledWith('/control-room/alerts/41/note', {
+                note: 'Area isolated and the resident checked.',
+                purpose: 'immediate_controls',
+            }),
         );
     });
 
-    it('shows where the immediate-action prefill came from and submits the operators edit', async () => {
-        const workspace = {
-            alert: {
-                id: 41,
-                reference_number: 'CR-2026-0041',
-                alert_type: 'fall',
-                severity: 'high',
-                context: {},
-            },
+    it('shows where the immediate-action prefill came from and reports the operator’s edit', async () => {
+        const d = alertDetail({
+            alert: { id: 41, reference_number: 'CR-2026-0041', alert_type: 'fall', severity: 'high' },
             client: { id: 7, name: 'Aroha Rangi' },
             incident_defaults: {
                 immediate_action_taken: 'Area isolated and first aid started.',
-                source_note: {
-                    id: 81,
-                    user_name: 'Moana Operator',
-                    created_at: '2026-07-16T05:30:00Z',
-                },
+                source_note: { id: 81, user_name: 'Moana Operator', created_at: '2026-07-16T05:30:00Z' },
             },
-        } as unknown as AlertWorkspaceDetail;
+        });
 
-        render(<CreateIncidentPane d={workspace} onDone={vi.fn()} />);
+        render(<ActionHarness d={d} action="report_incident" />);
 
-        expect(
-            screen.getByText(/Prefilled from an Immediate controls note/),
-        ).toHaveTextContent('Moana Operator');
-        const action = screen.getByLabelText('Immediate action taken *');
+        expect(screen.getByText(/Filled in from an Immediate controls note/)).toHaveTextContent(
+            'Moana Operator',
+        );
+        const action = screen.getByLabelText(/Immediate action taken/);
         expect(action).toHaveValue('Area isolated and first aid started.');
 
         fireEvent.change(action, {
-            target: {
-                value: 'Edited before submission: area isolated and RN called.',
-            },
+            target: { value: 'Edited before submission: area isolated and RN called.' },
         });
-        fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Create incident and hand over',
-            }),
-        );
+        fireEvent.click(screen.getByRole('button', { name: 'Review report' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
 
         await waitFor(() =>
             expect(inertia.post).toHaveBeenCalledWith(
                 '/control-room/alerts/41/create-incident',
                 expect.objectContaining({
-                    immediate_action_taken:
-                        'Edited before submission: area isolated and RN called.',
+                    immediate_action_taken: 'Edited before submission: area isolated and RN called.',
                 }),
             ),
         );
     });
 
-    it('blocks serious incident handover while immediate action is blank', () => {
-        const workspace = {
-            alert: {
-                id: 42,
-                reference_number: 'CR-2026-0042',
-                alert_type: 'injury',
-                severity: 'critical',
-                context: {},
-            },
+    it('blocks a serious incident report while the immediate action is blank', () => {
+        const d = alertDetail({
+            alert: { id: 42, reference_number: 'CR-2026-0042', alert_type: 'injury', severity: 'critical' },
             client: { id: 8, name: 'Wiremu Kauri' },
-            incident_defaults: {
-                immediate_action_taken: '',
-                source_note: null,
-            },
-        } as unknown as AlertWorkspaceDetail;
+        });
 
-        render(<CreateIncidentPane d={workspace} onDone={vi.fn()} />);
+        render(<ActionHarness d={d} action="report_incident" />);
 
-        expect(
-            screen.getByRole('button', {
-                name: 'Create incident and hand over',
-            }),
-        ).toBeDisabled();
-        expect(
-            screen.getByText(/No immediate control was possible/),
-        ).toBeVisible();
-        expect(
-            screen.getByText(/No marked Immediate controls note was found/),
-        ).toBeVisible();
+        expect(screen.getByRole('button', { name: 'Review report' })).toBeDisabled();
+        expect(screen.getByText(/No immediate control was possible/)).toBeVisible();
+        expect(screen.getByText(/No Immediate controls note was found/)).toBeVisible();
     });
 
     it('requires controls when a low alert is raised to a high-severity incident', async () => {
-        const workspace = {
-            alert: {
-                id: 44,
-                reference_number: 'CR-2026-0044',
-                alert_type: 'fall',
-                severity: 'low',
-                context: {},
-            },
+        const d = alertDetail({
+            alert: { id: 44, reference_number: 'CR-2026-0044', alert_type: 'fall', severity: 'low' },
             client: { id: 10, name: 'Mereana Kauri' },
-            incident_defaults: {
-                immediate_action_taken: '',
-                source_note: null,
-            },
-        } as unknown as AlertWorkspaceDetail;
+        });
 
-        render(<CreateIncidentPane d={workspace} onDone={vi.fn()} />);
+        render(<ActionHarness d={d} action="report_incident" />);
+        expect(screen.getByRole('button', { name: 'Review report' })).toBeEnabled();
 
-        expect(
-            screen.getByRole('button', {
-                name: 'Create incident and hand over',
-            }),
-        ).toBeEnabled();
-
-        fireEvent.click(
-            screen.getByRole('combobox', { name: 'Select severity' }),
-        );
+        fireEvent.click(screen.getByRole('combobox', { name: 'Severity' }));
         fireEvent.click(await screen.findByRole('option', { name: 'High' }));
 
-        expect(
-            screen.getByRole('button', {
-                name: 'Create incident and hand over',
-            }),
-        ).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Review report' })).toBeDisabled();
     });
 
-    it('carries the typed immediate-control prefill through sensor confirmation', async () => {
-        const workspace = {
+    it('carries the immediate-control prefill through sensor confirmation', async () => {
+        const d = alertDetail({
             alert: {
                 id: 43,
                 reference_number: 'CR-2026-0043',
                 source: 'sensor',
                 alert_type: 'fall_detected',
                 severity: 'critical',
-                context: {},
             },
             client: { id: 9, name: 'Hemi Te Rangi' },
             incident_defaults: {
-                immediate_action_taken:
-                    'Resident checked and the sensor area made safe.',
-                source_note: {
-                    id: 83,
-                    user_name: 'Aroha Operator',
-                    created_at: '2026-07-16T06:00:00Z',
-                },
+                immediate_action_taken: 'Resident checked and the sensor area made safe.',
+                source_note: { id: 83, user_name: 'Aroha Operator', created_at: '2026-07-16T06:00:00Z' },
             },
-        } as unknown as AlertWorkspaceDetail;
+        });
 
-        render(<SensorConfirmPane d={workspace} onDone={vi.fn()} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+        render(<ActionHarness d={d} action="confirm_sensor" />);
 
-        expect(screen.getByLabelText('Immediate action taken *')).toHaveValue(
+        expect(screen.getByLabelText(/Immediate action taken/)).toHaveValue(
             'Resident checked and the sensor area made safe.',
         );
-        fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Confirm — create incident',
-            }),
-        );
+        fireEvent.click(screen.getByRole('button', { name: 'Review confirmation' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm and report incident' }));
 
         await waitFor(() =>
             expect(inertia.post).toHaveBeenCalledWith(
                 '/control-room/alerts/43/confirm',
                 expect.objectContaining({
-                    immediate_action_taken:
-                        'Resident checked and the sensor area made safe.',
+                    immediate_action_taken: 'Resident checked and the sensor area made safe.',
                 }),
             ),
         );
     });
 
     it('requires controls when sensor confirmation defaults a medium alert to a high incident', () => {
-        const workspace = {
+        const d = alertDetail({
             alert: {
                 id: 45,
                 reference_number: 'CR-2026-0045',
                 source: 'sensor',
                 alert_type: 'fall_detected',
                 severity: 'medium',
-                context: {},
             },
             client: { id: 11, name: 'Rangi Moana' },
-            incident_defaults: {
-                immediate_action_taken: '',
-                source_note: null,
-            },
-        } as unknown as AlertWorkspaceDetail;
+        });
 
-        render(<SensorConfirmPane d={workspace} onDone={vi.fn()} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+        render(<ActionHarness d={d} action="confirm_sensor" />);
 
-        expect(
-            screen.getByRole('button', {
-                name: 'Confirm — create incident',
-            }),
-        ).toBeDisabled();
-        expect(
-            screen.getByText(/No marked Immediate controls note was found/),
-        ).toBeVisible();
+        expect(screen.getByRole('button', { name: 'Review confirmation' })).toBeDisabled();
+        expect(screen.getByText(/No Immediate controls note was found/)).toBeVisible();
     });
 });

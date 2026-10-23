@@ -194,6 +194,26 @@ meter row).
 - **Simple dialogs** (single-section forms, confirmations, detail viewers) —
   follow `design_styles/POPUP_STYLE_GUIDE.md` exactly (shell/body split,
   `_dialogs.tsx` co-location, width tokens, tile pickers).
+- **The pop-up kit — `components/popup/` (approved by Stephan 2026-10-23;
+  Control Room is the first module on it).** One shared frame so every
+  pop-up looks and behaves the same: `PopupForm` (480 / 720 / 900),
+  `PopupConfirm` (480: plain, destructive, warning, alert), `PopupViewer`,
+  `PopupSelectionBar`, and the one `DiscardDraftConfirm` ("Discard this
+  draft?" · Keep editing · Discard draft) that Esc, ✕ and Cancel all ask
+  when typing would be lost. Wizards stay on `WizardShell` (1100). Every
+  pop-up has the same top: a round icon **lens** (`.popup-lens`, never a
+  rounded square), the title, one line, ✕; a 2px **horizon** line on its top
+  edge (`.popup-horizon`); the record it came from as a plain context line;
+  a grey footer band with Cancel first and the main button last, named for
+  what it does. Red only when data is destroyed or a safety check is
+  loosened. Consequential actions keep a review step (Control Room: resolve,
+  report incident, confirm sensor report). A lost response shows "Result not
+  confirmed" with a way to check, never an invitation to submit twice.
+  Feature code passes icon, title, fields and the action — never widths,
+  paddings, colours or footers. Source drawings: the "Oblivion color scheme
+  and design system" session's `docs/design-refresh-2026-10-19/POPUP-SYSTEM.md`
+  (its Slate colours are not in `app.css` yet; the kit uses today's tokens).
+  Other modules move onto the kit one at a time.
 - **Premium attachment uploads** (approved by Stephan 2026-09-20) — invoice,
   evidence, photo and document fields reuse `FileDropzone` + `StagedFileCard`
   from `components/ui/file-dropzone.tsx`. Keep browse and keyboard access
@@ -617,6 +637,15 @@ before.
   transforms on `default`/`outline` buttons (via `className` or raw
   elements) instead of the soft-depth treatment owned by
   `components/ui/button.tsx` (see `design_styles/BUTTON_STYLE_GUIDE.md`).
+- **One module dropping the header band** (corrected 2026-10-23, Control
+  Room) — redesign drawings replaced the purple Event Horizon header with a
+  plain white title, a search row and underline tabs for one module only.
+  Stephan chose the standard header for Control Room: consistency across
+  modules wins. Fix a header that looks wrong by keeping it compact (title,
+  ≤ 4 linked numbers, filters and view tabs inside it), not by giving one
+  module its own header. Control Room pages use `ControlRoomPage`
+  (`components/control-room/control-room-page.tsx`), which wraps the shared
+  `PageHeader` and the destination's view tabs.
 - **Page tops that bypass the Event Horizon header** — a page opening
   with a plain heading, a one-off banner, a legacy `PageHero`, or a
   search/filter bar sitting BELOW the header, instead of the fixed

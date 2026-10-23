@@ -1538,3 +1538,104 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 .grayscale-map .leaflet-tile-pane {
     filter: grayscale(1);
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * The pop-up kit (components/popup/, DESIGN.md "Pop-up kit"; approved by
+ * Stephan 23 Oct 2026 — Control Room first). Two brand marks, both derived
+ * from --primary so Settings › Branding retints them:
+ *   .popup-lens     the round icon lens in a pop-up header (never a rounded
+ *                   square). Critical/warning lenses use the fixed status
+ *                   pairs — safety tones never follow the brand.
+ *   .popup-horizon  the 2px horizon line on the top edge of anything that
+ *                   floats (dialog, confirm); .popup-horizon-left is the side
+ *                   panel's edge where it meets the page.
+ * ────────────────────────────────────────────────────────────────────────── */
+.popup-lens {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: var(--primary);
+    background:
+        radial-gradient(
+            110% 110% at 50% 118%,
+            color-mix(in oklch, var(--primary) 22%, transparent) 0%,
+            transparent 62%
+        ),
+        color-mix(in oklch, var(--primary-fill) 9%, var(--card));
+    box-shadow:
+        inset 0 0 0 1.5px color-mix(in oklch, currentColor 36%, transparent),
+        0 0 0 5px color-mix(in oklch, currentColor 7%, transparent);
+}
+.popup-lens--sm {
+    width: 30px;
+    height: 30px;
+    box-shadow: inset 0 0 0 1.5px var(--border);
+    background: transparent;
+    color: var(--muted-foreground);
+}
+.popup-lens--critical {
+    color: var(--status-critical);
+    background: var(--status-critical-bg);
+}
+.popup-lens--warning {
+    color: var(--status-warning);
+    background: var(--status-warning-bg);
+}
+.popup-horizon {
+    position: relative;
+}
+.popup-horizon::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            20%,
+        var(--primary) 50%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            80%,
+        transparent 100%
+    );
+}
+.popup-horizon-left::after {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 -1px;
+    width: 2px;
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            18%,
+        var(--primary) 50%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            82%,
+        transparent 100%
+    );
+}

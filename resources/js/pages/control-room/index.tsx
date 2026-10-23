@@ -1,40 +1,37 @@
+import { useAlertActions } from '@/components/control-room/alert-record/alert-actions';
+import type { AlertWorkspaceDetail } from '@/components/control-room/alert-record/alert-sections';
 import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
-import {
-    AlertWorkspaceDialog,
-    type AlertWorkspaceDetail,
-} from '@/components/control-room/alert-workspace-dialog';
-import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
 import { buildControlRoomAlertRowActions } from '@/components/control-room/control-room-alert-row-actions';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
+import type {
+    DeskActivity,
+    DeskAnalytics,
+    DeskFilters,
+    DeskHandover,
+    DeskHero,
+    DeskQueue,
+    DeskWorklist,
+} from '@/components/control-room/live-response/desk-types';
+import { AlertPreview } from '@/components/control-room/live-response/alert-preview';
 import {
-    AnalyticsPanel,
-    type DeskAnalytics,
-} from '@/components/control-room/dashboard/analytics-panel';
-import { ContinuityPanel } from '@/components/control-room/dashboard/continuity-panel';
+    LiveResponseFilters,
+    LiveResponseSearch,
+    applyLiveResponseFilters,
+} from '@/components/control-room/live-response/live-response-filters';
+import { ResponseWorklist } from '@/components/control-room/live-response/response-worklist';
+import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
 import {
-    ControlRoomHero,
-    type DeskHandover,
-    type DeskHero,
-} from '@/components/control-room/dashboard/control-room-hero';
-import {
-    LiveDeskPanel,
-    type DeskFilters,
-    type DeskWorklist,
-} from '@/components/control-room/dashboard/live-desk-panel';
-import {
-    QueuePressurePanel,
-    type DeskQueue,
-} from '@/components/control-room/dashboard/queue-pressure-panel';
-import {
-    ServiceHealthPanel,
-    type DeskActivity,
-    type FreshnessState,
-} from '@/components/control-room/dashboard/service-health-panel';
-import { useAlertWorkspaceFocusReturn } from '@/components/control-room/use-alert-workspace-focus-return';
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page';
+import { PopupCallout } from '@/components/popup';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { BellRing, ChevronUp, LoaderCircle } from 'lucide-react';
+import { formatTime } from '@/lib/datetime';
+import { Link, router } from '@inertiajs/react';
+import { Clock, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Option = { id: number; name: string };
@@ -60,6 +57,7 @@ export type ControlRoomDashboardProps = {
     analytics?: DeskAnalytics;
 };
 
+/** Props refreshed by the 30-second poll (the selected alert included). */
 const LIVE_PROPS = [
     'hero',
     'worklist',
@@ -67,252 +65,245 @@ const LIVE_PROPS = [
     'handover',
     'activity',
     'freshness',
+    'detail',
 ] as const;
+
+function useLiveRefresh(freshness: ControlRoomDashboardProps['freshness']) {
+    const [refreshing, setRefreshing] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const [clock, setClock] = useState(() => Date.now());
+
+    const refresh = () => {
+        setRefreshing(true);
+        router.reload({
+            only: [...LIVE_PROPS],
+            preserveScroll: true,
+            onSuccess: () => setFailed(false),
+            onError: () => setFailed(true),
+            onFinish: () => {
+                setRefreshing(false);
+                setClock(Date.now());
+            },
+        });
+    };
+
+    useEffect(() => {
+        const poll = window.setInterval(() => {
+            if (!document.hidden) refresh();
+        }, 30_000);
+        const tick = window.setInterval(() => setClock(Date.now()), 15_000);
+        return () => {
+            window.clearInterval(poll);
+            window.clearInterval(tick);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- one poll per page
+    }, []);
+
+    const age = (clock - new Date(freshness.updated_at).getTime()) / 1000;
+    const stale = failed || age > freshness.stale_after_seconds;
+    return { refreshing, stale, refresh };
+}
+
+/** New critical alerts since the page was opened, until dismissed. */
+function useNewCriticalNotice(rows: AlertWorklistRow[]) {
+    const ids = useMemo(
+        () => rows.filter((row) => row.severity === 'critical').map((row) => row.id),
+        [rows],
+    );
+    const seen = useRef(new Set(ids));
+    const [count, setCount] = useState(0);
+    useEffect(() => {
+        const fresh = ids.filter((id) => !seen.current.has(id));
+        if (fresh.length) setCount((current) => current + fresh.length);
+        fresh.forEach((id) => seen.current.add(id));
+    }, [ids]);
+    return { count, dismiss: () => setCount(0) };
+}
 
 export function ControlRoomDashboardView({
     hero,
     worklist,
     queues,
-    handover,
-    activity,
     filters,
     freshness,
     sites,
     staff,
     can,
     detail,
-    analytics,
 }: ControlRoomDashboardProps) {
-    const [refreshing, setRefreshing] = useState(false);
-    const [clock, setClock] = useState(() => Date.now());
-    const [analyticsOpen, setAnalyticsOpen] = useState(() =>
-        Boolean(analytics),
-    );
-    const [newCriticalCount, setNewCriticalCount] = useState(0);
-    const criticalIds = useMemo(
-        () =>
-            worklist.data
-                .filter((row) => row.severity === 'critical')
-                .map((row) => row.id),
-        [worklist.data],
-    );
-    const seenCriticalIds = useRef(new Set(criticalIds));
+    const live = useLiveRefresh(freshness);
+    const notice = useNewCriticalNotice(worklist.data);
+    const actions = useAlertActions(detail);
+    const selection = useAlertSelection({
+        rows: worklist.data,
+        detail,
+        runAction: actions.run,
+    });
 
-    useEffect(() => {
-        const next = new Set(criticalIds);
-        const newlyVisible = criticalIds.filter(
-            (id) => !seenCriticalIds.current.has(id),
-        );
-        if (newlyVisible.length > 0) setNewCriticalCount(newlyVisible.length);
-        seenCriticalIds.current = next;
-    }, [criticalIds]);
-
-    useEffect(() => {
-        const poll = window.setInterval(() => {
-            if (document.hidden) return;
-            setRefreshing(true);
-            router.reload({
-                only: [...LIVE_PROPS],
-                preserveScroll: true,
-                onFinish: () => {
-                    setRefreshing(false);
-                    setClock(Date.now());
-                },
-            });
-        }, 30_000);
-        return () => window.clearInterval(poll);
-    }, []);
-
-    useEffect(() => {
-        const timer = window.setInterval(() => setClock(Date.now()), 15_000);
-        return () => window.clearInterval(timer);
-    }, []);
-
-    const ageSeconds = Math.max(
-        0,
-        (clock - new Date(freshness.updated_at).getTime()) / 1000,
-    );
-    const freshnessState: FreshnessState = refreshing
-        ? 'refreshing'
-        : ageSeconds > freshness.stale_after_seconds
-          ? 'stale'
-          : 'updated';
-
-    const applyFilters = (next: DeskFilters) => {
-        const query = Object.fromEntries(
-            Object.entries(next).filter(
-                ([, value]) =>
-                    value !== '' && value !== null && value !== undefined,
-            ),
-        );
-        router.get('/control-room', query, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
-    };
-
-    const workspaceFocus = useAlertWorkspaceFocusReturn();
-    const openWorkspace = (id: number) => {
-        workspaceFocus.rememberOpen(id);
-        const params = new URLSearchParams(window.location.search);
-        params.set('alert', String(id));
-        router.get(
-            `/control-room?${params.toString()}`,
-            {},
-            {
-                preserveState: true,
-                preserveScroll: true,
-                only: ['detail'],
-            },
-        );
-    };
-
-    const closeWorkspace = () => {
-        workspaceFocus.beginClose();
-        const params = new URLSearchParams(window.location.search);
-        params.delete('alert');
-        router.get(
-            `/control-room${params.size ? `?${params.toString()}` : ''}`,
-            {},
-            {
-                preserveState: true,
-                preserveScroll: true,
-                only: ['detail'],
-            },
-        );
-    };
+    const apply = (next: Partial<DeskFilters>) =>
+        applyLiveResponseFilters('/control-room', { ...filters, ...next, page: undefined });
 
     const rowActions = (row: AlertWorklistRow) =>
         buildControlRoomAlertRowActions(row, {
-            openWorkspace,
+            select: (id) => selection.select(id),
+            openAction: (id, key) => selection.select(id, key),
             post: (href) => router.post(href, {}, { preserveScroll: true }),
             visit: (href) => router.visit(href),
             copy: (value) => void navigator.clipboard?.writeText(value),
         });
 
-    const openAnalytics = () => {
-        setAnalyticsOpen(true);
-        if (!analytics) {
-            router.reload({
-                only: ['analytics'],
-                preserveScroll: true,
-            });
-        }
-    };
+    const updated = `Updated ${formatTime(freshness.updated_at)}`;
 
     return (
-        <div className="space-y-5 p-4 md:p-6">
-            <ControlRoomHero
-                hero={hero}
-                handover={handover}
-                canCreate={can.create}
-                canViewAnalytics={can.viewReports}
-                onOpenAnalytics={openAnalytics}
-            />
-
-            <CommandCentreTabs
-                current="/control-room"
-                badges={{
-                    '/control-room/alerts': hero.active,
-                    '/control-room/escalations': hero.sla_breached,
-                    '/control-room/incidents': handover.needs_incident,
-                }}
-            />
-
-            {newCriticalCount > 0 ? (
-                <div
-                    role="alert"
-                    className="flex items-center justify-between gap-4 rounded-xl border border-status-critical/30 bg-status-critical/10 px-4 py-3 text-sm text-status-critical-foreground"
-                >
-                    <span className="flex items-center gap-2 font-semibold">
-                        <BellRing className="h-4 w-4" aria-hidden />
-                        {newCriticalCount} new critical{' '}
-                        {newCriticalCount === 1 ? 'alert is' : 'alerts are'} in
-                        the priority worklist
+        <ControlRoomPage
+            header={{
+                subline: (
+                    <>
+                        Prioritise urgent work, name the owner and keep the next
+                        step clear ·{' '}
+                        <span aria-live="polite">
+                            {live.refreshing ? 'Refreshing…' : updated}
+                        </span>
+                    </>
+                ),
+                actions: (
+                    <>
+                        <LiveResponseSearch
+                            value={filters.q ?? ''}
+                            onApply={(q) => apply({ q })}
+                        />
+                        <PageHeaderGlassButton icon={Clock} asChild>
+                            <Link href="/control-room/shifts">Duty handover</Link>
+                        </PageHeaderGlassButton>
+                        {can.create ? (
+                            <PageHeaderPrimaryButton icon={Plus} asChild>
+                                <Link href="/control-room/alerts?new=1">
+                                    Add alert
+                                </Link>
+                            </PageHeaderPrimaryButton>
+                        ) : null}
+                    </>
+                ),
+                meters: (
+                    <>
+                        <PageHeaderMeterBlock
+                            label="Open"
+                            href="/control-room"
+                            ariaLabel="Show every open alert"
+                        >
+                            <PageHeaderMeterBig>{hero.active}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                in the worklist
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Critical"
+                            tone={hero.critical > 0 ? 'critical' : 'brand'}
+                            href="/control-room?severity=critical"
+                            ariaLabel="Show critical alerts"
+                        >
+                            <PageHeaderMeterBig>{hero.critical}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>act first</PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Unassigned"
+                            tone={hero.unassigned > 0 ? 'warning' : 'brand'}
+                            href="/control-room?assigned_to=unassigned"
+                            ariaLabel="Show alerts with no owner"
+                        >
+                            <PageHeaderMeterBig>{hero.unassigned}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                claim or assign
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Target missed"
+                            tone={hero.sla_breached > 0 ? 'critical' : 'brand'}
+                            href="/control-room/sla/breaches"
+                            ariaLabel="Show response targets that were missed"
+                        >
+                            <PageHeaderMeterBig>{hero.sla_breached}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                past a response target
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    </>
+                ),
+                filters: (
+                    <LiveResponseFilters
+                        values={filters}
+                        rows={worklist.data}
+                        staff={staff}
+                        sites={sites}
+                        queues={queues}
+                        onChange={(next) => apply(next as Partial<DeskFilters>)}
+                    />
+                ),
+            }}
+        >
+            {live.stale ? (
+                <PopupCallout tone="warning">
+                    <span className="flex flex-wrap items-center justify-between gap-3">
+                        <span>
+                            The worklist couldn&apos;t refresh — what you see may
+                            be out of date ({updated.toLowerCase()}).
+                        </span>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={live.refresh}
+                        >
+                            Try again
+                        </Button>
                     </span>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setNewCriticalCount(0)}
-                    >
-                        Dismiss notice
-                    </Button>
-                </div>
+                </PopupCallout>
+            ) : null}
+            {notice.count > 0 ? (
+                <PopupCallout tone="critical">
+                    <span className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="font-semibold">
+                            {notice.count} new critical{' '}
+                            {notice.count === 1 ? 'alert is' : 'alerts are'} in the
+                            worklist
+                        </span>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={notice.dismiss}
+                        >
+                            Dismiss
+                        </Button>
+                    </span>
+                </PopupCallout>
             ) : null}
 
-            <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
-                <LiveDeskPanel
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+                <ResponseWorklist
+                    title="Priority worklist"
+                    description="Missed response targets first, then severity, escalation and the next deadline."
                     worklist={worklist}
-                    filters={filters}
-                    sites={sites}
-                    staff={staff}
-                    queues={queues}
-                    onFilter={applyFilters}
-                    onOpen={openWorkspace}
+                    selectedId={selection.selectedId}
+                    onSelect={(id) => selection.select(id)}
                     getActions={rowActions}
+                    emptyTitle="Nothing needs a response"
+                    emptyDescription="No open alerts match these filters. Snoozed alerts are under Waiting; finished ones are under History."
                 />
-                <aside className="space-y-5">
-                    <ContinuityPanel handover={handover} />
-                    <QueuePressurePanel queues={queues} />
-                </aside>
+                <div className="min-w-0 xl:sticky xl:top-5">
+                    <AlertPreview
+                        row={selection.row}
+                        detail={detail}
+                        onRun={actions.run}
+                    />
+                </div>
             </div>
 
-            <ServiceHealthPanel
-                activity={activity}
-                freshness={freshness}
-                state={freshnessState}
-            />
-
-            {analyticsOpen ? (
-                <div className="flex justify-end">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setAnalyticsOpen(false)}
-                    >
-                        <ChevronUp className="h-4 w-4" aria-hidden />
-                        Hide analytics
-                    </Button>
-                </div>
-            ) : null}
-
-            {analyticsOpen && analytics ? (
-                <AnalyticsPanel analytics={analytics} />
-            ) : analyticsOpen ? (
-                <Card className="min-h-32 flex-row items-center justify-center gap-2 py-0 text-sm text-muted-foreground">
-                    <LoaderCircle
-                        className="h-4 w-4 animate-spin motion-reduce:animate-none"
-                        aria-hidden
-                    />
-                    Loading historical performance…
-                </Card>
-            ) : null}
-
-            {detail ? (
-                <AlertWorkspaceDialog
-                    detail={detail}
-                    open
-                    onClose={closeWorkspace}
-                    onCloseAutoFocus={workspaceFocus.onCloseAutoFocus}
-                />
-            ) : null}
-        </div>
+            {actions.host}
+        </ControlRoomPage>
     );
 }
 
 export default function ControlRoomDashboard(props: ControlRoomDashboardProps) {
-    return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'Desk', href: '/control-room' },
-            ]}
-            contentClassName="overflow-x-hidden"
-        >
-            <Head title="Desk - Control Room" />
-            <ControlRoomDashboardView {...props} />
-        </AppLayout>
-    );
+    return <ControlRoomDashboardView {...props} />;
 }

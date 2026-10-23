@@ -1,60 +1,37 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import { AlertStatusChip } from '@/components/control-room/alert-worklist/alert-status';
-import { AlertWorklist } from '@/components/control-room/alert-worklist/alert-worklist';
+import { useAlertActions } from '@/components/control-room/alert-record/alert-actions';
 import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
-import {
-    AlertWorkspaceDialog,
-    type AlertWorkspaceDetail,
-} from '@/components/control-room/alert-workspace-dialog';
+import type { AlertWorkspaceDetail } from '@/components/control-room/alert-record/alert-sections';
 import {
     BulkAlertActionDialog,
     type BulkAlertMode,
 } from '@/components/control-room/bulk-alert-action-dialog';
 import { buildControlRoomAlertRowActions } from '@/components/control-room/control-room-alert-row-actions';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
+import { AlertPreview } from '@/components/control-room/live-response/alert-preview';
+import {
+    LiveResponseFilters,
+    LiveResponseSearch,
+    applyLiveResponseFilters,
+} from '@/components/control-room/live-response/live-response-filters';
+import { ResponseWorklist } from '@/components/control-room/live-response/response-worklist';
+import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
 import { NewAlertWizard } from '@/components/control-room/new-alert-wizard';
-import { useAlertWorkspaceFocusReturn } from '@/components/control-room/use-alert-workspace-focus-return';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page';
+import { PopupSelectionBar } from '@/components/popup';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { formatRelative } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
-import {
-    Bell,
-    BellOff,
-    CheckCircle2,
-    ChevronDown,
-    ChevronUp,
-    Clock,
-    Eye,
-    Filter,
-    User,
-    UserPlus,
-    X,
-} from 'lucide-react';
-import {
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-    type ReactNode,
-} from 'react';
+import { SelectInput } from '@/components/wizard/primitives';
+import { router } from '@inertiajs/react';
+import { CalendarRange, Plus, UserCheck, UserPlus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface AlertItem {
+/** The older row shape still sent by /control-room/integration-alerts. */
+interface LegacyAlertItem {
     id: number;
     source: string;
     alert_type: string;
@@ -78,16 +55,10 @@ type CanonicalAlertItem = AlertWorklistRow & {
     snoozed_until: string | null;
 };
 
-interface PaginationLink {
-    url: string | null;
-    label: string;
-    active: boolean;
-}
-
 interface Props {
     alerts: {
-        data: Array<AlertItem | CanonicalAlertItem>;
-        links: PaginationLink[];
+        data: Array<LegacyAlertItem | CanonicalAlertItem>;
+        links: Array<{ url: string | null; label: string; active: boolean }>;
         current_page: number;
         last_page: number;
         total: number;
@@ -103,104 +74,103 @@ interface Props {
         history?: number;
     };
     staff: Array<{ id: number; name: string; email: string }>;
-    /** For the New-alert wizard (manual creation). */
     clients?: Array<{ id: number; name: string }>;
     sites?: Array<{ id: number; name: string }>;
-    can: {
-        manage: boolean;
-        assign: boolean;
-        create?: boolean;
-    };
-    /** Workspace-over-list: present when ?alert= is in the URL. */
+    can: { manage: boolean; assign: boolean; create?: boolean };
     detail?: AlertWorkspaceDetail | null;
     basePath?: string;
     pageTitle?: string;
     pageDescription?: string;
-    pageBreadcrumbs?: Array<{ title: string; href: string }>;
 }
 
-function AlertsWorkspaceFrame({
-    canonical,
-    stats,
-    canCreate,
-    onCreate,
-    children,
-}: {
-    canonical: boolean;
-    stats: Props['stats'];
-    canCreate: boolean;
-    onCreate: () => void;
-    children: ReactNode;
-}) {
-    if (!canonical) return <>{children}</>;
-
-    return (
-        <CommandCentrePage
-            current="/control-room/alerts"
-            icon={Bell}
-            title="Active alerts"
-            description="Work the live priority queue, keep ownership clear, and continue each alert through its governed response."
-            status="Live priority worklist"
-            badges={{ '/control-room/alerts': stats.open }}
-            actions={
-                canCreate ? (
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={onCreate}
-                    >
-                        <Bell className="h-4 w-4" aria-hidden />
-                        New alert
-                    </Button>
-                ) : null
-            }
-            metricGroups={[
-                {
-                    title: 'Live workload',
-                    icon: Bell,
-                    metrics: [
-                        {
-                            label: 'Open',
-                            value: String(stats.open),
-                            caption: 'actionable now',
-                            tone: 'neutral',
-                        },
-                        {
-                            label: 'Critical',
-                            value: String(stats.critical),
-                            caption: 'act first',
-                            tone: stats.critical > 0 ? 'critical' : 'success',
-                        },
-                        {
-                            label: 'Unassigned',
-                            value: String(stats.unassigned),
-                            caption: 'claim or assign',
-                            tone: stats.unassigned > 0 ? 'warning' : 'success',
-                        },
-                        {
-                            label: 'Snoozed',
-                            value: String(stats.snoozed),
-                            caption: 'deferred safely',
-                            tone: 'neutral',
-                        },
-                    ],
-                },
-            ]}
-        >
-            {children}
-        </CommandCentrePage>
-    );
+function plain(value: string): string {
+    const words = value.replace(/[._-]+/g, ' ').trim().toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+/** Read the older integration rows as worklist rows so both lists look and act alike. */
+function fromLegacy(item: LegacyAlertItem): AlertWorklistRow {
+    const sla =
+        item.sla_status === 'red'
+            ? 'breached'
+            : item.sla_status === 'yellow'
+              ? 'at_risk'
+              : item.sla_status === 'green'
+                ? 'on_track'
+                : null;
+    return {
+        id: item.id,
+        reference_number: null,
+        summary: item.notes ?? plain(item.alert_type),
+        source: { key: item.source, label: plain(item.source) },
+        status: item.status as AlertWorklistRow['status'],
+        severity: item.severity,
+        priority: { level: item.severity, rank: 0, reason: '' },
+        triggered_at: item.triggered_at,
+        next_deadline_at: null,
+        sla: { status: sla, next_deadline_at: null },
+        site: null,
+        person: item.client_name ? { id: 0, name: item.client_name } : null,
+        assignee: item.assigned_to,
+        queue: null,
+        journey: {
+            incident_reference: null,
+            health_safety_reference: null,
+            handover_status: null,
+        },
+        next_action: { label: 'View alert', href: `/control-room/alerts/${item.id}` },
+        actions: {
+            can_claim: false,
+            can_acknowledge: false,
+            can_move_queue: false,
+            can_escalate: false,
+            can_create_incident: false,
+            can_snooze: false,
+            can_unsnooze: false,
+            can_copy_reference: false,
+            incident_href: null,
+            health_safety_href: null,
+        },
+        href: `/control-room/alerts/${item.id}`,
+    };
+}
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function isCanonical(item: LegacyAlertItem | CanonicalAlertItem): item is CanonicalAlertItem {
+    return 'summary' in item && 'actions' in item;
+}
 
+const PERIODS = [
+    { value: 'all', label: 'Any time' },
+    { value: '1', label: 'Today' },
+    { value: '7', label: 'Last 7 days' },
+    { value: '30', label: 'Last 30 days' },
+];
+
+function periodFrom(days: string): string | undefined {
+    if (days === 'all') return undefined;
+    const date = new Date();
+    date.setDate(date.getDate() - (Number(days) - 1));
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function periodValue(dateFrom: string | undefined): string {
+    if (!dateFrom) return 'all';
+    return PERIODS.find((p) => p.value !== 'all' && periodFrom(p.value) === dateFrom)?.value ?? 'all';
+}
+
+const SORTS = [
+    { value: 'priority', label: 'Most urgent first' },
+    { value: 'triggered_at:desc', label: 'Newest first' },
+    { value: 'triggered_at:asc', label: 'Oldest first' },
+    { value: 'severity:desc', label: 'Severity' },
+];
+
+/**
+ * Live response views served by the alerts list: Waiting (snoozed), History,
+ * and Active for people who can work alerts but not open the desk. One list
+ * and a preview beside it, the same as every other Live response view.
+ */
 export default function AlertsIndex({
     alerts,
     filters,
@@ -211,817 +181,257 @@ export default function AlertsIndex({
     can,
     detail = null,
     basePath = '/control-room/alerts',
-    pageTitle = 'Active alerts',
-    pageDescription = 'Alerts worklist — every alert opens a guided workspace.',
-    pageBreadcrumbs = [
-        { title: 'Control Room', href: '/control-room' },
-        { title: 'Alerts', href: '/control-room/alerts' },
-    ],
+    pageTitle,
+    pageDescription,
 }: Props) {
-    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const canonical = basePath === '/control-room/alerts';
+    const lens = filters.lens ?? (filters.snoozed === '1' ? 'snoozed' : 'active');
+    const view = lens === 'snoozed' ? 'waiting' : lens === 'history' ? 'history' : 'active';
+
+    const rows = useMemo<AlertWorklistRow[]>(
+        () => alerts.data.map((item) => (isCanonical(item) ? item : fromLegacy(item))),
+        [alerts.data],
+    );
+    const [ticked, setTicked] = useState<Set<number>>(new Set());
     const [bulkMode, setBulkMode] = useState<BulkAlertMode | null>(null);
-    // ?new=1 deep-links straight into the New-alert wizard (house pattern).
     const [newOpen, setNewOpen] = useState<boolean>(
         () =>
+            canonical &&
             typeof window !== 'undefined' &&
             new URLSearchParams(window.location.search).get('new') === '1',
     );
-    const searchRef = useRef<HTMLInputElement>(null);
-    const isCanonicalWorklist = basePath === '/control-room/alerts';
-    const workspaceFocus = useAlertWorkspaceFocusReturn();
+    const actions = useAlertActions(detail);
+    const selection = useAlertSelection({ rows, detail, runAction: actions.run });
 
-    // Workspace-over-list: fetch only the `detail` prop and open the dialog
-    // without navigating away; closing drops the param so `detail` goes null.
-    const openWorkspace = (id: number) => {
-        workspaceFocus.rememberOpen(id);
-        router.get(
-            basePath,
-            { ...filters, alert: String(id) } as Record<string, string>,
-            { preserveState: true, preserveScroll: true, only: ['detail'] },
-        );
-    };
-    const closeWorkspace = () => {
-        workspaceFocus.beginClose();
-        router.get(basePath, { ...filters } as Record<string, string>, {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['detail'],
-        });
-    };
+    useEffect(() => {
+        const poll = window.setInterval(() => {
+            if (!document.hidden)
+                router.reload({ only: ['alerts', 'stats', 'detail'], preserveScroll: true });
+        }, 30_000);
+        return () => window.clearInterval(poll);
+    }, []);
+    useEffect(() => setTicked(new Set()), [alerts.current_page, lens]);
 
-    const rowActions = (row: CanonicalAlertItem) =>
+    const apply = (next: Record<string, string | undefined | null>) =>
+        applyLiveResponseFilters(basePath, { ...filters, ...next, page: undefined, alert: undefined });
+
+    const rowActions = (row: AlertWorklistRow) =>
         buildControlRoomAlertRowActions(row, {
-            openWorkspace,
+            select: (id) => selection.select(id),
+            openAction: (id, key) => selection.select(id, key),
             post: (href) => router.post(href, {}, { preserveScroll: true }),
             visit: (href) => router.visit(href),
             copy: (value) => void navigator.clipboard?.writeText(value),
         });
 
-    // 30-second auto-refresh
-    useEffect(() => {
-        const interval = setInterval(() => {
-            router.reload({ only: ['alerts', 'stats'], preserveScroll: true });
-        }, 30000);
-        return () => clearInterval(interval);
-    }, []);
+    const bulkAllowed = canonical && view !== 'history' && (can.manage || can.assign);
+    const tickedRows = rows.filter((row) => ticked.has(row.id));
+    const sortValue = filters.sort && filters.sort !== 'priority'
+        ? `${filters.sort}:${filters.dir ?? 'desc'}`
+        : 'priority';
 
-    // Clear selection on page change
-    useEffect(() => {
-        setSelected(new Set());
-    }, [alerts.current_page]);
+    const subline = !canonical
+        ? (pageDescription ?? 'Alerts raised by connected systems')
+        : view === 'waiting'
+          ? 'Snoozed alerts. Each comes back to the worklist on its own when its time is up.'
+          : view === 'history'
+            ? 'Finished response work, with who did what and when'
+            : 'Every open alert, most urgent first';
 
-    // ------------------------------------------------------------------
-    // Filter helpers
-    // ------------------------------------------------------------------
-
-    const applyFilter = useCallback(
-        (key: string, value: string) => {
-            const newFilters = { ...filters, [key]: value || undefined };
-            // Reset to page 1 when filtering
-            router.get(basePath, newFilters as Record<string, string>, {
-                preserveState: true,
-                preserveScroll: true,
-            });
-        },
-        [basePath, filters],
-    );
-
-    const applyQuickFilter = useCallback(
-        (preset: Record<string, string | undefined>) => {
-            router.get(basePath, preset as Record<string, string>, {
-                preserveState: true,
-                preserveScroll: true,
-            });
-        },
-        [basePath],
-    );
-
-    const clearFilters = useCallback(() => {
-        router.get(basePath, {}, { preserveState: true, preserveScroll: true });
-    }, [basePath]);
-
-    const hasFilters = Object.entries(filters).some(
-        ([key, value]) => value && !(key === 'lens' && value === 'active'),
-    );
-
-    // ------------------------------------------------------------------
-    // Sorting
-    // ------------------------------------------------------------------
-
-    const currentSort =
-        filters.sort || (isCanonicalWorklist ? 'priority' : 'triggered_at');
-    const currentDir = filters.dir || 'desc';
-
-    const toggleSort = useCallback(
-        (field: string) => {
-            let dir = 'asc';
-            if (currentSort === field && currentDir === 'asc') dir = 'desc';
-            const newFilters = { ...filters, sort: field, dir };
-            router.get(basePath, newFilters as Record<string, string>, {
-                preserveState: true,
-                preserveScroll: true,
-            });
-        },
-        [basePath, currentSort, currentDir, filters],
-    );
-
-    const renderSortIcon = (field: string) => {
-        if (currentSort !== field)
-            return <ChevronDown className="h-3 w-3 opacity-30" />;
-        return currentDir === 'asc' ? (
-            <ChevronUp className="h-3 w-3" />
-        ) : (
-            <ChevronDown className="h-3 w-3" />
-        );
-    };
-
-    // ------------------------------------------------------------------
-    // Selection helpers
-    // ------------------------------------------------------------------
-
-    const allOnPageSelected =
-        alerts.data.length > 0 && alerts.data.every((a) => selected.has(a.id));
-
-    const toggleAll = () => {
-        if (allOnPageSelected) {
-            setSelected(new Set());
-        } else {
-            setSelected(new Set(alerts.data.map((a) => a.id)));
-        }
-    };
-
-    const toggleOne = (id: number) => {
-        setSelected((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
-    // ------------------------------------------------------------------
-    // Bulk actions — stepped dialogs (review selection → details → submit)
-    // ------------------------------------------------------------------
-
-    const selectedAlerts = alerts.data.filter((a) => selected.has(a.id));
-
-    // ------------------------------------------------------------------
-    // Quick filter tabs config
-    // ------------------------------------------------------------------
-
-    const tabs = [
-        {
-            label: isCanonicalWorklist ? 'Active' : 'All',
-            count: stats.total,
-            filter: isCanonicalWorklist ? { lens: 'active' } : {},
-        },
-        {
-            label: 'Open',
-            count: stats.open,
-            filter: { lens: 'active', status: 'open' },
-        },
-        {
-            label: 'Critical',
-            count: stats.critical,
-            filter: { lens: 'active', severity: 'critical' },
-        },
-        {
-            label: 'Assigned to Me',
-            count: stats.assigned_to_me,
-            filter: { lens: 'my_queue', assigned_to: 'me' },
-        },
-        {
-            label: 'Unassigned',
-            count: stats.unassigned,
-            filter: { lens: 'active', assigned_to: 'unassigned' },
-        },
-        {
-            label: 'Snoozed',
-            count: stats.snoozed ?? 0,
-            filter: { lens: 'snoozed', snoozed: '1' },
-        },
-        ...(isCanonicalWorklist
-            ? [
-                  {
-                      label: 'History',
-                      count: stats.history ?? 0,
-                      filter: { lens: 'history' },
-                  },
-              ]
-            : []),
-    ];
-
-    const activeTab = (() => {
-        if (filters.snoozed === '1') return 'Snoozed';
-        if (filters.lens === 'history') return 'History';
-        if (filters.assigned_to === 'me') return 'Assigned to Me';
-        if (filters.assigned_to === 'unassigned') return 'Unassigned';
-        if (filters.status === 'open' && !filters.severity) return 'Open';
-        if (filters.severity === 'critical' && !filters.status)
-            return 'Critical';
-        if (!hasFilters || filters.lens === 'active')
-            return isCanonicalWorklist ? 'Active' : 'All';
-        return null;
-    })();
-
-    // ------------------------------------------------------------------
-    // Render
-    // ------------------------------------------------------------------
+    const meters = canonical ? (
+        <>
+            <PageHeaderMeterBlock label="Open" href="/control-room/alerts" ariaLabel="Show open alerts">
+                <PageHeaderMeterBig>{stats.open}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>actionable now</PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Critical"
+                tone={stats.critical > 0 ? 'critical' : 'brand'}
+                href="/control-room/alerts?severity=critical"
+                ariaLabel="Show critical alerts"
+            >
+                <PageHeaderMeterBig>{stats.critical}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>act first</PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Unassigned"
+                tone={stats.unassigned > 0 ? 'warning' : 'brand'}
+                href="/control-room/alerts?assigned_to=unassigned"
+                ariaLabel="Show alerts with no owner"
+            >
+                <PageHeaderMeterBig>{stats.unassigned}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>claim or assign</PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Waiting"
+                href="/control-room/alerts?lens=snoozed"
+                ariaLabel="Show snoozed alerts"
+            >
+                <PageHeaderMeterBig>{stats.snoozed}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>snoozed for now</PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+        </>
+    ) : undefined;
 
     return (
-        <AppLayout breadcrumbs={pageBreadcrumbs}>
-            <Head
-                title={
-                    pageTitle === 'Alerts'
-                        ? 'Control Room Alerts'
-                        : `${pageTitle} - Control Room`
-                }
-            />
-
-            <PageLayout
-                hero={
-                    !isCanonicalWorklist ? (
-                        <PageHero
-                            pageType="task"
-                            title={pageTitle}
-                            description={pageDescription}
-                            actions={
-                                can.create &&
-                                basePath === '/control-room/alerts' ? (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setNewOpen(true)}
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    >
-                                        <Bell className="mr-2 h-4 w-4" />
-                                        New alert
-                                    </Button>
-                                ) : undefined
-                            }
+        <ControlRoomPage
+            headTitle={!canonical ? pageTitle : view === 'waiting' ? 'Waiting' : view === 'history' ? 'History' : 'Active'}
+            rail={canonical ? undefined : null}
+            header={{
+                title: canonical ? undefined : (pageTitle ?? 'Integration alerts'),
+                subline,
+                actions: (
+                    <>
+                        <LiveResponseSearch
+                            value={filters.search ?? ''}
+                            onApply={(search) => apply({ search: search || undefined })}
                         />
-                    ) : undefined
-                }
-            >
-                <AlertsWorkspaceFrame
-                    canonical={isCanonicalWorklist}
-                    stats={stats}
-                    canCreate={Boolean(can.create)}
-                    onCreate={() => setNewOpen(true)}
-                >
-                    {/* Quick filter tabs */}
-                    <div
-                        role="group"
-                        aria-label="Alert queue filters"
-                        className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1"
-                    >
-                        {tabs.map((tab, index) => (
-                            <Button
-                                key={tab.label}
-                                data-page-first-action={
-                                    index === 0 ? '' : undefined
-                                }
-                                type="button"
-                                variant="ghost"
-                                aria-pressed={activeTab === tab.label}
-                                onClick={() => applyQuickFilter(tab.filter)}
-                                className={`frontline-focus frontline-tap h-auto gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                                    activeTab === tab.label
-                                        ? 'bg-background text-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground'
-                                }`}
-                            >
-                                {tab.label}
-                                <span
-                                    className={`inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1 text-xs font-semibold ${
-                                        activeTab === tab.label
-                                            ? 'bg-primary-fill text-primary-fill-foreground'
-                                            : 'bg-muted text-muted-foreground'
-                                    }`}
-                                >
-                                    {tab.count}
-                                </span>
-                            </Button>
-                        ))}
-                    </div>
-
-                    {/* Filter bar */}
-                    <Card className="flex flex-row flex-wrap items-end gap-3 rounded-lg p-3">
-                        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                            <Filter className="h-4 w-4" />
-                            Filters
-                        </div>
-
-                        <Input
-                            ref={searchRef}
-                            placeholder="Search alerts..."
-                            defaultValue={filters.search || ''}
-                            className="h-9 w-52"
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter')
-                                    applyFilter(
-                                        'search',
-                                        (e.target as HTMLInputElement).value,
-                                    );
+                        {canonical && can.create ? (
+                            <PageHeaderPrimaryButton icon={Plus} onClick={() => setNewOpen(true)}>
+                                Add alert
+                            </PageHeaderPrimaryButton>
+                        ) : null}
+                    </>
+                ),
+                meters,
+                filters: (
+                    <>
+                        <LiveResponseFilters
+                            values={{
+                                severity: filters.severity,
+                                source: filters.source,
+                                assigned_to: filters.assigned_to,
                             }}
+                            rows={rows}
+                            staff={staff}
+                            onChange={(next) =>
+                                apply({
+                                    severity: next.severity ? String(next.severity) : undefined,
+                                    source: next.source ? String(next.source) : undefined,
+                                    assigned_to: next.assigned_to ? String(next.assigned_to) : undefined,
+                                })
+                            }
+                            show={{ severity: true, source: true, owner: true }}
                         />
+                        {view === 'history' ? (
+                            <PageHeaderFilterSelect
+                                icon={CalendarRange}
+                                label="Any time"
+                                value={periodValue(filters.date_from)}
+                                onChange={(days) =>
+                                    apply({ date_from: periodFrom(days), date_to: undefined })
+                                }
+                                options={PERIODS}
+                            />
+                        ) : null}
+                    </>
+                ),
+            }}
+        >
+            {bulkAllowed ? (
+                <PopupSelectionBar count={ticked.size} onClear={() => setTicked(new Set())}>
+                    {can.manage ? (
+                        <Button type="button" variant="outline" onClick={() => setBulkMode('acknowledge')}>
+                            <UserCheck aria-hidden="true" />
+                            Acknowledge
+                        </Button>
+                    ) : null}
+                    {can.assign ? (
+                        <Button type="button" onClick={() => setBulkMode('assign')}>
+                            <UserPlus aria-hidden="true" />
+                            Assign
+                        </Button>
+                    ) : null}
+                </PopupSelectionBar>
+            ) : null}
 
-                        <Select
-                            value={filters.severity || 'all'}
-                            onValueChange={(v) =>
-                                applyFilter('severity', v === 'all' ? '' : v)
-                            }
-                        >
-                            <SelectTrigger className="h-9 w-36">
-                                <SelectValue placeholder="Severity" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All Severity
-                                </SelectItem>
-                                <SelectItem value="critical">
-                                    Critical
-                                </SelectItem>
-                                <SelectItem value="high">High</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="low">Low</SelectItem>
-                            </SelectContent>
-                        </Select>
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+                <ResponseWorklist
+                    title={view === 'waiting' ? 'Waiting' : view === 'history' ? 'Finished alerts' : 'Open alerts'}
+                    description={
+                        view === 'history'
+                            ? 'Resolved, closed and dismissed alerts. Your access is checked again when you open one.'
+                            : view === 'waiting'
+                              ? 'Snoozed alerts keep their response targets running.'
+                              : 'Missed response targets first, then severity and the next deadline.'
+                    }
+                    worklist={{
+                        data: rows,
+                        links: alerts.links,
+                        meta: {
+                            current_page: alerts.current_page,
+                            last_page: alerts.last_page,
+                            total: alerts.total,
+                        },
+                    }}
+                    selectedId={selection.selectedId}
+                    onSelect={(id) => selection.select(id)}
+                    getActions={rowActions}
+                    selection={bulkAllowed ? { selected: ticked, onChange: setTicked } : undefined}
+                    toolbar={
+                        canonical ? (
+                            <SelectInput
+                                value={sortValue}
+                                onChange={(value) => {
+                                    const [sort, dir] = value.split(':');
+                                    apply({
+                                        sort: sort === 'priority' ? undefined : sort,
+                                        dir: sort === 'priority' ? undefined : dir,
+                                    });
+                                }}
+                                placeholder="Sort"
+                                ariaLabel="Sort the list"
+                                options={SORTS}
+                                className="h-8 w-44"
+                            />
+                        ) : null
+                    }
+                    emptyTitle={
+                        view === 'waiting'
+                            ? 'Nothing is snoozed'
+                            : view === 'history'
+                              ? 'No finished alerts here'
+                              : 'Nothing needs a response'
+                    }
+                    emptyDescription={
+                        view === 'history'
+                            ? 'Try a longer period or clear a filter.'
+                            : 'No alerts match these filters.'
+                    }
+                />
+                <div className="min-w-0 xl:sticky xl:top-5">
+                    <AlertPreview row={selection.row} detail={detail} onRun={actions.run} />
+                </div>
+            </div>
 
-                        <Select
-                            value={filters.source || 'all'}
-                            onValueChange={(v) =>
-                                applyFilter('source', v === 'all' ? '' : v)
-                            }
-                        >
-                            <SelectTrigger className="h-9 w-36">
-                                <SelectValue placeholder="Source" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Sources</SelectItem>
-                                <SelectItem value="fleet">Fleet</SelectItem>
-                                <SelectItem value="personal_tracker">
-                                    Tracker
-                                </SelectItem>
-                                <SelectItem value="sensor">Sensor</SelectItem>
-                                <SelectItem value="manual">Manual</SelectItem>
-                                <SelectItem value="control_room">
-                                    Control Room
-                                </SelectItem>
-                                <SelectItem value="external">
-                                    External
-                                </SelectItem>
-                                <SelectItem value="compliance">
-                                    Compliance
-                                </SelectItem>
-                                <SelectItem value="other">Other</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={filters.status || 'all'}
-                            onValueChange={(v) =>
-                                applyFilter('status', v === 'all' ? '' : v)
-                            }
-                        >
-                            <SelectTrigger className="h-9 w-36">
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="open">Open</SelectItem>
-                                <SelectItem value="ack">
-                                    Acknowledged
-                                </SelectItem>
-                                <SelectItem value="triaging">
-                                    Triaging
-                                </SelectItem>
-                                <SelectItem value="resolved">
-                                    Resolved
-                                </SelectItem>
-                                <SelectItem value="closed">Closed</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Input
-                            type="date"
-                            placeholder="From"
-                            defaultValue={filters.date_from || ''}
-                            className="h-9 w-36"
-                            onChange={(e) =>
-                                applyFilter('date_from', e.target.value)
-                            }
-                        />
-
-                        <Input
-                            type="date"
-                            placeholder="To"
-                            defaultValue={filters.date_to || ''}
-                            className="h-9 w-36"
-                            onChange={(e) =>
-                                applyFilter('date_to', e.target.value)
-                            }
-                        />
-
-                        {hasFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-9"
-                                onClick={clearFilters}
-                            >
-                                <X className="mr-1 h-3 w-3" />
-                                Clear
-                            </Button>
-                        )}
-                    </Card>
-
-                    {/* Bulk actions bar */}
-                    {selected.size > 0 && (
-                        <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2">
-                            <span className="text-sm font-medium">
-                                {selected.size} selected
-                            </span>
-                            <div className="h-4 w-px bg-border" />
-                            {can.manage && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setBulkMode('acknowledge')}
-                                >
-                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                                    Acknowledge Selected
-                                </Button>
-                            )}
-                            {can.assign && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setBulkMode('assign')}
-                                >
-                                    <UserPlus className="mr-1.5 h-3.5 w-3.5" />
-                                    Assign Selected
-                                </Button>
-                            )}
-                            <div className="flex-1" />
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={toggleAll}
-                            >
-                                {allOnPageSelected
-                                    ? 'Deselect All'
-                                    : 'Select All'}
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* Canonical worklist on the Control Room route; the integration
-                    route keeps its existing compatibility table until Task 13. */}
-                    {isCanonicalWorklist ? (
-                        <AlertWorklist
-                            rows={alerts.data as CanonicalAlertItem[]}
-                            selected={selected}
-                            onSelectionChange={setSelected}
-                            onSort={toggleSort}
-                            onOpen={openWorkspace}
-                            getActions={rowActions}
-                        />
-                    ) : (
-                        <Card className="gap-0 overflow-x-auto rounded-lg p-0">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-muted/50 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                        <th className="w-10 px-3 py-3">
-                                            <Checkbox
-                                                checked={allOnPageSelected}
-                                                onCheckedChange={toggleAll}
-                                            />
-                                        </th>
-                                        <th
-                                            className="cursor-pointer px-3 py-3"
-                                            onClick={() =>
-                                                toggleSort('alert_type')
-                                            }
-                                        >
-                                            <span className="inline-flex items-center gap-1">
-                                                Alert Type{' '}
-                                                {renderSortIcon('alert_type')}
-                                            </span>
-                                        </th>
-                                        <th className="px-3 py-3">Source</th>
-                                        <th
-                                            className="cursor-pointer px-3 py-3"
-                                            onClick={() =>
-                                                toggleSort('severity')
-                                            }
-                                        >
-                                            <span className="inline-flex items-center gap-1">
-                                                Severity{' '}
-                                                {renderSortIcon('severity')}
-                                            </span>
-                                        </th>
-                                        <th
-                                            className="cursor-pointer px-3 py-3"
-                                            onClick={() => toggleSort('status')}
-                                        >
-                                            <span className="inline-flex items-center gap-1">
-                                                Status{' '}
-                                                {renderSortIcon('status')}
-                                            </span>
-                                        </th>
-                                        <th className="px-3 py-3">SLA</th>
-                                        <th
-                                            className="cursor-pointer px-3 py-3"
-                                            onClick={() =>
-                                                toggleSort('triggered_at')
-                                            }
-                                        >
-                                            <span className="inline-flex items-center gap-1">
-                                                Triggered{' '}
-                                                {renderSortIcon('triggered_at')}
-                                            </span>
-                                        </th>
-                                        <th className="px-3 py-3">Assigned</th>
-                                        <th className="px-3 py-3 text-right">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {alerts.data.length === 0 ? (
-                                        <tr>
-                                            <td
-                                                colSpan={9}
-                                                className="px-3 py-16 text-center"
-                                            >
-                                                <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-                                                <p className="text-sm text-muted-foreground">
-                                                    No alerts found matching
-                                                    your filters.
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        (alerts.data as AlertItem[]).map(
-                                            (alert, idx) => (
-                                                <tr
-                                                    key={alert.id}
-                                                    onClick={() =>
-                                                        openWorkspace(alert.id)
-                                                    }
-                                                    className={`cursor-pointer border-b border-l-4 border-l-primary/50 transition-colors hover:bg-muted/40 ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
-                                                        selected.has(alert.id)
-                                                            ? 'bg-primary/5'
-                                                            : ''
-                                                    }`}
-                                                >
-                                                    <td
-                                                        className="px-3 py-2.5"
-                                                        onClick={(e) =>
-                                                            e.stopPropagation()
-                                                        }
-                                                    >
-                                                        <Checkbox
-                                                            checked={selected.has(
-                                                                alert.id,
-                                                            )}
-                                                            onCheckedChange={() =>
-                                                                toggleOne(
-                                                                    alert.id,
-                                                                )
-                                                            }
-                                                        />
-                                                    </td>
-                                                    <td className="px-3 py-2.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-medium">
-                                                                {
-                                                                    alert.alert_type
-                                                                }
-                                                            </span>
-                                                            {alert.escalation_level &&
-                                                                alert.escalation_level >
-                                                                    0 && (
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="border-status-warning/30 px-1 py-0 text-[10px] text-status-warning"
-                                                                    >
-                                                                        L
-                                                                        {
-                                                                            alert.escalation_level
-                                                                        }
-                                                                    </Badge>
-                                                                )}
-                                                        </div>
-                                                        {alert.client_name && (
-                                                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                                                {
-                                                                    alert.client_name
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-2.5">
-                                                        <span className="text-xs text-muted-foreground capitalize">
-                                                            {alert.source?.replace(
-                                                                '_',
-                                                                ' ',
-                                                            )}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-3 py-2.5">
-                                                        <AlertStatusChip
-                                                            kind="severity"
-                                                            value={
-                                                                alert.severity
-                                                            }
-                                                        />
-                                                    </td>
-                                                    <td className="px-3 py-2.5">
-                                                        <AlertStatusChip
-                                                            kind="status"
-                                                            value={alert.status}
-                                                        />
-                                                        {alert.snoozed_until &&
-                                                        new Date(
-                                                            alert.snoozed_until,
-                                                        ) > new Date() ? (
-                                                            <span
-                                                                className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"
-                                                                title={`Snoozed until ${new Date(alert.snoozed_until).toLocaleString()}`}
-                                                            >
-                                                                <BellOff className="h-3 w-3" />
-                                                                Snoozed
-                                                            </span>
-                                                        ) : null}
-                                                    </td>
-                                                    <td className="px-3 py-2.5">
-                                                        {alert.sla_status ? (
-                                                            <AlertStatusChip
-                                                                kind="sla"
-                                                                value={
-                                                                    alert.sla_status
-                                                                }
-                                                            />
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                -
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-2.5">
-                                                        <span
-                                                            className="flex items-center gap-1 text-xs text-muted-foreground"
-                                                            title={
-                                                                alert.triggered_at
-                                                                    ? new Date(
-                                                                          alert.triggered_at,
-                                                                      ).toLocaleString()
-                                                                    : ''
-                                                            }
-                                                        >
-                                                            <Clock className="h-3 w-3" />
-                                                            {formatRelative(
-                                                                alert.triggered_at,
-                                                            )}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-3 py-2.5">
-                                                        {alert.assigned_to ? (
-                                                            <span className="flex items-center gap-1 text-xs">
-                                                                <User className="h-3 w-3" />
-                                                                {
-                                                                    alert
-                                                                        .assigned_to
-                                                                        .name
-                                                                }
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground italic">
-                                                                Unassigned
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td
-                                                        className="px-3 py-2.5"
-                                                        onClick={(e) =>
-                                                            e.stopPropagation()
-                                                        }
-                                                    >
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-7 px-2 text-xs"
-                                                                onClick={() =>
-                                                                    openWorkspace(
-                                                                        alert.id,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Eye className="mr-1 h-3 w-3" />
-                                                                Open
-                                                            </Button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ),
-                                        )
-                                    )}
-                                </tbody>
-                            </table>
-                        </Card>
-                    )}
-
-                    {/* Pagination */}
-                    {alerts.links?.length > 3 && (
-                        <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-xs text-muted-foreground">
-                                Page {alerts.current_page} of {alerts.last_page}{' '}
-                                ({alerts.total} total alerts)
-                            </p>
-                            <div className="max-w-full overflow-x-auto pb-1">
-                                <div className="flex w-max gap-1">
-                                    {alerts.links.map((link, i) => (
-                                        <Button
-                                            key={i}
-                                            variant={
-                                                link.active
-                                                    ? 'default'
-                                                    : 'outline'
-                                            }
-                                            size="sm"
-                                            className="h-8 min-w-[2rem] px-2 text-xs"
-                                            disabled={!link.url}
-                                            onClick={() =>
-                                                link.url &&
-                                                router.get(
-                                                    link.url,
-                                                    {},
-                                                    {
-                                                        preserveState: true,
-                                                        preserveScroll: true,
-                                                    },
-                                                )
-                                            }
-                                        >
-                                            <span
-                                                dangerouslySetInnerHTML={{
-                                                    __html: link.label,
-                                                }}
-                                            />
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </AlertsWorkspaceFrame>
-            </PageLayout>
-
-            {/* Stepped bulk actions: review selection → details → submit */}
+            {actions.host}
             {bulkMode ? (
                 <BulkAlertActionDialog
                     mode={bulkMode}
                     open
                     onClose={() => setBulkMode(null)}
-                    alerts={selectedAlerts.map((item) => {
-                        const alert = item as AlertItem | CanonicalAlertItem;
-                        return {
-                            id: alert.id,
-                            alert_type: alert.alert_type,
-                            severity: alert.severity,
-                            status: alert.status,
-                            client_name: alert.client_name,
-                        };
-                    })}
+                    alerts={tickedRows.map((row) => ({
+                        id: row.id,
+                        reference_number: row.reference_number,
+                        summary: row.summary,
+                        alert_type: row.source.label,
+                        severity: row.severity,
+                        status: row.status,
+                        client_name: row.person?.name,
+                    }))}
                     staff={staff}
-                    onDone={() => setSelected(new Set())}
+                    onDone={() => setTicked(new Set())}
                 />
             ) : null}
-
-            {/* Workspace-over-list */}
-            {detail ? (
-                <AlertWorkspaceDialog
-                    detail={detail}
-                    open
-                    onClose={closeWorkspace}
-                    onCloseAutoFocus={workspaceFocus.onCloseAutoFocus}
-                />
-            ) : null}
-
-            {/* Manual alert creation — guided wizard. Mounted only while open so
-                every run starts fresh and a closed wizard can never linger. */}
             {newOpen ? (
                 <NewAlertWizard
                     open
                     onClose={() => setNewOpen(false)}
                     clients={clients}
                     sites={sites}
-                    onOpenAlert={openWorkspace}
+                    onOpenAlert={(id) => router.visit(`/control-room/alerts/${id}`)}
                 />
             ) : null}
-        </AppLayout>
+        </ControlRoomPage>
     );
 }

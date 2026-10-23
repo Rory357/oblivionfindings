@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,39 +6,28 @@ import {
     ControlRoomDashboardView,
     type ControlRoomDashboardProps,
 } from '@/pages/control-room/index';
-import { FreshnessIndicator } from './service-health-panel';
 
-const { reload } = vi.hoisted(() => ({ reload: vi.fn() }));
+const inertia = vi.hoisted(() => ({
+    get: vi.fn(),
+    reload: vi.fn(),
+    visit: vi.fn(),
+    post: vi.fn(),
+    url: '/control-room',
+}));
 
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
-    Link: ({
-        href,
-        children,
-        ...props
-    }: {
-        href: string;
-        children: ReactNode;
-    }) => (
+    Link: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
         <a href={href} {...props}>
             {children}
         </a>
     ),
-    router: {
-        get: vi.fn(),
-        reload,
-        visit: vi.fn(),
-    },
-}));
-
-vi.mock('@/components/control-room/alert-workspace-dialog', () => ({
-    AlertWorkspaceDialog: () => null,
-}));
-
-vi.mock('@/components/control-room/command-centre-tabs', () => ({
-    CommandCentreTabs: () => (
-        <nav aria-label="Command centre views">Desk tabs</nav>
-    ),
+    router: inertia,
+    usePage: () => ({
+        url: inertia.url,
+        props: { auth: { can: { controlRoom: { viewAny: true, alertsManage: true } } } },
+    }),
+    useForm: () => ({ data: {}, errors: {}, setData: vi.fn(), post: vi.fn(), processing: false, isDirty: false, transform: vi.fn() }),
 }));
 
 vi.mock('@/layouts/app-layout', () => ({
@@ -152,87 +141,62 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-describe('Control Room desktop Desk composition', () => {
-    it('puts workflow, hero, filters, priority work and continuity ahead of service health', () => {
-        const { container } = render(<ControlRoomDashboardView {...props()} />);
+describe('Live response › Active', () => {
+    it('opens with the standard header: title, linked numbers and the view tabs', () => {
+        render(<ControlRoomDashboardView {...props()} />);
 
-        expect(
-            screen.getByRole('navigation', {
-                name: 'Incident response workflow',
-            }),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByRole('link', { name: 'New alert' }),
-        ).toBeInTheDocument();
-        expect(screen.getByText('Now')).toBeInTheDocument();
-        expect(screen.getByText('Continuity')).toBeInTheDocument();
-        expect(
-            screen.getByRole('search', { name: 'Filter priority work' }),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByRole('heading', { name: 'Priority worklist' }),
-        ).toBeInTheDocument();
-
-        const order = [
-            ...container.querySelectorAll('[data-desk-section]'),
-        ].map((node) => node.getAttribute('data-desk-section'));
-        expect(order.indexOf('workflow')).toBeLessThan(order.indexOf('hero'));
-        expect(order.indexOf('hero')).toBeLessThan(order.indexOf('worklist'));
-        expect(order.indexOf('continuity')).toBeLessThan(
-            order.indexOf('service-health'),
+        expect(screen.getByRole('heading', { level: 1, name: 'Live response' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Show critical alerts' })).toHaveAttribute(
+            'href',
+            '/control-room?severity=critical',
         );
-        expect(
-            screen.queryByText('Historical performance'),
-        ).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Show alerts with no owner' })).toHaveAttribute(
+            'href',
+            '/control-room?assigned_to=unassigned',
+        );
+        expect(screen.getByRole('link', { name: 'Duty handover' })).toHaveAttribute(
+            'href',
+            '/control-room/shifts',
+        );
+        expect(screen.getByRole('link', { name: 'Add alert' })).toHaveAttribute(
+            'href',
+            '/control-room/alerts?new=1',
+        );
+        for (const tab of ['Active', 'My work', 'Escalated', 'Waiting', 'Safety handovers', 'History']) {
+            expect(screen.getAllByText(tab).length).toBeGreaterThan(0);
+        }
     });
 
-    it('requests analytics only when opened and then renders the historical panel', () => {
-        const { rerender } = render(<ControlRoomDashboardView {...props()} />);
+    it('lists the priority work and previews the first alert', () => {
+        render(<ControlRoomDashboardView {...props()} />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Open analytics' }));
-        expect(reload).toHaveBeenCalledWith(
-            expect.objectContaining({ only: ['analytics'] }),
+        expect(screen.getByRole('heading', { name: 'Priority worklist' })).toBeInTheDocument();
+        expect(screen.getAllByText('Missed welfare check').length).toBeGreaterThan(0);
+        // Nothing was chosen, so the top alert loads into the preview.
+        expect(inertia.get).toHaveBeenCalledWith(
+            expect.stringContaining('alert=9'),
+            {},
+            expect.objectContaining({ only: ['detail'], replace: true }),
         );
+        const preview = screen.getByLabelText('Selected alert CR-2026-0009');
+        expect(within(preview).getByRole('link', { name: /Open full record/ })).toHaveAttribute(
+            'href',
+            '/control-room/alerts/9',
+        );
+    });
 
-        rerender(
+    it('says plainly when the worklist could not refresh', () => {
+        render(
             <ControlRoomDashboardView
                 {...props({
-                    analytics: {
-                        period: '7d',
-                        volume: { daily_trend: [] },
-                        sla: { compliance_pct: 92 },
-                        escalation: { escalation_rate: 4 },
-                        sites: [],
-                    },
+                    freshness: { updated_at: '2020-01-01T00:00:00Z', stale_after_seconds: 90 },
                 })}
             />,
         );
-        expect(screen.getByText('Historical performance')).toBeInTheDocument();
-    });
-
-    it('always gives freshness a readable Updated, Refreshing or Stale state', () => {
-        const { rerender } = render(
-            <FreshnessIndicator
-                state="updated"
-                updatedAt="2026-07-15T08:00:00Z"
-            />,
+        expect(screen.getByText(/couldn.t refresh/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+        expect(inertia.reload).toHaveBeenCalledWith(
+            expect.objectContaining({ only: expect.arrayContaining(['worklist', 'detail']) }),
         );
-        expect(screen.getByText(/Updated/)).toBeInTheDocument();
-
-        rerender(
-            <FreshnessIndicator
-                state="refreshing"
-                updatedAt="2026-07-15T08:00:00Z"
-            />,
-        );
-        expect(screen.getByText(/Refreshing/)).toBeInTheDocument();
-
-        rerender(
-            <FreshnessIndicator
-                state="stale"
-                updatedAt="2026-07-15T08:00:00Z"
-            />,
-        );
-        expect(screen.getByText(/Stale/)).toBeInTheDocument();
     });
 });

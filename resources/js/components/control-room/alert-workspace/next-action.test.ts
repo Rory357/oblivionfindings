@@ -31,7 +31,7 @@ describe('alert workspace next action', () => {
         expect(nextAlertAction(base)).toEqual(
             expect.objectContaining({
                 key: 'create_incident',
-                label: 'Create incident and hand over',
+                label: 'Report incident',
             }),
         );
     });

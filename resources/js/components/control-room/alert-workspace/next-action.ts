@@ -48,7 +48,7 @@ export function nextAlertAction(input: AlertNextActionInput): AlertNextAction {
     if (!input.incident && input.can.createIncident) {
         return {
             key: 'create_incident',
-            label: 'Create incident and hand over',
+            label: 'Report incident',
             href: null,
             statusText:
                 'Creates one official incident and opens its H&S handover.',

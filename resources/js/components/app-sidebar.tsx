@@ -15,6 +15,11 @@ import {
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
 import {
+    controlRoomDestinations,
+    controlRoomPrimaryLinkActive,
+    type ControlRoomNavCapabilities,
+} from '@/lib/control-room-navigation';
+import {
     EMAR_SEARCH_KEYWORDS,
     emarHubLinkActive,
     emarSearchEntries,
@@ -74,13 +79,10 @@ import {
     HeartPulse,
     Home,
     Landmark,
-    LayoutDashboard,
     LayoutGrid,
     ListChecks,
     Map,
     MapPin,
-    Megaphone,
-    MessageSquare,
     MessageSquareText,
     Package,
     PersonStanding,
@@ -94,7 +96,6 @@ import {
     ShieldAlert,
     ShieldCheck,
     Siren,
-    Smartphone,
     Stethoscope,
     Target,
     Timer,
@@ -345,6 +346,15 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
             ? 2000 + item.length
             : -1;
     }
+
+    // A Control Room destination stays lit on every view of its rail
+    // (/control-room prefixes every Control Room URL).
+    const controlRoomActive = controlRoomPrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (controlRoomActive !== undefined)
+        return controlRoomActive ? 2000 + item.length : -1;
 
     const fleetActive = fleetPrimaryLinkActive(
         normalizedCurrentPath,
@@ -1893,100 +1903,18 @@ function buildReportingSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     return groups.filter((g) => g.items.length > 0);
 }
 
+/** Control Room's six destinations (lib/control-room-navigation.ts, approved
+ * 11 Oct 2026: 12 menu items → 6). Each destination's views are tabs on its
+ * header rail, not more sidebar links. */
 function buildControlRoomSubPanelGroups({
     can,
 }: {
-    can?: any;
+    can?: ControlRoomNavCapabilities;
 }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
-
-    // All items assume `controlRoom.viewAny` because the icon itself is
-    // already gated on that capability. We still gate sub-items that require
-    // richer permissions (alerts, reports, messaging, settings).
-    // The old Dashboard / All Alerts / Escalation Queue / Incident Tracker
-    // entries merged into ONE command centre (tabs on the page itself).
-    const live: NavItem[] = [];
-    if (can?.controlRoom?.viewAny) {
-        live.push({
-            title: 'Desk',
-            href: '/control-room',
-            icon: LayoutDashboard,
-        });
-        live.push({
-            title: 'My queue',
-            href: '/control-room/my-tasks',
-            icon: CheckCircle2,
-        });
-        live.push({ title: 'Live Map', href: '/control-room/map', icon: Map });
-        live.push({
-            title: 'Shifts',
-            href: '/control-room/shifts',
-            icon: Clock,
-        });
-    }
-    if (live.length) groups.push({ label: 'Live Monitoring', items: live });
-
-    const comms: NavItem[] = [];
-    if (can?.controlRoom?.alertsCreate || can?.controlRoom?.alertsManage)
-        comms.push({
-            title: 'Broadcast',
-            href: '/control-room/broadcast',
-            icon: Megaphone,
-        });
-    if (can?.messages?.send || can?.messages?.viewAny)
-        comms.push({
-            title: 'Staff Messaging',
-            href: '/control-room/messaging',
-            icon: MessageSquare,
-        });
-    if (comms.length) groups.push({ label: 'Communications', items: comms });
-
-    const ops: NavItem[] = [];
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'Device signals',
-            href: '/control-room/devices',
-            icon: Smartphone,
-        });
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'Playbooks',
-            href: '/control-room/playbooks',
-            icon: ClipboardCheck,
-        });
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'SLA Management',
-            href: '/control-room/sla',
-            icon: Target,
-        });
-    if (ops.length) groups.push({ label: 'Operations', items: ops });
-
-    const analytics: NavItem[] = [];
-    if (can?.controlRoom?.viewAny)
-        analytics.push({
-            title: 'Real-time Stats',
-            href: '/control-room/stats',
-            icon: Activity,
-        });
-    if (can?.controlRoom?.reportsView)
-        analytics.push({
-            title: 'Reports',
-            href: '/control-room/reports',
-            icon: FileText,
-        });
-    if (analytics.length) groups.push({ label: 'Analytics', items: analytics });
-
-    const config: NavItem[] = [];
-    if (can?.controlRoom?.alertsManage)
-        config.push({
-            title: 'Settings',
-            href: '/control-room/settings',
-            icon: Settings,
-        });
-    if (config.length) groups.push({ label: 'Configuration', items: config });
-
-    return groups;
+    const items: NavItem[] = controlRoomDestinations(can).map(
+        ({ title, href, icon }) => ({ title, href, icon }),
+    );
+    return items.length ? [{ label: 'Control Room', items }] : [];
 }
 
 function buildSecurityDevicesSubPanelGroups({

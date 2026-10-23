@@ -1,51 +1,42 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import { AlertStatus } from '@/components/control-room/alert-worklist/alert-status';
+import { useAlertActions } from '@/components/control-room/alert-record/alert-actions';
 import {
-    AlertWorkspaceDialog,
-    type AlertWorkspaceDetail,
-} from '@/components/control-room/alert-workspace-dialog';
+    severityBadge,
+    statusBadge,
+} from '@/components/control-room/alert-record/alert-labels';
+import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
+import type { AlertWorkspaceDetail } from '@/components/control-room/alert-record/alert-sections';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
 import {
     ControlRoomRowActions,
     type ControlRoomRowAction,
 } from '@/components/control-room/control-room-row-actions';
+import { AlertPreview } from '@/components/control-room/live-response/alert-preview';
 import {
-    SafetyHandoverLenses,
-    type SafetyHandoverLens,
-} from '@/components/control-room/safety-handover-lenses';
-import { PageLayout } from '@/components/page';
+    LiveResponseFilters,
+    LiveResponseSearch,
+    applyLiveResponseFilters,
+} from '@/components/control-room/live-response/live-response-filters';
+import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
+import {
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
-import { Head, Link, router } from '@inertiajs/react';
-import {
-    ArrowRight,
-    CheckCircle2,
-    ClipboardCheck,
-    Clock3,
-    Copy,
-    ExternalLink,
-    Eye,
-    FileWarning,
-    Filter,
-    HeartPulse,
-    MapPin,
-    RadioTower,
-    Search,
-    UserRound,
-    X,
-} from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
+import { router } from '@inertiajs/react';
+import { ArrowUpRight, Copy, ExternalLink, Eye, HeartPulse, Layers } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
 
 type PersonRef = { id: number; name: string };
+
+/** A step filter sent by ControlRoomIncidentController (key, label, help, count). */
+type SafetyHandoverLens = { key: string; label: string; help: string; count: number };
 
 type SafetyJourney = {
     id: number;
@@ -95,11 +86,7 @@ type SafetyJourney = {
         | 'accepted_in_progress'
         | 'operational_complete_governance_open'
         | 'complete';
-    next_action: {
-        key: string;
-        label: string;
-        href: string | null;
-    };
+    next_action: { key: string; label: string; href: string | null };
 };
 
 type Props = {
@@ -134,41 +121,89 @@ type Props = {
     detail?: AlertWorkspaceDetail | null;
 };
 
-const STAGE_COPY: Record<
+const STAGE: Record<
     SafetyJourney['stage'],
-    { label: string; explanation: string; tone: string }
+    { label: string; explanation: string; tone: StatusVariant }
 > = {
     needs_incident: {
-        label: 'Needs incident',
-        explanation:
-            'Control Room must create the official record and hand it to H&S.',
-        tone: 'border-status-critical/30 bg-status-critical/10 text-status-critical',
+        label: 'Needs an incident report',
+        explanation: 'Control Room reports the incident and hands it to H&S.',
+        tone: 'critical',
     },
     awaiting_health_safety: {
-        label: 'Awaiting H&S',
-        explanation:
-            'The incident exists; H&S acceptance is the next ownership step.',
-        tone: 'border-status-warning/30 bg-status-warning/10 text-status-warning',
+        label: 'Waiting for H&S',
+        explanation: 'The incident exists; H&S still has to accept it.',
+        tone: 'warning',
     },
     accepted_in_progress: {
-        label: 'Accepted / in progress',
-        explanation:
-            'H&S owns governance while Control Room can finish operational work.',
-        tone: 'border-primary/30 bg-primary/10 text-primary',
+        label: 'H&S in progress',
+        explanation: 'H&S owns the follow-up; Control Room can finish its own work.',
+        tone: 'info',
     },
     operational_complete_governance_open: {
-        label: 'Operations done / H&S open',
-        explanation:
-            'The operational response is complete; governance still needs closure.',
-        tone: 'border-status-warning/30 bg-status-warning/10 text-status-warning',
+        label: 'Response done, H&S open',
+        explanation: 'The response is finished; H&S still has to close its follow-up.',
+        tone: 'warning',
     },
     complete: {
         label: 'Complete',
-        explanation: 'Operational and governance work are both closed.',
-        tone: 'border-status-success/30 bg-status-success/10 text-status-success',
+        explanation: 'The response and the H&S follow-up are both closed.',
+        tone: 'success',
     },
 };
 
+const basePath = '/control-room/incidents';
+
+/** A journey read as a worklist row, so the shared preview can show its alert. */
+function asRow(journey: SafetyJourney): AlertWorklistRow {
+    return {
+        id: journey.alert.id,
+        reference_number: journey.alert.reference_number,
+        summary: journey.alert.summary,
+        source: { key: 'safety_handover', label: 'Safety handover' },
+        status: journey.alert.status as AlertWorklistRow['status'],
+        severity: journey.alert.severity as AlertWorklistRow['severity'],
+        priority: journey.priority,
+        triggered_at: journey.triggered_at,
+        next_deadline_at: journey.next_deadline_at,
+        sla: {
+            status: journey.sla.status as AlertWorklistRow['sla']['status'],
+            next_deadline_at: journey.sla.next_deadline_at,
+        },
+        site: journey.site,
+        person: journey.person,
+        assignee: journey.assignee,
+        queue: journey.queue,
+        journey: {
+            incident_reference: journey.incident?.reference_number ?? null,
+            health_safety_reference: journey.health_safety?.reference_number ?? null,
+            handover_status: journey.health_safety?.handover_status ?? null,
+        },
+        next_action: {
+            label: journey.next_action.label,
+            href: journey.next_action.href ?? journey.alert.href,
+        },
+        actions: {
+            can_claim: false,
+            can_acknowledge: false,
+            can_move_queue: false,
+            can_escalate: false,
+            can_create_incident: journey.next_action.key === 'create_incident',
+            can_snooze: false,
+            can_unsnooze: false,
+            can_copy_reference: true,
+            incident_href: journey.incident?.href ?? null,
+            health_safety_href: journey.health_safety?.href ?? null,
+        },
+        href: journey.alert.href,
+    };
+}
+
+/**
+ * Live response › Safety handovers — alerts on their way into an incident
+ * report and H&S follow-up (its own tab, Stephan 23 Oct 2026). Each row says
+ * which step it is at and who owns it; the preview shows the alert.
+ */
 export default function SafetyHandovers({
     journeys,
     filters,
@@ -177,515 +212,300 @@ export default function SafetyHandovers({
     sites,
     detail = null,
 }: Props) {
-    const searchRef = useRef<HTMLInputElement>(null);
-    const basePath = '/control-room/incidents';
-
-    const visit = useCallback((next: Record<string, string | undefined>) => {
-        router.get(basePath, next as Record<string, string>, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    }, []);
-
-    const applyFilter = (key: string, value?: string) =>
-        visit({ ...filters, [key]: value || undefined, page: undefined });
-
-    const openWorkspace = (alertId: number) =>
-        router.get(
-            basePath,
-            { ...filters, alert: String(alertId) } as Record<string, string>,
-            {
-                preserveState: true,
-                preserveScroll: true,
-                only: ['detail'],
-            },
-        );
-
-    const closeWorkspace = () =>
-        router.get(basePath, filters as Record<string, string>, {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['detail'],
-        });
-
-    const hasFilters = Boolean(
-        filters.search ||
-        filters.severity ||
-        filters.site_id ||
-        filters.date_from ||
-        filters.date_to,
-    );
+    const rows = useMemo(() => journeys.data.map(asRow), [journeys.data]);
+    const actions = useAlertActions(detail);
+    const selection = useAlertSelection({ rows, detail, runAction: actions.run });
+    const lens = filters.lens ?? 'attention';
 
     useEffect(() => {
-        const interval = window.setInterval(() => {
-            if (document.hidden) return;
-            router.reload({
-                only: ['journeys', 'lenses', 'stats'],
-                preserveScroll: true,
-            });
+        const poll = window.setInterval(() => {
+            if (!document.hidden)
+                router.reload({
+                    only: ['journeys', 'lenses', 'stats', 'detail'],
+                    preserveScroll: true,
+                });
         }, 30_000);
-
-        return () => window.clearInterval(interval);
+        return () => window.clearInterval(poll);
     }, []);
 
-    return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'Safety handovers', href: basePath },
-            ]}
+    const apply = (next: Record<string, string | undefined>) =>
+        applyLiveResponseFilters(basePath, { ...filters, ...next, page: undefined, alert: undefined });
+
+    const meter = (
+        key: keyof typeof STAGE_LENS,
+        count: number,
+        caption: string,
+        tone: 'critical' | 'warning' | 'brand',
+    ) => (
+        <PageHeaderMeterBlock
+            label={STAGE_LENS[key].label}
+            tone={count > 0 ? tone : 'brand'}
+            onClick={() => apply({ lens: STAGE_LENS[key].lens })}
+            pressed={lens === STAGE_LENS[key].lens}
+            ariaLabel={`Show ${STAGE_LENS[key].label.toLowerCase()}`}
         >
-            <Head title="Safety handovers - Control Room" />
+            <PageHeaderMeterBig>{count}</PageHeaderMeterBig>
+            <PageHeaderMeterCaption>{caption}</PageHeaderMeterCaption>
+        </PageHeaderMeterBlock>
+    );
 
-            <PageLayout>
-                <CommandCentrePage
-                    current={basePath}
-                    icon={HeartPulse}
-                    title="Safety handovers"
-                    description="Follow every Control Room alert into its official incident and governed H&S ownership."
-                    status="Canonical safety journey"
-                    metricGroups={[
-                        {
-                            title: 'Safety continuity',
-                            icon: HeartPulse,
-                            metrics: [
-                                {
-                                    label: 'Needs incident',
-                                    value: String(stats.needs_incident),
-                                    caption: 'record required',
-                                    tone:
-                                        stats.needs_incident > 0
-                                            ? 'critical'
-                                            : 'success',
-                                },
-                                {
-                                    label: 'Waiting for H&S',
-                                    value: String(stats.awaiting_health_safety),
-                                    caption: 'accept ownership',
-                                    tone:
-                                        stats.awaiting_health_safety > 0
-                                            ? 'warning'
-                                            : 'success',
-                                },
-                                {
-                                    label: 'In progress',
-                                    value: String(stats.accepted_in_progress),
-                                    caption: 'governance active',
-                                    tone: 'neutral',
-                                },
-                                {
-                                    label: 'Governance open',
-                                    value: String(stats.governance_open),
-                                    caption: 'operations complete',
-                                    tone:
-                                        stats.governance_open > 0
-                                            ? 'warning'
-                                            : 'success',
-                                },
-                            ],
-                        },
-                    ]}
-                >
-                    <Card className="flex flex-row items-center gap-3 overflow-x-auto rounded-xl p-3">
-                        <JourneyKey
-                            icon={RadioTower}
-                            title="Control Room"
-                            text="Respond and stabilise"
-                        />
-                        <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-                        <JourneyKey
-                            icon={FileWarning}
-                            title="Incident"
-                            text="Official record of what happened"
-                        />
-                        <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-                        <JourneyKey
-                            icon={HeartPulse}
-                            title="Health & Safety"
-                            text="Investigate, govern and close"
-                        />
-                    </Card>
-
-                    <SafetyHandoverLenses
-                        lenses={lenses}
-                        activeLens={filters.lens ?? 'attention'}
-                        onSelect={(lens) => visit({ lens, page: undefined })}
+    return (
+        <ControlRoomPage
+            headTitle="Safety handovers"
+            header={{
+                subline: 'Alerts going into an incident report and H&S follow-up',
+                actions: (
+                    <LiveResponseSearch
+                        value={filters.search ?? ''}
+                        onApply={(search) => apply({ search: search || undefined })}
+                        placeholder="Search alert, incident or H&S reference"
                     />
-
-                    <Card className="flex flex-col gap-3 rounded-xl p-3 sm:flex-row sm:items-end">
-                        <div className="flex items-center gap-1.5 pb-2 text-sm font-medium text-muted-foreground">
-                            <Filter className="h-4 w-4" />
-                            Filters
+                ),
+                meters: (
+                    <>
+                        {meter('needs_incident', stats.needs_incident, 'report needed', 'critical')}
+                        {meter('awaiting_health_safety', stats.awaiting_health_safety, 'to accept ownership', 'warning')}
+                        {meter('accepted_in_progress', stats.accepted_in_progress, 'H&S working on it', 'brand')}
+                        {meter('governance_open', stats.governance_open, 'response finished', 'warning')}
+                    </>
+                ),
+                filters: (
+                    <>
+                        <PageHeaderFilterSelect
+                            icon={Layers}
+                            label="Needs attention"
+                            allValue="attention"
+                            value={lens}
+                            onChange={(value) => apply({ lens: value })}
+                            options={lenses.map((l) => ({
+                                value: l.key,
+                                label: `${l.label} (${l.count})`,
+                            }))}
+                        />
+                        <LiveResponseFilters
+                            values={{ severity: filters.severity, site_id: filters.site_id }}
+                            rows={rows}
+                            sites={sites}
+                            onChange={(next) =>
+                                apply({
+                                    severity: next.severity ? String(next.severity) : undefined,
+                                    site_id: next.site_id ? String(next.site_id) : undefined,
+                                })
+                            }
+                            show={{ severity: true, site: true }}
+                        />
+                    </>
+                ),
+            }}
+        >
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+                <Card className="min-w-0 gap-0 overflow-hidden py-0">
+                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+                        <div className="min-w-0">
+                            <h2 className="text-section-title">Safety handovers</h2>
+                            <p className="text-subtle mt-0.5">
+                                {lenses.find((l) => l.key === lens)?.help ??
+                                    'Each alert with the step it is at and who owns it.'}
+                            </p>
                         </div>
-                        <div className="relative min-w-0 flex-1">
-                            <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                ref={searchRef}
-                                aria-label="Search safety handovers"
-                                placeholder="Search CR, INC or HS reference…"
-                                defaultValue={filters.search ?? ''}
-                                className="h-9 w-full pl-8"
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter') {
-                                        applyFilter(
-                                            'search',
-                                            (event.target as HTMLInputElement)
-                                                .value,
-                                        );
-                                    }
-                                }}
+                        <StatusBadge variant="neutral" className="tabular-nums">
+                            {journeys.meta.total} {journeys.meta.total === 1 ? 'alert' : 'alerts'}
+                        </StatusBadge>
+                    </div>
+                    {journeys.data.length === 0 ? (
+                        <div className="px-5 py-10">
+                            <EmptyState
+                                icon={HeartPulse}
+                                title="Nothing in this step"
+                                description="Try another step or clear a filter."
                             />
                         </div>
-                        <Select
-                            value={filters.severity ?? 'all'}
-                            onValueChange={(value) =>
-                                applyFilter(
-                                    'severity',
-                                    value === 'all' ? undefined : value,
-                                )
-                            }
-                        >
-                            <SelectTrigger className="h-9 w-full sm:w-40">
-                                <SelectValue placeholder="Severity" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All severities
-                                </SelectItem>
-                                <SelectItem value="critical">
-                                    Critical
-                                </SelectItem>
-                                <SelectItem value="high">High</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="low">Low</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select
-                            value={filters.site_id ?? 'all'}
-                            onValueChange={(value) =>
-                                applyFilter(
-                                    'site_id',
-                                    value === 'all' ? undefined : value,
-                                )
-                            }
-                        >
-                            <SelectTrigger className="h-9 w-full sm:w-52">
-                                <SelectValue placeholder="Site" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All accessible sites
-                                </SelectItem>
-                                {sites.map((site) => (
-                                    <SelectItem
-                                        key={site.id}
-                                        value={String(site.id)}
-                                    >
-                                        {site.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        {hasFilters ? (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-9"
-                                onClick={() =>
-                                    visit({ lens: filters.lens ?? 'attention' })
-                                }
-                            >
-                                <X className="mr-1.5 h-4 w-4" />
-                                Clear filters
-                            </Button>
-                        ) : null}
-                    </Card>
-
-                    <section className="overflow-hidden rounded-xl border border-border bg-card">
-                        <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)_minmax(14rem,0.8fr)_auto] gap-4 border-b border-border bg-muted/30 px-4 py-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid">
-                            <span>Journey</span>
-                            <span>Current handover</span>
-                            <span>Owner and timing</span>
-                            <span className="text-right">Next action</span>
-                        </div>
-
-                        {journeys.data.length ? (
-                            journeys.data.map((journey) => (
-                                <SafetyJourneyRow
-                                    key={journey.alert.id}
+                    ) : (
+                        <ol className="divide-y divide-border">
+                            {journeys.data.map((journey) => (
+                                <JourneyRow
+                                    key={journey.id}
                                     journey={journey}
-                                    onOpenWorkspace={openWorkspace}
+                                    selected={journey.alert.id === selection.selectedId}
+                                    onSelect={() => selection.select(journey.alert.id)}
+                                    onReport={() => selection.select(journey.alert.id, 'report_incident')}
                                 />
-                            ))
-                        ) : (
-                            <div className="flex min-h-64 flex-col items-center justify-center gap-2 px-6 text-center">
-                                <CheckCircle2 className="h-9 w-9 text-status-success" />
-                                <p className="font-semibold text-foreground">
-                                    Nothing in this handover view
-                                </p>
-                                <p className="max-w-lg text-sm text-muted-foreground">
-                                    There is no matching operational or
-                                    governance work. Try another lens or clear
-                                    the filters.
-                                </p>
+                            ))}
+                        </ol>
+                    )}
+                    {journeys.meta.last_page > 1 ? (
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                            <p className="text-caption">
+                                Showing {journeys.meta.from ?? 0}–{journeys.meta.to ?? 0} of{' '}
+                                {journeys.meta.total}
+                            </p>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!journeys.links.prev}
+                                    onClick={() =>
+                                        journeys.links.prev &&
+                                        router.get(journeys.links.prev, {}, { preserveState: true })
+                                    }
+                                >
+                                    Previous
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!journeys.links.next}
+                                    onClick={() =>
+                                        journeys.links.next &&
+                                        router.get(journeys.links.next, {}, { preserveState: true })
+                                    }
+                                >
+                                    Next
+                                </Button>
                             </div>
-                        )}
-                    </section>
-
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">
-                            {journeys.meta.total
-                                ? `Showing ${journeys.meta.from}–${journeys.meta.to} of ${journeys.meta.total} journeys`
-                                : 'No journeys'}
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={!journeys.links.prev}
-                                onClick={() =>
-                                    journeys.links.prev &&
-                                    router.visit(journeys.links.prev)
-                                }
-                            >
-                                Previous
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                                Page {journeys.meta.current_page} of{' '}
-                                {journeys.meta.last_page}
-                            </span>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={!journeys.links.next}
-                                onClick={() =>
-                                    journeys.links.next &&
-                                    router.visit(journeys.links.next)
-                                }
-                            >
-                                Next
-                            </Button>
                         </div>
-                    </div>
-                </CommandCentrePage>
-            </PageLayout>
-
-            {detail ? (
-                <AlertWorkspaceDialog
-                    detail={detail}
-                    open
-                    onClose={closeWorkspace}
-                />
-            ) : null}
-        </AppLayout>
+                    ) : null}
+                </Card>
+                <div className="min-w-0 xl:sticky xl:top-5">
+                    <AlertPreview row={selection.row} detail={detail} onRun={actions.run} />
+                </div>
+            </div>
+            {actions.host}
+        </ControlRoomPage>
     );
 }
 
-function JourneyKey({
-    icon: Icon,
-    title,
-    text,
-}: {
-    icon: typeof RadioTower;
-    title: string;
-    text: string;
-}) {
-    return (
-        <div className="flex items-center gap-3">
-            <span className="rounded-lg bg-primary/10 p-2 text-primary">
-                <Icon className="h-5 w-5" />
-            </span>
-            <span>
-                <span className="block text-sm font-semibold text-foreground">
-                    {title}
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                    {text}
-                </span>
-            </span>
-        </div>
-    );
-}
+/** Header numbers → the server's lenses (keys from ControlRoomIncidentController). */
+const STAGE_LENS = {
+    needs_incident: { label: 'Needs a report', lens: 'needs_incident' },
+    awaiting_health_safety: { label: 'Waiting for H&S', lens: 'awaiting_health_safety' },
+    accepted_in_progress: { label: 'H&S in progress', lens: 'accepted_in_progress' },
+    governance_open: { label: 'H&S still open', lens: 'operational_complete_governance_open' },
+} as const;
 
-function SafetyJourneyRow({
+function JourneyRow({
     journey,
-    onOpenWorkspace,
+    selected,
+    onSelect,
+    onReport,
 }: {
     journey: SafetyJourney;
-    onOpenWorkspace: (alertId: number) => void;
+    selected: boolean;
+    onSelect: () => void;
+    onReport: () => void;
 }) {
-    const stage = STAGE_COPY[journey.stage];
-    const reference =
-        journey.alert.reference_number ?? `Alert ${journey.alert.id}`;
-    const runNextAction = () => {
-        if (journey.next_action.key === 'create_incident') {
-            onOpenWorkspace(journey.alert.id);
-            return;
-        }
-        if (journey.next_action.href) router.visit(journey.next_action.href);
-        else onOpenWorkspace(journey.alert.id);
+    const stage = STAGE[journey.stage];
+    const status = statusBadge(journey.alert.status);
+    const severity = severityBadge(journey.alert.severity);
+    const reference = journey.alert.reference_number ?? `Alert ${journey.alert.id}`;
+    const owner = journey.health_safety?.owner?.name ?? journey.assignee?.name ?? null;
+    const runNext = () => {
+        if (journey.next_action.key === 'create_incident') onReport();
+        else if (journey.next_action.href) router.visit(journey.next_action.href);
+        else onSelect();
     };
-    const actions: ControlRoomRowAction[] = [
+    const items: ControlRoomRowAction[] = [
+        { key: 'preview', label: 'Show in preview', icon: Eye, onSelect },
         {
-            key: 'open-alert',
-            label: 'Open alert workspace',
-            icon: Eye,
-            onSelect: () => onOpenWorkspace(journey.alert.id),
+            key: 'open',
+            label: 'Open full record',
+            icon: ArrowUpRight,
+            onSelect: () => router.visit(journey.alert.href),
         },
-        {
-            key: 'next-action',
-            label: journey.next_action.label,
-            icon: ArrowRight,
-            onSelect: runNextAction,
-        },
+        { key: 'next', label: journey.next_action.label, icon: ArrowUpRight, onSelect: runNext },
     ];
-
-    if (journey.incident?.href) {
-        actions.push({
-            key: 'open-incident',
+    if (journey.incident?.href)
+        items.push({
+            key: 'incident',
             label: 'Open incident record',
             icon: ExternalLink,
             onSelect: () => router.visit(journey.incident!.href!),
         });
-    }
-    if (journey.health_safety?.href) {
-        actions.push({
-            key: 'open-health-safety',
+    if (journey.health_safety?.href)
+        items.push({
+            key: 'hs',
             label: 'Open H&S event',
             icon: ExternalLink,
             onSelect: () => router.visit(journey.health_safety!.href!),
         });
-    }
-    actions.push({
-        key: 'copy-reference',
+    items.push({
+        key: 'copy',
         label: 'Copy alert reference',
         icon: Copy,
         onSelect: () => void navigator.clipboard?.writeText(reference),
     });
 
     return (
-        <ControlRoomRowActions
-            label={`Actions for ${reference}`}
-            items={actions}
-        >
+        <ControlRoomRowActions label={`Actions for ${reference}`} items={items}>
             {({ rowProps, overflowButton }) => (
-                <article
-                    {...rowProps}
-                    className="grid gap-4 border-b border-border px-4 py-4 last:border-b-0 hover:bg-muted/20 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)_minmax(14rem,0.8fr)_auto] lg:items-center"
+                <li
+                    onContextMenu={rowProps.onContextMenu}
+                    className={cn(
+                        'flex items-start gap-3 px-5 py-3.5 transition-colors',
+                        selected
+                            ? 'bg-primary-fill/10 shadow-[inset_3px_0_0_var(--primary)]'
+                            : 'hover:bg-muted/40',
+                    )}
                 >
-                    <div className="min-w-0 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                unstyled
-                                type="button"
-                                className="font-mono text-xs font-semibold text-primary hover:underline"
-                                onClick={() =>
-                                    onOpenWorkspace(journey.alert.id)
-                                }
+                    <button
+                        type="button"
+                        onClick={onSelect}
+                        aria-current={selected ? 'true' : undefined}
+                        className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <span className="flex items-start justify-between gap-3">
+                            <span className="min-w-0 font-semibold text-foreground">
+                                {journey.summary}
+                            </span>
+                            <span
+                                className="text-caption shrink-0 tabular-nums"
+                                title={formatDateTime(journey.triggered_at)}
                             >
-                                {reference}
-                            </Button>
-                            {journey.incident?.reference_number &&
-                            journey.incident.href ? (
-                                <Link
-                                    href={journey.incident.href}
-                                    className="font-mono text-xs font-semibold text-foreground hover:text-primary hover:underline"
-                                >
-                                    {journey.incident.reference_number}
-                                </Link>
-                            ) : null}
-                            {journey.health_safety?.reference_number &&
-                            journey.health_safety.href ? (
-                                <Link
-                                    href={journey.health_safety.href}
-                                    className="font-mono text-xs font-semibold text-foreground hover:text-primary hover:underline"
-                                >
-                                    {journey.health_safety.reference_number}
-                                </Link>
-                            ) : null}
-                        </div>
-                        <p className="truncate text-sm font-semibold text-foreground">
-                            {journey.summary}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            {journey.site ? (
-                                <span className="inline-flex items-center gap-1">
-                                    <MapPin className="h-3.5 w-3.5" />
-                                    {journey.site.name}
-                                </span>
-                            ) : null}
-                            {journey.person ? (
-                                <span className="inline-flex items-center gap-1">
-                                    <UserRound className="h-3.5 w-3.5" />
-                                    {journey.person.name}
-                                </span>
-                            ) : null}
-                            {journey.triggered_at ? (
-                                <span
-                                    title={formatDateTime(journey.triggered_at)}
-                                >
-                                    Raised{' '}
-                                    {formatRelative(journey.triggered_at)}
-                                </span>
-                            ) : null}
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${stage.tone}`}
-                        >
-                            {stage.label}
+                                {formatRelative(journey.triggered_at)}
+                            </span>
                         </span>
-                        <p className="text-xs leading-relaxed text-muted-foreground">
-                            {stage.explanation}
-                        </p>
-                        <AlertStatus
-                            status={journey.alert.status}
-                            severity={journey.alert.severity}
-                            slaStatus={journey.sla.status}
-                        />
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                        <p className="font-medium text-foreground">
-                            {journey.health_safety?.owner?.name ??
-                                journey.assignee?.name ??
-                                'Unassigned'}
-                        </p>
-                        {journey.health_safety?.accepted_by ? (
-                            <p className="text-muted-foreground">
-                                Accepted by{' '}
-                                {journey.health_safety.accepted_by.name}
-                            </p>
-                        ) : null}
-                        {journey.next_deadline_at ? (
-                            <p
-                                className="inline-flex items-center gap-1 text-muted-foreground"
-                                title={formatDateTime(journey.next_deadline_at)}
-                            >
-                                <Clock3 className="h-3.5 w-3.5" />
-                                Due {formatRelative(journey.next_deadline_at)}
-                            </p>
-                        ) : null}
-                        <p className="inline-flex items-center gap-1 text-muted-foreground">
-                            <ClipboardCheck className="h-3.5 w-3.5" />
-                            {journey.priority.reason}
-                        </p>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-1">
-                        <Button
-                            size="sm"
-                            onClick={runNextAction}
-                            aria-label={`${journey.next_action.label} for ${reference}`}
-                        >
+                        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <StatusBadge variant={stage.tone} size="sm">
+                                {stage.label}
+                            </StatusBadge>
+                            <StatusBadge variant={severity.tone} size="sm">
+                                {severity.label}
+                            </StatusBadge>
+                            <StatusBadge variant={status.tone} size="sm">
+                                {status.label}
+                            </StatusBadge>
+                        </span>
+                        <span className="text-caption mt-1 block">
+                            {[
+                                reference,
+                                journey.incident?.reference_number
+                                    ? `Incident ${journey.incident.reference_number}`
+                                    : null,
+                                journey.health_safety?.reference_number
+                                    ? `H&S ${journey.health_safety.reference_number}`
+                                    : null,
+                                journey.site?.name,
+                                journey.person?.name,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                        </span>
+                        <span className="text-caption mt-1 block">
+                            {stage.explanation}{' '}
+                            {owner ? `Owner: ${owner}.` : (
+                                <span className="font-medium text-status-warning">No owner yet.</span>
+                            )}
+                        </span>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                        <Button type="button" size="sm" variant="outline" onClick={runNext}>
                             {journey.next_action.label}
-                            <ArrowRight className="ml-1.5 h-4 w-4" />
                         </Button>
                         {overflowButton}
                     </div>
-                </article>
+                </li>
             )}
         </ControlRoomRowActions>
     );

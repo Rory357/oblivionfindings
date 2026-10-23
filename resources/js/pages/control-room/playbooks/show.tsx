@@ -1,5 +1,5 @@
 import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
+import { ConfirmChip } from '@/components/control-room/alert-record/alert-sections';
 import { PlaybookWizard } from '@/components/control-room/playbook-wizard';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
