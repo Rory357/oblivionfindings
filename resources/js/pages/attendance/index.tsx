@@ -173,6 +173,7 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/dashboard' },
+    { title: 'Workforce', href: '/attendance' },
     { title: 'Attendance', href: '/attendance' },
 ];
 
@@ -236,7 +237,7 @@ function StatusPill({
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold',
                 variant === 'success'
                     ? 'border-status-success/25 bg-status-success-bg text-status-success'
                     : 'border-status-warning/25 bg-status-warning-bg text-status-warning',
@@ -324,7 +325,7 @@ function SessionsCard({
                                                     status={
                                                         session.timesheet_status
                                                     }
-                                                    className="text-[10px]"
+                                                    className="text-xs"
                                                 />
                                             ) : null}
                                         </Link>
@@ -411,7 +412,7 @@ function SessionsCard({
                                                         status={
                                                             session.timesheet_status
                                                         }
-                                                        className="text-[10px]"
+                                                        className="text-xs"
                                                     />
                                                 ) : null}
                                             </Link>
@@ -705,7 +706,7 @@ function HandoversList({
                                                 </span>
                                             ) : null}
                                         </div>
-                                        <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                                             {h.handover_notes}
                                         </p>
                                         {h.medications_due.length ||
@@ -715,7 +716,7 @@ function HandoversList({
                                                     (m, i) => (
                                                         <span
                                                             key={`m${i}`}
-                                                            className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2.5 py-1 text-[11px] font-semibold text-status-critical-foreground"
+                                                            className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2.5 py-1 text-xs font-semibold text-status-critical-foreground"
                                                         >
                                                             <Pill className="h-3 w-3" />
                                                             {m}
@@ -725,7 +726,7 @@ function HandoversList({
                                                 {tasks.map((t, i) => (
                                                     <span
                                                         key={`t${i}`}
-                                                        className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-accent-foreground"
+                                                        className="inline-flex items-center gap-1 rounded-full bg-primary-fill/10 px-2.5 py-1 text-xs font-semibold text-primary"
                                                     >
                                                         <ListChecks className="h-3 w-3" />
                                                         {t}
@@ -1185,7 +1186,7 @@ function AttendanceBody({
                 : []),
             {
                 icon: <ArrowLeftRight className="h-3.5 w-3.5" />,
-                label: 'Open in Shift Handovers',
+                label: 'Open in Handovers',
                 onClick: () => {
                     const day =
                         h.outgoing_shift?.starts_at ?? h.created_at ?? null;
@@ -1562,7 +1563,7 @@ function AttendanceBody({
                                 >
                                     <SelectTrigger
                                         aria-label="Whose sessions"
-                                        className="h-[23px] w-48 rounded-[8px] border-band-foreground/20 bg-band-foreground/10 px-2 py-0 text-[11.5px] text-band-foreground"
+                                        className="h-[23px] w-48 rounded-[8px] border-band-foreground/20 bg-band-foreground/10 px-2 py-0 text-sm text-band-foreground"
                                     >
                                         <SelectValue placeholder="My sessions" />
                                     </SelectTrigger>
@@ -1711,7 +1712,7 @@ function AttendanceBody({
                 sessions={fixSessions ?? []}
             />
 
-            {/* Full handover record — the same detail pop-up as Shift Handovers. */}
+            {/* Full handover record — the same detail pop-up as Handovers. */}
             <HandoverDetailDialog
                 handover={detailHandover}
                 open={detailId != null}

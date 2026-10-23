@@ -716,9 +716,11 @@ class JobBoardController extends Controller
             'id' => $position->id,
             'title' => $this->formatPositionTitle($position, $canViewSensitiveDetails),
             'status' => $position->status,
-            'date' => optional($position->shift?->starts_at)->toDateString(),
-            'start_time' => optional($position->shift?->starts_at)->format('H:i'),
-            'end_time' => optional($position->shift?->ends_at)->format('H:i'),
+            // Shift times are stored in UTC; cards show the worker's wall clock,
+            // the same zone the approve and claim dialogs use.
+            'date' => $position->shift?->starts_at?->copy()->setTimezone($this->workerTimezone())->toDateString(),
+            'start_time' => $position->shift?->starts_at?->copy()->setTimezone($this->workerTimezone())->format('H:i'),
+            'end_time' => $position->shift?->ends_at?->copy()->setTimezone($this->workerTimezone())->format('H:i'),
             'location' => $this->formatPositionLocation($position, $canViewSensitiveDetails),
             'required_skills' => $requiredSkills,
             'your_skills' => $this->resolveViewerSkills($requiredSkills, $viewerEligibilityResult),
@@ -1406,6 +1408,11 @@ class JobBoardController extends Controller
             'metrics' => $metrics,
             'available_skills_basis' => 'accessible_open_positions_all_weeks_cache_60_seconds',
         ];
+    }
+
+    private function workerTimezone(): string
+    {
+        return (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
     }
 
     private function jobBoardSqlWindow(array $bounds): array

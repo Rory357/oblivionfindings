@@ -522,6 +522,24 @@ class JobBoardControllerTest extends TestCase
                 ->where('jobs.data.1.id', $later->id));
     }
 
+    public function test_index_card_date_and_times_use_the_worker_timezone(): void
+    {
+        config(['app.worker_timezone' => 'Pacific/Auckland']);
+        // 13:00–17:00 UTC on Saturday is 02:00–06:00 NZDT on Sunday.
+        $position = $this->positionForShift($this->shiftForSite(startsAt: Carbon::parse('2027-03-06T13:00:00Z')));
+
+        $this->allowEligibility();
+
+        $this->actingAs($this->manager)
+            ->get(route('operations.job_board.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('jobs.data.0.id', $position->id)
+                ->where('jobs.data.0.date', '2027-03-07')
+                ->where('jobs.data.0.start_time', '02:00')
+                ->where('jobs.data.0.end_time', '06:00'));
+    }
+
     public function test_index_includes_per_viewer_eligibility_for_each_open_card(): void
     {
         $position = $this->positionForShift($this->shiftForSite());

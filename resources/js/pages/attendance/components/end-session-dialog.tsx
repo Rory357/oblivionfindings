@@ -49,7 +49,7 @@ export function EndSessionDialog(props: EndSessionDialogProps) {
             }}
         >
             <DialogContent
-                className="max-h-[85vh] overflow-y-auto"
+                className="max-h-[85vh] overflow-x-hidden overflow-y-auto"
                 style={{
                     maxWidth: 'min(92vw, 480px)',
                     width: 'min(92vw, 480px)',

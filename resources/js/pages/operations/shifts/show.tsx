@@ -3277,7 +3277,7 @@ export default function ShiftShow({
 
                 <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
                     <DialogContent
-                        className="max-h-[90vh] overflow-y-auto"
+                        className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
                         style={{
                             maxWidth: 'min(92vw, 720px)',
                             width: 'min(92vw, 720px)',
@@ -3557,7 +3557,7 @@ export default function ShiftShow({
 
                 <Dialog open={incidentOpen} onOpenChange={setIncidentOpen}>
                     <DialogContent
-                        className="max-h-[90vh] overflow-y-auto"
+                        className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
                         style={{
                             maxWidth: 'min(92vw, 720px)',
                             width: 'min(92vw, 720px)',

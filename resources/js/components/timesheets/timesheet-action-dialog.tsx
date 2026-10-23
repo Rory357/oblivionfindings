@@ -268,7 +268,7 @@ function TimesheetActionBody(
                 onOpenChange={(open) => !open && onOpenChange(false)}
             >
                 <DialogContent
-                    className="max-h-[90vh] overflow-y-auto"
+                    className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
                     style={{
                         maxWidth: 'min(92vw, 480px)',
                         width: 'min(92vw, 480px)',
@@ -299,7 +299,7 @@ function TimesheetActionBody(
                         width: 'min(92vw, 480px)',
                         maxWidth: 'min(92vw, 480px)',
                     }}
-                    className="max-h-[90vh] overflow-y-auto"
+                    className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
                 >
                     <DialogHeader>
                         <DialogTitle>

@@ -195,10 +195,11 @@ function HandoversBody({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/handovers' },
                 { title: 'Handovers', href: '/operations/handovers' },
             ]}
         >
-            <Head title="Shift Handovers" />
+            <Head title="Handovers" />
             <PageShell>
                 <HandoversHero
                     weekStart={weekStartDate}

@@ -798,7 +798,7 @@ export function BoardActionDialog({
             }}
         >
             <DialogContent
-                className="frontline-dialog max-h-[90vh] overflow-y-auto"
+                className="frontline-dialog max-h-[90vh] overflow-x-hidden overflow-y-auto"
                 style={{
                     width: 'min(92vw, 480px)',
                     maxWidth: 'min(92vw, 480px)',
