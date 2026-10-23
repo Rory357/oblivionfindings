@@ -25,21 +25,34 @@ use App\Models\SiteInspectionRecord;
 use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\HealthSafety\EmergencyDrillAccessService;
+use App\Services\HealthSafety\FirstAidAccessService;
+use App\Services\HealthSafety\FirstAidSourceProjectionService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\HsEventAccessService;
 use App\Services\HealthSafety\HsEventClosureService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
+use App\Services\HealthSafety\RestraintAccessService;
+use App\Services\HealthSafety\SafeWorkProcedureAccessService;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
+use App\Support\HealthSafety\EmergencyDrillReturn;
 use App\Support\HealthSafety\HsCorrectiveActionPresenter;
+use App\Support\Incidents\IncidentOccurrencePeriod;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class HsEventController extends Controller
 {
@@ -57,16 +70,32 @@ class HsEventController extends Controller
     ) {}
 
     /**
-     * H&S Events register — the governance convergence view.
+     * H&S Events register â€” the governance convergence view.
      *
      * Hero counts, tab counts, standardised rows (source + governance flags) and,
      * on ?event=, the detail payload for the over-the-list modal.
      */
     public function index(Request $request): Response
     {
+        return DB::transaction(fn () => $this->indexWithinSourceAuthority($request));
+    }
+
+    private function indexWithinSourceAuthority(Request $request): Response
+    {
+        $this->validateRegisterPeriod($request);
+        $request->validate([
+            'action_context' => ['nullable', 'array:q,priority,unassigned,site_id,from,to,tab'],
+            'action_context.q' => ['nullable', 'string', 'max:2000'],
+            'action_context.priority' => ['nullable', 'string', 'max:60'],
+            'action_context.unassigned' => ['nullable', 'boolean'],
+            'action_context.site_id' => ['nullable', 'integer'],
+            'action_context.tab' => ['nullable', 'string', 'max:60'],
+            'action_context.from' => ['nullable', 'date_format:Y-m-d'],
+            'action_context.to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('action_context.from') ? ['after_or_equal:action_context.from'] : [])],
+        ]);
         $tab = (string) $request->input('tab', 'all');
 
-        // ── List query: scope (site + period) + tab + refinements ──
+        // â”€â”€ List query: scope (site + period) + tab + refinements â”€â”€
         $query = HsEvent::query()
             ->with([
                 'site:id,name',
@@ -88,30 +117,14 @@ class HsEventController extends Controller
             ])
             ->orderByDesc('reported_at');
 
-        $this->applyScope($query, $request);
         $this->applyTab($query, $tab);
-
-        if ($request->filled('severity')) {
-            $query->where('severity', $request->input('severity'));
-        }
-        if ($request->filled('category')) {
-            $query->where('event_category', $request->input('category'));
-        }
-        if ($sourceType = $this->sourceTypeForFilter($request->input('source'))) {
-            $query->where('source_type', $sourceType);
-        }
-        if ($request->boolean('worksafe')) {
-            $query->where('worksafe_notifiable', true);
-        }
-        if ($request->filled('q')) {
-            $term = trim((string) $request->input('q'));
-            $query->where('reference_number', 'like', "%{$term}%");
-        }
+        $this->applyEventRefinements($query, $request);
+        $this->applyScope($query, $request);
 
         $paginator = $query->paginate(25)->withQueryString();
 
         // Batch-resolve the two source types whose jump URL needs a record lookup
-        // (exposure → substance, inspection → site) so the per-row resolveSource()
+        // (exposure â†’ substance, inspection â†’ site) so the per-row resolveSource()
         // below issues no extra queries (was a small N+1 across the page).
         $rows = $paginator->getCollection();
         $exposureIds = $rows->where('source_type', SubstanceExposureRecord::class)->pluck('source_id');
@@ -123,39 +136,43 @@ class HsEventController extends Controller
             ? collect()
             : SiteInspectionRecord::whereIn('id', $inspectionIds)->pluck('site_id', 'id');
 
-        $events = $paginator->through(fn (HsEvent $e) => [
-            'id' => $e->id,
-            'reference_number' => $e->reference_number,
-            'event_category' => $e->event_category,
-            'severity' => $e->severity,
-            'status' => $e->status,
-            'occurred_at' => $e->occurred_at?->toIso8601String(),
-            'reported_at' => $e->reported_at?->toIso8601String(),
-            'site_name' => $e->site?->name,
-            'client_name' => $e->client ? trim($e->client->first_name.' '.$e->client->last_name) : null,
-            'staff_name' => $e->staff?->name,
-            'worksafe_notifiable' => $e->worksafe_notifiable,
-            'worksafe_status' => $e->worksafe_status,
-            'worksafe_decision_signed' => $e->hasSignedWorksafeDecision(),
-            'handover' => [
-                'status' => $e->handover_status,
-                'owner' => $e->owner ? ['id' => $e->owner->id, 'name' => $e->owner->name] : null,
-                'accepted_by' => $e->acceptedBy ? ['id' => $e->acceptedBy->id, 'name' => $e->acceptedBy->name] : null,
-                'accepted_at' => $e->accepted_at?->toIso8601String(),
-            ],
-            'investigation_required' => (bool) $e->investigation_required,
-            'source' => $this->resolveSource($e->source_type, $e->source_id, $exposureMap, $inspectionMap),
-            'flags' => [
-                'investigation_overdue' => $e->overdue_investigations_count > 0,
-                'awaiting_verification' => (int) $e->awaiting_verification_count,
-                'worksafe_pending' => $e->worksafe_notifiable && $e->worksafe_status === HsEvent::WORKSAFE_PENDING,
-                'unwired' => $e->source_id === null,
-            ],
-            'has_investigation' => $e->investigations_count > 0,
-            'has_open_actions' => $e->open_actions_count > 0,
-        ]);
+        $events = $paginator->through(function (HsEvent $e) use ($request, $exposureMap, $inspectionMap) {
+            $source = $this->resolveSource($e->source_type, $e->source_id, $request->user(), $exposureMap, $inspectionMap, $e);
 
-        // ── Hero + tab counts (respect scope only — not tab/refinements) ──
+            return [
+                'id' => $e->id,
+                'reference_number' => $e->reference_number,
+                'event_category' => $e->event_category,
+                'severity' => $e->severity,
+                'status' => $e->status,
+                'occurred_at' => $e->occurred_at?->toIso8601String(),
+                'reported_at' => $e->reported_at?->toIso8601String(),
+                'site_name' => $e->site?->name,
+                'client_name' => $e->client && (! app(FirstAidSourceProjectionService::class)->isFirstAidSource($e->source_type) || $source !== null) ? trim($e->client->first_name.' '.$e->client->last_name) : null,
+                'staff_name' => $e->staff?->name,
+                'worksafe_notifiable' => $e->worksafe_notifiable,
+                'worksafe_status' => $e->worksafe_status,
+                'worksafe_decision_signed' => $e->hasSignedWorksafeDecision(),
+                'handover' => [
+                    'status' => $e->handover_status,
+                    'owner' => $e->owner ? ['id' => $e->owner->id, 'name' => $e->owner->name] : null,
+                    'accepted_by' => $e->acceptedBy ? ['id' => $e->acceptedBy->id, 'name' => $e->acceptedBy->name] : null,
+                    'accepted_at' => $e->accepted_at?->toIso8601String(),
+                ],
+                'investigation_required' => (bool) $e->investigation_required,
+                'source' => $source,
+                'flags' => [
+                    'investigation_overdue' => $e->overdue_investigations_count > 0,
+                    'awaiting_verification' => (int) $e->awaiting_verification_count,
+                    'worksafe_pending' => $e->worksafe_notifiable && $e->worksafe_status === HsEvent::WORKSAFE_PENDING,
+                    'unwired' => $e->source_id === null,
+                ],
+                'has_investigation' => $e->investigations_count > 0,
+                'has_open_actions' => $e->open_actions_count > 0,
+            ];
+        });
+
+        // Counts use the same active refinements as their linked worklists.
         $statusCounts = $this->scopedBase($request)
             ->selectRaw('status, count(*) as c')
             ->groupBy('status')
@@ -175,6 +192,11 @@ class HsEventController extends Controller
                 ->count(),
             'worksafe' => (int) $this->scopedBase($request)->where('worksafe_notifiable', true)->count(),
         ];
+        foreach (['investigation_due', 'awaiting_verification', 'worksafe_pending'] as $attentionTab) {
+            $attentionQuery = $this->scopedBase($request);
+            $this->applyTab($attentionQuery, $attentionTab);
+            $tabCounts[$attentionTab] = $attentionQuery->count();
+        }
 
         $hero = [
             'live' => [
@@ -184,31 +206,26 @@ class HsEventController extends Controller
                 'monitoring' => $count(HsEvent::STATUS_MONITORING),
             ],
             'attention' => [
-                'investigation_due' => (int) $this->scopedBase($request)
-                    ->where('investigation_required', true)
-                    ->where('status', '!=', HsEvent::STATUS_CLOSED)
-                    ->whereDoesntHave('investigations', fn (Builder $q) => $q->where('status', HsInvestigation::STATUS_COMPLETED))
-                    ->count(),
-                'awaiting_verification' => (int) $this->scopedBase($request)
-                    ->whereHas('correctiveActions', fn (Builder $q) => $q->where('status', HsCorrectiveAction::STATUS_COMPLETED))
-                    ->count(),
-                'worksafe_due' => (int) $this->scopedBase($request)
-                    ->where('worksafe_notifiable', true)
-                    ->where('worksafe_status', HsEvent::WORKSAFE_PENDING)
-                    ->count(),
-                'handover_due' => (int) $this->scopedBase($request)
-                    ->where('handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE)
-                    ->count(),
+                'investigation_due' => $tabCounts['investigation_due'],
+                'awaiting_verification' => $tabCounts['awaiting_verification'],
+                'worksafe_due' => $tabCounts['worksafe_pending'],
+                'handover_due' => $tabCounts['handover'],
                 'closed_period' => $count(HsEvent::STATUS_CLOSED),
             ],
         ];
 
-        // ── Detail-over-list (?event=) ──
+        // â”€â”€ Detail-over-list (?event=) â”€â”€
         $detail = null;
         if ($request->filled('event')) {
-            $target = $this->resolveAccessibleEvent($request, $request->integer('event'));
-            $target = $this->scopedBase($request)->whereKey($target->id)->first();
-            $detail = $target ? $this->buildEventDetail($target, $request->user()) : null;
+            $detail = HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), function (HealthSafetyReadContext $context) use ($request): ?array {
+                $target = $this->resolveAccessibleEvent($request, $request->integer('event'), $context);
+                $detailQuery = HsEvent::query()->whereKey($target->id);
+                $this->applyScope($detailQuery, $request, $context);
+                $target = $context->query($detailQuery)->first();
+
+                return $target ? $context->consumeViewer($this->detailReadPermissionKeys(),
+                    fn (User $current): array => $this->buildEventDetail($target, $current, $context)) : null;
+            });
         }
 
         $siteIds = $this->scopedBase($request)->whereNotNull('site_id')->distinct()->pluck('site_id');
@@ -228,48 +245,60 @@ class HsEventController extends Controller
                 'worksafe' => $request->boolean('worksafe') ?: null,
                 'from' => $request->input('from'),
                 'to' => $request->input('to'),
+                'action_context' => $request->input('action_context'),
             ],
+            'actionReturnUrl' => $request->filled('action_context')
+                ? '/health-safety/corrective-actions?'.http_build_query($request->input('action_context'), '', '&', PHP_QUERY_RFC3986)
+                : null,
             'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']),
             'detail' => $detail,
             'can' => ['manage' => (bool) ($request->user()?->canDo('hazards.manage') ?? false)],
         ]);
     }
 
-    /** Scope = the hero/tab "period + site" lens (never the tab or list refinements). */
-    private function applyScope(Builder $query, Request $request): void
+    /** Canonical Site authority and the selected New Zealand occurrence period. */
+    private function applyScope(Builder $query, Request $request, ?HealthSafetyReadContext $context = null): void
     {
-        $this->siteAccess->applyHsEventScope(
-            $query,
-            $request->user(),
-            $this->hsEventBypassPermissions(),
-        );
-
-        if ($request->filled('site_id')) {
-            $this->siteAccess->assertCanAccessSiteId(
+        if ($context !== null) {
+            $context->applyEventSiteScope($query, $this->hsEventBypassPermissions());
+        } else {
+            $this->siteAccess->applyHsEventScope(
+                $query,
                 $request->user(),
-                (int) $request->input('site_id'),
                 $this->hsEventBypassPermissions(),
             );
+        }
+        if ($request->filled('site_id')) {
+            if ($context !== null) {
+                $context->consumeSourceViewer(FirstAidAccessService::PERMISSIONS, function ($current, $reads) use ($request): void {
+                    $sites = $this->siteAccess->accessibleSiteIds($current, $this->hsEventBypassPermissions(), $reads);
+                    abort_unless(in_array((int) $request->input('site_id'), $sites, true), 403);
+                });
+            } else {
+                $this->siteAccess->assertCanAccessSiteId(
+                    $request->user(),
+                    (int) $request->input('site_id'),
+                    $this->hsEventBypassPermissions(),
+                );
+            }
             $query->where('site_id', (int) $request->input('site_id'));
         }
-        if ($request->filled('from')) {
-            $query->whereDate('occurred_at', '>=', $request->input('from'));
-        }
-        if ($request->filled('to')) {
-            $query->whereDate('occurred_at', '<=', $request->input('to'));
-        }
+        IncidentOccurrencePeriod::apply($query, $request->input('from'), $request->input('to'));
+        // Candidate discovery sees the selected list filters before private proof.
+        app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $request->user(), $context);
     }
 
     /** A fresh, scope-applied base query for the hero/tab aggregates. */
     private function scopedBase(Request $request): Builder
     {
         $query = HsEvent::query();
+        $this->applyEventRefinements($query, $request);
         $this->applyScope($query, $request);
 
         return $query;
     }
 
-    /** Tab → governance-status filter (category stays a filter, never a tab). */
+    /** Tab â†’ governance-status filter (category stays a filter, never a tab). */
     private function applyTab(Builder $query, string $tab): void
     {
         match ($tab) {
@@ -280,8 +309,52 @@ class HsEventController extends Controller
             'closed' => $query->where('status', HsEvent::STATUS_CLOSED),
             'handover' => $query->where('handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE),
             'worksafe' => $query->where('worksafe_notifiable', true),
+            'investigation_due' => $query->where('investigation_required', true)
+                ->where('status', '!=', HsEvent::STATUS_CLOSED)
+                ->whereDoesntHave('investigations', fn (Builder $q) => $q->where('status', HsInvestigation::STATUS_COMPLETED)),
+            'awaiting_verification' => $query->whereHas('correctiveActions', fn (Builder $q) => $q->where('status', HsCorrectiveAction::STATUS_COMPLETED)),
+            'worksafe_pending' => $query->where('worksafe_notifiable', true)->where('worksafe_status', HsEvent::WORKSAFE_PENDING),
             default => $query, // 'all'
         };
+    }
+
+    private function validateRegisterPeriod(Request $request): void
+    {
+        $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
+        ]);
+    }
+
+    private function applyEventRefinements(Builder $query, Request $request): void
+    {
+        if ($request->filled('severity')) {
+            $query->where('severity', $request->input('severity'));
+        }
+        if ($request->filled('category')) {
+            $query->where('event_category', $request->input('category'));
+        }
+        if ($sourceType = $this->sourceTypeForFilter($request->input('source'))) {
+            $query->where('source_type', $sourceType);
+        }
+        if ($request->boolean('worksafe')) {
+            $query->where('worksafe_notifiable', true);
+        }
+        if ($request->filled('q')) {
+            $query->where('reference_number', 'like', '%'.trim((string) $request->input('q')).'%');
+        }
+        if ($request->filled('action_context')) {
+            // An action due date is not the parent review's occurrence date.
+            $actionRequest = Request::create('/', 'GET', $request->input('action_context'));
+            $actionRequest->setUserResolver(fn () => $request->user());
+            $parentCandidates = (clone $query)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_events.id');
+            $actionCandidates = HsCorrectiveAction::query()->whereIn('hs_event_id', $parentCandidates);
+            $this->applyActionRefinements($actionCandidates, $actionRequest);
+            $query->whereHas('correctiveActions', function (Builder $actions) use ($actionRequest, $actionCandidates): void {
+                $this->applyActionRefinements($actions, $actionRequest);
+                $this->applyActionScope($actions, $actionRequest, $actionCandidates);
+            });
+        }
     }
 
     private function sourceTypeForFilter(mixed $source): ?string
@@ -302,21 +375,43 @@ class HsEventController extends Controller
     }
 
     /**
-     * H&S Event detail — thin deep-link / share fallback. Renders the same
+     * H&S Event detail â€” thin deep-link / share fallback. Renders the same
      * governance modal (HsEventDialog) on a thin shell as the over-the-list
      * modal opened from the register.
      */
     public function show(Request $request, int $hsEvent): Response
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
+        return DB::transaction(fn () => $this->showWithinSourceAuthority($request, $hsEvent));
+    }
 
-        return Inertia::render('health-safety/events/show', [
-            'detail' => $this->buildEventDetail($hsEvent, $request->user()),
-        ]);
+    private function showWithinSourceAuthority(Request $request, int $hsEvent): Response
+    {
+        foreach ([TaskAggregator::NAVIGATION_REQUEST_ATTRIBUTE, TaskAggregator::NAVIGATION_USER_ATTRIBUTE, TaskAggregator::NAVIGATION_EVENT_ATTRIBUTE] as $attribute) {
+            $request->attributes->remove($attribute);
+        }
+        $projection = HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), function (HealthSafetyReadContext $context) use ($request, $hsEvent): array {
+            $event = $this->resolveAccessibleEvent($request, $hsEvent, $context);
+            $detail = $context->consumeViewer($this->detailReadPermissionKeys(),
+                fn (User $current): array => $this->buildEventDetail($event, $current, $context));
+            $navigation = app(TaskAggregator::class)->navigationBadgeInContext($request->user(), $context);
+
+            return ['detail' => $detail, 'navigation' => $navigation, 'event_id' => (int) $event->id, 'user_id' => (int) $request->user()->id];
+        });
+        // Only detached projections are published, after successful callback materialization.
+        $request->attributes->set(TaskAggregator::NAVIGATION_REQUEST_ATTRIBUTE, $projection['navigation']);
+        $request->attributes->set(TaskAggregator::NAVIGATION_USER_ATTRIBUTE, $projection['user_id']);
+        $request->attributes->set(TaskAggregator::NAVIGATION_EVENT_ATTRIBUTE, $projection['event_id']);
+
+        return Inertia::render('health-safety/events/show', ['detail' => $projection['detail']]);
     }
 
     /** Close through the one canonical H&S readiness/exception aggregate. */
     public function close(Request $request, int $hsEvent)
+    {
+        return DB::transaction(fn () => $this->closeWithinSourceAuthority($request, $hsEvent));
+    }
+
+    private function closeWithinSourceAuthority(Request $request, int $hsEvent)
     {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
@@ -341,6 +436,11 @@ class HsEventController extends Controller
 
     public function requestClosureException(Request $request, int $hsEvent)
     {
+        return DB::transaction(fn () => $this->requestClosureExceptionWithinSourceAuthority($request, $hsEvent));
+    }
+
+    private function requestClosureExceptionWithinSourceAuthority(Request $request, int $hsEvent)
+    {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $data = $request->validate([
             'category' => ['required', 'string', 'in:'.implode(',', array_keys(HsClosureException::CATEGORY_SCOPES))],
@@ -362,6 +462,11 @@ class HsEventController extends Controller
     }
 
     public function decideClosureException(Request $request, int $hsEvent, int $exception)
+    {
+        return DB::transaction(fn () => $this->decideClosureExceptionWithinSourceAuthority($request, $hsEvent, $exception));
+    }
+
+    private function decideClosureExceptionWithinSourceAuthority(Request $request, int $hsEvent, int $exception)
     {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $exception = $hsEvent->closureExceptions()->findOrFail($exception);
@@ -387,6 +492,11 @@ class HsEventController extends Controller
 
     public function revokeClosureException(Request $request, int $hsEvent, int $exception)
     {
+        return DB::transaction(fn () => $this->revokeClosureExceptionWithinSourceAuthority($request, $hsEvent, $exception));
+    }
+
+    private function revokeClosureExceptionWithinSourceAuthority(Request $request, int $hsEvent, int $exception)
+    {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $exception = $hsEvent->closureExceptions()->findOrFail($exception);
         $data = $request->validate([
@@ -406,6 +516,11 @@ class HsEventController extends Controller
      * Accept a submitted incident handover while leaving H&S governance status unchanged.
      */
     public function acceptHandover(Request $request, int $hsEvent)
+    {
+        return DB::transaction(fn () => $this->acceptHandoverWithinSourceAuthority($request, $hsEvent));
+    }
+
+    private function acceptHandoverWithinSourceAuthority(Request $request, int $hsEvent)
     {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $data = $request->validate([
@@ -442,9 +557,14 @@ class HsEventController extends Controller
 
     /**
      * Record the WorkSafe NZ notification for a notifiable event (E-Gap 2):
-     * pending → notified, persisting date/method/reference + site preservation.
+     * pending â†’ notified, persisting date/method/reference + site preservation.
      */
     public function worksafeNotify(Request $request, int $hsEvent)
+    {
+        return DB::transaction(fn () => $this->worksafeNotifyWithinSourceAuthority($request, $hsEvent));
+    }
+
+    private function worksafeNotifyWithinSourceAuthority(Request $request, int $hsEvent)
     {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
@@ -472,9 +592,14 @@ class HsEventController extends Controller
     }
 
     /**
-     * Record WorkSafe's acknowledgement of the notification (notified → acknowledged).
+     * Record WorkSafe's acknowledgement of the notification (notified â†’ acknowledged).
      */
     public function worksafeAcknowledge(Request $request, int $hsEvent)
+    {
+        return DB::transaction(fn () => $this->worksafeAcknowledgeWithinSourceAuthority($request, $hsEvent));
+    }
+
+    private function worksafeAcknowledgeWithinSourceAuthority(Request $request, int $hsEvent)
     {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
@@ -492,6 +617,11 @@ class HsEventController extends Controller
     }
 
     public function worksafeSitePreservation(Request $request, int $hsEvent)
+    {
+        return DB::transaction(fn () => $this->worksafeSitePreservationWithinSourceAuthority($request, $hsEvent));
+    }
+
+    private function worksafeSitePreservationWithinSourceAuthority(Request $request, int $hsEvent)
     {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $data = $request->validate([
@@ -514,6 +644,11 @@ class HsEventController extends Controller
     }
 
     public function worksafeSitePreservationRelease(Request $request, int $hsEvent)
+    {
+        return DB::transaction(fn () => $this->worksafeSitePreservationReleaseWithinSourceAuthority($request, $hsEvent));
+    }
+
+    private function worksafeSitePreservationReleaseWithinSourceAuthority(Request $request, int $hsEvent)
     {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $data = $request->validate([
@@ -543,24 +678,80 @@ class HsEventController extends Controller
      */
     /**
      * Resolve a polymorphic source to a label + jump URL. The two source types
-     * whose URL needs a record lookup (exposure → its substance, inspection → its
-     * site) accept an optional pre-loaded id→value map so the list can batch-resolve
+     * whose URL needs a record lookup (exposure â†’ its substance, inspection â†’ its
+     * site) accept an optional pre-loaded idâ†’value map so the list can batch-resolve
      * them in one query instead of one-per-row (the detail path passes none and
      * looks the single record up directly).
      */
-    private function resolveSource(?string $sourceType, ?int $sourceId, ?Collection $exposureMap = null, ?Collection $inspectionMap = null): ?array
+    private function resolveSource(?string $sourceType, ?int $sourceId, User $viewer, ?Collection $exposureMap = null, ?Collection $inspectionMap = null, ?HsEvent $sourceEvent = null, ?HealthSafetyReadContext $context = null): ?array
     {
         if (! $sourceType || ! $sourceId) {
             return null;
         }
 
+        $firstAid = app(FirstAidSourceProjectionService::class);
+        if ($firstAid->isFirstAidSource($sourceType)) {
+            return $sourceEvent ? $firstAid->sourceForReview($sourceEvent, $viewer, $context) : null;
+        }
+
         $basename = class_basename($sourceType);
+        if (in_array($sourceType, [WorkplaceInjury::class, (new WorkplaceInjury)->getMorphClass()], true)) {
+            $record = app(\App\Services\HealthSafety\InjurySourceProjectionService::class)->forInjury($sourceId, $viewer, $context);
+            if (! $record || ! $sourceEvent || $sourceEvent->event_category !== HsEvent::CATEGORY_INJURY
+                || (int) $sourceEvent->staff_id !== $record['worker']['id']
+                || (int) $sourceEvent->site_id !== $record['site']['id']
+                || $sourceEvent->client_id !== null || $sourceEvent->asset_id !== null) {
+                return null;
+            }
+            return ['type' => 'WorkplaceInjury', 'id' => $record['id'], 'label' => $record['reference'],
+                'url' => \App\Support\HealthSafety\InjuryReturn::record($record['id'], request()->getRequestUri(), 'connections'),
+                'unwired' => false];
+        }
+        if ($basename === 'WorkplaceInjury') {
+            // A matching basename is not the canonical source class or morph.
+            return null;
+        }
+        if ($basename === 'EmergencyDrill') {
+            if (! in_array($sourceType, [EmergencyDrill::class, (new EmergencyDrill)->getMorphClass()], true)) {
+                return null;
+            }
+            try {
+                $record = app(EmergencyDrillAccessService::class)->readableQuery($viewer)->find($sourceId);
+                if (! $record) {
+                    return null;
+                }
+                $back = EmergencyDrillReturn::sanitize(request()->query('return_to'));
+                $href = $back && parse_url($back, PHP_URL_PATH) === EmergencyDrillReturn::REGISTER.'/'.$record->id
+                    ? $back : EmergencyDrillReturn::href($record->id, EmergencyDrillReturn::sanitize(request()->getRequestUri()), 'connections');
+
+                return ['type' => 'EmergencyDrill', 'id' => $record->id, 'label' => 'Emergency drill #'.$record->id, 'url' => $href, 'unwired' => false];
+            } catch (HttpException $error) {
+                if (! in_array($error->getStatusCode(), [403, 404], true)) {
+                    throw $error;
+                }
+
+                return null;
+            }
+        }
+
+        if ($basename === 'ClientIncident') {
+            if ($context === null || $sourceEvent === null) { return null; }
+            $context->assertViewer($viewer);
+            $incident = $context->consumeSourceViewer(\App\Services\Incidents\IncidentHsEventSourceReadService::PERMISSIONS,
+                fn (User $current, \App\Services\CurrentAuthorizationReads $reads) => $context->incidentQueryForEvent($sourceEvent)->first(['id']));
+            if ($incident === null || (int) $incident->id !== $sourceId) { return null; }
+        }
+        if ($basename === 'ControlRoomAlert') {
+            $alert = ControlRoomAlert::query()->find($sourceId);
+            if (! $alert || ! app(ControlRoomAlertAccessService::class)->canView($alert, $viewer)) {
+                return null;
+            }
+        }
 
         [$label, $url] = match ($basename) {
             'ClientIncident' => ['Incident', "/incidents/{$sourceId}"],
             'SafeguardingConcern' => ['Safeguarding concern', "/safeguarding/{$sourceId}"],
             'FleetIncident' => ['Fleet incident', "/fleet-assets/incidents?incident={$sourceId}"],
-            'WorkplaceInjury' => ['Workplace injury', "/health-safety/injuries/{$sourceId}"],
             'SubstanceExposureRecord' => $this->resolveSubstanceExposureSource($sourceId, $exposureMap),
             'SiteInspectionRecord' => $this->resolveSiteInspectionSource($sourceId, $inspectionMap),
             'FleetWorkOrder' => ['Fleet work order', "/fleet-assets/maintenance/work-orders/{$sourceId}"],
@@ -597,28 +788,26 @@ class HsEventController extends Controller
         return ['Site inspection', $siteId ? "/sites/{$siteId}/inspections" : null];
     }
 
+    private function detailReadPermissionKeys(): array
+    {
+        return [...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
+            ...\App\Services\HealthSafety\InjuryAccessService::PERMISSIONS,
+            ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS,
+            'healthSafety.events.close', 'healthSafety.closureExceptions.request', 'healthSafety.closureExceptions.approve'];
+    }
+
     /**
-     * The full governance detail payload — the contract behind the HsEventDialog
+     * The full governance detail payload â€” the contract behind the HsEventDialog
      * (mirrored by `EventDetail` in event-detail-dialog.tsx). Shared by index()
      * (over-the-list modal on ?event=) and show() (deep-link shell).
      */
-    private function buildEventDetail(HsEvent $hsEvent, User $currentUser): array
+    private function buildEventDetail(HsEvent $hsEvent, User $currentUser, ?HealthSafetyReadContext $context = null): array
     {
         $hsEvent->loadMissing([
             'site:id,name',
             'client:id,first_name,last_name',
             'staff:id,name',
             'asset:id,name',
-            'controlRoomAlert:id,reference_number,severity,status,playbook_run_id,assigned_to_user_id,resolved_at',
-            'controlRoomAlert.assignedTo:id,name',
-            'controlRoomAlert.evidencePacks.evidenceItems',
-            'controlRoomAlert.playbookRun.playbook:id,name',
-            'controlRoomAlert.communications' => fn ($query) => $query
-                ->conversational()
-                ->orderByDesc('created_at')
-                ->limit(20),
-            'controlRoomAlert.tasks.assignedTo:id,name',
-            'controlRoomAlert.tasks.transferredCorrectiveAction:id,source_control_room_task_id',
             'creator:id,name',
             'owner:id,name',
             'acceptedBy:id,name',
@@ -751,40 +940,21 @@ class HsEventController extends Controller
                 'is_due_for_review' => $ra->isDueForReview(),
             ]);
 
-        $source = $this->resolveSource($hsEvent->source_type, $hsEvent->source_id);
-        $sourceIncident = $hsEvent->source_type === ClientIncident::class
-            ? ClientIncident::query()
-                ->with([
-                    'reporter:id,name',
-                    'attachments.uploader:id,name',
-                    'followups.assignedTo:id,name',
-                ])
-                ->find($hsEvent->source_id)
-            : $hsEvent->clientIncident()
-                ->with([
-                    'reporter:id,name',
-                    'attachments.uploader:id,name',
-                    'followups.assignedTo:id,name',
-                ])
-                ->first();
+        $source = $this->resolveSource($hsEvent->source_type, $hsEvent->source_id, $currentUser, sourceEvent: $hsEvent, context: $context);
+        $incidentSource = $this->incidentDetailSourceInContext($hsEvent, $context);
+        $sourceIncident = $incidentSource['incident'];
+        $canOpenIncident = $sourceIncident !== null;
+        $readableIncident = $sourceIncident;
         if ($source !== null && $sourceIncident !== null) {
-            if ($sourceIncident->reference_number) {
+            if ($canOpenIncident && $sourceIncident->reference_number) {
                 $source['label'] = 'Incident '.$sourceIncident->reference_number;
             }
-            $canOpenIncident = $currentUser->canDo('incidents.viewAny')
-                || ($currentUser->canDo('incidents.viewAssigned')
-                    && $currentUser->can('view', $sourceIncident));
             if (! $canOpenIncident) {
-                $source['url'] = null;
+                $source = null;
             }
         }
-        $alert = $this->linkedControlRoomAlert($hsEvent, $sourceIncident);
-        $alert?->loadMissing([
-            'playbookRun.playbook:id,name',
-            'tasks.assignedTo:id,name',
-            'tasks.transferredCorrectiveAction:id,source_control_room_task_id',
-        ]);
-        $handoverAttachments = $sourceIncident?->attachments->map(fn (ClientIncidentAttachment $attachment) => [
+        $alert = $this->detailControlRoomAlertInContext($hsEvent, $sourceIncident, $incidentSource['parent'], $currentUser, $context);
+        $handoverAttachments = $readableIncident?->attachments->map(fn (ClientIncidentAttachment $attachment) => [
             'id' => $attachment->id,
             'name' => $attachment->original_name,
             'mime' => $attachment->mime ?? $attachment->mime_type,
@@ -800,14 +970,22 @@ class HsEventController extends Controller
                 fn (EvidenceItem $item): string => "/health-safety/events/{$hsEvent->id}/control-room-evidence/{$item->id}/download",
             )
             : null;
-        $incidentFollowups = $sourceIncident?->followups->map(fn ($followup): array => [
+        $canOpenAlert = data_get($linkedOperationalEvidence, 'access') === 'readable';
+        if ($canOpenAlert) {
+            // Operational source authority is independent of the H&S parent.
+            $alert->loadMissing([
+                'playbookRun.playbook:id,name',
+                'tasks.transferredCorrectiveAction:id,source_control_room_task_id',
+            ]);
+        }
+        $incidentFollowups = $readableIncident?->followups->map(fn ($followup): array => [
             'id' => $followup->id,
             'notes' => $followup->notes,
             'assigned_to' => $followup->assignedTo?->name,
             'due_at' => $followup->due_at?->toIso8601String(),
             'completed_at' => $followup->completed_at?->toIso8601String(),
         ])->values()->all() ?? [];
-        $unresolvedControlRoomTasks = $canManage && $alert
+        $unresolvedControlRoomTasks = $canManage && $canOpenAlert
             ? $alert->tasks
                 ->reject(fn (AlertTask $task): bool => in_array($task->status, AlertTask::TERMINAL_STATUSES, true)
                     || $task->transferred_to_hs_corrective_action_id !== null
@@ -916,7 +1094,7 @@ class HsEventController extends Controller
             ->values()
             ->all();
 
-        return [
+        $detail = [
             'id' => $hsEvent->id,
             'reference_number' => $hsEvent->reference_number,
             'event_category' => $hsEvent->event_category,
@@ -924,9 +1102,9 @@ class HsEventController extends Controller
             'status' => $hsEvent->status,
             'occurred_at' => $hsEvent->occurred_at?->toIso8601String(),
             'reported_at' => $hsEvent->reported_at?->toIso8601String(),
-            'description' => $sourceIncident?->description,
+            'description' => $readableIncident?->description,
             'site' => $hsEvent->site ? ['id' => $hsEvent->site->id, 'name' => $hsEvent->site->name] : null,
-            'client' => $hsEvent->client ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name.' '.$hsEvent->client->last_name)] : null,
+            'client' => $hsEvent->client && (! app(FirstAidSourceProjectionService::class)->isFirstAidSource($hsEvent->source_type) || $source !== null) ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name.' '.$hsEvent->client->last_name)] : null,
             'staff' => $hsEvent->staff ? ['id' => $hsEvent->staff->id, 'name' => $hsEvent->staff->name] : null,
             'asset' => $hsEvent->asset ? ['id' => $hsEvent->asset->id, 'name' => $hsEvent->asset->name] : null,
             'worksafe' => [
@@ -968,7 +1146,7 @@ class HsEventController extends Controller
                 'can_release_site_preservation' => $canReleaseSitePreservation,
             ],
             'investigation_required' => (bool) $hsEvent->investigation_required,
-            'control_room_alert' => $alert ? [
+            'control_room_alert' => $canOpenAlert ? [
                 'id' => $alert->id,
                 'reference_number' => $alert->reference_number,
                 'severity' => $alert->severity,
@@ -976,6 +1154,10 @@ class HsEventController extends Controller
                 'url' => data_get($linkedOperationalEvidence, 'source.href'),
             ] : null,
             'linked_operational_evidence' => $linkedOperationalEvidence,
+            'linked_access' => [
+                'incident' => $sourceIncident === null ? 'absent' : ($canOpenIncident ? 'readable' : 'restricted'),
+                'control_room' => $alert === null ? 'absent' : ($canOpenAlert ? 'readable' : 'restricted'),
+            ],
             'incident_followups' => $incidentFollowups,
             'journey_state' => $this->journeyPresenter->journeyState(
                 $sourceIncident,
@@ -1006,19 +1188,19 @@ class HsEventController extends Controller
                 'health_safety' => $hsEvent->status,
             ],
             'handover_summary' => [
-                'incident_reference' => $sourceIncident?->reference_number,
-                'alert_reference' => $alert?->reference_number,
-                'narrative' => $sourceIncident?->description,
-                'immediate_controls' => $sourceIncident?->immediate_action_taken
-                    ?? $sourceIncident?->immediate_action,
-                'witnesses' => $sourceIncident?->witnesses,
-                'potential_consequence' => $sourceIncident?->potential_consequence,
-                'reporter' => $sourceIncident?->reporter?->name,
+                'incident_reference' => $readableIncident?->reference_number,
+                'alert_reference' => $canOpenAlert ? $alert->reference_number : null,
+                'narrative' => $readableIncident?->description,
+                'immediate_controls' => $readableIncident?->immediate_action_taken
+                    ?? $readableIncident?->immediate_action,
+                'witnesses' => $readableIncident?->witnesses,
+                'potential_consequence' => $readableIncident?->potential_consequence,
+                'reporter' => $readableIncident?->reporter?->name,
                 'source_label' => $source['label'] ?? null,
                 'site_name' => $hsEvent->site?->name,
-                'attachments' => $handoverAttachments,
+                'attachments' => $handoverAttachments->all(),
                 'control_room_evidence' => data_get($linkedOperationalEvidence, 'evidence_packs', []),
-                'playbook' => $alert?->playbookRun ? [
+                'playbook' => $canOpenAlert && $alert->playbookRun ? [
                     'name' => $alert->playbookRun->playbook?->name,
                     'status' => $alert->playbookRun->status,
                     'outcome' => data_get($alert->playbookRun->context, 'outcome'),
@@ -1027,10 +1209,10 @@ class HsEventController extends Controller
                 'operational_tasks' => data_get($linkedOperationalEvidence, 'tasks', []),
                 'next_action' => $nextAction,
             ],
-            'investigations' => $investigations,
-            'corrective_actions' => $correctiveActions,
-            'risk_assessments' => $riskAssessments,
-            'attachments' => $handoverAttachments,
+            'investigations' => $investigations->all(),
+            'corrective_actions' => $correctiveActions->all(),
+            'risk_assessments' => $riskAssessments->all(),
+            'attachments' => $handoverAttachments->all(),
             'close_gate' => $closureReadiness->toJourneyGate()->toArray(),
             'close_readiness' => $closureReadiness->toArray(),
             'closure_exceptions' => $closureExceptions,
@@ -1044,11 +1226,36 @@ class HsEventController extends Controller
                 'close' => $currentUser->canDo('healthSafety.events.close'),
                 'request_closure_exception' => $currentUser->canDo('healthSafety.closureExceptions.request'),
                 'approve_closure_exception' => $currentUser->canDo('healthSafety.closureExceptions.approve'),
+                ...app(SafeWorkProcedureAccessService::class)->sourceCan($hsEvent, $currentUser, $context),
                 'manage_corrective_action_lifecycle' => $canManage
                     && $canAccessActionEvidence,
                 'verify_corrective_actions' => $canManage && $canAccessActionEvidence,
             ],
         ];
+        if ($context !== null && $incidentSource['parent'] !== null
+            && ltrim((string) $hsEvent->getRawOriginal('source_type'), '\\') === ClientIncident::class) {
+            abort_unless($context->query(clone $incidentSource['parent'])->exists(), 404);
+        }
+        if ($sourceIncident !== null && $context !== null) {
+            $context->consumeSourceViewer(\App\Services\Incidents\IncidentHsEventSourceReadService::PERMISSIONS,
+                function (User $current, \App\Services\CurrentAuthorizationReads $reads) use ($sourceIncident, $incidentSource): void {
+                    abort_unless(app(\App\Services\Incidents\IncidentTaskReadService::class)
+                        ->isStillIncident($sourceIncident, $incidentSource['parent'], $reads), 404);
+                    foreach (['attachments' => 'incident_id', 'followups' => 'client_incident_id'] as $relation => $column) {
+                        foreach ($sourceIncident->getRelation($relation) as $child) {
+                            $guard = app(\App\Services\Incidents\IncidentHsEventSourceReadService::class)
+                                ->childQueryInReads($child->newQuery()->whereKey($child->id), $column, $incidentSource['parent'], $reads);
+                            foreach ($child->getRawOriginal() as $field => $value) {
+                                if ($value === null) { $guard->whereNull($field); }
+                                elseif (is_string($value)) { $guard->whereRaw('BINARY '.$guard->getQuery()->getGrammar()->wrap($field).' = BINARY ?', [$value]); }
+                                else { $guard->where($field, $value); }
+                            }
+                            abort_unless($guard->exists(), 404);
+                        }
+                    }
+                });
+        }
+        return $detail;
     }
 
     /**
@@ -1086,12 +1293,21 @@ class HsEventController extends Controller
         int $hsEvent,
         ClientIncidentAttachment $attachment,
     ): StreamedResponse {
+        return DB::transaction(fn () => $this->downloadIncidentAttachmentWithinSourceAuthority($request, $hsEvent, $attachment));
+    }
+
+    private function downloadIncidentAttachmentWithinSourceAuthority(
+        Request $request,
+        int $hsEvent,
+        ClientIncidentAttachment $attachment,
+    ): StreamedResponse {
         $event = $this->resolveAccessibleEvent($request, $hsEvent);
         $incidentId = $event->source_type === ClientIncident::class
             ? (int) $event->source_id
             : (int) ($event->clientIncident()->value('id') ?? 0);
 
         abort_unless($incidentId > 0 && (int) $attachment->incident_id === $incidentId, 404);
+        $this->authorize('view', ClientIncident::query()->findOrFail($incidentId));
 
         return $this->streamPrivateAttachment(
             $attachment->disk,
@@ -1102,6 +1318,14 @@ class HsEventController extends Controller
     }
 
     public function downloadControlRoomEvidence(
+        Request $request,
+        int $hsEvent,
+        EvidenceItem $item,
+    ): StreamedResponse {
+        return DB::transaction(fn () => $this->downloadControlRoomEvidenceWithinSourceAuthority($request, $hsEvent, $item));
+    }
+
+    private function downloadControlRoomEvidenceWithinSourceAuthority(
         Request $request,
         int $hsEvent,
         EvidenceItem $item,
@@ -1117,6 +1341,8 @@ class HsEventController extends Controller
                 ->exists();
 
         abort_unless($belongsToJourney && filled($item->storage_path), 404);
+        abort_unless(app(ControlRoomAlertAccessService::class)
+            ->canView($alert, $request->user()), 403);
 
         return $this->streamPrivateAttachment(
             'local',
@@ -1127,10 +1353,16 @@ class HsEventController extends Controller
     }
 
     /**
-     * Corrective actions listing — all actions across all events.
+     * Corrective actions listing â€” all actions across all events.
      */
     public function correctiveActions(Request $request): Response
     {
+        return DB::transaction(fn () => $this->correctiveActionsWithinSourceAuthority($request));
+    }
+
+    private function correctiveActionsWithinSourceAuthority(Request $request): Response
+    {
+        $this->validateRegisterPeriod($request);
         $tab = (string) $request->input('tab', $this->legacyActionTab($request));
 
         $canManage = (bool) ($request->user()?->canDo('hazards.manage') ?? false);
@@ -1149,26 +1381,9 @@ class HsEventController extends Controller
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date');
 
-        $this->applyActionScope($query, $request);
         $this->applyActionTab($query, $tab);
-
-        if ($request->filled('priority')) {
-            $query->whereIn('priority', array_filter(explode(',', (string) $request->input('priority'))));
-        }
-
-        if ($request->boolean('unassigned')) {
-            $query->whereNull('assigned_to_user_id')
-                ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]);
-        }
-
-        if ($request->filled('q')) {
-            $term = trim((string) $request->input('q'));
-            $query->where(function (Builder $q) use ($term) {
-                $q->where('reference_number', 'like', "%{$term}%")
-                    ->orWhere('title', 'like', "%{$term}%")
-                    ->orWhereHas('hsEvent', fn (Builder $event) => $event->where('reference_number', 'like', "%{$term}%"));
-            });
-        }
+        $this->applyActionRefinements($query, $request);
+        $this->applyActionScope($query, $request);
 
         $actions = $query->paginate(25)->withQueryString();
         $pageActions = $actions->getCollection();
@@ -1179,6 +1394,7 @@ class HsEventController extends Controller
             $request->user(),
             [],
         );
+        app(HsEventAccessService::class)->applyFirstAidSourceScope($strictEventIds, $request->user());
         $strictEventIds = $strictEventIds->pluck('id')->map(fn ($id) => (int) $id);
         $evidenceLoadState = HsCorrectiveActionPresenter::EVIDENCE_LOADED;
         try {
@@ -1233,6 +1449,11 @@ class HsEventController extends Controller
             'verified' => $verifiedCount,
             'closed' => $closedCount,
         ];
+        foreach (['critical_open', 'unassigned'] as $attentionTab) {
+            $attentionQuery = clone $base;
+            $this->applyActionTab($attentionQuery, $attentionTab);
+            $tabCounts[$attentionTab] = $attentionQuery->count();
+        }
 
         $hero = [
             'live' => [
@@ -1243,14 +1464,8 @@ class HsEventController extends Controller
             ],
             'attention' => [
                 'overdue' => $tabCounts['overdue'],
-                'critical_open' => (int) (clone $base)
-                    ->whereIn('priority', [HsCorrectiveAction::PRIORITY_HIGH, HsCorrectiveAction::PRIORITY_CRITICAL])
-                    ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
-                    ->count(),
-                'unassigned' => (int) (clone $base)
-                    ->whereNull('assigned_to_user_id')
-                    ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
-                    ->count(),
+                'critical_open' => $tabCounts['critical_open'],
+                'unassigned' => $tabCounts['unassigned'],
                 'monitoring_events' => (int) (clone $base)
                     ->whereHas('hsEvent', fn (Builder $q) => $q->where('status', HsEvent::STATUS_MONITORING))
                     ->distinct('hs_event_id')
@@ -1260,8 +1475,12 @@ class HsEventController extends Controller
 
         $detail = null;
         if ($request->filled('event')) {
-            $target = $this->resolveAccessibleEvent($request, $request->integer('event'));
-            $detail = $this->buildEventDetail($target, $request->user());
+            $detail = HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), function (HealthSafetyReadContext $context) use ($request): array {
+                $target = $this->resolveAccessibleEvent($request, $request->integer('event'), $context);
+
+                return $context->consumeViewer($this->detailReadPermissionKeys(),
+                    fn (User $current): array => $this->buildEventDetail($target, $current, $context));
+            });
         }
 
         $siteIds = $this->actionScopedBase($request)->whereHas('hsEvent', fn (Builder $q) => $q->whereNotNull('site_id'))
@@ -1277,6 +1496,14 @@ class HsEventController extends Controller
             'tab' => $tab,
             'tabCounts' => $tabCounts,
             'hero' => $hero,
+            'monitoringReviewUrl' => '/health-safety/events?'.http_build_query([
+                'tab' => 'monitoring',
+                'action_context' => array_filter([
+                    ...$request->only(['q', 'priority', 'site_id', 'from', 'to']),
+                    'tab' => $tab,
+                    'unassigned' => $request->boolean('unassigned') ? 1 : null,
+                ], fn ($value) => $value !== null && $value !== ''),
+            ], '', '&', PHP_QUERY_RFC3986),
             'filters' => [
                 'q' => $request->input('q'),
                 'tab' => $tab,
@@ -1317,16 +1544,28 @@ class HsEventController extends Controller
         };
     }
 
-    private function applyActionScope(Builder $query, Request $request): void
+    private function applyActionScope(Builder $query, Request $request, ?Builder $sourceActions = null): void
     {
-        $query->whereHas('hsEvent', function (Builder $eventQuery) use ($request) {
+        $this->applyActionSourceFilters($query, $request);
+        $candidateActions = clone ($sourceActions ?? $query);
+        if ($sourceActions !== null) {
+            $this->applyActionSourceFilters($candidateActions, $request);
+        }
+        $candidateActions->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_corrective_actions.hs_event_id');
+        $sourceCandidates = HsEvent::query()->whereIn('id', $candidateActions);
+        $this->siteAccess->applyHsEventScope($sourceCandidates, $request->user(), $this->hsEventBypassPermissions());
+        $query->whereHas('hsEvent', function (Builder $eventQuery) use ($request, $sourceCandidates) {
             $this->siteAccess->applyHsEventScope(
                 $eventQuery,
                 $request->user(),
                 $this->hsEventBypassPermissions(),
             );
+            app(HsEventAccessService::class)->applyFirstAidSourceScope($eventQuery, $request->user(), null, $sourceCandidates);
         });
+    }
 
+    private function applyActionSourceFilters(Builder $query, Request $request): void
+    {
         if ($request->filled('site_id')) {
             $this->siteAccess->assertCanAccessSiteId(
                 $request->user(),
@@ -1347,6 +1586,7 @@ class HsEventController extends Controller
     private function actionScopedBase(Request $request): Builder
     {
         $query = HsCorrectiveAction::query();
+        $this->applyActionRefinements($query, $request);
         $this->applyActionScope($query, $request);
 
         return $query;
@@ -1361,20 +1601,102 @@ class HsEventController extends Controller
             'verified' => $query->where('status', HsCorrectiveAction::STATUS_VERIFIED),
             'closed' => $query->where('status', HsCorrectiveAction::STATUS_CLOSED),
             'overdue' => $query->overdue(),
+            'critical_open' => $query->whereIn('priority', [HsCorrectiveAction::PRIORITY_HIGH, HsCorrectiveAction::PRIORITY_CRITICAL])
+                ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
+            'unassigned' => $query->whereNull('assigned_to_user_id')
+                ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
             default => $query,
         };
     }
 
-    private function resolveAccessibleEvent(Request $request, int $eventId): HsEvent
+    private function applyActionRefinements(Builder $query, Request $request): void
     {
-        $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope(
-            $query,
-            $request->user(),
-            $this->hsEventBypassPermissions(),
-        );
+        if ($request->filled('priority')) {
+            $query->whereIn('priority', array_filter(explode(',', (string) $request->input('priority'))));
+        }
+        if ($request->boolean('unassigned')) {
+            $query->whereNull('assigned_to_user_id')
+                ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]);
+        }
+        if ($request->filled('q')) {
+            $term = trim((string) $request->input('q'));
+            $query->where(function (Builder $q) use ($term) {
+                $q->where('reference_number', 'like', "%{$term}%")
+                    ->orWhere('title', 'like', "%{$term}%")
+                    ->orWhereHas('hsEvent', fn (Builder $event) => $event->where('reference_number', 'like', "%{$term}%"));
+            });
+        }
+    }
+
+    private function resolveAccessibleEvent(Request $request, int $eventId, ?HealthSafetyReadContext $context = null): HsEvent
+    {
+        $query = HsEvent::query()->whereKey($eventId);
+        if ($context !== null) {
+            $context->assertViewer($request->user());
+            $context->applyEventSiteScope($query, $this->hsEventBypassPermissions());
+        } else {
+            $this->siteAccess->applyHsEventScope($query, $request->user(), $this->hsEventBypassPermissions());
+        }
+        // First Aid copied treatment evidence retains its independent source boundary.
+        app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $request->user(), $context);
 
         return $query->findOrFail($eventId);
+    }
+
+    /** The literal original parent Builder is reused on every body/child query, never replaced by a warmed policy/model. */
+    private function incidentDetailSourceInContext(HsEvent $event, ?HealthSafetyReadContext $context): array
+    {
+        if ($context === null) { return ['incident' => null, 'parent' => null]; }
+        return $context->consumeSourceViewer(\App\Services\Incidents\IncidentHsEventSourceReadService::PERMISSIONS,
+            function (User $current, \App\Services\CurrentAuthorizationReads $reads) use ($event, $context): array {
+                $source = app(\App\Services\Incidents\IncidentHsEventSourceReadService::class);
+                $parent = $context->incidentQueryForEvent($event);
+                $incident = $reads->query(clone $parent)->first();
+                if ($incident === null) { return ['incident' => null, 'parent' => $parent]; }
+                $reporter = $reads->query(User::query()->whereKey($incident->reported_by)
+                    ->whereExists((clone $parent)->reorder()->selectRaw('1')->toBase()))->first(['id', 'name']);
+                $incident->setRelation('reporter', $reporter);
+                $attachments = $source->childQueryInReads(ClientIncidentAttachment::query(), 'incident_id', $parent, $reads)
+                    ->with(['uploader' => function ($relation) use ($source, $parent, $reads): void {
+                        $query = $relation->getQuery();
+                        $query->whereExists($source->childQueryInReads(ClientIncidentAttachment::query(), 'incident_id', $parent, $reads)
+                            ->whereColumn('client_incident_attachments.uploaded_by', 'users.id')->selectRaw('1')->toBase());
+                        $reads->query($query)->select(['id', 'name']);
+                    }])->get(['id', 'incident_id', 'uploaded_by', 'original_name', 'mime', 'mime_type', 'size', 'created_at']);
+                $followups = $source->childQueryInReads(\App\Models\IncidentFollowup::query(), 'client_incident_id', $parent, $reads)
+                    ->with(['assignedTo' => function ($relation) use ($source, $parent, $reads): void {
+                        $query = $relation->getQuery();
+                        $query->whereExists($source->childQueryInReads(\App\Models\IncidentFollowup::query(), 'client_incident_id', $parent, $reads)
+                            ->whereColumn('incident_followups.assigned_to_user_id', 'users.id')->selectRaw('1')->toBase());
+                        $reads->query($query)->select(['id', 'name']);
+                    }])->get(['id', 'client_incident_id', 'assigned_to_user_id', 'due_at', 'completed_at', 'notes', 'created_by', 'created_at']);
+                $incident->setRelation('attachments', $attachments);
+                $incident->setRelation('followups', $followups);
+                return ['incident' => $incident, 'parent' => $parent];
+            });
+    }
+
+    /** Independent owning alert authority remains mandatory; never refresh an admitted incident through an unscoped Journey reload. */
+    private function detailControlRoomAlertInContext(HsEvent $event, ?ClientIncident $incident, ?Builder $parent, User $viewer, ?HealthSafetyReadContext $context): ?ControlRoomAlert
+    {
+        $query = ControlRoomAlert::query();
+        $alertId = $incident?->control_room_alert_id ?? $event->control_room_alert_id;
+        if ($alertId !== null) { $query->whereKey($alertId); }
+        elseif ($incident !== null) { $query->where('context->incident_id', $incident->id)->orderBy('id'); }
+        else { return null; }
+        if ($incident !== null) {
+            // The direct alert and legacy context remain this original source's literal Site/Client/identity.
+            $query->where('site_id', $event->site_id)->where('client_id', $incident->client_id)
+                ->where(fn (Builder $claim) => $claim->whereNull('context->incident_id')
+                    ->orWhereRaw('BINARY JSON_UNQUOTE(JSON_EXTRACT(`control_room_alerts`.`context`, ?)) = BINARY ?', ['$.incident_id', (string) $incident->id]))
+                ->whereNotExists(DB::table('client_incidents as hs_other_alert_source')->selectRaw('1')
+                    ->whereColumn('hs_other_alert_source.control_room_alert_id', 'control_room_alerts.id')->where('hs_other_alert_source.id', '!=', $incident->id));
+        }
+        $query = app(ControlRoomAlertAccessService::class)->applyReadableScope($query, $viewer);
+        if ($incident !== null && $parent !== null) {
+            $query->whereExists((clone $parent)->reorder()->selectRaw('1')->toBase());
+        }
+        return $context !== null ? $context->query($query)->first() : $query->first();
     }
 
     private function linkedControlRoomAlert(

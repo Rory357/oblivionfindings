@@ -161,11 +161,21 @@ function Gauge({ pct }: { pct: number }) {
     );
 }
 
-export function GaugeCard({ pct, title }: { pct: number; title: string }) {
+export function GaugeCard({
+    pct,
+    title,
+}: {
+    pct: number | null;
+    title: string;
+}) {
     return (
         <ChartCard title={title}>
             <div className="flex items-center justify-center py-1">
-                <Gauge pct={pct} />
+                {pct === null ? (
+                    <p className="text-subtle py-6">Not confirmed</p>
+                ) : (
+                    <Gauge pct={pct} />
+                )}
             </div>
         </ChartCard>
     );
@@ -180,19 +190,27 @@ export function RatioDonutCard({
     operands,
 }: {
     ratio: number | null;
-    operands: { near_misses: number; recordable: number };
+    operands: { near_misses: number; recordable: number | null };
 }) {
-    const total = operands.near_misses + operands.recordable;
-    const fillPct = total > 0 ? operands.near_misses / total : 0;
+    const total =
+        operands.recordable === null
+            ? null
+            : operands.near_misses + operands.recordable;
+    const confirmed = total !== null && ratio !== null;
+    const fillPct = confirmed && total > 0 ? operands.near_misses / total : 0;
     const offset = CIRC * (1 - fillPct);
     return (
-        <ChartCard title="Near-miss : incident ratio">
+        <ChartCard title="Near-miss : recordable injury ratio">
             <div className="flex items-center gap-4">
                 <svg
                     viewBox="0 0 120 120"
                     className="h-28 w-28 shrink-0"
                     role="img"
-                    aria-label="Near-miss ratio"
+                    aria-label={
+                        confirmed
+                            ? 'Near-miss ratio'
+                            : 'Near-miss ratio not confirmed'
+                    }
                 >
                     <circle
                         cx="60"
@@ -207,7 +225,7 @@ export function RatioDonutCard({
                         cy="60"
                         r={RADIUS}
                         fill="none"
-                        stroke="var(--status-success)"
+                        stroke="var(--chart-1)"
                         strokeWidth="14"
                         strokeLinecap="round"
                         strokeDasharray={CIRC}
@@ -222,7 +240,7 @@ export function RatioDonutCard({
                         fontSize="22"
                         fontWeight="700"
                     >
-                        {ratio == null ? '—' : `${ratio}×`}
+                        {confirmed ? `${ratio}×` : '—'}
                     </text>
                     <text
                         x="60"
@@ -243,12 +261,14 @@ export function RatioDonutCard({
                     </div>
                     <div>
                         <span className="font-bold text-foreground">
-                            {operands.recordable}
+                            {operands.recordable ?? 'Not confirmed'}
                         </span>{' '}
-                        recordable incidents
+                        recordable injuries
                     </div>
-                    <p className="mt-1.5 text-status-success">
-                        A high ratio means hazards are caught before harm.
+                    <p className="mt-1.5 text-muted-foreground">
+                        {confirmed
+                            ? 'Compares readable near misses with recordable injuries.'
+                            : 'The ratio is not confirmed; its operands may be incomplete.'}
                     </p>
                 </div>
             </div>
@@ -363,11 +383,11 @@ export function CategoryBarsCard({
     return (
         <ChartCard
             title="Incidents by category"
-            subtitle="Recordable incidents this period"
+            subtitle="Readable incidents in the selected period"
         >
             {data.length === 0 ? (
                 <p className="py-6 text-center text-xs text-muted-foreground">
-                    No incidents this period.
+                    No matching readable incidents in this period.
                 </p>
             ) : (
                 <div className="space-y-2.5 py-1">
@@ -546,74 +566,79 @@ export function HazardBurndownCard({
 /*  Site safety league — horizontal bars per site                      */
 /* ------------------------------------------------------------------ */
 
-export function SiteLeagueCard({
+export function SiteSafetyComparisonCard({
     data,
 }: {
     data: Array<{
         id: number;
         name: string;
         incidents: number;
-        hazards: number;
+        hazards: number | null;
     }>;
 }) {
-    // Rank by risk score and show the top sites only — the prototype is a compact league,
-    // not an exhaustive list (orgs can have many sites).
-    const ranked = data
-        .map((d) => ({ ...d, score: d.incidents * 2 + d.hazards }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 6);
-    const max = Math.max(...ranked.map((d) => d.score), 1);
+    const sites = [...data].sort(
+        (a, b) => a.name.localeCompare(b.name, 'en-NZ') || a.id - b.id,
+    );
     return (
         <ChartCard
-            title="Site safety league"
-            subtitle="Incidents · open hazards (30d)"
+            title="Site safety comparison"
+            subtitle="Safety reports in the selected period · hazards open now"
             icon={Building2}
-            iconTone="primary"
         >
-            {ranked.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                    No sites to compare.
+            <p className="text-subtle mb-3">
+                Counts cover records you can currently read. Reporting activity
+                is not a safety rating. Fewer reports do not prove a safer site;
+                these counts do not measure harm, hours worked or reporting
+                completeness.
+            </p>
+            {sites.length === 0 ? (
+                <p className="text-subtle py-5">
+                    No sites are available in this view.
                 </p>
             ) : (
-                <div className="flex flex-col gap-3 py-1">
-                    {ranked.map((d) => {
-                        const tone =
-                            d.score === 0
-                                ? 'success'
-                                : d.score >= max * 0.6
-                                  ? 'critical'
-                                  : 'warning';
-                        return (
-                            <Link
-                                key={d.id}
-                                href={`/sites/${d.id}`}
-                                className="block rounded-md transition-colors hover:bg-muted/50"
-                            >
-                                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                                    <span className="min-w-0 truncate font-semibold text-foreground">
-                                        {d.name}
+                <>
+                    <p className="text-caption mb-2">
+                        {sites.length} sites in the current view · alphabetical
+                        order
+                    </p>
+                    <ul className="max-h-72 space-y-2 overflow-y-auto">
+                        {sites.map((site) => (
+                            <li key={site.id}>
+                                <Link
+                                    href={`/sites/${site.id}`}
+                                    aria-label={`Open ${site.name} safety comparison`}
+                                    className="frontline-tap flex flex-col gap-2 rounded-lg border border-border px-3 py-2 transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    <span className="text-subtle font-semibold text-foreground">
+                                        {site.name}
                                     </span>
-                                    <span className="shrink-0 text-muted-foreground tabular-nums">
-                                        {d.incidents} inc · {d.hazards} haz
-                                    </span>
-                                </div>
-                                <div className="h-[7px] overflow-hidden rounded-full bg-muted">
-                                    <div
-                                        className="h-full rounded-full"
-                                        style={{
-                                            width: `${Math.max((d.score / max) * 100, 6)}%`,
-                                            background: `var(--status-${tone})`,
-                                        }}
-                                    />
-                                </div>
-                            </Link>
-                        );
-                    })}
-                </div>
+                                    <dl className="text-caption flex flex-wrap gap-x-5 gap-y-1">
+                                        <div className="flex gap-2">
+                                            <dt>Safety reports</dt>
+                                            <dd className="text-foreground tabular-nums">
+                                                {site.incidents}
+                                            </dd>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <dt>Open hazards</dt>
+                                            <dd className="text-foreground tabular-nums">
+                                                {site.hazards === null
+                                                    ? 'Restricted'
+                                                    : site.hazards}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </>
             )}
         </ChartCard>
     );
 }
+/** Retain the previous import contract while the dashboard uses the neutral comparison. */
+export const SiteLeagueCard = SiteSafetyComparisonCard;
 
 /* ------------------------------------------------------------------ */
 /*  Open hazards list (Leading row 3)                                  */
@@ -719,10 +744,10 @@ export function LeadingCharts({
     openHazards,
 }: {
     ratio: number | null;
-    operands: { near_misses: number; recordable: number };
+    operands: { near_misses: number; recordable: number | null };
     burndown: Array<{ week: string; open: number }>;
-    drillPct: number;
-    trainingPct: number;
+    drillPct: number | null;
+    trainingPct: number | null;
     openHazards: OpenHazardRow[];
 }) {
     return (

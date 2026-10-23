@@ -38,7 +38,9 @@ class CommitteeMeetingScheduled extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $when = $this->meeting->scheduled_at?->format('D j M Y, g:ia');
+        $workerTimezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $when = $this->meeting->scheduled_at?->copy()->setTimezone($workerTimezone)->format('D j M Y, g:ia');
+        if ($when !== null) { $when .= ' ('.$workerTimezone.')'; }
         $name = $this->committee?->name ?? 'H&S committee';
 
         return (new MailMessage)
@@ -66,6 +68,7 @@ class CommitteeMeetingScheduled extends Notification
                 ? 'You are invited to an upcoming H&S committee meeting.'
                 : 'An H&S committee meeting is coming up — you are welcome to raise items for the agenda with your H&S representative.',
             'link' => '/health-safety/worker-participation?tab=meetings&meeting='.$this->meeting->id,
+            'url' => '/health-safety/worker-participation?tab=meetings&meeting='.$this->meeting->id,
         ];
     }
 }

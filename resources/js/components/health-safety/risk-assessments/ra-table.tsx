@@ -2,11 +2,13 @@
  * shared register-row-kit; bespoke row chrome (keyboard-openable rows, right-click
  * context menu) with semantic design tokens only. */
 import type { ShiftCtxItem } from '@/components/rostering';
+import { riskHref } from '@/lib/health-safety/risk-navigation';
 import { cn } from '@/lib/utils';
 import {
     initials,
     RegisterTableHeader,
 } from '@/pages/health-safety/components/register-row-kit';
+import { Link } from '@inertiajs/react';
 import {
     Archive,
     ExternalLink,
@@ -36,12 +38,11 @@ const COLS = [
     'Reference',
     'Title',
     'Attached to',
-    'Status',
+    'Status & review due',
     'Inherent',
     'Residual',
     'Acceptable',
-    'By',
-    'Review due',
+    'Assessed by',
 ];
 
 export interface RaCtxHandlers {
@@ -96,7 +97,7 @@ export function buildRaCtxItems(
                 },
                 {
                     icon: <RefreshCw className="h-3.5 w-3.5" />,
-                    label: 'Record review / residual',
+                    label: 'Record residual risk',
                     onClick: () => h.onResidual(row),
                 },
                 {
@@ -110,7 +111,7 @@ export function buildRaCtxItems(
             items.push(
                 {
                     icon: <RefreshCw className="h-3.5 w-3.5" />,
-                    label: 'Record review / residual',
+                    label: 'Record residual risk',
                     onClick: () => h.onResidual(row),
                 },
                 {
@@ -165,10 +166,11 @@ export function RaTable({
     rows,
     title = 'Risk assessment register',
     countLabel,
-    hint = 'Click a row to open · right-click for the full lifecycle',
+    hint = 'Open an assessment to view its controls, history and next steps',
     emptyCta,
     onOpen,
     onCtx,
+    hrefFor = riskHref,
 }: {
     rows: RaRow[];
     title?: string;
@@ -177,6 +179,7 @@ export function RaTable({
     emptyCta?: ReactNode;
     onOpen: (id: number) => void;
     onCtx: (e: MouseEvent, row: RaRow) => void;
+    hrefFor?: (id: number) => string;
 }) {
     return (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -188,7 +191,69 @@ export function RaTable({
                 hintIcon={MousePointerClick}
             />
 
-            <div className="overflow-x-auto">
+            <ul className="divide-y divide-border md:hidden">
+                {rows.map((r) => (
+                    <li key={r.id} className="space-y-3 p-4">
+                        <Link
+                            href={hrefFor(r.id)}
+                            className="frontline-tap frontline-focus inline-flex flex-col justify-center text-primary underline"
+                        >
+                            <span className="font-semibold">
+                                {r.reference_number} · {r.title}
+                            </span>
+                        </Link>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <StatusChip status={r.status} />
+                            <AttachChip attached={r.attached_to} />
+                        </div>
+                        <dl className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <dt className="text-subtle">Inherent risk</dt>
+                                <dd>
+                                    <LevelCell
+                                        score={r.risk_score}
+                                        level={r.risk_level}
+                                    />
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-subtle">Residual risk</dt>
+                                <dd>
+                                    {r.residual_risk_score != null &&
+                                    r.residual_risk_level ? (
+                                        <LevelCell
+                                            score={r.residual_risk_score}
+                                            level={r.residual_risk_level}
+                                        />
+                                    ) : (
+                                        'Not recorded'
+                                    )}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-subtle">Review due</dt>
+                                <dd>
+                                    <ReviewBadge
+                                        state={r.review_state}
+                                        dueAt={r.review_due_at}
+                                    />
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-subtle">Assessed by</dt>
+                                <dd>{r.assessed_by_name ?? 'Not recorded'}</dd>
+                            </div>
+                        </dl>
+                    </li>
+                ))}
+                {!rows.length && (
+                    <li className="space-y-3 p-5">
+                        <p>No risk assessments match this view.</p>
+                        {emptyCta}
+                    </li>
+                )}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[980px] border-collapse text-[13px]">
                     <thead>
                         <tr className="border-b border-border text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -215,6 +280,8 @@ export function RaTable({
                                     onClick={() => onOpen(r.id)}
                                     onContextMenu={(e) => onCtx(e, r)}
                                     onKeyDown={(e) => {
+                                        if (e.target !== e.currentTarget)
+                                            return;
                                         if (
                                             e.key === 'Enter' ||
                                             e.key === ' '
@@ -229,9 +296,15 @@ export function RaTable({
                                     )}
                                 >
                                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                                        <span className="font-semibold tabular-nums">
+                                        <Link
+                                            href={hrefFor(r.id)}
+                                            onClick={(event) =>
+                                                event.stopPropagation()
+                                            }
+                                            className="frontline-tap frontline-focus inline-flex items-center font-semibold text-primary tabular-nums underline"
+                                        >
                                             {r.reference_number}
-                                        </span>
+                                        </Link>
                                     </td>
                                     <td className="max-w-[230px] px-4 py-3 align-top">
                                         <span className="block leading-tight font-semibold">
@@ -246,8 +319,14 @@ export function RaTable({
                                     <td className="px-4 py-3 align-top">
                                         <AttachChip attached={r.attached_to} />
                                     </td>
-                                    <td className="px-4 py-3 align-top">
+                                    <td className="space-y-2 px-4 py-3 align-top whitespace-nowrap">
                                         <StatusChip status={r.status} />
+                                        <div>
+                                            <ReviewBadge
+                                                state={r.review_state}
+                                                dueAt={r.review_due_at}
+                                            />
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3 align-top">
                                         <LevelCell
@@ -291,12 +370,6 @@ export function RaTable({
                                         >
                                             {initials(r.assessed_by_name)}
                                         </span>
-                                    </td>
-                                    <td className="px-4 py-3 align-top whitespace-nowrap">
-                                        <ReviewBadge
-                                            state={r.review_state}
-                                            dueAt={r.review_due_at}
-                                        />
                                     </td>
                                 </tr>
                             );

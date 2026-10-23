@@ -69,6 +69,11 @@ use App\Jobs\PruneIncidentReportDrafts;
 use App\Jobs\PrunePersonalTrackingTelemetry;
 use App\Jobs\RecalculateFutureShiftEligibility;
 use App\Jobs\ReconcileTimesheetsJob;
+use App\Jobs\RecoverEmergencyDrillFailures;
+use App\Jobs\RecoverFirstAidDeliveries;
+use App\Jobs\RecoverIncidentOwnerDeliveries;
+use App\Jobs\RecoverLoneWorkerEmergencies;
+use App\Jobs\RecoverProcedureReviewDeliveries;
 use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Jobs\ShiftTaskDueJob;
@@ -85,6 +90,12 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 app(Schedule::class)->job(new SyncWorkCalendarsJob)->everyFifteenMinutes()->withoutOverlapping();
+app(Schedule::class)->job(new RecoverIncidentOwnerDeliveries)->everyMinute()->onOneServer()->withoutOverlapping();
+
+// Recovery rotates through committed routing intents and source-owner checks.
+// Initial routing never relies on a scheduler transaction or a report recipient grant.
+app(Schedule::class)->command('incidents:recover-routing --limit=100')
+    ->everyMinute()->onOneServer()->withoutOverlapping();
 
 if (config('fleet_maintenance.effects_enabled', false)) {
     app(Schedule::class)->command('maintenance:dispatch-effects --limit=25')
@@ -1038,3 +1049,23 @@ Artisan::command('referrals:prune-intake-drafts', function () {
 app(Schedule::class)->command('referrals:prune-intake-drafts')->dailyAt('02:20')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
 app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
+
+// Procedure review assignment delivery is independent of reading or completing work.
+app(Schedule::class)->job(new RecoverProcedureReviewDeliveries)->everyMinute()->onOneServer()->withoutOverlapping();
+
+// Recover retained drill review and signal delivery independently of source completion.
+app(Schedule::class)->job(new RecoverEmergencyDrillFailures)->everyMinute()->onOneServer()->withoutOverlapping();
+
+app(Schedule::class)->job(new RecoverLoneWorkerEmergencies)->everyMinute()->onOneServer()->withoutOverlapping();
+
+// Recover accepted First Aid review/inbox intents without resending confirmed receipts.
+app(Schedule::class)->job(new RecoverFirstAidDeliveries)->everyMinute()->withoutOverlapping();
+
+// Accepted restraint commands retain delivery intents independently of source completion.
+app(Schedule::class)->command('restraints:recover-deliveries')->everyMinute()->withoutOverlapping();
+app(Schedule::class)->command('restraints:followup-reminders')->dailyAt('08:00')->timezone('Pacific/Auckland')->withoutOverlapping();
+
+// Recover committed participation intents through independently current recipient source admission.
+// A sending mail claim becomes uncertain after a crash and is never automatically resent.
+app(Schedule::class)->job(new \App\Jobs\RecoverWorkerParticipationMeetingDeliveries)
+    ->everyMinute()->withoutOverlapping();

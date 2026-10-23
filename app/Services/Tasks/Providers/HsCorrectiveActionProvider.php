@@ -3,8 +3,17 @@
 namespace App\Services\Tasks\Providers;
 
 use App\Models\HsCorrectiveAction;
+use App\Models\HsEvent;
 use App\Models\User;
-use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\HealthSafety\FirstAidAccessService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\HsEventAccessService;
+use App\Services\HealthSafety\InjuryAccessService;
+use App\Services\HealthSafety\RestraintAccessService;
+use App\Services\Tasks\Contracts\ContextualHealthSafetyTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -13,12 +22,11 @@ use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
-use Illuminate\Validation\ValidationException;
+use LogicException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
+class HsCorrectiveActionProvider implements ContextualHealthSafetyTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
-    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
-
     public function sourceKey(): string
     {
         return 'corrective_action';
@@ -34,65 +42,8 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
         return HsCorrectiveAction::class;
     }
 
-    public function canAssign(User $user): bool
-    {
-        // Mirrors routes/health-safety.php: all corrective-action writes sit
-        // behind permission:hazards.manage.
-        return $user->canDo('hazards.manage');
-    }
-
-    public function assign(User $actor, int $id, ?int $assigneeId): void
-    {
-        $access = app(UserSiteAccessService::class);
-        $action = HsCorrectiveAction::query()
-            ->with('hsEvent')
-            ->whereHas('hsEvent', fn ($query) => $access->applyHsEventScope(
-                $query,
-                $actor,
-                self::SITE_BYPASS_PERMISSIONS,
-            ))
-            ->find($id);
-
-        if (! $action) {
-            throw ValidationException::withMessages([
-                'assignee_id' => 'Corrective action not found.',
-            ]);
-        }
-
-        if ($action->status === HsCorrectiveAction::STATUS_CLOSED) {
-            throw ValidationException::withMessages([
-                'assignee_id' => 'A closed corrective action cannot be reassigned.',
-            ]);
-        }
-
-        if ($assigneeId !== null) {
-            $assignee = User::query()
-                ->whereKey($assigneeId)
-                ->tap(fn ($query) => $access->applyHsEventStaffScope(
-                    $query,
-                    $action->hsEvent,
-                    $actor,
-                    self::SITE_BYPASS_PERMISSIONS,
-                ))
-                ->first();
-
-            if (! $assignee) {
-                throw ValidationException::withMessages([
-                    'assignee_id' => 'That staff member is not eligible for this event site.',
-                ]);
-            }
-        }
-
-        // Same side-effect columns HsCorrectiveActionService stamps on
-        // create/start: assignee + who assigned it + when.
-        $action->update([
-            'assigned_to_user_id' => $assigneeId,
-            'assigned_by_user_id' => $assigneeId !== null ? $actor->id : null,
-            'assigned_at' => $assigneeId !== null ? now() : null,
-            'updated_by' => $actor->id, // module service stamps this on every write
-        ]);
-    }
-
+    // Accountable ownership needs a reason and a current revision. The record
+    // page owns that handover; generic queue assignment must not bypass it.
     public function canView(User $user): bool
     {
         return $user->canDo('hazards.view');
@@ -100,9 +51,48 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
 
     public function authorizedTasks(User $user, array $filters = []): array
     {
+        try {
+            return HealthSafetyReadContext::within($user, array_unique([
+                ...FirstAidAccessService::PERMISSIONS,
+                ...RestraintAccessService::PERMISSIONS,
+                ...InjuryAccessService::PERMISSIONS,
+            ]), fn (HealthSafetyReadContext $context): array => $this->authorizedTasksInContext($user, $filters, $context));
+        } catch (HttpException $denial) {
+            if (! in_array($denial->getStatusCode(), [403, 404], true)) {
+                throw $denial;
+            }
+
+            return [];
+        }
+    }
+
+    public function authorizedTasksInContext(User $viewer, array $filters, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+
+        return $context->consumeSourceViewer(FirstAidAccessService::PERMISSIONS,
+            fn (User $current, CurrentAuthorizationReads $reads) => $this->authorizedTasksWithinSourceAuthority($viewer, $filters, $context, $current, $reads));
+    }
+
+    public function authorizedNavigationTasksInContext(User $viewer, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+
+        return $context->consumeSourceViewer(FirstAidAccessService::PERMISSIONS,
+            fn (User $current, CurrentAuthorizationReads $reads) => $this->authorizedTasksWithinSourceAuthority($viewer, [], $context, $current, $reads, true));
+    }
+
+    private function authorizedTasksWithinSourceAuthority(User $user, array $filters, ?HealthSafetyReadContext $context = null, ?User $current = null, ?CurrentAuthorizationReads $reads = null, bool $navigation = false): array
+    {
+        $current ??= $user;
         $includeSearchContext = TaskSearch::hasQuery($filters);
         $with = [
             'assignedTo:id,name',
+            'sourceControlRoomTask:id,alert_id,title,description',
+            'sourceControlRoomTask.alert' => fn ($relation) => app(ControlRoomAlertAccessService::class)->applyReadableScope($relation->getQuery(), $user),
+            'sourceControlRoomTask.alert.asset',
+            'sourceControlRoomTask.alert.fleetSignal',
+            'sourceControlRoomTask.alert.device',
             'hsEvent.client:id,first_name,last_name',
             'hsEvent.site:id,name',
             $includeSearchContext
@@ -118,7 +108,6 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
         if ($includeSearchContext) {
             array_push(
                 $with,
-                'sourceControlRoomTask:id,title,description',
                 'hsInvestigation:id,reference_number',
                 'hsEvent.owner:id,name',
                 'hsEvent.controlRoomAlert.assignedTo:id,name',
@@ -135,13 +124,27 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
         }
 
         $query = HsCorrectiveAction::query()
-            ->with($with)
+            ->with($navigation ? [] : $with)
             ->when(
                 $includeSearchContext,
-                fn ($q) => $q->whereHas(
-                    'hsEvent.clientIncident',
-                    fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
-                ),
+                fn ($q) => $q->where(fn ($match) => $match
+                    ->whereHas('hsEvent.clientIncident', fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters))
+                    ->orWhere(fn ($own) => TaskSearch::applyRecordPredicate($own, $filters,
+                        ['reference_number', 'title', 'description', 'status', 'priority'],
+                        [
+                            'assignedTo' => ['name'],
+                            'hsEvent' => ['reference_number'],
+                            'hsEvent.client' => ['first_name', 'last_name'],
+                            'hsEvent.site' => ['name'],
+                            'hsInvestigation' => ['reference_number'],
+                            'sourceControlRoomTask' => ['title', 'description'],
+                        ],
+                        [
+                            'open' => 'Not started', 'in_progress' => 'In progress',
+                            'completed' => 'Awaiting independent verification',
+                            'verified' => 'Verified — ready to close', 'closed' => 'Closed',
+                        ],
+                    ))),
             )
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
@@ -151,25 +154,50 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
             $query->where('status', '!=', HsCorrectiveAction::STATUS_CLOSED);
         }
 
+        if ($reads !== null) {
+            $query = $reads->query($query);
+        }
+
         return app(TaskProviderAuthorization::class)->siteScoped(
-            $user,
-            $this->canView($user),
+            $current,
+            $this->canView($current),
             $query,
-            fn ($scoped, User $actor) => $scoped->whereHas(
-                'hsEvent',
-                fn ($events) => app(UserSiteAccessService::class)->applyHsEventScope(
-                    $events,
-                    $actor,
-                    self::SITE_BYPASS_PERMISSIONS,
-                ),
-            ),
-            function (HsCorrectiveAction $action) use ($includeSearchContext) {
+            function ($scoped, User $actor) use ($context) {
+                // Candidate discovery is independent; the final relation retains its outer-row correlation.
+                $childIds = (clone $scoped)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+                    ->select($scoped->qualifyColumn('hs_event_id'));
+                if ($context === null) {
+                    throw new LogicException('H&S task source discovery requires its active prepared callback.');
+                }
+                $context->assertViewer($actor);
+                $candidates = $context->applyEventSiteScope(
+                    HsEvent::query()->whereIn('hs_events.id', $childIds),
+                    UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+                );
+
+                return $scoped->whereHas('hsEvent', function ($events) use ($actor, $context, $candidates) {
+                    return app(HsEventAccessService::class)->applyReadableScope($events, $actor, $context, $candidates);
+                });
+            },
+            function (HsCorrectiveAction $action) use ($includeSearchContext, $user, $context, $current, $navigation) {
+                if ($navigation) {
+                    // Preserve the canonical query, ordering and cap before badge eligibility.
+                    return new TaskItem(id: 'corrective_action-'.$action->id, source: $this->sourceKey(), sourceLabel: $this->label(),
+                        ref: null, title: '', status: (string) $action->status, bucket: match ($action->status) {
+                            HsCorrectiveAction::STATUS_CLOSED => TaskItem::BUCKET_DONE, HsCorrectiveAction::STATUS_IN_PROGRESS, HsCorrectiveAction::STATUS_COMPLETED, HsCorrectiveAction::STATUS_VERIFIED => TaskItem::BUCKET_IN_PROGRESS, default => TaskItem::BUCKET_OPEN
+                        },
+                        severity: 'info', assignee: (int) $action->assigned_to_user_id === (int) $current->id ? ['id' => $current->id] : null,
+                        dueAt: optional($action->due_date)->toIso8601String());
+                }
+
                 $event = $action->hsEvent;
                 $journey = IncidentJourneyTaskContext::make(
                     $event?->clientIncident,
+                    $user,
                     $event?->controlRoomAlert,
                     $event,
                     $includeSearchContext,
+                    $context,
                 );
                 $client = $journey['person'] ?? ($event?->client ? [
                     'id' => $event->client->id,
@@ -179,6 +207,22 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
                     'id' => $event->site->id,
                     'name' => $event->site->name,
                 ] : null);
+                // Eager loading applies the source reader once for the batch. A
+                // copied task description remains source-owned in every queue view.
+                $sourceTask = $action->sourceControlRoomTask;
+                $canReadSourceTask = $sourceTask?->alert
+                    && $event
+                    && (int) $sourceTask->alert_id === (int) $event->control_room_alert_id;
+                if ($canReadSourceTask) {
+                    try {
+                        app(ControlRoomAlertProvenanceService::class)->assertHealthSafetyEventTuple($sourceTask->alert, $event);
+                    } catch (\DomainException) {
+                        $canReadSourceTask = false;
+                    }
+                }
+                $description = $action->source_control_room_task_id !== null && ! $canReadSourceTask
+                    ? null
+                    : $action->description;
 
                 return new TaskItem(
                     id: 'corrective_action-'.$action->id,
@@ -202,9 +246,9 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
                     site: $site,
                     dueAt: optional($action->due_date)->toIso8601String(),
                     createdAt: optional($action->created_at)->toIso8601String(),
-                    link: "/health-safety/corrective-actions?event={$action->hs_event_id}",
+                    link: "/health-safety/corrective-actions/{$action->id}",
                     type: 'Corrective action',
-                    description: $action->description ? str($action->description)->limit(140)->toString() : null,
+                    description: $description ? str($description)->limit(140)->toString() : null,
                     journey: $journey,
                     sourceContext: 'Health & Safety',
                     actionLabel: match ($action->status) {
@@ -224,16 +268,17 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
                     },
                     searchTerms: $includeSearchContext
                         ? array_values(array_filter([
+                            $event?->reference_number,
                             $action->assignedTo?->name,
-                            $action->sourceControlRoomTask?->title,
-                            $action->sourceControlRoomTask?->description,
+                            $canReadSourceTask ? $sourceTask->title : null,
+                            $canReadSourceTask ? $sourceTask->description : null,
                             $action->hsInvestigation?->reference_number,
                         ]))
                         : [],
                     actionHelp: match ($action->status) {
                         HsCorrectiveAction::STATUS_COMPLETED => 'A different H&S manager must review the retained evidence.',
                         HsCorrectiveAction::STATUS_VERIFIED => 'The evidence is verified; close the action to finish the responsibility.',
-                        default => null,
+                        default => 'Open the action to manage work or hand over its accountable owner.',
                     },
                 );
             },

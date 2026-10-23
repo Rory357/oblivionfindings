@@ -30,6 +30,7 @@ import {
     WP_BASE,
     fmtDate,
 } from '@/components/worker-participation/shared';
+import { toDateInput } from '@/lib/datetime';
 import { useForm } from '@inertiajs/react';
 import {
     ChevronLeft,
@@ -475,8 +476,8 @@ export function AddRepresentativeWizard({
                             term has been agreed.
                         </InfoCard>
                         <Field
-                            label="Training days completed"
-                            hint="paid days"
+                            label="Recorded training days"
+                            hint="Cumulative paid days"
                             error={err('training_days_completed')}
                         >
                             <Input
@@ -496,13 +497,13 @@ export function AddRepresentativeWizard({
                             />
                         </Field>
                         <Field
-                            label="Initial training completed"
-                            hint="NZQA US 29315 — optional"
+                            label="Reported initial training date"
+                            hint="Optional · qualification evidence is managed in HR"
                             error={err('initial_training_completed_at')}
                         >
                             <Input
                                 type="date"
-                                max={new Date().toISOString().slice(0, 10)}
+                                max={toDateInput(new Date())}
                                 value={data.initial_training_completed_at}
                                 onChange={(e) =>
                                     setData(
@@ -513,11 +514,11 @@ export function AddRepresentativeWizard({
                             />
                         </Field>
                         <InfoCard icon={GraduationCap}>
-                            HSWA entitles each rep to 2 days&rsquo; paid
-                            training per year; NZQA US 29315 must be completed
-                            before a rep can issue PINs or direct an unsafe-work
-                            cease. Recording the completion date adds a tracked
-                            credential to the rep&rsquo;s HR record.
+                            Record paid training days and the reported
+                            completion date here. These records do not confirm
+                            the current year&apos;s training position or a
+                            qualification. Qualification evidence and
+                            credentials are managed in HR.
                         </InfoCard>
                         <Field
                             label="Notes"
@@ -602,11 +603,11 @@ export function AddRepresentativeWizard({
                                 }
                             />
                             <ReviewRow
-                                label="Training days"
+                                label="Recorded training days (cumulative)"
                                 value={`${data.training_days_completed} ${data.training_days_completed === 1 ? 'day' : 'days'}`}
                             />
                             <ReviewRow
-                                label="Initial training (US 29315)"
+                                label="Reported initial training date"
                                 value={
                                     data.initial_training_completed_at
                                         ? fmtDate(

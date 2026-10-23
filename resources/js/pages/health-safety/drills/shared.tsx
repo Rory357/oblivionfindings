@@ -246,7 +246,13 @@ export const STATUS_META: Record<string, StatusMeta> = {
 };
 
 export function statusMeta(status: string): StatusMeta {
-    return STATUS_META[status] ?? STATUS_META.scheduled;
+    return (
+        STATUS_META[status] ?? {
+            label: titleCase(status),
+            icon: Activity,
+            tone: 'neutral',
+        }
+    );
 }
 
 export const OUTCOME_META: Record<string, { label: string; tone: ChipTone }> = {

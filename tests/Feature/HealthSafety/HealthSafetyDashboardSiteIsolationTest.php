@@ -25,9 +25,9 @@ use App\Models\Permission;
 use App\Models\PpeAllocation;
 use App\Models\PpeInventory;
 use App\Models\RestraintEvent;
-use App\Models\SafeWorkProcedure;
 use App\Models\SafeguardingConcern;
 use App\Models\SafetyDataSheet;
+use App\Models\SafeWorkProcedure;
 use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\SubstanceStorageLocation;
@@ -53,7 +53,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view'], 'H&S Viewer');
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'fleet.viewAny'], 'H&S Viewer');
 
         $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
@@ -315,7 +315,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view'], 'Dashboard Viewer');
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'clients.viewAssigned'], 'Dashboard Viewer');
         $visibleWorker = $this->siteBoundUser($visibleSite, [], 'Accessible Worker');
         $foreignWorker = $this->siteBoundUser($foreignSite, [], 'Foreign Worker');
         $visibleClient = Client::factory()->create([
@@ -328,6 +328,8 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
             'first_name' => 'Foreign',
             'last_name' => 'Client',
         ]);
+
+        $viewer->assignedClients()->attach($visibleClient->id);
 
         $expectedStaffIds = collect([$viewer->id, $visibleWorker->id])->sort()->values()->all();
 
@@ -569,7 +571,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $secondarySite = Site::factory()->create(['name' => 'Secondary Site']);
         $remoteSite = Site::factory()->create(['name' => 'Remote Site']);
         $viewer = $this->userWithPermissions(
-            ['hazards.view', 'healthSafety.viewAllSites'],
+            ['hazards.view', 'healthSafety.viewAllSites', 'fleet.viewAny', 'fleet.manage'],
             'Application H&S lead',
         );
         HrEmployeeProfile::factory()->create([

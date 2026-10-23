@@ -1,18 +1,25 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+} from '@/components/page/page-header';
+import { EntityFilter } from '@/components/rostering';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import { AlertOctagon } from 'lucide-react';
+import { formatDateOnly } from '@/lib/datetime';
+import type { SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { AlertOctagon, CalendarDays, Download, List } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
@@ -27,136 +34,211 @@ type Props = {
 };
 
 export default function IncidentReports({ clients, filters }: Props) {
-    const ANY = '__any__';
+    const can = usePage<SharedData>().props.auth.can?.incidents;
     const [from, setFrom] = useState(filters.from || '');
     const [to, setTo] = useState(filters.to || '');
     const [clientId, setClientId] = useState(filters.client_id || '');
     const [severity, setSeverity] = useState(filters.severity || '');
     const [reviewed, setReviewed] = useState(filters.reviewed || '');
-
-    const buildUrl = () => {
-        const params = new URLSearchParams();
-        if (from) params.set('from', from);
-        if (to) params.set('to', to);
-        if (clientId) params.set('client_id', clientId);
-        if (severity) params.set('severity', severity);
-        if (reviewed) params.set('reviewed', reviewed);
-        return `/reports/incidents/export?${params.toString()}`;
-    };
+    const invalidRange = Boolean(from && to && from > to);
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (clientId) params.set('client_id', clientId);
+    if (severity) params.set('severity', severity);
+    if (reviewed) params.set('reviewed', reviewed);
+    const exportUrl = `/reports/incidents/export?${params.toString()}`;
+    const period =
+        from || to
+            ? `${from ? formatDateOnly(from) : 'Earliest'} – ${to ? formatDateOnly(to) : 'Latest'}`
+            : 'All dates';
 
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Reports', href: '/reports' },
                 { title: 'Incidents', href: '/reports/incidents' },
             ]}
         >
             <Head title="Incident reports" />
-
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={AlertOctagon}
                         title="Incident reports"
-                        description="Export CSV with filters"
+                        subline="Incident occurrence dates · New Zealand time · Your permitted records"
+                        actions={
+                            <>
+                                {can?.viewAny || can?.viewAssigned ? (
+                                    <PageHeaderGlassButton icon={List} asChild>
+                                        <Link href="/incidents">
+                                            Open register
+                                        </Link>
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {can?.export ? (
+                                    invalidRange ? (
+                                        <PageHeaderPrimaryButton
+                                            icon={Download}
+                                            disabled
+                                        >
+                                            Download CSV
+                                        </PageHeaderPrimaryButton>
+                                    ) : (
+                                        <PageHeaderPrimaryButton
+                                            icon={Download}
+                                            asChild
+                                        >
+                                            <a href={exportUrl}>Download CSV</a>
+                                        </PageHeaderPrimaryButton>
+                                    )
+                                ) : null}
+                            </>
+                        }
+                        filters={
+                            <>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <PageHeaderFilterButton
+                                            icon={CalendarDays}
+                                            active={Boolean(from || to)}
+                                            aria-label="Occurrence date range"
+                                        >
+                                            {period}
+                                        </PageHeaderFilterButton>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        align="end"
+                                        className="w-72 space-y-3"
+                                    >
+                                        <div className="space-y-1">
+                                            <Label htmlFor="incident-report-from">
+                                                From (NZ date)
+                                            </Label>
+                                            <Input
+                                                id="incident-report-from"
+                                                type="date"
+                                                value={from}
+                                                max={to || undefined}
+                                                onChange={(event) =>
+                                                    setFrom(event.target.value)
+                                                }
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="incident-report-to">
+                                                To (NZ date)
+                                            </Label>
+                                            <Input
+                                                id="incident-report-to"
+                                                type="date"
+                                                value={to}
+                                                min={from || undefined}
+                                                onChange={(event) =>
+                                                    setTo(event.target.value)
+                                                }
+                                            />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Both selected days are included.
+                                        </p>
+                                    </PopoverContent>
+                                </Popover>
+                                <EntityFilter
+                                    onDark
+                                    label="Person"
+                                    allLabel="All permitted people"
+                                    items={clients.map((client) => ({
+                                        id: client.id,
+                                        name: `${client.first_name} ${client.last_name}`,
+                                    }))}
+                                    value={clientId ? Number(clientId) : null}
+                                    onChange={(id) =>
+                                        setClientId(
+                                            id == null ? '' : String(id),
+                                        )
+                                    }
+                                />
+                                <PageHeaderFilterSelect
+                                    label="Severity"
+                                    value={severity || 'all'}
+                                    onChange={(value) =>
+                                        setSeverity(
+                                            value === 'all' ? '' : value,
+                                        )
+                                    }
+                                    options={[
+                                        {
+                                            value: 'all',
+                                            label: 'All severities',
+                                        },
+                                        ...[
+                                            'low',
+                                            'medium',
+                                            'high',
+                                            'critical',
+                                        ].map((value) => ({
+                                            value,
+                                            label:
+                                                value.charAt(0).toUpperCase() +
+                                                value.slice(1),
+                                        })),
+                                    ]}
+                                />
+                                <PageHeaderFilterSelect
+                                    label="Review status"
+                                    value={reviewed || 'all'}
+                                    onChange={(value) =>
+                                        setReviewed(
+                                            value === 'all' ? '' : value,
+                                        )
+                                    }
+                                    options={[
+                                        {
+                                            value: 'all',
+                                            label: 'All review states',
+                                        },
+                                        { value: 'yes', label: 'Reviewed' },
+                                        { value: 'no', label: 'Not reviewed' },
+                                    ]}
+                                />
+                            </>
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={[{ key: 'export', label: 'Export' }]}
+                                value="export"
+                                onSelect={() => {}}
+                                ariaLabel="Incident report views"
+                            />
+                        }
                     />
                 }
             >
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Filters</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-                        <div className="space-y-1">
-                            <Label>From</Label>
-                            <Input
-                                type="date"
-                                value={from}
-                                onChange={(e) => setFrom(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>To</Label>
-                            <Input
-                                type="date"
-                                value={to}
-                                onChange={(e) => setTo(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label>Client</Label>
-                            <Select
-                                value={clientId || ANY}
-                                onValueChange={(v) =>
-                                    setClientId(v === ANY ? '' : v)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ANY}>Any</SelectItem>
-                                    {clients.map((c) => (
-                                        <SelectItem
-                                            key={c.id}
-                                            value={String(c.id)}
-                                        >
-                                            {c.first_name} {c.last_name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label>Severity</Label>
-                            <Select
-                                value={severity || ANY}
-                                onValueChange={(v) =>
-                                    setSeverity(v === ANY ? '' : v)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ANY}>Any</SelectItem>
-                                    {['low', 'medium', 'high'].map((s) => (
-                                        <SelectItem key={s} value={s}>
-                                            {s}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label>Reviewed</Label>
-                            <Select
-                                value={reviewed || ANY}
-                                onValueChange={(v) =>
-                                    setReviewed(v === ANY ? '' : v)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="yes">Yes</SelectItem>
-                                    <SelectItem value="no">No</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="flex justify-end sm:col-span-5">
-                            <a href={buildUrl()}>
-                                <Button>Download CSV</Button>
-                            </a>
-                        </div>
-                    </CardContent>
-                </Card>
+                {invalidRange ? (
+                    <p role="alert" className="text-sm text-destructive">
+                        Choose an end date on or after the start date.
+                    </p>
+                ) : null}
+                <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>
+                        The CSV includes the incident, immediate response,
+                        reporter and review details for the selected records.
+                        Dates are based on when the incident occurred.
+                    </p>
+                    <p>
+                        Access and confidentiality are checked again when you
+                        download. An export does not submit a regulatory
+                        notification or complete incident work.
+                    </p>
+                    {!can?.export ? (
+                        <p>
+                            You do not have permission to export incident
+                            records.
+                        </p>
+                    ) : null}
+                </div>
             </PageLayout>
         </AppLayout>
     );

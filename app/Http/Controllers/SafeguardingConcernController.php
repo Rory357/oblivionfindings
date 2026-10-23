@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\HsEvent;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingAttachment;
@@ -17,6 +18,7 @@ use App\Policies\SafeguardingConcernPolicy;
 use App\Services\Safeguarding\SafeguardingLifecycle;
 use App\Services\Safeguarding\SafeguardingSensitivityService;
 use App\Services\Safeguarding\SafeguardingTerminalTransitionService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,7 +36,7 @@ class SafeguardingConcernController extends Controller
     public function __construct(
         private readonly SafeguardingSensitivityService $sensitivity,
         private readonly SafeguardingConcernPolicy $concernPolicy,
-        private readonly \App\Services\UserSiteAccessService $siteAccess,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -91,6 +93,7 @@ class SafeguardingConcernController extends Controller
 
         $tabScopes = [
             'all' => fn ($q) => $q,
+            'open' => fn ($q) => $q->open(),
             'triage' => fn ($q) => $q->where('status', 'reported'),
             'investigation' => fn ($q) => $q->where('status', 'investigating'),
             'action_plan' => fn ($q) => $q->where('status', 'action_plan'),
@@ -204,15 +207,54 @@ class SafeguardingConcernController extends Controller
     /**
      * Show the form for creating a new concern.
      */
-    /**
-     * The full-page create form is retired — raising is a modal wizard on the
-     * list. Redirect deep links to the list with the wizard open.
-     */
-    public function create(): RedirectResponse
+    public function create(Request $request): Response
     {
         $this->authorize('create', SafeguardingConcern::class);
 
-        return redirect()->route('safeguarding.index', ['raise' => 1]);
+        // Reporting authority does not imply permission to browse the register.
+        // The intake page contains only the choices the reporter may use.
+        $user = $request->user();
+
+        return Inertia::render('safeguarding/create', [
+            'clients' => $this->siteAccess->applyClientScope(Client::query(), $user)
+                ->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
+                ->map(fn (Client $client) => ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)])
+                ->values(),
+            'staff' => $this->siteAccess->applyStaffScope(User::query(), $user)
+                ->orderBy('name')->get(['id', 'name']),
+            'sites' => $this->siteAccess->applySiteScope(Site::query(), $user)
+                ->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'returnUrl' => $this->reportingReturnUrl($request),
+        ]);
+    }
+
+    /** Keep the permitted caller's filters, never an external or nested return. */
+    private function reportingReturnUrl(Request $request): string
+    {
+        $allowed = ['/my-day'];
+        if ($request->user()->canDo('incidents.viewAny') || $request->user()->canDo('incidents.viewAssigned')) {
+            $allowed[] = '/incidents';
+        }
+        if ($request->user()->canDo('safeguarding.viewAny')) {
+            $allowed[] = '/safeguarding';
+        }
+        $fallback = end($allowed);
+        $value = $request->input('return_to');
+        if (! is_string($value) || ! str_starts_with($value, '/') || str_starts_with($value, '//')
+            || str_contains($value, '\\') || preg_match('/[\x00-\x1f\x7f]/', $value)) {
+            return $fallback;
+        }
+        $parts = parse_url($value);
+        if (! is_array($parts) || isset($parts['host']) || ! in_array($parts['path'] ?? '', $allowed, true)) {
+            return $fallback;
+        }
+        parse_str($parts['query'] ?? '', $query);
+        $query = array_filter(Arr::only($query, [
+            'q', 'tab', 'severity', 'category', 'site_id', 'client_id', 'subject_id', 'source', 'from', 'to', 'page',
+        ]), fn ($item) => is_scalar($item));
+        $encoded = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+
+        return $parts['path'].($encoded !== '' ? '?'.$encoded : '');
     }
 
     /**
@@ -283,6 +325,7 @@ class SafeguardingConcernController extends Controller
 
         return Inertia::render('safeguarding/concern', [
             'detail' => $this->buildConcernDetail($concern, $request->user(), $canSensitive),
+            'returnUrl' => $this->reportingReturnUrl($request),
         ]);
     }
 
@@ -1237,7 +1280,7 @@ class SafeguardingConcernController extends Controller
         // 4. Canonical Incident reconciliation
         $incidentId = $validated['related_incident_id'] ?? $existing?->related_incident_id;
         if ($incidentId) {
-            $incident = \App\Models\ClientIncident::findOrFail($incidentId);
+            $incident = ClientIncident::findOrFail($incidentId);
 
             if ($siteId) {
                 $this->siteAccess->assertCanUseClientIncidentAtSite($user, $incident, (int) $siteId);

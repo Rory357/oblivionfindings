@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Requests\HealthSafety\StoreHsCorrectiveActionRequest;
 use App\Models\Client;
@@ -15,24 +16,37 @@ use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\HealthSafety\FirstAidSourceProjectionService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
+use App\Services\HealthSafety\HsEventAccessService;
+use App\Services\HealthSafety\HsVisibilityService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
+use App\Services\Incidents\IncidentAccessService;
 use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use App\Services\Incidents\IncidentClosureService;
+use App\Services\Incidents\IncidentEvidenceReadService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Incidents\IncidentOwnershipService;
+use App\Services\Incidents\IncidentRegisterReadService;
 use App\Services\Incidents\IncidentReportDraftService;
+use App\Services\Incidents\IncidentResponseEscalationService;
 use App\Services\Medication\MedicationErrorSummary;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
+use App\Support\Incidents\IncidentOccurrencePeriod;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IncidentController extends Controller
@@ -45,309 +59,24 @@ class IncidentController extends Controller
         private readonly IncidentJourneyPresenter $journeyPresenter,
         private readonly IncidentAlertLifecycleSignalService $incidentAlertSignals,
         private readonly IncidentReportDraftService $incidentReportDrafts,
+        private readonly IncidentOwnershipService $owners,
+        private readonly IncidentRegisterReadService $register,
     ) {}
 
     /**
-     * Unified Incidents register (redesign): hs-hero-kit hero with incident stat
-     * clusters, an 8-tab TabStrip, Site/Client/Source filters, and right-click
-     * rows. Near misses and the follow-ups worklist are first-class tabs.
+     * Current scoped incident register. Ownership qualifies the parent source
+     * before tab counts, incident pages and the follow-up worklist.
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && ($user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned')), 403);
-
-        $q = trim((string) $request->get('q', ''));
-        $tab = $request->get('tab', 'all'); // all|open|investigation|followups|worksafe|near_misses|review|closed
-        // Back-compat: the legacy ?type=near_miss lens now lands on the tab.
-        if ($request->get('type') === 'near_miss' && ! $request->filled('tab')) {
-            $tab = 'near_misses';
-        }
-        $severity = $request->get('severity');
-        $clientId = $request->get('client_id');
-        $siteId = $request->get('site_id');
-        $source = $request->get('source');
-        $from = $request->get('from');
-        $to = $request->get('to');
-
-        // Shared filters (everything EXCEPT the tab), reusable on both the
-        // ClientIncident query and the follow-ups whereHas('incident') subquery,
-        // so the tab counts stay mutually consistent.
-        $applyFilters = function ($query) use ($user, $q, $severity, $clientId, $siteId, $source, $from, $to) {
-            return $query
-                ->when($user->canDo('incidents.viewAssigned') && ! $user->canDo('incidents.viewAny'), function ($query) use ($user) {
-                    $query->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($user->id));
-                })
-                ->when($q !== '', function ($query) use ($q) {
-                    $term = '%'.$q.'%';
-                    $query->where(fn ($sub) => $sub->where('description', 'like', $term)
-                        ->orWhere('type', 'like', $term)
-                        ->orWhere('title', 'like', $term));
-                })
-                ->when($severity, fn ($query) => $query->where('severity', $severity))
-                ->when($clientId, fn ($query) => $query->where('client_id', $clientId))
-                ->when($siteId, fn (Builder $query) => $this->whereIncidentSite($query, (int) $siteId))
-                ->when($source, fn ($query) => $query->where('source', $source))
-                ->when($from, fn ($query) => $query->whereDate('occurred_at', '>=', $from))
-                ->when($to, fn ($query) => $query->whereDate('occurred_at', '<=', $to));
-        };
-
-        $applyTab = fn ($query, string $t) => match ($t) {
-            'open' => $query->where('status', '!=', 'closed'),
-            'investigation' => $query->whereIn('investigation_status', ['pending', 'in_progress']),
-            'worksafe' => $this->whereCanonicalWorksafeEvent($query),
-            'near_misses' => $query->where('type', 'near_miss'),
-            'review' => $query->where('status', 'submitted'),
-            'closed' => $query->where('status', 'closed'),
-            default => $query,
-        };
-
-        // Per-tab counts.
-        $countFor = fn (string $t) => $applyTab($applyFilters(ClientIncident::query()), $t)->count();
-        $openFollowupsQuery = fn () => IncidentFollowup::query()
-            ->whereNull('completed_at')
-            ->whereHas('incident', fn ($i) => $applyFilters($i));
-
-        $tabCounts = [
-            'all' => $countFor('all'),
-            'open' => $countFor('open'),
-            'investigation' => $countFor('investigation'),
-            'followups' => $openFollowupsQuery()->count(),
-            'worksafe' => $countFor('worksafe'),
-            'near_misses' => $countFor('near_misses'),
-            'review' => $countFor('review'),
-            'closed' => $countFor('closed'),
-        ];
-
-        // Rows for the active tab. Follow-ups due is a worklist of follow-up rows;
-        // every other tab is a list of incident rows.
-        if ($tab === 'followups') {
-            $rows = $openFollowupsQuery()
-                ->with(['incident:id,type,client_id,reference_number', 'incident.client:id,first_name,last_name', 'assignedTo:id,name'])
-                ->orderByRaw('due_at is null')
-                ->orderBy('due_at')
-                ->paginate(50)
-                ->withQueryString()
-                ->through(fn (IncidentFollowup $f) => [
-                    'id' => $f->id,
-                    'incident_id' => $f->client_incident_id,
-                    'incident_ref' => $f->incident?->reference_number,
-                    'incident_type' => $f->incident?->type,
-                    'client_name' => $f->incident?->client
-                        ? trim(($f->incident->client->first_name ?? '').' '.($f->incident->client->last_name ?? ''))
-                        : null,
-                    'assigned_to' => $f->assignedTo?->name,
-                    'due_at' => $f->due_at,
-                    'overdue' => $f->due_at ? $f->due_at->isPast() : false,
-                    'notes' => $f->notes,
-                ]);
-            $rowsKind = 'followups';
-        } else {
-            $rows = $applyTab($applyFilters(ClientIncident::query()), $tab)
-                ->with([
-                    'client:id,first_name,last_name,site_id',
-                    'client.site:id,name',
-                    'site:id,name',
-                    'reporter:id,name',
-                    'hsEvent:id,source_type,source_id,event_category,idempotency_key,client_id,site_id,control_room_alert_id,worksafe_notifiable,worksafe_status,worksafe_reference,worksafe_notified_at,worksafe_acknowledged_at,worksafe_method,worksafe_site_preserved',
-                    'hsEvent.site:id,name',
-                ])
-                ->withCount([
-                    'attachments',
-                    'followups as open_followups_count' => fn ($qq) => $qq->whereNull('completed_at'),
-                ])
-                ->orderByDesc('occurred_at')
-                ->orderByDesc('id')
-                ->paginate(50)
-                ->withQueryString()
-                ->through(function (ClientIncident $incident): array {
-                    $directEvent = $incident->hsEvent;
-                    $event = $directEvent !== null
-                        && $this->journeys->hsEventIsCanonicalForIncident($incident, $directEvent)
-                            ? $directEvent
-                            : null;
-                    $journeyRepairRequired = $incident->hs_event_id !== null && $event === null;
-
-                    return [
-                        'id' => $incident->id,
-                        'ref' => $incident->reference_number,
-                        'occurred_at' => $incident->occurred_at,
-                        'type' => $incident->type,
-                        'description' => $incident->description,
-                        'severity' => $incident->severity,
-                        'status' => $incident->status,
-                        'source' => $incident->source,
-                        'interactive' => $incident->interactive,
-                        'is_notifiable' => $journeyRepairRequired
-                            ? false
-                            : ($event
-                            ? (bool) $event->worksafe_notifiable
-                            : (bool) $incident->is_notifiable),
-                        'worksafe_notification_status' => $journeyRepairRequired
-                            ? null
-                            : ($event
-                            ? $event->worksafe_status
-                            : $incident->worksafe_notification_status),
-                        'journey_repair_required' => $journeyRepairRequired,
-                        'potential_severity' => $incident->potential_severity,
-                        'investigation_status' => $incident->investigation_status,
-                        'control_room_alert_id' => $incident->control_room_alert_id,
-                        'requires_followup' => (bool) $incident->requires_followup,
-                        'attachments_count' => $incident->attachments_count,
-                        'open_followups_count' => $incident->open_followups_count,
-                        'client' => $incident->client ? [
-                            'id' => $incident->client->id,
-                            'first_name' => $incident->client->first_name,
-                            'last_name' => $incident->client->last_name,
-                            'site' => $incident->site?->name
-                                ?? $event?->site?->name
-                                ?? $incident->client->site?->name,
-                        ] : null,
-                        'reporter' => $incident->reporter ? ['name' => $incident->reporter->name] : null,
-                    ];
-                });
-            $rowsKind = 'incidents';
-        }
-
-        // Hero clusters. "This period" = 30-day flow (Reported/Closed carry a
-        // delta vs the prior 30 days); Open / Under investigation are current
-        // state. "Needs attention" = current worklists.
-        $p30 = now()->subDays(30);
-        $p60 = now()->subDays(60);
-        $p90 = now()->subDays(90);
-
-        $reported30 = $applyFilters(ClientIncident::query())->where('occurred_at', '>=', $p30)->count();
-        $reportedPrev = $applyFilters(ClientIncident::query())->whereBetween('occurred_at', [$p60, $p30])->count();
-        $closed30 = $applyFilters(ClientIncident::query())->where('status', 'closed')->where('closed_at', '>=', $p30)->count();
-        $closedPrev = $applyFilters(ClientIncident::query())->where('status', 'closed')->whereBetween('closed_at', [$p60, $p30])->count();
-
-        $overdueFollowups = $openFollowupsQuery()->where('due_at', '<', now())->count();
-        $worksafeAwaiting = $this->whereCanonicalWorksafeEvent(
-            $applyFilters(ClientIncident::query()),
-            HsEvent::WORKSAFE_PENDING,
-        )->count();
-        $activeAlerts = $applyFilters(ClientIncident::query())
-            ->whereNotNull('control_room_alert_id')
-            ->whereHas('controlRoomAlert', fn ($a) => $a->actionable())
-            ->count();
-
-        $hero = [
-            'period' => [
-                'reported' => ['value' => $reported30, 'delta' => $reported30 - $reportedPrev],
-                'open' => ['value' => $tabCounts['open']],
-                'investigation' => ['value' => $tabCounts['investigation']],
-                'closed' => ['value' => $closed30, 'delta' => $closed30 - $closedPrev],
-            ],
-            'attention' => [
-                'followups' => ['value' => $tabCounts['followups'], 'overdue' => $overdueFollowups],
-                'review' => ['value' => $tabCounts['review']],
-                'worksafe' => ['value' => $worksafeAwaiting],
-                'alerts' => ['value' => $activeAlerts],
-            ],
-        ];
-
-        // Near-miss insights strip (leading indicator).
-        $nm30 = $applyFilters(ClientIncident::query())->where('type', 'near_miss')->where('occurred_at', '>=', $p30)->count();
-        $nmPrev = $applyFilters(ClientIncident::query())->where('type', 'near_miss')->whereBetween('occurred_at', [$p60, $p30])->count();
-        $nm90 = $applyFilters(ClientIncident::query())->where('type', 'near_miss')->where('occurred_at', '>=', $p90)->count();
-        $inc90 = $applyFilters(ClientIncident::query())->where('type', '!=', 'near_miss')->where('occurred_at', '>=', $p90)->count();
-        $nmByPotential = $applyFilters(ClientIncident::query())
-            ->where('type', 'near_miss')
-            ->whereNotNull('potential_severity')
-            ->selectRaw('potential_severity, count(*) as c')
-            ->groupBy('potential_severity')
-            ->orderByDesc('c')
-            ->pluck('c', 'potential_severity');
-
-        $nearMissInsights = [
-            'trend_pct' => $nmPrev > 0 ? (int) round((($nm30 - $nmPrev) / $nmPrev) * 100) : null,
-            'ratio' => $inc90 > 0 ? round($nm90 / $inc90, 1) : null,
-            'by_potential' => $nmByPotential, // {low: n, medium: n, ...} — "what could have happened"
-        ];
-
-        $sites = null;
-        $clients = null;
-        if ($user->canDo('incidents.viewAny')) {
-            $siteQuery = Site::query()->where('is_active', true);
-            app(UserSiteAccessService::class)->applySiteScope(
-                $siteQuery,
-                $user,
-                $this->incidentReportSiteBypassPermissions(),
-            );
-            $sites = $siteQuery->orderBy('name')->get(['id', 'name']);
-            $clientQuery = Client::query();
-            app(UserSiteAccessService::class)->applyClientScope(
-                $clientQuery,
-                $user,
-                $this->incidentReportSiteBypassPermissions(),
-            );
-            $clients = $clientQuery->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
-        }
-
-        // Report-wizard data for the modal-first "+ Report": clients the user may
-        // report for (scoped like IncidentController@create) + follow-up owners.
-        $reportClients = null;
-        $reportStaff = null;
-        if ($user->canDo('incidents.create')) {
-            $reportClientQuery = Client::query();
-
-            app(UserSiteAccessService::class)->applyClientScope(
-                $reportClientQuery,
-                $user,
-                $this->incidentReportSiteBypassPermissions(),
-            );
-
-            if (! $this->canReportAcrossHealthSafety($user) && ! $user->canDo('clients.viewAny')) {
-                $reportClientQuery->whereHas('supportWorkers', fn ($s) => $s->whereKey($user->id));
-            }
-
-            $reportClients = $reportClientQuery
-                ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name', 'site_id']);
-            $reportStaff = $user->canDo('incidents.followups.manage')
-                ? User::staff()->orderBy('name')->get(['id', 'name'])
-                : [];
-        }
-
-        return inertia('incidents/index', [
-            'filters' => [
-                'q' => $q,
-                'tab' => $tab,
-                'severity' => $severity,
-                'client_id' => $clientId ? (int) $clientId : null,
-                'site_id' => $siteId ? (int) $siteId : null,
-                'source' => $source,
-                'from' => $from,
-                'to' => $to,
-            ],
-            'tab' => $tab,
-            'tabCounts' => $tabCounts,
-            'rows' => $rows,
-            'rowsKind' => $rowsKind,
-            'hero' => $hero,
-            'nearMissInsights' => $nearMissInsights,
-            'sites' => $sites,
-            'clients' => $clients,
-            'reportClients' => $reportClients,
-            'reportStaff' => $reportStaff,
-            // Auto-open the report wizard when arriving from /incidents/create
-            // (redirected here with ?report= + optional prefill).
-            'report' => in_array($request->get('report'), ['incident', 'near_miss'], true) ? $request->get('report') : null,
-            'reportPrefill' => [
-                'client_id' => $request->filled('report_client_id') ? (int) $request->get('report_client_id') : null,
-                'shift_id' => $request->filled('report_shift_id') ? (int) $request->get('report_shift_id') : null,
-            ],
-            'can' => [
-                'create' => $user->canDo('incidents.create'),
-                'followupsManage' => $user->canDo('incidents.followups.manage'),
-                'templatesManage' => $user->canDo('incidents.templates.manage'),
-            ],
-            // Detail-over-list: when ?incident= is present the dialog opens over
-            // the register (Inertia partial-reloads only this prop). Null otherwise.
-            'detail' => $request->filled('incident')
-                ? $this->buildIncidentDetail($request, (int) $request->get('incident'))
-                : null,
-        ]);
+        $props = $this->register->index($request,
+            fn (Request $current, int $id, CurrentAuthorizationReads $reads): ?array => $this->buildIncidentDetail($current, $id, $reads));
+        // Existing eager fanout is preserved; sensitive props replace stale partial values.
+        $fresh = array_map(fn ($value) => Inertia::always($value), $props);
+        $response = Inertia::render('incidents/index', $fresh)->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        return $response;
     }
 
     private function whereCanonicalWorksafeEvent(
@@ -371,43 +100,12 @@ class IncidentController extends Controller
      */
     private function whereIncidentSite(Builder $query, int $siteId): Builder
     {
-        return $query->where(function (Builder $siteQuery) use ($siteId): void {
-            $siteQuery->where($siteQuery->qualifyColumn('site_id'), $siteId)
-                ->orWhere(function (Builder $historicQuery) use ($siteId): void {
-                    $historicQuery->whereNull($historicQuery->qualifyColumn('site_id'))
-                        ->where(function (Builder $fallbackQuery) use ($siteId): void {
-                            $fallbackQuery
-                                ->whereHas('hsEvent', fn (Builder $eventQuery) => $eventQuery->where('site_id', $siteId))
-                                ->orWhere(function (Builder $shiftQuery) use ($siteId): void {
-                                    $shiftQuery
-                                        ->whereDoesntHave('hsEvent', fn (Builder $eventQuery) => $eventQuery->whereNotNull('site_id'))
-                                        ->whereHas('shift', fn (Builder $linkedShiftQuery) => $linkedShiftQuery->where('site_id', $siteId));
-                                })
-                                ->orWhere(function (Builder $clientQuery) use ($siteId): void {
-                                    $clientQuery
-                                        ->whereDoesntHave('hsEvent', fn (Builder $eventQuery) => $eventQuery->whereNotNull('site_id'))
-                                        ->whereDoesntHave('shift', fn (Builder $linkedShiftQuery) => $linkedShiftQuery->whereNotNull('site_id'))
-                                        ->whereHas('client', fn (Builder $linkedClientQuery) => $linkedClientQuery->where('site_id', $siteId));
-                                });
-                        });
-                });
-        });
+        return app(IncidentAccessService::class)->forSiteIds($query, [$siteId]);
     }
 
     private function canOpenHsEvent(User $user, HsEvent $event): bool
     {
-        if (! $user->canDo('hazards.view')) {
-            return false;
-        }
-
-        $query = HsEvent::query()->whereKey($event->id);
-        app(UserSiteAccessService::class)->applyHsEventScope(
-            $query,
-            $user,
-            $this->healthSafetySiteBypassPermissions(),
-        );
-
-        return $query->exists();
+        return app(HsEventAccessService::class)->canView($event, $user);
     }
 
     /**
@@ -417,11 +115,17 @@ class IncidentController extends Controller
      *
      * @return array<string, mixed>|null
      */
-    private function buildIncidentDetail(Request $request, int $incidentId): ?array
+    private function buildIncidentDetail(Request $request, int $incidentId, ?CurrentAuthorizationReads $reads = null): ?array
     {
         $user = $request->user();
 
-        $incident = ClientIncident::query()
+        $query = ClientIncident::query();
+        if ($reads !== null) {
+            // The register's supplied current actor/source scope precedes root and relation hydration.
+            $query = app(IncidentAccessService::class)->apply($query->whereKey($incidentId), $user, $reads);
+            $query = app(\App\Services\Incidents\IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $user, $reads);
+        }
+        $incident = $query
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
@@ -436,11 +140,12 @@ class IncidentController extends Controller
                 'safeguardingConcerns',
                 'fleetIncident:id,incident_type',
                 'restraintEvents:id,reference_number,related_incident_id,restraint_type,severity,within_support_plan,injury_occurred,started_at',
-                'firstAidRecords:id,reference_number,related_incident_id,treated_person_name,injury_illness_type,treatment_date,ambulance_called',
             ])
             ->find($incidentId);
 
-        if (! $incident || ! $user || $user->cannot('view', $incident)) {
+        if (! $incident || ! $user || ($reads !== null
+            ? ! app(IncidentAccessService::class)->canView($user, $incident, $reads)
+            : $user->cannot('view', $incident))) {
             return null;
         }
 
@@ -449,6 +154,7 @@ class IncidentController extends Controller
             $journey = $this->journeys->journeyForIncident($incident);
             $hsEvent = $journey->hsEvent;
             $linkedControlRoomAlert = $journey->alert;
+            $journeyRepairRequired = $incident->hs_event_id !== null && $hsEvent === null;
         } catch (\DomainException) {
             // A contradictory direct link is an integrity signal, not authority
             // to disclose another incident's linked records in this journey.
@@ -457,40 +163,95 @@ class IncidentController extends Controller
             $linkedControlRoomAlert = null;
         }
 
-        $hsEvent?->loadMissing([
-            'site:id,name',
-            'latestInvestigation',
-            'correctiveActions.assignedTo:id,name',
-            'owner:id,name',
-            'acceptedBy:id,name',
-        ]);
+        $hsProjection = app(HsVisibilityService::class)->summaryWithWorkflowFacts($hsEvent, $user,
+            function (HsEvent $current, User $actor, \App\Services\HealthSafety\HealthSafetyReadContext $context): array {
+                $canRaiseCorrectiveAction = $actor->canDo('incidents.viewAny')
+                    || $actor->canDo('compliance.view') || $actor->canDo('hazards.view');
+                $current->loadMissing(['site:id,name', 'latestInvestigation', 'correctiveActions.assignedTo:id,name']);
+                $inv = $current->latestInvestigation;
+                $correctiveActionOwners = [];
+                if ($canRaiseCorrectiveAction) {
+                    $ownerQuery = User::query();
+                    app(UserSiteAccessService::class)->applyHsEventStaffScope(
+                        $ownerQuery,
+                        $current,
+                        $actor,
+                        ['healthSafety.viewAllSites'],
+                    );
+                    $correctiveActionOwners = $context->query($ownerQuery->orderBy('name')->limit(200))
+                        ->get(['id', 'name'])
+                        ->filter(fn (User $candidate): bool => $candidate->canDo('hazards.manage'))
+                        ->map(fn (User $candidate): array => [
+                            'id' => $candidate->id,
+                            'name' => $candidate->name,
+                        ])
+                        ->values()
+                        ->all();
+                }
 
-        $inv = $hsEvent?->latestInvestigation;
-        $canOpenHsEvent = $hsEvent && $this->canOpenHsEvent($user, $hsEvent);
-        $canRaiseCorrectiveAction = $user->canDo('incidents.viewAny')
-            || $user->canDo('compliance.view')
-            || $user->canDo('hazards.view');
-        $correctiveActionOwners = [];
-        if ($hsEvent && $canRaiseCorrectiveAction) {
-            $ownerQuery = User::query();
-            app(UserSiteAccessService::class)->applyHsEventStaffScope(
-                $ownerQuery,
-                $hsEvent,
-                $user,
-                ['healthSafety.viewAllSites'],
-            );
-            $correctiveActionOwners = $ownerQuery
-                ->orderBy('name')
-                ->limit(200)
-                ->get(['id', 'name'])
-                ->filter(fn (User $candidate): bool => $candidate->canDo('hazards.manage'))
-                ->map(fn (User $candidate): array => [
-                    'id' => $candidate->id,
-                    'name' => $candidate->name,
-                ])
-                ->values()
-                ->all();
+                return [
+                    'event' => [
+                        'id' => $current->id,
+                        'reference_number' => $current->reference_number,
+                        'status' => $current->status,
+                        'url' => "/health-safety/events/{$current->id}",
+                        'corrective_actions_url' => "/health-safety/corrective-actions?event={$current->id}",
+                        'worksafe_notifiable' => (bool) $current->worksafe_notifiable,
+                        'worksafe_status' => $current->worksafe_status,
+                        'worksafe_reference' => $current->worksafe_reference,
+                        'worksafe_notified_at' => $current->worksafe_notified_at?->toIso8601String(),
+                        'worksafe_acknowledged_at' => $current->worksafe_acknowledged_at?->toIso8601String(),
+                        'handover' => [
+                            'status' => $current->handover_status,
+                            'owner' => $current->owner ? [
+                                'id' => $current->owner->id,
+                                'name' => $current->owner->name,
+                            ] : null,
+                            'accepted_by' => $current->acceptedBy ? [
+                                'id' => $current->acceptedBy->id,
+                                'name' => $current->acceptedBy->name,
+                            ] : null,
+                            'accepted_at' => $current->accepted_at?->toIso8601String(),
+                            'notes' => $current->acceptance_notes,
+                            'can_accept' => false,
+                        ],
+                        'investigation_required' => (bool) $current->investigation_required,
+                        'investigation' => $inv ? [
+                            'reference_number' => $inv->reference_number,
+                            'status' => $inv->status,
+                            'methodology' => $inv->methodology,
+                            'root_causes' => $inv->root_causes,
+                            'contributing_factors' => $inv->contributing_factors,
+                            'recommendations' => $inv->recommendations,
+                            'lessons_learned' => $inv->lessons_learned,
+                        ] : null,
+                        'corrective_actions' => $current->correctiveActions->map(fn ($ca) => [
+                            'id' => $ca->id,
+                            'reference_number' => $ca->reference_number,
+                            'title' => $ca->title,
+                            'status' => $ca->status,
+                            'priority' => $ca->priority,
+                            'assigned_to' => $ca->assignedTo?->name,
+                            'due_date' => $ca->due_date?->toJSON(),
+                        ])->values()->all(),
+                    ],
+                    'site_name' => $current->site?->name,
+                    'notification_instant' => $current->worksafe_notified_at?->toJSON(),
+                    'corrective_action_owners' => $correctiveActionOwners,
+                    'can_raise_corrective_action' => $canRaiseCorrectiveAction,
+                ];
+            });
+        $hsSummary = $hsProjection['summary'];
+        $hsSourceDetail = $hsProjection['source_detail'];
+        $canRaiseCorrectiveAction = $hsSourceDetail['can_raise_corrective_action'] ?? false;
+        if ($hsEvent === null && $incident->hs_event_id === null) {
+            $canRaiseCorrectiveAction = \App\Services\HealthSafety\HealthSafetyReadContext::within($user,
+                [...\App\Services\HealthSafety\FirstAidAccessService::PERMISSIONS, 'compliance.view'],
+                fn ($context): bool => $context->consumeSourceViewer(['incidents.viewAny', 'compliance.view', 'hazards.view'],
+                    fn (User $actor): bool => $actor->canDo('incidents.viewAny') || $actor->canDo('compliance.view') || $actor->canDo('hazards.view')));
         }
+        $canOpenHsEvent = ($hsSummary['access'] ?? null) === 'readable';
+        $correctiveActionOwners = $hsSourceDetail['corrective_action_owners'] ?? [];
         $linkedOperationalEvidence = $linkedControlRoomAlert
             ? $this->linkedEvidence->present(
                 $linkedControlRoomAlert,
@@ -498,6 +259,7 @@ class IncidentController extends Controller
                 fn (EvidenceItem $item): string => "/incidents/{$incident->id}/control-room-evidence/{$item->id}/download",
             )
             : null;
+        $canOpenAlert = data_get($linkedOperationalEvidence, 'access') === 'readable';
         $closeGatePayload = $journeyRepairRequired
             ? [
                 'allowed' => false,
@@ -509,11 +271,14 @@ class IncidentController extends Controller
                 ]],
             ]
             : $this->journeys->closeGateForDisplay($incident)->toArray();
-        if (! $request->user()?->canDo('hazards.view')) {
+        if (! $canOpenHsEvent) {
             $closeGatePayload['requirements'] = collect($closeGatePayload['requirements'])
                 ->map(function (array $requirement): array {
-                    if (str_starts_with($requirement['href'], '/health-safety/')) {
+                    if (str_starts_with($requirement['href'] ?? '', '/health-safety/')) {
                         $requirement['href'] = null;
+                        $requirement['label'] = $requirement['complete']
+                            ? 'The linked H&S requirement is complete.'
+                            : 'The linked H&S work must be completed by an authorised person before this incident can close.';
                     }
 
                     return $requirement;
@@ -533,6 +298,7 @@ class IncidentController extends Controller
         return [
             'id' => $incident->id,
             'ref' => $incident->reference_number,
+            'ownership' => $this->owners->present($request->user(), $incident),
             'type' => $incident->type,
             'source' => $incident->source,
             'interactive' => $incident->interactive,
@@ -542,25 +308,25 @@ class IncidentController extends Controller
             'description' => $incident->description,
             'immediate_action_taken' => $incident->immediate_action_taken,
             'witnesses' => $incident->witnesses,
-            'is_notifiable' => $journeyRepairRequired
-                ? false
+            'is_notifiable' => $journeyRepairRequired || ($hsEvent && ! $canOpenHsEvent)
+                ? null
                 : ($hsEvent
-                ? (bool) $hsEvent->worksafe_notifiable
+                ? (bool) $hsSummary['worksafe_notifiable']
                 : (bool) $incident->is_notifiable),
-            'worksafe_notification_status' => $journeyRepairRequired
+            'worksafe_notification_status' => $journeyRepairRequired || ($hsEvent && ! $canOpenHsEvent)
                 ? null
                 : ($hsEvent
-                ? $hsEvent->worksafe_status
+                ? $hsSummary['worksafe_status']
                 : $incident->worksafe_notification_status),
-            'worksafe_notified_at' => $journeyRepairRequired
+            'worksafe_notified_at' => $journeyRepairRequired || ($hsEvent && ! $canOpenHsEvent)
                 ? null
                 : ($hsEvent
-                ? $hsEvent->worksafe_notified_at
+                ? $hsSourceDetail['notification_instant']
                 : $incident->worksafe_notified_at),
-            'worksafe_reference' => $journeyRepairRequired
+            'worksafe_reference' => $journeyRepairRequired || ($hsEvent && ! $canOpenHsEvent)
                 ? null
                 : ($hsEvent
-                ? $hsEvent->worksafe_reference
+                ? $hsSummary['worksafe_reference']
                 : $incident->worksafe_reference),
             'journey_repair_required' => $journeyRepairRequired,
             'potential_severity' => $incident->potential_severity,
@@ -574,13 +340,13 @@ class IncidentController extends Controller
             'closed_notes' => $incident->closed_notes,
             'reopened_at' => $incident->reopened_at,
             'reopened_reason' => $incident->reopened_reason,
-            'control_room_alert_id' => $linkedControlRoomAlert?->id,
+            'control_room_alert_id' => $canOpenAlert ? $linkedControlRoomAlert->id : null,
             'client' => $incident->client ? [
                 'id' => $incident->client->id,
                 'first_name' => $incident->client->first_name,
                 'last_name' => $incident->client->last_name,
                 'site' => $incident->site?->name
-                    ?? $hsEvent?->site?->name
+                    ?? ($hsSourceDetail['site_name'] ?? null)
                     ?? $incident->client->site?->name,
             ] : null,
             'reporter' => $incident->reporter ? ['name' => $incident->reporter->name, 'email' => $incident->reporter->email] : null,
@@ -616,7 +382,7 @@ class IncidentController extends Controller
                 'reported_at' => $medicationError->reported_at,
                 'url' => '/emar/errors?error='.$medicationError->id,
             ] : null,
-            'control_room_alert' => $linkedControlRoomAlert ? [
+            'control_room_alert' => $canOpenAlert ? [
                 'id' => $linkedControlRoomAlert->id,
                 'status' => $linkedControlRoomAlert->status,
                 'severity' => $linkedControlRoomAlert->severity,
@@ -626,6 +392,10 @@ class IncidentController extends Controller
                 'url' => data_get($linkedOperationalEvidence, 'source.href'),
             ] : null,
             'linked_operational_evidence' => $linkedOperationalEvidence,
+            'linked_access' => [
+                'control_room' => $linkedControlRoomAlert === null ? 'absent' : ($canOpenAlert ? 'readable' : 'restricted'),
+                'health_safety' => $hsEvent === null && $incident->hs_event_id === null ? 'absent' : ($canOpenHsEvent ? 'readable' : 'restricted'),
+            ],
             'close_gate' => $closeGatePayload,
             'journey_state' => $journeyRepairRequired
                 ? 'Journey repair required'
@@ -633,56 +403,9 @@ class IncidentController extends Controller
                     $incident,
                     $linkedControlRoomAlert,
                     $hsEvent,
+                    $hsProjection['workflow_facts'],
                 ),
-            'hs_event' => $hsEvent ? [
-                'id' => $hsEvent->id,
-                'reference_number' => $hsEvent->reference_number,
-                'status' => $hsEvent->status,
-                'url' => $canOpenHsEvent
-                    ? "/health-safety/events/{$hsEvent->id}"
-                    : null,
-                'corrective_actions_url' => $canOpenHsEvent
-                    ? "/health-safety/corrective-actions?event={$hsEvent->id}"
-                    : null,
-                'worksafe_notifiable' => (bool) $hsEvent->worksafe_notifiable,
-                'worksafe_status' => $hsEvent->worksafe_status,
-                'worksafe_reference' => $hsEvent->worksafe_reference,
-                'worksafe_notified_at' => $hsEvent->worksafe_notified_at?->toIso8601String(),
-                'worksafe_acknowledged_at' => $hsEvent->worksafe_acknowledged_at?->toIso8601String(),
-                'handover' => [
-                    'status' => $hsEvent->handover_status,
-                    'owner' => $hsEvent->owner ? [
-                        'id' => $hsEvent->owner->id,
-                        'name' => $hsEvent->owner->name,
-                    ] : null,
-                    'accepted_by' => $hsEvent->acceptedBy ? [
-                        'id' => $hsEvent->acceptedBy->id,
-                        'name' => $hsEvent->acceptedBy->name,
-                    ] : null,
-                    'accepted_at' => $hsEvent->accepted_at?->toIso8601String(),
-                    'notes' => $hsEvent->acceptance_notes,
-                    'can_accept' => false,
-                ],
-                'investigation_required' => (bool) $hsEvent->investigation_required,
-                'investigation' => $inv ? [
-                    'reference_number' => $inv->reference_number,
-                    'status' => $inv->status,
-                    'methodology' => $inv->methodology,
-                    'root_causes' => $inv->root_causes,
-                    'contributing_factors' => $inv->contributing_factors,
-                    'recommendations' => $inv->recommendations,
-                    'lessons_learned' => $inv->lessons_learned,
-                ] : null,
-                'corrective_actions' => $hsEvent->correctiveActions->map(fn ($ca) => [
-                    'id' => $ca->id,
-                    'reference_number' => $ca->reference_number,
-                    'title' => $ca->title,
-                    'status' => $ca->status,
-                    'priority' => $ca->priority,
-                    'assigned_to' => $ca->assignedTo?->name,
-                    'due_date' => $ca->due_date,
-                ])->values(),
-            ] : null,
+            'hs_event' => $hsSourceDetail['event'] ?? null,
             // X1: safeguarding concern(s) spawned from this incident (e.g. abuse/neglect
             // auto-escalation). Need-to-know — redacted unless the viewer can view the concern.
             'safeguarding_concerns' => $incident->safeguardingConcerns->map(function ($concern) use ($user) {
@@ -716,14 +439,7 @@ class IncidentController extends Controller
             ])->values()->all(),
             // First-aid treatments escalated to / linked with this incident — reciprocal
             // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
-            'first_aid_records' => $incident->firstAidRecords->map(fn ($r) => [
-                'id' => $r->id,
-                'reference' => $r->reference_number ?? 'FA-'.str_pad((string) $r->id, 4, '0', STR_PAD_LEFT),
-                'person' => $r->treated_person_name,
-                'injury' => $r->injury_illness_type,
-                'treatment_date' => $r->treatment_date?->toISOString(),
-                'ambulance_called' => (bool) $r->ambulance_called,
-            ])->values(),
+            'first_aid_records' => app(FirstAidSourceProjectionService::class)->forIncident($user, $incident),
             'can' => [
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),
@@ -734,11 +450,18 @@ class IncidentController extends Controller
                 'followupsComplete' => $user->canDo('incidents.followups.complete') || $user->canDo('incidents.followups.manage'),
                 'portalManage' => $user->canDo('incidents.portal.manage'),
                 'raiseCorrectiveAction' => $canRaiseCorrectiveAction,
+                'requestResponse' => ! $journeyRepairRequired
+                    && $linkedControlRoomAlert === null
+                    && $incident->control_room_alert_id === null
+                    && ! in_array($incident->status, ['draft', 'closed'], true)
+                    && app(IncidentResponseEscalationService::class)->canEscalate($user, $incident),
             ],
             // Follow-up assignees remain broader than the site-scoped H&S owner
             // list used by the corrective-action form.
-            'assignable_staff' => ($user->canDo('incidents.followups.manage') || $user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view'))
-                ? User::staff()->orderBy('name')->get(['id', 'name'])
+            'assignable_staff' => $user->canDo('incidents.followups.manage')
+                ? ($reads !== null
+                    ? $reads->query(app(HrCurrentStaffService::class)->currentUsersQuery()->orderBy('name')->orderBy('id'))
+                    : app(HrCurrentStaffService::class)->currentUsersQuery()->orderBy('name')->orderBy('id'))->get(['id', 'name'])
                 : [],
             'corrective_action_owners' => $correctiveActionOwners,
         ];
@@ -756,11 +479,13 @@ class IncidentController extends Controller
         $user = $request->user();
         abort_unless($user?->canDo('incidents.create'), 403);
 
+        // Only the literal My Day read destination is admitted by this GET relay.
+        $source = $request->query('return_to') === '/my-day' ? ['return_to' => '/my-day'] : [];
         if ($request->filled('incident')) {
-            return redirect()->route('incidents.index', ['incident' => (int) $request->query('incident')]);
+            return redirect()->route('incidents.index', ['incident' => (int) $request->query('incident'), ...$source]);
         }
 
-        $params = ['report' => $request->query('type') === 'near_miss' ? 'near_miss' : 'incident'];
+        $params = ['report' => $request->query('type') === 'near_miss' ? 'near_miss' : 'incident', ...$source];
 
         if ($request->filled('shift_id')) {
             $shiftQuery = Shift::query()->with('client:id,site_id');
@@ -935,7 +660,7 @@ class IncidentController extends Controller
             'status' => $isSubmit ? 'submitted' : 'draft',
             'submitted_at' => $isSubmit ? now() : null,
             'source' => 'manual',
-            'occurred_at' => $data['occurred_at'] ?? now(),
+            'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
             'description' => $data['description'] ?? null,
             'requires_followup' => (bool) ($data['requires_followup'] ?? false) || ! empty($data['followups']),
             'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
@@ -1076,7 +801,7 @@ class IncidentController extends Controller
                 }
 
                 if ($isSubmit) {
-                    $journey = $journeys->ensureForSubmittedIncident($incident, $actor);
+                    $journey = $journeys->ensureForSubmittedIncident($incident, $actor, newlySubmitted: $submittedNow);
                     $incident = $journey->incident;
                 }
 
@@ -1356,17 +1081,40 @@ class IncidentController extends Controller
     }
 
     /**
-     * Deep-link / shareable view of a single incident. The full editable surface is
-     * the IncidentDetailDialog; this is now a thin shell rendering the same modal
-     * content (no navigate-away page). Reuses the shared detail payload.
+     * Permanent incident workspace. Current source admission precedes the shared detail projection.
      */
-    public function show(Request $request, ClientIncident $incident)
+    public function show(Request $request, string $incident)
     {
-        $this->authorize('view', $incident);
+        $id = $this->incidentRecordIdentity($incident);
+        // Match window commands: policy mutex precedes the current incident/detail read locks.
+        $props = app(\App\Services\Incidents\IncidentEvidenceWindowPolicySettings::class)->withLockedPolicy(fn () =>
+            $this->register->show($request, $id,
+            function (Request $current, int $id, CurrentAuthorizationReads $reads): ?array {
+                $detail = $this->buildIncidentDetail($current, $id, $reads);
+                if ($detail === null) { return null; }
+                $page = $current->query('recording_page', '1');
+                abort_unless(is_string($page) && preg_match('/^[1-9][0-9]{0,5}$/D', $page)
+                    && (int) $page <= 100000, 422);
+                $detail['recording_evidence'] = app(\App\Services\Incidents\IncidentRecordingReferenceReadService::class)
+                    ->forIncident($current, $id, (int) $page);
+                $detail['recording_preview'] = app(\App\Services\Incidents\IncidentRecordingPreviewReadService::class)
+                    ->forIncident($current, $id);
+                return $detail;
+            }));
+        $response = Inertia::render('incidents/show', array_map(fn ($value) => Inertia::always($value), $props))->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        return $response;
+    }
 
-        return inertia('incidents/show', [
-            'detail' => $this->buildIncidentDetail($request, $incident->id),
-        ]);
+    /** Bound raw route identities before integer conversion or private model hydration. */
+    private function incidentRecordIdentity(string $identity): int
+    {
+        $maximum = (string) PHP_INT_MAX;
+        abort_unless(preg_match('/^[1-9][0-9]{0,18}$/D', $identity)
+            && (strlen($identity) < strlen($maximum)
+                || (strlen($identity) === strlen($maximum) && strcmp($identity, $maximum) <= 0)), 404);
+        return (int) $identity;
     }
 
     public function update(Request $request, ClientIncident $incident)
@@ -1392,7 +1140,9 @@ class IncidentController extends Controller
 
         $data = $request->validate([
             'type' => ['required', 'string', 'max:120'],
-            'severity' => ['required', 'in:low,medium,high'],
+            // Critical is already a canonical stored severity (reported_severity
+            // maps to it at intake). Preserve it for draft and partial updates.
+            'severity' => ['required', 'in:low,medium,high,critical'],
             'occurred_at' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],
             'requires_followup' => ['sometimes', 'boolean'],
@@ -1449,6 +1199,10 @@ class IncidentController extends Controller
             ] as $field) {
                 unset($data[$field]);
             }
+        }
+
+        if (array_key_exists('occurred_at', $data)) {
+            $data['occurred_at'] = WorkerClock::toUtc($data['occurred_at']);
         }
 
         $incident->update([
@@ -1546,7 +1300,7 @@ class IncidentController extends Controller
                 ])->save();
 
                 $this->recordMissingImmediateActionForSubmission($locked, $submission);
-                $journey = $journeys->ensureForSubmittedIncident($locked, $actor);
+                $journey = $journeys->ensureForSubmittedIncident($locked, $actor, newlySubmitted: true);
 
                 return [$journey->incident, $journey, true];
             },
@@ -1862,18 +1616,9 @@ class IncidentController extends Controller
         return back()->with('success', 'Attachment removed.');
     }
 
-    public function downloadAttachment(Request $request, ClientIncident $incident, ClientIncidentAttachment $attachment): StreamedResponse
+    public function downloadAttachment(Request $request, string $incident, string $attachment, IncidentEvidenceReadService $evidence): StreamedResponse
     {
-        $this->authorize('view', $incident);
-        abort_unless((int) $attachment->incident_id === (int) $incident->id, 404);
-
-        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
-        return $this->streamPrivateAttachment(
-            $attachment->disk,
-            $attachment->path,
-            $attachment->original_name,
-            $attachment->mime,
-        );
+        return $evidence->download($request, $this->incidentRecordIdentity($incident), $this->incidentRecordIdentity($attachment));
     }
 
     public function downloadControlRoomEvidence(
@@ -1889,6 +1634,8 @@ class IncidentController extends Controller
                 ->exists();
 
         abort_unless($belongsToJourney && filled($item->storage_path), 404);
+        abort_unless(app(ControlRoomAlertAccessService::class)
+            ->canView($alert, $request->user()), 403);
 
         return $this->streamPrivateAttachment(
             'local',

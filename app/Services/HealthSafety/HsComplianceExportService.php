@@ -2,6 +2,7 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Models\Client;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
@@ -10,6 +11,8 @@ use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Structured compliance exports for WorkSafe, auditors, and governance.
@@ -64,9 +67,21 @@ class HsComplianceExportService
         ?Carbon $to = null,
         ?User $viewer = null,
         ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
     ): array {
-        $query = $this->eventQuery($viewer, $siteId)
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->worksafeRegisterSnapshot($from, $to, $viewer, $siteId, $context));
+    }
+
+    private function worksafeRegisterSnapshot(
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+        ?User $viewer = null,
+        ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
+    ): array {
+        $query = $this->eventQuery($viewer, $siteId, $context)
             ->where('worksafe_notifiable', true)
+            ->withExists('investigations')
             ->with(['site:id,name', 'client:id,first_name,last_name', 'staff:id,name'])
             ->orderByDesc('reported_at');
 
@@ -82,7 +97,7 @@ class HsComplianceExportService
             'pending_notification' => (clone $query)->where('worksafe_status', HsEvent::WORKSAFE_PENDING)->count(),
             'notified' => (clone $query)->where('worksafe_status', HsEvent::WORKSAFE_NOTIFIED)->count(),
             'acknowledged' => (clone $query)->where('worksafe_status', HsEvent::WORKSAFE_ACKNOWLEDGED)->count(),
-        ], $query->get()->map(fn (HsEvent $e) => [
+        ], $this->protectSourceEagerLoads($query)->get()->map(fn (HsEvent $e) => [
             'reference_number' => $e->reference_number,
             'event_category' => $e->event_category,
             'severity' => $e->severity,
@@ -93,7 +108,7 @@ class HsComplianceExportService
             'reported_at' => $e->reported_at?->toIso8601String(),
             'site_name' => $e->site?->name,
             'investigation_required' => $e->investigation_required,
-            'has_investigation' => $e->investigations()->exists(),
+            'has_investigation' => (bool) $e->investigations_exists,
         ])->toArray());
     }
 
@@ -106,8 +121,19 @@ class HsComplianceExportService
         ?Carbon $to = null,
         ?User $viewer = null,
         ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
     ): array {
-        $query = $this->investigationQuery($viewer, $siteId)
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->investigationOutcomesSnapshot($from, $to, $viewer, $siteId, $context));
+    }
+
+    private function investigationOutcomesSnapshot(
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+        ?User $viewer = null,
+        ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
+    ): array {
+        $query = $this->investigationQuery($viewer, $siteId, $context)
             ->ofStatus(HsInvestigation::STATUS_COMPLETED)
             ->with([
                 'hsEvent:id,reference_number,event_category,severity,site_id',
@@ -124,7 +150,7 @@ class HsComplianceExportService
             $query->where('completed_at', '<=', $to);
         }
 
-        $results = $query->get();
+        $results = $this->protectSourceEagerLoads($query)->get();
 
         return $this->envelope(self::REPORT_INVESTIGATION_OUTCOMES, 'Investigation Outcomes Summary', $from, $to, [
             'total_completed' => $results->count(),
@@ -161,11 +187,23 @@ class HsComplianceExportService
         ?Carbon $to = null,
         ?User $viewer = null,
         ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
     ): array {
-        $summaryQuery = $this->correctiveActionQuery($viewer, $siteId);
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->correctiveActionTraceabilitySnapshot($statusFilter, $from, $to, $viewer, $siteId, $context));
+    }
+
+    private function correctiveActionTraceabilitySnapshot(
+        ?string $statusFilter = null,
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+        ?User $viewer = null,
+        ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
+    ): array {
+        $summaryQuery = $this->correctiveActionQuery($viewer, $siteId, $context);
         $query = (clone $summaryQuery)->with([
             'hsEvent:id,reference_number,event_category,severity',
-            'hsInvestigation:id,reference_number,investigation_type',
+            'hsInvestigation' => fn (BelongsTo $investigation) => app(HsEventAccessService::class)->applyFirstAidChildSourceScope($investigation->getQuery(), 'hs_investigations.hs_event_id', $viewer, $context)->select(['id', 'hs_event_id', 'reference_number', 'investigation_type']),
             'assignedTo:id,name',
             'completedBy:id,name',
             'verifiedBy:id,name',
@@ -194,7 +232,7 @@ class HsComplianceExportService
                 ->count(),
             'effectiveness_rate' => $this->effectivenessRate($summaryQuery),
             'applied_filter' => $statusFilter,
-        ], $query->get()->map(fn (HsCorrectiveAction $a) => [
+        ], $this->protectSourceEagerLoads($query)->get()->map(fn (HsCorrectiveAction $a) => [
             'reference_number' => $a->reference_number,
             'title' => $a->title,
             'action_type' => $a->action_type,
@@ -202,7 +240,7 @@ class HsComplianceExportService
             'status' => $a->status,
             'event_reference' => $a->hsEvent?->reference_number,
             'event_category' => $a->hsEvent?->event_category,
-            'investigation_reference' => $a->hsInvestigation?->reference_number,
+            'investigation_reference' => (int) $a->hsInvestigation?->hs_event_id === (int) $a->hs_event_id ? $a->hsInvestigation?->reference_number : null,
             'assigned_to' => $a->assignedTo?->name,
             'due_date' => $a->due_date?->toDateString(),
             'is_overdue' => $a->isOverdue(),
@@ -218,9 +256,14 @@ class HsComplianceExportService
     /*  Risk Assessment Register */
     /* ------------------------------------------------------------------ */
 
-    public function riskAssessmentRegister(?User $viewer = null, ?int $siteId = null): array
+    public function riskAssessmentRegister(?User $viewer = null, ?int $siteId = null, array $filters = [], ?HealthSafetyReadContext $context = null): array
     {
-        $query = HsRiskAssessment::query()->active();
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->riskAssessmentRegisterSnapshot($viewer, $siteId, $filters, $context));
+    }
+
+    private function riskAssessmentRegisterSnapshot(?User $viewer = null, ?int $siteId = null, array $filters = [], ?HealthSafetyReadContext $context = null): array
+    {
+        $query = HsRiskAssessment::query();
         if ($viewer) {
             if ($siteId !== null) {
                 $this->assertRequestedSite($viewer, $siteId);
@@ -237,22 +280,64 @@ class HsComplianceExportService
             $query->whereRaw('1 = 0');
         }
 
+        if ($viewer) {
+            // Site filters narrow the viewer's canonical report scope; they never replace it.
+            $this->siteAccess->applyHsRiskAssessmentScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
+            if (! empty($filters['client_id'])) {
+                $this->siteAccess->assertCanAccessClientId($viewer, (int) $filters['client_id'], self::SITE_BYPASS_PERMISSIONS);
+                $query->where('assessable_type', Client::class)->where('assessable_id', $filters['client_id']);
+            }
+            if (! empty($filters['hs_event_id'])) {
+                $event = app(HsEventAccessService::class)->applyFirstAidSourceScope(HsEvent::query()->whereKey($filters['hs_event_id']), $viewer, $context)->firstOrFail();
+                $this->siteAccess->assertCanAccessHsEvent($viewer, $event, self::SITE_BYPASS_PERMISSIONS);
+                $query->where('hs_event_id', $event->id);
+            }
+        }
+        match ($filters['tab'] ?? 'active') {
+            'active' => $query->active(), 'drafts' => $query->where('status', HsRiskAssessment::STATUS_DRAFT),
+            'due' => $query->dueForReview(), 'high' => $query->highOrExtreme(),
+            'closed' => $query->whereIn('status', [HsRiskAssessment::STATUS_SUPERSEDED, HsRiskAssessment::STATUS_ARCHIVED]),
+            default => null,
+        };
+        foreach (['status', 'risk_level'] as $facet) {
+            if (! empty($filters[$facet])) {
+                $query->where($facet, $filters[$facet]);
+            }
+        }
+        if (($filters['due_for_review'] ?? null) === 'true') {
+            $query->dueForReview();
+        }
+        if (isset($filters['risk_acceptable']) && $filters['risk_acceptable'] !== '') {
+            $query->where('risk_acceptable', (string) $filters['risk_acceptable'] === '1');
+        }
+        if (! empty($filters['search'])) {
+            $term = '%'.$filters['search'].'%';
+            $query->where(fn ($search) => $search->where('title', 'like', $term)->orWhere('reference_number', 'like', $term)->orWhere('risk_description', 'like', $term));
+        }
+
+        app(HsEventAccessService::class)->applyFirstAidRiskSourceScope($query, $viewer, $context);
+
         $assessments = $query
             ->with(['assessedBy:id,name', 'approvedBy:id,name'])
+            ->tap(fn (Builder $parents) => $this->protectSourceEagerLoads($parents))
             ->orderByDesc('risk_score')
             ->get();
 
         return $this->envelope(self::REPORT_RISK_ASSESSMENT_REGISTER, 'H&S Risk Assessment Register', null, null, [
-            'total_active' => $assessments->count(),
+            'total' => $assessments->count(),
+            'total_active' => $assessments->where('status', HsRiskAssessment::STATUS_ACTIVE)->count(),
+            'under_review' => $assessments->where('status', HsRiskAssessment::STATUS_UNDER_REVIEW)->count(),
             'extreme' => $assessments->where('risk_level', 'extreme')->count(),
             'high' => $assessments->where('risk_level', 'high')->count(),
             'medium' => $assessments->where('risk_level', 'medium')->count(),
             'low' => $assessments->where('risk_level', 'low')->count(),
             'due_for_review' => $assessments->filter(fn ($a) => $a->isDueForReview())->count(),
-            'unacceptable' => $assessments->where('risk_acceptable', false)->count(),
+            'unacceptable' => $assessments->filter(fn ($assessment) => $assessment->risk_acceptable === false)->count(),
+            'acceptability_unknown' => $assessments->filter(fn ($assessment) => $assessment->risk_acceptable === null)->count(),
         ], $assessments->map(fn (HsRiskAssessment $ra) => [
             'reference_number' => $ra->reference_number,
             'title' => $ra->title,
+            'status' => $ra->status,
             'assessable_type' => $ra->assessable_type ? class_basename($ra->assessable_type) : null,
             'likelihood' => $ra->likelihood,
             'consequence' => $ra->consequence,
@@ -291,12 +376,12 @@ class HsComplianceExportService
         ];
     }
 
-    private function effectivenessRate(Builder $actions): int
+    private function effectivenessRate(Builder $actions): ?int
     {
         $verified = (clone $actions)->where('status', HsCorrectiveAction::STATUS_VERIFIED);
         $total = (clone $verified)->count();
         if ($total === 0) {
-            return 100;
+            return null;
         }
         $effective = (clone $verified)
             ->where('effectiveness_confirmed', true)->count();
@@ -304,7 +389,7 @@ class HsComplianceExportService
         return (int) round(($effective / $total) * 100);
     }
 
-    private function eventQuery(?User $viewer, ?int $siteId): Builder
+    private function eventQuery(?User $viewer, ?int $siteId, ?HealthSafetyReadContext $context = null): Builder
     {
         $query = HsEvent::query();
         if (! $viewer) {
@@ -319,26 +404,34 @@ class HsComplianceExportService
             $query->where('site_id', $siteId);
         }
 
-        return $query;
+        return $this->protectMaterialisation(app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $viewer, $context));
     }
 
-    private function investigationQuery(?User $viewer, ?int $siteId): Builder
+    private function investigationQuery(?User $viewer, ?int $siteId, ?HealthSafetyReadContext $context = null): Builder
     {
-        return HsInvestigation::query()->whereHas(
+        $query = HsInvestigation::query();
+        $children = (clone $query)->withoutEagerLoads()->select('hs_investigations.hs_event_id');
+        $candidates = HsEvent::query()->whereIn('hs_events.id', $children);
+
+        return $this->protectMaterialisation($query->whereHas(
             'hsEvent',
-            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId),
-        );
+            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId, $candidates, $context),
+        ));
     }
 
-    private function correctiveActionQuery(?User $viewer, ?int $siteId): Builder
+    private function correctiveActionQuery(?User $viewer, ?int $siteId, ?HealthSafetyReadContext $context = null): Builder
     {
-        return HsCorrectiveAction::query()->whereHas(
+        $query = HsCorrectiveAction::query();
+        $children = (clone $query)->withoutEagerLoads()->select('hs_corrective_actions.hs_event_id');
+        $candidates = HsEvent::query()->whereIn('hs_events.id', $children);
+
+        return $this->protectMaterialisation($query->whereHas(
             'hsEvent',
-            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId),
-        );
+            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId, $candidates, $context),
+        ));
     }
 
-    private function scopeEventBuilder(Builder $query, ?User $viewer, ?int $siteId): Builder
+    private function scopeEventBuilder(Builder $query, ?User $viewer, ?int $siteId, Builder $sourceCandidates, ?HealthSafetyReadContext $context = null): Builder
     {
         if (! $viewer) {
             abort_if($siteId !== null, 403, UserSiteAccessService::DEFAULT_MESSAGE);
@@ -347,12 +440,14 @@ class HsComplianceExportService
         }
 
         $this->siteAccess->applyHsEventScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
+        $this->siteAccess->applyHsEventScope($sourceCandidates, $viewer, self::SITE_BYPASS_PERMISSIONS);
         if ($siteId !== null) {
             $this->assertRequestedSite($viewer, $siteId);
             $query->where($query->qualifyColumn('site_id'), $siteId);
+            $sourceCandidates->where($sourceCandidates->qualifyColumn('site_id'), $siteId);
         }
 
-        return $query;
+        return $this->protectMaterialisation(app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $viewer, $context, $sourceCandidates));
     }
 
     private function assertRequestedSite(User $viewer, int $siteId): void
@@ -362,5 +457,98 @@ class HsComplianceExportService
             $siteId,
             self::SITE_BYPASS_PERMISSIONS,
         );
+    }
+
+    /** All source decisions and their final SQL share the caller's original prepared evidence. */
+    private ?HealthSafetyReadMaterialisationProof $materialisationProof = null;
+
+    private function protectMaterialisation(Builder $query): Builder
+    {
+        return $this->materialisationProof?->protect($query) ?? $query;
+    }
+    private function withSourceRead(?User $viewer, ?HealthSafetyReadContext $context, callable $consumer): mixed
+    {
+        $project = static fn (mixed $result): mixed => is_array($result) && ! array_is_list($result)
+            ? [...$result, 'source_scope' => 'readable_subset', 'source_completeness' => 'unknown'] : $result;
+        if ($viewer === null) {
+            abort_unless($context === null, 403);
+
+            return DB::transaction(fn () => $project($consumer(null, null)));
+        }
+        $permissions = array_values(array_unique([...FirstAidAccessService::PERMISSIONS,
+            ...RestraintAccessService::PERMISSIONS, ...InjuryAccessService::PERMISSIONS]));
+        $consume = function (HealthSafetyReadContext $active) use ($viewer, $permissions, $consumer, $project): mixed {
+            $active->assertViewer($viewer);
+
+            return $active->consumeSourceViewer($permissions,
+                function (User $current) use ($active, $project, $consumer): mixed {
+                    return HealthSafetyReadMaterialisationProof::within($active, function (HealthSafetyReadMaterialisationProof $proof) use ($current, $active, $project, $consumer): mixed {
+                        $previous = $this->materialisationProof;
+                        $this->materialisationProof = $proof;
+                        try { return $project($consumer($current, $active)); }
+                        finally { $this->materialisationProof = $previous; }
+                    });
+                });
+        };
+
+        return $context !== null ? $consume($context) : HealthSafetyReadContext::within($viewer, $permissions, $consume);
+    }
+
+    /** Eager names and event bodies retain the original admitted report query through their own SELECT. */
+    private function protectSourceEagerLoads(Builder $parents): Builder
+    {
+        $eagerLoads = $parents->getEagerLoads();
+        $columns = [
+            'hsEvent' => 'hs_event_id', 'hsInvestigation' => 'hs_investigation_id', 'client' => 'client_id', 'staff' => 'staff_id',
+            'site' => 'site_id', 'owner' => 'owner_user_id', 'assignedTo' => 'assigned_to_user_id',
+            'completedBy' => 'completed_by_user_id', 'verifiedBy' => 'verified_by_user_id',
+            'leadInvestigator' => 'lead_investigator_id', 'assessedBy' => 'assessed_by_user_id',
+            'approvedBy' => $parents->getModel() instanceof HsInvestigation ? 'approved_by_id' : 'approved_by_user_id',
+        ];
+        foreach ($columns as $name => $column) {
+            if (! isset($eagerLoads[$name])) {
+                continue;
+            }
+            $original = $eagerLoads[$name];
+            $proof = (clone $parents)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+                ->select($parents->getModel()->qualifyColumn($column));
+            $parents->with([$name => function ($relation) use ($original, $proof): void {
+                $original($relation);
+                $relation->whereIn($relation->getRelated()->qualifyColumn('id'), clone $proof);
+                $this->reconsumeOriginalSource($relation->getQuery(), $proof);
+            }]);
+        }
+        if (isset($eagerLoads['hsEvent.site'])) {
+            $original = $eagerLoads['hsEvent.site'];
+            $proof = (clone $parents)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+                ->select($parents->getModel()->qualifyColumn('hs_event_id'));
+            $sites = HsEvent::query()->whereIn('hs_events.id', $proof)->select('hs_events.site_id');
+            $parents->with(['hsEvent.site' => function ($relation) use ($original, $sites, $proof): void {
+                $original($relation);
+                $relation->whereIn('sites.id', clone $sites);
+                $this->reconsumeOriginalSource($relation->getQuery(), $proof);
+            }]);
+        }
+
+        return $this->protectMaterialisation($parents);
+    }
+
+    /** whereIn compiles subqueries immediately; reconsume the SAME original guard at final body compilation. */
+    private function reconsumeOriginalSource(Builder $destination, Builder $originalSource): Builder
+    {
+        return $this->protectMaterialisation($destination->whereRaw(new class(clone $originalSource) extends \Illuminate\Database\Query\Expression {
+            public function __construct(private readonly Builder $originalSource)
+            {
+                parent::__construct('1 = 1');
+            }
+
+            public function getValue(\Illuminate\Database\Grammar $grammar)
+            {
+                // SQL compilation only: no new authority, source discovery or replacement baseline.
+                (clone $this->originalSource)->toSql();
+
+                return parent::getValue($grammar);
+            }
+        }));
     }
 }

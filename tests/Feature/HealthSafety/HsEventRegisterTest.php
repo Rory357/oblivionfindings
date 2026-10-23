@@ -454,9 +454,8 @@ class HsEventRegisterTest extends TestCase
             ->get('/health-safety/events?event='.$event->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('detail.source.type', 'ClientIncident')
-                ->where('detail.source.url', null)
-                ->where('detail.source.unwired', false)
+                ->where('detail.source', null)
+                ->where('detail.linked_access.incident', 'restricted')
             );
 
         $admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);

@@ -33,6 +33,7 @@ class AuditLogger
         array $meta = [],
         ?Request $request = null,
         bool $systemActor = false,
+        ?\DateTimeImmutable $recordedAt = null,
     ): void {
         $request = $request ?? request();
         $user = $systemActor ? null : ($request?->user() ?? auth()->user());
@@ -64,7 +65,7 @@ class AuditLogger
             $meta = SafeOperationalData::auditMeta($meta, $auditable, $canonicalScope);
         }
 
-        AuditLog::create([
+        $attributes = [
             'user_id' => $actorId,
             'client_id' => $clientId,
             'action' => $action,
@@ -73,6 +74,18 @@ class AuditLogger
             'meta' => $meta,
             'ip_address' => $protectRequestContext ? null : $request?->ip(),
             'user_agent' => $protectRequestContext ? null : substr((string) $request?->userAgent(), 0, 5000),
-        ]);
+        ];
+        if ($recordedAt === null) {
+            AuditLog::create($attributes);
+            return;
+        }
+
+        // Explicit server evidence time is assigned without widening mass-assignable audit fields.
+        $audit = new AuditLog($attributes);
+        $audit->setCreatedAt($recordedAt);
+        $audit->setUpdatedAt($recordedAt);
+        if (! $audit->saveOrFail() || ! $audit->exists || ! $audit->getKey()) {
+            throw new \LogicException('The explicitly timed strict audit insert was vetoed.');
+        }
     }
 }

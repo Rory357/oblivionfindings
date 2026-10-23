@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const state = vi.hoisted(() => ({ post: vi.fn() }));
 
 vi.mock('@inertiajs/react', () => ({
     Link: ({
@@ -16,16 +18,21 @@ vi.mock('@inertiajs/react', () => ({
         </a>
     ),
     router: { post: vi.fn(), delete: vi.fn(), patch: vi.fn() },
-    usePage: () => ({ props: { flash: {} } }),
-    useForm: (initial: Record<string, unknown>) => ({
-        data: initial,
-        errors: {},
-        processing: false,
-        setData: vi.fn(),
-        post: vi.fn(),
-        reset: vi.fn(),
-        clearErrors: vi.fn(),
-    }),
+    usePage: () => ({ props: { flash: {}, auth: { user: { id: 7 } } } }),
+    useForm: (initial: Record<string, unknown>) => {
+        const [data, setData] = useState(initial);
+        return {
+            data,
+            errors: {},
+            processing: false,
+            isDirty: JSON.stringify(data) !== JSON.stringify(initial),
+            setData: (key: string, value: unknown) =>
+                setData((previous) => ({ ...previous, [key]: value })),
+            post: (url: string) => state.post(url, data),
+            reset: vi.fn(),
+            clearErrors: vi.fn(),
+        };
+    },
 }));
 
 vi.mock('@/components/wizard/shell', async () => {
@@ -72,6 +79,7 @@ vi.mock('@/components/wizard/shell', async () => {
 });
 
 import {
+    EditPane,
     IncidentDetailDialog,
     InvestigationSection,
     LinkedSection,
@@ -194,9 +202,29 @@ function incidentDetail(): IncidentDetail {
     } as IncidentDetail;
 }
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+});
 
 describe('IncidentDetailDialog H&S handover', () => {
+    it('prefills occurrence editing in NZ time regardless of the browser timezone', () => {
+        const detail = incidentDetail();
+        detail.status = 'draft';
+        detail.can.update = true;
+        render(<EditPane d={detail} onDone={() => {}} />);
+        expect(
+            screen.getByRole('button', {
+                name: 'When it occurred date: 14 Jul 2026',
+            }),
+        ).toBeEnabled();
+        expect(
+            screen.getByRole('button', {
+                name: 'When it occurred time: 01:30 PM',
+            }),
+        ).toBeEnabled();
+    });
+
     it('shows the canonical H&S WorkSafe and accepted ownership state in the overview', () => {
         render(
             <IncidentDetailDialog
@@ -229,6 +257,9 @@ describe('IncidentDetailDialog H&S handover', () => {
             <IncidentDetailDialog detail={detail} open onClose={() => {}} />,
         );
         fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        fireEvent.change(screen.getByRole('textbox', { name: /Outcome/ }), {
+            target: { value: 'The care plan has been updated.' },
+        });
 
         expect(
             screen.getByRole('link', {
@@ -239,6 +270,12 @@ describe('IncidentDetailDialog H&S handover', () => {
         expect(
             screen.getByRole('button', { name: 'Close incident' }),
         ).toBeDisabled();
+        fireEvent.submit(
+            screen
+                .getByRole('button', { name: 'Close incident' })
+                .closest('form')!,
+        );
+        expect(state.post).not.toHaveBeenCalled();
     });
 
     it('names the unassigned ownership state while H&S acceptance is pending', () => {
@@ -262,20 +299,34 @@ describe('IncidentDetailDialog H&S handover', () => {
         expect(screen.getByText('No H&S owner assigned')).toBeInTheDocument();
     });
 
-    it('keeps restricted H&S and Control Room records visible without dead-end links', () => {
+    it('distinguishes restricted linked records from missing records without exposing references', () => {
         const detail = incidentDetail();
-        Object.assign(detail.control_room_alert ?? {}, { url: null });
-        if (detail.linked_operational_evidence) {
-            detail.linked_operational_evidence.source.href = null;
-        }
-        Object.assign(detail.hs_event ?? {}, {
-            url: null,
-            corrective_actions_url: null,
-        });
+        detail.control_room_alert = null;
+        detail.hs_event = null;
+        detail.linked_access = {
+            control_room: 'restricted',
+            health_safety: 'restricted',
+        };
+        detail.linked_operational_evidence = {
+            label: 'Linked Control Room evidence',
+            read_only: true,
+            access: 'restricted',
+            source: null,
+            notes: [],
+            tasks: [],
+            evidence_packs: [],
+            communications: [],
+        };
 
         const { unmount } = render(<InvestigationSection d={detail} />);
 
-        expect(screen.getByText('HS-2026-0017')).toBeInTheDocument();
+        expect(screen.queryByText('HS-2026-0017')).not.toBeInTheDocument();
+        expect(
+            screen.getByText(/Your access does not include its details/),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/No Health.*Safety event recorded/),
+        ).not.toBeInTheDocument();
         expect(
             screen.queryByRole('link', { name: /Open in Health & Safety/i }),
         ).not.toBeInTheDocument();
@@ -284,8 +335,11 @@ describe('IncidentDetailDialog H&S handover', () => {
         unmount();
         render(<LinkedSection d={detail} clientName="No client linked" />);
 
-        expect(screen.getByText('Control Room alert')).toBeInTheDocument();
-        expect(screen.getByText('Health & Safety event')).toBeInTheDocument();
+        expect(
+            screen.getByText(/Your access does not include its notes or files/),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Health & Safety record')).toBeInTheDocument();
+        expect(screen.queryByText('CR-2026-0011')).not.toBeInTheDocument();
         expect(
             screen.queryByRole('link', { name: /Control Room alert/i }),
         ).not.toBeInTheDocument();

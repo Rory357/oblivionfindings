@@ -6,12 +6,15 @@ use App\Models\AuditLog;
 use App\Models\SiteHazard;
 use App\Models\SiteHazardAction;
 use App\Models\User;
+use App\Services\Sites\HazardWorkspaceConnectionsService;
+use App\Services\UserSiteAccessService;
+use App\Support\HealthSafety\SafeWorkProcedurePresenter;
 use Illuminate\Support\Str;
 
 /**
- * Serialises a SiteHazard into the HazardDetail payload the detail modal
+ * Serialises a SiteHazard into the HazardDetail payload the hazard workspace
  * consumes. Shared by SiteHazardController (editable register) and
- * ClientController (read-only client-profile panel) so the modal is identical
+ * ClientController (read-only client-profile panel) so the source detail is identical
  * everywhere and the serialiser lives in one place.
  *
  * Twin of HsEventController::buildEventDetail(). Expects the hazard pre-loaded
@@ -39,23 +42,9 @@ class HazardDetailPresenter
             'hazard_type' => $hazard->hazard_type,
             'hazard_label' => self::hazardLabel($hazard),
             'custom_hazard_type' => $hazard->custom_hazard_type,
-            // Approved safe work procedures that mitigate this hazard type (clean
-            // taxonomy overlaps only — manual handling / fire / biological / equipment).
-            // Gated on procedures.view to match every other procedure surface.
-            'related_procedures' => auth()->user()?->canDo('procedures.view')
-                ? \App\Models\SafeWorkProcedure::query()
-                    ->mitigatingHazardType($hazard->hazard_type)
-                    ->orderBy('title')->limit(8)
-                    ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
-                    ->map(fn ($p) => [
-                        'id' => $p->id,
-                        'reference_number' => $p->reference_number,
-                        'title' => $p->title,
-                        'category' => $p->category,
-                        'status' => $p->status,
-                        'review_date' => $p->review_date?->toDateString(),
-                    ])->values()
-                : [],
+            'related_procedures' => SafeWorkProcedurePresenter::applicableRows(
+                auth()->user(), '/hazards/'.$hazard->id.'?section=connections', (int) $hazard->site_id, null, $hazard->hazard_type,
+            )->all(),
             'severity' => $hazard->severity,
             'likelihood' => $hazard->likelihood,
             'risk_rating' => $hazard->risk_rating,
@@ -72,9 +61,9 @@ class HazardDetailPresenter
             'reported_by' => $hazard->reportedBy ? ['id' => $hazard->reportedBy->id, 'name' => $hazard->reportedBy->name] : null,
             'assigned_to' => $hazard->assignedTo ? ['id' => $hazard->assignedTo->id, 'name' => $hazard->assignedTo->name] : null,
             'due_date' => $hazard->due_date?->toDateString(),
-            'created_at' => $hazard->created_at?->toDateTimeString(),
-            'closed_at' => $hazard->closed_at?->toDateTimeString(),
-            'status_changed_at' => $hazard->status_changed_at?->toDateTimeString(),
+            'created_at' => $hazard->created_at?->toISOString(),
+            'closed_at' => $hazard->closed_at?->toISOString(),
+            'status_changed_at' => $hazard->status_changed_at?->toISOString(),
             'status_changed_by' => $hazard->statusChangedBy ? ['id' => $hazard->statusChangedBy->id, 'name' => $hazard->statusChangedBy->name] : null,
             'worksafe_notifiable' => $hazard->isWorksafeNotifiable(),
             'resolution_summary' => $hazard->resolution_summary,
@@ -97,15 +86,16 @@ class HazardDetailPresenter
                     'status' => $a->status === 'pending' ? 'open' : $a->status,
                     'assigned_to' => $a->assignedTo ? ['id' => $a->assignedTo->id, 'name' => $a->assignedTo->name] : null,
                     'due_date' => $a->due_date?->toDateString(),
-                    'completed_at' => $a->completed_at?->toDateTimeString(),
+                    'completed_at' => $a->completed_at?->toISOString(),
                     'completed_by' => $a->completedBy ? ['id' => $a->completedBy->id, 'name' => $a->completedBy->name] : null,
                     'completion_notes' => $a->completion_notes,
                 ])->all(),
             'assignable_staff' => $can['manage'] || $can['assign']
-                ? User::staff()->select(['id', 'name'])->orderBy('name')->get()->all()
+                ? app(UserSiteAccessService::class)->applyStaffScope(User::query()->select(['id', 'name']), auth()->user(), ['sites.viewAll'])->orderBy('name')->get()->all()
                 : [],
             'close_gate' => self::closeGate($openActions),
             'history' => self::buildHistory($hazard),
+            'connections' => app(HazardWorkspaceConnectionsService::class)->forViewer($hazard, auth()->user()),
             'can' => $can,
         ];
     }
@@ -164,7 +154,7 @@ class HazardDetailPresenter
     {
         $blockers = [];
         if ($openActions > 0) {
-            $blockers[] = $openActions . ' corrective action' . ($openActions === 1 ? '' : 's') . ' still open.';
+            $blockers[] = $openActions.' corrective action'.($openActions === 1 ? '' : 's').' still open.';
         }
 
         return ['actions_ok' => $openActions === 0, 'blockers' => $blockers];
@@ -181,7 +171,7 @@ class HazardDetailPresenter
         $audits = AuditLog::query()
             ->where('auditable_type', $hazard->getMorphClass())
             ->where('auditable_id', $hazard->id)
-            ->whereIn('action', ['hazard.created', 'hazard.assigned', 'hazard.status_changed', 'hazard.reviewed', 'hazard.risk_changed'])
+            ->whereIn('action', ['hazard.created', 'hazard.assigned', 'hazard.status_changed', 'hazard.reviewed', 'hazard.risk_changed', 'hazard.progress_note', 'hazard.due_date_changed', 'hazard.evidence_added', 'hazard.action_added'])
             ->orderBy('created_at')
             ->get(['id', 'user_id', 'action', 'meta', 'created_at']);
 
@@ -200,17 +190,22 @@ class HazardDetailPresenter
                 'title' => $entry['title'],
                 'note' => $entry['note'] ?? null,
                 'actor' => $actors[$audit->user_id] ?? null,
-                'at' => $audit->created_at?->toDateTimeString(),
+                'at' => $audit->created_at?->toISOString(),
             ];
         }
 
         foreach ($hazard->actions as $action) {
+            $creation = $audits->first(fn ($audit) => $audit->action === 'hazard.action_added'
+                && (int) data_get($audit->meta, 'action_id') === (int) $action->id);
+            $creationMeta = $creation?->meta ?? [];
+            $reference = $creationMeta['reference_number'] ?? $action->reference_number;
+            $description = $creationMeta['action_description'] ?? $action->action_description;
             $entries[] = [
                 'type' => 'action_added',
                 'title' => 'Corrective action added',
-                'note' => trim(($action->reference_number ? $action->reference_number . ' · ' : '') . ($action->action_description ?? '')),
-                'actor' => $action->assignedTo?->name,
-                'at' => $action->created_at?->toDateTimeString(),
+                'note' => trim(($reference ? $reference.' · ' : '').($description ?? '')),
+                'actor' => $creation ? ($actors[$creation->user_id] ?? null) : null,
+                'at' => ($creation?->created_at ?? $action->created_at)?->toISOString(),
             ];
             if ($action->completed_at) {
                 $entries[] = [
@@ -218,7 +213,7 @@ class HazardDetailPresenter
                     'title' => 'Corrective action completed',
                     'note' => $action->completion_notes,
                     'actor' => $action->completedBy?->name,
-                    'at' => $action->completed_at?->toDateTimeString(),
+                    'at' => $action->completed_at?->toISOString(),
                 ];
             }
         }
@@ -236,10 +231,13 @@ class HazardDetailPresenter
     {
         return match ($action) {
             'hazard.created' => ['type' => 'reported', 'title' => 'Hazard reported'],
-            'hazard.assigned' => ['type' => 'assigned', 'title' => isset($meta['assignee_name']) ? 'Assigned to ' . $meta['assignee_name'] : 'Hazard assigned'],
+            'hazard.assigned' => ['type' => 'assigned', 'title' => isset($meta['assignee_name']) ? 'Assigned to '.$meta['assignee_name'] : 'Hazard assigned', 'note' => isset($meta['due_date']) ? 'Due '.$meta['due_date'] : null],
             'hazard.reviewed' => ['type' => 'reviewed', 'title' => 'Review recorded', 'note' => $meta['note'] ?? null],
-            'hazard.risk_changed' => ['type' => 'risk', 'title' => 'Risk re-rated' . (isset($meta['from'], $meta['to']) ? ' ' . Str::title($meta['from']) . ' → ' . Str::title($meta['to']) : '')],
-            'hazard.status_changed' => self::statusHistoryEntry($meta['to'] ?? '', $hazard),
+            'hazard.progress_note' => ['type' => 'reviewed', 'title' => 'Progress note recorded', 'note' => $meta['note'] ?? null],
+            'hazard.risk_changed' => ['type' => 'risk', 'title' => 'Risk re-rated'.(isset($meta['from'], $meta['to']) ? ' '.Str::title($meta['from']).' → '.Str::title($meta['to']) : '')],
+            'hazard.status_changed' => self::statusHistoryEntry($meta['to'] ?? '', $hazard, $meta),
+            'hazard.due_date_changed' => ['type' => 'due_date', 'title' => 'Due date changed', 'note' => isset($meta['to']) ? 'Due '.$meta['to'] : 'Due date removed'],
+            'hazard.evidence_added' => ['type' => 'evidence', 'title' => 'Evidence added', 'note' => collect($meta['names'] ?? [])->filter(fn ($name) => is_string($name))->implode(', ') ?: null],
             default => null,
         };
     }
@@ -247,26 +245,28 @@ class HazardDetailPresenter
     /**
      * @return array{type:string, title:string, note?:string|null}
      */
-    private static function statusHistoryEntry(string $to, SiteHazard $hazard): array
+    private static function statusHistoryEntry(string $to, SiteHazard $hazard, array $meta): array
     {
         return match ($to) {
             'in_progress' => ['type' => 'in_progress', 'title' => 'Moved to In progress'],
-            'mitigated' => ['type' => 'mitigated', 'title' => 'Marked Mitigated', 'note' => self::mitigationNote($hazard)],
-            'closed' => ['type' => 'closed', 'title' => 'Hazard closed', 'note' => $hazard->resolution_summary],
+            'mitigated' => ['type' => 'mitigated', 'title' => 'Marked Mitigated', 'note' => self::mitigationNote($meta)],
+            'closed' => ['type' => 'closed', 'title' => 'Hazard closed', 'note' => $meta['resolution_summary'] ?? null],
             'reopened' => ['type' => 'reopened', 'title' => 'Hazard reopened'],
             'open' => ['type' => 'reopened', 'title' => 'Returned to Open'],
             default => ['type' => 'status', 'title' => 'Status updated'],
         };
     }
 
-    private static function mitigationNote(SiteHazard $hazard): ?string
+    private static function mitigationNote(array $meta): ?string
     {
         $parts = [];
-        if ($hazard->control_hierarchy) {
-            $parts[] = 'Controls: ' . collect($hazard->control_hierarchy)->map(fn ($c) => Str::title(str_replace('_', ' ', $c)))->implode(', ');
+        $controls = $meta['control_hierarchy'] ?? null;
+        $residual = $meta['residual_risk_rating'] ?? null;
+        if ($controls) {
+            $parts[] = 'Controls: '.collect($controls)->map(fn ($c) => Str::title(str_replace('_', ' ', $c)))->implode(', ');
         }
-        if ($hazard->residual_risk_rating) {
-            $parts[] = 'Residual: ' . Str::title($hazard->residual_risk_rating);
+        if ($residual) {
+            $parts[] = 'Residual: '.Str::title($residual);
         }
 
         return $parts ? implode(' · ', $parts) : null;

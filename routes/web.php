@@ -69,6 +69,7 @@ use App\Http\Controllers\It\ItWorkTaskHistoryController;
 use App\Http\Controllers\LegacyRouteRedirectController;
 use App\Http\Controllers\MyCalendarController;
 use App\Http\Controllers\MyDayActionsController;
+use App\Http\Controllers\MyDayMeetingInvitationController;
 use App\Http\Controllers\MyDayTaskController;
 use App\Http\Controllers\MyDayTaskDraftController;
 use App\Http\Controllers\MyTasksController;
@@ -167,6 +168,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::get('/my-day', MyTasksController::class)
     ->middleware(['auth'])
     ->name('my-day');
+
+Route::get('/my-day/safety/meetings/{id}', [MyDayMeetingInvitationController::class, 'show'])
+    ->middleware(['auth'])
+    ->whereNumber('id')
+    ->name('my-day.safety.meetings.show');
 
 Route::get('/my-roster', [RosterController::class, 'index'])
     ->middleware(['auth'])

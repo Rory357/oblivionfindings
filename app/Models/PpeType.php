@@ -24,6 +24,8 @@ class PpeType extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
         'is_active' => 'boolean',
     ];
 
@@ -44,5 +46,11 @@ class PpeType extends Model
     public function scopeByCategory($query, string $category)
     {
         return $query->where('category', $category);
+    }
+
+    /** Governed facts remain distinct from legacy rows and current authority. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PpeSourceVersion::class, 'source_id')->where('source_type', 'type');
     }
 }

@@ -1,37 +1,41 @@
-import { TabStrip } from '@/components/rostering';
+import { PageHeaderRail, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 
-import { SubstanceWizardDialog } from '@/components/health-safety/substance-wizard-dialog';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     IncidentTrendCard,
     LaggingCharts,
     LeadingCharts,
     type OpenHazardRow,
-    SiteLeagueCard,
+    SiteSafetyComparisonCard,
 } from './components/charts';
 import {
+    CommandCentreAttention,
     CommandCentreHero,
     type HeroFilters,
     type HeroLeadingLagging,
 } from './components/command-centre-hero';
+import { searchDashboardWorklists } from './components/dashboard-search';
 import {
     buildHsTabItems,
     CompliancePanel,
     GovernanceExports,
     LaggingPanel,
     LeadingPanel,
-    RoleLensBanner,
 } from './components/dashboard-tabs';
 import { HsFormWizard } from './components/form-wizard';
 import { ReportIncidentDialog } from './components/report-incident-dialog';
 import { ReportLauncher } from './components/report-launcher';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
+import type { ParticipationCoverage } from './participation-source-state';
 
 type Props = {
+    source_scope?: 'readable_subset';
+    source_completeness?: 'unknown';
     kpis: Record<string, number | null>;
     incident_trends: Array<{
         month: string;
@@ -85,37 +89,43 @@ type Props = {
         ltifr: number | null;
         trifr: number | null;
     }>;
-    frequency_operands: { near_misses: number; recordable: number };
+    frequency_operands: { near_misses: number; recordable: number | null };
     hazard_burndown: Array<{ week: string; open: number }>;
     incidents_by_category: Array<{ label: string; count: number }>;
     site_league: Array<{
         id: number;
         name: string;
         incidents: number;
-        hazards: number;
+        hazards: number | null;
     }>;
     open_hazards_list: OpenHazardRow[];
-    worker_participation: { pct: number | null; committees: number };
+    worker_participation: ParticipationCoverage;
     procedures: {
         approved: number;
         review_due: number;
         coverage_gap_categories: number;
     };
-    first_aid?: { treatments: number; ambulance: number; hospital: number };
+    first_aid?: {
+        treatments: number | null;
+        ambulance: number | null;
+        hospital: number | null;
+    };
     restraints?: RestraintDashboardData;
     worklists: WorklistsPayload;
 };
 
 type RestraintDashboardData = {
     summary: {
-        events_in_period: number;
-        out_of_plan: number;
-        with_injury: number;
-        critical: number;
-        unreviewed: number;
-        active_plans: number;
-        plans_review_due: number;
-        clients_no_active_bsp: number;
+        events_in_period: number | null;
+        out_of_plan: number | null;
+        with_injury: number | null;
+        critical: number | null;
+        unreviewed: number | null;
+        active_plans: number | null;
+        plans_review_due: number | null;
+        clients_no_active_bsp: number | null;
+        source_access?: 'readable' | 'restricted' | 'unavailable';
+        scope?: 'current_readable_sources';
     };
     unreviewed: Array<{
         id: number;
@@ -126,24 +136,26 @@ type RestraintDashboardData = {
         within_support_plan: boolean;
         injury_occurred: boolean;
         started_at: string | null;
-    }>;
+    }> | null;
 };
 
 const EMPTY_RESTRAINTS: RestraintDashboardData = {
     summary: {
-        events_in_period: 0,
-        out_of_plan: 0,
-        with_injury: 0,
-        critical: 0,
-        unreviewed: 0,
-        active_plans: 0,
-        plans_review_due: 0,
-        clients_no_active_bsp: 0,
+        events_in_period: null,
+        out_of_plan: null,
+        with_injury: null,
+        critical: null,
+        unreviewed: null,
+        active_plans: null,
+        plans_review_due: null,
+        clients_no_active_bsp: null,
+        source_access: 'unavailable',
     },
-    unreviewed: [],
+    unreviewed: null,
 };
 
 export default function HealthSafetyDashboard({
+    source_completeness,
     kpis,
     incident_trends,
     backbone,
@@ -159,15 +171,31 @@ export default function HealthSafetyDashboard({
     incidents_by_category,
     site_league,
     open_hazards_list = [],
-    worker_participation = { pct: null, committees: 0 },
+    worker_participation = {
+        pct: null,
+        committees: null,
+        source_access: 'unavailable',
+    },
     procedures = { approved: 0, review_due: 0, coverage_gap_categories: 0 },
-    first_aid = { treatments: 0, ambulance: 0, hospital: 0 },
+    first_aid = { treatments: null, ambulance: null, hospital: null },
     restraints = EMPTY_RESTRAINTS,
     worklists,
 }: Props) {
     const [tab, setTab] = useState<string>('overview');
     const [launcherOpen, setLauncherOpen] = useState(false);
     const [activeWizard, setActiveWizard] = useState<string | null>(null);
+    const [search, setSearch] = useState('');
+    const visibleWorklists = searchDashboardWorklists(worklists, search);
+    const searchTerms = search
+        .trim()
+        .toLocaleLowerCase('en-NZ')
+        .split(/\s+/)
+        .filter(Boolean);
+    const visibleSites = site_league.filter((site) =>
+        searchTerms.every((term) =>
+            site.name.toLocaleLowerCase('en-NZ').includes(term),
+        ),
+    );
     const tabItems = buildHsTabItems(
         worklists.open_investigations.length,
         worklists.expiring.length,
@@ -176,175 +204,220 @@ export default function HealthSafetyDashboard({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Health & Safety', href: '/health-safety' },
                 { title: 'Dashboard', href: '/health-safety/dashboard' },
             ]}
         >
             <Head title="Health & Safety Dashboard" />
 
-            <div className="flex flex-col gap-6 p-6">
-                <CommandCentreHero
-                    leadingLagging={leading_lagging}
-                    filters={filters}
-                    sites={sites}
-                    expiring={worklists.expiring}
-                    worksafePending={backbone?.events.worksafe_pending ?? 0}
-                    activeAlerts={kpis.active_alerts ?? 0}
-                    openSafeguarding={kpis.open_safeguarding ?? 0}
-                    fleetUnresolved={kpis.fleet_unresolved ?? 0}
-                    fleetIncidents30d={kpis.fleet_incidents_30d ?? 0}
-                    procedures={procedures}
-                    onReport={() => setLauncherOpen(true)}
-                    orgName={org_name}
-                />
-
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    items={tabItems}
-                    ariaLabel="Health & Safety views"
-                />
-                <RoleLensBanner lens={filters.lens} />
-
-                {tab === 'overview' && (
-                    <div className="flex flex-col gap-4">
-                        {/* First attention queue — direct H&S governance acceptance. */}
-                        <HsWorklists
-                            worklists={worklists}
-                            show={['acceptance']}
-                        />
-                        {/* Next row — overdue corrective actions (1.5fr) + site safety league (1fr) */}
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                            <HsWorklists
-                                worklists={worklists}
-                                show={['corrective_actions']}
-                            />
-                            <SiteLeagueCard data={site_league} />
-                        </div>
-                        {/* Row 2 — WorkSafe-notifiable events + expiring soon (1fr 1fr) */}
-                        <HsWorklists
-                            worklists={worklists}
-                            show={['notifiable', 'expiring']}
-                        />
-                        {/* Row 3 — full-width incident & near-miss trend */}
-                        <IncidentTrendCard
-                            bars={incident_trends}
-                            frequency={frequency_trends}
-                            variant="full"
-                        />
-                    </div>
-                )}
-
-                {tab === 'leading' && (
-                    <div className="flex flex-col gap-4">
-                        <FirstAidStrip data={first_aid} />
-                        <LeadingPanel
-                            data={leading_lagging.leading}
-                            workerParticipation={worker_participation}
-                            siteCount={sites.length}
-                        />
-                        <LeadingCharts
-                            ratio={leading_lagging.leading.near_miss_ratio}
-                            operands={frequency_operands}
-                            burndown={hazard_burndown}
-                            drillPct={kpis.drill_compliance_pct ?? 0}
-                            trainingPct={
-                                leading_lagging.leading.training_pct ?? 0
-                            }
-                            openHazards={open_hazards_list}
-                        />
-                    </div>
-                )}
-
-                {tab === 'lagging' && (
-                    <div className="flex flex-col gap-4">
-                        <LaggingPanel data={leading_lagging.lagging} />
-                        <LaggingCharts
-                            bars={incident_trends}
-                            frequency={frequency_trends}
-                            severity={backbone?.events?.events_by_severity}
-                            category={incidents_by_category}
-                        />
-                        <RestraintStrip data={restraints} />
-                        <HsWorklists
-                            worklists={worklists}
-                            show={['investigations']}
-                        />
-                    </div>
-                )}
-
-                {tab === 'compliance' && (
-                    <div className="flex flex-col gap-4">
-                        <CompliancePanel
-                            expiring={worklists.expiring}
-                            worksafePending={
-                                backbone?.events.worksafe_pending ?? 0
-                            }
-                        />
-                        <HsWorklists
-                            worklists={worklists}
-                            show={['expiring']}
-                        />
-                        <GovernanceExports />
-                    </div>
-                )}
-
-                <ReportLauncher
-                    open={launcherOpen}
-                    onClose={() => setLauncherOpen(false)}
-                    onWorkflow={(key) => {
-                        setLauncherOpen(false);
-                        // First aid has its own bespoke add-client-style wizard on the register
-                        // page (the single record-first-aid experience) — open it there with all
-                        // its props rather than the generic config-driven HsFormWizard.
-                        if (key === 'first_aid') {
-                            router.visit('/health-safety/first-aid?report=1');
-                            return;
-                        }
-                        setActiveWizard(key);
-                    }}
-                />
-                {activeWizard === 'incident' ? (
-                    <ReportIncidentDialog
-                        open
-                        onClose={() => setActiveWizard(null)}
-                        clients={clients}
+            <PageLayout
+                hero={
+                    <CommandCentreHero
+                        sourceCompleteness={source_completeness}
+                        leadingLagging={leading_lagging}
+                        filters={filters}
                         sites={sites}
+                        expiring={worklists.expiring}
+                        ppeState={worklists.ppe_expiring_state}
+                        worksafePending={
+                            backbone?.events.worksafe_pending ?? null
+                        }
+                        activeAlerts={kpis.active_alerts ?? null}
+                        openSafeguarding={kpis.open_safeguarding ?? null}
+                        fleetUnresolved={kpis.fleet_unresolved ?? null}
+                        fleetIncidents30d={kpis.fleet_incidents_30d ?? null}
+                        procedures={procedures}
+                        onReport={() => setLauncherOpen(true)}
+                        orgName={org_name}
+                        search={{ value: search, onChange: setSearch }}
+                        rail={
+                            <PageHeaderRail
+                                items={tabItems.map((item) => ({
+                                    key: item.id,
+                                    label: item.label,
+                                    icon: item.icon,
+                                    count:
+                                        typeof item.badge === 'number'
+                                            ? item.badge
+                                            : undefined,
+                                }))}
+                                value={tab}
+                                onSelect={setTab}
+                                ariaLabel="Health & Safety views"
+                            />
+                        }
                     />
-                ) : null}
-                {/* The Chemical register's add-substance wizard is the single source — the
-                    launcher tile mounts the same modal as the register's "Add substance". */}
-                {activeWizard === 'substance' ? (
-                    <SubstanceWizardDialog
-                        open
-                        onClose={() => setActiveWizard(null)}
-                        onOpenSubstance={(id, opts) => {
-                            setActiveWizard(null);
-                            router.visit(
-                                `/health-safety/substances?substance=${id}${opts?.action ? `&action=${opts.action}` : ''}`,
-                            );
+                }
+            >
+                <div className="flex flex-col gap-5">
+                    {filters.lens === 'frontline' && (
+                        <p className="text-subtle">
+                            <Link
+                                href="/my-day"
+                                className="frontline-hit frontline-focus inline-flex rounded-md text-primary underline"
+                            >
+                                Open My Day
+                            </Link>{' '}
+                            for your shift, medicines and reporting tasks.
+                        </p>
+                    )}
+                    <CommandCentreAttention
+                        expiring={worklists.expiring}
+                        ppeState={worklists.ppe_expiring_state}
+                        worksafePending={
+                            backbone?.events.worksafe_pending ?? null
+                        }
+                        activeAlerts={kpis.active_alerts ?? null}
+                    />
+                    {search.trim() && (
+                        <p className="text-subtle" role="status">
+                            Search matches the items loaded on this overview.
+                            Counts and charts retain the selected dates and
+                            site. Open a register to search all accessible
+                            records.
+                        </p>
+                    )}
+
+                    {tab === 'overview' && (
+                        <div className="flex flex-col gap-4">
+                            {/* First attention queue — direct H&S governance acceptance. */}
+                            <HsWorklists
+                                worklists={visibleWorklists}
+                                show={['acceptance']}
+                            />
+                            {/* Next row — overdue corrective actions (1.5fr) + site safety league (1fr) */}
+                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+                                <HsWorklists
+                                    worklists={visibleWorklists}
+                                    show={['corrective_actions']}
+                                />
+                                <SiteSafetyComparisonCard data={visibleSites} />
+                            </div>
+                            {/* Row 2 — WorkSafe-notifiable events + expiring soon (1fr 1fr) */}
+                            <HsWorklists
+                                worklists={visibleWorklists}
+                                show={['notifiable', 'expiring']}
+                            />
+                            {/* Row 3 — full-width incident & near-miss trend */}
+                            <IncidentTrendCard
+                                bars={incident_trends}
+                                frequency={frequency_trends}
+                                variant="full"
+                            />
+                        </div>
+                    )}
+
+                    {tab === 'leading' && (
+                        <div className="flex flex-col gap-4">
+                            <FirstAidStrip data={first_aid} />
+                            <LeadingPanel
+                                data={leading_lagging.leading}
+                                workerParticipation={worker_participation}
+                                siteCount={sites.length}
+                                filters={filters}
+                            />
+                            <LeadingCharts
+                                ratio={leading_lagging.leading.near_miss_ratio}
+                                operands={frequency_operands}
+                                burndown={hazard_burndown}
+                                drillPct={kpis.drill_compliance_pct ?? null}
+                                trainingPct={
+                                    leading_lagging.leading.training_pct
+                                }
+                                openHazards={open_hazards_list}
+                            />
+                        </div>
+                    )}
+
+                    {tab === 'lagging' && (
+                        <div className="flex flex-col gap-4">
+                            <LaggingPanel
+                                data={leading_lagging.lagging}
+                                filters={filters}
+                            />
+                            <LaggingCharts
+                                bars={incident_trends}
+                                frequency={frequency_trends}
+                                severity={backbone?.events?.events_by_severity}
+                                category={incidents_by_category}
+                            />
+                            <RestraintStrip data={restraints} />
+                            <HsWorklists
+                                worklists={visibleWorklists}
+                                show={['investigations']}
+                            />
+                        </div>
+                    )}
+
+                    {tab === 'compliance' && (
+                        <div className="flex flex-col gap-4">
+                            <CompliancePanel
+                                site={filters.site}
+                                expiring={worklists.expiring}
+                                worksafePending={
+                                    backbone?.events.worksafe_pending ?? null
+                                }
+                            />
+                            <HsWorklists
+                                worklists={visibleWorklists}
+                                show={['expiring']}
+                            />
+                            <GovernanceExports />
+                        </div>
+                    )}
+
+                    <ReportLauncher
+                        open={launcherOpen}
+                        onClose={() => setLauncherOpen(false)}
+                        onWorkflow={(key) => {
+                            setLauncherOpen(false);
+                            // First aid has its own bespoke add-client-style wizard on the register
+                            // page (the single record-first-aid experience) — open it there with all
+                            // its props rather than the generic config-driven HsFormWizard.
+                            if (key === 'first_aid') {
+                                router.visit(
+                                    '/health-safety/first-aid/report?return_to=%2Fhealth-safety',
+                                );
+                                return;
+                            }
+                            if (key === 'substance') {
+                                router.visit(
+                                    '/health-safety/substances/create',
+                                );
+                                return;
+                            }
+                            setActiveWizard(key);
                         }}
                     />
-                ) : null}
-                {activeWizard &&
-                activeWizard !== 'substance' &&
-                WIZARD_CONFIGS[activeWizard] ? (
-                    <HsFormWizard
-                        key={activeWizard}
-                        config={WIZARD_CONFIGS[activeWizard]}
-                        refData={{
-                            sites,
-                            clients: clients.map((client) => ({
-                                id: client.id,
-                                name: `${client.first_name} ${client.last_name}`.trim(),
-                            })),
-                            staff,
-                        }}
-                        open
-                        onClose={() => setActiveWizard(null)}
-                    />
-                ) : null}
-            </div>
+                    {activeWizard === 'incident' ? (
+                        <ReportIncidentDialog
+                            open
+                            onClose={() => setActiveWizard(null)}
+                            clients={clients}
+                            sites={sites}
+                        />
+                    ) : null}
+                    {activeWizard &&
+                    activeWizard !== 'substance' &&
+                    WIZARD_CONFIGS[activeWizard] ? (
+                        <HsFormWizard
+                            key={activeWizard}
+                            config={WIZARD_CONFIGS[activeWizard]}
+                            refData={{
+                                sites,
+                                clients: clients.map((client) => ({
+                                    id: client.id,
+                                    name: `${client.first_name} ${client.last_name}`.trim(),
+                                })),
+                                staff,
+                            }}
+                            open
+                            onClose={() => setActiveWizard(null)}
+                        />
+                    ) : null}
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }
@@ -357,11 +430,15 @@ export default function HealthSafetyDashboard({
 function FirstAidStrip({
     data,
 }: {
-    data: { treatments: number; ambulance: number; hospital: number };
+    data: {
+        treatments: number | null;
+        ambulance: number | null;
+        hospital: number | null;
+    };
 }) {
     const cards: {
         label: string;
-        value: number;
+        value: number | null;
         href: string;
         tone: 'neutral' | 'warning' | 'critical';
     }[] = [
@@ -387,10 +464,10 @@ function FirstAidStrip({
 
     const valueClass = (
         tone: 'neutral' | 'warning' | 'critical',
-        value: number,
+        value: number | null,
     ) => {
         const colour =
-            value <= 0
+            value === null || value <= 0
                 ? 'text-foreground'
                 : tone === 'critical'
                   ? 'text-status-critical'
@@ -412,10 +489,12 @@ function FirstAidStrip({
                         {c.label}
                     </span>
                     <span className={valueClass(c.tone, c.value)}>
-                        {c.value}
+                        {c.value ?? '—'}
                     </span>
                     <span className="mt-1 text-[11px] text-muted-foreground">
-                        last 30 days
+                        {c.value === null
+                            ? 'Not confirmed'
+                            : 'last 30 days · readable records'}
                     </span>
                 </Link>
             ))}
@@ -434,7 +513,7 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
     const s = data.summary;
     const tiles: {
         label: string;
-        value: number;
+        value: number | null;
         caption: string;
         href: string;
         tone: 'neutral' | 'warning' | 'critical';
@@ -485,10 +564,10 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
 
     const valueClass = (
         tone: 'neutral' | 'warning' | 'critical',
-        value: number,
+        value: number | null,
     ) => {
         const colour =
-            value <= 0
+            value === null || value <= 0
                 ? 'text-foreground'
                 : tone === 'critical'
                   ? 'text-status-critical'
@@ -504,15 +583,6 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
             : sev === 'medium'
               ? 'warning'
               : 'neutral';
-    const sevClass = (sev: string | null) => {
-        const t = sevTone(sev);
-        return t === 'critical'
-            ? 'bg-status-critical-bg text-status-critical'
-            : t === 'warning'
-              ? 'bg-status-warning-bg text-status-warning'
-              : 'bg-muted text-muted-foreground';
-    };
-
     return (
         <GuardrailCard
             unstyled
@@ -546,16 +616,21 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
                             {t.label}
                         </span>
                         <span className={valueClass(t.tone, t.value)}>
-                            {t.value}
+                            {t.value ?? '—'}
                         </span>
                         <span className="mt-0.5 text-[10px] text-muted-foreground">
-                            {t.caption}
+                            {t.value === null ? 'Not confirmed' : t.caption}
                         </span>
                     </Link>
                 ))}
             </div>
 
-            {data.unreviewed.length > 0 ? (
+            <p className="text-subtle mt-3 text-muted-foreground">
+                {s.source_access === 'restricted'
+                    ? 'Access to restraint measures is restricted.'
+                    : 'Measures cover readable records; the full picture may be incomplete.'}
+            </p>
+            {data.unreviewed !== null && data.unreviewed.length > 0 ? (
                 <div className="mt-4">
                     <div className="mb-2 flex items-center justify-between">
                         <span className="text-xs font-medium text-muted-foreground">
@@ -579,7 +654,8 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
                                         {e.reference}
                                     </span>
                                     <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                                        {e.client ?? 'Unknown client'}
+                                        {e.client ??
+                                            'Client details unavailable'}
                                     </span>
                                     {e.restraint_type ? (
                                         <span className="hidden truncate text-xs text-muted-foreground sm:inline">
@@ -587,21 +663,27 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
                                         </span>
                                     ) : null}
                                     {!e.within_support_plan ? (
-                                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">
+                                        <StatusBadge
+                                            variant="critical"
+                                            size="sm"
+                                        >
                                             Out of plan
-                                        </span>
+                                        </StatusBadge>
                                     ) : null}
                                     {e.injury_occurred ? (
-                                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">
+                                        <StatusBadge
+                                            variant="critical"
+                                            size="sm"
+                                        >
                                             Injury
-                                        </span>
+                                        </StatusBadge>
                                     ) : null}
                                     {e.severity ? (
-                                        <span
-                                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${sevClass(e.severity)}`}
-                                        >
-                                            {e.severity}
-                                        </span>
+                                        <StatusBadge
+                                            variant={sevTone(e.severity)}
+                                            status={e.severity}
+                                            size="sm"
+                                        />
                                     ) : null}
                                 </Link>
                             </li>
@@ -610,7 +692,9 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
                 </div>
             ) : (
                 <p className="mt-4 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                    No restraint events awaiting review.
+                    {data.unreviewed === null
+                        ? 'The review queue is not available.'
+                        : 'No matching readable restraint events awaiting review.'}
                 </p>
             )}
         </GuardrailCard>

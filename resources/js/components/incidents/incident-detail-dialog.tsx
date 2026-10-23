@@ -1,16 +1,28 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import {
+    DateTimeField,
+    validLocalDateTime,
+} from '@/components/fleet-assets/maintenance/date-time-field';
 import { JourneyTermHelp } from '@/components/journey-term-help';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
+    FieldErr,
     InfoCard,
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
-import { formatDateTime } from '@/lib/datetime';
+import type { IncidentDraftState } from '@/hooks/use-incident-workspace-drafts';
+import {
+    formatDateOnly,
+    formatDateTime,
+    toDatetimeLocal,
+} from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -38,7 +50,15 @@ import {
     Users,
     X,
 } from 'lucide-react';
-import { useState, type ComponentType, type FormEvent } from 'react';
+import {
+    useEffect,
+    useId,
+    useRef,
+    useState,
+    type ComponentType,
+    type FormEvent,
+} from 'react';
+import type { IncidentOwnership } from './incident-ownership-panel';
 import { JourneyGateList, type JourneyGateData } from './journey-gate-list';
 import {
     LinkedOperationalEvidence,
@@ -57,6 +77,7 @@ type JsonRec = {
 };
 
 export type IncidentDetail = {
+    ownership?: IncidentOwnership;
     id: number;
     ref: string | null;
     type: string;
@@ -68,7 +89,7 @@ export type IncidentDetail = {
     description: string | null;
     immediate_action_taken: string | null;
     witnesses: string | null;
-    is_notifiable: boolean;
+    is_notifiable: boolean | null;
     worksafe_notification_status: string | null;
     worksafe_notified_at: string | null;
     worksafe_reference: string | null;
@@ -122,6 +143,10 @@ export type IncidentDetail = {
         url: string | null;
     } | null;
     linked_operational_evidence: LinkedOperationalEvidenceData | null;
+    linked_access?: {
+        control_room: 'absent' | 'readable' | 'restricted';
+        health_safety: 'absent' | 'readable' | 'restricted';
+    };
     close_gate: JourneyGateData;
     journey_state: string;
     hs_event: {
@@ -173,6 +198,7 @@ export type IncidentDetail = {
         followupsComplete: boolean;
         portalManage: boolean;
         raiseCorrectiveAction: boolean;
+        requestResponse?: boolean;
     };
     assignable_staff: Array<{ id: number; name: string }>;
     corrective_action_owners: Array<{ id: number; name: string }>;
@@ -206,6 +232,7 @@ export type IncidentDetail = {
     first_aid_records?: Array<{
         id: number;
         reference: string;
+        href: string;
         person: string;
         injury: string;
         treatment_date: string | null;
@@ -273,7 +300,7 @@ function fmtSize(bytes: number | null): string {
 /*  Dialog                                                             */
 /* ------------------------------------------------------------------ */
 
-type LifecycleAction = 'submit' | 'review' | 'close' | 'reopen';
+export type LifecycleAction = 'submit' | 'review' | 'close' | 'reopen';
 
 export function IncidentDetailDialog({
     detail,
@@ -467,7 +494,7 @@ export function IncidentDetailDialog({
 /*  Lifecycle action pane (review / close / reopen)                    */
 /* ------------------------------------------------------------------ */
 
-const ACTION_META: Record<
+export const ACTION_META: Record<
     LifecycleAction,
     {
         title: string;
@@ -502,22 +529,34 @@ const ACTION_META: Record<
     },
 };
 
-function ActionPane({
+export function ActionPane({
     d,
     action,
     onDone,
+    onCancel = onDone,
+    onDraftStateChange,
+    confirmCurrentIncident = false,
 }: {
     d: IncidentDetail;
     action: LifecycleAction;
     onDone: () => void;
+    onCancel?: () => void;
+    onDraftStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
+    confirmCurrentIncident?: boolean;
 }) {
-    const incidentId = d.id;
+    const [incidentId] = useState(d.id);
     const meta = ACTION_META[action];
-    // Guardrail rejections come back as a 302 + flash.error (the pane stays
-    // open) — show WHY it was blocked, or the user sees nothing happen.
-    const [attempted, setAttempted] = useState(false);
-    const flashError = (usePage().props as { flash?: { error?: string } }).flash
-        ?.error;
+    const currentActorId = (
+        usePage().props.auth as { user?: { id?: number } } | undefined
+    )?.user?.id;
+    const [actorId] = useState(currentActorId);
+    const [sending, setSending] = useState(false);
+    const inFlight = useRef(false);
+    const [unconfirmedWork, setUnconfirmedWork] = useState(false);
+    const [confirmationError, setConfirmationError] = useState<string | null>(
+        null,
+    );
+    const fieldId = useId();
     const form = useForm<{
         review_notes: string;
         closed_outcome: string;
@@ -529,150 +568,304 @@ function ActionPane({
         closed_notes: '',
         reopened_reason: '',
     });
+    const busy = form.processing || sending;
+    const requiredStatus: Record<LifecycleAction, string> = {
+        submit: 'draft',
+        review: 'submitted',
+        close: 'reviewed',
+        reopen: 'closed',
+    };
+    const resultingStatus: Record<LifecycleAction, string> = {
+        submit: 'submitted',
+        review: 'reviewed',
+        close: 'closed',
+        reopen: 'reviewed',
+    };
+    const canPerform =
+        d.id === incidentId &&
+        d.can[action] === true &&
+        d.status === requiredStatus[action] &&
+        typeof actorId === 'number' &&
+        Number.isSafeInteger(actorId) &&
+        actorId > 0 &&
+        actorId === currentActorId;
+    const ready =
+        canPerform &&
+        (action !== 'close' ||
+            (d.close_gate.allowed &&
+                Boolean(form.data.closed_outcome.trim()))) &&
+        (action !== 'reopen' || Boolean(form.data.reopened_reason.trim()));
+    useEffect(() => {
+        // Successful redirects adopt posted form defaults even when their
+        // application-level result is unavailable. Keep dismissal guarded.
+        onDraftStateChange?.({ dirty: form.isDirty || unconfirmedWork, busy });
+    }, [form.isDirty, unconfirmedWork, busy, onDraftStateChange]);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        setAttempted(true);
+        if (!ready || busy || inFlight.current) return;
+        inFlight.current = true;
+        setSending(true);
+        setUnconfirmedWork(true);
+        setConfirmationError(null);
         const url = `/incidents/${incidentId}/${action}`;
-        form.post(url, {
-            preserveScroll: true,
-            // Guardrail failures come back as flash.error on a 302 (Inertia onSuccess),
-            // not a 422 — keep the pane open in that case so the user can adjust.
-            onSuccess: (page) => {
-                if (
-                    !(page.props as { flash?: { error?: string } }).flash?.error
-                )
+        try {
+            form.post(url, {
+                preserveScroll: true,
+                // Guardrail failures come back as flash.error on a 302 (Inertia onSuccess),
+                // not a 422 — keep the pane open in that case so the user can adjust.
+                onSuccess: (page) => {
+                    const props = page.props as {
+                        flash?: { error?: unknown };
+                        viewer_id?: number;
+                        auth?: { user?: { id?: number } };
+                        detail?: { id?: number; status?: string };
+                    };
+                    if (props.flash?.error) {
+                        setConfirmationError(
+                            typeof props.flash.error === 'string'
+                                ? props.flash.error
+                                : 'The incident change could not be confirmed. Your entries have been kept.',
+                        );
+                        return;
+                    }
+                    if (
+                        confirmCurrentIncident &&
+                        (props.viewer_id !== actorId ||
+                            props.auth?.user?.id !== actorId ||
+                            props.detail?.id !== incidentId ||
+                            props.detail?.status !== resultingStatus[action])
+                    ) {
+                        setConfirmationError(
+                            'The incident change could not be confirmed. Your entries have been kept. Check the current incident before trying again.',
+                        );
+                        return;
+                    }
                     onDone();
-            },
-        });
+                },
+                onFinish: () => {
+                    inFlight.current = false;
+                    setSending(false);
+                },
+            });
+        } catch {
+            inFlight.current = false;
+            setSending(false);
+            setConfirmationError(
+                'The incident change could not be confirmed. Your entries have been kept. Check the current incident before trying again.',
+            );
+        }
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <form
+            onSubmit={submit}
+            aria-busy={busy}
+            className="flex flex-col gap-4"
+        >
             <StepHead icon={meta.icon} title={meta.title} blurb={meta.blurb} />
 
-            {attempted && flashError ? (
+            {confirmationError ? (
                 <InfoCard icon={AlertTriangle} tone="crit">
-                    <span className="font-semibold">
-                        Couldn't {action === 'submit' ? 'submit' : action} this
-                        incident.
-                    </span>{' '}
-                    {flashError}
+                    <p role="alert">{confirmationError}</p>
                 </InfoCard>
             ) : null}
+            {!canPerform ? (
+                <p
+                    role="status"
+                    className="text-subtle text-status-warning-foreground"
+                >
+                    This action is no longer available for the current incident.
+                    Your entries have been kept.
+                </p>
+            ) : null}
+            {confirmCurrentIncident && (confirmationError || !canPerform) ? (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="frontline-tap self-start"
+                    disabled={busy}
+                    onClick={() =>
+                        router.reload({
+                            only: ['viewer_id', 'detail'],
+                            preserveState: true,
+                            preserveScroll: true,
+                        })
+                    }
+                >
+                    Check current incident
+                </Button>
+            ) : null}
 
-            {action === 'submit' ? (
-                <>
-                    <ReviewCard
-                        icon={FileText}
-                        title="What you're submitting"
-                        span
+            <fieldset
+                disabled={busy || !canPerform}
+                className="flex min-w-0 flex-col gap-4"
+            >
+                <legend className="sr-only">{meta.title}</legend>
+
+                {action === 'submit' ? (
+                    <>
+                        <ReviewCard
+                            icon={FileText}
+                            title="What you're submitting"
+                            span
+                        >
+                            <ReviewRow
+                                label="Incident"
+                                value={`${d.ref ?? `INC-${d.id}`} · ${titleCase(d.type)}`}
+                            />
+                            <ReviewRow
+                                label="Client"
+                                value={
+                                    d.client
+                                        ? `${d.client.first_name} ${d.client.last_name}`
+                                        : undefined
+                                }
+                            />
+                            <ReviewRow
+                                label="Severity"
+                                value={SEV_LABEL[d.severity] ?? d.severity}
+                            />
+                            <ReviewRow
+                                label="What happened"
+                                value={d.description}
+                            />
+                            <ReviewRow
+                                label="Attachments"
+                                value={`${d.attachments.length}`}
+                            />
+                        </ReviewCard>
+                        <InfoCard icon={Send} tone="info">
+                            Check the details above — after submitting, the
+                            record locks and changes need a reviewer. Photos and
+                            documents can no longer be added.
+                        </InfoCard>
+                    </>
+                ) : null}
+
+                {action === 'review' ? (
+                    <Field
+                        label="Review notes"
+                        hint="Optional"
+                        error={form.errors.review_notes}
+                        errorId={`${fieldId}-review-error`}
                     >
-                        <ReviewRow
-                            label="Incident"
-                            value={`${d.ref ?? `INC-${d.id}`} · ${titleCase(d.type)}`}
-                        />
-                        <ReviewRow
-                            label="Client"
-                            value={
-                                d.client
-                                    ? `${d.client.first_name} ${d.client.last_name}`
+                        <Textarea
+                            rows={4}
+                            value={form.data.review_notes}
+                            aria-invalid={Boolean(form.errors.review_notes)}
+                            aria-describedby={
+                                form.errors.review_notes
+                                    ? `${fieldId}-review-error`
                                     : undefined
                             }
+                            onChange={(e) =>
+                                form.setData('review_notes', e.target.value)
+                            }
+                            placeholder="Notes from your review…"
                         />
-                        <ReviewRow
-                            label="Severity"
-                            value={SEV_LABEL[d.severity] ?? d.severity}
-                        />
-                        <ReviewRow
-                            label="What happened"
-                            value={d.description}
-                        />
-                        <ReviewRow
-                            label="Attachments"
-                            value={`${d.attachments.length}`}
-                        />
-                    </ReviewCard>
-                    <InfoCard icon={Send} tone="info">
-                        Check the details above — after submitting, the record
-                        locks and changes need a reviewer. Photos and documents
-                        can no longer be added.
-                    </InfoCard>
-                </>
-            ) : null}
+                    </Field>
+                ) : null}
 
-            {action === 'review' ? (
-                <Field label="Review notes" hint="Optional">
-                    <Textarea
-                        rows={4}
-                        value={form.data.review_notes}
-                        onChange={(e) =>
-                            form.setData('review_notes', e.target.value)
-                        }
-                        placeholder="Notes from your review…"
-                    />
-                </Field>
-            ) : null}
+                {action === 'close' ? (
+                    <>
+                        <JourneyGateList gate={d.close_gate} />
+                        <Field
+                            label="Outcome"
+                            required
+                            error={form.errors.closed_outcome}
+                            errorId={`${fieldId}-outcome-error`}
+                        >
+                            <Input
+                                value={form.data.closed_outcome}
+                                maxLength={120}
+                                aria-required
+                                className="frontline-tap"
+                                aria-invalid={Boolean(
+                                    form.errors.closed_outcome,
+                                )}
+                                aria-describedby={
+                                    form.errors.closed_outcome
+                                        ? `${fieldId}-outcome-error`
+                                        : undefined
+                                }
+                                onChange={(e) =>
+                                    form.setData(
+                                        'closed_outcome',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="e.g. Resolved — care plan updated"
+                            />
+                        </Field>
+                        <Field
+                            label="Closing notes"
+                            hint="Optional"
+                            error={form.errors.closed_notes}
+                            errorId={`${fieldId}-closing-error`}
+                        >
+                            <Textarea
+                                rows={3}
+                                value={form.data.closed_notes}
+                                aria-invalid={Boolean(form.errors.closed_notes)}
+                                aria-describedby={
+                                    form.errors.closed_notes
+                                        ? `${fieldId}-closing-error`
+                                        : undefined
+                                }
+                                onChange={(e) =>
+                                    form.setData('closed_notes', e.target.value)
+                                }
+                            />
+                        </Field>
+                    </>
+                ) : null}
 
-            {action === 'close' ? (
-                <>
-                    <JourneyGateList gate={d.close_gate} />
+                {action === 'reopen' ? (
                     <Field
-                        label="Outcome"
+                        label="Reason for reopening"
                         required
-                        error={form.errors.closed_outcome}
+                        error={form.errors.reopened_reason}
+                        errorId={`${fieldId}-reopen-error`}
                     >
-                        <Input
-                            value={form.data.closed_outcome}
-                            onChange={(e) =>
-                                form.setData('closed_outcome', e.target.value)
-                            }
-                            placeholder="e.g. Resolved — care plan updated"
-                        />
-                    </Field>
-                    <Field label="Closing notes" hint="Optional">
                         <Textarea
-                            rows={3}
-                            value={form.data.closed_notes}
-                            onChange={(e) =>
-                                form.setData('closed_notes', e.target.value)
+                            rows={4}
+                            value={form.data.reopened_reason}
+                            maxLength={2000}
+                            aria-required
+                            aria-invalid={Boolean(form.errors.reopened_reason)}
+                            aria-describedby={
+                                form.errors.reopened_reason
+                                    ? `${fieldId}-reopen-error`
+                                    : undefined
                             }
+                            onChange={(e) =>
+                                form.setData('reopened_reason', e.target.value)
+                            }
+                            placeholder="Why is this incident being reopened?"
                         />
                     </Field>
-                </>
-            ) : null}
-
-            {action === 'reopen' ? (
-                <Field
-                    label="Reason for reopening"
-                    required
-                    error={form.errors.reopened_reason}
-                >
-                    <Textarea
-                        rows={4}
-                        value={form.data.reopened_reason}
-                        onChange={(e) =>
-                            form.setData('reopened_reason', e.target.value)
-                        }
-                        placeholder="Why is this incident being reopened?"
-                    />
-                </Field>
-            ) : null}
+                ) : null}
+            </fieldset>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="frontline-tap"
+                    onClick={() => {
+                        if (!busy) onCancel();
+                    }}
+                    disabled={busy}
+                >
                     Cancel
                 </Button>
                 <Button
                     type="submit"
-                    disabled={
-                        form.processing ||
-                        (action === 'close' &&
-                            (!d.close_gate.allowed ||
-                                !form.data.closed_outcome.trim()))
-                    }
+                    className="frontline-tap"
+                    disabled={busy || !ready}
                 >
-                    {meta.cta}
+                    {busy ? 'Saving…' : meta.cta}
                 </Button>
             </div>
         </form>
@@ -699,157 +892,357 @@ const SEVERITY_OPTIONS = [
     { value: 'low', label: 'Low' },
     { value: 'medium', label: 'Medium' },
     { value: 'high', label: 'High' },
-];
-const POTENTIAL_OPTIONS = [
-    ...SEVERITY_OPTIONS,
     { value: 'critical', label: 'Critical' },
 ];
+const POTENTIAL_OPTIONS = SEVERITY_OPTIONS;
 
-function toLocalInput(iso: string): string {
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return '';
-    return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
-}
-
-function EditPane({ d, onDone }: { d: IncidentDetail; onDone: () => void }) {
+export function EditPane({
+    d,
+    onDone,
+    onCancel = onDone,
+    onDraftStateChange,
+    confirmCurrentIncident = false,
+}: {
+    d: IncidentDetail;
+    onDone: () => void;
+    onCancel?: () => void;
+    onDraftStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
+    confirmCurrentIncident?: boolean;
+}) {
+    const [incidentId] = useState(d.id);
+    const [originalType] = useState(d.type);
+    const typeOptions =
+        originalType &&
+        !INCIDENT_TYPES.some(({ value }) => value === originalType)
+            ? [
+                  {
+                      value: originalType,
+                      label: `${titleCase(originalType)} (saved type)`,
+                  },
+                  ...INCIDENT_TYPES,
+              ]
+            : INCIDENT_TYPES;
+    const currentActorId = (
+        usePage().props.auth as { user?: { id?: number } } | undefined
+    )?.user?.id;
+    const [actorId] = useState(currentActorId);
+    const [sending, setSending] = useState(false);
+    const inFlight = useRef(false);
+    const [unconfirmedWork, setUnconfirmedWork] = useState(false);
+    const [confirmationError, setConfirmationError] = useState<string | null>(
+        null,
+    );
+    const fieldId = useId();
     const form = useForm({
         type: d.type,
         severity: d.severity,
-        occurred_at: d.occurred_at ? toLocalInput(d.occurred_at) : '',
+        occurred_at: toDatetimeLocal(d.occurred_at),
         description: d.description ?? '',
         immediate_action_taken: d.immediate_action_taken ?? '',
         witnesses: d.witnesses ?? '',
         potential_severity: d.potential_severity ?? '',
         potential_consequence: d.potential_consequence ?? '',
-        is_notifiable: d.is_notifiable,
+        // Unknown/restricted values are omitted from this JSON update, never
+        // replaced with an unchecked false value from a source the user cannot read.
+        is_notifiable: d.is_notifiable ?? undefined,
     });
     const isNearMiss = form.data.type === 'near_miss';
+    const busy = form.processing || sending;
+    const canEdit =
+        d.id === incidentId &&
+        d.status === 'draft' &&
+        d.can.update === true &&
+        typeof actorId === 'number' &&
+        Number.isSafeInteger(actorId) &&
+        actorId > 0 &&
+        actorId === currentActorId;
+    const validOccurredAt =
+        form.data.occurred_at === '' ||
+        validLocalDateTime(form.data.occurred_at);
+    useEffect(() => {
+        onDraftStateChange?.({ dirty: form.isDirty || unconfirmedWork, busy });
+    }, [form.isDirty, unconfirmedWork, busy, onDraftStateChange]);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        form.put(`/incidents/${d.id}`, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                if (
-                    !(page.props as { flash?: { error?: string } }).flash?.error
-                )
+        if (!canEdit || !validOccurredAt || busy || inFlight.current) return;
+        inFlight.current = true;
+        setSending(true);
+        setUnconfirmedWork(true);
+        setConfirmationError(null);
+        try {
+            form.put(`/incidents/${incidentId}`, {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const props = page.props as {
+                        flash?: { error?: unknown };
+                        viewer_id?: number;
+                        auth?: { user?: { id?: number } };
+                        detail?: { id?: number; status?: string };
+                    };
+                    if (props.flash?.error) {
+                        setConfirmationError(
+                            typeof props.flash.error === 'string'
+                                ? props.flash.error
+                                : 'The draft update could not be confirmed. Your entries have been kept.',
+                        );
+                        return;
+                    }
+                    if (
+                        confirmCurrentIncident &&
+                        (props.viewer_id !== actorId ||
+                            props.auth?.user?.id !== actorId ||
+                            props.detail?.id !== incidentId ||
+                            props.detail?.status !== 'draft')
+                    ) {
+                        setConfirmationError(
+                            'The draft update could not be confirmed. Your entries have been kept. Check the current incident before trying again.',
+                        );
+                        return;
+                    }
                     onDone();
-            },
-        });
+                },
+                onFinish: () => {
+                    inFlight.current = false;
+                    setSending(false);
+                },
+            });
+        } catch {
+            inFlight.current = false;
+            setSending(false);
+            setConfirmationError(
+                'The draft update could not be confirmed. Your entries have been kept. Check the current incident before trying again.',
+            );
+        }
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <form
+            onSubmit={submit}
+            aria-busy={busy}
+            className="flex flex-col gap-4"
+        >
             <StepHead
                 icon={Pencil}
                 title="Edit incident"
                 blurb="Update the incident details. Drafts only — once submitted, the record is locked for audit."
             />
-            <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Type" required error={form.errors.type}>
-                    <SelectInput
-                        value={form.data.type}
-                        onChange={(v) => form.setData('type', v)}
-                        placeholder="Select type"
-                        options={INCIDENT_TYPES}
-                    />
-                </Field>
-                <Field label="Severity" required error={form.errors.severity}>
-                    <SelectInput
-                        value={form.data.severity}
-                        onChange={(v) => form.setData('severity', v)}
-                        placeholder="Select severity"
-                        options={SEVERITY_OPTIONS}
-                    />
-                </Field>
-            </div>
-            <Field label="When it occurred" error={form.errors.occurred_at}>
-                <Input
-                    type="datetime-local"
-                    value={form.data.occurred_at}
-                    onChange={(e) =>
-                        form.setData('occurred_at', e.target.value)
+            {confirmationError ? (
+                <p
+                    role="alert"
+                    className="text-subtle text-status-warning-foreground"
+                >
+                    {confirmationError}
+                </p>
+            ) : null}
+            {!canEdit ? (
+                <p
+                    role="status"
+                    className="text-subtle text-status-warning-foreground"
+                >
+                    This incident draft is no longer available for editing. Your
+                    entries have been kept.
+                </p>
+            ) : null}
+            {confirmCurrentIncident && (confirmationError || !canEdit) ? (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="frontline-tap self-start"
+                    disabled={busy}
+                    onClick={() =>
+                        router.reload({
+                            only: ['viewer_id', 'detail'],
+                            preserveState: true,
+                            preserveScroll: true,
+                        })
                     }
-                />
-            </Field>
-            <Field label="What happened" error={form.errors.description}>
-                <Textarea
-                    rows={4}
-                    value={form.data.description}
-                    onChange={(e) =>
-                        form.setData('description', e.target.value)
-                    }
-                />
-            </Field>
-            <Field
-                label="Immediate action taken"
-                error={form.errors.immediate_action_taken}
+                >
+                    Check current incident
+                </Button>
+            ) : null}
+            <fieldset
+                disabled={busy || !canEdit}
+                className="flex min-w-0 flex-col gap-4"
             >
-                <Textarea
-                    rows={3}
-                    value={form.data.immediate_action_taken}
-                    onChange={(e) =>
-                        form.setData('immediate_action_taken', e.target.value)
-                    }
-                />
-            </Field>
-            <Field label="Witnesses" error={form.errors.witnesses}>
-                <Input
-                    value={form.data.witnesses}
-                    onChange={(e) => form.setData('witnesses', e.target.value)}
-                    placeholder="Names of any witnesses"
-                />
-            </Field>
-            {isNearMiss ? (
+                <legend className="sr-only">Incident draft details</legend>
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <Field
-                        label="Potential severity"
-                        error={form.errors.potential_severity}
-                    >
+                    <Field label="Type" required error={form.errors.type}>
                         <SelectInput
-                            value={form.data.potential_severity}
-                            onChange={(v) =>
-                                form.setData('potential_severity', v)
-                            }
-                            placeholder="What could have happened"
-                            options={POTENTIAL_OPTIONS}
+                            value={form.data.type}
+                            onChange={(v) => form.setData('type', v)}
+                            placeholder="Select type"
+                            options={typeOptions}
+                            frontline
+                            disabled={busy || !canEdit}
                         />
                     </Field>
                     <Field
-                        label="Could have caused"
-                        error={form.errors.potential_consequence}
+                        label="Severity"
+                        required
+                        error={form.errors.severity}
                     >
-                        <Input
-                            value={form.data.potential_consequence}
-                            onChange={(e) =>
-                                form.setData(
-                                    'potential_consequence',
-                                    e.target.value,
-                                )
-                            }
+                        <SelectInput
+                            value={form.data.severity}
+                            onChange={(v) => form.setData('severity', v)}
+                            placeholder="Select severity"
+                            options={SEVERITY_OPTIONS}
+                            frontline
+                            disabled={busy || !canEdit}
                         />
                     </Field>
                 </div>
-            ) : null}
-            <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                    type="checkbox"
-                    checked={form.data.is_notifiable}
-                    onChange={(e) =>
-                        form.setData('is_notifiable', e.target.checked)
-                    }
-                    className="h-4 w-4 rounded border-border"
+                <DateTimeField
+                    key={busy || !canEdit ? 'locked' : 'available'}
+                    compact
+                    id={`${fieldId}-occurred`}
+                    label="When it occurred"
+                    value={form.data.occurred_at}
+                    hint="Date and time in New Zealand. Clear both if the occurrence time is unknown."
+                    error={form.errors.occurred_at}
+                    onChange={(value) => {
+                        if (canEdit && !busy)
+                            form.setData('occurred_at', value);
+                    }}
                 />
-                WorkSafe NZ notifiable event
-            </label>
+                {!validOccurredAt ? (
+                    <p
+                        role="status"
+                        className="text-subtle text-status-warning-foreground"
+                    >
+                        Choose both an occurrence date and time, or clear both
+                        if unknown.
+                    </p>
+                ) : null}
+                <Field
+                    label="What happened"
+                    error={form.errors.description}
+                    errorId={`${fieldId}-description-error`}
+                >
+                    <Textarea
+                        rows={4}
+                        value={form.data.description}
+                        aria-invalid={Boolean(form.errors.description)}
+                        aria-describedby={
+                            form.errors.description
+                                ? `${fieldId}-description-error`
+                                : undefined
+                        }
+                        onChange={(e) =>
+                            form.setData('description', e.target.value)
+                        }
+                    />
+                </Field>
+                <Field
+                    label="Immediate action taken"
+                    error={form.errors.immediate_action_taken}
+                    errorId={`${fieldId}-immediate-error`}
+                >
+                    <Textarea
+                        rows={3}
+                        value={form.data.immediate_action_taken}
+                        aria-invalid={Boolean(
+                            form.errors.immediate_action_taken,
+                        )}
+                        aria-describedby={
+                            form.errors.immediate_action_taken
+                                ? `${fieldId}-immediate-error`
+                                : undefined
+                        }
+                        onChange={(e) =>
+                            form.setData(
+                                'immediate_action_taken',
+                                e.target.value,
+                            )
+                        }
+                    />
+                </Field>
+                <Field
+                    label="Witnesses"
+                    error={form.errors.witnesses}
+                    errorId={`${fieldId}-witnesses-error`}
+                >
+                    <Input
+                        value={form.data.witnesses}
+                        className="frontline-tap"
+                        aria-invalid={Boolean(form.errors.witnesses)}
+                        aria-describedby={
+                            form.errors.witnesses
+                                ? `${fieldId}-witnesses-error`
+                                : undefined
+                        }
+                        onChange={(e) =>
+                            form.setData('witnesses', e.target.value)
+                        }
+                        placeholder="Names of any witnesses"
+                    />
+                </Field>
+                {isNearMiss ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <Field
+                            label="Potential severity"
+                            error={form.errors.potential_severity}
+                        >
+                            <SelectInput
+                                value={form.data.potential_severity}
+                                onChange={(v) =>
+                                    form.setData('potential_severity', v)
+                                }
+                                placeholder="What could have happened"
+                                options={POTENTIAL_OPTIONS}
+                                frontline
+                                disabled={busy || !canEdit}
+                            />
+                        </Field>
+                        <Field
+                            label="Could have caused"
+                            error={form.errors.potential_consequence}
+                        >
+                            <Input
+                                value={form.data.potential_consequence}
+                                className="frontline-tap"
+                                onChange={(e) =>
+                                    form.setData(
+                                        'potential_consequence',
+                                        e.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                    </div>
+                ) : null}
+                {d.is_notifiable !== null ? (
+                    <label className="frontline-tap flex items-center gap-2 text-sm text-foreground">
+                        <input
+                            type="checkbox"
+                            checked={form.data.is_notifiable}
+                            onChange={(e) =>
+                                form.setData('is_notifiable', e.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-border"
+                        />
+                        WorkSafe NZ notifiable event
+                    </label>
+                ) : null}
+            </fieldset>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="frontline-tap"
+                    onClick={() => {
+                        if (!busy) onCancel();
+                    }}
+                    disabled={busy}
+                >
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
-                    Save changes
+                <Button
+                    type="submit"
+                    className="frontline-tap"
+                    disabled={busy || !canEdit || !validOccurredAt}
+                >
+                    {busy ? 'Saving…' : 'Save changes'}
                 </Button>
             </div>
         </form>
@@ -860,12 +1253,14 @@ function EditPane({ d, onDone }: { d: IncidentDetail; onDone: () => void }) {
 /*  Sections                                                           */
 /* ------------------------------------------------------------------ */
 
-function OverviewSection({
+export function OverviewSection({
     d,
     isNearMiss,
+    part = 'all',
 }: {
     d: IncidentDetail;
     isNearMiss: boolean;
+    part?: 'all' | 'summary' | 'details';
 }) {
     const concerns = d.safeguarding_concerns ?? [];
     const escalation = concerns.length
@@ -891,136 +1286,159 @@ function OverviewSection({
         worksafe.status === 'notified' || worksafe.status === 'acknowledged';
     return (
         <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex justify-end sm:col-span-2">
-                <JourneyTermHelp
-                    terms={['status', 'severity', 'priority']}
-                    label="Explain incident status terms"
-                />
-            </div>
-            {escalation ? (
-                <div className="sm:col-span-2">
-                    <InfoCard icon={ShieldAlert} tone="warn">
-                        <span className="font-semibold">
-                            Escalated to safeguarding.
-                        </span>{' '}
-                        {escalation.can_view ? (
-                            <>
-                                Concern {escalation.reference_number}
-                                {escalation.status
-                                    ? ` · ${titleCase(escalation.status)}`
-                                    : ''}
-                                .{' '}
-                                <Link
-                                    href={`/safeguarding/${escalation.id}`}
-                                    className="font-medium text-primary hover:underline"
-                                >
-                                    Open concern
-                                </Link>
-                            </>
-                        ) : (
-                            'A safeguarding concern was raised from this incident (restricted — need-to-know).'
-                        )}
-                    </InfoCard>
-                </div>
+            {part !== 'details' ? (
+                <>
+                    <div className="flex justify-end sm:col-span-2">
+                        <JourneyTermHelp
+                            terms={['status', 'severity', 'priority']}
+                            label="Explain incident status terms"
+                        />
+                    </div>
+                    {escalation ? (
+                        <div className="sm:col-span-2">
+                            <InfoCard icon={ShieldAlert} tone="warn">
+                                <span className="font-semibold">
+                                    Escalated to safeguarding.
+                                </span>{' '}
+                                {escalation.can_view ? (
+                                    <>
+                                        Concern {escalation.reference_number}
+                                        {escalation.status
+                                            ? ` · ${titleCase(escalation.status)}`
+                                            : ''}
+                                        .{' '}
+                                        <Link
+                                            href={`/safeguarding/${escalation.id}`}
+                                            className="font-medium text-primary hover:underline"
+                                        >
+                                            Open concern
+                                        </Link>
+                                    </>
+                                ) : (
+                                    'A safeguarding concern was raised from this incident (restricted — need-to-know).'
+                                )}
+                            </InfoCard>
+                        </div>
+                    ) : null}
+
+                    {worksafe.notifiable ? (
+                        <div className="sm:col-span-2">
+                            <InfoCard icon={ShieldAlert} tone="crit">
+                                <span className="font-semibold">
+                                    WorkSafe NZ notifiable event.
+                                </span>{' '}
+                                {worksafe.status === 'acknowledged'
+                                    ? `Acknowledged by WorkSafe${worksafe.acknowledgedAt ? ` ${formatDateTime(worksafe.acknowledgedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''}.`
+                                    : worksafeNotified
+                                      ? `Notified${worksafe.notifiedAt ? ` ${formatDateTime(worksafe.notifiedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''} — awaiting acknowledgement.`
+                                      : 'Notification to WorkSafe NZ is still pending with Health & Safety.'}
+                            </InfoCard>
+                        </div>
+                    ) : null}
+
+                    <ReviewCard icon={FileText} title="What happened" span>
+                        <p className="text-sm whitespace-pre-wrap text-foreground">
+                            {d.description || '—'}
+                        </p>
+                    </ReviewCard>
+
+                    <ReviewCard
+                        icon={CheckCircle2}
+                        title="Immediate actions"
+                        span
+                    >
+                        <p className="text-sm whitespace-pre-wrap text-foreground">
+                            {d.immediate_action_taken || '—'}
+                        </p>
+                    </ReviewCard>
+                </>
             ) : null}
+            {part !== 'summary' ? (
+                <>
+                    {handover ? (
+                        <ReviewCard icon={RadioTower} title="H&S handover" span>
+                            <ReviewRow
+                                label="Status"
+                                value={handoverStatusLabel(handover.status)}
+                            />
+                            <ReviewRow
+                                label="H&S owner"
+                                value={
+                                    handover.owner?.name ??
+                                    'No H&S owner assigned'
+                                }
+                            />
+                            <ReviewRow
+                                label="Accepted by"
+                                value={handover.accepted_by?.name}
+                            />
+                            <ReviewRow
+                                label="Accepted at"
+                                value={
+                                    handover.accepted_at
+                                        ? formatDateTime(handover.accepted_at)
+                                        : undefined
+                                }
+                            />
+                            <ReviewRow
+                                label="Acceptance notes"
+                                value={handover.notes}
+                            />
+                        </ReviewCard>
+                    ) : null}
 
-            {worksafe.notifiable ? (
-                <div className="sm:col-span-2">
-                    <InfoCard icon={ShieldAlert} tone="crit">
-                        <span className="font-semibold">
-                            WorkSafe NZ notifiable event.
-                        </span>{' '}
-                        {worksafe.status === 'acknowledged'
-                            ? `Acknowledged by WorkSafe${worksafe.acknowledgedAt ? ` ${formatDateTime(worksafe.acknowledgedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''}.`
-                            : worksafeNotified
-                              ? `Notified${worksafe.notifiedAt ? ` ${formatDateTime(worksafe.notifiedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''} — awaiting acknowledgement.`
-                              : 'Notification to WorkSafe NZ is still pending with Health & Safety.'}
-                    </InfoCard>
-                </div>
+                    <ReviewCard icon={Users} title="People">
+                        <ReviewRow
+                            label="Client"
+                            value={
+                                d.client
+                                    ? `${d.client.first_name} ${d.client.last_name}`
+                                    : undefined
+                            }
+                        />
+                        <ReviewRow
+                            label="Reported by"
+                            value={d.reporter?.name}
+                        />
+                        <ReviewRow label="Witnesses" value={d.witnesses} />
+                    </ReviewCard>
+
+                    <ReviewCard icon={Search} title="Classification">
+                        <ReviewRow label="Source" value={titleCase(d.source)} />
+                        <ReviewRow
+                            label={
+                                isNearMiss ? 'Potential severity' : 'Severity'
+                            }
+                            value={
+                                isNearMiss
+                                    ? d.potential_severity
+                                        ? SEV_LABEL[d.potential_severity]
+                                        : undefined
+                                    : SEV_LABEL[d.severity]
+                            }
+                        />
+                        {isNearMiss ? (
+                            <ReviewRow
+                                label="Could have caused"
+                                value={d.potential_consequence}
+                            />
+                        ) : null}
+                        <ReviewRow
+                            label="H&S event"
+                            value={
+                                d.linked_access?.health_safety === 'restricted'
+                                    ? 'Access restricted'
+                                    : d.hs_event?.reference_number
+                            }
+                        />
+                    </ReviewCard>
+                </>
             ) : null}
-
-            {handover ? (
-                <ReviewCard icon={RadioTower} title="H&S handover" span>
-                    <ReviewRow
-                        label="Status"
-                        value={handoverStatusLabel(handover.status)}
-                    />
-                    <ReviewRow
-                        label="H&S owner"
-                        value={handover.owner?.name ?? 'No H&S owner assigned'}
-                    />
-                    <ReviewRow
-                        label="Accepted by"
-                        value={handover.accepted_by?.name}
-                    />
-                    <ReviewRow
-                        label="Accepted at"
-                        value={
-                            handover.accepted_at
-                                ? formatDateTime(handover.accepted_at)
-                                : undefined
-                        }
-                    />
-                    <ReviewRow
-                        label="Acceptance notes"
-                        value={handover.notes}
-                    />
-                </ReviewCard>
-            ) : null}
-
-            <ReviewCard icon={FileText} title="What happened" span>
-                <p className="text-sm whitespace-pre-wrap text-foreground">
-                    {d.description || '—'}
-                </p>
-            </ReviewCard>
-
-            <ReviewCard icon={Users} title="People">
-                <ReviewRow
-                    label="Client"
-                    value={
-                        d.client
-                            ? `${d.client.first_name} ${d.client.last_name}`
-                            : undefined
-                    }
-                />
-                <ReviewRow label="Reported by" value={d.reporter?.name} />
-                <ReviewRow label="Witnesses" value={d.witnesses} />
-            </ReviewCard>
-
-            <ReviewCard icon={Search} title="Classification">
-                <ReviewRow label="Source" value={titleCase(d.source)} />
-                <ReviewRow
-                    label={isNearMiss ? 'Potential severity' : 'Severity'}
-                    value={
-                        isNearMiss
-                            ? d.potential_severity
-                                ? SEV_LABEL[d.potential_severity]
-                                : undefined
-                            : SEV_LABEL[d.severity]
-                    }
-                />
-                {isNearMiss ? (
-                    <ReviewRow
-                        label="Could have caused"
-                        value={d.potential_consequence}
-                    />
-                ) : null}
-                <ReviewRow
-                    label="H&S event"
-                    value={d.hs_event?.reference_number}
-                />
-            </ReviewCard>
-
-            <ReviewCard icon={CheckCircle2} title="Immediate actions" span>
-                <p className="text-sm whitespace-pre-wrap text-foreground">
-                    {d.immediate_action_taken || '—'}
-                </p>
-            </ReviewCard>
         </div>
     );
 }
 
-function TimelineSection({ d }: { d: IncidentDetail }) {
+export function TimelineSection({ d }: { d: IncidentDetail }) {
     type TLEvent = {
         at: string;
         label: string;
@@ -1104,7 +1522,7 @@ function TimelineSection({ d }: { d: IncidentDetail }) {
     );
 }
 
-function PhotosSection({ d }: { d: IncidentDetail }) {
+export function PhotosSection({ d }: { d: IncidentDetail }) {
     // Attachments are only mutable while the incident is a draft (server guardrail).
     const canEdit = d.status === 'draft' && d.can.update;
     return (
@@ -1243,16 +1661,23 @@ function AttachmentRow({
     );
 }
 
-function FollowupsSection({
+export function FollowupsSection({
     d,
     onComplete,
+    onDraftStateChange,
 }: {
     d: IncidentDetail;
     onComplete: (id: number) => void;
+    onDraftStateChange?: (state: IncidentDraftState) => void;
 }) {
     return (
         <div className="flex flex-col gap-3">
-            {d.can.followupsManage ? <AddFollowupForm d={d} /> : null}
+            {d.can.followupsManage ? (
+                <AddFollowupForm
+                    d={d}
+                    onDraftStateChange={onDraftStateChange}
+                />
+            ) : null}
 
             {d.followups.length ? (
                 <div className="flex flex-col gap-2">
@@ -1265,37 +1690,49 @@ function FollowupsSection({
                                 className={`mt-0.5 h-4 w-4 shrink-0 ${f.completed_at ? 'text-status-success' : f.overdue ? 'text-status-critical' : 'text-status-warning'}`}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-foreground">
+                                <p className="text-subtle break-words whitespace-pre-wrap text-foreground">
                                     {f.notes || 'Follow-up task'}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-caption text-muted-foreground">
                                     {f.assigned_to
                                         ? `${f.assigned_to}`
                                         : 'Unassigned'}
                                     {f.due_at
                                         ? ` · due ${formatDateTime(f.due_at)}`
-                                        : ''}
+                                        : ' · no due date'}
                                     {f.completed_at
                                         ? ` · completed ${formatDateTime(f.completed_at)}`
                                         : f.overdue
                                           ? ' · overdue'
                                           : ''}
                                 </p>
+                                <StatusBadge
+                                    variant={
+                                        f.completed_at
+                                            ? 'success'
+                                            : f.overdue
+                                              ? 'critical'
+                                              : 'warning'
+                                    }
+                                    className="mt-1"
+                                >
+                                    {f.completed_at
+                                        ? 'Completed'
+                                        : f.overdue
+                                          ? 'Overdue'
+                                          : 'Open'}
+                                </StatusBadge>
                             </div>
                             {!f.completed_at && d.can.followupsComplete ? (
                                 <Button
                                     variant="outline"
                                     size="sm"
+                                    className="frontline-tap shrink-0"
                                     onClick={() => onComplete(f.id)}
                                 >
                                     <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />{' '}
                                     Complete
                                 </Button>
-                            ) : f.completed_at ? (
-                                <span className="inline-flex items-center gap-1 text-xs font-medium text-status-success">
-                                    <CheckCircle2 className="h-3.5 w-3.5" />{' '}
-                                    Done
-                                </span>
                             ) : null}
                         </div>
                     ))}
@@ -1312,36 +1749,78 @@ function FollowupsSection({
     );
 }
 
-function AddFollowupForm({ d }: { d: IncidentDetail }) {
+function AddFollowupForm({
+    d,
+    onDraftStateChange,
+}: {
+    d: IncidentDetail;
+    onDraftStateChange?: (state: IncidentDraftState) => void;
+}) {
     const [open, setOpen] = useState(false);
+    const assignmentId = useId();
+    const assignmentLabelId = useId();
+    const assignmentErrorId = useId();
+    const notesErrorId = useId();
+    const dueErrorId = useId();
+    const dueId = useId();
     const form = useForm<{
         notes: string;
         assigned_to_user_id: string;
         due_at: string;
     }>({ notes: '', assigned_to_user_id: '', due_at: '' });
+    const closed = d.status === 'closed';
+    const unavailableSelection =
+        Boolean(form.data.assigned_to_user_id) &&
+        !d.assignable_staff.some(
+            (staff) => String(staff.id) === form.data.assigned_to_user_id,
+        );
+    const incidentError = (form.errors as Record<string, string | undefined>)
+        .incident;
+    useEffect(() => {
+        onDraftStateChange?.({
+            dirty: Boolean(form.isDirty),
+            busy: form.processing,
+        });
+    }, [form.isDirty, form.processing, onDraftStateChange]);
+    useEffect(
+        () => () => onDraftStateChange?.({ dirty: false, busy: false }),
+        [onDraftStateChange],
+    );
 
     if (!open) {
         return (
-            <Button
-                variant="outline"
-                size="sm"
-                className="self-start"
-                onClick={() => setOpen(true)}
-            >
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add follow-up
-            </Button>
+            <div className="flex flex-col items-start gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="frontline-tap self-start"
+                    disabled={closed || form.processing}
+                    onClick={() => setOpen(true)}
+                >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />{' '}
+                    {form.isDirty ? 'Continue follow-up' : 'Add follow-up'}
+                </Button>
+                {closed ? (
+                    <p className="text-subtle text-muted-foreground">
+                        Reopen the incident before adding a follow-up.
+                    </p>
+                ) : null}
+            </div>
         );
     }
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (closed || form.processing) return;
         if (!form.data.notes.trim()) {
             form.setError('notes', 'Describe the follow-up task.');
             return;
         }
         form.post(`/incidents/${d.id}/followups`, {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                if ((page.props as { flash?: { error?: string } }).flash?.error)
+                    return;
                 form.reset();
                 setOpen(false);
             },
@@ -1349,53 +1828,142 @@ function AddFollowupForm({ d }: { d: IncidentDetail }) {
     };
 
     return (
-        <form
-            onSubmit={submit}
-            className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3"
-        >
-            <Field label="Task" required error={form.errors.notes}>
+        <form onSubmit={submit} className="flex flex-col gap-5">
+            {closed ? (
+                <p
+                    role="status"
+                    className="text-subtle text-status-warning-foreground"
+                >
+                    This incident is closed. Your unsaved follow-up is retained
+                    here; reopen the incident before adding it.
+                </p>
+            ) : null}
+            {incidentError ? (
+                <div role="alert">
+                    <FieldErr>{incidentError}</FieldErr>
+                </div>
+            ) : null}
+            <Field
+                label="Task"
+                required
+                error={form.errors.notes}
+                errorId={notesErrorId}
+            >
                 <Textarea
                     rows={2}
                     value={form.data.notes}
+                    disabled={closed || form.processing}
+                    aria-invalid={Boolean(form.errors.notes)}
+                    aria-describedby={
+                        form.errors.notes ? notesErrorId : undefined
+                    }
                     onChange={(e) => form.setData('notes', e.target.value)}
                     placeholder="e.g. Update the care plan and notify the GP"
                 />
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Assign to">
-                    <SelectInput
-                        value={form.data.assigned_to_user_id}
-                        onChange={(v) => form.setData('assigned_to_user_id', v)}
-                        placeholder="Unassigned"
-                        options={d.assignable_staff.map((s) => ({
-                            value: String(s.id),
-                            label: s.name,
-                        }))}
-                    />
+                <Field
+                    label="Assign to"
+                    htmlFor={assignmentId}
+                    labelId={assignmentLabelId}
+                    error={form.errors.assigned_to_user_id}
+                    errorId={assignmentErrorId}
+                >
+                    <div
+                        role="group"
+                        aria-labelledby={assignmentLabelId}
+                        aria-invalid={Boolean(form.errors.assigned_to_user_id)}
+                        aria-describedby={
+                            form.errors.assigned_to_user_id
+                                ? assignmentErrorId
+                                : undefined
+                        }
+                        className="flex flex-col items-start gap-2"
+                    >
+                        <SelectInput
+                            id={assignmentId}
+                            frontline
+                            ariaLabel="Assign to"
+                            value={form.data.assigned_to_user_id}
+                            disabled={closed || form.processing}
+                            onChange={(v) =>
+                                form.setData('assigned_to_user_id', v)
+                            }
+                            placeholder="Unassigned"
+                            options={[
+                                ...(unavailableSelection
+                                    ? [
+                                          {
+                                              value: form.data
+                                                  .assigned_to_user_id,
+                                              label: 'Staff selection unavailable',
+                                              disabled: true,
+                                          },
+                                      ]
+                                    : []),
+                                ...d.assignable_staff.map((s) => ({
+                                    value: String(s.id),
+                                    label: s.name,
+                                })),
+                            ]}
+                        />
+                        {form.data.assigned_to_user_id ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="frontline-tap"
+                                disabled={closed || form.processing}
+                                onClick={() =>
+                                    form.setData('assigned_to_user_id', '')
+                                }
+                            >
+                                Clear assignment
+                            </Button>
+                        ) : null}
+                    </div>
                 </Field>
-                <Field label="Due">
-                    <Input
-                        type="date"
+                <Field
+                    label="Due"
+                    error={form.errors.due_at}
+                    errorId={dueErrorId}
+                >
+                    <DatePicker
+                        key={closed || form.processing ? 'locked' : 'available'}
+                        compact
+                        id={dueId}
+                        label="Due"
                         value={form.data.due_at}
-                        onChange={(e) => form.setData('due_at', e.target.value)}
+                        disabled={closed || form.processing}
+                        invalid={Boolean(form.errors.due_at)}
+                        describedBy={
+                            form.errors.due_at ? dueErrorId : undefined
+                        }
+                        allowClear
+                        onChange={(value) => {
+                            if (!closed && !form.processing)
+                                form.setData('due_at', value);
+                        }}
                     />
                 </Field>
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                        form.reset();
-                        form.clearErrors();
-                        setOpen(false);
-                    }}
+                    className="frontline-tap"
+                    onClick={() => setOpen(false)}
                 >
-                    Cancel
+                    Hide draft
                 </Button>
-                <Button type="submit" size="sm" disabled={form.processing}>
-                    Add follow-up
+                <Button
+                    type="submit"
+                    size="sm"
+                    className="frontline-tap"
+                    disabled={closed || form.processing}
+                >
+                    {form.processing ? 'Adding follow-up…' : 'Add follow-up'}
                 </Button>
             </div>
         </form>
@@ -1411,13 +1979,23 @@ const METHODOLOGY_LABELS: Record<string, string> = {
     other: 'Other',
 };
 
-export function InvestigationSection({ d }: { d: IncidentDetail }) {
+export function InvestigationSection({
+    d,
+    onDraftStateChange,
+}: {
+    d: IncidentDetail;
+    onDraftStateChange?: (state: IncidentDraftState) => void;
+}) {
     if (!d.hs_event) {
         return (
             <div className="rounded-xl border border-dashed border-border py-12 text-center">
                 <Search className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
                 <p className="text-sm text-muted-foreground">
-                    No Health &amp; Safety event recorded for this incident.
+                    {d.linked_access?.health_safety === 'restricted'
+                        ? 'This incident has a linked Health & Safety record. Your access does not include its details.'
+                        : d.linked_access?.health_safety === 'absent'
+                          ? 'No Health & Safety event recorded for this incident.'
+                          : 'The safety review is unavailable. Reload the incident to check its current connection.'}
                 </p>
             </div>
         );
@@ -1531,7 +2109,7 @@ export function InvestigationSection({ d }: { d: IncidentDetail }) {
                                             ? ` · ${ca.assigned_to}`
                                             : ''}
                                         {ca.due_date
-                                            ? ` · due ${formatDateTime(ca.due_date)}`
+                                            ? ` · due ${formatDateOnly(ca.due_date)}`
                                             : ''}
                                     </p>
                                 </div>
@@ -1546,14 +2124,23 @@ export function InvestigationSection({ d }: { d: IncidentDetail }) {
                 )}
 
                 {d.can.raiseCorrectiveAction ? (
-                    <RaiseCorrectiveActionForm d={d} />
+                    <RaiseCorrectiveActionForm
+                        d={d}
+                        onDraftStateChange={onDraftStateChange}
+                    />
                 ) : null}
             </div>
         </div>
     );
 }
 
-function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
+function RaiseCorrectiveActionForm({
+    d,
+    onDraftStateChange,
+}: {
+    d: IncidentDetail;
+    onDraftStateChange?: (state: IncidentDraftState) => void;
+}) {
     const [open, setOpen] = useState(false);
     const form = useForm<{
         title: string;
@@ -1568,6 +2155,16 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
         due_date: '',
         assigned_to_user_id: '',
     });
+    useEffect(() => {
+        onDraftStateChange?.({
+            dirty: Boolean(form.isDirty),
+            busy: form.processing,
+        });
+    }, [form.isDirty, form.processing, onDraftStateChange]);
+    useEffect(
+        () => () => onDraftStateChange?.({ dirty: false, busy: false }),
+        [onDraftStateChange],
+    );
 
     if (!d.hs_event) {
         return null; // need an H&S event to attach the action to
@@ -1581,7 +2178,10 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
                 className="mt-2"
                 onClick={() => setOpen(true)}
             >
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> Raise corrective action
+                <Plus className="mr-1.5 h-3.5 w-3.5" />{' '}
+                {form.isDirty
+                    ? 'Continue corrective action'
+                    : 'Raise corrective action'}
             </Button>
         );
     }
@@ -1687,13 +2287,9 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                        form.reset();
-                        form.clearErrors();
-                        setOpen(false);
-                    }}
+                    onClick={() => setOpen(false)}
                 >
-                    Cancel
+                    Hide draft
                 </Button>
                 <Button
                     type="submit"
@@ -1732,6 +2328,14 @@ export function LinkedSection({
                     Other linked records
                 </h2>
                 <div className="flex flex-col gap-2">
+                    {d.linked_access?.health_safety === 'restricted' ? (
+                        <LinkedRow
+                            icon={ShieldAlert}
+                            title="Health & Safety record"
+                            sub="Linked record — access restricted"
+                            href={null}
+                        />
+                    ) : null}
                     {d.hs_event ? (
                         <LinkedRow
                             icon={ShieldAlert}
@@ -1793,7 +2397,7 @@ export function LinkedSection({
                             icon={HeartPulse}
                             title="First-aid treatment"
                             sub={`${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`}
-                            href={`/health-safety/first-aid?record=${r.id}`}
+                            href={r.href}
                         />
                     ))}
                     {d.client ? (

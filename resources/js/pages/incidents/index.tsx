@@ -1,13 +1,29 @@
 import {
+    SafetyDateFilter,
+    SafetyRegisterSearch,
+    SafetyWorkspaceRail,
+} from '@/components/health-safety/workspace-header';
+import {
     IncidentDetailDialog,
     type IncidentDetail,
 } from '@/components/incidents/incident-detail-dialog';
+import {
+    incidentOwnerLabel,
+    type IncidentOwnership,
+} from '@/components/incidents/incident-ownership-panel';
 import { IncidentReportDialog } from '@/components/incidents/incident-report-dialog';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page';
 import {
     EntityFilter,
     ShiftContextMenu,
-    TabStrip,
     type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
@@ -20,24 +36,14 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
+import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
+import { fmt, type Tone } from '@/pages/health-safety/components/hs-hero-kit';
+import type { SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    fmt,
-    type Tone,
-} from '@/pages/health-safety/components/hs-hero-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
-import { Head, router } from '@inertiajs/react';
-import {
-    Activity,
-    AlertTriangle,
-    Bell,
     Bot,
     Calendar,
     CheckCircle2,
@@ -48,6 +54,7 @@ import {
     FileEdit,
     LayoutList,
     ListTodo,
+    MoreHorizontal,
     Paperclip,
     Plus,
     RadioTower,
@@ -66,7 +73,8 @@ import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type IncidentRow = {
+export type IncidentRow = {
+    ownership?: IncidentOwnership;
     id: number;
     ref: string | null;
     occurred_at: string | null;
@@ -93,7 +101,7 @@ type IncidentRow = {
     reporter: { name: string } | null;
 };
 
-type FollowupRow = {
+export type FollowupRow = {
     id: number;
     incident_id: number;
     incident_ref: string | null;
@@ -112,17 +120,20 @@ type Paginated<T> = {
 };
 
 type Filters = {
+    owner?: 'all' | 'me' | 'needs_owner';
     q: string;
     tab: string;
     severity: string | null;
     client_id: number | null;
     site_id: number | null;
     source: string | null;
+    kind?: 'all' | 'incidents' | 'near_misses';
     from: string | null;
     to: string | null;
 };
 
 type Props = {
+    viewer_id: number;
     filters: Filters;
     tab: string;
     tabCounts: Record<string, number>;
@@ -139,7 +150,7 @@ type Props = {
             followups: { value: number; overdue: number };
             review: { value: number };
             worksafe: { value: number };
-            alerts: { value: number };
+            alerts: { value: number | null };
         };
     };
     nearMissInsights: {
@@ -165,6 +176,7 @@ type Props = {
     can: {
         create: boolean;
         templatesManage: boolean;
+        reportSafeguarding?: boolean;
         followupsManage?: boolean;
     };
     detail: IncidentDetail | null;
@@ -241,26 +253,58 @@ function titleCase(s: string): string {
     return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/* date helpers (browser-local) */
-const todayStr = () => {
-    const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-};
-const daysAgoStr = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-};
-
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function IncidentsIndex({
+export default function IncidentsIndex(props: Props) {
+    const { auth } = usePage<SharedData>().props;
+    if (
+        !Number.isSafeInteger(props.viewer_id) ||
+        props.viewer_id !== auth?.user?.id
+    ) {
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
+                    { title: 'Incidents', href: '/incidents' },
+                ]}
+            >
+                <Head title="Incidents" />
+                <PageHeader
+                    title="Incidents"
+                    icon={ShieldAlert}
+                    frontline
+                    wrapTitle
+                    subline="Incident information is unavailable for your current account."
+                    actions={
+                        <PageHeaderPrimaryButton
+                            onClick={() =>
+                                router.get(
+                                    '/incidents',
+                                    {},
+                                    { preserveState: false },
+                                )
+                            }
+                        >
+                            Reload incidents
+                        </PageHeaderPrimaryButton>
+                    }
+                />
+                <p
+                    role="alert"
+                    className="text-subtle mt-5 text-status-warning-foreground"
+                >
+                    Reload to check current access before opening incident
+                    information or reporting.
+                </p>
+            </AppLayout>
+        );
+    }
+    return <CurrentActorIncidentsIndex key={props.viewer_id} {...props} />;
+}
+
+function CurrentActorIncidentsIndex({
     filters,
     tab,
     tabCounts,
@@ -301,14 +345,14 @@ export default function IncidentsIndex({
             { preserveScroll: true },
         );
 
-    // Detail-over-list: fetch only the `detail` prop and open the dialog without
-    // navigating away; closing drops the param so `detail` comes back null.
+    const registerUrl = usePage().url;
+    const reportReturnParams = new URLSearchParams(registerUrl.split('?')[1]?.split('#')[0] ?? '');
+    const reportReturnTo = reportReturnParams.getAll('return_to').length === 1
+        && reportReturnParams.get('return_to') === '/my-day' ? '/my-day' : null;
+    // New entry points open the canonical page; the legacy query remains readable
+    // until all cross-module producers have moved to the dedicated destination.
     const openDetail = (id: number) =>
-        router.get(
-            '/incidents',
-            { ...filters, incident: id },
-            { preserveState: true, preserveScroll: true, only: ['detail'] },
-        );
+        router.visit(incidentWorkspaceHref(id, registerUrl));
     const closeDetail = () =>
         router.get(
             '/incidents',
@@ -329,8 +373,10 @@ export default function IncidentsIndex({
         filters.client_id ||
         filters.site_id ||
         filters.source ||
+        (!!filters.owner && filters.owner !== 'all') ||
         filters.from ||
-        filters.to
+        filters.to ||
+        (!!filters.kind && filters.kind !== 'all')
     );
 
     /* ---- hero stat clusters ---- */
@@ -362,7 +408,7 @@ export default function IncidentsIndex({
         },
         {
             id: 'followups',
-            label: 'Follow-ups due',
+            label: 'Open follow-ups',
             icon: ListTodo,
             tone: 'warning',
             badge: tabCounts.followups || undefined,
@@ -398,65 +444,38 @@ export default function IncidentsIndex({
     ];
 
     /* ---- source filter (segmented pill on dark) ---- */
+    TABS.push(
+        {
+            id: 'reported_recent',
+            label: 'Occurred in past 30 days',
+            icon: Calendar,
+            tone: 'primary',
+        },
+        {
+            id: 'closed_recent',
+            label: 'Closed in past 30 days',
+            icon: CheckCircle2,
+            tone: 'success',
+        },
+        {
+            id: 'worksafe_pending',
+            label: 'Awaiting WorkSafe notification',
+            icon: ShieldAlert,
+            tone: 'warning',
+        },
+    );
     const SOURCE_ITEMS = [
         { key: 'all', label: 'All sources' },
         { key: 'manual', label: 'Staff' },
         { key: 'control_room', label: 'Control Room' },
         { key: 'sensor', label: 'Sensor' },
+        { key: 'automated', label: 'Automated' },
     ];
-
-    /* ---- date range (footer pills) ---- */
-    const activeRange = !filters.from
-        ? ''
-        : filters.from === daysAgoStr(7)
-          ? 'week'
-          : filters.from === daysAgoStr(30)
-            ? '30d'
-            : filters.from === daysAgoStr(90)
-              ? 'quarter'
-              : 'custom';
-    const RANGE_ITEMS = [
-        { key: 'week', label: 'This week' },
-        { key: '30d', label: '30 days' },
-        { key: 'quarter', label: 'Quarter' },
-        {
-            key: 'custom',
-            label: 'Custom',
-            popover: (
-                <div className="space-y-2">
-                    <label className="block text-xs font-medium text-foreground">
-                        From
-                        <input
-                            type="date"
-                            defaultValue={filters.from ?? ''}
-                            onChange={(e) =>
-                                go({ from: e.target.value || null })
-                            }
-                            className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
-                        />
-                    </label>
-                    <label className="block text-xs font-medium text-foreground">
-                        To
-                        <input
-                            type="date"
-                            defaultValue={filters.to ?? ''}
-                            onChange={(e) => go({ to: e.target.value || null })}
-                            className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
-                        />
-                    </label>
-                </div>
-            ),
-        },
-    ];
-    const onRange = (key: string) => {
-        if (key === 'custom') return;
-        const map: Record<string, number> = { week: 7, '30d': 30, quarter: 90 };
-        go({ from: daysAgoStr(map[key]), to: todayStr() });
-    };
 
     /* ---- right-click context menu (incident rows) ---- */
     const openRowCtx = (e: ReactMouseEvent, i: IncidentRow) => {
         e.preventDefault();
+        e.stopPropagation();
         const sev = SEV[i.severity] ?? SEV.low;
         const clientName = i.client
             ? `${i.client.first_name} ${i.client.last_name}`.trim()
@@ -519,9 +538,10 @@ export default function IncidentsIndex({
                   ]
                 : []),
         ];
+        const anchor = e.currentTarget.getBoundingClientRect();
         setCtx({
-            x: e.clientX,
-            y: e.clientY,
+            x: e.clientX || anchor.left + 12,
+            y: e.clientY || anchor.bottom,
             tag: (sev.label ?? i.severity).toUpperCase(),
             meta: `${clientName} · ${titleCase(i.type)}`,
             items,
@@ -536,24 +556,264 @@ export default function IncidentsIndex({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Incidents', href: '/incidents' },
             ]}
         >
             <Head title="Incidents" />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* ---- Hero ---- */}
-                <HeroShell
-                    footer={
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroSegmented
-                                label="Period"
-                                variant="pill"
-                                ariaLabel="Date range"
-                                items={RANGE_ITEMS}
-                                value={activeRange}
-                                onChange={onRange}
+            <div className="flex min-w-0 flex-col gap-5">
+                <PageHeader
+                    title="Incidents"
+                    icon={ShieldAlert}
+                    wrapTitle
+                    frontline
+                    subline={`Report and follow up safety concerns${a.alerts.value === null ? '' : ` · ${a.alerts.value} incidents linked to active Control Room alerts you can view`}`}
+                    mobileSummary={`${p.open.value} open incidents · ${a.followups.value} open follow-ups`}
+                    actions={
+                        <>
+                            <SafetyRegisterSearch
+                                key={filters.q}
+                                query={filters.q ?? ''}
+                                onSearch={(q) => go({ q })}
+                                placeholder="Search incidents"
+                            />
+                            {can.templatesManage && (
+                                <PageHeaderGlassButton
+                                    onClick={() =>
+                                        router.visit('/incidents/templates')
+                                    }
+                                >
+                                    Templates
+                                </PageHeaderGlassButton>
+                            )}
+                            {(can.create || can.reportSafeguarding) && (
+                                <Popover
+                                    open={launcherOpen}
+                                    onOpenChange={setLauncherOpen}
+                                >
+                                    <PopoverTrigger asChild>
+                                        <PageHeaderPrimaryButton icon={Plus}>
+                                            Report
+                                        </PageHeaderPrimaryButton>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        align="end"
+                                        className="w-72 max-w-[calc(100vw-2rem)] p-1.5"
+                                    >
+                                        {can.create && (
+                                            <>
+                                                <Button
+                                                    unstyled
+                                                    type="button"
+                                                    onClick={() =>
+                                                        openReport('incident')
+                                                    }
+                                                    className="frontline-tap frontline-focus flex w-full items-start gap-2.5 rounded-md p-2.5 text-left hover:bg-muted"
+                                                >
+                                                    <ShieldAlert
+                                                        aria-hidden
+                                                        className="mt-0.5 size-4 shrink-0 text-status-critical"
+                                                    />
+                                                    <span>
+                                                        <span className="block text-sm font-medium">
+                                                            An incident
+                                                        </span>
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            Something happened
+                                                            to a client or
+                                                            worker.
+                                                        </span>
+                                                    </span>
+                                                </Button>
+                                                <Button
+                                                    unstyled
+                                                    type="button"
+                                                    onClick={() =>
+                                                        openReport('near_miss')
+                                                    }
+                                                    className="frontline-tap frontline-focus flex w-full items-start gap-2.5 rounded-md p-2.5 text-left hover:bg-muted"
+                                                >
+                                                    <Eye
+                                                        aria-hidden
+                                                        className="mt-0.5 size-4 shrink-0 text-primary"
+                                                    />
+                                                    <span>
+                                                        <span className="block text-sm font-medium">
+                                                            A near miss
+                                                        </span>
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            An event that could
+                                                            have caused harm.
+                                                        </span>
+                                                    </span>
+                                                </Button>
+                                            </>
+                                        )}
+                                        {can.reportSafeguarding && (
+                                            <Button
+                                                unstyled
+                                                type="button"
+                                                onClick={() =>
+                                                    router.visit(
+                                                        `/safeguarding/create?${new URLSearchParams({ return_to: registerUrl })}`,
+                                                    )
+                                                }
+                                                className="frontline-tap frontline-focus flex w-full items-start gap-2.5 rounded-md p-2.5 text-left hover:bg-muted"
+                                            >
+                                                <ShieldAlert
+                                                    aria-hidden
+                                                    className="mt-0.5 size-4 shrink-0 text-status-warning"
+                                                />
+                                                <span>
+                                                    <span className="block text-sm font-medium">
+                                                        A safeguarding concern
+                                                    </span>
+                                                    <span className="block text-xs text-muted-foreground">
+                                                        Raise a concern about
+                                                        abuse, neglect or
+                                                        exploitation.
+                                                    </span>
+                                                </span>
+                                            </Button>
+                                        )}
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+                        </>
+                    }
+                    meters={
+                        <div className="grid grid-cols-2 gap-px sm:grid-cols-4 xl:grid-cols-7">
+                            {[
+                                {
+                                    label: 'Occurred · 30 days',
+                                    value: p.reported.value,
+                                    tab: 'reported_recent',
+                                    caption:
+                                        !filters.from && !filters.to
+                                            ? deltaStr(p.reported.delta)
+                                                ? `${deltaStr(p.reported.delta)} versus previous 30 days`
+                                                : 'No change from previous 30 days'
+                                            : 'Within the selected filters',
+                                },
+                                {
+                                    label: 'Open',
+                                    value: p.open.value,
+                                    tab: 'open',
+                                    caption: 'Not yet closed',
+                                },
+                                {
+                                    label: 'Investigating',
+                                    value: p.investigation.value,
+                                    tab: 'investigation',
+                                    caption: 'Pending or underway',
+                                },
+                                {
+                                    label: 'Closed · 30 days',
+                                    value: p.closed.value,
+                                    tab: 'closed_recent',
+                                    caption:
+                                        !filters.from && !filters.to
+                                            ? deltaStr(p.closed.delta)
+                                                ? `${deltaStr(p.closed.delta)} versus previous 30 days`
+                                                : 'No change from previous 30 days'
+                                            : 'Among matching incidents',
+                                },
+                                {
+                                    label: 'Open follow-ups',
+                                    value: a.followups.value,
+                                    tab: 'followups',
+                                    caption: `${a.followups.overdue} overdue`,
+                                },
+                                {
+                                    label: 'Awaiting review',
+                                    value: a.review.value,
+                                    tab: 'review',
+                                    caption: 'Submitted incidents',
+                                },
+                                {
+                                    label: 'WorkSafe pending',
+                                    value: a.worksafe.value,
+                                    tab: 'worksafe_pending',
+                                    caption: 'Awaiting notification',
+                                },
+                            ].map((meter) => (
+                                <PageHeaderMeterBlock
+                                    key={meter.tab}
+                                    label={meter.label}
+                                    tone={
+                                        meter.tab === 'worksafe_pending' &&
+                                        meter.value > 0
+                                            ? 'critical'
+                                            : meter.tab === 'followups' &&
+                                                a.followups.overdue > 0
+                                              ? 'warning'
+                                              : 'brand'
+                                    }
+                                    onClick={() => setTab(meter.tab)}
+                                    pressed={tab === meter.tab}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {fmt(meter.value)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {meter.caption}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ))}
+                        </div>
+                    }
+                    filters={
+                        <>
+                            <PageHeaderFilterSelect
+                                label="Incident view"
+                                value={tab}
+                                options={TABS.map((item) => ({
+                                    value: item.id,
+                                    label: `${item.label} (${tabCounts[item.id] ?? 0})`,
+                                }))}
+                                onChange={setTab}
+                            />
+                            <PageHeaderFilterSelect
+                                label="Incident owner"
+                                value={filters.owner ?? 'all'}
+                                options={[
+                                    {
+                                        value: 'all',
+                                        label: 'All incident owners',
+                                    },
+                                    { value: 'me', label: 'My incidents' },
+                                    {
+                                        value: 'needs_owner',
+                                        label: 'Needs an owner',
+                                    },
+                                ]}
+                                onChange={(value) =>
+                                    go({ owner: value as Filters['owner'] })
+                                }
+                            />
+                            <PageHeaderFilterSelect
+                                label="Report kind"
+                                value={filters.kind ?? 'all'}
+                                options={[
+                                    { value: 'all', label: 'All reports' },
+                                    {
+                                        value: 'incidents',
+                                        label: 'Incidents only',
+                                    },
+                                    {
+                                        value: 'near_misses',
+                                        label: 'Near misses only',
+                                    },
+                                ]}
+                                onChange={(value) =>
+                                    go({ kind: value as Filters['kind'] })
+                                }
+                            />
+                            <SafetyDateFilter
+                                from={filters.from}
+                                to={filters.to}
+                                onChange={go}
                             />
                             {sites?.length ? (
                                 <EntityFilter
@@ -569,222 +829,59 @@ export default function IncidentsIndex({
                                 <EntityFilter
                                     label="Client"
                                     allLabel="All clients"
-                                    items={clients.map((c) => ({
-                                        id: c.id,
-                                        name: `${c.first_name} ${c.last_name}`.trim(),
+                                    items={clients.map((client) => ({
+                                        id: client.id,
+                                        name: `${client.first_name} ${client.last_name}`.trim(),
                                     }))}
                                     value={filters.client_id}
                                     onChange={(id) => go({ client_id: id })}
                                     onDark
                                 />
                             ) : null}
-                            <HeroSegmented
+                            <PageHeaderFilterSelect
                                 label="Source"
-                                variant="pill"
-                                ariaLabel="Source"
-                                items={SOURCE_ITEMS}
                                 value={filters.source ?? 'all'}
+                                options={SOURCE_ITEMS.map((item) => ({
+                                    value: item.key,
+                                    label: item.label,
+                                }))}
                                 onChange={(key) =>
                                     go({ source: key === 'all' ? null : key })
                                 }
                             />
-                            <div className="relative ml-auto">
-                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                                <input
-                                    type="search"
-                                    placeholder="Search incidents…"
-                                    defaultValue={filters.q}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter')
-                                            go({
-                                                q: (
-                                                    e.target as HTMLInputElement
-                                                ).value,
-                                            });
-                                    }}
-                                    className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                                />
-                            </div>
-                            {hasFilters ? (
-                                // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
-                                <button
-                                    type="button"
+                            <PageHeaderFilterSelect
+                                label="Severity"
+                                value={filters.severity ?? 'all'}
+                                options={[
+                                    { value: 'all', label: 'All severities' },
+                                    ...SEV_ORDER.map((value) => ({
+                                        value,
+                                        label: SEV[value].label,
+                                    })),
+                                ]}
+                                onChange={(value) =>
+                                    go({
+                                        severity:
+                                            value === 'all' ? null : value,
+                                    })
+                                }
+                            />
+                            {hasFilters && (
+                                <PageHeaderGlassButton
+                                    icon={X}
                                     onClick={clearFilters}
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
                                 >
-                                    <X className="h-3 w-3" /> Clear
-                                </button>
-                            ) : null}
-                        </div>
+                                    Clear filters
+                                </PageHeaderGlassButton>
+                            )}
+                        </>
                     }
-                >
-                    <WorkflowRibbon current="report" />
-
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <HeroMedallion icon={AlertTriangle} />
-                            <div className="flex flex-col gap-1.5">
-                                <HeroStatusPill>
-                                    Incident register · operational worklist
-                                </HeroStatusPill>
-                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                    Incidents
-                                </h1>
-                                <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    Report, triage and close the loop on
-                                    incidents and near misses — from the Control
-                                    Room desk through to Health &amp; Safety
-                                    investigation.
-                                </p>
-                            </div>
-                        </div>
-
-                        {can.create ? (
-                            <Popover
-                                open={launcherOpen}
-                                onOpenChange={setLauncherOpen}
-                            >
-                                <PopoverTrigger asChild>
-                                    <PageHeaderPrimaryButton icon={Plus}>
-                                        Report
-                                    </PageHeaderPrimaryButton>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    align="end"
-                                    className="w-64 p-1.5"
-                                >
-                                    <Button
-                                        unstyled
-                                        type="button"
-                                        onClick={() => openReport('incident')}
-                                        className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
-                                    >
-                                        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-critical" />
-                                        <span>
-                                            <span className="block text-sm font-medium">
-                                                An incident
-                                            </span>
-                                            <span className="block text-xs text-muted-foreground">
-                                                Something happened to a client
-                                                or worker.
-                                            </span>
-                                        </span>
-                                    </Button>
-                                    <Button
-                                        unstyled
-                                        type="button"
-                                        onClick={() => openReport('near_miss')}
-                                        className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
-                                    >
-                                        <Eye className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
-                                        <span>
-                                            <span className="block text-sm font-medium">
-                                                A near miss
-                                            </span>
-                                            <span className="block text-xs text-muted-foreground">
-                                                No harm done — takes under a
-                                                minute.
-                                            </span>
-                                        </span>
-                                    </Button>
-                                </PopoverContent>
-                            </Popover>
-                        ) : null}
-                    </div>
-
-                    {/* stat clusters */}
-                    <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster
-                            title="This period · last 30 days"
-                            icon={Activity}
-                        >
-                            <HeroClusterTile
-                                href="/incidents?tab=all"
-                                label="Reported"
-                                value={fmt(p.reported.value)}
-                                caption="last 30 days"
-                                tone="neutral"
-                                delta={deltaStr(p.reported.delta)}
-                                deltaTone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/incidents?tab=open"
-                                label="Open"
-                                value={fmt(p.open.value)}
-                                caption="not yet closed"
-                                tone="warning"
-                            />
-                            <HeroClusterTile
-                                href="/incidents?tab=investigation"
-                                label="Investigating"
-                                value={fmt(p.investigation.value)}
-                                caption="under investigation"
-                                tone="critical"
-                            />
-                            <HeroClusterTile
-                                href="/incidents?tab=closed"
-                                label="Closed"
-                                value={fmt(p.closed.value)}
-                                caption="last 30 days"
-                                tone="success"
-                                delta={deltaStr(p.closed.delta)}
-                                deltaTone={
-                                    p.closed.delta >= 0 ? 'success' : 'critical'
-                                }
-                            />
-                        </HeroCluster>
-                        <HeroCluster title="Needs attention" icon={Bell}>
-                            <HeroClusterTile
-                                href="/incidents?tab=followups"
-                                label="Follow-ups due"
-                                value={fmt(a.followups.value)}
-                                caption={
-                                    a.followups.overdue > 0
-                                        ? `${a.followups.overdue} overdue`
-                                        : 'all on track'
-                                }
-                                tone={
-                                    a.followups.overdue > 0
-                                        ? 'critical'
-                                        : 'warning'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/incidents?tab=review"
-                                label="Awaiting review"
-                                value={fmt(a.review.value)}
-                                caption="submitted"
-                                tone="warning"
-                            />
-                            <HeroClusterTile
-                                href="/incidents?tab=worksafe"
-                                label="WorkSafe"
-                                value={fmt(a.worksafe.value)}
-                                caption="awaiting notify"
-                                tone={
-                                    a.worksafe.value > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                label="Active CR alerts"
-                                value={fmt(a.alerts.value)}
-                                caption="Control Room"
-                                tone={
-                                    a.alerts.value > 0 ? 'critical' : 'success'
-                                }
-                            />
-                        </HeroCluster>
-                    </div>
-                </HeroShell>
-
-                {/* ---- Tabs ---- */}
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    items={TABS}
-                    ariaLabel="Incident views"
+                    rail={
+                        <SafetyWorkspaceRail
+                            hub="concerns"
+                            current="incidents"
+                        />
+                    }
                 />
 
                 {/* ---- Near-miss insights strip ---- */}
@@ -844,10 +941,18 @@ export default function IncidentsIndex({
                                     client.id === reportPrefill?.client_id,
                             )?.site_id ?? null,
                     }}
-                    onClose={() => setReportMode(null)}
+                    doneLabel={reportReturnTo ? 'Back to My Day' : undefined}
+                    onClose={() => {
+                        setReportMode(null);
+                        if (reportReturnTo) router.visit(reportReturnTo);
+                    }}
                     onOpenIncident={(url) => {
                         setReportMode(null);
-                        router.visit(url);
+                        const target = new URL(url, window.location.origin);
+                        const match = target.pathname.match(/^\/incidents\/([1-9]\d*)$/);
+                        router.visit(reportReturnTo && target.origin === window.location.origin
+                            && match && Number.isSafeInteger(Number(match[1]))
+                            ? incidentWorkspaceHref(Number(match[1]), reportReturnTo) : url);
                     }}
                 />
             ) : null}
@@ -966,7 +1071,7 @@ function Metric({
 /*  Incident table                                                     */
 /* ------------------------------------------------------------------ */
 
-function IncidentTable({
+export function IncidentTable({
     rows,
     onRowCtx,
     onOpen,
@@ -989,164 +1094,326 @@ function IncidentTable({
         );
     }
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                        <th className="px-4 py-2.5">When</th>
-                        <th className="px-4 py-2.5">Incident</th>
-                        <th className="px-4 py-2.5">Client</th>
-                        <th className="px-4 py-2.5">Severity</th>
-                        <th className="px-4 py-2.5">Status</th>
-                        <th className="px-4 py-2.5">Source</th>
-                        <th className="px-4 py-2.5">Flags</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y">
-                    {rows.map((i) => {
-                        const sev = SEV[i.severity] ?? SEV.low;
-                        const stat = STATUS[i.status] ?? STATUS.draft;
-                        const StatusIcon = stat.icon;
-                        const src = SOURCE[i.source] ?? SOURCE.manual;
-                        const SrcIcon = src.icon;
-                        const clientName = i.client
-                            ? `${i.client.first_name} ${i.client.last_name}`.trim()
-                            : null;
-                        const isNearMiss = i.type === 'near_miss';
-                        return (
-                            <tr
-                                key={i.id}
-                                onClick={() => onOpen(i.id)}
-                                onContextMenu={(e) => onRowCtx(e, i)}
-                                className="cursor-pointer transition-colors hover:bg-muted/40"
+        <>
+            <ul aria-label="Incidents" className="min-w-0 divide-y md:hidden">
+                {rows.map((incident) => (
+                    <li key={incident.id} className="min-w-0 space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-2">
+                            <Button
+                                unstyled
+                                className="frontline-tap frontline-focus min-w-0 rounded-md text-left font-semibold [overflow-wrap:anywhere] text-primary"
+                                onClick={() => onOpen(incident.id)}
+                                aria-label={`Open incident ${incident.ref ?? 'INC-' + incident.id}`}
                             >
-                                <td className="px-4 py-3 align-top whitespace-nowrap">
-                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                        <Calendar className="h-3 w-3" />
-                                        {i.occurred_at
-                                            ? formatDateTime(i.occurred_at)
-                                            : '—'}
-                                    </div>
-                                    <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                        {i.ref ?? `INC-${i.id}`}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex items-center gap-2">
-                                        <span
-                                            className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`}
-                                        />
-                                        <span className="font-medium capitalize">
-                                            {titleCase(i.type)}
-                                        </span>
-                                    </div>
-                                    {i.description ? (
-                                        <p className="mt-0.5 line-clamp-1 max-w-md text-xs text-muted-foreground">
-                                            {i.description}
-                                        </p>
-                                    ) : null}
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    {clientName ? (
-                                        <div className="flex items-center gap-2">
-                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-                                                {clientName
-                                                    .split(' ')
-                                                    .map((n) => n[0])
-                                                    .slice(0, 2)
-                                                    .join('')}
-                                            </span>
-                                            <span className="min-w-0">
-                                                <span className="block truncate font-medium">
-                                                    {clientName}
-                                                </span>
-                                                {i.client?.site ? (
-                                                    <span className="block truncate text-xs text-muted-foreground">
-                                                        {i.client.site}
-                                                    </span>
-                                                ) : null}
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground">
-                                            —
+                                {incident.ref ?? `INC-${incident.id}`} ·{' '}
+                                {titleCase(incident.type)}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="frontline-tap shrink-0"
+                                aria-label={`Options for ${incident.ref ?? 'INC-' + incident.id}`}
+                                onClick={(event) => onRowCtx(event, incident)}
+                            >
+                                <MoreHorizontal
+                                    aria-hidden
+                                    className="size-4"
+                                />
+                            </Button>
+                        </div>
+                        {incident.description && (
+                            <p className="line-clamp-3 text-sm [overflow-wrap:anywhere] text-muted-foreground">
+                                {incident.description}
+                            </p>
+                        )}
+                        <dl className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="col-span-2">
+                                <dt className="text-caption text-muted-foreground">
+                                    When
+                                </dt>
+                                <dd>
+                                    {incident.occurred_at
+                                        ? formatDateTime(incident.occurred_at)
+                                        : 'Time not recorded'}
+                                </dd>
+                            </div>
+                            <div className="min-w-0">
+                                <dt className="text-caption text-muted-foreground">
+                                    Client
+                                </dt>
+                                <dd className="[overflow-wrap:anywhere]">
+                                    {incident.client
+                                        ? `${incident.client.first_name} ${incident.client.last_name}`
+                                        : 'No client recorded'}
+                                    {incident.client?.site && (
+                                        <span className="block text-xs text-muted-foreground">
+                                            {incident.client.site}
                                         </span>
                                     )}
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[sev.tone]}`}
-                                    >
-                                        {isNearMiss && i.potential_severity
-                                            ? `Potential: ${SEV[i.potential_severity]?.label ?? i.potential_severity}`
-                                            : sev.label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${stat.cls}`}
-                                    >
-                                        <StatusIcon className="h-3 w-3" />
-                                        {stat.label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className="inline-flex items-center gap-1 text-xs text-muted-foreground"
-                                        title={src.label}
-                                    >
-                                        <SrcIcon className="h-3.5 w-3.5" />
-                                        {src.label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                                        {i.control_room_alert_id ? (
-                                            <RadioTower
-                                                className="h-3.5 w-3.5 text-status-info"
-                                                aria-label="Linked to Control Room alert"
-                                            />
-                                        ) : null}
-                                        {i.investigation_status &&
-                                        i.investigation_status !==
-                                            'not_required' ? (
-                                            <Search
-                                                className="h-3.5 w-3.5 text-primary"
-                                                aria-label="Investigation"
-                                            />
-                                        ) : null}
-                                        {i.is_notifiable ? (
-                                            <ShieldAlert
-                                                className="h-3.5 w-3.5 text-status-critical"
-                                                aria-label="WorkSafe-notifiable"
-                                            />
-                                        ) : null}
-                                        {i.open_followups_count > 0 ? (
+                                </dd>
+                            </div>
+                            <div className="min-w-0">
+                                <dt className="text-caption text-muted-foreground">
+                                    Incident owner
+                                </dt>
+                                <dd className="[overflow-wrap:anywhere]">
+                                    {incident.ownership
+                                        ? incidentOwnerLabel(incident.ownership)
+                                        : 'Owner not recorded'}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-caption text-muted-foreground">
+                                    Severity
+                                </dt>
+                                <dd className="mt-1">
+                                    <StatusBadge
+                                        status={
+                                            incident.type === 'near_miss' &&
+                                            incident.potential_severity
+                                                ? incident.potential_severity
+                                                : incident.severity
+                                        }
+                                        label={
+                                            incident.type === 'near_miss' &&
+                                            incident.potential_severity
+                                                ? `Potential: ${SEV[incident.potential_severity]?.label ?? incident.potential_severity}`
+                                                : (SEV[incident.severity]
+                                                      ?.label ??
+                                                  incident.severity)
+                                        }
+                                    />
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-caption text-muted-foreground">
+                                    Status
+                                </dt>
+                                <dd className="mt-1">
+                                    <StatusBadge
+                                        status={incident.status}
+                                        label={
+                                            STATUS[incident.status]?.label ??
+                                            titleCase(incident.status)
+                                        }
+                                    />
+                                </dd>
+                            </div>
+                            <div className="col-span-2">
+                                <dt className="text-caption text-muted-foreground">
+                                    Source
+                                </dt>
+                                <dd>
+                                    {SOURCE[incident.source]?.label ??
+                                        titleCase(incident.source)}
+                                </dd>
+                            </div>
+                        </dl>
+                        <div className="flex flex-wrap gap-3 text-xs">
+                            {incident.is_notifiable && (
+                                <span className="inline-flex items-center gap-1 text-status-critical">
+                                    <ShieldAlert
+                                        aria-hidden
+                                        className="size-4"
+                                    />
+                                    WorkSafe-notifiable
+                                </span>
+                            )}
+                            {incident.open_followups_count > 0 && (
+                                <span className="inline-flex items-center gap-1">
+                                    <ListTodo aria-hidden className="size-4" />
+                                    {incident.open_followups_count} open
+                                    follow-ups
+                                </span>
+                            )}
+                            {incident.attachments_count > 0 && (
+                                <span className="inline-flex items-center gap-1">
+                                    <Paperclip aria-hidden className="size-4" />
+                                    {incident.attachments_count} attachments
+                                </span>
+                            )}
+                        </div>
+                    </li>
+                ))}
+            </ul>
+            <div
+                role="region"
+                aria-label="Incidents table"
+                tabIndex={0}
+                className="hidden max-w-full overflow-x-auto overscroll-x-contain focus-visible:ring-2 focus-visible:ring-ring md:block"
+            >
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                            <th className="px-4 py-2.5">When</th>
+                            <th className="px-4 py-2.5">Incident</th>
+                            <th className="px-4 py-2.5">Client</th>
+                            <th className="px-4 py-2.5">Incident owner</th>
+                            <th className="px-4 py-2.5">Severity</th>
+                            <th className="px-4 py-2.5">Status</th>
+                            <th className="px-4 py-2.5">Source</th>
+                            <th className="px-4 py-2.5">Flags</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {rows.map((i) => {
+                            const sev = SEV[i.severity] ?? SEV.low;
+                            const stat = STATUS[i.status] ?? STATUS.draft;
+                            const StatusIcon = stat.icon;
+                            const src = SOURCE[i.source] ?? SOURCE.manual;
+                            const SrcIcon = src.icon;
+                            const clientName = i.client
+                                ? `${i.client.first_name} ${i.client.last_name}`.trim()
+                                : null;
+                            const isNearMiss = i.type === 'near_miss';
+                            return (
+                                <tr
+                                    key={i.id}
+                                    onClick={() => onOpen(i.id)}
+                                    onContextMenu={(e) => onRowCtx(e, i)}
+                                    className="cursor-pointer transition-colors hover:bg-muted/40"
+                                >
+                                    <td className="px-4 py-3 align-top whitespace-nowrap">
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <Calendar className="h-3 w-3" />
+                                            {i.occurred_at
+                                                ? formatDateTime(i.occurred_at)
+                                                : '—'}
+                                        </div>
+                                        <Button
+                                            unstyled
+                                            className="frontline-focus mt-0.5 min-h-11 rounded-md text-left text-xs font-medium text-primary"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onOpen(i.id);
+                                            }}
+                                            aria-label={`Open incident ${i.ref ?? 'INC-' + i.id}`}
+                                        >
+                                            {i.ref ?? `INC-${i.id}`}
+                                        </Button>
+                                    </td>
+                                    <td className="px-4 py-3 align-top">
+                                        <div className="flex items-center gap-2">
                                             <span
-                                                className="inline-flex items-center gap-0.5 text-xs text-status-warning"
-                                                aria-label="Open follow-ups"
-                                            >
-                                                <ListTodo className="h-3.5 w-3.5" />
-                                                {i.open_followups_count}
+                                                className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`}
+                                            />
+                                            <span className="font-medium capitalize">
+                                                {titleCase(i.type)}
                                             </span>
+                                        </div>
+                                        {i.description ? (
+                                            <p className="mt-0.5 line-clamp-1 max-w-md text-xs text-muted-foreground">
+                                                {i.description}
+                                            </p>
                                         ) : null}
-                                        {i.attachments_count > 0 ? (
-                                            <span
-                                                className="inline-flex items-center gap-0.5 text-xs"
-                                                aria-label="Attachments"
-                                            >
-                                                <Paperclip className="h-3.5 w-3.5" />
-                                                {i.attachments_count}
+                                    </td>
+                                    <td className="px-4 py-3 align-top">
+                                        {clientName ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                                                    {clientName
+                                                        .split(' ')
+                                                        .map((n) => n[0])
+                                                        .slice(0, 2)
+                                                        .join('')}
+                                                </span>
+                                                <span className="min-w-0">
+                                                    <span className="block truncate font-medium">
+                                                        {clientName}
+                                                    </span>
+                                                    {i.client?.site ? (
+                                                        <span className="block truncate text-xs text-muted-foreground">
+                                                            {i.client.site}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">
+                                                —
                                             </span>
-                                        ) : null}
-                                    </div>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 align-top">
+                                        {i.ownership
+                                            ? incidentOwnerLabel(i.ownership)
+                                            : 'Owner not recorded'}
+                                    </td>
+                                    <td className="px-4 py-3 align-top">
+                                        <span
+                                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[sev.tone]}`}
+                                        >
+                                            {isNearMiss && i.potential_severity
+                                                ? `Potential: ${SEV[i.potential_severity]?.label ?? i.potential_severity}`
+                                                : sev.label}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 align-top">
+                                        <span
+                                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${stat.cls}`}
+                                        >
+                                            <StatusIcon className="h-3 w-3" />
+                                            {stat.label}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 align-top">
+                                        <span
+                                            className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                                            title={src.label}
+                                        >
+                                            <SrcIcon className="h-3.5 w-3.5" />
+                                            {src.label}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 align-top">
+                                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                                            {i.control_room_alert_id ? (
+                                                <RadioTower
+                                                    className="h-3.5 w-3.5 text-status-info"
+                                                    aria-label="Linked to Control Room alert"
+                                                />
+                                            ) : null}
+                                            {i.investigation_status &&
+                                            i.investigation_status !==
+                                                'not_required' ? (
+                                                <Search
+                                                    className="h-3.5 w-3.5 text-primary"
+                                                    aria-label="Investigation"
+                                                />
+                                            ) : null}
+                                            {i.is_notifiable ? (
+                                                <ShieldAlert
+                                                    className="h-3.5 w-3.5 text-status-critical"
+                                                    aria-label="WorkSafe-notifiable"
+                                                />
+                                            ) : null}
+                                            {i.open_followups_count > 0 ? (
+                                                <span
+                                                    className="inline-flex items-center gap-0.5 text-xs text-status-warning"
+                                                    aria-label="Open follow-ups"
+                                                >
+                                                    <ListTodo className="h-3.5 w-3.5" />
+                                                    {i.open_followups_count}
+                                                </span>
+                                            ) : null}
+                                            {i.attachments_count > 0 ? (
+                                                <span
+                                                    className="inline-flex items-center gap-0.5 text-xs"
+                                                    aria-label="Attachments"
+                                                >
+                                                    <Paperclip className="h-3.5 w-3.5" />
+                                                    {i.attachments_count}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </>
     );
 }
 
@@ -1154,7 +1421,7 @@ function IncidentTable({
 /*  Follow-ups worklist                                                */
 /* ------------------------------------------------------------------ */
 
-function FollowupTable({
+export function FollowupTable({
     rows,
     onOpen,
 }: {
@@ -1169,84 +1436,160 @@ function FollowupTable({
                     No open follow-ups
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground/70">
-                    Every follow-up across these incidents is complete.
+                    No open follow-ups match this view and its filters.
                 </p>
             </div>
         );
     }
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                        <th className="px-4 py-2.5">Follow-up</th>
-                        <th className="px-4 py-2.5">Incident</th>
-                        <th className="px-4 py-2.5">Client</th>
-                        <th className="px-4 py-2.5">Owner</th>
-                        <th className="px-4 py-2.5">Due</th>
-                        <th className="px-4 py-2.5"></th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y">
-                    {rows.map((f) => (
-                        <tr
-                            key={f.id}
-                            onClick={() => onOpen(f.incident_id)}
-                            className="cursor-pointer transition-colors hover:bg-muted/40"
+        <>
+            <ul
+                aria-label="Open incident follow-ups"
+                className="min-w-0 divide-y md:hidden"
+            >
+                {rows.map((followup) => (
+                    <li key={followup.id} className="min-w-0 space-y-3 p-4">
+                        <Button
+                            unstyled
+                            className="frontline-tap frontline-focus block w-full rounded-md text-left font-semibold [overflow-wrap:anywhere] text-primary"
+                            onClick={() => onOpen(followup.incident_id)}
+                            aria-label={`Open incident ${followup.incident_ref ?? 'INC-' + followup.incident_id}`}
                         >
-                            <td className="px-4 py-3 align-top">
-                                <div className="flex items-start gap-2">
-                                    <Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
-                                    <span className="line-clamp-2 max-w-md">
-                                        {f.notes ?? 'Follow-up task'}
-                                    </span>
-                                </div>
-                            </td>
-                            <td className="px-4 py-3 align-top whitespace-nowrap text-muted-foreground">
-                                <span className="font-medium text-foreground">
-                                    {f.incident_ref ?? `INC-${f.incident_id}`}
-                                </span>
-                                {f.incident_type ? (
-                                    <span className="block text-xs capitalize">
-                                        {titleCase(f.incident_type)}
-                                    </span>
-                                ) : null}
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                                {f.client_name ?? '—'}
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                    {f.assigned_to ? (
-                                        <UserCog className="h-3.5 w-3.5" />
-                                    ) : null}
-                                    {f.assigned_to ?? 'Unassigned'}
-                                </span>
-                            </td>
-                            <td className="px-4 py-3 align-top whitespace-nowrap">
-                                {f.due_at ? (
-                                    <span
-                                        className={`inline-flex items-center gap-1 text-xs ${f.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}
-                                    >
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {formatDateTime(f.due_at)}
-                                        {f.overdue ? ' · overdue' : ''}
-                                    </span>
-                                ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                        No due date
-                                    </span>
-                                )}
-                            </td>
-                            <td className="px-4 py-3 text-right align-top">
-                                <span className="inline-flex items-center gap-1 text-xs text-primary">
-                                    <Stethoscope className="h-3.5 w-3.5" /> Open
-                                </span>
-                            </td>
+                            {followup.incident_ref ??
+                                `INC-${followup.incident_id}`}
+                            {followup.incident_type
+                                ? ` · ${titleCase(followup.incident_type)}`
+                                : ''}
+                        </Button>
+                        <p className="text-sm [overflow-wrap:anywhere]">
+                            {followup.notes ?? 'Follow-up task'}
+                        </p>
+                        <dl className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="min-w-0">
+                                <dt className="text-caption text-muted-foreground">
+                                    Client
+                                </dt>
+                                <dd className="[overflow-wrap:anywhere]">
+                                    {followup.client_name ??
+                                        'No client recorded'}
+                                </dd>
+                            </div>
+                            <div className="min-w-0">
+                                <dt className="text-caption text-muted-foreground">
+                                    Owner
+                                </dt>
+                                <dd className="[overflow-wrap:anywhere]">
+                                    {followup.assigned_to ?? 'Unassigned'}
+                                </dd>
+                            </div>
+                            <div className="col-span-2">
+                                <dt className="text-caption text-muted-foreground">
+                                    Due
+                                </dt>
+                                <dd>
+                                    {followup.due_at
+                                        ? formatDateTime(followup.due_at)
+                                        : 'No due date'}
+                                    {followup.overdue && (
+                                        <StatusBadge
+                                            className="ml-2"
+                                            status="overdue"
+                                        />
+                                    )}
+                                </dd>
+                            </div>
+                        </dl>
+                    </li>
+                ))}
+            </ul>
+            <div
+                role="region"
+                aria-label="Incident follow-ups table"
+                tabIndex={0}
+                className="hidden max-w-full overflow-x-auto overscroll-x-contain focus-visible:ring-2 focus-visible:ring-ring md:block"
+            >
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                            <th className="px-4 py-2.5">Follow-up</th>
+                            <th className="px-4 py-2.5">Incident</th>
+                            <th className="px-4 py-2.5">Client</th>
+                            <th className="px-4 py-2.5">Owner</th>
+                            <th className="px-4 py-2.5">Due</th>
+                            <th className="px-4 py-2.5"></th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody className="divide-y">
+                        {rows.map((f) => (
+                            <tr
+                                key={f.id}
+                                onClick={() => onOpen(f.incident_id)}
+                                className="cursor-pointer transition-colors hover:bg-muted/40"
+                            >
+                                <td className="px-4 py-3 align-top">
+                                    <div className="flex items-start gap-2">
+                                        <Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
+                                        <span className="line-clamp-2 max-w-md">
+                                            {f.notes ?? 'Follow-up task'}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3 align-top whitespace-nowrap text-muted-foreground">
+                                    <Button
+                                        unstyled
+                                        className="frontline-focus min-h-11 rounded-md text-left font-medium text-primary"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            onOpen(f.incident_id);
+                                        }}
+                                        aria-label={`Open incident ${f.incident_ref ?? 'INC-' + f.incident_id}`}
+                                    >
+                                        {f.incident_ref ??
+                                            `INC-${f.incident_id}`}
+                                    </Button>
+                                    {f.incident_type ? (
+                                        <span className="block text-xs capitalize">
+                                            {titleCase(f.incident_type)}
+                                        </span>
+                                    ) : null}
+                                </td>
+                                <td className="px-4 py-3 align-top">
+                                    {f.client_name ?? '—'}
+                                </td>
+                                <td className="px-4 py-3 align-top">
+                                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                        {f.assigned_to ? (
+                                            <UserCog className="h-3.5 w-3.5" />
+                                        ) : null}
+                                        {f.assigned_to ?? 'Unassigned'}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-3 align-top whitespace-nowrap">
+                                    {f.due_at ? (
+                                        <span
+                                            className={`inline-flex items-center gap-1 text-xs ${f.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}
+                                        >
+                                            <Clock className="h-3.5 w-3.5" />
+                                            {formatDateTime(f.due_at)}
+                                            {f.overdue ? ' · overdue' : ''}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">
+                                            No due date
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="px-4 py-3 text-right align-top">
+                                    <span className="inline-flex items-center gap-1 text-xs text-primary">
+                                        <Stethoscope className="h-3.5 w-3.5" />{' '}
+                                        Open
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
     );
 }

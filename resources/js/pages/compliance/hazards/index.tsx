@@ -12,12 +12,12 @@ export default function ComplianceHazardsIndex(props: HazardRegisterData) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Compliance', href: '/compliance/hazards' },
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Hazards', href: '/compliance/hazards' },
             ]}
         >
-            <Head title="Homes & Sites Hazards" />
-            <div className="flex flex-col p-6">
+            <Head title="Hazards" />
+            <div className="flex min-w-0 flex-col gap-5">
                 <HazardRegister baseUrl="/compliance/hazards" data={props} />
             </div>
         </AppLayout>

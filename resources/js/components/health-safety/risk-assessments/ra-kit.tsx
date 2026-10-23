@@ -3,6 +3,8 @@
  * semantic design tokens only, never hardcoded colours. Mirrors the look of
  * register-row-kit but adds the 4-band risk tone (incl. an `info`/medium band the
  * shared kit lacks) so low/medium/high/extreme stay visually distinct. */
+import { StatusBadge } from '@/components/ui/status-badge';
+import { formatDate, formatDateOnly } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     AlertTriangle,
@@ -29,7 +31,7 @@ export type RaTone = 'success' | 'info' | 'warning' | 'critical' | 'neutral';
 
 export const RA_TONE_CHIP: Record<RaTone, string> = {
     success: 'bg-status-success-bg text-status-success',
-    info: 'bg-primary/10 text-primary',
+    info: 'bg-status-info-bg text-status-info',
     warning: 'bg-status-warning-bg text-status-warning',
     critical: 'bg-status-critical-bg text-status-critical',
     neutral: 'bg-muted text-muted-foreground',
@@ -135,11 +137,9 @@ export function attachMeta(type: AttachType): {
 
 export function fmtDate(iso: string | null): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+    return /^\d{4}-\d{2}-\d{2}$/.test(iso)
+        ? formatDateOnly(iso)
+        : formatDate(iso);
 }
 
 /* ------------------------------------------------------------------ */
@@ -173,19 +173,7 @@ export function LevelCell({ score, level }: { score: number; level: RaLevel }) {
 
 export function StatusChip({ status }: { status: RaStatus }) {
     const { label, tone } = statusMeta(status);
-    return (
-        <span
-            className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
-                RA_TONE_CHIP[tone],
-            )}
-        >
-            <span
-                className={cn('h-1.5 w-1.5 rounded-full', RA_TONE_DOT[tone])}
-            />
-            {label}
-        </span>
-    );
+    return <StatusBadge variant={tone}>{label}</StatusBadge>;
 }
 
 export function AttachChip({ attached }: { attached: AttachedTo }) {
@@ -204,18 +192,10 @@ export function AttachChip({ attached }: { attached: AttachedTo }) {
 }
 
 export function AcceptableBadge({ value }: { value: boolean | null }) {
-    if (value === null) return <span className="text-muted-foreground">—</span>;
+    if (value === null)
+        return <span className="text-muted-foreground">Not recorded</span>;
     const tone: RaTone = value ? 'success' : 'critical';
-    return (
-        <span
-            className={cn(
-                'inline-flex items-center rounded-md px-2 py-0.5 text-[10.5px] font-bold',
-                RA_TONE_CHIP[tone],
-            )}
-        >
-            {value ? 'Yes' : 'No'}
-        </span>
-    );
+    return <StatusBadge variant={tone}>{value ? 'Yes' : 'No'}</StatusBadge>;
 }
 
 /** Review-due flag: red overdue / amber due-soon / plain date / em-dash. */
@@ -238,7 +218,7 @@ export function ReviewBadge({
             </span>
         );
     }
-    if (state.kind === 'soon') {
+    if (state.kind === 'soon' || state.kind === 'today') {
         return (
             <span
                 className={cn(
@@ -246,7 +226,10 @@ export function ReviewBadge({
                     RA_TONE_CHIP.warning,
                 )}
             >
-                <Clock className="h-3 w-3" /> Due {state.days}d
+                <Clock className="h-3 w-3" />{' '}
+                {state.kind === 'today'
+                    ? 'Due today'
+                    : `Due in ${state.days} days`}
             </span>
         );
     }
@@ -257,5 +240,9 @@ export function ReviewBadge({
             </span>
         );
     }
-    return <span className="text-muted-foreground">—</span>;
+    return (
+        <span className="text-xs text-muted-foreground">
+            {dueAt ? fmtDate(dueAt) : 'Not scheduled'}
+        </span>
+    );
 }

@@ -1,26 +1,13 @@
-/* H&S Event detail — the governance workspace MODAL (HsEventDialog).
- *
- * The Events register's detail-as-modal, built on the Add-Client `WizardShell`
- * read-only chrome (rail = sections, footer = Options bar) — the governance twin
- * of the Incidents / Safeguarding / Fleet detail dialogs. Opens *over* the
- * register (and from a source module's "Open in Health & Safety") and never
- * navigates away; `/health-safety/events/{id}` renders the same content on a thin
- * shell as a deep-link fallback.
- *
- * The `EventDetail` type is the contract — it mirrors
- * `HsEventController::buildEventDetail()`. Tokens are semantic only; every flag
- * pairs an icon + `title` (never colour-only); WCAG AA + keyboard + focus-trap
- * come from `WizardShell`. NZ-only (WorkSafe NZ / HSWA 2015). Web-only.
- *
- * Write actions (close / WorkSafe / investigation / corrective actions) are added
- * to the Options bar as their backend lands — an action appears only when it can
- * actually run (no stubs). */
+/* Permanent safety review and compatibility dialog share canonical records and
+ * workflow commands. EventDetail mirrors the permission-shaped server payload;
+ * a URL selects a view, never grants permission or changes a record. */
 import {
     CorrectiveActionHandoverPane,
     type CorrectiveActionHandover,
 } from '@/components/health-safety/corrective-action-handover-pane';
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
+import { SourceProcedureRequests } from '@/components/health-safety/procedures/source-procedure-requests';
 import {
     JourneyGateList,
     type JourneyGateData,
@@ -30,7 +17,18 @@ import {
     type LinkedOperationalEvidenceData,
 } from '@/components/incidents/linked-operational-evidence';
 import { JourneyTermHelp } from '@/components/journey-term-help';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -46,8 +44,16 @@ import {
     WizardShell,
     type WizardStep,
 } from '@/components/wizard/shell';
+import {
+    SafetyFormDraftContext,
+    useSafetyForm as useForm,
+    useSafetyDraftState,
+    useSafetyWorkspaceDrafts,
+} from '@/hooks/use-safety-workspace-drafts';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
-import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { correctiveActionHref } from '@/lib/health-safety/navigation';
+import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -165,7 +171,8 @@ export type EventCorrectiveAction = {
               title: string;
           }
         | { type: 'new_responsibility'; reason: string | null }
-        | { type: 'standalone' };
+        | { type: 'standalone' }
+        | { type: 'restricted' | 'unavailable' };
     source_task: {
         id: number;
         reference: string;
@@ -410,6 +417,10 @@ export type EventDetail = {
     lifecycle: EventLifecycle;
     handover_summary: EventHandoverSummary;
     linked_operational_evidence: LinkedOperationalEvidenceData | null;
+    linked_access?: {
+        incident: 'absent' | 'readable' | 'restricted';
+        control_room: 'absent' | 'readable' | 'restricted';
+    };
     incident_followups: Array<{
         id: number;
         notes: string | null;
@@ -430,6 +441,8 @@ export type EventDetail = {
     action_handover: CorrectiveActionHandover;
     can: {
         manage: boolean;
+        request_procedure_review?: boolean;
+        view_procedure_requests?: boolean;
         close: boolean;
         request_closure_exception: boolean;
         approve_closure_exception: boolean;
@@ -640,7 +653,7 @@ function fmtSize(bytes: number | null): string {
 /** A workflow form that replaces the body + owns its buttons. Event-level panes
  *  are launched from the Options bar / row menu; per-item ones from inside the
  *  Investigation / Corrective-actions sections. */
-type ActivePane =
+export type SafetyReviewPane =
     | { kind: 'close' }
     | { kind: 'accept_handover' }
     | { kind: 'worksafe_decision' }
@@ -661,6 +674,53 @@ type ActivePane =
     | { kind: 'ca_complete'; actionId: number }
     | { kind: 'ca_verify'; actionId: number }
     | { kind: 'ca_return'; actionId: number };
+
+type ActivePane = SafetyReviewPane;
+
+/** UI eligibility mirrors the existing commands; the server reauthorizes writes. */
+function canOpenPane(pane: ActivePane, detail: EventDetail): boolean {
+    if (detail.status === 'closed') return false;
+    if ('investigationId' in pane) {
+        const inv = detail.investigations.find(
+            (item) => item.id === pane.investigationId,
+        );
+        if (!detail.can.manage || !inv) return false;
+        if (pane.kind === 'inv_findings') return inv.status === 'in_progress';
+        if (pane.kind === 'inv_complete')
+            return ['under_review', 'reviewed'].includes(inv.status);
+        if (pane.kind === 'inv_return') return inv.status === 'under_review';
+        return (
+            inv.status === 'completed' &&
+            !!inv.recommendations?.[pane.recommendationIndex]
+        );
+    }
+    if ('actionId' in pane) {
+        const action = detail.corrective_actions.find(
+            (item) => item.id === pane.actionId,
+        );
+        if (
+            !detail.can.manage ||
+            !detail.can.manage_corrective_action_lifecycle ||
+            !action
+        )
+            return false;
+        if (pane.kind === 'ca_complete') return action.status === 'in_progress';
+        if (pane.kind === 'ca_return') return action.status === 'completed';
+        return (
+            action.status === 'completed' &&
+            detail.can.verify_corrective_actions &&
+            action.can_verify &&
+            action.evidence.load_state === 'loaded'
+        );
+    }
+    if (pane.kind === 'inv_start')
+        return (
+            detail.can.manage &&
+            !detail.investigations.some((inv) => inv.status !== 'completed')
+        );
+    if (pane.kind === 'ca_add') return detail.can.manage;
+    return paneFromAction(pane.kind, detail) !== null;
+}
 
 function paneFromAction(
     action: EventActionKey | null,
@@ -698,9 +758,13 @@ function paneFromAction(
                 ? { kind: 'worksafe_site_release' }
                 : null;
         case 'investigation':
-            return { kind: 'inv_start' };
+            return detail.can.manage && detail.status !== 'closed'
+                ? { kind: 'inv_start' }
+                : null;
         case 'add_action':
-            return { kind: 'ca_add' };
+            return detail.can.manage && detail.status !== 'closed'
+                ? { kind: 'ca_add' }
+                : null;
         default:
             return null;
     }
@@ -714,15 +778,7 @@ const CA_TARGET_PANE = {
     return: 'ca_return',
 } as const;
 
-export function EventDetailDialog({
-    detail,
-    open,
-    onClose,
-    initialSection = 'overview',
-    initialAction = null,
-    initialActionTarget = null,
-    openedFrom = null,
-}: {
+type EventWorkspaceProps = {
     detail: EventDetail;
     open: boolean;
     onClose: () => void;
@@ -736,24 +792,83 @@ export function EventDetailDialog({
     } | null;
     /** Set when arrived via a source module's "Open in Health & Safety" jump. */
     openedFrom?: string | null;
-}) {
+    presentation?: 'dialog' | 'page';
+    returnHref?: string;
+    onSectionChange?: (section: EventSectionKey) => void;
+    initialPane?: SafetyReviewPane | null;
+    onPaneChange?: (
+        pane: SafetyReviewPane | null,
+        section: EventSectionKey,
+    ) => void;
+};
+
+export function EventDetailDialog(props: EventWorkspaceProps) {
+    return <EventWorkspace {...props} />;
+}
+
+export function EventRecordWorkspace(
+    props: Omit<EventWorkspaceProps, 'open' | 'onClose' | 'presentation'>,
+) {
+    return (
+        <EventWorkspace
+            {...props}
+            open
+            presentation="page"
+            onClose={() =>
+                router.visit(props.returnHref ?? '/health-safety/events')
+            }
+        />
+    );
+}
+
+function EventWorkspace({
+    detail,
+    open,
+    onClose,
+    initialSection = 'overview',
+    initialAction = null,
+    initialActionTarget = null,
+    openedFrom = null,
+    presentation = 'dialog',
+    returnHref = '/health-safety/events',
+    onSectionChange,
+    initialPane = null,
+    onPaneChange,
+}: EventWorkspaceProps) {
+    const drafts = useSafetyWorkspaceDrafts();
     const [section, setSection] = useState<EventSectionKey>(
         initialActionTarget ? 'actions' : initialSection,
     );
-    const [pane, setPane] = useState<ActivePane | null>(() =>
-        initialActionTarget
-            ? {
-                  kind: CA_TARGET_PANE[initialActionTarget.pane],
-                  actionId: initialActionTarget.actionId,
-              }
-            : paneFromAction(initialAction, detail),
+    const [pane, setActivePane] = useState<ActivePane | null>(
+        () =>
+            initialPane ??
+            (initialActionTarget
+                ? {
+                      kind: CA_TARGET_PANE[initialActionTarget.pane],
+                      actionId: initialActionTarget.actionId,
+                  }
+                : paneFromAction(initialAction, detail)),
     );
     /** Briefly ring the deep-linked action card once its section is on screen. */
     const [highlightActionId, setHighlightActionId] = useState<number | null>(
         initialActionTarget?.actionId ?? null,
     );
     const actionRowRefs = useRef<Record<number, HTMLDivElement | null>>({});
+    const initialPaneKey = JSON.stringify(initialPane);
     const d = detail;
+    const finishPane = (next: ActivePane | null = null) => {
+        setActivePane(next);
+        onPaneChange?.(next, section);
+    };
+    const setPane = (next: ActivePane | null) =>
+        drafts.request(() => finishPane(next));
+    const selectSection = (next: EventSectionKey) =>
+        drafts.request(() => {
+            setActivePane(null);
+            if (presentation === 'page' && onSectionChange)
+                onSectionChange(next);
+            else setSection(next);
+        });
 
     useEffect(() => {
         const targetId = initialActionTarget?.actionId;
@@ -774,16 +889,19 @@ export function EventDetailDialog({
     // would stay stale and the lifecycle action would silently do nothing. Depends
     // only on incoming prop VALUES, so it never overrides the user's in-dialog nav.
     useEffect(() => {
-        if (initialActionTarget) {
+        if (initialPane) {
+            setSection(initialSection);
+            setActivePane(initialPane);
+        } else if (initialActionTarget) {
             setSection('actions');
-            setPane({
+            setActivePane({
                 kind: CA_TARGET_PANE[initialActionTarget.pane],
                 actionId: initialActionTarget.actionId,
             });
             setHighlightActionId(initialActionTarget.actionId);
         } else {
             setSection(initialSection);
-            setPane(paneFromAction(initialAction, detail));
+            setActivePane(paneFromAction(initialAction, detail));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on incoming prop-value changes; the local setters are stable and intentionally excluded
     }, [
@@ -791,12 +909,9 @@ export function EventDetailDialog({
         initialActionTarget?.pane,
         initialSection,
         initialAction,
-        detail.worksafe.can_decide,
-        detail.worksafe.can_notify,
-        detail.worksafe.can_acknowledge,
-        detail.worksafe.can_review_site_preservation,
-        detail.worksafe.can_release_site_preservation,
-        detail.handover.can_accept,
+        // Permission refreshes must not silently reset a form. PaneRenderer
+        // checks current authority and gives a clear unavailable state instead.
+        initialPaneKey,
     ]);
 
     const cat =
@@ -864,7 +979,10 @@ export function EventDetailDialog({
         {
             key: 'evidence',
             label: 'Evidence',
-            blurb: `${d.attachments.length} file${d.attachments.length === 1 ? '' : 's'}`,
+            blurb:
+                d.linked_access?.incident === 'restricted'
+                    ? 'Access restricted'
+                    : `${d.attachments.length} file${d.attachments.length === 1 ? '' : 's'}`,
             icon: Paperclip,
         },
     ];
@@ -872,6 +990,28 @@ export function EventDetailDialog({
         0,
         SECTIONS.findIndex((s) => s.key === section),
     );
+    const groups = [
+        {
+            key: 'record',
+            label: 'Record',
+            icon: FileText,
+            sections: ['overview', 'handover'],
+        },
+        {
+            key: 'review',
+            label: 'Safety work',
+            icon: ListChecks,
+            sections: ['investigation', 'actions', 'risk'],
+        },
+        {
+            key: 'evidence',
+            label: 'Evidence & history',
+            icon: Paperclip,
+            sections: ['evidence', 'timeline'],
+        },
+    ];
+    const currentGroup =
+        groups.find((group) => group.sections.includes(section)) ?? groups[0];
 
     const footerStart = (
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -912,12 +1052,14 @@ export function EventDetailDialog({
     // action workflows live inline in their sections (and the row menu).
     const footerEnd = pane ? null : (
         <div className="flex flex-wrap items-center gap-2">
-            <Link
-                href={`/health-safety/events/${d.id}`}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
-            >
-                <ExternalLink className="h-4 w-4" /> Open full page
-            </Link>
+            {presentation === 'dialog' ? (
+                <Link
+                    href={`/health-safety/events/${d.id}`}
+                    className="frontline-tap frontline-focus inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+                >
+                    <ExternalLink className="h-4 w-4" /> Open full page
+                </Link>
+            ) : null}
             {d.handover.can_accept ? (
                 <Button
                     size="sm"
@@ -1011,65 +1153,310 @@ export function EventDetailDialog({
         </div>
     );
 
-    return (
-        <WizardShell
-            open={open}
-            onClose={onClose}
-            title={`Event ${d.reference_number}`}
-            description={`${cat} — ${stage.label}`}
-            railIcon={ShieldAlert}
-            railTitle={d.reference_number}
-            railSub={`${cat} · ${sev.label}`}
-            steps={SECTIONS as readonly WizardStep[]}
-            stepIndex={stepIndex}
-            onStepClick={(i) => setSection(SECTIONS[i].key)}
-            headerLabel={SECTIONS[stepIndex]?.label ?? 'Overview'}
-            pct={null}
-            footerStart={footerStart}
-            footerEnd={footerEnd}
-        >
-            {pane ? (
-                <PaneRenderer pane={pane} d={d} onDone={() => setPane(null)} />
-            ) : (
-                <>
-                    {openedFrom ? (
-                        <div className="mb-4">
-                            <InfoCard icon={LinkIcon} tone="info">
-                                Opened from {openedFrom}. This is the Health
-                                &amp; Safety governance record — investigation,
-                                corrective actions and closure are managed here.
-                            </InfoCard>
-                        </div>
-                    ) : null}
+    const body = pane ? (
+        <PaneRenderer
+            pane={pane}
+            d={d}
+            onDone={() => finishPane()}
+            onCancel={() => setPane(null)}
+        />
+    ) : (
+        <>
+            {openedFrom ? (
+                <div className="mb-4">
+                    <InfoCard icon={LinkIcon} tone="info">
+                        Opened from {openedFrom}. This is the Health &amp;
+                        Safety governance record — investigation, corrective
+                        actions and closure are managed here.
+                    </InfoCard>
+                </div>
+            ) : null}
 
-                    {section === 'overview' ? (
-                        <OverviewSection d={d} cat={cat} stage={stage} />
-                    ) : null}
-                    {section === 'handover' ? <HandoverSection d={d} /> : null}
-                    {section === 'investigation' ? (
-                        <InvestigationSection
-                            d={d}
-                            canAct={canAct}
-                            onPane={setPane}
-                        />
-                    ) : null}
-                    {section === 'actions' ? (
-                        <ActionsSection
-                            d={d}
-                            openActions={openActions}
-                            awaitingVerification={awaitingVerification}
-                            canAct={canAct}
-                            onPane={setPane}
-                            rowRefs={actionRowRefs}
-                            highlightActionId={highlightActionId}
-                        />
-                    ) : null}
-                    {section === 'risk' ? <RiskSection d={d} /> : null}
-                    {section === 'timeline' ? <TimelineSection d={d} /> : null}
-                    {section === 'evidence' ? <EvidenceSection d={d} /> : null}
+            {section === 'overview' ? (
+                <OverviewSection d={d} cat={cat} stage={stage} />
+            ) : null}
+            {section === 'handover' ? <HandoverSection d={d} /> : null}
+            {section === 'investigation' ? (
+                <InvestigationSection d={d} canAct={canAct} onPane={setPane} />
+            ) : null}
+            {section === 'actions' ? (
+                <>
+                <ActionsSection
+                    d={d}
+                    openActions={openActions}
+                    awaitingVerification={awaitingVerification}
+                    canAct={canAct}
+                    onPane={setPane}
+                    rowRefs={actionRowRefs}
+                    highlightActionId={highlightActionId}
+                />
+                {(d.can.view_procedure_requests || d.can.request_procedure_review) && <SourceProcedureRequests eventId={d.id} requestDiscard={drafts.request} />}
                 </>
+            ) : null}
+            {section === 'risk' ? <RiskSection d={d} /> : null}
+            {section === 'timeline' ? <TimelineSection d={d} /> : null}
+            {section === 'evidence' ? <EvidenceSection d={d} /> : null}
+        </>
+    );
+    const bodyOrder =
+        pane || section !== 'overview'
+            ? ['details', 'next-step', 'closure']
+            : ['next-step', 'details', 'closure'];
+
+    return (
+        <SafetyFormDraftContext.Provider value={drafts.register}>
+            {presentation === 'page' ? (
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            variant="profile"
+                            frontline
+                            wrapTitle
+                            backHref={returnHref}
+                            icon={ShieldAlert}
+                            title={d.reference_number}
+                            titleChip={
+                                <PageHeaderStatusChip
+                                    variant={
+                                        d.status === 'closed'
+                                            ? 'neutral'
+                                            : 'info'
+                                    }
+                                >
+                                    {stage.label}
+                                </PageHeaderStatusChip>
+                            }
+                            subline={`${cat} · ${d.site?.name ?? 'Site not recorded'} · ${d.occurred_at ? formatDateTime(d.occurred_at) : 'Occurrence time not recorded'} · ${sev.label}`}
+                            mobileSummary={d.journey_state}
+                            meters={
+                                <>
+                                    <PageHeaderMeterBlock
+                                        label="Investigations"
+                                        onClick={() =>
+                                            selectSection('investigation')
+                                        }
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {d.investigations.length}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {
+                                                d.investigations.filter(
+                                                    (inv) =>
+                                                        inv.status !==
+                                                        'completed',
+                                                ).length
+                                            }{' '}
+                                            active
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Actions still open"
+                                        onClick={() => selectSection('actions')}
+                                        tone={openActions ? 'warning' : 'brand'}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {openActions}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {awaitingVerification} awaiting
+                                            verification
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Risk assessments"
+                                        onClick={() => selectSection('risk')}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {d.risk_assessments.length}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Recorded assessments
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Closure requirements"
+                                        onClick={() =>
+                                            selectSection('overview')
+                                        }
+                                        tone={
+                                            blockers.length
+                                                ? 'warning'
+                                                : 'brand'
+                                        }
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {blockers.length}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Requirements still open
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                </>
+                            }
+                            rail={
+                                <PageHeaderRail
+                                    items={groups}
+                                    value={currentGroup.key}
+                                    onSelect={(key) => {
+                                        if (key !== currentGroup.key)
+                                            selectSection(
+                                                groups.find(
+                                                    (group) =>
+                                                        group.key === key,
+                                                )!
+                                                    .sections[0] as EventSectionKey,
+                                            );
+                                    }}
+                                    ariaLabel="Safety review groups"
+                                />
+                            }
+                        />
+                    }
+                    tabs={
+                        <TierTwoTabs
+                            tabs={SECTIONS.filter((item) =>
+                                currentGroup.sections.includes(item.key),
+                            )}
+                            activeTab={section}
+                            onTab={(key) =>
+                                selectSection(key as EventSectionKey)
+                            }
+                            testIdPrefix="safety-review"
+                            panelId="safety-review-panel"
+                            ariaLabel="Safety review sections"
+                            renderLink={(tab, className, content, props) => (
+                                <Link
+                                    href={tab.href!}
+                                    className={className}
+                                    {...props}
+                                >
+                                    {content}
+                                </Link>
+                            )}
+                        />
+                    }
+                >
+                    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+                        {[
+                            <div
+                                key="details"
+                                className="min-w-0 xl:col-start-1 xl:row-span-2 xl:row-start-1"
+                                id="safety-review-panel"
+                                role="tabpanel"
+                                aria-labelledby={`safety-review-tab-${section}`}
+                            >
+                                {pane ? (
+                                    <Card>
+                                        <CardContent className="frontline-dialog pt-5">
+                                            {body}
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    body
+                                )}
+                            </div>,
+                            <aside
+                                key="next-step"
+                                className="min-w-0 xl:col-start-2 xl:row-start-1"
+                                aria-label="Safety review responsibilities and next steps"
+                            >
+                                <Card>
+                                    <CardHeader>
+                                        <h2 className="text-section-title">
+                                            Next step
+                                        </h2>
+                                    </CardHeader>
+                                    <CardContent className="frontline-dialog space-y-4">
+                                        <p className="text-sm font-semibold">
+                                            {d.journey_state}
+                                        </p>
+                                        <ReviewRow
+                                            label="Safety review owner"
+                                            value={
+                                                d.handover.owner?.name ??
+                                                'Not assigned'
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Handover"
+                                            value={handoverStatusLabel(
+                                                d.handover.status,
+                                            )}
+                                        />
+                                        {pane ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                Finish or cancel the current
+                                                action before choosing another.
+                                            </p>
+                                        ) : (
+                                            footerEnd
+                                        )}
+                                        {!pane &&
+                                        !canAct &&
+                                        !canClose &&
+                                        !d.handover.can_accept ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                Your role can read this review.
+                                                Available specialist decisions
+                                                are shown here when permitted.
+                                            </p>
+                                        ) : null}
+                                    </CardContent>
+                                </Card>
+                            </aside>,
+                            <aside
+                                key="closure"
+                                className="min-w-0 xl:col-start-2 xl:row-start-2"
+                                aria-label="Safety review closure requirements"
+                            >
+                                <Card>
+                                    <CardHeader>
+                                        <h2 className="text-section-title">
+                                            Closure requirements
+                                        </h2>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <JourneyGateList gate={d.close_gate} />
+                                        <p className="mt-3 text-sm text-muted-foreground">
+                                            Response resolution, incident
+                                            closure and safety review closure
+                                            are separate decisions.
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            </aside>,
+                        ].sort(
+                            (left, right) =>
+                                bodyOrder.indexOf(String(left.key)) -
+                                bodyOrder.indexOf(String(right.key)),
+                        )}
+                    </div>
+                </PageLayout>
+            ) : (
+                <WizardShell
+                    open={open}
+                    frontline
+                    sequential={false}
+                    onClose={() => drafts.request(onClose)}
+                    title={`Event ${d.reference_number}`}
+                    description={`${cat} — ${stage.label}`}
+                    railIcon={ShieldAlert}
+                    railTitle={d.reference_number}
+                    railSub={`${cat} · ${sev.label}`}
+                    steps={SECTIONS as readonly WizardStep[]}
+                    stepIndex={stepIndex}
+                    onStepClick={(i) => selectSection(SECTIONS[i].key)}
+                    headerLabel={SECTIONS[stepIndex]?.label ?? 'Overview'}
+                    pct={null}
+                    footerStart={footerStart}
+                    footerEnd={footerEnd}
+                >
+                    {body}
+                </WizardShell>
             )}
-        </WizardShell>
+            {drafts.confirmation}
+        </SafetyFormDraftContext.Provider>
     );
 }
 
@@ -1077,7 +1464,15 @@ export function EventDetailDialog({
 /*  Workflow action panes                                              */
 /* ------------------------------------------------------------------ */
 
-function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
+function CloseEventPane({
+    d,
+    onDone,
+    onCancel = onDone,
+}: {
+    d: EventDetail;
+    onDone: () => void;
+    onCancel?: () => void;
+}) {
     const hardBlockers = d.close_readiness.hard_blockers;
     const exceptionalBlockers = d.close_readiness.exceptional_blockers;
     const now = Date.now();
@@ -1196,7 +1591,7 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={onDone}
+                            onClick={onCancel}
                         >
                             Cancel
                         </Button>
@@ -1488,9 +1883,11 @@ function ClosureExceptionRecord({
 function AcceptHandoverPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{ owner_user_id: string; acceptance_notes: string }>({
         owner_user_id: '',
@@ -1542,7 +1939,7 @@ function AcceptHandoverPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -1556,9 +1953,11 @@ function AcceptHandoverPane({
 function WorksafeDecisionPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const revising = d.worksafe.decision_signed;
     const completedNotification =
@@ -1792,7 +2191,7 @@ function WorksafeDecisionPane({
             </Field>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={!canSubmit}>
@@ -1823,9 +2222,11 @@ function todayInput(): string {
 function WorksafeNotifyPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         notified_at: string;
@@ -1913,7 +2314,7 @@ function WorksafeNotifyPane({
             </label>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -1927,9 +2328,11 @@ function WorksafeNotifyPane({
 function WorksafeAcknowledgePane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{ acknowledged_at: string }>({
         acknowledged_at: todayInput(),
@@ -1969,7 +2372,7 @@ function WorksafeAcknowledgePane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -1983,9 +2386,11 @@ function WorksafeAcknowledgePane({
 function WorksafeSitePreservationPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm({
         required:
@@ -2044,7 +2449,7 @@ function WorksafeSitePreservationPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button
@@ -2065,9 +2470,11 @@ function WorksafeSitePreservationPane({
 function WorksafeSiteReleasePane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm({
         released_at: todayInput(),
@@ -2117,7 +2524,7 @@ function WorksafeSiteReleasePane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button
@@ -2139,10 +2546,12 @@ function PaneRenderer({
     pane,
     d,
     onDone,
+    onCancel = onDone,
 }: {
     pane: ActivePane;
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const inv =
         'investigationId' in pane
@@ -2154,44 +2563,97 @@ function PaneRenderer({
             ? (d.corrective_actions.find((a) => a.id === pane.actionId) ?? null)
             : null;
 
+    if (!canOpenPane(pane, d)) {
+        return (
+            <div className="space-y-4">
+                <InfoCard icon={ShieldAlert} tone="warn">
+                    This action is unavailable for the current record or your
+                    access. Review its current status before continuing.
+                </InfoCard>
+                <Button variant="outline" onClick={onCancel}>
+                    Return to review
+                </Button>
+            </div>
+        );
+    }
+
     switch (pane.kind) {
         case 'close':
-            return <CloseEventPane d={d} onDone={onDone} />;
+            return <CloseEventPane d={d} onDone={onDone} onCancel={onCancel} />;
         case 'accept_handover':
-            return <AcceptHandoverPane d={d} onDone={onDone} />;
+            return (
+                <AcceptHandoverPane d={d} onDone={onDone} onCancel={onCancel} />
+            );
         case 'worksafe_decision':
             return d.worksafe.can_decide ? (
-                <WorksafeDecisionPane d={d} onDone={onDone} />
+                <WorksafeDecisionPane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'worksafe_notify':
             return d.worksafe.can_notify ? (
-                <WorksafeNotifyPane d={d} onDone={onDone} />
+                <WorksafeNotifyPane d={d} onDone={onDone} onCancel={onCancel} />
             ) : null;
         case 'worksafe_acknowledge':
             return d.worksafe.can_acknowledge ? (
-                <WorksafeAcknowledgePane d={d} onDone={onDone} />
+                <WorksafeAcknowledgePane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'worksafe_site_preservation':
             return d.worksafe.can_review_site_preservation ? (
-                <WorksafeSitePreservationPane d={d} onDone={onDone} />
+                <WorksafeSitePreservationPane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'worksafe_site_release':
             return d.worksafe.can_release_site_preservation ? (
-                <WorksafeSiteReleasePane d={d} onDone={onDone} />
+                <WorksafeSiteReleasePane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'inv_start':
-            return <StartInvestigationPane d={d} onDone={onDone} />;
+            return (
+                <StartInvestigationPane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
+            );
         case 'inv_findings':
             return inv ? (
-                <RecordFindingsPane d={d} inv={inv} onDone={onDone} />
+                <RecordFindingsPane
+                    d={d}
+                    inv={inv}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'inv_complete':
             return inv ? (
-                <CompleteInvestigationPane d={d} inv={inv} onDone={onDone} />
+                <CompleteInvestigationPane
+                    d={d}
+                    inv={inv}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'inv_return':
             return inv ? (
-                <ReturnInvestigationPane d={d} inv={inv} onDone={onDone} />
+                <ReturnInvestigationPane
+                    d={d}
+                    inv={inv}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'inv_disposition':
             return inv ? (
@@ -2200,21 +2662,43 @@ function PaneRenderer({
                     inv={inv}
                     recommendationIndex={pane.recommendationIndex}
                     onDone={onDone}
+                    onCancel={onCancel}
                 />
             ) : null;
         case 'ca_add':
-            return <AddCorrectiveActionPane d={d} onDone={onDone} />;
+            return (
+                <AddCorrectiveActionPane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
+            );
         case 'ca_complete':
             return ca ? (
-                <CompleteActionPane d={d} ca={ca} onDone={onDone} />
+                <CompleteActionPane
+                    d={d}
+                    ca={ca}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'ca_verify':
             return ca ? (
-                <VerifyActionPane d={d} ca={ca} onDone={onDone} />
+                <VerifyActionPane
+                    d={d}
+                    ca={ca}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'ca_return':
             return ca ? (
-                <ReturnActionPane d={d} ca={ca} onDone={onDone} />
+                <ReturnActionPane
+                    d={d}
+                    ca={ca}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
     }
 }
@@ -2404,9 +2888,11 @@ function RecommendationEditor({
 function StartInvestigationPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         methodology: string;
@@ -2472,7 +2958,7 @@ function StartInvestigationPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -2487,10 +2973,12 @@ function RecordFindingsPane({
     d,
     inv,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     inv: EventInvestigation;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         findings_summary: string;
@@ -2607,7 +3095,7 @@ function RecordFindingsPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -2622,10 +3110,12 @@ function CompleteInvestigationPane({
     d,
     inv,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     inv: EventInvestigation;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm({});
     const isReviewDecision = inv.status === 'under_review';
@@ -2668,7 +3158,7 @@ function CompleteInvestigationPane({
                     : 'Approval records your authenticated decision. You must be different from the investigation submitter, team and recorded reviewer.'}
             </InfoCard>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -2685,10 +3175,12 @@ function ReturnInvestigationPane({
     d,
     inv,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     inv: EventInvestigation;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{ review_notes: string }>({ review_notes: '' });
 
@@ -2731,7 +3223,7 @@ function ReturnInvestigationPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -2852,11 +3344,13 @@ function RecommendationDispositionPane({
     inv,
     recommendationIndex,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     inv: EventInvestigation;
     recommendationIndex: number;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const recommendation = inv.recommendations?.[recommendationIndex];
     const current = recommendation?.disposition;
@@ -2926,6 +3420,7 @@ function RecommendationDispositionPane({
                     recommendation={recommendation}
                     handover={d.action_handover}
                     onDone={onDone}
+                    onCancel={onCancel}
                 />
             ) : (
                 <form onSubmit={submit} className="flex flex-col gap-4">
@@ -2950,7 +3445,7 @@ function RecommendationDispositionPane({
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={onDone}
+                            onClick={onCancel}
                         >
                             Cancel
                         </Button>
@@ -2969,7 +3464,7 @@ function RecommendationDispositionPane({
             )}
             {raisesAction && current?.corrective_action ? (
                 <div className="flex justify-end">
-                    <Button type="button" variant="outline" onClick={onDone}>
+                    <Button type="button" variant="outline" onClick={onCancel}>
                         Done
                     </Button>
                 </div>
@@ -2989,9 +3484,11 @@ const ACTION_TYPES = [
 function AddCorrectiveActionPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         title: string;
@@ -3108,7 +3605,7 @@ function AddCorrectiveActionPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button
@@ -3130,15 +3627,18 @@ function AddCorrectiveActionPane({
     );
 }
 
-function CompleteActionPane({
+export function CompleteActionPane({
     d,
     ca,
     onDone,
+    onCancel = onDone,
 }: {
-    d: EventDetail;
+    d: Pick<EventDetail, 'id'>;
     ca: EventCorrectiveAction;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
+    const [evidenceBusy, setEvidenceBusy] = useState(false);
     const form = useForm<{ completion_notes: string }>({
         completion_notes: '',
     });
@@ -3182,19 +3682,25 @@ function CompleteActionPane({
                     placeholder="Describe the evidence that this action is complete."
                 />
             </Field>
-            <ActionEvidencePanel d={d} ca={ca} allowUpload />
+            <ActionEvidencePanel
+                d={d}
+                ca={ca}
+                allowUpload
+                onBusyChange={setEvidenceBusy}
+            />
             <InfoCard icon={ShieldCheck} tone="info">
                 A different person must verify this action — separation of
                 duties.
             </InfoCard>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button
                     type="submit"
                     disabled={
                         form.processing ||
+                        evidenceBusy ||
                         (!form.data.completion_notes.trim() &&
                             ca.evidence.attachments.length === 0 &&
                             ca.evidence.legacy_paths.length === 0)
@@ -3216,19 +3722,40 @@ type EvidenceUploadState = {
     status: 'queued' | 'uploading' | 'uploaded' | 'failed';
 };
 
-function ActionEvidencePanel({
+export function ActionEvidencePanel({
     d,
     ca,
     allowUpload = false,
     allowRemove = true,
+    onBusyChange,
 }: {
-    d: EventDetail;
+    d: Pick<EventDetail, 'id'>;
     ca: EventCorrectiveAction;
     allowUpload?: boolean;
     allowRemove?: boolean;
+    onBusyChange?: (busy: boolean) => void;
 }) {
     const [description, setDescription] = useState('');
     const [uploads, setUploads] = useState<EvidenceUploadState[]>([]);
+    const mounted = useRef(true);
+    const busy = uploads.some((upload) =>
+        ['queued', 'uploading'].includes(upload.status),
+    );
+    useSafetyDraftState({
+        dirty:
+            description !== '' ||
+            uploads.some((upload) => upload.status !== 'uploaded'),
+        busy,
+    });
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
+    useEffect(() => {
+        onBusyChange?.(busy);
+    }, [onBusyChange, busy]);
     const evidence = ca.evidence;
     const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}/evidence`;
 
@@ -3244,6 +3771,9 @@ function ActionEvidencePanel({
     };
 
     const uploadFiles = (files: File[]) => {
+        if (!files.length || busy) return;
+        let cancelled = false;
+        let batchFailed = false;
         const selectionId = `${Date.now()}-${Math.random()}`;
         const queue = files.map((file, index) => ({
             file,
@@ -3260,8 +3790,15 @@ function ActionEvidencePanel({
         ]);
 
         const uploadNext = (index: number) => {
+            if (!mounted.current || cancelled) return;
             const item = queue[index];
-            if (!item) return;
+            if (!item) {
+                if (!batchFailed)
+                    setDescription((current) =>
+                        current === description ? '' : current,
+                    );
+                return;
+            }
             updateUpload(item.key, 'uploading');
 
             router.post(
@@ -3279,9 +3816,29 @@ function ActionEvidencePanel({
                             (page.props as { flash?: { error?: string } }).flash
                                 ?.error,
                         );
+                        batchFailed ||= failed;
                         updateUpload(item.key, failed ? 'failed' : 'uploaded');
                     },
-                    onError: () => updateUpload(item.key, 'failed'),
+                    onError: () => {
+                        batchFailed = true;
+                        updateUpload(item.key, 'failed');
+                    },
+                    onCancel: () => {
+                        cancelled = true;
+                        if (mounted.current)
+                            setUploads((current) =>
+                                current.map((upload) =>
+                                    queue.some(
+                                        (item) => item.key === upload.key,
+                                    ) &&
+                                    ['queued', 'uploading'].includes(
+                                        upload.status,
+                                    )
+                                        ? { ...upload, status: 'failed' }
+                                        : upload,
+                                ),
+                            );
+                    },
                     onFinish: () => uploadNext(index + 1),
                 },
             );
@@ -3326,10 +3883,10 @@ function ActionEvidencePanel({
                     {evidence.attachments.map((attachment) => (
                         <li
                             key={attachment.id}
-                            className="flex items-start justify-between gap-3 rounded-lg border border-border bg-background/70 p-2.5"
+                            className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background/70 p-2.5"
                         >
                             <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold">
+                                <p className="text-sm font-semibold [overflow-wrap:anywhere]">
                                     {attachment.original_name}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
@@ -3339,16 +3896,16 @@ function ActionEvidencePanel({
                                         : ''}
                                 </p>
                                 {attachment.description ? (
-                                    <p className="mt-1 text-xs text-foreground">
+                                    <p className="mt-1 text-xs [overflow-wrap:anywhere] text-foreground">
                                         {attachment.description}
                                     </p>
                                 ) : null}
                             </div>
-                            <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <a
                                     href={attachment.download_url}
                                     aria-label={`Download ${attachment.original_name}`}
-                                    className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 text-xs font-semibold text-primary hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                    className="frontline-tap inline-flex items-center gap-1 rounded-md border border-border px-2 text-xs font-semibold text-primary hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                                 >
                                     <ExternalLink className="h-3.5 w-3.5" />
                                     Download
@@ -3399,6 +3956,7 @@ function ActionEvidencePanel({
                         <input
                             aria-label="Add completion evidence"
                             type="file"
+                            disabled={busy}
                             accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
                             multiple
                             className="sr-only"
@@ -3442,14 +4000,18 @@ function ActionEvidencePanel({
     );
 }
 
-function VerifyActionPane({
+export function VerifyActionPane({
     d,
     ca,
     onDone,
+    onCancel = onDone,
 }: {
-    d: EventDetail;
+    d: Pick<EventDetail, 'id'> & {
+        can: Pick<EventDetail['can'], 'verify_corrective_actions'>;
+    };
     ca: EventCorrectiveAction;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         evidence_reviewed: boolean;
@@ -3592,7 +4154,7 @@ function VerifyActionPane({
                 ) : null}
             </VerificationSection>
             <VerificationSection title="Verifier decision">
-                <label className="flex items-start gap-2 text-sm text-foreground">
+                <label className="frontline-tap flex cursor-pointer items-start gap-2 text-sm text-foreground">
                     <input
                         type="checkbox"
                         checked={form.data.evidence_reviewed}
@@ -3608,7 +4170,7 @@ function VerifyActionPane({
                         Is the action effective?
                     </legend>
                     <div className="mt-2 flex flex-wrap gap-3">
-                        <label className="flex items-center gap-2 text-sm text-foreground">
+                        <label className="frontline-tap flex cursor-pointer items-center gap-2 text-sm text-foreground">
                             <input
                                 type="radio"
                                 name={`corrective-action-${ca.id}-effective`}
@@ -3618,7 +4180,7 @@ function VerifyActionPane({
                             />
                             Effective
                         </label>
-                        <label className="flex items-center gap-2 text-sm text-foreground">
+                        <label className="frontline-tap flex cursor-pointer items-center gap-2 text-sm text-foreground">
                             <input
                                 type="radio"
                                 name={`corrective-action-${ca.id}-effective`}
@@ -3652,7 +4214,7 @@ function VerifyActionPane({
                 </div>
             </VerificationSection>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing || !canVerify}>
@@ -3681,14 +4243,16 @@ function VerificationSection({
     );
 }
 
-function ReturnActionPane({
+export function ReturnActionPane({
     d,
     ca,
     onDone,
+    onCancel = onDone,
 }: {
-    d: EventDetail;
+    d: Pick<EventDetail, 'id'>;
     ca: EventCorrectiveAction;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{ reason: string }>({ reason: '' });
 
@@ -3726,7 +4290,7 @@ function ReturnActionPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -4174,7 +4738,11 @@ function OverviewSection({
                 </ReviewCard>
             </div>
 
-            <OriginatingRecordCard source={d.source} />
+            <OriginatingRecordCard
+                source={d.source}
+                eventId={d.id}
+                restricted={d.linked_access?.incident === 'restricted'}
+            />
 
             {d.description ? (
                 <ReviewCard icon={FileText} title="What happened" span>
@@ -4203,6 +4771,8 @@ function OverviewSection({
 
 function HandoverSection({ d }: { d: EventDetail }) {
     const summary = d.handover_summary;
+    const incidentRestricted = d.linked_access?.incident === 'restricted';
+    const responseRestricted = d.linked_access?.control_room === 'restricted';
     return (
         <div className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -4210,31 +4780,59 @@ function HandoverSection({ d }: { d: EventDetail }) {
                 <ReviewCard icon={LinkIcon} title="Official references">
                     <ReviewRow
                         label="Incident"
-                        value={summary.incident_reference}
+                        value={
+                            incidentRestricted
+                                ? 'Access restricted'
+                                : summary.incident_reference
+                        }
                     />
                     <ReviewRow
                         label="Control Room alert"
-                        value={summary.alert_reference}
+                        value={
+                            responseRestricted
+                                ? 'Access restricted'
+                                : summary.alert_reference
+                        }
                     />
                     <ReviewRow label="Source" value={summary.source_label} />
                     <ReviewRow label="Site" value={summary.site_name} />
                 </ReviewCard>
-                <ReviewCard icon={UserIcon} title="People & consequence">
-                    <ReviewRow label="Reported by" value={summary.reporter} />
-                    <ReviewRow label="Witnesses" value={summary.witnesses} />
-                    <ReviewRow
-                        label="Potential consequence"
-                        value={summary.potential_consequence}
-                    />
-                </ReviewCard>
+                {!incidentRestricted ? (
+                    <ReviewCard icon={UserIcon} title="People & consequence">
+                        <ReviewRow
+                            label="Reported by"
+                            value={summary.reporter}
+                        />
+                        <ReviewRow
+                            label="Witnesses"
+                            value={summary.witnesses}
+                        />
+                        <ReviewRow
+                            label="Potential consequence"
+                            value={summary.potential_consequence}
+                        />
+                    </ReviewCard>
+                ) : null}
             </div>
 
             <ReviewCard icon={FileText} title="Handover narrative" span>
-                <HandoverText label="What happened" value={summary.narrative} />
-                <HandoverText
-                    label="Immediate controls"
-                    value={summary.immediate_controls}
-                />
+                {incidentRestricted ? (
+                    <p className="text-sm text-muted-foreground">
+                        A linked incident is recorded. Your access does not
+                        include its account or evidence.
+                    </p>
+                ) : (
+                    <>
+                        <HandoverText
+                            label="What happened"
+                            value={summary.narrative}
+                        />
+                        <HandoverText
+                            label="Immediate controls"
+                            value={summary.immediate_controls}
+                        />
+                    </>
+                )}
             </ReviewCard>
 
             {summary.next_action ? (
@@ -4269,7 +4867,9 @@ function HandoverSection({ d }: { d: EventDetail }) {
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No attachments were handed over.
+                        {incidentRestricted
+                            ? 'Incident attachments are restricted.'
+                            : 'No attachments were handed over.'}
                     </p>
                 )}
             </ReviewCard>
@@ -4305,7 +4905,9 @@ function HandoverSection({ d }: { d: EventDetail }) {
                     ))
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No incident follow-ups were recorded.
+                        {incidentRestricted
+                            ? 'Incident follow-ups are restricted.'
+                            : 'No incident follow-ups were recorded.'}
                     </p>
                 )}
             </ReviewCard>
@@ -4333,7 +4935,9 @@ function HandoverSection({ d }: { d: EventDetail }) {
                         </>
                     ) : (
                         <p className="text-sm text-muted-foreground">
-                            No playbook run was linked.
+                            {responseRestricted
+                                ? 'Control Room response details are restricted.'
+                                : 'No playbook run was linked.'}
                         </p>
                     )}
                 </ReviewCard>
@@ -4391,11 +4995,21 @@ function AttachmentRow({ attachment }: { attachment: EventAttachment }) {
 
 /** E-Gap 4 — two-way convergence. The resolver lands in Step 5; until then the
  *  card shows the origin reference as read-only information (never a broken jump). */
-function OriginatingRecordCard({ source }: { source: EventSource | null }) {
+function OriginatingRecordCard({
+    source,
+    eventId,
+    restricted = false,
+}: {
+    source: EventSource | null;
+    eventId: number;
+    restricted?: boolean;
+}) {
     if (!source) {
         return (
             <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                No originating record linked.
+                {restricted
+                    ? 'The originating incident is linked. Your access does not include its details.'
+                    : 'No originating record linked.'}
             </div>
         );
     }
@@ -4420,7 +5034,10 @@ function OriginatingRecordCard({ source }: { source: EventSource | null }) {
     if (source.url && !source.unwired) {
         return (
             <Link
-                href={source.url}
+                href={source.type === 'ClientIncident' && Number.isSafeInteger(source.id)
+                    && source.id > 0 && source.url === '/incidents/' + source.id
+                    ? incidentWorkspaceHref(source.id, '/health-safety/events/' + eventId + '?section=overview')
+                    : source.url}
                 className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50"
             >
                 {body}
@@ -5008,9 +5625,14 @@ function ActionsSection({
                         >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div className="min-w-0">
-                                    <p className="text-sm font-medium text-foreground">
+                                    <Link
+                                        href={correctiveActionHref(a.id, {
+                                            returnTo: `/health-safety/events/${d.id}?section=actions`,
+                                        })}
+                                        className="frontline-tap inline-flex items-center text-sm font-medium [overflow-wrap:anywhere] text-primary"
+                                    >
                                         {a.reference_number} · {a.title}
-                                    </p>
+                                    </Link>
                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                         {a.assigned_to_name ?? 'Unassigned'}
                                         {a.due_date
@@ -5241,6 +5863,15 @@ function TimelineSection({ d }: { d: EventDetail }) {
 }
 
 function EvidenceSection({ d }: { d: EventDetail }) {
+    if (d.linked_access?.incident === 'restricted') {
+        return (
+            <EmptyState
+                icon={Paperclip}
+                title="Incident evidence restricted"
+                blurb="Your access does not include the linked incident's photos, documents or reports."
+            />
+        );
+    }
     if (!d.attachments.length) {
         return (
             <EmptyState

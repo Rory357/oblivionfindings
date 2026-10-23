@@ -5,379 +5,283 @@ namespace Tests\Feature\HealthSafety;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\FirstAidAttachment;
+use App\Models\FirstAidCommandReceipt;
+use App\Models\FirstAidFollowup;
 use App\Models\FirstAidRecord;
 use App\Models\HsEvent;
-use App\Models\Role;
+use App\Models\Permission;
 use App\Models\Site;
-use App\Models\User;
-use Database\Seeders\RbacSeeder;
+use App\Support\HealthSafety\FirstAidReturn;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\FirstAidSourceFixtures;
 use Tests\TestCase;
 
-/**
- * First Aid Register — H&S gold-standard controller coverage (the module had zero HTTP
- * tests before the rebuild). Modal-first register payload (hero/tabs/can + picker pools),
- * param-driven detail (?record=), CRUD with the client-link clearing rule, user-driven
- * incident escalation (create for a client / link existing / reject for a non-client),
- * the premium attachment library with its IDOR guard, CSV export and permission gating.
- *
- * Reuses the hazards.* scheme (no dedicated first_aid.* perms): admin holds them all,
- * support_worker holds none.
- */
+/** Retained register/capture/link/evidence/export coverage, now using real current source authority and reviewed commands. */
 class FirstAidControllerTest extends TestCase
 {
-    use RefreshDatabase;
-
-    private User $admin;
-
-    private Site $site;
+    use FirstAidSourceFixtures, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(RbacSeeder::class);
-        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
-        $this->admin->roles()->attach(Role::where('name', 'admin')->first());
-        $this->site = Site::factory()->create();
+        $this->initializeFirstAidFixtures();
     }
-
-    private function userWithRole(string $role): User
-    {
-        $user = User::factory()->create(['role' => $role, 'approved_at' => now()]);
-        if ($r = Role::where('name', $role)->first()) {
-            $user->roles()->attach($r);
-        }
-
-        return $user;
-    }
-
-    private function record(array $overrides = []): FirstAidRecord
-    {
-        return FirstAidRecord::factory()->create(array_merge([
-            'site_id' => $this->site->id,
-        ], $overrides));
-    }
-
-    /** A valid store() payload (every required field in StoreFirstAidRecordRequest). */
-    private function validPayload(array $overrides = []): array
-    {
-        return array_merge([
-            'site_id' => $this->site->id,
-            'treated_person_name' => 'Jordan Smith',
-            'treated_person_type' => 'staff',
-            'treatment_date' => now()->toDateTimeString(),
-            'injury_illness_type' => 'cut',
-            'injury_illness_description' => 'Laceration to the left hand while preparing food.',
-            'treatment_given' => 'Cleaned, dressed and bandaged the wound.',
-            'treatment_outcome' => 'returned_to_activity',
-            'first_aider_id' => $this->admin->id,
-        ], $overrides);
-    }
-
-    /* ================================================================== */
-    /*  Register page */
-    /* ================================================================== */
 
     public function test_index_renders_hero_tabcounts_can_and_pickers(): void
     {
-        // Pin treatment_date to now() so both fall inside the default 30d period window
-        // and the tab counts are deterministic.
-        $this->record(['treatment_date' => now()]); // a plain staff treatment
-        FirstAidRecord::factory()->ambulance()->create([
-            'site_id' => $this->site->id,
-            'treatment_date' => now(),
-        ]); // ambulance signal
-
-        $this->actingAs($this->admin)
-            ->get('/health-safety/first-aid')
-            ->assertOk()
-            ->assertInertia(fn (Assert $p) => $p
-                ->component('health-safety/first-aid/index')
-                ->where('tab', 'all')
-                ->where('tabCounts.all', 2)
-                ->where('tabCounts.ambulance', 1)
-                ->where('can.manage', true)
-                ->has('hero.live')
-                ->has('hero.attention')
-                ->has('hero.badges')
-                ->has('firstAiders')
-                ->has('clients')
-                ->has('incidents')
-                ->has('staff')
-                ->where('detail', null));
+        $this->source();
+        $this->source(['ambulance_called' => true]);
+        $this->get('/health-safety/first-aid')->assertOk()->assertInertia(fn (Assert $p) => $p->component('health-safety/first-aid/index')
+            ->where('tab', 'all')->where('tabCounts.all', 2)->where('tabCounts.ambulance', 1)->where('can.manage', true)
+            ->has('hero.live')->has('hero.attention')->has('hero.badges')->has('firstAiders')->has('clients')->has('incidents')->has('staff')->where('detail', null));
     }
 
     public function test_detail_loads_only_with_record_param(): void
     {
-        $record = $this->record();
-
-        $this->actingAs($this->admin)
-            ->get('/health-safety/first-aid?record='.$record->id)
-            ->assertOk()
-            ->assertInertia(fn (Assert $p) => $p
-                ->where('detail.id', $record->id)
-                ->where('detail.reference', $record->fresh()->reference_number)
-                ->has('detail.attachments')
-                ->has('detail.followups')
-                ->has('detail.history')
-                ->where('detail.can.manage', true));
+        $record = $this->source();
+        $this->get('/health-safety/first-aid?record='.$record->id)->assertRedirect(FirstAidReturn::href($record->id, '/health-safety/first-aid'));
+        $this->getJson('/health-safety/first-aid?record='.$record->id)->assertOk()->assertJsonPath('detail.id', $record->id)->assertJsonPath('detail.can.manage', true)->assertJsonStructure(['detail' => ['attachments', 'followups', 'history']]);
     }
-
-    /* ================================================================== */
-    /*  CRUD */
-    /* ================================================================== */
 
     public function test_store_creates_record_and_stamps_creator(): void
     {
-        $this->actingAs($this->admin)
-            ->from('/health-safety/first-aid')
-            ->post('/health-safety/first-aid', $this->validPayload())
-            ->assertRedirect()
-            ->assertSessionHasNoErrors();
-
-        $record = FirstAidRecord::latest('id')->first();
-        $this->assertNotNull($record);
+        $payload = $this->treatment(['treated_person_name' => 'Jordan Smith']);
+        $response = $this->post('/health-safety/first-aid', $payload)->assertSessionHasNoErrors();
+        $record = FirstAidRecord::sole();
+        $response->assertRedirect('/health-safety/first-aid/'.$record->id)->assertSessionHas('first_aid_confirmation', fn ($proof) => $proof === ['id' => $record->id, 'lock_version' => 1, 'idempotency_key' => $payload['idempotency_key'], 'command' => 'create', 'removed' => false]);
         $this->assertSame('Jordan Smith', $record->treated_person_name);
-        $this->assertSame($this->admin->id, $record->created_by);
-        $this->assertEquals($record->id, session('created_first_aid_id'));
+        $this->assertSame($this->manager->id, $record->created_by);
+        $this->post('/health-safety/first-aid', $payload)->assertSessionHasNoErrors();
+        $this->assertSame(1, FirstAidRecord::count());
+    }
+
+    public static function captureReturnOrigins(): array
+    {
+        return [
+            'dashboard origin' => ['/dashboard?discarded=private', '/dashboard'],
+            'health and safety origin' => ['/health-safety?discarded=private', '/health-safety'],
+            'untrusted external origin' => ['https://untrusted.example/record', null],
+        ];
+    }
+
+    #[DataProvider('captureReturnOrigins')]
+    public function test_create_only_html_confirmation_preserves_only_sanitized_origin_without_granting_record_read(string $submittedOrigin, ?string $origin): void
+    {
+        $capturer = $this->sourceStaff(['hazards.create']);
+        foreach (['hazards.view', 'hazards.manage'] as $key) {
+            $capturer->permissionOverrides()->syncWithoutDetaching([Permission::where('key', $key)->firstOrFail()->id => ['allowed' => false]]);
+        }
+        $payload = $this->treatment(['return_to' => $submittedOrigin]);
+        $target = '/health-safety/first-aid/report'.($origin !== null ? '?return_to='.rawurlencode($origin) : '');
+        $response = $this->actingAs($capturer)->post('/health-safety/first-aid', $payload)->assertSessionHasNoErrors()->assertRedirect($target);
+        $record = FirstAidRecord::sole();
+        $proof = ['id' => $record->id, 'lock_version' => 1, 'idempotency_key' => $payload['idempotency_key'], 'command' => 'create', 'removed' => false];
+        $response->assertSessionHas('first_aid_confirmation', $proof);
+        $this->get($target)->assertOk()->assertInertia(fn (Assert $page) => $page->component('health-safety/first-aid/report')
+            ->where('can.view', false)->where('record_href', null)->where('first_aid_confirmation', $proof));
+        $this->getJson('/health-safety/first-aid/'.$record->id)->assertForbidden();
+        $this->getJson('/health-safety/first-aid')->assertForbidden();
+        $this->post('/health-safety/first-aid', $payload)->assertSessionHasNoErrors()->assertRedirect($target)->assertSessionHas('first_aid_confirmation', $proof);
+        $this->assertSame(1, FirstAidRecord::count());
+        $this->assertSame(1, FirstAidCommandReceipt::count());
     }
 
     public function test_store_persists_linked_treated_staff(): void
     {
-        // NOTE: the "treated staff" picker is being added to the wizard concurrently; the
-        // field is already validated (exists:users) + fillable, so a posted id must persist.
-        $staff = User::factory()->create();
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/first-aid', $this->validPayload([
-                'treated_person_id' => $staff->id,
-            ]))
-            ->assertSessionHasNoErrors();
-
-        $record = FirstAidRecord::latest('id')->first();
-        $this->assertSame($staff->id, $record->treated_person_id);
+        $staff = $this->sourceStaff();
+        $this->post('/health-safety/first-aid', $this->treatment(['treated_person_id' => $staff->id]))->assertSessionHasNoErrors();
+        $this->assertSame($staff->id, FirstAidRecord::sole()->treated_person_id);
     }
 
     public function test_update_edits_fields(): void
     {
-        $record = $this->record(['body_part' => 'Left hand']);
-
-        $this->actingAs($this->admin)
-            ->put('/health-safety/first-aid/'.$record->id, [
-                'body_part' => 'Right forearm',
-                'treatment_outcome' => 'sent_home',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $record->refresh();
-        $this->assertSame('Right forearm', $record->body_part);
-        $this->assertSame('sent_home', $record->treatment_outcome);
-        $this->assertSame($this->admin->id, $record->updated_by);
+        $record = $this->source(['body_part' => 'Left hand']);
+        $this->put('/health-safety/first-aid/'.$record->id, $this->reviewed($record, ['body_part' => 'Right forearm', 'treatment_outcome' => 'sent_home']))->assertSessionHasNoErrors();
+        $this->assertSame('Right forearm', $record->fresh()->body_part);
+        $this->assertSame('sent_home', $record->fresh()->treatment_outcome);
+        $this->assertSame($this->manager->id, $record->fresh()->updated_by);
     }
 
     public function test_update_clears_client_link_when_type_switches_away_from_client(): void
     {
-        // A client treatment carries a client_id; switching the person type to staff must
-        // null it, else the record keeps showing on the old client's First-aid panel.
-        $client = Client::factory()->create();
-        $record = $this->record([
-            'treated_person_type' => 'client',
-            'client_id' => $client->id,
-        ]);
-
-        $this->actingAs($this->admin)
-            ->put('/health-safety/first-aid/'.$record->id, [
-                'treated_person_type' => 'staff',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $record->refresh();
-        $this->assertSame('staff', $record->treated_person_type);
-        $this->assertNull($record->client_id, 'Switching away from client must clear client_id');
+        $client = Client::factory()->create(['site_id' => $this->sourceSite->id]);
+        $record = $this->source(['treated_person_type' => 'client', 'client_id' => $client->id, 'treated_person_id' => null]);
+        $this->put('/health-safety/first-aid/'.$record->id, $this->reviewed($record, ['treated_person_type' => 'staff']))->assertSessionHasNoErrors();
+        $this->assertSame('staff', $record->fresh()->treated_person_type);
+        $this->assertNull($record->fresh()->client_id);
     }
 
     public function test_destroy_soft_deletes_record(): void
     {
-        $record = $this->record();
-
-        $this->actingAs($this->admin)
-            ->from('/health-safety/first-aid')
-            ->delete('/health-safety/first-aid/'.$record->id)
-            ->assertSessionHasNoErrors();
-
+        $record = $this->source();
+        $payload = $this->reviewed($record);
+        $this->delete('/health-safety/first-aid/'.$record->id, $payload)->assertSessionHasNoErrors()->assertSessionHas('first_aid_confirmation', fn ($proof) => $proof['removed'] === true && $proof['idempotency_key'] === $payload['idempotency_key']);
         $this->assertSoftDeleted('first_aid_records', ['id' => $record->id]);
+        $this->delete('/health-safety/first-aid/'.$record->id, $payload)->assertSessionHasNoErrors();
+        $this->getJson('/health-safety/first-aid/'.$record->id)->assertOk()->assertJsonPath('record.status', 'archived');
     }
-
-    /* ================================================================== */
-    /*  Incident escalation (linkIncident) */
-    /* ================================================================== */
 
     public function test_link_incident_creates_incident_for_a_client_treatment(): void
     {
-        $client = Client::factory()->create(['site_id' => $this->site->id]);
-        $record = $this->record([
-            'treated_person_type' => 'client',
-            'client_id' => $client->id,
-            'injury_illness_type' => 'fall',
-            'related_incident_id' => null,
-        ]);
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/first-aid/'.$record->id.'/link-incident', [])
-            ->assertSessionHasNoErrors();
-
-        $record->refresh();
-        $this->assertNotNull($record->related_incident_id, 'A client treatment must auto-create + link an incident');
-        $this->assertTrue((bool) $record->incident_reported);
-
-        $incident = ClientIncident::find($record->related_incident_id);
-        $this->assertNotNull($incident);
+        $client = Client::factory()->create(['site_id' => $this->sourceSite->id]);
+        $record = $this->source(['treated_person_type' => 'client', 'client_id' => $client->id, 'treated_person_id' => null, 'injury_illness_type' => 'fall']);
+        $payload = $this->reviewed($record);
+        $this->post('/health-safety/first-aid/'.$record->id.'/link-incident', $payload)->assertSessionHasNoErrors();
+        $this->post('/health-safety/first-aid/'.$record->id.'/link-incident', $payload)->assertSessionHasNoErrors();
+        $incident = ClientIncident::sole();
         $this->assertSame($client->id, $incident->client_id);
-        $this->assertSame($this->site->id, $incident->site_id);
-        $this->assertSame(HsEvent::query()->sole()->id, $incident->hs_event_id);
+        $this->assertSame($this->sourceSite->id, $incident->site_id);
+        $this->assertSame($incident->id, $record->fresh()->related_incident_id);
+        $this->assertSame(HsEvent::sole()->id, $incident->hs_event_id);
     }
 
     public function test_serious_client_treatment_requires_immediate_action_before_incident_escalation(): void
     {
-        $client = Client::factory()->create(['site_id' => $this->site->id]);
-        $record = $this->record([
-            'treated_person_type' => 'client',
-            'client_id' => $client->id,
-            'ambulance_called' => true,
-            'related_incident_id' => null,
-        ]);
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/first-aid/'.$record->id.'/link-incident')
-            ->assertSessionHasErrors(['immediate_action_taken']);
-
-        $this->assertDatabaseCount('client_incidents', 0);
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/first-aid/'.$record->id.'/link-incident', [
-                'immediate_action_taken' => 'Ambulance called and the client monitored until handover.',
-            ])
-            ->assertSessionDoesntHaveErrors();
-
-        $incident = ClientIncident::query()->sole();
-        $this->assertSame('Ambulance called and the client monitored until handover.', $incident->immediate_action_taken);
-        $this->assertSame($this->site->id, $incident->site_id);
+        $client = Client::factory()->create(['site_id' => $this->sourceSite->id]);
+        $record = $this->source(['treated_person_type' => 'client', 'client_id' => $client->id, 'treated_person_id' => null, 'ambulance_called' => true]);
+        $payload = $this->reviewed($record);
+        $this->post('/health-safety/first-aid/'.$record->id.'/link-incident', $payload)->assertSessionHasErrors('immediate_action_taken');
+        $this->assertSame(0, ClientIncident::count());
+        $this->assertSame(1, (int) $record->fresh()->lock_version);
+        $this->post('/health-safety/first-aid/'.$record->id.'/link-incident', [...$payload, 'immediate_action_taken' => 'Ambulance called; actual handover recorded.'])->assertSessionHasNoErrors();
+        $this->assertSame('Ambulance called; actual handover recorded.', ClientIncident::sole()->immediate_action_taken);
     }
 
     public function test_link_incident_links_an_existing_incident(): void
     {
-        $record = $this->record(['related_incident_id' => null]);
-        $incident = ClientIncident::factory()->create();
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/first-aid/'.$record->id.'/link-incident', [
-                'related_incident_id' => $incident->id,
-            ])
-            ->assertSessionHasNoErrors();
-
-        $record->refresh();
-        $this->assertSame($incident->id, $record->related_incident_id);
-        $this->assertTrue((bool) $record->incident_reported);
+        $client = Client::factory()->create(['site_id' => $this->sourceSite->id]);
+        $record = $this->source(['treated_person_type' => 'client', 'client_id' => $client->id, 'treated_person_id' => null]);
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create(['client_id' => $client->id, 'site_id' => $this->sourceSite->id, 'reported_by' => $this->manager->id]));
+        $this->post('/health-safety/first-aid/'.$record->id.'/link-incident', $this->reviewed($record, ['related_incident_id' => $incident->id]))->assertSessionHasNoErrors();
+        $this->assertSame($incident->id, $record->fresh()->related_incident_id);
+        $this->assertTrue($record->fresh()->incident_reported);
     }
 
     public function test_link_incident_rejects_create_for_a_non_client_treatment(): void
     {
-        // client_incidents.client_id is NOT-NULL → only a client treatment can auto-create one.
-        $record = $this->record([
-            'treated_person_type' => 'staff',
-            'client_id' => null,
-            'related_incident_id' => null,
-        ]);
-
-        $this->actingAs($this->admin)
-            ->from('/health-safety/first-aid?record='.$record->id)
-            ->post('/health-safety/first-aid/'.$record->id.'/link-incident', [])
-            ->assertSessionHas('error');
-
+        $record = $this->source();
+        $this->post('/health-safety/first-aid/'.$record->id.'/link-incident', $this->reviewed($record))->assertSessionHasErrors('related_incident_id');
         $this->assertNull($record->fresh()->related_incident_id);
+        $this->assertSame(0, ClientIncident::count());
+        $this->assertSame(1, FirstAidCommandReceipt::count());
     }
-
-    /* ================================================================== */
-    /*  Attachments (premium document upload + IDOR guard) */
-    /* ================================================================== */
 
     public function test_upload_download_destroy_attachment_with_idor_guard(): void
     {
-        Storage::fake('private');
-        $record = $this->record();
-        $other = $this->record();
-
-        // Upload (real fake image so it passes the mimes allowlist).
-        $this->actingAs($this->admin)
-            ->post('/health-safety/first-aid/'.$record->id.'/attachments', [
-                'file' => UploadedFile::fake()->image('acc45.jpg'),
-                'kind' => 'acc45',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $att = FirstAidAttachment::where('first_aid_record_id', $record->id)->first();
-        $this->assertNotNull($att);
+        $record = $this->source();
+        $other = $this->source();
+        $payload = $this->reviewed($record, ['kind' => 'acc45', 'file' => UploadedFile::fake()->image('acc45.jpg')]);
+        $this->post('/health-safety/first-aid/'.$record->id.'/attachments', $payload)->assertSessionHasNoErrors();
+        $this->post('/health-safety/first-aid/'.$record->id.'/attachments', $payload)->assertSessionHasNoErrors();
+        $att = FirstAidAttachment::sole();
         $this->assertSame('acc45', $att->kind);
-        // Stored on the PRIVATE disk now — never world-readable under /storage.
         Storage::disk('private')->assertExists($att->path);
-        $this->assertSame('private', $att->disk);
-
-        // IDOR guard: the attachment belongs to $record, not $other → 404 under $other's id.
-        $this->actingAs($this->admin)
-            ->get('/health-safety/first-aid/'.$other->id.'/attachments/'.$att->id.'/download')
-            ->assertNotFound();
-
-        // Correct parent downloads fine — streamed from the private disk with the
-        // hardened CSP-sandbox header from ServesPrivateAttachments (nosniff +
-        // X-Frame-Options come from the edge layer, not the app).
-        $this->actingAs($this->admin)
-            ->get('/health-safety/first-aid/'.$record->id.'/attachments/'.$att->id.'/download')
-            ->assertOk()
-            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
-
-        // Destroy (FirstAidAttachment uses SoftDeletes).
-        $this->actingAs($this->admin)
-            ->delete('/health-safety/first-aid/'.$record->id.'/attachments/'.$att->id)
-            ->assertSessionHasNoErrors();
+        $this->assertCount(1, Storage::disk('private')->allFiles());
+        $this->get('/health-safety/first-aid/'.$other->id.'/attachments/'.$att->id.'/download')->assertNotFound();
+        $this->get('/health-safety/first-aid/'.$record->id.'/attachments/'.$att->id.'/download')->assertOk()->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
+        $remove = $this->reviewed($record);
+        $this->delete('/health-safety/first-aid/'.$record->id.'/attachments/'.$att->id, $remove)->assertSessionHasNoErrors()->assertSessionHas('first_aid_confirmation', fn ($proof) => $proof['removed'] === false);
+        $this->delete('/health-safety/first-aid/'.$record->id.'/attachments/'.$att->id, $remove)->assertSessionHasNoErrors();
         $this->assertSoftDeleted('first_aid_attachments', ['id' => $att->id]);
+        Storage::disk('private')->assertExists($att->path);
     }
-
-    /* ================================================================== */
-    /*  Export */
-    /* ================================================================== */
 
     public function test_export_streams_csv_with_reference(): void
     {
-        // NOTE: export() is being wired into the controller/routes concurrently — this
-        // asserts the contract: text/csv stream containing the FA- reference.
-        $record = $this->record(['treatment_date' => now()]);
-
-        $res = $this->actingAs($this->admin)->get('/health-safety/first-aid/export');
+        $record = $this->source(['treated_person_name' => '=SUM(1,2)']);
+        $res = $this->get('/health-safety/first-aid/export');
         $res->assertOk();
         $this->assertStringContainsString('text/csv', (string) $res->headers->get('Content-Type'));
-        $this->assertStringContainsString($record->fresh()->reference_number, $res->streamedContent());
+        $this->assertStringContainsString($record->reference_number, $res->streamedContent());
+        $this->assertStringContainsString("'=SUM(1,2)", $res->streamedContent());
     }
 
-    /* ================================================================== */
-    /*  Show redirect + permission gating */
-    /* ================================================================== */
-
-    public function test_show_redirects_to_register_modal(): void
+    public function test_show_renders_permanent_record_with_legacy_redirect_retained(): void
     {
-        $record = $this->record();
-
-        $this->actingAs($this->admin)
-            ->get('/health-safety/first-aid/'.$record->id)
-            ->assertRedirect('/health-safety/first-aid?record='.$record->id);
+        $record = $this->source();
+        $this->get('/health-safety/first-aid/'.$record->id)->assertOk()->assertInertia(fn (Assert $p) => $p->component('health-safety/first-aid/show')->where('detail.id', $record->id));
+        $this->get('/health-safety/first-aid?record='.$record->id)->assertRedirect(FirstAidReturn::href($record->id, '/health-safety/first-aid'));
     }
 
     public function test_zero_permission_user_is_forbidden(): void
     {
-        $this->actingAs($this->userWithRole('support_worker'))
-            ->get('/health-safety/first-aid')
-            ->assertForbidden();
+        $this->actingAs($this->sourceStaff())->get('/health-safety/first-aid')->assertForbidden();
+    }
+
+    public function test_create_only_http_confirmation_stays_on_capture_without_granting_treatment_read(): void
+    {
+        $creator = $this->sourceStaff(['hazards.create']);
+        $this->actingAs($creator)->get('/health-safety/first-aid/report')->assertOk()->assertInertia(fn (Assert $p) => $p->component('health-safety/first-aid/report')->where('can.view', false));
+        $payload = $this->treatment();
+        $this->post('/health-safety/first-aid', $payload)->assertRedirect('/health-safety/first-aid/report')->assertSessionHas('first_aid_confirmation');
+        $record = FirstAidRecord::sole();
+        $proof = ['id' => $record->id, 'lock_version' => 1, 'idempotency_key' => $payload['idempotency_key'], 'command' => 'create', 'removed' => false];
+        $response = $this->postJson('/health-safety/first-aid', $payload)->assertOk()->assertJsonPath('first_aid_confirmation', $proof)->assertJsonPath('record_href', null);
+        $this->assertStringNotContainsString('Recorded small cut', $response->getContent());
+        $this->get('/health-safety/first-aid/'.$record->id)->assertForbidden();
+        $this->get('/health-safety/first-aid')->assertForbidden();
+        $this->assertSame(1, FirstAidRecord::count());
+    }
+
+    public function test_reader_first_aider_filter_retains_historical_attribution_only_from_readable_selected_site_sources(): void
+    {
+        $retired = $this->firstAider;
+        $retired->forceFill(['name' => 'Recorded retired first aider'])->save();
+        $record = $this->source(['treatment_date' => now()->subYears(2)->toISOString()]);
+        $retired->hrEmployeeProfile()->update(['is_active' => false, 'is_first_aider' => false]);
+        $reader = $this->sourceStaff(['hazards.view']);
+        $privateAider = $this->sourceStaff([], true);
+        $privateAider->forceFill(['name' => 'Private Client treatment attribution'])->save();
+        $client = Client::factory()->create(['site_id' => $this->sourceSite->id]);
+        $this->source(['treated_person_type' => 'client', 'treated_person_id' => null, 'client_id' => $client->id, 'first_aider_id' => $privateAider->id]);
+        $unrecordedAider = $this->sourceStaff([], true);
+        $unrecordedAider->forceFill(['name' => 'Unrecorded eligible HR first aider'])->save();
+        $otherSite = Site::factory()->create(['is_active' => true]);
+        $this->manager->hrEmployeeProfile()->update(['secondary_site_ids' => [$otherSite->id]]);
+        $reader->hrEmployeeProfile()->update(['secondary_site_ids' => [$otherSite->id]]);
+        $otherAider = $this->sourceStaff([], true);
+        $otherAider->forceFill(['name' => 'Other approved Site recorded aider'])->save();
+        $otherAider->hrEmployeeProfile()->update(['primary_site_id' => $otherSite->id]);
+        $this->source(['site_id' => $otherSite->id, 'treated_person_id' => null, 'first_aider_id' => $otherAider->id]);
+        $url = '/health-safety/first-aid?site_id='.$this->sourceSite->id;
+        $response = $this->actingAs($reader)->getJson($url)->assertOk()->assertJsonPath('filterOptions.first_aiders', [['id' => $retired->id, 'name' => $retired->name]])->assertJsonPath('pickers.first_aiders', [])->assertJsonPath('pickers.staff', [])->assertJsonPath('can.create', false)->assertJsonPath('records.total', 0);
+        $this->assertStringNotContainsString($privateAider->name, $response->getContent());
+        $this->assertStringNotContainsString($unrecordedAider->name, $response->getContent());
+        $this->assertStringNotContainsString($otherAider->name, $response->getContent());
+        $this->getJson($url.'&period=all&first_aider_id='.$retired->id)->assertOk()->assertJsonPath('records.total', 1)->assertJsonPath('records.data.0.id', $record->id);
+        $this->getJson('/health-safety/first-aid?site_id='.$otherSite->id)->assertOk()->assertJsonPath('filterOptions.first_aiders', [['id' => $otherAider->id, 'name' => $otherAider->name]]);
+        $reader->hrEmployeeProfile()->update(['secondary_site_ids' => []]);
+        $this->getJson('/health-safety/first-aid?site_id='.$otherSite->id)->assertOk()->assertJsonPath('filterOptions.first_aiders', [])->assertJsonPath('records.total', 0);
+        $this->assertFalse($retired->hrEmployeeProfile()->firstOrFail()->is_active);
+    }
+
+    public function test_new_capture_incident_choices_require_selected_site_and_current_independent_authority(): void
+    {
+        $client = Client::factory()->create(['site_id' => $this->sourceSite->id]);
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create(['client_id' => $client->id, 'site_id' => $this->sourceSite->id, 'reported_by' => $this->manager->id, 'status' => 'draft']));
+        $captureManager = $this->sourceStaff(['hazards.manage', 'clients.viewAny', 'incidents.viewAny', 'incidents.update']);
+        $url = '/health-safety/first-aid/options?site_id='.$this->sourceSite->id.'&client_id='.$client->id;
+        $this->actingAs($captureManager)->getJson($url)->assertOk()->assertJsonCount(1, 'incidents')->assertJsonPath('incidents.0.id', $incident->id);
+        $this->getJson('/health-safety/first-aid/options?client_id='.$client->id)->assertUnprocessable()->assertJsonValidationErrors('site_id');
+        $record = $this->source(['treated_person_type' => 'client', 'client_id' => $client->id, 'treated_person_id' => null]);
+        $this->getJson('/health-safety/first-aid/options?record_id='.$record->id)->assertForbidden();
+        $deniedClient = $this->sourceStaff(['hazards.manage', 'incidents.viewAny', 'incidents.update']);
+        $this->actingAs($deniedClient)->getJson($url)->assertForbidden();
+        $this->assertSame(1, ClientIncident::count());
+    }
+
+    public function test_named_executor_completion_is_source_owned_and_confirms_exact_reviewed_parent(): void
+    {
+        $record = $this->source();
+        $this->sourceService()->addFollowup($record, $this->manager, $this->reviewed($record, ['notes' => 'Record actual follow-through', 'assigned_to_user_id' => $this->worker->id]));
+        $child = FirstAidFollowup::sole();
+        $payload = $this->reviewed($record, ['completion_notes' => 'Actual action recorded', 'section' => 'followups', 'action' => 'complete-followup', 'followup' => $child->id, 'return_to' => '/my-day']);
+        $this->actingAs($this->worker)->patch('/health-safety/first-aid/'.$record->id.'/followups/'.$child->id.'/complete', $payload)->assertSessionHasNoErrors()->assertRedirect(FirstAidReturn::href($record->id, '/my-day', 'followups', $child->id).'&action=complete-followup');
+        $this->assertSame($this->worker->id, $child->fresh()->completed_by_user_id);
+        $this->get(FirstAidReturn::href($record->id, '/my-day', 'followups', $child->id))->assertOk()->assertInertia(fn (Assert $p) => $p->where('first_aid_confirmation.idempotency_key', $payload['idempotency_key'])->where('detail.lock_version', 3));
     }
 }

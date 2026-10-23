@@ -13,6 +13,7 @@ import type { ReactNode } from 'react';
 export type LinkedOperationalEvidenceData = {
     label: string;
     read_only: boolean;
+    access?: 'readable' | 'restricted';
     source: {
         id: number;
         reference: string | null;
@@ -28,7 +29,7 @@ export type LinkedOperationalEvidenceData = {
         closed_at?: string | null;
         created_at: string | null;
         updated_at: string | null;
-    };
+    } | null;
     notes: Array<{
         id: number;
         type: string;
@@ -92,6 +93,23 @@ export function LinkedOperationalEvidence({
 }) {
     if (!evidence) return null;
 
+    if (evidence.access === 'restricted' || !evidence.source) {
+        return (
+            <section
+                aria-label="Linked Control Room evidence"
+                className="rounded-xl border border-border bg-card/70 p-4"
+            >
+                <h2 className="text-sm font-bold text-foreground">
+                    Linked Control Room evidence
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    This incident has a linked Control Room record. Your access
+                    does not include its notes or files.
+                </p>
+            </section>
+        );
+    }
+
     const empty =
         evidence.notes.length === 0 &&
         evidence.tasks.length === 0 &&
@@ -115,8 +133,8 @@ export function LinkedOperationalEvidence({
                             {evidence.label}
                         </h2>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            Canonical Control Room records remain linked here;
-                            they are not copied into the incident.
+                            Notes, response tasks and files from the linked
+                            Control Room record.
                         </p>
                     </div>
                 </div>
@@ -130,7 +148,7 @@ export function LinkedOperationalEvidence({
                     {evidence.source.href ? (
                         <Link
                             href={evidence.source.href}
-                            className="font-semibold text-primary hover:underline"
+                            className="frontline-tap frontline-focus inline-flex items-center rounded-md font-semibold text-primary hover:underline"
                         >
                             {evidence.source.reference ??
                                 'Reference unavailable'}
@@ -316,7 +334,7 @@ export function LinkedOperationalEvidence({
                                                                 item.download_url
                                                             }
                                                             aria-label={`Download ${item.title}`}
-                                                            className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-primary hover:bg-muted"
+                                                            className="frontline-tap frontline-focus inline-flex shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-primary hover:bg-muted"
                                                         >
                                                             <Download className="h-3.5 w-3.5" />
                                                             Download

@@ -156,7 +156,9 @@ class HandleInertiaRequests extends Middleware
             // least one module feed; badge = my open + overdue items. One
             // cache entry per user — the aggregator fans out across ~17
             // modules, and users with no feeds never pay for the badge.
-            $can['tasks'] = $this->taskNavigation($user);
+            $can['tasks'] = $request->isMethod('GET') && $request->routeIs('health-safety.events.show')
+                ? fn () => $this->requestTaskNavigation($request, $user)
+                : $this->taskNavigation($user);
         }
 
         // Pull all app-settings we need for chrome (labels / theme / branding)
@@ -546,6 +548,41 @@ class HandleInertiaRequests extends Middleware
      * than the 300s permission-map cache that gates the same sidebar.
      */
     private const TASK_NAV_TTL = 90;
+
+    /**
+     * Only the event-show route consumes a detached current-request projection.
+     * The scalar guards identify its producer; they do not confer record authority.
+     *
+     * @return array{view: bool, badge: int, badgeDegraded: bool}
+     */
+    private function requestTaskNavigation(Request $request, User $viewer): array
+    {
+        $currentViewer = $request->user();
+        if (! $currentViewer instanceof User) {
+            return ['view' => false, 'badge' => 0, 'badgeDegraded' => false];
+        }
+        $routeEvent = $request->route('hsEvent');
+        $projection = $request->attributes->get(TaskAggregator::NAVIGATION_REQUEST_ATTRIBUTE);
+        $sameProducer = $request->isMethod('GET') && $request->routeIs('health-safety.events.show')
+            && (int) $currentViewer->id === (int) $viewer->id
+            && $request->attributes->get(TaskAggregator::NAVIGATION_USER_ATTRIBUTE) === (int) $currentViewer->id
+            && (is_int($routeEvent) || is_string($routeEvent)) && preg_match('/^[1-9][0-9]*$/D', (string) $routeEvent)
+            && $request->attributes->get(TaskAggregator::NAVIGATION_EVENT_ATTRIBUTE) === (int) $routeEvent;
+        $validProjection = is_array($projection) && count($projection) === 3
+            && is_bool($projection['view'] ?? null) && is_int($projection['badge'] ?? null) && $projection['badge'] >= 0
+            && is_bool($projection['degraded'] ?? null)
+            && ($projection['view'] || $projection['badge'] === 0);
+        if (! $sameProducer || ! $validProjection) {
+            // Missing/invalid/deferred/error paths must not substitute the global TTL snapshot.
+            $projection = app(TaskAggregator::class)->navigationBadgeFor($currentViewer);
+        }
+
+        return [
+            'view' => $projection['view'],
+            'badge' => $projection['view'] ? $projection['badge'] : 0,
+            'badgeDegraded' => $projection['degraded'],
+        ];
+    }
 
     /**
      * Keep task-provider faults out of the global Inertia failure path.

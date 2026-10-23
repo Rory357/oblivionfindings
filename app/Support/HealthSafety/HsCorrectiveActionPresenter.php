@@ -82,7 +82,7 @@ class HsCorrectiveActionPresenter
                 && $canAccessEvidence
                 && $evidenceLoaded
                 && $action->status === HsCorrectiveAction::STATUS_COMPLETED
-                && (int) $action->assigned_to_user_id !== (int) $viewer->id
+                && ! $action->hasBeenOwnedBy((int) $viewer->id)
                 && (int) $action->completed_by_user_id !== (int) $viewer->id
                 && (int) $action->created_by !== (int) $viewer->id
                 && (int) $action->hsEvent?->created_by !== (int) $viewer->id,

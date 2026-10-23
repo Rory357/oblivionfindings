@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SafeWorkProcedure extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'title',
@@ -37,7 +37,7 @@ class SafeWorkProcedure extends Model
         'applicable_sites',
         'related_training',
         'created_by',
-        'updated_by',
+        'updated_by', 'published_version_id', 'published_review_date', 'lock_version',
     ];
 
     protected $casts = [
@@ -50,12 +50,12 @@ class SafeWorkProcedure extends Model
         'related_training' => 'array',
         'approved_at' => 'datetime',
         'review_date' => 'date',
-        'current_version' => 'integer',
+        'current_version' => 'integer', 'published_version_id' => 'integer', 'published_review_date' => 'date', 'lock_version' => 'integer',
         'review_frequency_months' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function approvedBy(): BelongsTo
@@ -100,33 +100,59 @@ class SafeWorkProcedure extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Cross-module resolution scopes                                     */
-    /*                                                                     */
-    /*  Reusable so Site profiles, HR staff / self-service and the client  */
-    /*  risk tab can surface the procedures that apply to them without     */
-    /*  re-implementing the JSON membership logic. An empty/absent         */
-    /*  applicable_* array means "applies organisation-wide / to all".     */
+    /*  Cross-module resolution scopes */
+    /* */
+    /*  Reusable so Site profiles, HR staff / self-service and the client */
+    /*  risk tab can surface the procedures that apply to them without */
+    /*  re-implementing the JSON membership logic. An empty/absent */
+    /*  applicable_* array means "applies organisation-wide / to all". */
     /* ------------------------------------------------------------------ */
 
-    /** Approved procedures that apply to a site (listed, or org-wide). */
-    public function scopeApplicableToSite(Builder $query, int $siteId): Builder
+    public function publishedVersion(): BelongsTo
     {
-        return $query->where('status', 'approved')->where(function (Builder $q) use ($siteId) {
-            $q->whereJsonContains('applicable_sites', $siteId)
-                ->orWhereJsonLength('applicable_sites', 0)
-                ->orWhereNull('applicable_sites');
-        });
+        return $this->belongsTo(SafeWorkProcedureVersion::class, 'published_version_id');
     }
 
-    /** Approved procedures that apply to any of the given role keys (or are role-agnostic). */
+    public function acknowledgementReceipts(): HasMany
+    {
+        return $this->hasMany(ProcedureAcknowledgementReceipt::class);
+    }
+
+    public function reviewRequests(): HasMany
+    {
+        return $this->hasMany(ProcedureReviewRequest::class);
+    }
+
+    public function publishedSnapshot(): array
+    {
+        return $this->publishedVersion?->content_snapshot ?? [];
+    }
+
+    public function publishedValue(string $field): mixed
+    {
+        return $this->publishedSnapshot()[$field] ?? null;
+    }
+
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where('status', '!=', 'archived')->whereNotNull('published_version_id')->whereHas('publishedVersion', fn (Builder $version) => $version->whereColumn('safe_work_procedure_versions.safe_work_procedure_id', 'safe_work_procedures.id')->where(fn (Builder $approval) => $approval->where('provenance', 'legacy_current_capture')->orWhere(fn (Builder $controlled) => $controlled->where('provenance', 'controlled')->whereNotNull('approved_by')->whereNotNull('approved_at'))));
+    }
+
+    public function scopeApplicableToSite(Builder $query, int $siteId): Builder
+    {
+        return $query->published()->whereHas('publishedVersion', fn (Builder $version) => $version->where(function (Builder $scope) use ($siteId) {
+            $scope->whereJsonContains('content_snapshot->applicable_sites', $siteId)->orWhereJsonLength('content_snapshot->applicable_sites', 0)->orWhereNull('content_snapshot->applicable_sites');
+        }));
+    }
+
     public function scopeApplicableToRoles(Builder $query, array $roleKeys): Builder
     {
-        return $query->where('status', 'approved')->where(function (Builder $q) use ($roleKeys) {
-            $q->whereJsonLength('applicable_roles', 0)->orWhereNull('applicable_roles');
+        return $query->published()->whereHas('publishedVersion', fn (Builder $version) => $version->where(function (Builder $scope) use ($roleKeys) {
+            $scope->whereJsonLength('content_snapshot->applicable_roles', 0)->orWhereNull('content_snapshot->applicable_roles');
             foreach ($roleKeys as $key) {
-                $q->orWhereJsonContains('applicable_roles', $key);
+                $scope->orWhereJsonContains('content_snapshot->applicable_roles', $key);
             }
-        });
+        }));
     }
 
     /**
@@ -151,6 +177,6 @@ class SafeWorkProcedure extends Model
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where('status', 'approved')->where('category', $category);
+        return $query->published()->whereHas('publishedVersion', fn (Builder $version) => $version->where('content_snapshot->category', $category));
     }
 }

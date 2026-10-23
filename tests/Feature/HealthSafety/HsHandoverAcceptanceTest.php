@@ -207,8 +207,11 @@ class HsHandoverAcceptanceTest extends TestCase
         ]);
         $controlRoomWorkspace = app(AlertWorkspaceService::class)->build($controlRoomOnly, $alert->id);
         $this->assertSame(HsEvent::HANDOVER_ACCEPTED, data_get($controlRoomWorkspace, 'linked_hs_event.handover.status'));
-        $this->assertSame($actor->id, data_get($controlRoomWorkspace, 'linked_hs_event.handover.owner.id'));
-        $this->assertNull(data_get($controlRoomWorkspace, 'linked_hs_event.href'));
+        $this->assertSame([
+            'access' => 'restricted',
+            'status' => HsEvent::STATUS_OPEN,
+            'handover' => ['status' => HsEvent::HANDOVER_ACCEPTED],
+        ], $controlRoomWorkspace['linked_hs_event']);
     }
 
     public function test_awaiting_handover_is_a_discoverable_hs_worklist_lens(): void
@@ -254,9 +257,10 @@ class HsHandoverAcceptanceTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('detail.handover.can_accept', false)
                 ->where('detail.handover_summary.next_action', null)
-                ->where('detail.source.url', null)
-                ->where('detail.control_room_alert.reference_number', $alert->reference_number)
-                ->where('detail.control_room_alert.url', null)
+                ->where('detail.source', null)
+                ->where('detail.control_room_alert', null)
+                ->where('detail.linked_access.incident', 'restricted')
+                ->where('detail.linked_access.control_room', 'restricted')
             );
 
         $this->actingAs($crossModuleViewer)
@@ -292,9 +296,10 @@ class HsHandoverAcceptanceTest extends TestCase
             ->get("/incidents?incident={$incident->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('detail.control_room_alert.url', null)
-                ->where('detail.hs_event.url', null)
-                ->where('detail.hs_event.corrective_actions_url', null)
+                ->where('detail.control_room_alert', null)
+                ->where('detail.hs_event', null)
+                ->where('detail.linked_access.control_room', 'restricted')
+                ->where('detail.linked_access.health_safety', 'restricted')
             );
 
         $this->actingAs($crossModuleViewer)
@@ -314,7 +319,7 @@ class HsHandoverAcceptanceTest extends TestCase
         Storage::disk('public')->put('incident_attachments/handover.txt', 'handover evidence');
         Storage::disk('local')->put('control-room/evidence-note.txt', 'control room evidence');
         $site = Site::factory()->create();
-        $viewer = $this->siteBoundUser($site, ['hazards.view']);
+        $viewer = $this->siteBoundUser($site, ['hazards.view', 'incidents.viewAny', 'controlRoom.alerts.view']);
         [$incident, $alert, $event] = $this->incidentJourney($site, $viewer);
         $attachment = ClientIncidentAttachment::query()->create([
             'incident_id' => $incident->id,
@@ -376,7 +381,7 @@ class HsHandoverAcceptanceTest extends TestCase
         Storage::disk('public')->put('incident_attachments/scene.txt', 'scene evidence');
         Storage::disk('local')->put('evidence/scene-note.txt', 'control room evidence');
         $site = Site::factory()->create();
-        $viewer = $this->siteBoundUser($site, ['hazards.view']);
+        $viewer = $this->siteBoundUser($site, ['hazards.view', 'incidents.viewAny', 'controlRoom.alerts.view']);
         [$incident, $alert, $event] = $this->incidentJourney($site, $viewer);
         $incident->updateQuietly([
             'witnesses' => 'Hana Te Rangi',

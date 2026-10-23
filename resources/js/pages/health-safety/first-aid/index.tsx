@@ -1,100 +1,75 @@
-/* eslint-disable no-restricted-syntax -- the hero filter-bar uses styled native <select>
- * and <input> controls on the dark primary gradient (matching the H&S dashboard/analytics
- * heroes); every colour is a semantic design token. */
+import { FirstAidFact } from '@/components/health-safety/first-aid/record-panels';
+import { FirstAidTreatmentWizard } from '@/components/health-safety/first-aid/treatment-wizard';
+import type {
+    FirstAidPickers,
+    FirstAidRecord,
+} from '@/components/health-safety/first-aid/types';
 import {
-    FirstAidDetailDialog,
-    type FirstAidActionKey,
-    type FirstAidDetail,
-    type FirstAidSectionKey,
-} from '@/components/health-safety/first-aid-detail-dialog';
-import { FirstAidReportDialog } from '@/components/health-safety/first-aid-report-dialog';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
-import {
-    EntityFilter,
-    ShiftContextMenu,
-    TabStrip,
-    type RosterTabItem,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    SafetyFormDraftContext,
+    useSafetyWorkspaceDrafts,
+} from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTimeLong } from '@/lib/datetime';
 import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroComplianceBadges,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    fmt,
-    ngaPaerewaBadge,
-    useNzsAssurance,
-    type HeroComplianceBadge,
-} from '@/pages/health-safety/components/hs-hero-kit';
+    FIRST_AID_REGISTER,
+    firstAidHref,
+    firstAidReturn,
+} from '@/lib/health-safety/first-aid-navigation';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    FlagBadge,
-    RegisterTableHeader,
-    TONE_BG,
-    TONE_DOT,
-    entityTone,
-    initials,
-} from '@/pages/health-safety/components/register-row-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
+    AlertTriangle,
+    Ambulance,
+    ClipboardList,
+    Download,
+    HeartPulse,
+    LayoutList,
+    Link2,
+    Plus,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
     OUTCOMES,
     PERSON_TYPES,
     injuryLabel,
-    injuryTone,
     outcomeLabel,
-    outcomeTone,
     personTypeLabel,
-} from '@/pages/health-safety/first-aid/options';
-import { Head, router } from '@inertiajs/react';
-import {
-    Activity,
-    AlertTriangle,
-    Ambulance,
-    BarChart3,
-    CheckCircle2,
-    ClipboardList,
-    Download,
-    FileText,
-    HeartPulse,
-    LayoutList,
-    Link2,
-    MousePointer2,
-    Paperclip,
-    Pencil,
-    Plus,
-    Search,
-    Trash2,
-    X,
-} from 'lucide-react';
-import { useState, type MouseEvent as ReactMouseEvent } from 'react';
+} from './options';
 
-type Opt = { id: number; name: string };
-type IncidentOpt = { id: number; reference: string; label: string };
-
-type FirstAidRow = {
-    id: number;
-    reference: string;
-    treatment_date: string | null;
-    treated_person_name: string;
-    treated_person_type: string;
-    injury_illness_type: string;
-    body_part: string | null;
-    treatment_given: string | null;
-    treatment_outcome: string;
-    ambulance_called: boolean;
+type FirstAidRow = Pick<
+    FirstAidRecord,
+    | 'id'
+    | 'reference'
+    | 'href'
+    | 'treatment_date'
+    | 'treated_person_name'
+    | 'treated_person_type'
+    | 'injury_illness_type'
+    | 'treatment_outcome'
+    | 'ambulance_called'
+    | 'site'
+    | 'incident_reported'
+    | 'can'
+> & {
     first_aider_name: string | null;
-    site_name: string | null;
-    incident_reported: boolean;
-    related_incident_id: number | null;
     attachments_count: number;
     open_followups_count: number;
 };
-
 type Filters = {
     site_id: number | null;
     treated_person_type: string | null;
@@ -103,831 +78,580 @@ type Filters = {
     period: string;
     q: string | null;
 };
-
-type Hero = {
-    live: {
-        treated: number;
-        ambulance: number;
-        hospital: number;
-        linked: number;
-    };
-    attention: {
-        reportable_unlinked: number;
-        followups_open: number;
-        no_aider: number;
-        today: number;
-    };
-    badges: {
-        first_aiders: number;
-        worksafe_awaiting: number;
-        acc45_month: number;
-    };
-};
-
-type Paginated<T> = {
-    data: T[];
-    links: Array<{ url: string | null; label: string; active: boolean }>;
-    current_page: number;
-    last_page: number;
-};
-
 type Props = {
-    records: Paginated<FirstAidRow>;
+    records: {
+        data: FirstAidRow[];
+        links: { url: string | null; label: string; active: boolean }[];
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
     tab: string;
     tabCounts: Record<string, number>;
-    hero: Hero;
     filters: Filters;
-    sites: Opt[];
-    firstAiders: Opt[];
-    clients: Opt[];
-    staff: Opt[];
-    incidents: IncidentOpt[];
+    pickers: FirstAidPickers;
+    filterOptions: { first_aiders: { id: number; name: string }[] };
+    hero: {
+        live: {
+            treated: number;
+            ambulance: number;
+            hospital: number;
+            linked: number;
+        };
+        attention: {
+            reportable_unlinked: number;
+            followups_open: number;
+            no_aider: number;
+            today: number;
+        };
+    };
     can: { view: boolean; create: boolean; manage: boolean };
-    detail: FirstAidDetail | null;
     report?: boolean;
 };
-
-const BASE = '/health-safety/first-aid';
-
-const PERIODS = [
-    { key: 'week', label: 'This week' },
-    { key: '30d', label: '30 days' },
-    { key: 'quarter', label: 'Quarter' },
-    { key: 'all', label: 'All' },
+const TABS = [
+    { key: 'all', label: 'All treatments', icon: LayoutList },
+    { key: 'ambulance', label: 'Ambulance called', icon: Ambulance },
+    { key: 'linked', label: 'Linked incidents', icon: Link2 },
+    { key: 'reportable', label: 'Needs incident review', icon: AlertTriangle },
+    { key: 'followup', label: 'Open follow-ups', icon: ClipboardList },
 ];
-
-function whenCompact(iso: string | null): string {
-    if (!iso) return '—';
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return '—';
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const hm = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    if (date.toDateString() === now.toDateString()) return `Today ${hm}`;
-    const yesterday = new Date(now.getTime() - 86400000);
-    if (date.toDateString() === yesterday.toDateString())
-        return `Yesterday ${hm}`;
-    const days = Math.floor((now.getTime() - date.getTime()) / 86400000);
-    if (days >= 0 && days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
-    return date.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
-}
+const PERIODS = [
+    { value: 'week', label: 'Last 7 days' },
+    { value: '30d', label: 'Last 30 days' },
+    { value: 'quarter', label: 'Last 3 months' },
+    { value: 'all', label: 'All time' },
+];
 
 export default function FirstAidIndex({
     records,
     tab,
     tabCounts,
-    hero,
     filters,
-    sites,
-    firstAiders,
-    clients,
-    staff,
-    incidents,
+    pickers,
+    filterOptions,
+    hero,
     can,
-    detail,
-    report,
+    report = false,
 }: Props) {
-    const assurance = useNzsAssurance();
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [reportOpen, setReportOpen] = useState(() => !!report);
-    const [pendingSection, setPendingSection] =
-        useState<FirstAidSectionKey>('overview');
-    const [pendingAction, setPendingAction] =
-        useState<FirstAidActionKey | null>(null);
-
-    const hasFilters =
-        !!filters.site_id ||
-        !!filters.treated_person_type ||
-        !!filters.treatment_outcome ||
-        !!filters.first_aider_id ||
-        !!filters.q ||
-        (filters.period !== '30d' && !!filters.period);
-
-    type QueryValue = string | number | undefined;
-    const params = (
-        extra: Record<string, QueryValue> = {},
-    ): Record<string, QueryValue> => ({
-        site_id: filters.site_id ?? undefined,
-        treated_person_type: filters.treated_person_type ?? undefined,
-        treatment_outcome: filters.treatment_outcome ?? undefined,
-        first_aider_id: filters.first_aider_id ?? undefined,
-        period: filters.period ?? undefined,
-        q: filters.q ?? undefined,
-        tab: tab !== 'all' ? tab : undefined,
-        ...extra,
-    });
-
-    const go = (extra: Record<string, QueryValue>) =>
-        router.get(BASE, params(extra), {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
-
-    const setTab = (id: string) =>
-        router.get(BASE, params({ tab: id === 'all' ? undefined : id }), {
-            preserveState: true,
-            preserveScroll: true,
-        });
-
-    const clearFilters = () =>
-        router.get(BASE, tab !== 'all' ? { tab } : {}, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
-
-    const openRecord = (
-        id: number,
-        opts?: { section?: FirstAidSectionKey; action?: FirstAidActionKey },
-    ) => {
-        setPendingSection(opts?.section ?? 'overview');
-        setPendingAction(opts?.action ?? null);
-        router.get(BASE, params({ record: id }), {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['detail'],
-        });
-    };
-    const closeDetail = () =>
-        router.get(BASE, params(), {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['detail'],
-        });
-
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'all',
-            label: 'All',
-            icon: LayoutList,
-            tone: 'primary',
-            badge: tabCounts.all || undefined,
-        },
-        {
-            id: 'ambulance',
-            label: 'Ambulance called',
-            icon: Ambulance,
-            tone: 'critical',
-            badge: tabCounts.ambulance || undefined,
-        },
-        {
-            id: 'linked',
-            label: 'Linked to incident',
-            icon: Link2,
-            tone: 'success',
-            badge: tabCounts.linked || undefined,
-        },
-        {
-            id: 'reportable',
-            label: 'Reportable · unlinked',
-            icon: AlertTriangle,
-            tone: 'warning',
-            badge: tabCounts.reportable || undefined,
-        },
-        {
-            id: 'followup',
-            label: 'Open follow-ups',
-            icon: ClipboardList,
-            tone: 'info',
-            badge: tabCounts.followup || undefined,
-        },
-    ];
-
-    const badges: HeroComplianceBadge[] = [
-        {
-            icon: HeartPulse,
-            tone: 'success',
-            label: `First aiders · ${hero.badges.first_aiders} on the roll`,
-        },
-        {
-            icon:
-                hero.badges.worksafe_awaiting > 0
-                    ? AlertTriangle
-                    : CheckCircle2,
-            tone: hero.badges.worksafe_awaiting > 0 ? 'warning' : 'success',
-            label: `WorkSafe-notifiable · ${hero.badges.worksafe_awaiting} awaiting`,
-        },
-        {
-            icon: FileText,
-            tone: 'success',
-            label: `ACC45 · ${hero.badges.acc45_month} this month`,
-        },
-        ngaPaerewaBadge(assurance.certification_status),
-    ];
-
-    const tableTitle =
-        TABS.find((t) => t.id === tab)?.label === 'All'
-            ? 'All treatments'
-            : (TABS.find((t) => t.id === tab)?.label ?? 'All treatments');
-
-    const openRowCtx = (e: ReactMouseEvent, r: FirstAidRow) => {
-        e.preventDefault();
-        const items: ShiftCtxItem[] = [
-            {
-                icon: <HeartPulse className="h-3.5 w-3.5" />,
-                label: 'View record',
-                sub: r.reference,
-                tone: 'primary',
-                onClick: () => openRecord(r.id),
-            },
-        ];
-        if (can.manage) {
-            items.push(
-                {
-                    icon: <Pencil className="h-3.5 w-3.5" />,
-                    label: 'Edit treatment',
-                    onClick: () => openRecord(r.id, { action: 'edit' }),
-                },
-                {
-                    icon: <Link2 className="h-3.5 w-3.5" />,
-                    label: r.incident_reported
-                        ? 'View incident link'
-                        : 'Link to incident',
-                    onClick: () =>
-                        openRecord(r.id, {
-                            section: 'incident',
-                            action: r.incident_reported
-                                ? undefined
-                                : 'link_incident',
-                        }),
-                },
-                {
-                    icon: <Plus className="h-3.5 w-3.5" />,
-                    label: 'Add follow-up',
-                    onClick: () => openRecord(r.id, { action: 'add_followup' }),
-                },
-                {
-                    icon: <Paperclip className="h-3.5 w-3.5" />,
-                    label: 'Add evidence',
-                    onClick: () => openRecord(r.id, { section: 'evidence' }),
-                },
-                { sep: true },
-                {
-                    icon: <Trash2 className="h-3.5 w-3.5" />,
-                    label: 'Archive record',
-                    tone: 'critical',
-                    onClick: () => openRecord(r.id, { action: 'delete' }),
-                },
-            );
-        }
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: 'FIRST AID',
-            meta: `${r.reference} · ${r.treated_person_name}`,
-            items,
-        });
-    };
-
-    const exportUrl = () => {
-        const qs = new URLSearchParams();
-        Object.entries(params()).forEach(([k, v]) => {
-            if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
-        });
-        const s = qs.toString();
-        return `${BASE}/export${s ? `?${s}` : ''}`;
-    };
-
-    const openHeroCtx = (e: ReactMouseEvent) => {
-        e.preventDefault();
-        const items: ShiftCtxItem[] = [];
-        if (can.create)
-            items.push({
-                icon: <Plus className="h-3.5 w-3.5" />,
-                label: 'Record first aid',
-                tone: 'primary',
-                onClick: () => setReportOpen(true),
-            });
-        items.push(
-            {
-                icon: <Download className="h-3.5 w-3.5" />,
-                label: 'Export register (CSV)',
-                sub: 'current filters & tab',
-                onClick: () => {
-                    window.location.href = exportUrl();
-                },
-            },
-            {
-                icon: <HeartPulse className="h-3.5 w-3.5" />,
-                label: 'Go to H&S events',
-                onClick: () => router.visit('/health-safety/events'),
-            },
-            {
-                icon: <BarChart3 className="h-3.5 w-3.5" />,
-                label: 'Go to analytics',
-                onClick: () => router.visit('/health-safety/analytics'),
-            },
+    const { url } = usePage();
+    const returnTo = firstAidReturn(url);
+    const drafts = useSafetyWorkspaceDrafts();
+    const [search, setSearch] = useState(filters.q ?? '');
+    const [reporting, setReporting] = useState(report && can.create);
+    useEffect(() => setSearch(filters.q ?? ''), [filters.q]);
+    useEffect(() => setReporting(report && can.create), [report, can.create]);
+    const params = (next: Partial<Filters> & { tab?: string } = {}) =>
+        Object.fromEntries(
+            Object.entries({ ...filters, tab, ...next }).filter(
+                ([, value]) => value != null && value !== '',
+            ),
         );
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: 'FIRST AID',
-            meta: 'Register actions',
-            items,
+    const query = (next: Partial<Filters> & { tab?: string } = {}) =>
+        new URLSearchParams(
+            Object.entries(params(next)).map(([key, value]) => [
+                key,
+                String(value),
+            ]),
+        );
+    const go = (next: Partial<Filters> & { tab?: string }) =>
+        router.get(FIRST_AID_REGISTER, params(next), {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
         });
-    };
-
+    const meterHref = (next: Partial<Filters> & { tab?: string }) =>
+        `${FIRST_AID_REGISTER}?${query(next)}`;
+    const closeReport = () =>
+        drafts.request(() => {
+            setReporting(false);
+            router.replace({
+                url: returnTo,
+                preserveState: true,
+                preserveScroll: true,
+            });
+        });
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'First aid', href: BASE },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'First aid', href: FIRST_AID_REGISTER },
             ]}
         >
             <Head title="First aid" />
-
-            <div className="flex flex-col gap-6 p-6">
-                {/* ── Hero ── */}
-                <div onContextMenu={openHeroCtx}>
-                    <HeroShell
-                        footer={
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                <HeroSegmented
-                                    label="Period"
-                                    variant="pill"
-                                    ariaLabel="Date range"
-                                    items={PERIODS}
-                                    value={filters.period}
-                                    onChange={(v) => go({ period: v })}
-                                />
-                                {sites.length > 0 ? (
-                                    <EntityFilter
-                                        label="Site"
-                                        allLabel="All sites"
-                                        items={sites}
-                                        value={filters.site_id}
-                                        onChange={(id) =>
-                                            go({ site_id: id ?? undefined })
-                                        }
-                                        onDark
-                                    />
-                                ) : null}
-                                <HeroSelect
-                                    label="Person"
-                                    value={filters.treated_person_type ?? ''}
-                                    onChange={(v) =>
-                                        go({
-                                            treated_person_type: v || undefined,
-                                        })
-                                    }
-                                    options={[
-                                        { value: '', label: 'All' },
-                                        ...PERSON_TYPES,
-                                    ]}
-                                />
-                                <HeroSelect
-                                    label="Outcome"
-                                    value={filters.treatment_outcome ?? ''}
-                                    onChange={(v) =>
-                                        go({
-                                            treatment_outcome: v || undefined,
-                                        })
-                                    }
-                                    options={[
-                                        { value: '', label: 'All outcomes' },
-                                        ...OUTCOMES,
-                                    ]}
-                                />
-                                <div className="relative ml-auto">
-                                    <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                                    <input
-                                        type="search"
-                                        placeholder="Search treatments…"
-                                        defaultValue={filters.q ?? ''}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter')
+            <SafetyFormDraftContext.Provider value={drafts.register}>
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            frontline
+                            wrapTitle
+                            icon={HeartPulse}
+                            title="First aid"
+                            subline="Treatment records, follow-up work and connected incident reviews"
+                            actions={
+                                <>
+                                    <PageHeaderSearch
+                                        value={search}
+                                        onChange={setSearch}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter')
                                                 go({
-                                                    q:
-                                                        (
-                                                            e.target as HTMLInputElement
-                                                        ).value || undefined,
+                                                    q: search.trim() || null,
                                                 });
                                         }}
-                                        className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
+                                        placeholder="Search treatment records"
+                                        ariaLabel="Search first-aid records"
                                     />
-                                </div>
-                                {hasFilters ? (
-                                    <button
-                                        type="button"
-                                        onClick={clearFilters}
-                                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-                                    >
-                                        <X className="h-3 w-3" /> Clear
-                                    </button>
-                                ) : null}
-                            </div>
-                        }
-                    >
-                        <WorkflowRibbon current="report" />
-
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                                <HeroMedallion icon={HeartPulse} />
-                                <div className="flex flex-col gap-1.5">
-                                    <HeroStatusPill>
-                                        First-aid register · synced just now
-                                    </HeroStatusPill>
-                                    <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                        First Aid Register
-                                    </h1>
-                                    <p className="max-w-xl text-sm text-primary-foreground/70">
-                                        Every first-aid treatment — recorded,
-                                        triaged and linked to its incident where
-                                        escalation is needed. Right-click any
-                                        row for the full treatment lifecycle.
-                                    </p>
-                                </div>
-                            </div>
-                            {can.create ? (
-                                <PageHeaderPrimaryButton
-                                    icon={Plus}
-                                    onClick={() => setReportOpen(true)}
-                                >
-                                    Record first aid
-                                </PageHeaderPrimaryButton>
-                            ) : null}
-                        </div>
-
-                        <div className="grid gap-3 lg:grid-cols-2">
-                            <HeroCluster
-                                title="Live · last 30 days"
-                                icon={Activity}
-                            >
-                                <HeroClusterTile
-                                    href={`${BASE}?period=30d`}
-                                    label="Treated"
-                                    value={fmt(hero.live.treated)}
-                                    caption="treatments"
-                                    tone="neutral"
-                                />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=ambulance`}
-                                    label="Ambulance"
-                                    value={fmt(hero.live.ambulance)}
-                                    caption="111 called"
-                                    tone="critical"
-                                />
-                                <HeroClusterTile
-                                    href={`${BASE}?treatment_outcome=sent_to_hospital`}
-                                    label="To hospital"
-                                    value={fmt(hero.live.hospital)}
-                                    caption="referred on"
-                                    tone="critical"
-                                />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=linked`}
-                                    label="Linked"
-                                    value={fmt(hero.live.linked)}
-                                    caption="to incidents"
-                                    tone="success"
-                                />
-                            </HeroCluster>
-                            <HeroCluster
-                                title="Needs attention"
-                                icon={AlertTriangle}
-                            >
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=reportable`}
-                                    label="Reportable"
-                                    value={fmt(
-                                        hero.attention.reportable_unlinked,
+                                    {can.view && (
+                                        <PageHeaderGlassButton asChild>
+                                            <a
+                                                href={`${FIRST_AID_REGISTER}/export?${query()}`}
+                                            >
+                                                <Download className="size-4" />
+                                                Export filtered records
+                                            </a>
+                                        </PageHeaderGlassButton>
                                     )}
-                                    caption="unlinked"
-                                    tone="critical"
+                                    {can.create && (
+                                        <PageHeaderPrimaryButton asChild>
+                                            <Link
+                                                href={`${FIRST_AID_REGISTER}/report?return_to=${encodeURIComponent(returnTo)}`}
+                                            >
+                                                <Plus className="size-4" />
+                                                Record first aid
+                                            </Link>
+                                        </PageHeaderPrimaryButton>
+                                    )}
+                                </>
+                            }
+                            meters={
+                                <>
+                                    <PageHeaderMeterBlock
+                                        label="Treatments"
+                                        href={meterHref({
+                                            tab: 'all',
+                                            period: '30d',
+                                        })}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {hero.live.treated}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Last 30 days · current filters
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Ambulance called"
+                                        href={meterHref({
+                                            tab: 'ambulance',
+                                            period: '30d',
+                                        })}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {hero.live.ambulance}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Last 30 days · current filters
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Needs incident review"
+                                        href={meterHref({
+                                            tab: 'reportable',
+                                            period: 'all',
+                                        })}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {hero.attention.reportable_unlinked}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Reported incidents or significant
+                                            treatment without a linked incident
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Treatments needing follow-up"
+                                        href={meterHref({
+                                            tab: 'followup',
+                                            period: 'all',
+                                        })}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {hero.attention.followups_open}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            At least one open follow-up · all
+                                            time
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                </>
+                            }
+                            filters={
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Site"
+                                        value={String(filters.site_id ?? '')}
+                                        options={pickers.sites.map((item) => ({
+                                            value: String(item.id),
+                                            label: item.name,
+                                        }))}
+                                        onChange={(value) =>
+                                            go({
+                                                site_id: value
+                                                    ? Number(value)
+                                                    : null,
+                                            })
+                                        }
+                                        allValue=""
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Person type"
+                                        value={
+                                            filters.treated_person_type ?? ''
+                                        }
+                                        options={PERSON_TYPES}
+                                        onChange={(value) =>
+                                            go({
+                                                treated_person_type:
+                                                    value || null,
+                                            })
+                                        }
+                                        allValue=""
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Outcome"
+                                        value={filters.treatment_outcome ?? ''}
+                                        options={OUTCOMES}
+                                        onChange={(value) =>
+                                            go({
+                                                treatment_outcome:
+                                                    value || null,
+                                            })
+                                        }
+                                        allValue=""
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="First aider"
+                                        value={String(
+                                            filters.first_aider_id ?? '',
+                                        )}
+                                        options={filterOptions.first_aiders.map(
+                                            (item) => ({
+                                                value: String(item.id),
+                                                label: item.name,
+                                            }),
+                                        )}
+                                        onChange={(value) =>
+                                            go({
+                                                first_aider_id: value
+                                                    ? Number(value)
+                                                    : null,
+                                            })
+                                        }
+                                        allValue=""
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Period"
+                                        value={filters.period}
+                                        allValue="30d"
+                                        options={PERIODS}
+                                        onChange={(value) =>
+                                            go({ period: value || '30d' })
+                                        }
+                                    />
+                                    <PageHeaderGlassButton
+                                        onClick={() =>
+                                            router.get(
+                                                FIRST_AID_REGISTER,
+                                                { tab },
+                                                {
+                                                    preserveState: true,
+                                                    preserveScroll: true,
+                                                    replace: true,
+                                                },
+                                            )
+                                        }
+                                    >
+                                        Clear filters
+                                    </PageHeaderGlassButton>
+                                </>
+                            }
+                            rail={
+                                <PageHeaderRail
+                                    items={TABS.map((item) => ({
+                                        ...item,
+                                        count: tabCounts[item.key] ?? 0,
+                                    }))}
+                                    value={tab}
+                                    onSelect={(next) => go({ tab: next })}
+                                    ariaLabel="First-aid register views"
                                 />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=followup`}
-                                    label="Follow-up"
-                                    value={fmt(hero.attention.followups_open)}
-                                    caption="open"
-                                    tone="warning"
-                                />
-                                <HeroClusterTile
-                                    label="No aider"
-                                    value={fmt(hero.attention.no_aider)}
-                                    caption="legacy rows"
-                                    tone="warning"
-                                />
-                                <HeroClusterTile
-                                    label="Today"
-                                    value={fmt(hero.attention.today)}
-                                    caption="new treatments"
-                                    tone="success"
-                                />
-                            </HeroCluster>
-                        </div>
-
-                        <HeroComplianceBadges items={badges} />
-                    </HeroShell>
-                </div>
-
-                {/* ── Tabs ── */}
-                <TabStrip
-                    value={tab}
-                    items={TABS}
-                    onChange={setTab}
-                    ariaLabel="First aid views"
-                />
-
-                {/* ── Table ── */}
-                <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                    <RegisterTableHeader
-                        icon={HeartPulse}
-                        title={tableTitle}
-                        subtitle={`${records.data.length} shown`}
-                        hint="Right-click a row for treatment actions"
-                        hintIcon={MousePointer2}
-                    />
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1040px] text-sm">
-                            <thead className="bg-muted/70 text-left text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
-                                <tr>
-                                    <th className="px-4 py-3 font-bold">
-                                        When
-                                    </th>
-                                    <th className="px-4 py-3 font-bold">
-                                        Person treated
-                                    </th>
-                                    <th className="px-4 py-3 font-bold">
-                                        Injury / illness
-                                    </th>
-                                    <th className="px-4 py-3 font-bold">
-                                        Treatment given
-                                    </th>
-                                    <th className="px-4 py-3 font-bold">
-                                        Outcome
-                                    </th>
-                                    <th className="px-4 py-3 font-bold">
-                                        First-aider
-                                    </th>
-                                    <th className="px-4 py-3 font-bold">
-                                        Incident
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {records.data.map((r) => {
-                                    const oTone = outcomeTone(
-                                        r.treatment_outcome,
-                                    );
-                                    const iTone = injuryTone(
-                                        r.injury_illness_type,
-                                    );
-                                    return (
-                                        <tr
-                                            key={r.id}
-                                            onClick={() => openRecord(r.id)}
-                                            onContextMenu={(e) =>
-                                                openRowCtx(e, r)
-                                            }
-                                            tabIndex={0}
-                                            aria-label={`Open record ${r.reference}`}
-                                            onKeyDown={(e) => {
-                                                if (
-                                                    e.key === 'Enter' ||
-                                                    e.key === ' '
-                                                ) {
-                                                    e.preventDefault();
-                                                    openRecord(r.id);
-                                                }
-                                            }}
-                                            className="cursor-pointer transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-                                        >
-                                            <td className="px-4 py-3 align-top whitespace-nowrap">
-                                                <div className="text-[12.5px] font-bold">
-                                                    {whenCompact(
-                                                        r.treatment_date,
-                                                    )}
-                                                </div>
-                                                <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
-                                                    {r.reference}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 align-top">
-                                                <div className="flex items-center gap-2.5">
-                                                    <span
-                                                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${entityTone(r.id)}`}
+                            }
+                        />
+                    }
+                >
+                    <div className="space-y-5">
+                        <p className="text-subtle">
+                            {records.total} treatment records match this view.
+                            {tab === 'reportable'
+                                ? ' Reported incidents, ambulance calls and recorded hospital referrals need review; this list does not determine statutory notification requirements.'
+                                : ''}
+                        </p>
+                        {!records.data.length ? (
+                            <Card>
+                                <CardContent className="space-y-2 p-6">
+                                    <h2 className="text-section-title">
+                                        No treatments match this view
+                                    </h2>
+                                    <p className="text-sm">
+                                        Change the filters to find a record.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <>
+                                <div className="hidden overflow-x-auto rounded-lg border lg:block">
+                                    <table className="w-full text-left text-sm">
+                                        <caption className="sr-only">
+                                            First-aid treatment records
+                                        </caption>
+                                        <thead className="bg-muted/40">
+                                            <tr>
+                                                {[
+                                                    'Treatment',
+                                                    'Person and Site',
+                                                    'Injury and outcome',
+                                                    'Follow-up work',
+                                                    'Open',
+                                                ].map((label) => (
+                                                    <th
+                                                        key={label}
+                                                        scope="col"
+                                                        className="p-4 font-medium"
                                                     >
-                                                        {initials(
-                                                            r.treated_person_name,
-                                                        )}
-                                                    </span>
-                                                    <span className="min-w-0">
-                                                        <span className="block truncate text-[12.5px] font-bold">
-                                                            {r.treated_person_name ||
-                                                                '—'}
-                                                        </span>
-                                                        <span className="mt-0.5 inline-flex items-center rounded-md border border-border px-1.5 text-[10px] font-semibold text-muted-foreground">
+                                                        {label}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {records.data.map((record) => (
+                                                <tr key={record.id}>
+                                                    <td className="p-4">
+                                                        <p className="font-medium">
+                                                            {record.reference ??
+                                                                `FA-${record.id}`}
+                                                        </p>
+                                                        <p className="text-subtle">
+                                                            {formatDateTimeLong(
+                                                                record.treatment_date,
+                                                                'Treatment time not recorded',
+                                                            )}
+                                                        </p>
+                                                        <p className="text-subtle">
+                                                            {record.first_aider_name
+                                                                ? `First aider: ${record.first_aider_name}`
+                                                                : 'First aider not recorded'}
+                                                        </p>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <p className="font-medium">
+                                                            {
+                                                                record.treated_person_name
+                                                            }
+                                                        </p>
+                                                        <p className="text-subtle">
                                                             {personTypeLabel(
-                                                                r.treated_person_type,
-                                                            )}
-                                                        </span>
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 align-top">
-                                                <div className="flex items-start gap-2">
-                                                    <span
-                                                        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${TONE_DOT[iTone]}`}
-                                                    />
-                                                    <span className="min-w-0">
-                                                        <span className="block text-[12.5px] font-semibold">
+                                                                record.treated_person_type,
+                                                            )}{' '}
+                                                            ·{' '}
+                                                            {record.site
+                                                                ?.name ??
+                                                                'Site not recorded'}
+                                                        </p>
+                                                    </td>
+                                                    <td className="space-y-2 p-4">
+                                                        <p>
                                                             {injuryLabel(
-                                                                r.injury_illness_type,
+                                                                record.injury_illness_type,
                                                             )}
-                                                        </span>
-                                                        {r.body_part ? (
-                                                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                                                                {r.body_part}
-                                                            </span>
-                                                        ) : null}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="max-w-[230px] px-4 py-3 align-top">
-                                                <span className="block truncate text-foreground">
-                                                    {r.treatment_given || '—'}
-                                                </span>
-                                                {r.attachments_count > 0 ||
-                                                r.open_followups_count > 0 ? (
-                                                    <span className="mt-1 flex items-center gap-2 text-[10.5px] font-medium text-muted-foreground">
-                                                        {r.attachments_count >
-                                                        0 ? (
-                                                            <span className="inline-flex items-center gap-0.5">
-                                                                <Paperclip className="h-3 w-3" />
-                                                                {
-                                                                    r.attachments_count
-                                                                }
-                                                            </span>
-                                                        ) : null}
-                                                        {r.open_followups_count >
-                                                        0 ? (
-                                                            <span className="inline-flex items-center gap-0.5 text-status-warning">
-                                                                <ClipboardList className="h-3 w-3" />
-                                                                {
-                                                                    r.open_followups_count
-                                                                }
-                                                            </span>
-                                                        ) : null}
-                                                    </span>
-                                                ) : null}
-                                            </td>
-                                            <td className="px-4 py-3 align-top">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span
-                                                        className={`inline-flex items-center rounded-md px-2 py-1 text-[11px] font-bold ${TONE_BG[oTone]}`}
-                                                    >
-                                                        {outcomeLabel(
-                                                            r.treatment_outcome,
+                                                        </p>
+                                                        <p>
+                                                            {outcomeLabel(
+                                                                record.treatment_outcome,
+                                                            )}
+                                                        </p>
+                                                        {record.ambulance_called && (
+                                                            <StatusBadge variant="warning">
+                                                                Ambulance called
+                                                            </StatusBadge>
                                                         )}
-                                                    </span>
-                                                    {r.ambulance_called ? (
-                                                        <span
-                                                            title="Ambulance called"
-                                                            className="grid h-5 w-5 place-items-center rounded bg-status-critical-bg text-status-critical"
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <p>
+                                                            {
+                                                                record.open_followups_count
+                                                            }{' '}
+                                                            open follow-ups
+                                                        </p>
+                                                        <p className="text-subtle">
+                                                            {
+                                                                record.attachments_count
+                                                            }{' '}
+                                                            evidence records
+                                                        </p>
+                                                        {record.incident_reported && (
+                                                            <p className="text-subtle">
+                                                                Incident report
+                                                                recorded
+                                                            </p>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <Button
+                                                            className="frontline-tap"
+                                                            asChild
+                                                            variant="outline"
                                                         >
-                                                            <Ambulance className="h-3 w-3" />
-                                                        </span>
-                                                    ) : null}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 align-top">
-                                                <span className="text-[12.5px]">
-                                                    {r.first_aider_name ?? (
-                                                        <span className="text-muted-foreground">
-                                                            —
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 align-top">
-                                                {r.related_incident_id ? (
-                                                    <FlagBadge
-                                                        icon={Link2}
-                                                        tone="success"
-                                                        title="Linked to incident"
-                                                    >
-                                                        Linked
-                                                    </FlagBadge>
-                                                ) : r.incident_reported ||
-                                                  r.ambulance_called ||
-                                                  r.treatment_outcome ===
-                                                      'sent_to_hospital' ? (
-                                                    <FlagBadge
-                                                        icon={AlertTriangle}
-                                                        tone="critical"
-                                                        title="Reportable — not yet linked to an incident"
-                                                    >
-                                                        Reportable
-                                                    </FlagBadge>
-                                                ) : (
-                                                    <span className="text-muted-foreground">
-                                                        —
-                                                    </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                        {records.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-                                <HeartPulse className="h-10 w-10 text-muted-foreground/40" />
-                                <p className="font-semibold text-muted-foreground">
-                                    No treatments here
-                                </p>
-                                <p className="text-sm text-muted-foreground/70">
-                                    Nothing matches this tab and filters.
-                                </p>
-                            </div>
-                        ) : null}
+                                                            <Link
+                                                                href={firstAidHref(
+                                                                    record.id,
+                                                                    {
+                                                                        returnTo,
+                                                                    },
+                                                                )}
+                                                            >
+                                                                Open{' '}
+                                                                {record.reference ??
+                                                                    `FA-${record.id}`}
+                                                            </Link>
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <ul className="space-y-4 lg:hidden">
+                                    {records.data.map((record) => (
+                                        <li key={record.id}>
+                                            <Card>
+                                                <CardContent className="space-y-4 p-5">
+                                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                                        <div>
+                                                            <h2 className="text-section-title">
+                                                                {
+                                                                    record.treated_person_name
+                                                                }
+                                                            </h2>
+                                                            <p className="text-subtle">
+                                                                {record.reference ??
+                                                                    `FA-${record.id}`}{' '}
+                                                                ·{' '}
+                                                                {record.site
+                                                                    ?.name ??
+                                                                    'Site not recorded'}
+                                                            </p>
+                                                        </div>
+                                                        {record.ambulance_called && (
+                                                            <StatusBadge variant="warning">
+                                                                Ambulance called
+                                                            </StatusBadge>
+                                                        )}
+                                                    </div>
+                                                    <dl className="grid gap-3 sm:grid-cols-2">
+                                                        <FirstAidFact label="Treatment time">
+                                                            {formatDateTimeLong(
+                                                                record.treatment_date,
+                                                                'Not recorded',
+                                                            )}
+                                                        </FirstAidFact>
+                                                        <FirstAidFact label="Injury or illness">
+                                                            {injuryLabel(
+                                                                record.injury_illness_type,
+                                                            )}
+                                                        </FirstAidFact>
+                                                        <FirstAidFact label="Recorded outcome">
+                                                            {outcomeLabel(
+                                                                record.treatment_outcome,
+                                                            )}
+                                                        </FirstAidFact>
+                                                        <FirstAidFact label="First aider">
+                                                            {
+                                                                record.first_aider_name
+                                                            }
+                                                        </FirstAidFact>
+                                                        <FirstAidFact label="Open follow-ups">
+                                                            {
+                                                                record.open_followups_count
+                                                            }
+                                                        </FirstAidFact>
+                                                        <FirstAidFact label="Evidence records">
+                                                            {
+                                                                record.attachments_count
+                                                            }
+                                                        </FirstAidFact>
+                                                    </dl>
+                                                    <div className="flex flex-wrap gap-3">
+                                                        <Button
+                                                            className="frontline-tap"
+                                                            variant="outline"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={firstAidHref(
+                                                                    record.id,
+                                                                    {
+                                                                        returnTo,
+                                                                    },
+                                                                )}
+                                                            >
+                                                                Open{' '}
+                                                                {record.reference ??
+                                                                    `FA-${record.id}`}
+                                                            </Link>
+                                                        </Button>
+                                                        {record.open_followups_count >
+                                                            0 && (
+                                                            <Button
+                                                                className="frontline-tap"
+                                                                variant="outline"
+                                                                asChild
+                                                            >
+                                                                <Link
+                                                                    href={firstAidHref(
+                                                                        record.id,
+                                                                        {
+                                                                            section:
+                                                                                'followups',
+                                                                            returnTo,
+                                                                        },
+                                                                    )}
+                                                                >
+                                                                    View
+                                                                    follow-ups
+                                                                </Link>
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </>
+                        )}
+                        <LaravelPagination links={records.links} />
                     </div>
-                </section>
-
-                {records.last_page > 1 ? (
-                    <LaravelPagination
-                        links={records.links}
-                        lastPage={records.last_page}
-                    />
-                ) : null}
-            </div>
-
-            {ctx ? (
-                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
-            ) : null}
-
-            {reportOpen && can.create ? (
-                <FirstAidReportDialog
-                    open
-                    onClose={() => setReportOpen(false)}
-                    sites={sites}
-                    firstAiders={firstAiders}
-                    clients={clients}
-                    staff={staff}
-                    incidents={incidents}
-                    onOpenRecord={(id) => {
-                        setReportOpen(false);
-                        openRecord(id);
-                    }}
-                />
-            ) : null}
-
-            {detail ? (
-                <FirstAidDetailDialog
-                    key={detail.id}
-                    detail={detail}
-                    open
-                    onClose={closeDetail}
-                    initialSection={pendingSection}
-                    initialAction={pendingAction}
-                    sites={sites}
-                    firstAiders={firstAiders}
-                    clients={clients}
-                    incidents={incidents}
-                />
-            ) : null}
+                    {reporting && (
+                        <FirstAidTreatmentWizard
+                            pickers={pickers}
+                            returnTo={returnTo}
+                            onClose={closeReport}
+                        />
+                    )}
+                </PageLayout>
+                {drafts.confirmation}
+            </SafetyFormDraftContext.Provider>
         </AppLayout>
-    );
-}
-
-/* Dark-hero native select — matches the search input chrome on the primary gradient. */
-function HeroSelect({
-    label,
-    value,
-    onChange,
-    options,
-}: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    options: { value: string; label: string }[];
-}) {
-    return (
-        <label className="inline-flex items-center gap-1.5">
-            <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                {label}
-            </span>
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-            >
-                {options.map((o) => (
-                    <option
-                        key={o.value}
-                        value={o.value}
-                        className="text-foreground"
-                    >
-                        {o.label}
-                    </option>
-                ))}
-            </select>
-        </label>
     );
 }

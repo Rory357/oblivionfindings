@@ -4,829 +4,257 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\HealthSafety\StoreSafeWorkProcedureRequest;
+use App\Http\Requests\HealthSafety\UpdateSafeWorkProcedureRequest;
 use App\Models\HsAttachment;
-use App\Models\ProcedureAcknowledgement;
-use App\Models\Role;
 use App\Models\SafeWorkProcedure;
 use App\Models\SafeWorkProcedureVersion;
-use App\Models\Site;
-use App\Models\TrainingCourse;
 use App\Models\User;
-use Carbon\Carbon;
+use App\Services\HealthSafety\SafeWorkProcedureAccessService;
+use App\Services\HealthSafety\SafeWorkProcedureService;
+use App\Support\HealthSafety\SafeWorkProcedurePresenter;
+use App\Support\HealthSafety\SafeWorkProcedureReturn;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
+use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-/**
- * Safe Work Procedures — the controlled SWMS document library.
- *
- * Lifecycle: draft → under_review → approved → archived (+ review_date / current_version).
- * Gold-standard H&S register (twin of LoneWorkerController): modal-first, in-place
- * transitions, param-driven detail, version-stamped controlled-document attachments.
- */
 class SafeWorkProcedureController extends Controller
 {
     use ServesPrivateAttachments;
 
-    /** Canonical categories (the design's category→tone map). */
-    private const PROCEDURE_CATEGORIES = [
-        'manual_handling',
-        'challenging_behaviour',
-        'lone_working',
-        'medication',
-        'infection_control',
-        'fire_safety',
-        'emergency_procedures',
-        'equipment_use',
-        'personal_care',
-    ];
-
-    /** High-risk categories that must each carry an approved procedure (NZ supported-living). */
-    private const HIGH_RISK_CATEGORIES = [
-        'manual_handling',
-        'challenging_behaviour',
-        'lone_working',
-        'medication',
-    ];
-
-    private const STATUSES = ['draft', 'under_review', 'approved', 'archived'];
-
     private const TABS = ['all', 'draft', 'under_review', 'approved', 'review_due', 'archived'];
 
-    private const REVIEW_STATES = ['overdue', 'due_soon', 'current'];
+    private const STATES = ['draft', 'under_review', 'approved', 'archived'];
 
-    /* ================================================================== */
-    /*  Register                                                          */
-    /* ================================================================== */
+    public function __construct(private readonly SafeWorkProcedureAccessService $access, private readonly SafeWorkProcedureService $service) {}
 
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response|RedirectResponse
     {
-        $filters = $this->resolveFilters($request);
+        if ($request->query->has('procedure')) {
+            $id = $request->query('procedure');
+            abort_unless(is_string($id) && preg_match('/^[1-9][0-9]*$/D', $id), 404);
+            $record = $this->access->recordForViewer(SafeWorkProcedure::findOrFail((int) $id), $request->user());
 
-        $procedures = $this->buildQuery($filters)
-            ->with(['approvedBy:id,name', 'owner:id,name'])
-            ->withCount('attachments')
-            ->paginate(25)
-            ->withQueryString()
-            ->through(fn (SafeWorkProcedure $p) => $this->mapRow($p));
+            return redirect(SafeWorkProcedureReturn::href($record->id, SafeWorkProcedureReturn::fromRegister($request->query()), null, null, $request->boolean('edit')));
+        }
+        $filters = $this->filters($request);
+        [$rows,$current] = $this->rows($request, $filters);
+        $facetRows = $this->filterRows($rows, $filters, false);
+        $matches = $this->filterRows($facetRows, $filters, true)->values();
+        $page = max(1, (int) $request->query('page', 1));
+        $paginator = new LengthAwarePaginator($matches->forPage($page, 25)->map(fn ($row) => array_diff_key($row, ['audience_sites' => true]))->values(), $matches->count(), 25, $page, ['path' => $request->url(), 'query' => $request->query()]);
+        $counts = collect(self::TABS)->mapWithKeys(fn ($tab) => [$tab => $facetRows->filter(fn ($row) => $this->inTab($row, $tab))->count()])->all();
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $soon = now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays(30)->toDateString();
+        $overdue = $facetRows->filter(fn ($row) => $row['published_version_id'] && $row['review_date'] && $row['review_date'] < $today)->count();
+        $dueSoon = $facetRows->filter(fn ($row) => $row['published_version_id'] && $row['review_date'] && $row['review_date'] >= $today && $row['review_date'] <= $soon)->count();
+        $categories = $facetRows->filter(fn ($row) => $row['published_version_id'])->pluck('category')->unique()->all();
+        $gaps = count(array_diff(SafeWorkProcedureService::CATEGORIES, $categories));
 
-        return Inertia::render('health-safety/procedures/index', array_merge([
-            'procedures' => $procedures,
-            'tab' => $filters['tab'],
-            'tabCounts' => $this->tabCounts(),
-            'hero' => $this->heroBlock(),
-            'filters' => $filters,
-            'detail' => $request->filled('procedure')
-                ? $this->procedureDetail((int) $request->input('procedure'), $request->user())
-                : null,
-            'can' => $this->canBlock($request->user()),
-        ], $this->pickerOptions()));
+        return Inertia::render('health-safety/procedures/index', [
+            'procedures' => $paginator, 'filters' => $filters, 'tab' => $filters['tab'], 'tabCounts' => $counts, 'detail' => null,
+            'hero' => ['library' => ['approved' => $counts['approved'], 'under_review' => $counts['under_review'], 'draft' => $counts['draft'], 'archived' => $counts['archived']], 'attention' => ['review_due_soon' => $dueSoon, 'review_overdue' => $overdue, 'review_unknown' => $facetRows->filter(fn ($row) => $row['published_version_id'] && $row['review_date'] === null)->count(), 'unapproved' => $facetRows->filter(fn ($row) => ! $row['published_version_id'] && $row['status'] !== 'archived')->count(), 'coverage_gaps' => $gaps], 'nz' => ['worksafe_approved' => null, 'nga_paerewa_documented' => null, 'review_overdue' => $overdue, 'coverage_gaps' => $gaps, 'high_risk_covered' => count(array_intersect(['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'], $categories)) === 4]],
+            'can' => ['view' => true, 'create' => $current->canDo('procedures.create') || $current->canDo('procedures.manage'), 'manage' => $current->canDo('procedures.manage'), 'approve' => $current->canDo('procedures.approve')],
+            ...$this->access->pickerOptions($current), 'categories' => collect(SafeWorkProcedureService::CATEGORIES)->map(fn ($key) => ['value' => $key, 'label' => ucwords(str_replace('_', ' ', $key))])->all(),
+        ]);
     }
 
-    /* ================================================================== */
-    /*  Deep-link fallbacks (modal-first is the primary path)             */
-    /* ================================================================== */
+    public function show(Request $request, SafeWorkProcedure $procedure, SafeWorkProcedurePresenter $presenter): Response|JsonResponse
+    {
+        $returnTo = SafeWorkProcedureReturn::sanitize($request->query('return_to')) ?? SafeWorkProcedureReturn::REGISTER;
+        $id = $request->query('version');
+        abort_unless($id === null || (is_string($id) && preg_match('/^[1-9][0-9]*$/D', $id)), 404);
+        $detail = $presenter->detail($procedure, $request->user(), $returnTo, $id === null ? null : (int) $id, $request->query('revision') === 'working');
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return response()->json(['detail' => $detail]);
+        }
+
+        return Inertia::render('health-safety/procedures/show', ['detail' => $detail, 'pickers' => ($detail['can']['edit'] ?? false) ? $this->access->pickerOptions($request->user(), $procedure) : ['sites' => [], 'roles' => [], 'owners' => [], 'trainingCourses' => [], 'categories' => [], 'can_apply_organisation_wide' => false], 'return_to' => $returnTo]);
+    }
 
     public function create(): RedirectResponse
     {
         return redirect()->route('health-safety.procedures.index', ['new' => 1]);
     }
 
-    public function edit(SafeWorkProcedure $procedure): RedirectResponse
+    public function edit(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        return redirect()->route('health-safety.procedures.index', ['procedure' => $procedure->id, 'edit' => 1]);
+        abort_unless($this->access->canManage($procedure, $request->user()), 403);
+
+        return redirect(SafeWorkProcedureReturn::href($procedure->id, SafeWorkProcedureReturn::fromRegister($request->query()), null, null, true));
     }
 
-    public function show(SafeWorkProcedure $procedure): RedirectResponse
+    public function store(StoreSafeWorkProcedureRequest $request): RedirectResponse
     {
-        // Modal-first: the permalink opens the detail-as-modal on the register.
-        return redirect()->route('health-safety.procedures.index', ['procedure' => $procedure->id]);
+        $record = $this->service->create($request->user(), $request->validated());
+
+        return back()->with(['success' => 'Procedure draft created.', 'created_procedure_id' => $record->id]);
     }
 
-    /** CSV export of the register, honouring the current tab + filters. */
-    public function export(Request $request): StreamedResponse
+    public function update(UpdateSafeWorkProcedureRequest $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        $procedures = $this->buildQuery($this->resolveFilters($request))
-            ->with(['approvedBy:id,name', 'owner:id,name'])
-            ->get();
+        $this->service->update($procedure, $request->user(), $request->validated());
 
-        $filename = 'safe-work-procedures-'.now()->format('Y-m-d').'.csv';
-
-        return response()->streamDownload(function () use ($procedures) {
-            $out = fopen('php://output', 'w');
-            $this->putCsv($out, ['Reference', 'Title', 'Category', 'Status', 'Version', 'Owner', 'Approved by', 'Next review', 'Sites', 'Roles']);
-            foreach ($procedures as $p) {
-                $this->putCsv($out, [
-                    $p->reference_number,
-                    $p->title,
-                    $this->categoryLabel((string) $p->category),
-                    ucfirst(str_replace('_', ' ', (string) $p->status)),
-                    'v'.$p->current_version,
-                    $p->owner?->name ?? '',
-                    $p->approvedBy?->name ?? '',
-                    $p->review_date?->toDateString() ?? '',
-                    is_array($p->applicable_sites) ? count($p->applicable_sites) : 0,
-                    is_array($p->applicable_roles) ? count($p->applicable_roles) : 0,
-                ]);
-            }
-            fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv']);
+        return back()->with('success', 'Working revision saved. The published copy is preserved.');
     }
-
-    /* ================================================================== */
-    /*  Create / edit (modal wizard posts in-place)                       */
-    /* ================================================================== */
-
-    public function store(Request $request): RedirectResponse
-    {
-        $validated = $this->cleanPayload($this->validateProcedure($request, null));
-
-        $procedure = SafeWorkProcedure::create(array_merge($validated, [
-            'created_by' => $request->user()->id,
-            'current_version' => 1,
-            'status' => 'draft',
-        ]));
-
-        $this->snapshotVersion($procedure, 1, 'Initial version', $request->user()->id);
-
-        return back()->with([
-            'success' => 'Safe work procedure created (draft).',
-            'created_procedure_id' => $procedure->id,
-        ]);
-    }
-
-    public function update(Request $request, SafeWorkProcedure $procedure): RedirectResponse
-    {
-        $validated = $this->validateProcedure($request, $procedure);
-        $changeSummary = $validated['change_summary'];
-        unset($validated['change_summary']);
-
-        $validated = $this->cleanPayload($validated);
-        $validated['updated_by'] = $request->user()->id;
-        $validated['current_version'] = $procedure->current_version + 1;
-
-        // Content change un-approves an approved procedure (keep existing behaviour).
-        if ($procedure->status === 'approved') {
-            $validated['status'] = 'under_review';
-        }
-
-        $procedure->update($validated);
-        $this->snapshotVersion($procedure->fresh(), $procedure->current_version, $changeSummary, $request->user()->id);
-
-        return back()->with([
-            'success' => "Procedure updated (v{$procedure->current_version}).",
-            'created_procedure_id' => $procedure->id,
-        ]);
-    }
-
-    /* ================================================================== */
-    /*  Lifecycle transitions (all in-place)                              */
-    /* ================================================================== */
 
     public function submitForReview(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        if ($procedure->status === 'approved') {
-            return back()->with('success', 'Procedure is already approved.');
-        }
-
-        $procedure->update(['status' => 'under_review', 'updated_by' => $request->user()->id]);
-
-        return back()->with('success', 'Procedure submitted for review.');
+        return $this->transition($request, $procedure, 'submit-for-review');
     }
 
     public function approve(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        $validated = $request->validate([
-            'note' => 'nullable|string|max:2000',
-            'review_date' => 'nullable|date',
-        ]);
-
-        $procedure->update([
-            'status' => 'approved',
-            'approved_by' => $request->user()->id,
-            'approved_at' => Carbon::now(),
-            'review_date' => $validated['review_date'] ?? $this->computeNextReview($procedure),
-            'updated_by' => $request->user()->id,
-        ]);
-
-        if (! empty($validated['note'])) {
-            $this->snapshotNewVersion($procedure, 'Approved: '.$validated['note'], $request->user()->id);
-        }
-
-        return back()->with('success', 'Procedure approved.');
+        return $this->transition($request, $procedure, 'approve');
     }
 
     public function requestChanges(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        abort_unless(in_array($procedure->status, ['under_review', 'approved'], true), 422);
-
-        $validated = $request->validate(['note' => 'nullable|string|max:2000']);
-
-        $procedure->update(['status' => 'draft', 'updated_by' => $request->user()->id]);
-
-        if (! empty($validated['note'])) {
-            $this->snapshotNewVersion($procedure, 'Returned to draft: '.$validated['note'], $request->user()->id);
-        }
-
-        return back()->with('success', 'Returned to draft for changes.');
+        return $this->transition($request, $procedure, 'request-changes');
     }
 
     public function recordReview(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        $validated = $request->validate([
-            'review_date' => 'required|date',
-            'note' => 'nullable|string|max:2000',
-        ]);
-
-        $procedure->update(['review_date' => $validated['review_date'], 'updated_by' => $request->user()->id]);
-
-        $this->snapshotNewVersion(
-            $procedure,
-            'Review recorded'.(! empty($validated['note']) ? ': '.$validated['note'] : ''),
-            $request->user()->id,
-        );
-
-        return back()->with('success', 'Review recorded.');
+        return $this->transition($request, $procedure, 'record-review');
     }
 
     public function archive(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        if ($procedure->status === 'archived') {
-            return back()->with('success', 'Procedure is already archived.');
-        }
-
-        $procedure->update([
-            'previous_status' => $procedure->status,
-            'status' => 'archived',
-            'updated_by' => $request->user()->id,
-        ]);
-
-        return back()->with('success', 'Procedure archived.');
+        return $this->transition($request, $procedure, 'archive');
     }
 
     public function restore(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        abort_unless($procedure->status === 'archived', 422);
-
-        $restoreTo = in_array($procedure->previous_status, self::STATUSES, true) && $procedure->previous_status !== 'archived'
-            ? $procedure->previous_status
-            : 'draft';
-
-        $procedure->update([
-            'status' => $restoreTo,
-            'previous_status' => null,
-            'updated_by' => $request->user()->id,
-        ]);
-
-        return back()->with('success', 'Procedure restored from the archive.');
+        return $this->transition($request, $procedure, 'restore');
     }
 
-    /** Record that the current worker has read & understood the procedure (version-stamped). */
+    private function transition(Request $request, SafeWorkProcedure $procedure, string $command): RedirectResponse
+    {
+        $this->service->lifecycle($procedure, $request->user(), $command, $request->all());
+
+        return back()->with('success', 'Procedure change recorded.');
+    }
+
     public function acknowledge(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        ProcedureAcknowledgement::updateOrCreate(
-            ['safe_work_procedure_id' => $procedure->id, 'user_id' => $request->user()->id],
-            ['version_acknowledged' => $procedure->current_version, 'acknowledged_at' => now()],
-        );
+        $this->service->acknowledge($procedure, $request->user(), $request->all());
 
-        return back()->with('success', 'Procedure acknowledged.');
+        return back()->with('success', 'Reading receipt recorded for this exact copy.');
     }
-
-    /* ================================================================== */
-    /*  Controlled-document library (premium upload — polymorphic HsAttachment) */
-    /* ================================================================== */
 
     public function uploadAttachment(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        $validated = $request->validate([
-            'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg,webp'],
-            'description' => ['nullable', 'string', 'max:1000'],
-        ]);
+        $data = $request->validate(['file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg,webp,txt'], 'description' => ['nullable', 'string', 'max:1000'], 'expected_version' => ['required', 'integer', 'min:1'], 'expected_lock_version' => ['required', 'integer', 'min:1']]);
+        $this->service->addEvidence($procedure, $request->user(), $data, $request->file('file'));
 
-        $file = $request->file('file');
-        $path = $file->store("health-safety/procedures/{$procedure->id}", 'private');
-
-        $procedure->attachments()->create([
-            'uploaded_by' => $request->user()->id,
-            'original_name' => $file->getClientOriginalName(),
-            'path' => $path,
-            'disk' => 'private',
-            'mime_type' => $file->getClientMimeType(),
-            'size_bytes' => $file->getSize(),
-            'description' => $validated['description'] ?? null,
-            'version_at_upload' => $procedure->current_version,
-        ]);
-
-        return back()->with('success', 'Document attached.');
+        return back()->with('success', 'Document added to a new working revision.');
     }
 
-    public function downloadAttachment(SafeWorkProcedure $procedure, HsAttachment $attachment): StreamedResponse
+    public function destroyAttachment(Request $request, SafeWorkProcedure $procedure, HsAttachment $attachment): RedirectResponse
     {
-        $this->assertAttachmentBelongsTo($procedure, $attachment);
+        $this->service->removeEvidence($procedure, $request->user(), $request->all(), $attachment);
 
-        return $this->streamPrivateAttachment(
-            $attachment->disk,
-            $attachment->path,
-            $attachment->original_name,
-            $attachment->mime_type,
-        );
+        return back()->with('success', 'Document removed from the working revision; prior copies are preserved.');
     }
 
-    public function destroyAttachment(SafeWorkProcedure $procedure, HsAttachment $attachment): RedirectResponse
+    public function downloadAttachment(Request $request, SafeWorkProcedure $procedure, HsAttachment $attachment): StreamedResponse
     {
-        $this->assertAttachmentBelongsTo($procedure, $attachment);
+        $record = $this->access->recordForViewer($procedure, $request->user());
+        abort_unless($attachment->attachable_type === $record->getMorphClass() && (int) $attachment->attachable_id === (int) $record->id, 404);
+        $id = $request->query('version');
+        abort_unless($id === null || (is_string($id) && preg_match('/^[1-9][0-9]*$/D', $id)), 404);
+        $version = SafeWorkProcedureVersion::query()->where('safe_work_procedure_id', $record->id)->findOrFail($id ?? $record->published_version_id);
+        abort_unless($this->access->canViewVersion($record, $version, $request->user()), 403);
+        abort_unless(in_array((int) $attachment->id, array_map('intval', $version->document_manifest ?? []), true), 404);
 
-        $disk = $attachment->disk ?: 'private';
-        if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
-            Storage::disk($disk)->delete($attachment->path);
-        }
-        $attachment->delete();
-
-        return back()->with('success', 'Document removed.');
+        return $this->streamPrivateAttachment($attachment->disk ?? 'private', $attachment->path, $attachment->original_name, $attachment->mime_type);
     }
 
-    /**
-     * IDOR guard: HsAttachment is polymorphic, so assert BOTH the FK id AND the morph
-     * type — otherwise procedure B could reach procedure A's document by id.
-     */
-    private function assertAttachmentBelongsTo(SafeWorkProcedure $procedure, HsAttachment $attachment): void
+    public function export(Request $request): StreamedResponse
     {
-        abort_unless(
-            (int) $attachment->attachable_id === (int) $procedure->id
-                && $attachment->attachable_type === $procedure->getMorphClass(),
-            404,
-        );
+        $filters = $this->filters($request);
+        [$rows] = $this->rows($request, $filters);
+        $rows = $this->filterRows($rows, $filters, true);
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            $this->putCsv($out, ['Reference', 'Title', 'Category', 'Status', 'Version', 'Owner', 'Approved by', 'Next review', 'Sites', 'Roles']);
+            foreach ($rows as $row) {
+                $this->putCsv($out, [$row['reference_number'], $row['title'], $row['category'], $row['status'], 'v'.$row['version'], $row['owner']['name'] ?? '', $row['approved_by']['name'] ?? '', $row['review_date'] ?? '', $row['sites_count'], $row['roles_count']]);
+            } fclose($out);
+        }, 'safe-work-procedures-'.now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString().'.csv', ['Content-Type' => 'text/csv']);
     }
 
-    /* ================================================================== */
-    /*  Row / detail mapping                                              */
-    /* ================================================================== */
-
-    private function mapRow(SafeWorkProcedure $p): array
+    private function rows(Request $request, array $filters): array
     {
-        return [
-            'id' => $p->id,
-            'reference_number' => $p->reference_number,
-            'title' => $p->title,
-            'purpose' => $p->purpose,
-            'category' => $p->category,
-            'status' => $p->status,
-            'version' => $p->current_version,
-            'review_date' => $p->review_date?->toDateString(),
-            'owner' => $p->owner ? ['id' => $p->owner->id, 'name' => $p->owner->name] : null,
-            'approved_by' => $p->approvedBy ? ['id' => $p->approvedBy->id, 'name' => $p->approvedBy->name] : null,
-            'sites_count' => is_array($p->applicable_sites) ? count($p->applicable_sites) : 0,
-            'roles_count' => is_array($p->applicable_roles) ? count($p->applicable_roles) : 0,
-            'documents_count' => (int) ($p->attachments_count ?? 0),
-        ];
+        return $this->access->withCurrentViewer($request->user(), function ($current, $reads, $sites) use ($filters) {
+            abort_unless($current->canDo('procedures.view'), 403);
+            if ($filters['site_id'] !== null) {
+                abort_unless(in_array($filters['site_id'], $sites, true), 403);
+            }
+            $records = $reads->query(SafeWorkProcedure::query())->with(['publishedVersion.approvedBy', 'versions', 'owner', 'approvedBy'])->orderBy('title')->get();
+            $rows = $records->map(function ($record) use ($current, $sites) {
+                $published = $record->status !== 'archived' && $record->publishedVersion && (int) $record->publishedVersion->safe_work_procedure_id === (int) $record->id && $this->access->isApprovedVersion($record->publishedVersion) && $this->access->audienceAllows($record->publishedSnapshot(), $current, $sites);
+                $working = $this->access->workingAllowed($record, $current, $sites) && $this->access->allSitesAllowed($record->applicable_sites ?? [], $sites, $current);
+                if (! $published && ! $working) {
+                    return null;
+                }
+                $snapshot = $published ? $record->publishedSnapshot() : $record->only(SafeWorkProcedureService::CONTENT_FIELDS);
+                $version = $published ? $record->publishedVersion : $record->versions->firstWhere('version_number', $record->current_version);
+                $owner = isset($snapshot['owner_id']) ? User::find($snapshot['owner_id']) : null;
+
+                return ['id' => $record->id, 'title' => $snapshot['title'] ?? '', 'reference_number' => $snapshot['reference_number'] ?? '', 'purpose' => $snapshot['purpose'] ?? null, 'category' => $snapshot['category'] ?? '', 'status' => $published ? 'approved' : $record->status, 'working_status' => $working ? $record->status : null, 'version' => $version?->version_number ?? $record->current_version, 'published_version_id' => $published ? $version->id : null, 'published_version' => $published ? $version->version_number : null, 'provenance' => $version?->provenance, 'review_date' => $published ? $record->published_review_date?->toDateString() : $record->review_date?->toDateString(), 'owner' => $owner ? ['id' => $owner->id, 'name' => $owner->name] : null, 'approved_by' => $published && $version->approvedBy ? ['id' => $version->approvedBy->id, 'name' => $version->approvedBy->name] : null, 'sites_count' => count(array_intersect(array_map('intval', $snapshot['applicable_sites'] ?? []), $sites)), 'roles_count' => count($snapshot['applicable_roles'] ?? []), 'documents_count' => count($version?->document_manifest ?? []), 'audience_sites' => $snapshot['applicable_sites'] ?? [], 'href' => SafeWorkProcedureReturn::href($record->id)];
+            })->filter()->values();
+
+            return [$rows, $current];
+        });
     }
 
-    private function procedureDetail(int $id, ?User $user): ?array
+    private function filterRows(Collection $rows, array $filters, bool $withTab): Collection
     {
-        $procedure = SafeWorkProcedure::with([
-            'approvedBy:id,name', 'owner:id,name', 'creator:id,name', 'updater:id,name',
-            'versions.changedBy:id,name', 'attachments.uploader:id,name',
-        ])->find($id);
+        return $rows->filter(function ($row) use ($filters, $withTab) {
+            if ($withTab && ! $this->inTab($row, $filters['tab'])) {
+                return false;
+            }
+            if ($filters['category'] && $row['category'] !== $filters['category']) {
+                return false;
+            }
+            if ($filters['status'] && $row['status'] !== $filters['status']) {
+                return false;
+            }
+            if ($filters['site_id'] && $row['audience_sites'] !== [] && ! in_array($filters['site_id'], array_map('intval', $row['audience_sites']), true)) {
+                return false;
+            }
+            if ($filters['q'] && ! str_contains(mb_strtolower($row['title'].' '.$row['reference_number']), mb_strtolower($filters['q']))) {
+                return false;
+            }
+            $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+            $soon = now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays(30)->toDateString();
+            $date = $row['review_date'];
 
-        if (! $procedure) {
-            return null;
-        }
-
-        return $this->mapDetail($procedure, $user);
+            return match ($filters['review_state']) {
+                'overdue' => $row['published_version_id'] && $date !== null && $date < $today,'due_soon' => $row['published_version_id'] && $date !== null && $date >= $today && $date <= $soon,'current' => $row['published_version_id'] && $date !== null && $date > $soon,'none','unknown' => $row['published_version_id'] && $date === null,'today' => $row['published_version_id'] && $date === $today,default => true
+            };
+        });
     }
 
-    private function mapDetail(SafeWorkProcedure $p, ?User $user): array
+    private function inTab(array $row, string $tab): bool
     {
-        return [
-            'id' => $p->id,
-            'reference_number' => $p->reference_number,
-            'title' => $p->title,
-            'category' => $p->category,
-            'status' => $p->status,
-            'previous_status' => $p->previous_status,
-            'version' => $p->current_version,
-            'purpose' => $p->purpose,
-            'scope' => $p->scope,
-            'steps' => $this->normalizeSteps($p->steps),
-            'ppe_required' => array_values($p->ppe_required ?? []),
-            'hazards_addressed' => array_values($p->hazards_addressed ?? []),
-            'emergency_procedures' => is_array($p->emergency_procedures)
-                ? implode("\n", $p->emergency_procedures)
-                : (string) $p->emergency_procedures,
-            'review_date' => $p->review_date?->toDateString(),
-            'review_frequency_months' => $p->review_frequency_months,
-            'approved_at' => $p->approved_at?->toISOString(),
-            'applies' => [
-                'roles' => $this->resolveRoles(array_values($p->applicable_roles ?? [])),
-                'sites' => $this->resolveSites(array_values($p->applicable_sites ?? [])),
-                'training' => $this->resolveTraining(array_values($p->related_training ?? [])),
-            ],
-            'owner' => $p->owner ? ['id' => $p->owner->id, 'name' => $p->owner->name] : null,
-            'approved_by' => $p->approvedBy ? ['id' => $p->approvedBy->id, 'name' => $p->approvedBy->name] : null,
-            'creator' => $p->creator ? ['id' => $p->creator->id, 'name' => $p->creator->name] : null,
-            'updater' => $p->updater ? ['id' => $p->updater->id, 'name' => $p->updater->name] : null,
-            'versions' => $p->versions->map(fn (SafeWorkProcedureVersion $v) => [
-                'id' => $v->id,
-                'version' => $v->version_number,
-                'change_summary' => $v->change_summary,
-                'changed_by' => $v->changedBy ? ['id' => $v->changedBy->id, 'name' => $v->changedBy->name] : null,
-                'created_at' => $v->created_at?->toISOString(),
-            ])->values(),
-            'attachments' => $p->attachments->map(fn (HsAttachment $a) => [
-                'id' => $a->id,
-                'original_name' => $a->original_name,
-                'mime' => $a->mime_type,
-                'size' => $a->size_bytes,
-                'description' => $a->description,
-                'version' => $a->version_at_upload,
-                'uploaded_by_name' => $a->uploader?->name,
-                'created_at' => $a->created_at?->toISOString(),
-                'url' => "/health-safety/procedures/{$p->id}/attachments/{$a->id}/download",
-            ])->values(),
-            'acknowledged' => $user
-                ? (int) $p->acknowledgements()->where('user_id', $user->id)->value('version_acknowledged') === (int) $p->current_version
-                : false,
-            'acknowledged_count' => $p->acknowledgements()->count(),
-            'form' => $this->mapProcedureForForm($p),
-            'can' => $this->canBlock($user),
-        ];
-    }
-
-    /* ================================================================== */
-    /*  Hero / tab counts                                                 */
-    /* ================================================================== */
-
-    private function tabCounts(): array
-    {
-        return [
-            'all' => SafeWorkProcedure::count(),
-            'draft' => SafeWorkProcedure::where('status', 'draft')->count(),
-            'under_review' => SafeWorkProcedure::where('status', 'under_review')->count(),
-            'approved' => SafeWorkProcedure::where('status', 'approved')->count(),
-            'review_due' => SafeWorkProcedure::where('status', 'approved')->where(fn ($w) => $this->applyReviewDue($w))->count(),
-            'archived' => SafeWorkProcedure::where('status', 'archived')->count(),
-        ];
-    }
-
-    /**
-     * Raw counts/booleans only — the page formats the copy (never pre-format here).
-     */
-    private function heroBlock(): array
-    {
-        $today = Carbon::today();
-        $approvedCats = SafeWorkProcedure::where('status', 'approved')
-            ->whereNotNull('category')->distinct()->pluck('category')->all();
-
-        $coverageGaps = count(array_diff(self::PROCEDURE_CATEGORIES, $approvedCats));
-        $highRiskCovered = count(array_intersect(self::HIGH_RISK_CATEGORIES, $approvedCats)) === count(self::HIGH_RISK_CATEGORIES);
-
-        $reviewOverdue = SafeWorkProcedure::where('status', 'approved')
-            ->whereNotNull('review_date')->where('review_date', '<', $today)->count();
-        $reviewDueSoon = SafeWorkProcedure::where('status', 'approved')
-            ->whereNotNull('review_date')->whereBetween('review_date', [$today, $today->copy()->addDays(30)])->count();
-
-        $draft = SafeWorkProcedure::where('status', 'draft')->count();
-        $underReview = SafeWorkProcedure::where('status', 'under_review')->count();
-        $approved = SafeWorkProcedure::where('status', 'approved')->count();
-        $archived = SafeWorkProcedure::where('status', 'archived')->count();
-
-        return [
-            'library' => [
-                'approved' => $approved,
-                'under_review' => $underReview,
-                'draft' => $draft,
-                'archived' => $archived,
-            ],
-            'attention' => [
-                'review_due_soon' => $reviewDueSoon,
-                'review_overdue' => $reviewOverdue,
-                'unapproved' => $draft + $underReview,
-                'coverage_gaps' => $coverageGaps,
-            ],
-            'nz' => [
-                'worksafe_approved' => $approved,
-                'nga_paerewa_documented' => $approved > 0,
-                'review_overdue' => $reviewOverdue,
-                'coverage_gaps' => $coverageGaps,
-                'high_risk_covered' => $highRiskCovered,
-            ],
-        ];
-    }
-
-    /* ================================================================== */
-    /*  Query scopes / options                                            */
-    /* ================================================================== */
-
-    /** Whitelisted filter set, shared by index() + export(). */
-    private function resolveFilters(Request $request): array
-    {
-        $tab = in_array($request->input('tab'), self::TABS, true) ? $request->input('tab') : 'all';
-        $q = trim((string) $request->input('q'));
-
-        return [
-            'q' => $q !== '' ? $q : null,
-            'tab' => $tab,
-            'category' => in_array($request->input('category'), self::PROCEDURE_CATEGORIES, true) ? $request->input('category') : null,
-            'status' => in_array($request->input('status'), self::STATUSES, true) ? $request->input('status') : null,
-            'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
-            'review_state' => in_array($request->input('review_state'), self::REVIEW_STATES, true) ? $request->input('review_state') : null,
-        ];
-    }
-
-    /** Build the filtered register query (no pagination/eager-loads), shared by index() + export(). */
-    private function buildQuery(array $filters): \Illuminate\Database\Eloquent\Builder
-    {
-        $tab = $filters['tab'];
-
-        return SafeWorkProcedure::query()
-            ->when($tab === 'review_due', fn ($query) => $query->where('status', 'approved')->where(fn ($w) => $this->applyReviewDue($w)))
-            ->when(in_array($tab, self::STATUSES, true), fn ($query) => $query->where('status', $tab))
-            ->when($filters['category'], fn ($query) => $query->where('category', $filters['category']))
-            ->when($filters['status'], fn ($query) => $query->where('status', $filters['status']))
-            ->when($filters['site_id'], fn ($query) => $query->whereJsonContains('applicable_sites', $filters['site_id']))
-            ->when($filters['review_state'], fn ($query) => $this->applyReviewState($query, $filters['review_state']))
-            ->when($filters['q'], fn ($query) => $query->where(function ($sub) use ($filters) {
-                $sub->where('title', 'like', "%{$filters['q']}%")
-                    ->orWhere('reference_number', 'like', "%{$filters['q']}%");
-            }))
-            ->orderBy('title');
-    }
-
-    /** Approved review-due predicate (overdue OR due within 30 days). Single source of truth. */
-    private function applyReviewDue($query): void
-    {
-        $query->whereNotNull('review_date')
-            ->where('review_date', '<=', Carbon::today()->addDays(30));
-    }
-
-    private function applyReviewState($query, string $state)
-    {
-        $today = Carbon::today();
-
-        return match ($state) {
-            'overdue' => $query->whereNotNull('review_date')->where('review_date', '<', $today),
-            'due_soon' => $query->whereNotNull('review_date')->whereBetween('review_date', [$today, $today->copy()->addDays(30)]),
-            'current' => $query->where(fn ($w) => $w->whereNull('review_date')->orWhere('review_date', '>', $today->copy()->addDays(30))),
-            default => $query,
+        return match ($tab) {
+            'all' => true,'approved' => $row['published_version_id'] !== null,'review_due' => $row['published_version_id'] && $row['review_date'] && $row['review_date'] <= now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays(30)->toDateString(),default => $row['working_status'] === $tab
         };
     }
 
-    private function computeNextReview(SafeWorkProcedure $procedure): ?string
+    private function filters(Request $request): array
     {
-        if ($procedure->review_frequency_months) {
-            return Carbon::today()->addMonths($procedure->review_frequency_months)->toDateString();
-        }
+        $q = $request->query('q');
+        $site = $request->query('site_id');
 
-        return $procedure->review_date?->toDateString();
-    }
-
-    private function pickerOptions(): array
-    {
-        return [
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'roles' => Role::query()->orderBy('label')->get(['id', 'name', 'label']),
-            'trainingCourses' => TrainingCourse::query()->where('active', true)->orderBy('name')->get(['id', 'name', 'code']),
-            'owners' => User::query()->orderBy('name')->get(['id', 'name']),
-            'categories' => array_map(fn ($key) => [
-                'value' => $key,
-                'label' => $this->categoryLabel($key),
-            ], self::PROCEDURE_CATEGORIES),
-        ];
-    }
-
-    private function canBlock(?User $user): array
-    {
-        return [
-            'view' => (bool) $user?->canDo('procedures.view'),
-            'create' => (bool) $user?->canDo('procedures.create'),
-            'manage' => (bool) $user?->canDo('procedures.manage'),
-            'approve' => (bool) $user?->canDo('procedures.approve'),
-        ];
-    }
-
-    /* ================================================================== */
-    /*  Resolution + normalisation                                       */
-    /* ================================================================== */
-
-    private function resolveSites(array $ids): array
-    {
-        if ($ids === []) {
-            return [];
-        }
-
-        $names = Site::whereIn('id', array_filter($ids, 'is_numeric'))->pluck('name', 'id');
-
-        return collect($ids)->map(fn ($id) => [
-            'id' => $id,
-            'name' => $names[$id] ?? (is_numeric($id) ? "Site #{$id}" : (string) $id),
-        ])->all();
-    }
-
-    private function resolveRoles(array $keys): array
-    {
-        if ($keys === []) {
-            return [];
-        }
-
-        $labels = Role::whereIn('name', $keys)->pluck('label', 'name');
-
-        return collect($keys)->map(fn ($key) => [
-            'key' => $key,
-            'label' => $labels[$key] ?? $this->categoryLabel((string) $key),
-        ])->all();
-    }
-
-    private function resolveTraining(array $ids): array
-    {
-        if ($ids === []) {
-            return [];
-        }
-
-        $courses = TrainingCourse::whereIn('id', array_filter($ids, 'is_numeric'))->get(['id', 'name', 'code'])->keyBy('id');
-
-        return collect($ids)->map(function ($id) use ($courses) {
-            $course = $courses[$id] ?? null;
-
-            return [
-                'id' => $id,
-                'name' => $course?->name ?? (is_numeric($id) ? "Course #{$id}" : (string) $id),
-                'code' => $course?->code,
-            ];
-        })->all();
-    }
-
-    private function normalizeSteps(?array $steps): array
-    {
-        return collect($steps ?? [])->map(fn ($step, int $index) => [
-            'step_number' => (int) ($step['step_number'] ?? ($index + 1)),
-            'description' => (string) ($step['description'] ?? ''),
-            'safety_notes' => (string) ($step['safety_notes'] ?? ''),
-        ])->values()->all();
-    }
-
-    private function categoryLabel(string $key): string
-    {
-        return ucwords(str_replace('_', ' ', $key));
-    }
-
-    /* ================================================================== */
-    /*  Validation + persistence helpers                                 */
-    /* ================================================================== */
-
-    private function validateProcedure(Request $request, ?SafeWorkProcedure $procedure): array
-    {
-        $request->merge([
-            'emergency_procedures' => $this->normalizeTextList($request->input('emergency_procedures')),
-        ]);
-
-        $refRule = $procedure
-            ? ['required', 'string', 'max:100', Rule::unique('safe_work_procedures', 'reference_number')->ignore($procedure->id)]
-            : ['required', 'string', 'max:100', 'unique:safe_work_procedures,reference_number'];
-
-        $rules = [
-            'title' => 'required|string|max:255',
-            'reference_number' => $refRule,
-            'category' => ['required', Rule::in(self::PROCEDURE_CATEGORIES)],
-            'purpose' => 'nullable|string',
-            'scope' => 'nullable|string',
-            'hazards_addressed' => 'nullable|array',
-            'hazards_addressed.*' => 'string|max:255',
-            'ppe_required' => 'nullable|array',
-            'ppe_required.*' => 'string|max:255',
-            'steps' => 'nullable|array',
-            'steps.*.step_number' => 'nullable|integer',
-            'steps.*.description' => 'nullable|string',
-            'steps.*.safety_notes' => 'nullable|string',
-            'emergency_procedures' => 'nullable|array',
-            'review_date' => 'nullable|date',
-            'review_frequency_months' => 'nullable|integer|min:1|max:120',
-            'owner_id' => ['nullable', Rule::exists('users', 'id')],
-            'applicable_roles' => 'nullable|array',
-            'applicable_roles.*' => 'string|max:100',
-            'applicable_sites' => 'nullable|array',
-            'applicable_sites.*' => 'integer',
-            'related_training' => 'nullable|array',
-            'related_training.*' => 'integer',
-        ];
-
-        if ($procedure) {
-            $rules['change_summary'] = 'required|string|max:2000';
-        }
-
-        return $request->validate($rules);
-    }
-
-    private function cleanPayload(array $validated): array
-    {
-        $validated['steps'] = $this->cleanSteps($validated['steps'] ?? []);
-        $validated['ppe_required'] = $this->cleanStringList($validated['ppe_required'] ?? []);
-        $validated['hazards_addressed'] = $this->cleanStringList($validated['hazards_addressed'] ?? []);
-        $validated['applicable_roles'] = $this->cleanStringList($validated['applicable_roles'] ?? []);
-        $validated['applicable_sites'] = $this->cleanIntList($validated['applicable_sites'] ?? []);
-        $validated['related_training'] = $this->cleanIntList($validated['related_training'] ?? []);
-
-        return $validated;
-    }
-
-    private function cleanSteps(?array $steps): array
-    {
-        return collect($steps ?? [])
-            ->filter(fn ($step) => trim((string) ($step['description'] ?? '')) !== '')
-            ->values()
-            ->map(fn ($step, int $index) => [
-                'step_number' => $index + 1,
-                'description' => trim((string) ($step['description'] ?? '')),
-                'safety_notes' => trim((string) ($step['safety_notes'] ?? '')),
-            ])->all();
-    }
-
-    private function cleanStringList(?array $items): array
-    {
-        return collect($items ?? [])
-            ->map(fn ($item) => trim((string) $item))
-            ->filter(fn ($item) => $item !== '')
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    private function cleanIntList(?array $items): array
-    {
-        return collect($items ?? [])
-            ->map(fn ($item) => (int) $item)
-            ->filter(fn ($item) => $item > 0)
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    private function snapshotVersion(SafeWorkProcedure $procedure, int $version, string $summary, int $userId): void
-    {
-        SafeWorkProcedureVersion::create([
-            'safe_work_procedure_id' => $procedure->id,
-            'version_number' => $version,
-            'content_snapshot' => $procedure->toArray(),
-            'change_summary' => $summary,
-            'changed_by' => $userId,
-        ]);
-    }
-
-    /**
-     * Record a controlled-document lifecycle revision (review / approval / return-to-
-     * draft note): bump current_version and snapshot at the NEW number. A version row
-     * for the current number already exists (store/update/seed wrote it), so reusing
-     * it would violate the unique (procedure, version) index — bump first.
-     */
-    private function snapshotNewVersion(SafeWorkProcedure $procedure, string $summary, int $userId): void
-    {
-        $procedure->update(['current_version' => $procedure->current_version + 1]);
-        $this->snapshotVersion($procedure->fresh(), $procedure->current_version, $summary, $userId);
-    }
-
-    private function mapProcedureForForm(SafeWorkProcedure $procedure): array
-    {
-        $steps = $this->normalizeSteps($procedure->steps);
-
-        return [
-            'id' => $procedure->id,
-            'title' => $procedure->title,
-            'reference_number' => $procedure->reference_number,
-            'category' => $procedure->category,
-            'purpose' => $procedure->purpose ?? '',
-            'scope' => $procedure->scope ?? '',
-            'steps' => $steps !== [] ? $steps : [['step_number' => 1, 'description' => '', 'safety_notes' => '']],
-            'ppe_required' => array_values($procedure->ppe_required ?? []),
-            'hazards_addressed' => array_values($procedure->hazards_addressed ?? []),
-            'emergency_procedures' => is_array($procedure->emergency_procedures)
-                ? implode("\n", array_filter($procedure->emergency_procedures))
-                : (string) ($procedure->emergency_procedures ?? ''),
-            'applicable_roles' => array_values($procedure->applicable_roles ?? []),
-            'applicable_sites' => array_map('intval', array_values($procedure->applicable_sites ?? [])),
-            'related_training' => array_map('intval', array_values($procedure->related_training ?? [])),
-            'review_date' => $procedure->review_date?->toDateString(),
-            'review_frequency_months' => $procedure->review_frequency_months,
-            'owner_id' => $procedure->owner_id,
-        ];
-    }
-
-    private function normalizeTextList(mixed $value): ?array
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (is_array($value)) {
-            $items = array_map(static fn ($item) => trim((string) $item), $value);
-
-            return array_values(array_filter($items, static fn ($item) => $item !== ''));
-        }
-
-        $items = preg_split('/\r\n|\r|\n/', (string) $value) ?: [];
-        $items = array_map(static fn ($item) => trim($item), $items);
-
-        return array_values(array_filter($items, static fn ($item) => $item !== ''));
+        return ['tab' => in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'all', 'q' => is_string($q) && trim($q) !== '' ? mb_substr(trim($q), 0, 200) : null, 'category' => in_array($request->query('category'), SafeWorkProcedureService::CATEGORIES, true) ? $request->query('category') : null, 'status' => in_array($request->query('status'), self::STATES, true) ? $request->query('status') : null, 'site_id' => is_scalar($site) && preg_match('/^[1-9][0-9]*$/D', (string) $site) ? (int) $site : null, 'review_state' => in_array($request->query('review_state'), ['overdue', 'today', 'due_soon', 'current', 'none', 'unknown'], true) ? $request->query('review_state') : null];
     }
 }

@@ -5,12 +5,12 @@ namespace App\Policies;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\User;
-use App\Services\UserSiteAccessService;
+use App\Services\Incidents\IncidentAccessService;
 
 class ClientIncidentPolicy
 {
     public function __construct(
-        private readonly ?UserSiteAccessService $siteAccess = null,
+        private readonly IncidentAccessService $access,
     ) {}
 
     public function viewAny(User $user): bool
@@ -20,17 +20,7 @@ class ClientIncidentPolicy
 
     public function view(User $user, ClientIncident $incident): bool
     {
-        if ($user->canDo('incidents.viewAny')) {
-            return true;
-        }
-
-        if (!$user->canDo('incidents.viewAssigned')) {
-            return false;
-        }
-
-        return $incident->client()
-            ->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
-            ->exists();
+        return $this->access->canView($user, $incident);
     }
 
     public function create(User $user, Client $client): bool
@@ -41,7 +31,7 @@ class ClientIncidentPolicy
     public function update(User $user, ClientIncident $incident): bool
     {
         // Locked once closed (immutability for audit).
-        if ($incident->status === 'closed') {
+        if ($incident->status === 'closed' || ! $this->view($user, $incident)) {
             return false;
         }
 
@@ -54,11 +44,11 @@ class ClientIncidentPolicy
 
     public function submit(User $user, ClientIncident $incident): bool
     {
-        if (!$user->canDo('incidents.submit')) {
+        if (! $user->canDo('incidents.submit') || ! $this->view($user, $incident)) {
             return false;
         }
 
-        return !$incident->isShiftLinked()
+        return ! $incident->isShiftLinked()
             && (int) $incident->reported_by === (int) $user->id
             && empty($incident->submitted_at)
             && $incident->status === 'draft';
@@ -98,21 +88,6 @@ class ClientIncidentPolicy
 
     private function canAccessIncidentSite(User $user, ClientIncident $incident): bool
     {
-        $siteService = $this->siteAccess ?? app(UserSiteAccessService::class);
-        if ($siteService->canBypass($user, ['sites.viewAll', 'incidents.manage'])) {
-            return true;
-        }
-
-        $siteId = $incident->site_id ?: $incident->client?->site_id;
-        if (! $siteId) {
-            return true;
-        }
-
-        $accessibleSiteIds = $siteService->accessibleSiteIds($user);
-        if ($accessibleSiteIds === []) {
-            return false;
-        }
-
-        return in_array((int) $siteId, $accessibleSiteIds, true);
+        return $this->access->canAccessSite($user, $incident);
     }
 }

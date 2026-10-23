@@ -33,7 +33,24 @@ class SubstanceExposureRecord extends Model
         'updated_by',
     ];
 
+    // Generic activity cannot copy identifiable exposure/medical source contents into a broad audit channel.
+    protected $auditExcludedAttributes = [
+        'hazardous_substance_id', 'user_id', 'site_id', 'exposed_at', 'exposure_type', 'exposure_duration',
+        'circumstances', 'symptoms', 'first_aid_given', 'medical_attention_sought', 'medical_treatment',
+        'medical_outcome', 'incident_reported', 'related_incident_id', 'created_by', 'updated_by',
+        'original_context',
+    ];
+
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
+        'hazardous_substance_id' => 'integer',
+        'user_id' => 'integer',
+        'site_id' => 'integer',
+        'created_by' => 'integer',
+        'updated_by' => 'integer',
+        'related_incident_id' => 'integer',
+        'original_context' => 'array',
         'exposed_at' => 'datetime',
         'medical_attention_sought' => 'boolean',
         'incident_reported' => 'boolean',
@@ -86,4 +103,29 @@ class SubstanceExposureRecord extends Model
     {
         return $query->where('medical_attention_sought', true);
     }
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ChemicalExposureSourceVersion::class, 'exposure_id');
+    }
+
+    public function commandReceipts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ChemicalExposureCommandReceipt::class, 'exposure_id');
+    }
+
+    public function reviews(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ChemicalExposureReview::class, 'exposure_id');
+    }
+
+    public function followups(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ChemicalExposureFollowup::class, 'exposure_id');
+    }
+
+    public function evidence(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ChemicalExposureEvidence::class, 'exposure_id');
+    }
+
 }

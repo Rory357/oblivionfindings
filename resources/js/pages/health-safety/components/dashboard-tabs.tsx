@@ -4,27 +4,34 @@
  * these; WS8 adds the governance export strip to Compliance. Tokens only; plain string URLs. */
 import type { RosterTabItem } from '@/components/rostering';
 import { Card, CardContent } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
-    CheckCircle2,
     ClipboardCheck,
     FileText,
     Flame,
     FlaskConical,
     HeartPulse,
     LayoutGrid,
-    type LucideIcon,
     Search,
     ShieldAlert,
     ShieldCheck,
     Target,
     TrendingDown,
     TrendingUp,
+    type LucideIcon,
 } from 'lucide-react';
 
-import type { HeroLeadingLagging } from './command-centre-hero';
+import {
+    participationAccessForViewer,
+    participationSourceMatches,
+    participationValue,
+    participationViewer,
+    type ParticipationCoverage,
+} from '../participation-source-state';
+import type { HeroFilters, HeroLeadingLagging } from './command-centre-hero';
 
 function fmt(value: number | null | undefined, suffix = ''): string {
     return value === null || value === undefined ? '—' : `${value}${suffix}`;
@@ -115,45 +122,53 @@ function KpiCard({
     caption,
     accent,
 }: {
-    href: string;
+    href?: string;
     label: string;
     value: string;
     caption: string;
     accent: Accent;
 }) {
-    return (
-        <Link href={href} className="group">
-            <Card
-                className={cn(
-                    'border-l-4 transition-all duration-150 group-hover:-translate-y-0.5 group-hover:shadow-md',
-                    BORDER_ACCENT[accent],
-                )}
-            >
-                <CardContent className="p-4">
-                    <div className="text-xs font-medium text-muted-foreground">
-                        {label}
-                    </div>
-                    <div className="mt-1 text-2xl font-bold text-foreground tabular-nums">
-                        {value}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">
-                        {caption}
-                    </div>
-                </CardContent>
-            </Card>
+    const content = (
+        <Card
+            className={cn(
+                'border-l-4 transition-all duration-150 group-hover:-translate-y-0.5 group-hover:shadow-md',
+                BORDER_ACCENT[accent],
+            )}
+        >
+            <CardContent className="p-4">
+                <div className="text-xs font-medium text-muted-foreground">
+                    {label}
+                </div>
+                <div className="mt-1 text-2xl font-bold text-foreground tabular-nums">
+                    {value}
+                </div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {caption}
+                </div>
+            </CardContent>
+        </Card>
+    );
+    return href ? (
+        <Link
+            href={href}
+            className="frontline-tap frontline-focus group focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+            {content}
         </Link>
+    ) : (
+        <div>{content}</div>
     );
 }
 
-type StatusTone = 'success' | 'warning';
+type StatusTone = 'neutral' | 'warning';
 
 const STATUS_CHIP: Record<StatusTone, string> = {
-    success: 'bg-status-success-bg text-status-success',
+    neutral: 'bg-muted text-muted-foreground',
     warning: 'bg-status-warning-bg text-status-warning',
 };
 
 const STATUS_TOP: Record<StatusTone, string> = {
-    success: 'border-t-status-success',
+    neutral: 'border-t-border',
     warning: 'border-t-status-warning',
 };
 
@@ -163,12 +178,16 @@ function StatusCard({
     status,
     sub,
     tone,
+    href,
+    linkLabel,
 }: {
     icon: LucideIcon;
     title: string;
     status: string;
     sub: string;
     tone: StatusTone;
+    href?: string;
+    linkLabel?: string;
 }) {
     return (
         <Card className={cn('border-t-4', STATUS_TOP[tone])}>
@@ -186,10 +205,16 @@ function StatusCard({
                         {title}
                     </span>
                 </div>
-                <div className="text-sm font-medium text-foreground">
-                    {status}
-                </div>
-                <div className="text-[11px] text-muted-foreground">{sub}</div>
+                <StatusBadge variant={tone}>{status}</StatusBadge>
+                <div className="text-caption text-muted-foreground">{sub}</div>
+                {href && (
+                    <Link
+                        href={href}
+                        className="frontline-tap frontline-focus inline-flex items-center rounded-md text-sm text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        {linkLabel}
+                    </Link>
+                )}
             </CardContent>
         </Card>
     );
@@ -203,48 +228,116 @@ export function LeadingPanel({
     data,
     workerParticipation,
     siteCount,
+    filters,
 }: {
     data: HeroLeadingLagging['leading'];
-    workerParticipation: { pct: number | null; committees: number };
+    workerParticipation: ParticipationCoverage;
     siteCount: number;
+    filters?: HeroFilters;
 }) {
+    const participationAudience = participationViewer(
+        usePage<SharedData>().props.auth,
+    );
+    const sourceAccess = participationAccessForViewer(
+        workerParticipation.source_access,
+        workerParticipation.viewer_id,
+        participationAudience,
+    );
+    const participationPct = participationValue(
+        workerParticipation.pct,
+        workerParticipation.source_access,
+        workerParticipation.viewer_id,
+        participationAudience,
+    );
+    const participationCommittees = participationValue(
+        workerParticipation.committees,
+        workerParticipation.source_access,
+        workerParticipation.viewer_id,
+        participationAudience,
+    );
+    const hr = usePage<SharedData>().props.auth.can?.hr as
+        | { compliance?: { view?: boolean } }
+        | undefined;
+    const nearMisses = new URLSearchParams({ kind: 'near_misses', tab: 'all' });
+    const actions = new URLSearchParams({ tab: 'all' });
+    const representatives = new URLSearchParams({ tab: 'representatives' });
+    if (filters) {
+        actions.set('from', filters.from);
+        actions.set('to', filters.to);
+        if (filters.site !== null) {
+            for (const query of [nearMisses, actions, representatives])
+                query.set('site_id', String(filters.site));
+        }
+    }
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
-                href="/incidents?type=near_miss"
-                label="Near-miss : incident"
+                href={`/incidents?${nearMisses}`}
+                label="Near-miss : recordable injury"
                 value={fmt(data.near_miss_ratio, '×')}
-                caption="target ≥ 3 — strong reporting culture"
-                accent={
-                    (data.near_miss_ratio ?? 0) >= 3 ? 'success' : 'warning'
+                caption={
+                    data.near_miss_ratio === null
+                        ? 'Not confirmed'
+                        : 'readable reports · annual rate window'
                 }
+                accent="neutral"
             />
             <KpiCard
-                href="/health-safety/corrective-actions"
+                href={`/health-safety/corrective-actions?${actions}`}
                 label="Actions closed on time"
                 value={fmt(data.actions_on_time_pct, '%')}
-                caption="30-day · target ≥ 90%"
+                caption={
+                    data.actions_on_time_pct === null
+                        ? 'Not confirmed'
+                        : 'readable actions due in this period · target ≥ 90%'
+                }
                 accent={
-                    (data.actions_on_time_pct ?? 0) >= 90
-                        ? 'success'
-                        : 'warning'
+                    data.actions_on_time_pct === null
+                        ? 'neutral'
+                        : data.actions_on_time_pct >= 90
+                          ? 'success'
+                          : 'warning'
                 }
             />
             <KpiCard
-                href="/health-safety/worker-participation"
-                label="Training & audit"
+                href={hr?.compliance?.view ? '/hr/compliance' : undefined}
+                label="H&S training"
                 value={fmt(data.training_pct, '%')}
-                caption={`compliance across ${siteCount} site${siteCount === 1 ? '' : 's'}`}
-                accent={(data.training_pct ?? 0) >= 90 ? 'success' : 'warning'}
+                caption={
+                    data.training_pct === null
+                        ? 'Not confirmed'
+                        : `linked training requirements · ${siteCount} site${siteCount === 1 ? '' : 's'}`
+                }
+                accent={
+                    data.training_pct === null
+                        ? 'neutral'
+                        : data.training_pct >= 90
+                          ? 'success'
+                          : 'warning'
+                }
             />
             <KpiCard
-                href="/health-safety/worker-participation"
-                label="Worker participation"
-                value={fmt(workerParticipation.pct, '%')}
-                caption={`HSR engagement · ${workerParticipation.committees} committee${workerParticipation.committees === 1 ? '' : 's'}`}
-                accent={
-                    (workerParticipation.pct ?? 0) >= 70 ? 'success' : 'warning'
+                href={
+                    workerParticipation.source_access === 'readable' &&
+                    participationSourceMatches(
+                        workerParticipation.viewer_id,
+                        participationAudience,
+                    )
+                        ? `/health-safety/worker-participation?${representatives}`
+                        : undefined
                 }
+                label="Sites with recorded representatives"
+                value={fmt(participationPct, '%')}
+                caption={
+                    sourceAccess === 'restricted'
+                        ? 'Access restricted'
+                        : participationPct === null
+                          ? 'Not confirmed'
+                          : participationCommittees === null
+                            ? 'current and former records · committee count not confirmed'
+                            : `current and former records · ${participationCommittees} committee${participationCommittees === 1 ? '' : 's'}`
+                }
+                accent="neutral"
             />
         </div>
     );
@@ -252,40 +345,74 @@ export function LeadingPanel({
 
 export function LaggingPanel({
     data,
+    filters,
 }: {
     data: HeroLeadingLagging['lagging'];
+    filters?: HeroFilters;
 }) {
+    const incidents = new URLSearchParams({ kind: 'incidents', tab: 'all' });
+    const injuries = new URLSearchParams();
+    if (filters) {
+        incidents.set('from', filters.from);
+        incidents.set('to', filters.to);
+        if (filters.site !== null) {
+            incidents.set('site_id', String(filters.site));
+            injuries.set('site_id', String(filters.site));
+        }
+    }
+    // Rates use their own annual basis; the LTI interval uses all recorded history.
+    // The injury register has no supported LTI-only filter, so preserve Site only.
+    const injuryHref =
+        '/health-safety/injuries' + (injuries.size ? `?${injuries}` : '');
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
-                href="/incidents"
+                href={`/incidents?${incidents}`}
                 label="Incidents"
                 value={fmt(data.incidents)}
-                caption="this period"
-                accent={data.incidents > 0 ? 'warning' : 'success'}
+                caption={
+                    filters
+                        ? 'readable records · this period'
+                        : 'readable records'
+                }
+                accent={data.incidents > 0 ? 'warning' : 'neutral'}
             />
             <KpiCard
-                href="/health-safety/injuries"
+                href={injuryHref}
                 label="LTIFR"
                 value={fmt(data.ltifr)}
-                caption="lost-time / million hrs"
-                accent="warning"
+                caption={
+                    data.ltifr === null
+                        ? 'Not confirmed'
+                        : 'lost-time / million hrs'
+                }
+                accent={
+                    data.ltifr !== null && data.ltifr > 0
+                        ? 'warning'
+                        : 'neutral'
+                }
             />
             <KpiCard
-                href="/health-safety/injuries"
+                href={injuryHref}
                 label="TRIFR"
                 value={fmt(data.trifr)}
-                caption="total recordable / million hrs"
+                caption={
+                    data.trifr === null
+                        ? 'Not confirmed'
+                        : 'total recordable / million hrs'
+                }
                 accent="neutral"
             />
             <KpiCard
-                href="/health-safety/injuries"
-                label="Days LTI-free"
+                href={injuryHref}
+                label="Days since LTI"
                 value={fmt(data.days_since_lti)}
-                caption="since last lost-time injury"
-                accent={
-                    (data.days_since_lti ?? 0) >= 30 ? 'success' : 'warning'
+                caption={
+                    data.days_since_lti === null
+                        ? 'Not confirmed'
+                        : 'last readable lost-time injury'
                 }
+                accent="neutral"
             />
         </div>
     );
@@ -294,57 +421,80 @@ export function LaggingPanel({
 export function CompliancePanel({
     expiring,
     worksafePending,
+    site,
 }: {
     expiring: Array<{ type: string }>;
-    worksafePending: number;
+    worksafePending: number | null;
+    site?: number | null;
 }) {
+    const events = new URLSearchParams({ tab: 'worksafe_pending' });
+    if (site !== undefined && site !== null)
+        events.set('site_id', String(site));
+    const siteSuffix =
+        site !== undefined && site !== null ? `?site_id=${site}` : '';
     const sdsExpiring = expiring.filter((e) => e.type === 'sds').length;
     const drillsDue = expiring.filter((e) => e.type === 'drill').length;
 
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatusCard
-                icon={worksafePending > 0 ? ShieldAlert : CheckCircle2}
+                icon={ShieldAlert}
                 title="WorkSafe notifiable"
-                status={`${worksafePending} awaiting notification`}
-                sub="HSWA 2015 · records kept ≥ 5 years"
-                tone={worksafePending > 0 ? 'warning' : 'success'}
+                status={
+                    worksafePending === null
+                        ? 'Not confirmed'
+                        : `${worksafePending} readable records awaiting notification`
+                }
+                sub="Recorded notification work; this count does not confirm regulatory compliance."
+                tone={
+                    worksafePending !== null && worksafePending > 0
+                        ? 'warning'
+                        : 'neutral'
+                }
+                href={`/health-safety/events?${events}`}
+                linkLabel="Open event register"
             />
             <StatusCard
                 icon={ShieldCheck}
                 title="Ngā Paerewa"
-                status="Certified"
-                sub="NZS 8134:2021"
-                tone="success"
+                status="Not confirmed"
+                sub="Certification evidence is not included in this overview."
+                tone="neutral"
             />
             <StatusCard
                 icon={FlaskConical}
                 title="Hazardous substances"
                 status={
                     sdsExpiring > 0
-                        ? `${sdsExpiring} SDS expiring`
-                        : 'SDS current'
+                        ? `${sdsExpiring} SDS reviews in preview`
+                        : 'No SDS reviews in preview'
                 }
-                sub="Hazardous Substances Regs 2017"
-                tone={sdsExpiring > 0 ? 'warning' : 'success'}
+                sub="The preview is not a complete register or a compliance assessment."
+                tone="neutral"
+                href={`/health-safety/substances${siteSuffix}`}
+                linkLabel="Open chemical register"
             />
             <StatusCard
                 icon={Flame}
                 title="Fire safety"
                 status={
                     drillsDue > 0
-                        ? `${drillsDue} drill${drillsDue === 1 ? '' : 's'} due`
-                        : 'Drills current'
+                        ? `${drillsDue} drill${drillsDue === 1 ? '' : 's'} in preview`
+                        : 'No drills in preview'
                 }
-                sub="Emergency evacuation drills"
-                tone={drillsDue > 0 ? 'warning' : 'success'}
+                sub="Open the drill register for the current schedule and outcomes."
+                tone="neutral"
+                href={`/health-safety/drills${siteSuffix}`}
+                linkLabel="Open drill register"
             />
             <StatusCard
                 icon={HeartPulse}
                 title="First-aid cover"
-                status="Cover OK"
-                sub="Certified first-aiders on every shift"
-                tone="success"
+                status="Not confirmed"
+                sub="Shift coverage and current first-aider certification are not included in this overview."
+                tone="neutral"
+                href={`/health-safety/first-aid${siteSuffix}`}
+                linkLabel="Open First Aid register"
             />
         </div>
     );

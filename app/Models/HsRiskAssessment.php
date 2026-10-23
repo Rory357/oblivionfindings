@@ -165,8 +165,15 @@ class HsRiskAssessment extends Model
     public function scopeDueForReview($query)
     {
         return $query->whereNotNull('review_due_at')
-            ->where('review_due_at', '<=', now()->toDateString())
-            ->whereIn('status', [self::STATUS_ACTIVE]);
+            ->whereDate('review_due_at', '<=', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+            ->whereIn('status', [self::STATUS_ACTIVE, self::STATUS_UNDER_REVIEW]);
+    }
+
+    public function scopeOverdueForReview($query)
+    {
+        return $query->whereNotNull('review_due_at')
+            ->whereDate('review_due_at', '<', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+            ->whereIn('status', [self::STATUS_ACTIVE, self::STATUS_UNDER_REVIEW]);
     }
 
     public function scopeForAssessable($query, string $type, int $id)
@@ -220,7 +227,9 @@ class HsRiskAssessment extends Model
 
     public function isDueForReview(): bool
     {
-        return $this->review_due_at && $this->review_due_at->isPast() && $this->isActive();
+        return $this->review_due_at !== null
+            && in_array($this->status, [self::STATUS_ACTIVE, self::STATUS_UNDER_REVIEW], true)
+            && $this->review_due_at->toDateString() <= now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
     }
 
     public function isHighOrExtreme(): bool

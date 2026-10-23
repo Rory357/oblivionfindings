@@ -9,10 +9,16 @@ use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\User;
+use App\Services\HealthSafety\HsCorrectiveActionOwnershipService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
+use App\Services\HealthSafety\HsCorrectiveActionWorkspace;
+use App\Services\HealthSafety\HsEventAccessService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Exposes the (already gated) HsCorrectiveActionService over HTTP (E-Gap 3).
@@ -28,8 +34,39 @@ class HsCorrectiveActionController extends Controller
         private readonly UserSiteAccessService $siteAccess,
     ) {}
 
+    public function show(Request $request, HsCorrectiveAction $action, HsCorrectiveActionWorkspace $workspace): Response
+    {
+        return DB::transaction(fn () => $this->showWithinSourceAuthority($request, $action, $workspace));
+    }
+
+    private function showWithinSourceAuthority(Request $request, HsCorrectiveAction $action, HsCorrectiveActionWorkspace $workspace): Response
+    {
+        return Inertia::render('health-safety/corrective-actions/show', [
+            'workspace' => $workspace->forViewer($action, $request->user()),
+        ]);
+    }
+
+    public function ownerCandidates(Request $request, HsCorrectiveAction $action, HsCorrectiveActionOwnershipService $ownership)
+    {
+        $data = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+
+        return response()->json(['options' => $ownership->candidates($request->user(), $action, trim($data['q'] ?? ''))]);
+    }
+
+    public function assignOwner(Request $request, HsCorrectiveAction $action, HsCorrectiveActionOwnershipService $ownership)
+    {
+        $ownership->assign($request->user(), $action, $request->only('owner_user_id', 'expected_revision', 'request_uuid', 'reason'));
+
+        return back()->with('success', 'Action ownership handover recorded.');
+    }
+
     /** Add a standalone corrective action to the event. */
     public function store(StoreHsCorrectiveActionRequest $request, HsEvent $event)
+    {
+        return DB::transaction(fn () => $this->storeWithinSourceAuthority($request, $event));
+    }
+
+    private function storeWithinSourceAuthority(StoreHsCorrectiveActionRequest $request, HsEvent $event)
     {
         $event = $this->resolveAccessibleEvent($request, $event);
         $data = $request->validated();
@@ -50,6 +87,14 @@ class HsCorrectiveActionController extends Controller
 
     /** Seed a corrective action from an investigation recommendation (E-Gap 6). */
     public function seedFromRecommendation(
+        CreateHsCorrectiveActionFromRecommendationRequest $request,
+        HsEvent $event,
+        HsInvestigation $investigation,
+    ) {
+        return DB::transaction(fn () => $this->seedFromRecommendationWithinSourceAuthority($request, $event, $investigation));
+    }
+
+    private function seedFromRecommendationWithinSourceAuthority(
         CreateHsCorrectiveActionFromRecommendationRequest $request,
         HsEvent $event,
         HsInvestigation $investigation,
@@ -78,8 +123,13 @@ class HsCorrectiveActionController extends Controller
         return back()->with('success', 'Corrective action created from recommendation.');
     }
 
-    /** Start (open → in_progress), optionally (re)assigning the owner. */
+    /** Start work. Ownership changes use the separate, recorded handover. */
     public function start(Request $request, HsEvent $event, HsCorrectiveAction $action)
+    {
+        return DB::transaction(fn () => $this->startWithinSourceAuthority($request, $event, $action));
+    }
+
+    private function startWithinSourceAuthority(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
         $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $action);
@@ -105,6 +155,11 @@ class HsCorrectiveActionController extends Controller
     /** Complete (in_progress → completed) with evidence. */
     public function complete(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
+        return DB::transaction(fn () => $this->completeWithinSourceAuthority($request, $event, $action));
+    }
+
+    private function completeWithinSourceAuthority(Request $request, HsEvent $event, HsCorrectiveAction $action)
+    {
         $event = $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
 
@@ -126,6 +181,11 @@ class HsCorrectiveActionController extends Controller
 
     /** Verify (completed → verified) — enforces strict-site evidence review and separation of duties. */
     public function verify(Request $request, HsEvent $event, HsCorrectiveAction $action)
+    {
+        return DB::transaction(fn () => $this->verifyWithinSourceAuthority($request, $event, $action));
+    }
+
+    private function verifyWithinSourceAuthority(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
         $event = $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
@@ -153,6 +213,11 @@ class HsCorrectiveActionController extends Controller
     /** Close (verified → closed); auto-advances the event to monitoring when all resolved. */
     public function close(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
+        return DB::transaction(fn () => $this->closeWithinSourceAuthority($request, $event, $action));
+    }
+
+    private function closeWithinSourceAuthority(Request $request, HsEvent $event, HsCorrectiveAction $action)
+    {
         $event = $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
 
@@ -167,6 +232,11 @@ class HsCorrectiveActionController extends Controller
 
     /** Return for rework (completed → in_progress) with a reason. */
     public function returnForRework(Request $request, HsEvent $event, HsCorrectiveAction $action)
+    {
+        return DB::transaction(fn () => $this->returnForReworkWithinSourceAuthority($request, $event, $action));
+    }
+
+    private function returnForReworkWithinSourceAuthority(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
         $event = $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
@@ -201,6 +271,8 @@ class HsCorrectiveActionController extends Controller
             $request->user(),
             $bypassPermissions,
         );
+
+        app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $request->user());
 
         return $query->findOrFail($event->id);
     }

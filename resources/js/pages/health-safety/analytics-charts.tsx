@@ -10,6 +10,8 @@
  */
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import type { SharedData } from '@/types';
+import { usePage } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import {
@@ -32,6 +34,12 @@ import {
     YAxis,
 } from 'recharts';
 import type { RootCauseRow, TrendPoint } from './analytics-types';
+import {
+    participationAccessForViewer,
+    participationSourceMatches,
+    participationValue,
+    participationViewer,
+} from './participation-source-state';
 
 export const TOKEN = {
     primary: 'var(--primary)',
@@ -590,20 +598,63 @@ export function WorkerParticipationChart({
     trends: TrendPoint[];
     height?: number;
 }) {
+    const viewer = participationViewer(usePage<SharedData>().props.auth);
+    const points = trends.map((point) => ({
+        ...point,
+        worker_participation_source_access: participationAccessForViewer(
+            point.worker_participation_source_access,
+            point.worker_participation_viewer_id,
+            viewer,
+        ),
+        worker_engagement: participationValue(
+            point.worker_engagement,
+            point.worker_participation_source_access,
+            point.worker_participation_viewer_id,
+            viewer,
+        ),
+        worker_consultation: participationValue(
+            point.worker_consultation,
+            point.worker_participation_source_access,
+            point.worker_participation_viewer_id,
+            viewer,
+        ),
+    }));
     if (
-        !trends.some(
+        !points.some(
             (t) =>
                 t.worker_engagement !== null || t.worker_consultation !== null,
         )
     ) {
         return (
-            <NeedsData label="No worker-participation records (HSR/committee meetings, consultations) for this period." />
+            <NeedsData
+                label={
+                    !viewer.canView ||
+                    points.some(
+                        (point) =>
+                            point.worker_participation_source_access ===
+                            'restricted',
+                    )
+                        ? 'Worker-participation access is restricted.'
+                        : points.length === 0 ||
+                            points.some(
+                                (point) =>
+                                    point.worker_participation_source_access !==
+                                        'readable' ||
+                                    !participationSourceMatches(
+                                        point.worker_participation_viewer_id,
+                                        viewer,
+                                    ),
+                            )
+                          ? 'Worker-participation information is not confirmed.'
+                          : 'No readable worker-participation records for this period.'
+                }
+            />
         );
     }
     return (
         <ResponsiveContainer width="100%" height={height}>
             <LineChart
-                data={trends}
+                data={points}
                 margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
             >
                 <CartesianGrid
@@ -620,7 +671,12 @@ export function WorkerParticipationChart({
                 <YAxis
                     domain={[
                         (min: number) =>
-                            Math.min(50, Math.floor((min || 50) / 10) * 10),
+                            Math.min(
+                                50,
+                                Math.floor(
+                                    (Number.isFinite(min) ? min : 0) / 10,
+                                ) * 10,
+                            ),
                         100,
                     ]}
                     tick={{ fontSize: 11, fill: TOKEN.axis }}
@@ -633,10 +689,10 @@ export function WorkerParticipationChart({
                 <Line
                     type="monotone"
                     dataKey="worker_engagement"
-                    name="Engagement"
+                    name="Meetings completed"
                     stroke={TOKEN.primary}
                     strokeWidth={2.5}
-                    connectNulls
+                    connectNulls={false}
                     dot={{ r: 3 }}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}
@@ -648,7 +704,7 @@ export function WorkerParticipationChart({
                     stroke={TOKEN.c2}
                     strokeWidth={2}
                     strokeDasharray="5 4"
-                    connectNulls
+                    connectNulls={false}
                     dot={{ r: 3 }}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}

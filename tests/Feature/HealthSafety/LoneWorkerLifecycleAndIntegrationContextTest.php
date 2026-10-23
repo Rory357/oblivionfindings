@@ -14,17 +14,20 @@ use App\Models\Permission;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\HealthSafety\LoneWorkerEmergencyDeliveryService;
 use App\Services\Integration\IntegrationContextProvider;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\LoneWorkerReviewedCommandFixtures;
 
     protected function setUp(): void
     {
@@ -40,7 +43,7 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $owner = $this->siteScopedUser($site);
         $actor = $actorKind === 'owner'
             ? $owner
-            : $this->siteScopedUser($site, ['hazards.manage']);
+            : $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
 
         foreach (['active', 'overdue'] as $initialStatus) {
             $session = $this->makeSession($owner, $site, [
@@ -71,7 +74,7 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $owner = $this->siteScopedUser($site);
         $actor = $actorKind === 'owner'
             ? $owner
-            : $this->siteScopedUser($site, ['hazards.manage']);
+            : $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
         $emergencyAt = now()->subMinutes(10)->startOfSecond();
         $lastCheckInAt = now()->subMinutes(20)->startOfSecond();
         $session = $this->makeSession($owner, $site, [
@@ -103,7 +106,7 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $owner = $this->siteScopedUser($site);
         $actor = $actorKind === 'owner'
             ? $owner
-            : $this->siteScopedUser($site, ['hazards.manage']);
+            : $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
         $endedAt = now()->subHour()->startOfSecond();
         $lastCheckInAt = now()->subHours(2)->startOfSecond();
         $session = $this->makeSession($owner, $site, [
@@ -129,7 +132,7 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
     {
         $site = Site::factory()->create();
         $worker = $this->siteScopedUser($site);
-        $coordinator = $this->siteScopedUser($site, ['hazards.manage']);
+        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
         $endedAt = now()->subHour()->startOfSecond();
         $session = $this->makeSession($worker, $site, [
             'status' => 'completed',
@@ -158,40 +161,28 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
     {
         $site = Site::factory()->create();
         $worker = $this->siteScopedUser($site);
-        $coordinator = $this->siteScopedUser($site, ['hazards.manage']);
+        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
         $session = $this->makeSession($worker, $site);
-
-        $this->actingAs($coordinator)
-            ->post("/health-safety/lone-workers/sessions/{$session->id}/emergency", [
-                'emergency_notes' => 'Worker requested urgent help.',
-            ])
-            ->assertRedirect();
+        $payload = ['expected_version' => $session->fresh()->lock_version, 'idempotency_key' => (string) Str::uuid(), 'emergency_notes' => 'Worker requested urgent help.'];
+        $this->actingAs($coordinator)->post("/health-safety/lone-workers/sessions/{$session->id}/emergency", $payload)->assertRedirect()->assertSessionHasNoErrors();
         $firstTriggeredAt = $session->fresh()->emergency_triggered_at;
-
-        $this->actingAs($coordinator)
-            ->post("/health-safety/lone-workers/sessions/{$session->id}/emergency", [
-                'emergency_notes' => 'Duplicate emergency request.',
-            ])
-            ->assertRedirect();
-
+        app(LoneWorkerEmergencyDeliveryService::class)->deliver($session->emergencyEpisodes()->sole()->id);
+        $this->post("/health-safety/lone-workers/sessions/{$session->id}/emergency", $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post("/health-safety/lone-workers/sessions/{$session->id}/emergency", ['emergency_notes' => 'Different request while response is open.'])->assertSessionHasErrors('status');
         $session->refresh();
-
         $this->assertSame('emergency', $session->status);
-        $this->assertNotNull($firstTriggeredAt);
         $this->assertTrue($session->emergency_triggered_at->equalTo($firstTriggeredAt));
         $this->assertSame('Worker requested urgent help.', $session->emergency_notes);
+        $this->assertSame(1, $session->emergencyEpisodes()->count());
         $this->assertSame(0, $session->alerts()->count());
-        $this->assertSame(1, ControlRoomAlert::query()
-            ->where('source', 'lone_worker')
-            ->where('context->normalized_data->lone_worker_session_id', $session->id)
-            ->count());
+        $this->assertSame(1, ControlRoomAlert::where('source', 'lone_worker')->where('context->normalized_data->lone_worker_session_id', $session->id)->count());
     }
 
     public function test_stale_session_update_cannot_clear_an_emergency_transition(): void
     {
         $site = Site::factory()->create();
         $worker = $this->siteScopedUser($site);
-        $coordinator = $this->siteScopedUser($site, ['hazards.manage']);
+        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
         $session = $this->makeSession($worker, $site);
         $staleSession = LoneWorkerSession::query()->findOrFail($session->id);
         $emergencyAt = now()->subMinute()->startOfSecond();
@@ -206,13 +197,19 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
             "/health-safety/lone-workers/sessions/{$session->id}",
             'PATCH',
             [
-                'expected_end_at' => now()->addHours(3)->toDateTimeString(),
+                'expected_end_at' => now()->addHours(3)->toISOString(),
                 'activity_description' => 'A stale coordinator edit.',
             ],
         );
+        $request->merge($this->reviewedLoneWorkerFixture($request->getRequestUri(), $request->all()));
         $request->setUserResolver(fn () => $coordinator);
 
-        app(LoneWorkerController::class)->updateSession($request, $staleSession);
+        try {
+            app(LoneWorkerController::class)->updateSession($request, $staleSession);
+            $this->fail('A stale source phase must not clear an emergency.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('status', $error->errors());
+        }
 
         $session->refresh();
         $this->assertSame('emergency', $session->status);
@@ -225,7 +222,7 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $site = Site::factory()->create();
         $otherSite = Site::factory()->create();
         $worker = $this->siteScopedUser($site);
-        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
+        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage', 'assets.telemetry.view']);
         $session = $this->makeSession($worker, $site);
         $otherSiteTracker = Device::factory()->create([
             'domain' => 'tracking',
@@ -255,7 +252,7 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
             ->count());
 
         $this->actingAs($coordinator)
-            ->get("/health-safety/lone-workers?session={$session->id}")
+            ->get("/health-safety/lone-workers/sessions/{$session->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.id', $session->id)
@@ -271,13 +268,13 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
     public function test_session_creation_cannot_leave_a_site_scoped_coordinator_with_an_active_orphan(): void
     {
         $site = Site::factory()->create();
-        $coordinator = $this->siteScopedUser($site, ['hazards.manage']);
+        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
         $worker = $this->siteScopedUser($site);
 
         $this->actingAs($coordinator)
             ->post('/health-safety/lone-workers/sessions', [
                 'user_id' => $worker->id,
-                'expected_end_at' => now()->addHours(2)->toDateTimeString(),
+                'expected_end_at' => now()->addHours(2)->toISOString(),
                 'activity_description' => 'Ad-hoc lone-worker visit.',
             ]);
 
@@ -400,6 +397,9 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
             'user_id' => $user->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subYear()->toDateString(),
+            'end_date' => null,
         ]);
 
         return $user;

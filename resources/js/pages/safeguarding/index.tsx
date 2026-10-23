@@ -350,6 +350,13 @@ export default function SafeguardingIndex({
             badge: tabCounts.all || undefined,
         },
         {
+            id: 'open',
+            label: 'Open concerns',
+            icon: ClipboardList,
+            tone: 'warning',
+            badge: tabCounts.open || undefined,
+        },
+        {
             id: 'triage',
             label: 'Awaiting triage',
             icon: ClipboardList,
