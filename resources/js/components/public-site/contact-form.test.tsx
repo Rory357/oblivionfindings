@@ -178,7 +178,9 @@ it('points support, referral and careers topics to the better form without block
 });
 
 it('maps server errors to their fields', async () => {
-    post.mockRejectedValue(
+    // One send, one answer. (Vitest 4.1 fails a test left with a persistent
+    // mockRejectedValue even when the rejection is handled; the Once form is exact.)
+    post.mockRejectedValueOnce(
         axiosError(422, {
             errors: {
                 'form.contact': [
