@@ -166,13 +166,13 @@ export function ProgressPathway({
                         </span>
                         <span>
                             <span className="block font-semibold">
-                                {step.title}
+                                {step.title}{' '}
                                 <span className="sr-only">
                                     {state === 'done'
-                                        ? ' (done)'
+                                        ? '(done)'
                                         : state === 'now'
-                                          ? ' (where it is now)'
-                                          : ' (still to come)'}
+                                          ? '(where it is now)'
+                                          : '(still to come)'}
                                 </span>
                             </span>
                             <span className="block text-sm text-muted-foreground">

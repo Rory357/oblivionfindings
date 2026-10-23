@@ -1073,9 +1073,8 @@ export function ApplyWizard({
                                         rel="noreferrer"
                                         className="font-semibold text-primary hover:underline"
                                     >
-                                        Read the privacy statement
+                                        Read the privacy statement{' '}
                                         <span className="sr-only">
-                                            {' '}
                                             (opens in a new tab)
                                         </span>
                                     </a>

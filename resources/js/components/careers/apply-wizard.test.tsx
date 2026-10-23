@@ -126,7 +126,9 @@ it('sends the new experience, right to work and licence answers to the existing 
 
     fireEvent.click(screen.getByRole('radio', { name: /1 to 3 years/ }));
     fireEvent.change(
-        screen.getByLabelText('Your experience, in a sentence or two (optional)'),
+        screen.getByLabelText(
+            'Your experience, in a sentence or two (optional)',
+        ),
         { target: { value: 'Two years at a rest home.' } },
     );
     press('Continue');

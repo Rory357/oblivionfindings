@@ -336,11 +336,15 @@ export default function CareersIndex({ jobs, options, filters }: Props) {
                                                 className="hover:underline"
                                             >
                                                 {job.title}
+                                                {/* The space is outside the span so it
+                                                    stays in the link's accessible name. */}
                                                 {job.site && (
-                                                    <span className="font-normal text-muted-foreground">
+                                                    <>
                                                         {' '}
-                                                        · {job.site.name}
-                                                    </span>
+                                                        <span className="font-normal text-muted-foreground">
+                                                            · {job.site.name}
+                                                        </span>
+                                                    </>
                                                 )}
                                             </Link>
                                         </h3>
@@ -359,9 +363,8 @@ export default function CareersIndex({ jobs, options, filters }: Props) {
                                             className="frontline-tap"
                                         >
                                             <Link href={applyUrl(job.slug)}>
-                                                Apply
+                                                Apply{' '}
                                                 <span className="sr-only">
-                                                    {' '}
                                                     for {job.title}
                                                 </span>
                                             </Link>
@@ -372,9 +375,8 @@ export default function CareersIndex({ jobs, options, filters }: Props) {
                                             className="frontline-tap"
                                         >
                                             <Link href={jobUrl(job.slug)}>
-                                                Read more
+                                                Read more{' '}
                                                 <span className="sr-only">
-                                                    {' '}
                                                     about {job.title}
                                                 </span>
                                             </Link>
