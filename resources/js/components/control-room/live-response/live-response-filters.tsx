@@ -24,7 +24,7 @@ export function applyLiveResponseFilters(
         Object.entries(next).filter(
             ([, value]) => value !== '' && value !== null && value !== undefined,
         ),
-    );
+    ) as Record<string, string | number>;
     router.get(path, query, {
         preserveState: true,
         preserveScroll: true,

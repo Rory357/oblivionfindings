@@ -61,7 +61,8 @@ describe('Control Room alert record page', () => {
             screen.getByRole('heading', { level: 1, name: 'Reported outside the safe zone' }),
         ).toBeInTheDocument();
         expect(screen.getAllByText('Open').length).toBeGreaterThan(0);
-        expect(screen.getByText('Missed')).toBeInTheDocument();
+        // The missed acknowledgement target shows in the header and the side card.
+        expect(screen.getAllByText('Missed').length).toBeGreaterThan(0);
         for (const tab of [
             'Overview',
             'Response & timeline',

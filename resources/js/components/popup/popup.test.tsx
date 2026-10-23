@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PopupConfirm, PopupForm, PopupSelectionBar } from './popup';
+import { POPUP_WIDTH, PopupConfirm, PopupForm, PopupSelectionBar } from './popup';
 
 afterEach(cleanup);
 
@@ -40,7 +40,7 @@ describe('PopupForm', () => {
         render(<Form />);
         const dialog = screen.getByRole('dialog', { name: 'Assign alert' });
         expect(dialog).toHaveAttribute('data-popup-size', 'sm');
-        expect(dialog.style.width).toBe('min(92vw, 480px)');
+        expect(POPUP_WIDTH).toEqual({ sm: 480, md: 720, lg: 900, xl: 1100 });
         expect(screen.getByText('Choose who owns the response.')).toBeInTheDocument();
         expect(screen.getByText('CR-2026-00418 · Outside the safe zone')).toBeInTheDocument();
         expect(screen.getByText('Aurora House')).toBeInTheDocument();

@@ -449,7 +449,8 @@ function JourneyRow({
                             : 'hover:bg-muted/40',
                     )}
                 >
-                    <button
+                    <Button
+                        unstyled
                         type="button"
                         onClick={onSelect}
                         aria-current={selected ? 'true' : undefined}
@@ -498,7 +499,7 @@ function JourneyRow({
                                 <span className="font-medium text-status-warning">No owner yet.</span>
                             )}
                         </span>
-                    </button>
+                    </Button>
                     <div className="flex shrink-0 items-center gap-1">
                         <Button type="button" size="sm" variant="outline" onClick={runNext}>
                             {journey.next_action.label}

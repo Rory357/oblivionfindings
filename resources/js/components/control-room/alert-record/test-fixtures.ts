@@ -2,7 +2,7 @@ import type { AlertWorkspaceDetail } from '@/components/control-room/alert-recor
 
 /** A complete alert payload (AlertWorkspaceService::build) for component tests. */
 export function alertDetail(
-    overrides: Partial<AlertWorkspaceDetail> & {
+    overrides: Omit<Partial<AlertWorkspaceDetail>, 'alert' | 'can'> & {
         alert?: Partial<AlertWorkspaceDetail['alert']>;
         can?: Partial<AlertWorkspaceDetail['can']>;
     } = {},

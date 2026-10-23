@@ -237,7 +237,8 @@ export default function MyTasks({
                                                         : 'No date set'}
                                                 </span>
                                                 {note.alert ? (
-                                                    <button
+                                                    <Button
+                                                        unstyled
                                                         type="button"
                                                         onClick={() =>
                                                             selection.select(note.alert!.id)
@@ -246,7 +247,7 @@ export default function MyTasks({
                                                     >
                                                         {note.alert.reference_number ??
                                                             `Alert ${note.alert.id}`}
-                                                    </button>
+                                                    </Button>
                                                 ) : null}
                                             </p>
                                         </div>

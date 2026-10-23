@@ -7,6 +7,7 @@ import {
     ControlRoomRowActions,
     type ControlRoomRowAction,
 } from '@/components/control-room/control-room-row-actions';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -154,10 +155,15 @@ export function ResponseWorklist({
                     <p className="text-caption">
                         Showing {rows.length} of {worklist.meta.total}
                     </p>
-                    <LaravelPagination
-                        links={worklist.links}
-                        lastPage={worklist.meta.last_page}
-                    />
+                    {/* Pagination: wide page links scroll here, never the page. */}
+                    <div className="min-w-0 max-w-full overflow-x-auto scrollbar-pretty">
+                        <div className="w-max">
+                            <LaravelPagination
+                                links={worklist.links}
+                                lastPage={worklist.meta.last_page}
+                            />
+                        </div>
+                    </div>
                 </div>
             ) : null}
         </Card>
@@ -219,7 +225,8 @@ function WorklistRow({
                     SEVERITY_DOT[row.severity] ?? SEVERITY_DOT.low,
                 )}
             />
-            <button
+            <Button
+                unstyled
                 type="button"
                 onClick={onSelect}
                 aria-current={selected ? 'true' : undefined}
@@ -267,7 +274,7 @@ function WorklistRow({
                         </span>
                     ) : null}
                 </span>
-            </button>
+            </Button>
             <div className="shrink-0">{overflowButton}</div>
         </li>
     );
