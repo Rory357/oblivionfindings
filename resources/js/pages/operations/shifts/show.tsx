@@ -2438,7 +2438,7 @@ export default function ShiftShow({
                                                             variant="outline"
                                                             className="capitalize"
                                                         >
-                                                            Job board:{' '}
+                                                            Available shifts:{' '}
                                                             {
                                                                 replacementRequest
                                                                     .open_position
@@ -2651,7 +2651,8 @@ export default function ShiftShow({
                                                     </div>
                                                     <div className="space-y-1">
                                                         <Label>
-                                                            Job board expiry
+                                                            Available shifts
+                                                            listing closes
                                                         </Label>
                                                         <Input
                                                             type="datetime-local"
@@ -2685,8 +2686,8 @@ export default function ShiftShow({
                                                             )
                                                         }
                                                     />
-                                                    Publish this replacement to
-                                                    the job board
+                                                    Post this replacement to
+                                                    Available shifts
                                                 </label>
                                                 <div className="flex justify-end">
                                                     <Button

@@ -77,5 +77,6 @@ it.each([null, 'invalid', '2026-10-20T12:00:00'])('withholds an absent or ambigu
     const data = fixture();
     data.nextShift!.starts_at = starts_at;
     render(<MyHrHero myHr={data} />);
-    expect(screen.getByRole('button', { name: 'Next shift —' })).toBeInTheDocument();
+    // jsdom computes no block layout, so the label and value spans join without a space.
+    expect(screen.getByRole('button', { name: /^Next shift\s*—$/ })).toBeInTheDocument();
 });

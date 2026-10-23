@@ -23,7 +23,10 @@ vi.mock('@inertiajs/react', () => ({
     ),
     router: { get: mock.get, post: mock.post },
 }));
-vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => mock.mobile }));
+vi.mock('@/hooks/use-mobile', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/hooks/use-mobile')>()),
+    useIsMobile: () => mock.mobile,
+}));
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));

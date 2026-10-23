@@ -361,6 +361,12 @@ class AttendanceBreakRecordedResultTest extends TestCase
         DB::commit();
         $this->fixturesCommitted = true;
         $this->assertFalse($connection->getPdo()->inTransaction());
+        // RefreshDatabase's testing manager treats the first open transaction as its own
+        // wrapper and runs afterCommit callbacks at once. That wrapper is committed now,
+        // so the request's real transaction needs the production manager's timing.
+        $manager = new \Illuminate\Database\DatabaseTransactionsManager;
+        $connection->setTransactionManager($manager);
+        $this->app->instance('db.transactions', $manager);
     }
 
     private function assertPrivate($response): void

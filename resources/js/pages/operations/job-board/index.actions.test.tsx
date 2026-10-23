@@ -36,7 +36,10 @@ vi.mock('@inertiajs/react', () => ({
         },
     },
 }));
-vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
+vi.mock('@/hooks/use-mobile', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/hooks/use-mobile')>()),
+    useIsMobile: () => false,
+}));
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));

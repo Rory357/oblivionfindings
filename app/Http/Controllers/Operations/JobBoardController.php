@@ -53,6 +53,11 @@ class JobBoardController extends Controller
         $canApprove = $this->canApprovePositions($auth);
 
         $search = trim((string) ($filters['q'] ?? ''));
+        // Same viewer-wide rule as canViewSensitivePositionDetails(): only these
+        // viewers see full client names and exact locations on every card.
+        $searchSensitive = $auth->canDo('job_board.approve')
+            || $auth->canDo('shifts.manageAny')
+            || $auth->canDo('shifts.viewAny');
         $scope = $filters['scope'] ?? 'for-you';
         $skill = trim((string) ($filters['skill'] ?? ''));
         $fit = $filters['fit'] ?? null;
@@ -116,15 +121,32 @@ class JobBoardController extends Controller
                     ->whereBetween('starts_at', [$weekStart, $weekEnd]));
             })
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
-            ->when($search !== '', function ($query) use ($search) {
-                // Posting notes are not shown on the board, and older replacement
-                // postings copied the absent worker's reason into them, so they are
-                // never searched (a search must not reveal why someone is away).
-                $query->where(function ($nested) use ($search) {
-                    $nested->whereHas('shift', fn ($shiftQuery) => $shiftQuery->where('location', 'like', '%'.$search.'%'))
-                        ->orWhereHas('shift.client', fn ($clientQuery) => $clientQuery
-                            ->where('first_name', 'like', '%'.$search.'%')
-                            ->orWhere('last_name', 'like', '%'.$search.'%'));
+            ->when($search !== '', function ($query) use ($search, $searchSensitive) {
+                $query->where(function ($nested) use ($search, $searchSensitive) {
+                    // Posting notes are searchable, except the notes older replacement
+                    // postings generated ("Replacement needed … Reason: …"): they copied
+                    // the absent worker's reason, and a search must not reveal it.
+                    $nested->where(fn ($notes) => $notes->where('notes', 'like', '%'.$search.'%')
+                        ->where('notes', 'not like', 'Replacement needed%Reason: %'))
+                        // Everyone can search the public place label a card shows.
+                        ->orWhereHas('shift.client', function ($clientQuery) use ($search, $searchSensitive) {
+                            $clientQuery->where(function ($labels) use ($search, $searchSensitive) {
+                                $labels->where('suburb', 'like', '%'.$search.'%')
+                                    ->orWhere('city', 'like', '%'.$search.'%')
+                                    ->orWhereHas('site', fn ($site) => $site->where('name', 'like', '%'.$search.'%')
+                                        ->orWhere('suburb', 'like', '%'.$search.'%')
+                                        ->orWhere('city', 'like', '%'.$search.'%'));
+                                // Names only for viewers who see full names; staff who
+                                // see initials must not learn who a shift is for by searching.
+                                if ($searchSensitive) {
+                                    $labels->orWhere('first_name', 'like', '%'.$search.'%')
+                                        ->orWhere('last_name', 'like', '%'.$search.'%');
+                                }
+                            });
+                        });
+                    if ($searchSensitive) {
+                        $nested->orWhereHas('shift', fn ($shiftQuery) => $shiftQuery->where('location', 'like', '%'.$search.'%'));
+                    }
                 });
             })
             ->when($dateRangeBounds !== null, fn ($q) => $this->applyDateRangeFilter($q, $filters['date_range'], $dateRangeBounds))

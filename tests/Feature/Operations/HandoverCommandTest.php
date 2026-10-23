@@ -459,7 +459,8 @@ class HandoverCommandTest extends CommittedDatabaseTestCase
     {
         $body = $this->body();
         DB::table('sites')->where('id', $this->shift->site_id)->update(['is_active' => false]);
-        $reply = $this->send($body)->assertNotFound()->assertJsonPath('outcome', 'unconfirmed')->assertJsonPath('saved', null);
+        // Same 403 as the shared handover save's Site check; the wizard treats 403 and 404 alike.
+        $reply = $this->send($body)->assertForbidden()->assertJsonPath('outcome', 'unconfirmed')->assertJsonPath('saved', null);
         $this->assertArrayNotHasKey('errors', $reply->json());
         $this->assertSame(0, ShiftHandover::query()->count());
         $this->assertSame(0, DB::table('operations_handover_attempts')->count());

@@ -25,6 +25,7 @@ class MyHrScheduleReadTest extends TestCase
     private User $worker;
     private Site $site;
     private ServiceContext $context;
+    private ?Client $siteClient = null;
 
     protected function setUp(): void
     {
@@ -386,9 +387,16 @@ class MyHrScheduleReadTest extends TestCase
         return $worker;
     }
 
+    /** shifts.client_id is required, so default fixtures use one Client at the same Site. */
+    private function siteClient(): Client
+    {
+        return $this->siteClient ??= Client::factory()->create(['site_id' => $this->site->id]);
+    }
+
     private function shift(User $worker, string $start, string $end, array $extra = []): Shift
     {
-        return Shift::create(['user_id' => $worker->id, 'site_id' => $this->site->id, 'client_id' => null,
+        return Shift::create(['user_id' => $worker->id, 'site_id' => $this->site->id,
+            'client_id' => array_key_exists('client_id', $extra) ? $extra['client_id'] : $this->siteClient()->id,
             'service_context_id' => $this->context->id, 'starts_at' => $this->at($start), 'ends_at' => $this->at($end),
             'location' => 'Recorded location', 'shift_type' => 'standard', 'status' => 'scheduled', 'created_by' => $this->worker->id, ...$extra]);
     }

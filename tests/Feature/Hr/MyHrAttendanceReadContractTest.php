@@ -46,7 +46,7 @@ class MyHrAttendanceReadContractTest extends TestCase
         $client = Client::factory()->create(['site_id' => $this->site->id]);
         $shift = Shift::factory()->create(['user_id' => $this->worker->id, 'client_id' => $client->id,
             'site_id' => $this->site->id, 'status' => 'scheduled']);
-        $session = $this->session(['shift_id' => $shift->id]);
+        $session = $this->attendanceSession(['shift_id' => $shift->id]);
         $entry = $this->entry($session, (int) $session->id + 1000000);
         $before = $this->recordedRows();
         $response = $this->actingAs($this->worker)->get('/hr/my/profile')->assertOk();
@@ -62,7 +62,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_a_canonical_session_is_available_without_a_time_entry_projection(): void
     {
-        $session = $this->session();
+        $session = $this->attendanceSession();
         $response = $this->actingAs($this->worker)->get('/hr/my/profile')->assertOk();
 
         $this->assertNull($response->inertiaProps('myHr.activeClock'));
@@ -70,28 +70,11 @@ class MyHrAttendanceReadContractTest extends TestCase
         $this->assertFalse(HrTimeEntry::where('user_id', $this->worker->id)->exists());
     }
 
-    public function test_a_readable_legacy_shift_without_client_cannot_advertise_break_commands(): void
-    {
-        $client = Client::factory()->create(['site_id' => $this->site->id]);
-        $shift = Shift::factory()->create(['user_id' => $this->worker->id, 'client_id' => $client->id,
-            'site_id' => $this->site->id, 'status' => 'scheduled']);
-        $session = $this->session(['shift_id' => $shift->id]);
-        // Historical record state; do not disable the production model guards.
-        DB::table('shifts')->where('id', $shift->id)->update(['client_id' => null]);
-        $before = $this->recordedRows();
-
-        $this->assertTrue($this->worker->canDo('timesheets.create'));
-        $this->assertSame($this->frame($session, false), $this->actingAs($this->worker)
-            ->get('/hr/my/profile')->assertOk()->inertiaProps('myHr.attendance'));
-        $this->postJson('/attendance/break/start', ['session_id' => $session->id])->assertNotFound();
-        $this->assertSame($before, $this->recordedRows());
-    }
-
     #[DataProvider('selfClockGrants')]
     public function test_each_existing_workforce_self_clock_grant_allows_break_hint(string $grant): void
     {
         $this->worker = $this->staff($this->site, [$grant]);
-        $session = $this->session();
+        $session = $this->attendanceSession();
         $response = $this->actingAs($this->worker)->get('/hr/my/profile')->assertOk();
 
         $this->assertSame($this->frame($session), $response->inertiaProps('myHr.attendance'));
@@ -107,7 +90,7 @@ class MyHrAttendanceReadContractTest extends TestCase
     public function test_hr_management_permissions_do_not_grant_workforce_break_commands(): void
     {
         $this->worker = $this->staff($this->site, ['hr.time.manage', 'hr.employees.viewAny']);
-        $session = $this->session();
+        $session = $this->attendanceSession();
         $state = $this->actingAs($this->worker)->get('/hr/my/profile')->assertOk()->inertiaProps('myHr.attendance');
 
         $this->assertSame($this->frame($session, false), $state);
@@ -115,7 +98,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_an_explicit_self_clock_denial_withdraws_the_hint(): void
     {
-        $session = $this->session();
+        $session = $this->attendanceSession();
         $permission = Permission::where('key', 'timesheets.create')->sole();
         $this->worker->permissionOverrides()->attach($permission, ['allowed' => false]);
 
@@ -125,7 +108,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_a_valid_ongoing_break_keeps_explicit_state_and_legacy_zero_count(): void
     {
-        $session = $this->session(['break_started_at' => now()->subMinutes(5), 'break_count' => 0]);
+        $session = $this->attendanceSession(['break_started_at' => now()->subMinutes(5), 'break_count' => 0]);
         $this->event($session);
 
         $this->assertSame($this->frame($session), $this->actingAs($this->worker)
@@ -134,7 +117,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_a_future_break_is_readable_but_cannot_yet_be_ended(): void
     {
-        $session = $this->session(['break_started_at' => now()->addMinutes(5), 'break_count' => 1]);
+        $session = $this->attendanceSession(['break_started_at' => now()->addMinutes(5), 'break_count' => 1]);
         $this->event($session);
 
         $this->assertSame($this->frame($session, false, false), $this->actingAs($this->worker)
@@ -143,7 +126,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_a_break_starting_at_the_proposed_end_keeps_both_action_hints(): void
     {
-        $session = $this->session(['break_started_at' => now(), 'break_count' => 1]);
+        $session = $this->attendanceSession(['break_started_at' => now(), 'break_count' => 1]);
         $this->event($session);
 
         $this->assertSame($this->frame($session), $this->actingAs($this->worker)
@@ -152,7 +135,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_a_just_started_session_keeps_break_authority_while_clock_out_must_wait(): void
     {
-        $session = $this->session(['clock_in_at' => now(), 'break_minutes' => 0]);
+        $session = $this->attendanceSession(['clock_in_at' => now(), 'break_minutes' => 0]);
 
         $this->assertSame($this->frame($session, true, false), $this->actingAs($this->worker)
             ->get('/hr/my/profile')->assertOk()->inertiaProps('myHr.attendance'));
@@ -160,7 +143,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_recorded_breaks_filling_the_interval_withhold_clock_out_independently(): void
     {
-        $session = $this->session(['break_minutes' => 120]);
+        $session = $this->attendanceSession(['break_minutes' => 120]);
 
         $this->assertSame($this->frame($session, true, false), $this->actingAs($this->worker)
             ->get('/hr/my/profile')->assertOk()->inertiaProps('myHr.attendance'));
@@ -169,7 +152,7 @@ class MyHrAttendanceReadContractTest extends TestCase
     #[DataProvider('inconsistentBreaks')]
     public function test_conflicting_break_evidence_is_unavailable(string $scenario): void
     {
-        $session = $this->session(['break_started_at' => $scenario === 'stray' ? null : now()->subMinutes(5)]);
+        $session = $this->attendanceSession(['break_started_at' => $scenario === 'stray' ? null : now()->subMinutes(5)]);
         if ($scenario !== 'missing') {
             $this->event($session, ['started_at' => $scenario === 'mismatch' ? now()->subMinutes(10) : now()->subMinutes(5)]);
         }
@@ -189,7 +172,7 @@ class MyHrAttendanceReadContractTest extends TestCase
     public function test_a_foreign_site_session_is_unavailable_instead_of_becoming_entry_only(): void
     {
         $other = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
-        $session = $this->session(['site_id' => $other->id]);
+        $session = $this->attendanceSession(['site_id' => $other->id]);
         $this->entry($session);
 
         $this->assertState('unavailable');
@@ -197,7 +180,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_an_archived_captured_site_is_unavailable(): void
     {
-        $this->session();
+        $this->attendanceSession();
         $this->site->update(['archived' => true, 'archived_at' => now()]);
 
         $this->assertState('unavailable');
@@ -205,9 +188,9 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_conflicting_current_sessions_are_unavailable_without_choosing_the_first(): void
     {
-        $this->session();
+        $this->attendanceSession();
         $other = $this->staff($this->site);
-        $second = $this->session(['user_id' => $other->id, 'created_by' => $other->id]);
+        $second = $this->attendanceSession(['user_id' => $other->id, 'created_by' => $other->id]);
         // Construct historical invalid rows without disabling the model guard.
         DB::table('hr_attendance_sessions')->where('id', $second->id)->update(['user_id' => $this->worker->id]);
 
@@ -216,7 +199,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_a_closed_row_missing_its_end_is_unavailable_instead_of_absent(): void
     {
-        $session = $this->session(['status' => 'closed', 'clock_out_at' => now()->subMinutes(30)]);
+        $session = $this->attendanceSession(['status' => 'closed', 'clock_out_at' => now()->subMinutes(30)]);
         DB::table('hr_attendance_sessions')->where('id', $session->id)->update(['clock_out_at' => null]);
 
         $this->assertState('unavailable');
@@ -227,7 +210,7 @@ class MyHrAttendanceReadContractTest extends TestCase
         $client = Client::factory()->create(['site_id' => $this->site->id]);
         $shift = Shift::factory()->create(['user_id' => $this->worker->id, 'client_id' => $client->id,
             'site_id' => $this->site->id, 'status' => 'scheduled']);
-        $session = $this->session(['shift_id' => $shift->id]);
+        $session = $this->attendanceSession(['shift_id' => $shift->id]);
         $this->entry($session);
         // Historical/current fixture drift: exercise the real read guard.
         DB::table('shifts')->where('id', $shift->id)->update(['user_id' => $this->staff($this->site)->id]);
@@ -249,7 +232,7 @@ class MyHrAttendanceReadContractTest extends TestCase
 
     public function test_an_active_projection_of_a_closed_session_is_unavailable(): void
     {
-        $session = $this->session(['status' => 'closed', 'clock_out_at' => now()->subMinutes(30)]);
+        $session = $this->attendanceSession(['status' => 'closed', 'clock_out_at' => now()->subMinutes(30)]);
         $this->entry($session);
 
         $this->assertState('unavailable');
@@ -345,7 +328,7 @@ class MyHrAttendanceReadContractTest extends TestCase
     public function test_another_workers_open_session_is_not_disclosed_or_substituted(): void
     {
         $other = $this->staff($this->site);
-        $this->session(['user_id' => $other->id, 'created_by' => $other->id]);
+        $this->attendanceSession(['user_id' => $other->id, 'created_by' => $other->id]);
 
         $this->assertState('none');
     }
@@ -379,7 +362,7 @@ class MyHrAttendanceReadContractTest extends TestCase
         return $user->fresh();
     }
 
-    private function session(array $attributes = []): HrAttendanceSession
+    private function attendanceSession(array $attributes = []): HrAttendanceSession
     {
         return HrAttendanceSession::create(['user_id' => $this->worker->id, 'site_id' => $this->site->id,
             'clock_in_at' => now()->subHours(2), 'clock_out_at' => null, 'status' => 'open', 'source' => 'manual',

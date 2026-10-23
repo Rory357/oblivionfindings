@@ -302,7 +302,9 @@ final class JobBoardActionCommand
             if (! $reads->query($this->sites->applyFleetRecipientEligibility(User::query()->whereKey($staff->id), $source['site']->id))->exists()) {
                 return AssignmentEligibilityDecision::fromResult($shift, $staff, EligibilityResult::fromChecks([
                     ['rule' => 'site_assignment', 'passed' => false, 'severity' => 'block', 'overrideable' => false,
-                        'message' => 'The selected worker is no longer eligible to work at this Shift Site.'],
+                        'message' => $action === 'approve'
+                            ? 'The claimed worker is no longer eligible to work at this Shift Site.'
+                            : 'The selected worker is no longer eligible to work at this Shift Site.'],
                 ]));
             }
         }

@@ -660,7 +660,8 @@ export default function ShiftSeriesShow({
                                                         {occurrence.replacement
                                                             .open_position_status ? (
                                                             <Badge variant="outline">
-                                                                Job board{' '}
+                                                                Available
+                                                                shifts:{' '}
                                                                 {
                                                                     occurrence
                                                                         .replacement

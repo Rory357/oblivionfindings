@@ -64,10 +64,23 @@ export function refusalMessage(
     value: unknown,
     definite: readonly number[],
 ): string | null {
-    if (!definite.includes(status)) return null;
+    // 503 counts only with field errors: that is the eligibility check being
+    // unavailable, raised before saving. A bare 503 could be anything.
+    const unavailable = status === 503;
+    if (!definite.includes(status) && !unavailable) return null;
     if (status === 419)
         return 'Your session has expired. Reload the page, then try again. Nothing was saved.';
     if (!value || typeof value !== 'object' || Array.isArray(value))
+        return null;
+    if (
+        unavailable &&
+        !(
+            'errors' in value &&
+            value.errors &&
+            typeof value.errors === 'object' &&
+            Object.keys(value.errors).length > 0
+        )
+    )
         return null;
     const body = value as {
         result?: unknown;

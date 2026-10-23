@@ -671,6 +671,35 @@ class JobBoardControllerTest extends TestCase
         }
     }
 
+    public function test_search_by_client_name_needs_the_same_access_as_seeing_the_name(): void
+    {
+        $this->client->update([
+            'first_name' => 'Aroha',
+            'last_name' => 'Brown',
+            'suburb' => 'Kingsland',
+        ]);
+        $position = $this->positionForShift($this->shiftForSite());
+
+        $this->allowEligibility();
+
+        $found = fn ($viewer, string $q) => $this->actingAs($viewer)
+            ->get(route('operations.job_board.index', ['scope' => 'all', 'q' => $q]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('jobs.data', fn ($jobs) => collect($jobs)->pluck('id')->contains($position->id)));
+        $notFound = fn ($viewer, string $q) => $this->actingAs($viewer)
+            ->get(route('operations.job_board.index', ['scope' => 'all', 'q' => $q]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('jobs.data', fn ($jobs) => collect($jobs)->pluck('id')->doesntContain($position->id)));
+
+        // A worker who sees "A. B." can't confirm who the shift is for by searching a name…
+        $notFound($this->worker, 'Brown');
+        $notFound($this->worker, 'Aroha');
+        // …but can still search the place shown on the card.
+        $found($this->worker, 'Kingsland');
+        // A manager who sees the full name can search it.
+        $found($this->manager, 'Brown');
+    }
+
     public function test_create_position_refuses_a_shift_from_another_site(): void
     {
         $foreignShift = $this->shiftForSite($this->foreignSite);
@@ -1463,6 +1492,9 @@ class JobBoardControllerTest extends TestCase
         'test_claim_succeeds_for_an_eligible_worker_and_notifies_staff_and_managers',
         'test_double_claim_attempts_leave_exactly_one_success_and_clear_feedback',
         'test_approve_sets_assignee_fills_position_cancels_siblings_and_notifies',
+        // Its advisory-warning approval asserts the legacy success flash, which is
+        // only confirmed at a physical root (never inside the test's wrapper).
+        'test_approve_hard_block_is_422_and_warning_state_remains_advisory',
         'test_approve_exception_is_safe_503_with_zero_side_effects_then_retry_and_replay_are_serialized',
     ];
 

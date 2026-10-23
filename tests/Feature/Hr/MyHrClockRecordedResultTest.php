@@ -80,7 +80,7 @@ class MyHrClockRecordedResultTest extends TestCase
 
     public function test_clock_out_uses_the_original_attendance_id_when_the_linked_hr_entry_id_is_different(): void
     {
-        $session = $this->session();
+        $session = $this->attendanceSession();
         $entry = new HrTimeEntry(['user_id' => $this->worker->id, 'attendance_session_id' => $session->id,
             'shift_id' => null, 'site_id' => $this->site->id,
             'entry_date' => $session->clock_in_at->copy()->timezone('Pacific/Auckland')->toDateString(),
@@ -135,7 +135,7 @@ class MyHrClockRecordedResultTest extends TestCase
 
     public function test_prewrite_validation_is_the_only_retryable_error_and_canonical_local_breaks_are_rejected(): void
     {
-        $session = $this->session();
+        $session = $this->attendanceSession();
         $before = $this->history();
         $payload = [...$this->target('attendance_session', $session->id), 'break_minutes' => 0];
         $this->actingAs($this->worker)->postJson('/hr/my/time/clock-out', $payload)->assertUnprocessable()
@@ -145,7 +145,7 @@ class MyHrClockRecordedResultTest extends TestCase
 
     public function test_canonical_target_never_falls_through_to_an_orphan_and_nullable_shift_is_exact(): void
     {
-        $session = $this->session(['clock_in_at' => now()->subHours(5), 'clock_out_at' => now()->subHours(4), 'status' => 'closed']);
+        $session = $this->attendanceSession(['clock_in_at' => now()->subHours(5), 'clock_out_at' => now()->subHours(4), 'status' => 'closed']);
         $entry = $this->orphan();
         $this->commitFixtures();
         $before = $this->history();
@@ -157,7 +157,7 @@ class MyHrClockRecordedResultTest extends TestCase
 
     public function test_orphan_target_cannot_close_a_new_attendance_session_or_another_entry(): void
     {
-        $session = $this->session();
+        $session = $this->attendanceSession();
         $entry = $this->orphan();
         $this->commitFixtures();
         $before = $this->history();
@@ -171,7 +171,7 @@ class MyHrClockRecordedResultTest extends TestCase
     #[DataProvider('vetoes')]
     public function test_real_save_veto_is_unconfirmed_and_rolls_back_clock_payroll_and_audit(string $command, string $row): void
     {
-        $target = $command === 'clock_in' ? null : ($command === 'orphan' ? $this->orphan() : $this->session());
+        $target = $command === 'clock_in' ? null : ($command === 'orphan' ? $this->orphan() : $this->attendanceSession());
         $this->commitFixtures();
         $reached = false;
         $listener = function ($model) use (&$reached) { $reached = true; return false; };
@@ -203,7 +203,7 @@ class MyHrClockRecordedResultTest extends TestCase
     #[DataProvider('draftOrigins')]
     public function test_existing_returned_draft_update_veto_stops_before_the_later_quiet_save(string $origin): void
     {
-        $target = $origin === 'orphan' ? $this->orphan() : $this->session();
+        $target = $origin === 'orphan' ? $this->orphan() : $this->attendanceSession();
         $sheet = $this->draft($target, ['status' => 'returned', 'break_minutes' => 18]);
         $this->commitFixtures();
         $reached = 0;
@@ -222,8 +222,9 @@ class MyHrClockRecordedResultTest extends TestCase
     #[DataProvider('draftOrigins')]
     public function test_later_real_quiet_rate_write_failure_rolls_back_the_entire_original_clock(string $origin): void
     {
-        $target = $origin === 'orphan' ? $this->orphan() : $this->session();
-        HrEmployeeProfile::where('user_id', $this->worker->id)->update(['hourly_rate' => 31]);
+        $target = $origin === 'orphan' ? $this->orphan() : $this->attendanceSession();
+        // hourly_rate is an encrypted cast: write through the model, not a raw update.
+        HrEmployeeProfile::where('user_id', $this->worker->id)->firstOrFail()->update(['hourly_rate' => 31]);
         $this->commitFixtures();
         $reached = false;
         DB::listen(function (\Illuminate\Database\Events\QueryExecuted $query) use (&$reached) {
@@ -247,7 +248,7 @@ class MyHrClockRecordedResultTest extends TestCase
     #[DataProvider('draftOrigins')]
     public function test_existing_returned_draft_reports_update_and_preserves_the_canonical_break_floor(string $origin): void
     {
-        $target = $origin === 'orphan' ? $this->orphan() : $this->session(['break_minutes' => 11]);
+        $target = $origin === 'orphan' ? $this->orphan() : $this->attendanceSession(['break_minutes' => 11]);
         $sheet = $this->draft($target, ['status' => 'returned', 'break_minutes' => 18]);
         $this->commitFixtures();
         $branch = $origin === 'orphan' ? 'time_entry_result' : 'attendance_result';
@@ -262,8 +263,12 @@ class MyHrClockRecordedResultTest extends TestCase
 
     public function test_submitted_canonical_sheet_is_not_rewritten_or_claimed_as_a_draft_save(): void
     {
-        $session = $this->session();
-        $sheet = $this->draft($session, ['status' => 'submitted']);
+        $session = $this->attendanceSession();
+        $sheet = $this->draft($session);
+        // Historical record state: the submit guard now refuses a sheet whose session is
+        // still open, so place the submitted status directly without disabling the guard.
+        DB::table('timesheets')->where('id', $sheet->id)->update(['status' => 'submitted']);
+        $sheet->refresh();
         $before = $sheet->getRawOriginal();
         $this->commitFixtures();
         $this->actingAs($this->worker)->postJson('/hr/my/time/clock-out', $this->target('attendance_session', $session->id))
@@ -276,7 +281,7 @@ class MyHrClockRecordedResultTest extends TestCase
     #[DataProvider('breakEndCases')]
     public function test_running_break_uses_recorded_minutes_and_an_event_veto_cannot_partially_close(bool $veto): void
     {
-        $session = $this->session(['break_minutes' => 7, 'break_count' => 1, 'break_started_at' => now()->subMinutes(9)]);
+        $session = $this->attendanceSession(['break_minutes' => 7, 'break_count' => 1, 'break_started_at' => now()->subMinutes(9)]);
         $event = HrAttendanceBreakEvent::create(['session_id' => $session->id, 'started_at' => $session->break_started_at]);
         $this->commitFixtures();
         $reached = false;
@@ -302,7 +307,7 @@ class MyHrClockRecordedResultTest extends TestCase
     #[DataProvider('lateFailures')]
     public function test_after_commit_logic_or_validation_failure_never_becomes_retryable(string $command, string $kind): void
     {
-        $target = $command === 'clock_in' ? null : ($command === 'orphan' ? $this->orphan() : $this->session());
+        $target = $command === 'clock_in' ? null : ($command === 'orphan' ? $this->orphan() : $this->attendanceSession());
         $this->commitFixtures();
         $reached = false;
         $callback = function () use ($kind, &$reached) {
@@ -336,7 +341,7 @@ class MyHrClockRecordedResultTest extends TestCase
     #[DataProvider('draftOrigins')]
     public function test_post_commit_reader_withdrawal_denies_the_result_without_claiming_rollback(string $origin): void
     {
-        $target = $origin === 'orphan' ? $this->orphan() : $this->session();
+        $target = $origin === 'orphan' ? $this->orphan() : $this->attendanceSession();
         $workerId = $this->worker->id;
         $this->commitFixtures();
         $reached = false;
@@ -361,7 +366,7 @@ class MyHrClockRecordedResultTest extends TestCase
 
     public function test_post_commit_current_read_does_not_replace_the_original_recorded_clock_frame(): void
     {
-        $session = $this->session();
+        $session = $this->attendanceSession();
         $originalEnd = now()->toIso8601String();
         $sessionId = $session->id;
         $this->commitFixtures();
@@ -410,7 +415,7 @@ class MyHrClockRecordedResultTest extends TestCase
         return $worker->fresh();
     }
 
-    private function session(array $extra = []): HrAttendanceSession
+    private function attendanceSession(array $extra = []): HrAttendanceSession
     {
         return HrAttendanceSession::create(['user_id' => $this->worker->id, 'site_id' => $this->site->id,
             'clock_in_at' => now()->subHours(2), 'status' => 'open', 'source' => 'manual', 'created_by' => $this->worker->id, ...$extra]);
@@ -463,5 +468,11 @@ class MyHrClockRecordedResultTest extends TestCase
         DB::commit();
         $this->fixturesCommitted = true;
         $this->assertFalse($connection->getPdo()->inTransaction());
+        // RefreshDatabase's testing manager treats the first open transaction as its own
+        // wrapper and runs afterCommit callbacks at once. That wrapper is committed now,
+        // so the request's real transaction needs the production manager's timing.
+        $manager = new \Illuminate\Database\DatabaseTransactionsManager;
+        $connection->setTransactionManager($manager);
+        $this->app->instance('db.transactions', $manager);
     }
 }

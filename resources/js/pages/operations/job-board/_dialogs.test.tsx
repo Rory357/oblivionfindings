@@ -166,8 +166,11 @@ describe('Post position dialog', () => {
         expect(screen.getByText('Wheelchair access at the back')).toBeVisible();
 
         click('Post position');
-        // A second press while the first is in flight sends nothing.
-        expect(screen.getByRole('button', { name: /Posting/ })).toBeDisabled();
+        // While sending, only a disabled Posting… button remains.
+        expect(screen.getByRole('button', { name: 'Posting…' })).toBeDisabled();
+        expect(
+            screen.queryByRole('button', { name: 'Post position' }),
+        ).toBeNull();
         expect(posts()).toHaveLength(1);
         const body = JSON.parse(String(posts()[0][1]?.body));
         expect(body).toMatchObject({
@@ -450,7 +453,7 @@ describe('Claim and approve dialog', () => {
             }),
         ).toBeVisible();
         expect(
-            screen.getAllByRole('button', { name: 'Claim shift' }),
+            screen.queryAllByRole('button', { name: 'Claim shift' }),
         ).toHaveLength(0);
         expect(callbacks.confirmed).not.toHaveBeenCalled();
     });
@@ -522,7 +525,7 @@ describe('Claim and approve dialog', () => {
             screen.getByText('Another duty overlaps this Shift.'),
         ).toBeVisible();
         expect(
-            screen.getAllByRole('button', { name: 'Claim shift' }),
+            screen.queryAllByRole('button', { name: 'Claim shift' }),
         ).toHaveLength(0);
     });
 });

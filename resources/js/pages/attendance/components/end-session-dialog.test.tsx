@@ -320,10 +320,11 @@ describe('manager End session recovery', () => {
 
     it('uses the confirmation width and resets the body after an explicit close/reopen', () => {
         const view = render(<EndSessionDialog {...props} />);
-        expect(screen.getByRole('dialog')).toHaveStyle({
-            width: 'min(92vw, 480px)',
-            maxWidth: 'min(92vw, 480px)',
-        });
+        // jsdom keeps the inline min() max-width but cannot compute it (and
+        // drops a min() width), so read the declared confirm-width token.
+        expect(screen.getByRole('dialog').style.maxWidth).toBe(
+            'min(92vw, 480px)',
+        );
         enterReason('A previous draft');
         view.rerender(<EndSessionDialog {...props} open={false} session={null} />);
         view.rerender(<EndSessionDialog {...props} />);

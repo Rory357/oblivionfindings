@@ -72,10 +72,13 @@ final class OperationsHandoverRoot
             // All available markers predate the current nested savepoint.
             // RELEASE consumes one without rows/ROLLBACK TO. Never recreate a
             // root marker inside trans2: lawful rollback would delete it.
+            // MySQL keeps savepoints as a stack: RELEASE also drops every
+            // savepoint set after the named one. Consume the newest marker so
+            // the older retained markers survive the check.
             if ($this->markers === []) {
                 throw new OperationsHandoverRootUnavailable('Finite root continuity markers were exhausted.');
             }
-            $marker = array_shift($this->markers);
+            $marker = array_pop($this->markers);
             $this->statement('RELEASE SAVEPOINT '.$marker);
             if ($level === 1) { $this->refill(); }
             if (! $this->frame($level)) {
