@@ -10,6 +10,7 @@ import type { AnchorHTMLAttributes, ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     ParticipationHeader,
+    ParticipationTally,
     type ParticipationHero,
 } from './participation-header';
 
@@ -62,7 +63,6 @@ const filters = {
 const props: ComponentProps<typeof ParticipationHeader> = {
     filters,
     hero,
-    meetingCount: 12,
     sites: [
         { id: 3, name: 'House Three' },
         { id: 4, name: 'House Four' },
@@ -165,7 +165,13 @@ describe('Participation shared header', () => {
         ).toHaveAttribute('aria-selected', 'true');
     });
     it('retains the recorded counts and linked views without claiming all work is compliant', () => {
-        render(<ParticipationHeader {...props} />);
+        // Four number boxes in the header; the other two lead the body as a tally.
+        render(
+            <>
+                <ParticipationHeader {...props} />
+                <ParticipationTally filters={filters} hero={hero} meetingCount={12} />
+            </>,
+        );
         expect(
             screen.getByRole('heading', { name: 'Worker participation' }),
         ).toBeInTheDocument();
@@ -190,7 +196,11 @@ describe('Participation shared header', () => {
             expect(href.searchParams.get('site_id')).toBe('3');
             expect(href.searchParams.get('tab')).toBe(tab);
             expect(href.searchParams.has('q')).toBe(false);
-            expect(link).toHaveClass('frontline-tap', 'eh-meter--neutral');
+            expect(link.className).toMatch(
+                ['All meetings', 'Rep training below 2 days'].includes(label)
+                    ? /sg-t--link/
+                    : /eh-number/,
+            );
         }
         expect(
             screen.getByText(
@@ -208,7 +218,12 @@ describe('Participation shared header', () => {
     });
 
     it('links populations to matching all-period views and retains the action sum as context', () => {
-        render(<ParticipationHeader {...props} />);
+        render(
+            <>
+                <ParticipationHeader {...props} />
+                <ParticipationTally filters={filters} hero={hero} meetingCount={12} />
+            </>,
+        );
         for (const label of [
             'active representatives',
             'open consultations',

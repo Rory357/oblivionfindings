@@ -63,3 +63,11 @@ the viewer can be brought up to date later. Newest last.
 | 23–23e | Next, Back and Raise concern stay in the footer under the step; the step's fields keep the wizard's own layout | The capture wizard is unchanged (its checks decide when Next is allowed); only its page frame follows the drawing |
 | 23–23e | Each step on the stage line is a button, so any step can be reopened | The old step rail allowed it; kept |
 | 25 | Times keep "· Pacific/Auckland", and the two invitation notes keep the code's wording; "Back to My day" sits under Your invitation | Invitation wording and its tests stay as they are; the drawing left the way back to the back arrow only |
+| 104–104c | The number boxes keep the code's captions ("67% recorded coverage · 2/3 sites · 1 without a rep", "N unfinished action items across these meetings" …) and the label "Meetings with outstanding actions" | They say exactly what the records show; the drawing's shorter captions dropped "recorded" |
+| 104 | "Representatives at each site" isn't shown | The page has no per-site counts or next-meeting dates (backend gap: `site_coverage` per Site with active reps and next committee date) |
+| 104 | Rep cards say "N training days recorded", not "training this year"; an inactive rep shows "inactive" in the sub-line and "Site ownership not confirmed" as the flag | Training days are cumulative and annual training isn't confirmed; ownership wording stays the code's |
+| 104 | The tally under the cards is "Committees and training": All meetings, and Rep training below 2 days | The two numbers beyond the header's four lead the body (header rule); the drawing's tally had only committees and meetings this quarter |
+| 104 | Every rep card has a kebab and right-click menu, and opens its record | DESIGN.md entity rows |
+| 104 | "Schedule meeting", More (New consultation, Export board report) and "Add representative" show only to people who manage participation | Same gate as the old New menu; Export was hidden in a right-click menu before |
+| 104b | Meetings are "Coming up" and "Held" (completed or cancelled), each row with View, a kebab and right-click | The view follows the period filter, so "this quarter" isn't promised |
+| 104d | The unavailable state keeps the code's wording ("Participation is unavailable" …) | Access wording stays as it is |

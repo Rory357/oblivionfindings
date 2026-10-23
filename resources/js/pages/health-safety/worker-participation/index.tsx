@@ -1,64 +1,48 @@
-import { EntityStatusChip } from '@/components/lists/entity-cells';
+/**
+ * Worker participation (approved H&S drawings pg-hsn-104 … 104d): one header
+ * with four number boxes, the filters and the three views as rail tabs; then
+ * representatives as people cards, committee meetings as two logs and
+ * consultations as a table. The detail dialogs and create wizards are
+ * unchanged. Every record's kebab and right-click come from one actionsFor
+ * list, so eligibility stays in one place. The viewer boundary masks the page
+ * if the signed-in account changes.
+ */
 import {
     EntityContextMenu,
     type MenuItem,
 } from '@/components/lists/entity-menu';
-import { PageLayout } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+import {
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageLayout,
+} from '@/components/page';
 import {
     ShiftContextMenu,
     type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Card, CardContent } from '@/components/ui/card';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { AddRepresentativeWizard } from '@/components/worker-participation/add-representative-wizard';
 import { ConsultationDetailDialog } from '@/components/worker-participation/consultation-detail-dialog';
 import { MeetingDetailDialog } from '@/components/worker-participation/meeting-detail-dialog';
 import { NewConsultationWizard } from '@/components/worker-participation/new-consultation-wizard';
-import { ParticipationOwnershipChip } from '@/components/worker-participation/ownership-notice';
 import { RepresentativeDetailDialog } from '@/components/worker-participation/representative-detail-dialog';
 import { ScheduleMeetingWizard } from '@/components/worker-participation/schedule-meeting-wizard';
 import {
-    CONSULT_ORDER,
-    CONSULT_STATUS,
-    MEETING_STATUS,
-    REP_STATUS,
     type ConsultationRow,
     type MeetingRow,
     type RepRow,
     type WpDetailAction,
 } from '@/components/worker-participation/shared';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
-import {
-    ParticipationCards,
-    ParticipationRowMenu,
-    participationMenu,
-    type ParticipationActions,
-} from './participation-cards';
-import {
-    ParticipationHeader,
-    type ParticipationFilters,
-    type ParticipationHero,
-} from './participation-header';
-
-import {
-    FlagBadge,
-    RegisterTableHeader,
-    TONE_BG,
-    TONE_DOT,
-    entityTone,
-    initials,
-    titleCase,
-    type Tone,
-} from '@/pages/health-safety/components/register-row-kit';
+import { titleCase } from '@/pages/health-safety/components/register-row-kit';
 import type { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
@@ -69,29 +53,31 @@ import {
     Download,
     Eye,
     FileCheck2,
-    FileText,
     GraduationCap,
-    Info,
-    MapPin,
     MessageSquare,
-    MousePointer2,
+    MoreHorizontal,
     Pencil,
     Plus,
     Slash,
     Upload,
-    UserCog,
     UserPlus,
     Users,
-    Wrench,
     XCircle,
 } from 'lucide-react';
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { participationMenu } from './participation-cards';
 import {
-    useState,
-    type ComponentType,
-    type MouseEvent as ReactMouseEvent,
-    type ReactNode,
-} from 'react';
+    ParticipationHeader,
+    ParticipationTally,
+    type ParticipationFilters,
+    type ParticipationHero,
+} from './participation-header';
 import { ParticipationViewerBoundary } from './participation-viewer-boundary';
+import {
+    ConsultationTable,
+    MeetingLogs,
+    RepresentativeCards,
+} from './participation-views';
 
 /* ------------------------------------------------------------------ */
 /*  Types (match WorkerParticipationController@index)                  */
@@ -168,7 +154,6 @@ function ParticipationWorkspace({
     const [wizard, setWizard] = useState<
         'rep' | 'meeting' | 'consultation' | null
     >(null);
-    const [newOpen, setNewOpen] = useState(false);
     // Tracks which sub-action a detail dialog should open straight onto (right-click → action).
     const [pendingAction, setPendingAction] = useState<WpDetailAction | null>(
         null,
@@ -504,20 +489,52 @@ function ParticipationWorkspace({
         });
     };
 
+    const pager =
+        rows.last_page > 1 ? <LaravelPagination links={rows.links} /> : null;
+    const exportHref = `${BASE}/export${filters.site_id ? `?site_id=${filters.site_id}` : ''}`;
+    const pageActions = can.manage ? (
+        <>
+            <PageHeaderGlassButton onClick={() => setWizard('meeting')}>
+                Schedule meeting
+            </PageHeaderGlassButton>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <PageHeaderGlassButton
+                        icon={MoreHorizontal}
+                        aria-label="More participation actions"
+                    />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => setWizard('consultation')}>
+                        <MessageSquare className="size-4" />
+                        New consultation
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => window.open(exportHref)}>
+                        <Download className="size-4" />
+                        Export board report
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <PageHeaderPrimaryButton icon={Plus} onClick={() => setWizard('rep')}>
+                Add representative
+            </PageHeaderPrimaryButton>
+        </>
+    ) : null;
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Worker Participation', href: BASE },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Safety registers', href: '/health-safety/registers' },
+                { title: 'Worker participation', href: BASE },
             ]}
         >
-            <Head title="Worker Participation" />
+            <Head title="Worker participation" />
             <PageLayout
                 hero={
                     <div onContextMenu={openHeroCtx}>
                         <ParticipationHeader
-                            meetingCount={tabCounts.meetings}
                             filters={filters}
                             hero={hero}
                             sites={sites}
@@ -527,138 +544,48 @@ function ParticipationWorkspace({
                             onFilters={go}
                             onTab={setTab}
                             onClear={clearFilters}
-                            actions={
-                                can.manage ? (
-                                    <Popover
-                                        open={newOpen}
-                                        onOpenChange={setNewOpen}
-                                    >
-                                        <PopoverTrigger asChild>
-                                            <PageHeaderPrimaryButton
-                                                icon={Plus}
-                                            >
-                                                New
-                                            </PageHeaderPrimaryButton>
-                                        </PopoverTrigger>
-                                        <PopoverContent
-                                            align="end"
-                                            className="w-64 p-1.5"
-                                        >
-                                            {(
-                                                [
-                                                    [
-                                                        'rep',
-                                                        UserPlus,
-                                                        'Add representative',
-                                                        'Elect or appoint a rep',
-                                                    ],
-                                                    [
-                                                        'meeting',
-                                                        Calendar,
-                                                        'Schedule meeting',
-                                                        'Committee meeting',
-                                                    ],
-                                                    [
-                                                        'consultation',
-                                                        MessageSquare,
-                                                        'New consultation',
-                                                        'Consult kaimahi on a change',
-                                                    ],
-                                                ] as const
-                                            ).map(([k, Icon, t, s]) => (
-                                                // eslint-disable-next-line no-restricted-syntax -- two-line menu item (icon + title + subtitle) in the New popover
-                                                <button
-                                                    key={k}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setNewOpen(false);
-                                                        setWizard(
-                                                            k as
-                                                                | 'rep'
-                                                                | 'meeting'
-                                                                | 'consultation',
-                                                        );
-                                                    }}
-                                                    className="frontline-tap frontline-focus flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
-                                                >
-                                                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                                                    <span>
-                                                        <span className="block text-sm font-medium">
-                                                            {t}
-                                                        </span>
-                                                        <span className="block text-xs text-muted-foreground">
-                                                            {s}
-                                                        </span>
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </PopoverContent>
-                                    </Popover>
-                                ) : null
-                            }
+                            actions={pageActions}
                         />
                     </div>
                 }
             >
-                <Card>
-                    <CardContent className="p-0">
-                        <RegisterTableHeader
-                            icon={
-                                tab === 'representatives'
-                                    ? Users
-                                    : tab === 'meetings'
-                                      ? Calendar
-                                      : MessageSquare
-                            }
-                            title={
-                                tab === 'representatives'
-                                    ? 'H&S Representatives'
-                                    : tab === 'meetings'
-                                      ? 'Committee Meetings'
-                                      : 'Worker Consultations'
-                            }
-                            subtitle={
-                                tab === 'representatives'
-                                    ? 'elected & appointed reps'
-                                    : tab === 'meetings'
-                                      ? 'scheduled & completed'
-                                      : 'feedback → outcome → close'
-                            }
-                            hint="Use the actions menu, or right-click a record"
-                            hintIcon={MousePointer2}
-                        />
-                        {tab === 'representatives' && (
-                            <RepTable
+                <div
+                    role="tabpanel"
+                    aria-label={TABS.find((item) => item.id === tab)?.label ?? 'Participation records'}
+                    className="grid min-w-0 gap-5"
+                >
+                    {tab === 'representatives' ? (
+                        <>
+                            <RepresentativeCards
                                 rows={rows.data as RepRow[]}
-                                onOpen={(id) =>
-                                    openDetail('representative', id)
-                                }
-                                onCtx={openRowCtx}
                                 actionsFor={actionsFor}
+                                onOpen={(id) => openDetail('representative', id)}
+                                onContext={openRowCtx}
+                                footer={pager}
                             />
-                        )}
-                        {tab === 'meetings' && (
-                            <MeetingTable
-                                rows={rows.data as MeetingRow[]}
-                                onOpen={(id) => openDetail('meeting', id)}
-                                onCtx={openRowCtx}
-                                actionsFor={actionsFor}
+                            <ParticipationTally
+                                filters={filters}
+                                hero={hero}
+                                meetingCount={tabCounts.meetings}
                             />
-                        )}
-                        {tab === 'consultations' && (
-                            <ConsultationTable
-                                rows={rows.data as ConsultationRow[]}
-                                onOpen={(id) => openDetail('consultation', id)}
-                                onCtx={openRowCtx}
-                                actionsFor={actionsFor}
-                            />
-                        )}
-                    </CardContent>
-                </Card>
-
-                {rows.last_page > 1 ? (
-                    <LaravelPagination links={rows.links} />
-                ) : null}
+                        </>
+                    ) : tab === 'meetings' ? (
+                        <MeetingLogs
+                            rows={rows.data as MeetingRow[]}
+                            actionsFor={actionsFor}
+                            onOpen={(id) => openDetail('meeting', id)}
+                            onContext={openRowCtx}
+                            footer={pager}
+                        />
+                    ) : (
+                        <ConsultationTable
+                            rows={rows.data as ConsultationRow[]}
+                            actionsFor={actionsFor}
+                            onOpen={(id) => openDetail('consultation', id)}
+                            footer={pager}
+                        />
+                    )}
+                </div>
             </PageLayout>
 
             {ctx ? (
@@ -733,507 +660,5 @@ function ParticipationWorkspace({
                 />
             ) : null}
         </AppLayout>
-    );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Tables                                                             */
-/* ------------------------------------------------------------------ */
-
-function Row({
-    children,
-    onClick,
-    onContextMenu,
-}: {
-    children: ReactNode;
-    onClick: () => void;
-    onContextMenu: (e: ReactMouseEvent) => void;
-}) {
-    return (
-        <tr
-            tabIndex={0}
-            onClick={onClick}
-            onContextMenu={onContextMenu}
-            onKeyDown={(e) => {
-                if (e.target !== e.currentTarget) return;
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onClick();
-                }
-            }}
-            className="cursor-pointer transition-colors hover:bg-muted/45 focus:bg-muted/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-            {children}
-        </tr>
-    );
-}
-
-const TH = ({ children }: { children: ReactNode }) => (
-    <th className="px-4 py-2.5">{children}</th>
-);
-const HeadRow = ({ cols }: { cols: string[] }) => (
-    <thead>
-        <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-            {cols.map((c) => (
-                <TH key={c}>{c}</TH>
-            ))}
-        </tr>
-    </thead>
-);
-const Pill = ({ tone, children }: { tone: Tone; children: ReactNode }) => (
-    <EntityStatusChip variant={tone} icon={Info}>
-        {children}
-    </EntityStatusChip>
-);
-
-function RepTable({
-    rows,
-    onOpen,
-    onCtx,
-    actionsFor,
-}: {
-    rows: RepRow[];
-    actionsFor: ParticipationActions;
-    onOpen: (id: number) => void;
-    onCtx: (
-        e: ReactMouseEvent,
-        kind: string,
-        row: RepRow,
-        tag: string,
-        meta: string,
-    ) => void;
-}) {
-    if (!rows.length) return <Empty icon={Users} label="No representatives" />;
-    return (
-        <>
-            <ParticipationCards
-                kind="representative"
-                rows={rows}
-                actionsFor={actionsFor}
-                onOpen={onOpen}
-                onContextMenu={onCtx}
-            />
-            <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-sm">
-                    <HeadRow
-                        cols={[
-                            'Representative',
-                            'Site',
-                            'Work group',
-                            'Election',
-                            'Training',
-                            'Status',
-                            'Actions',
-                        ]}
-                    />
-                    <tbody className="divide-y">
-                        {rows.map((r) => {
-                            const name = r.user?.name ?? '—';
-                            const recorded = Number.isFinite(
-                                r.training_days_completed,
-                            );
-                            const below =
-                                recorded && r.training_days_completed < 2;
-                            return (
-                                <Row
-                                    key={r.id}
-                                    onClick={() => onOpen(r.id)}
-                                    onContextMenu={(e) =>
-                                        onCtx(
-                                            e,
-                                            'representative',
-                                            r,
-                                            r.status.toUpperCase(),
-                                            `${name} · ${r.site?.name ?? ''}`,
-                                        )
-                                    }
-                                >
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2.5">
-                                            <span
-                                                className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold ${entityTone(r.id)}`}
-                                            >
-                                                {initials(name)}
-                                            </span>
-                                            <span className="font-medium">
-                                                {name}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                            <MapPin className="h-3.5 w-3.5" />
-                                            {r.site_ownership ===
-                                            'unconfirmed' ? (
-                                                <ParticipationOwnershipChip
-                                                    state={r.site_ownership}
-                                                />
-                                            ) : (
-                                                (r.site?.name ?? '—')
-                                            )}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-muted-foreground">
-                                        {r.work_group ?? '—'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className="font-medium">
-                                            {titleCase(
-                                                r.election_method ?? '—',
-                                            )}
-                                        </span>
-                                        <span className="block text-xs text-muted-foreground">
-                                            {formatDateOnly(r.elected_at)}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <FlagBadge
-                                            icon={GraduationCap}
-                                            tone={below ? 'warning' : 'neutral'}
-                                            title="Recorded representative training"
-                                        >
-                                            {recorded
-                                                ? `${r.training_days_completed} ${r.training_days_completed === 1 ? 'day' : 'days'}`
-                                                : 'Not recorded'}
-                                        </FlagBadge>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <Pill
-                                            tone={
-                                                REP_STATUS[r.status] ??
-                                                'neutral'
-                                            }
-                                        >
-                                            {titleCase(r.status)}
-                                        </Pill>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <ParticipationRowMenu
-                                            kind="representative"
-                                            row={r}
-                                            name={name}
-                                            actionsFor={actionsFor}
-                                        />
-                                    </td>
-                                </Row>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-function MeetingTable({
-    rows,
-    onOpen,
-    onCtx,
-    actionsFor,
-}: {
-    rows: MeetingRow[];
-    actionsFor: ParticipationActions;
-    onOpen: (id: number) => void;
-    onCtx: (
-        e: ReactMouseEvent,
-        kind: string,
-        row: MeetingRow,
-        tag: string,
-        meta: string,
-    ) => void;
-}) {
-    if (!rows.length) return <Empty icon={Calendar} label="No meetings" />;
-    return (
-        <>
-            <ParticipationCards
-                kind="meeting"
-                rows={rows}
-                actionsFor={actionsFor}
-                onOpen={onOpen}
-                onContextMenu={onCtx}
-            />
-            <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-sm">
-                    <HeadRow
-                        cols={[
-                            'Committee',
-                            'Date',
-                            'Status',
-                            'Attendees',
-                            'Flags',
-                            'Actions',
-                        ]}
-                    />
-                    <tbody className="divide-y">
-                        {rows.map((m) => (
-                            <Row
-                                key={m.id}
-                                onClick={() => onOpen(m.id)}
-                                onContextMenu={(e) =>
-                                    onCtx(
-                                        e,
-                                        'meeting',
-                                        m,
-                                        m.status.toUpperCase(),
-                                        m.committee?.name ?? '',
-                                    )
-                                }
-                            >
-                                <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2.5">
-                                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                                            <Users className="h-4 w-4" />
-                                        </span>
-                                        <span className="font-medium">
-                                            {m.committee?.name ?? '—'}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                        <Calendar className="h-3.5 w-3.5" />
-                                        {formatDateTimeLong(m.scheduled_at)}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <Pill
-                                        tone={
-                                            MEETING_STATUS[m.status] ??
-                                            'neutral'
-                                        }
-                                    >
-                                        {titleCase(m.status)}
-                                    </Pill>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                        <UserCog className="h-3.5 w-3.5" />
-                                        {Number.isFinite(m.attendees_count)
-                                            ? `${m.attendees_count} listed`
-                                            : 'Not recorded'}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <div className="flex flex-wrap gap-1.5">
-                                        <ParticipationOwnershipChip
-                                            state={m.site_ownership}
-                                        />
-                                        {m.actions_due_count > 0 ? (
-                                            <FlagBadge
-                                                icon={Wrench}
-                                                tone="warning"
-                                                title="Unfinished action items"
-                                            >
-                                                {m.actions_due_count}{' '}
-                                                outstanding
-                                            </FlagBadge>
-                                        ) : null}
-                                        {m.status === 'completed' &&
-                                        !m.minutes_document_path ? (
-                                            <FlagBadge
-                                                icon={FileText}
-                                                tone="warning"
-                                                title="Minutes outstanding"
-                                            >
-                                                No minutes
-                                            </FlagBadge>
-                                        ) : null}
-                                        {m.minutes_document_path ? (
-                                            <FlagBadge
-                                                icon={FileCheck2}
-                                                tone="success"
-                                                title="Minutes filed"
-                                            >
-                                                Minutes
-                                            </FlagBadge>
-                                        ) : null}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <ParticipationRowMenu
-                                        kind="meeting"
-                                        row={m}
-                                        name={
-                                            m.committee?.name ??
-                                            'Committee not recorded'
-                                        }
-                                        actionsFor={actionsFor}
-                                    />
-                                </td>
-                            </Row>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-function ConsultationTable({
-    rows,
-    onOpen,
-    onCtx,
-    actionsFor,
-}: {
-    rows: ConsultationRow[];
-    actionsFor: ParticipationActions;
-    onOpen: (id: number) => void;
-    onCtx: (
-        e: ReactMouseEvent,
-        kind: string,
-        row: ConsultationRow,
-        tag: string,
-        meta: string,
-    ) => void;
-}) {
-    if (!rows.length)
-        return <Empty icon={MessageSquare} label="No consultations" />;
-    return (
-        <>
-            <ParticipationCards
-                kind="consultation"
-                rows={rows}
-                actionsFor={actionsFor}
-                onOpen={onOpen}
-                onContextMenu={onCtx}
-            />
-            <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-sm">
-                    <HeadRow
-                        cols={[
-                            'Topic',
-                            'Type',
-                            'Status',
-                            'Progress',
-                            'Docs',
-                            'Actions',
-                        ]}
-                    />
-                    <tbody className="divide-y">
-                        {rows.map((c) => {
-                            const st = CONSULT_STATUS[c.status] ?? {
-                                tone: 'neutral' as const,
-                                label:
-                                    titleCase(c.status) ||
-                                    'Status not recorded',
-                            };
-                            const ord = CONSULT_ORDER[c.status];
-                            return (
-                                <Row
-                                    key={c.id}
-                                    onClick={() => onOpen(c.id)}
-                                    onContextMenu={(e) =>
-                                        onCtx(
-                                            e,
-                                            'consultation',
-                                            c,
-                                            c.status.toUpperCase(),
-                                            c.title,
-                                        )
-                                    }
-                                >
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2.5">
-                                            <span
-                                                className={`h-1.5 w-1.5 rounded-full ${TONE_DOT[st.tone]}`}
-                                            />
-                                            <span>
-                                                <span className="block max-w-sm truncate font-medium">
-                                                    {c.title}
-                                                </span>
-                                                <span className="block text-xs text-muted-foreground">
-                                                    {c.site?.name} ·{' '}
-                                                    {formatDateOnly(
-                                                        c.consultation_date,
-                                                    )}
-                                                </span>
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span
-                                            className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${TONE_BG.neutral}`}
-                                        >
-                                            {titleCase(c.consultation_type)}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <Pill tone={st.tone}>{st.label}</Pill>
-                                        <div className="mt-1">
-                                            <ParticipationOwnershipChip
-                                                state={c.site_ownership}
-                                            />
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div
-                                            className="flex items-center gap-1"
-                                            aria-label={
-                                                ord
-                                                    ? `Stage ${ord} of 4`
-                                                    : 'Stage not confirmed'
-                                            }
-                                        >
-                                            {[1, 2, 3, 4].map((i) => (
-                                                <span
-                                                    key={i}
-                                                    className={`h-1.5 w-6 rounded ${ord && i <= ord ? TONE_DOT[st.tone] : 'bg-muted'}`}
-                                                />
-                                            ))}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex gap-2 text-muted-foreground">
-                                            <FileText
-                                                aria-label={
-                                                    c.document_path
-                                                        ? 'Consultation document recorded'
-                                                        : 'Consultation document not recorded'
-                                                }
-                                                className={`h-4 w-4 ${c.document_path ? 'text-primary' : 'opacity-30'}`}
-                                            />
-                                            <FileCheck2
-                                                aria-label={
-                                                    c.outcome_document_path
-                                                        ? 'Outcome document recorded'
-                                                        : 'Outcome document not recorded'
-                                                }
-                                                className={`h-4 w-4 ${c.outcome_document_path ? 'text-status-success' : 'opacity-30'}`}
-                                            />
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <ParticipationRowMenu
-                                            kind="consultation"
-                                            row={c}
-                                            name={c.title}
-                                            actionsFor={actionsFor}
-                                        />
-                                    </td>
-                                </Row>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-function Empty({
-    icon: Icon,
-    label,
-}: {
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-}) {
-    return (
-        <div className="px-4 py-16 text-center">
-            <Icon className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p className="font-medium text-muted-foreground">{label}</p>
-            <p className="mt-1 text-sm text-muted-foreground/70">
-                Nothing matches this tab and filters.
-            </p>
-        </div>
     );
 }

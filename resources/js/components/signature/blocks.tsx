@@ -155,6 +155,8 @@ export interface TallyItem {
     tone?: SgTone;
     /** Where the number lives — the number and its label become a link. */
     href?: string;
+    /** The link's name when the number and label alone don't say where it goes ("View all meetings"). */
+    linkLabel?: string;
 }
 
 /** Related numbers on one line. Zeros fold into one calm sentence ("Nothing overdue or unassigned"). */
@@ -178,7 +180,7 @@ export function Tally({ title, sub, action, items, calm, keepZeros = false, ...r
                         </>
                     );
                     return i.href ? (
-                        <Link key={i.label} href={i.href} className="sg-t sg-t--link">
+                        <Link key={i.label} href={i.href} aria-label={i.linkLabel} className="sg-t sg-t--link">
                             {body}
                         </Link>
                     ) : (
@@ -395,6 +397,13 @@ export interface PersonCardItem {
     flag?: ReactNode;
     foot?: ReactNode;
     href?: string;
+    /** The card opens its record in place (a dialog) — the whole card is the button. */
+    onOpen?: () => void;
+    /** The card's menu: a kebab in its corner, and the same items on right-click (DESIGN.md entity rows). */
+    menu?: MenuItem[];
+    onContextMenu?: (event: MouseEvent<HTMLElement>) => void;
+    /** Stable identity when two people could share a name. */
+    id?: string | number;
 }
 
 /** People as cards: the avatar ring, their role, one flag, one footer line. */
@@ -420,14 +429,29 @@ export function PeopleCards({ title, sub, action, cols = 3, items }: { title?: s
                         </>
                     );
                     return (
-                        <li key={p.name} className="sg-surface sg-p">
+                        <li
+                            key={p.id ?? p.name}
+                            className={cn('sg-surface sg-p', p.menu?.length && 'relative pr-10')}
+                            onContextMenu={p.onContextMenu}
+                        >
                             {p.href ? (
                                 <Link href={p.href} className="grid gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     {body}
                                 </Link>
+                            ) : p.onOpen ? (
+                                <button
+                                    type="button"
+                                    onClick={p.onOpen}
+                                    className="grid gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    {body}
+                                </button>
                             ) : (
                                 body
                             )}
+                            {p.menu?.length ? (
+                                <EntityKebab actions={p.menu} label={`Actions for ${p.name}`} className="absolute top-3 right-2" />
+                            ) : null}
                         </li>
                     );
                 })}

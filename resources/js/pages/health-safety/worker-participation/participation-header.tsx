@@ -1,14 +1,25 @@
+/**
+ * Worker participation header (approved H&S drawings pg-hsn-104 … 104c): the
+ * title row with search and the page's actions, four number boxes, the
+ * filters, and the three views as rail tabs. Every number is a link to the
+ * matching all-period view and keeps the code's careful captions — recorded
+ * coverage, cumulative (not annual) training — so nothing claims more than
+ * the records show. The two numbers beyond four lead the body as a tally
+ * (ParticipationTally), per the header rule.
+ */
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
-    PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
 import type { RosterTabItem } from '@/components/rostering';
+import { Tally } from '@/components/signature/blocks';
 import { Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 
@@ -49,10 +60,22 @@ export type ParticipationHero = {
 
 const BASE = '/health-safety/worker-participation';
 
+/** A summary link: the current Site stays, search and an applied focus never carry over. */
+export function participationHref(
+    filters: ParticipationFilters,
+    next: Partial<ParticipationFilters>,
+): string {
+    const values = { ...filters, q: null, focus: null, ...next };
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(values)) {
+        if (value !== null && value !== '') search.set(key, String(value));
+    }
+    return `${BASE}?${search}`;
+}
+
 export function ParticipationHeader({
     filters,
     hero,
-    meetingCount,
     sites,
     tabs,
     periods,
@@ -64,7 +87,6 @@ export function ParticipationHeader({
 }: {
     filters: ParticipationFilters;
     hero: ParticipationHero;
-    meetingCount: number;
     sites: { id: number; name: string }[];
     tabs: RosterTabItem[];
     periods: { key: string; label: string }[];
@@ -86,82 +108,13 @@ export function ParticipationHeader({
         query ||
         filters.period !== 'quarter'
     );
-    const href = (next: Partial<ParticipationFilters>) => {
-        const values = { ...filters, q: null, focus: null, ...next };
-        const search = new URLSearchParams();
-        for (const [key, value] of Object.entries(values)) {
-            if (value !== null && value !== '') search.set(key, String(value));
-        }
-        return `${BASE}?${search}`;
-    };
-    const meters = [
-        {
-            label: 'Active representatives',
-            value: c.participation.active_reps,
-            caption:
-                b.sites_total > 0
-                    ? `${b.reps_coverage_pct}% recorded coverage · ${b.sites_covered}/${b.sites_total} sites · ${c.participation.sites_without_rep} without a rep`
-                    : 'Site coverage not confirmed',
-            href: href({
-                tab: 'representatives',
-                status: 'active',
-                period: 'all',
-            }),
-        },
-        {
-            label: 'All meetings',
-            value: meetingCount,
-            caption: `${c.participation.committees} active committees · ${c.participation.meetings_quarter} meetings this quarter`,
-            href: href({ tab: 'meetings', status: null, period: 'all' }),
-        },
-        {
-            label: 'Open consultations',
-            value: c.consultation.open,
-            caption: `${c.consultation.awaiting_feedback} open or feedback received · ${b.consultations_awaiting} awaiting progression`,
-            href: href({ tab: 'consultations', status: 'open', period: 'all' }),
-        },
-        {
-            label: 'Meetings with outstanding actions',
-            value: c.consultation.meetings_with_outstanding_actions,
-            caption: `${c.consultation.overdue_actions} unfinished action items across these meetings`,
-            href: href({
-                tab: 'meetings',
-                status: null,
-                period: 'all',
-                focus: 'actions_outstanding',
-            }),
-        },
-        {
-            label: 'Minutes missing',
-            value: c.consultation.minutes_outstanding,
-            caption: `${b.minutes_overdue} completed meetings without filed minutes`,
-            href: href({
-                tab: 'meetings',
-                status: null,
-                period: 'all',
-                focus: 'minutes_missing',
-            }),
-        },
-        {
-            label: 'Rep training below 2 days',
-            value: b.training_below_minimum,
-            caption: 'Cumulative recorded days · annual training not confirmed',
-            href: href({
-                tab: 'representatives',
-                status: 'active',
-                period: 'all',
-                focus: 'training_below_two',
-            }),
-        },
-    ];
+    const href = (next: Partial<ParticipationFilters>) => participationHref(filters, next);
     return (
         <PageHeader
             title="Worker participation"
             icon={Users}
             wrapTitle
-            frontline
             subline="Representatives, committee meetings and staff consultations"
-            mobileSummary={`${tabs.find((item) => item.id === filters.tab)?.label ?? 'Participation records'} · recorded work`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -179,23 +132,71 @@ export function ParticipationHeader({
                     {actions}
                 </>
             }
-            meters={meters.map((meter) => (
-                <PageHeaderMeterBlock
-                    key={meter.label}
-                    label={meter.label}
-                    href={meter.href}
-                    tone="neutral"
-                    preserveState
-                    preserveScroll
-                >
-                    <PageHeaderMeterBig>{meter.value}</PageHeaderMeterBig>
-                    <PageHeaderMeterCaption>
-                        {meter.caption}
-                    </PageHeaderMeterCaption>
-                </PageHeaderMeterBlock>
-            ))}
+            strip={
+                <PageHeaderNumbers>
+                    <PageHeaderNumber
+                        label="Active representatives"
+                        value={c.participation.active_reps}
+                        caption={
+                            b.sites_total > 0
+                                ? `${b.reps_coverage_pct}% recorded coverage · ${b.sites_covered}/${b.sites_total} sites · ${c.participation.sites_without_rep} without a rep`
+                                : 'Site coverage not confirmed'
+                        }
+                        tone={c.participation.sites_without_rep > 0 ? 'warning' : undefined}
+                        href={href({ tab: 'representatives', status: 'active', period: 'all' })}
+                        preserveState
+                        preserveScroll
+                    />
+                    <PageHeaderNumber
+                        label="Open consultations"
+                        value={c.consultation.open}
+                        caption={`${c.consultation.awaiting_feedback} open or feedback received · ${b.consultations_awaiting} awaiting progression`}
+                        href={href({ tab: 'consultations', status: 'open', period: 'all' })}
+                        preserveState
+                        preserveScroll
+                    />
+                    <PageHeaderNumber
+                        label="Meetings with outstanding actions"
+                        value={c.consultation.meetings_with_outstanding_actions}
+                        caption={`${c.consultation.overdue_actions} unfinished action items across these meetings`}
+                        tone={c.consultation.meetings_with_outstanding_actions > 0 ? 'warning' : undefined}
+                        href={href({ tab: 'meetings', status: null, period: 'all', focus: 'actions_outstanding' })}
+                        preserveState
+                        preserveScroll
+                    />
+                    <PageHeaderNumber
+                        label="Minutes missing"
+                        value={c.consultation.minutes_outstanding}
+                        caption={`${b.minutes_overdue} completed meetings without filed minutes`}
+                        tone={c.consultation.minutes_outstanding > 0 ? 'warning' : undefined}
+                        href={href({ tab: 'meetings', status: null, period: 'all', focus: 'minutes_missing' })}
+                        preserveState
+                        preserveScroll
+                    />
+                </PageHeaderNumbers>
+            }
             filters={
                 <>
+                    {sites.length > 0 && (
+                        <PageHeaderFilterSelect
+                            label="Site"
+                            value={filters.site_id === null ? 'all' : String(filters.site_id)}
+                            onChange={(site) => onFilters({ site_id: site === 'all' ? null : Number(site) })}
+                            options={[
+                                { value: 'all', label: 'All sites' },
+                                ...sites.map((site) => ({ value: String(site.id), label: site.name })),
+                            ]}
+                        />
+                    )}
+                    <PageHeaderFilterSelect
+                        label="Period"
+                        value={filters.period}
+                        onChange={(period) => onFilters({ period })}
+                        options={[
+                            { value: 'all', label: 'All periods' },
+                            ...periods.map((item) => ({ value: item.key, label: item.label })),
+                        ]}
+                    />
                     {filters.tab !== 'consultations' && (
                         <PageHeaderFilterSelect
                             label="Show"
@@ -210,85 +211,25 @@ export function ParticipationHeader({
                             options={
                                 filters.tab === 'representatives'
                                     ? [
-                                          {
-                                              value: 'all',
-                                              label: 'All representatives',
-                                          },
-                                          {
-                                              value: 'training_below_two',
-                                              label: 'Active reps below 2 training days',
-                                          },
+                                          { value: 'all', label: 'All representatives' },
+                                          { value: 'training_below_two', label: 'Active reps below 2 training days' },
                                       ]
                                     : [
-                                          {
-                                              value: 'all',
-                                              label: 'All meetings',
-                                          },
-                                          {
-                                              value: 'actions_outstanding',
-                                              label: 'Meetings with outstanding actions',
-                                          },
-                                          {
-                                              value: 'minutes_missing',
-                                              label: 'Completed meetings missing minutes',
-                                          },
+                                          { value: 'all', label: 'All meetings' },
+                                          { value: 'actions_outstanding', label: 'Meetings with outstanding actions' },
+                                          { value: 'minutes_missing', label: 'Completed meetings missing minutes' },
                                       ]
                             }
-                        />
-                    )}
-                    <PageHeaderFilterSelect
-                        label="Period"
-                        value={filters.period}
-                        onChange={(period) => onFilters({ period })}
-                        options={[
-                            { value: 'all', label: 'All periods' },
-                            ...periods.map((item) => ({
-                                value: item.key,
-                                label: item.label,
-                            })),
-                        ]}
-                    />
-                    {sites.length > 0 && (
-                        <PageHeaderFilterSelect
-                            label="Site"
-                            value={
-                                filters.site_id === null
-                                    ? 'all'
-                                    : String(filters.site_id)
-                            }
-                            onChange={(site) =>
-                                onFilters({
-                                    site_id:
-                                        site === 'all' ? null : Number(site),
-                                })
-                            }
-                            options={[
-                                { value: 'all', label: 'All sites' },
-                                ...sites.map((site) => ({
-                                    value: String(site.id),
-                                    label: site.name,
-                                })),
-                            ]}
                         />
                     )}
                     <PageHeaderFilterSelect
                         label="Status"
                         value={filters.status ?? 'all'}
-                        onChange={(status) =>
-                            onFilters({
-                                status: status === 'all' ? null : status,
-                            })
-                        }
-                        options={[
-                            { value: 'all', label: 'All' },
-                            ...statuses.map(([value, label]) => ({
-                                value,
-                                label,
-                            })),
-                        ]}
+                        onChange={(status) => onFilters({ status: status === 'all' ? null : status })}
+                        options={[{ value: 'all', label: 'All' }, ...statuses.map(([value, label]) => ({ value, label }))]}
                     />
                     {hasFilters && (
-                        <PageHeaderGlassButton
+                        <PageHeaderFilterButton
                             icon={X}
                             onClick={() => {
                                 setQuery('');
@@ -296,7 +237,7 @@ export function ParticipationHeader({
                             }}
                         >
                             Clear filters
-                        </PageHeaderGlassButton>
+                        </PageHeaderFilterButton>
                     )}
                 </>
             }
@@ -306,10 +247,7 @@ export function ParticipationHeader({
                         key: item.id,
                         label: item.label,
                         icon: item.icon,
-                        count:
-                            typeof item.badge === 'number'
-                                ? item.badge
-                                : undefined,
+                        count: typeof item.badge === 'number' ? item.badge : undefined,
                         alert: item.tone === 'critical',
                     }))}
                     value={filters.tab}
@@ -317,6 +255,47 @@ export function ParticipationHeader({
                     ariaLabel="Participation views"
                 />
             }
+        />
+    );
+}
+
+/** The two numbers beyond the header's four: every meeting, and reps below two recorded training days. */
+export function ParticipationTally({
+    filters,
+    hero,
+    meetingCount,
+}: {
+    filters: ParticipationFilters;
+    hero: ParticipationHero;
+    meetingCount: number;
+}) {
+    const c = hero.clusters.participation;
+    return (
+        <Tally
+            title="Committees and training"
+            keepZeros
+            items={[
+                {
+                    value: meetingCount,
+                    label: 'All meetings',
+                    sub: `${c.committees} active committees · ${c.meetings_quarter} meetings this quarter`,
+                    href: participationHref(filters, { tab: 'meetings', status: null, period: 'all' }),
+                    linkLabel: 'View all meetings',
+                },
+                {
+                    value: hero.badges.training_below_minimum,
+                    label: 'Rep training below 2 days',
+                    sub: 'Cumulative recorded days · annual training not confirmed',
+                    tone: hero.badges.training_below_minimum > 0 ? 'warning' : undefined,
+                    href: participationHref(filters, {
+                        tab: 'representatives',
+                        status: 'active',
+                        period: 'all',
+                        focus: 'training_below_two',
+                    }),
+                    linkLabel: 'View rep training below 2 days',
+                },
+            ]}
         />
     );
 }
