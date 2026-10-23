@@ -968,15 +968,17 @@ export interface EvidenceWindowRow {
 }
 
 function minutes(m: number): string {
-    return m >= 60 ? `${m / 60} h` : `${m} min`;
+    if (m < 1) return `${Math.round(m * 60)} s`;
+    if (m >= 60) return `${Math.round((m / 60) * 10) / 10} h`;
+    return `${Math.round(m * 10) / 10} min`;
 }
 
 /** Evidence windows as time bars around the moment of the incident: what is reviewed, and the longest allowed. */
-export function EvidenceWindows({ title, sub, action, before = 60, after = 120, rows, actions }: Omit<SurfaceProps, 'children'> & { before?: number; after?: number; rows: EvidenceWindowRow[]; actions?: ReactNode }) {
+export function EvidenceWindows({ title, sub, action, before = 60, after = 120, rows, actions, ...rest }: Omit<SurfaceProps, 'children'> & { before?: number; after?: number; rows: EvidenceWindowRow[]; actions?: ReactNode }) {
     const total = before + after;
     const pc = (m: number) => `${((m / total) * 100).toFixed(2)}%`;
     return (
-        <Surface title={title} sub={sub} action={action}>
+        <Surface title={title} sub={sub} action={action} aria-label={rest['aria-label']}>
             <div className="sg-windows">
                 <div className="sg-wn-axis" aria-hidden="true">
                     <span />

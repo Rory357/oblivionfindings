@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Choices, KnowList, Log, Note, QuietLine, Surface } from '@/components/signature/blocks';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,7 +7,7 @@ import {
     useSafetyDraftState,
     useSafetyForm,
 } from '@/hooks/use-safety-workspace-drafts';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { formatDate, formatDateTimeLong } from '@/lib/datetime';
 import { AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -40,94 +40,101 @@ function ActorIndependencePanel({
 }: Props) {
     const [editing, setEditing] = useState(false);
     const [saved, setSaved] = useState(false);
+    // Independent incident review, drawn as the approved settings drawing (24c): both choices side by side,
+    // the one in use marked, each showing what the people named in a report can and can't do.
+    const chosen = history.data.find(
+        (row) => row.revision === policy.policy_revision && row.integrity === 'recorded',
+    );
+    const status =
+        policy.origin === 'organisation_setting'
+            ? 'Organisation decision recorded'
+            : policy.origin === 'application_default_unreviewed'
+              ? 'Application default · not reviewed'
+              : 'Needs review';
+    const chosenMeta = (mode: IndependenceMode) =>
+        policy.mode !== mode ? undefined : policy.reviewed_at ? (
+            <>
+                Chosen{chosen?.actor?.name ? <> by <b>{chosen.actor.name}</b></> : null} ·{' '}
+                {formatDateTimeLong(policy.reviewed_at)} · revision {policy.policy_revision}
+            </>
+        ) : (
+            'Organisation review has not been recorded.'
+        );
     return (
-        <section aria-label="Independent incident review" className="space-y-5">
-            <Card>
-                <CardContent className="space-y-4 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-2">
-                            <h2 className="text-section-title">
-                                Independent incident review
-                            </h2>
-                            <StatusBadge
-                                variant={
-                                    policy.configuration_valid
-                                        ? 'info'
-                                        : 'warning'
-                                }
-                            >
-                                {policy.configuration_valid ? (
-                                    <ShieldCheck
-                                        aria-hidden
-                                        className="size-3"
-                                    />
-                                ) : (
-                                    <AlertCircle
-                                        aria-hidden
-                                        className="size-3"
-                                    />
-                                )}
-                                {policy.origin === 'organisation_setting'
-                                    ? 'Organisation decision recorded'
-                                    : policy.origin ===
-                                        'application_default_unreviewed'
-                                      ? 'Application default · not reviewed'
-                                      : 'Needs review'}
-                            </StatusBadge>
-                            <p className="text-subtle">
-                                {independenceModeLabel(policy.mode)}
-                            </p>
-                            <p className="text-subtle text-muted-foreground">
-                                Choose what happens when a report identifies the
-                                usual manager or another staff member as
-                                involved. Named people cannot own or manage that
-                                report. Access and notification protection
-                                follows the choice below.
-                            </p>
-                        </div>
-                        {!editing &&
-                        canManage &&
-                        policy.policy_revision !== null ? (
-                            <Button
-                                className="frontline-tap frontline-focus"
-                                variant="outline"
-                                onClick={() => {
-                                    setSaved(false);
-                                    setEditing(true);
-                                }}
-                            >
-                                Edit independent review
-                            </Button>
-                        ) : null}
-                    </div>
-                    <p className="text-subtle text-muted-foreground">
-                        Each report retains the policy accepted when independent
-                        handling is first recorded. Changing this setting does
-                        not rewrite existing reports, reassign their owner or
-                        resolve their independent review. People who are not yet
-                        identified remain marked unknown.
-                    </p>
-                    {policy.reviewed_at ? (
-                        <p className="text-caption text-muted-foreground">
-                            Organisation review recorded{' '}
-                            {formatDateTimeLong(policy.reviewed_at)} · revision{' '}
-                            {policy.policy_revision}
-                        </p>
-                    ) : (
-                        <p className="text-caption text-muted-foreground">
-                            Organisation review has not been recorded.
-                        </p>
-                    )}
-                    {saved ? (
-                        <p
-                            role="status"
-                            className="text-subtle flex items-center gap-2"
+        <section aria-label="Independent incident review" className="flex flex-col gap-5">
+            <Choices
+                title="Independent incident review"
+                sub={
+                    <>
+                        When a report names the usual manager or another staff member as involved ·{' '}
+                        <StatusBadge variant={policy.configuration_valid ? 'info' : 'warning'} size="sm">
+                            {policy.configuration_valid ? (
+                                <ShieldCheck aria-hidden className="size-3" />
+                            ) : (
+                                <AlertCircle aria-hidden className="size-3" />
+                            )}
+                            {status}
+                        </StatusBadge>
+                    </>
+                }
+                options={[
+                    {
+                        title: independenceModeLabel('block_involved_access'),
+                        badge: 'Recommended',
+                        on: policy.mode === 'block_involved_access',
+                        text: 'During independent review, named people cannot read the report, receive its notifications, own it or manage it. Other people still need the usual permission and Site access.',
+                        canTitle: 'People named in the report',
+                        can: [
+                            { label: 'Can’t read it', state: 'success' },
+                            { label: 'Can’t get its notifications', state: 'success' },
+                            { label: 'Can’t own it', state: 'success' },
+                            { label: 'Can’t manage it', state: 'success' },
+                        ],
+                        meta: chosenMeta('block_involved_access'),
+                    },
+                    {
+                        title: independenceModeLabel('assignment_only'),
+                        on: policy.mode === 'assignment_only',
+                        text: 'Named people cannot own or manage the report. Existing read and notification permissions still apply, so those people may be able to read it and receive notifications.',
+                        canTitle: 'People named in the report',
+                        can: [
+                            { label: 'May still read it', state: 'warning' },
+                            { label: 'May still get notifications', state: 'warning' },
+                            { label: 'Can’t own it', state: 'success' },
+                            { label: 'Can’t manage it', state: 'success' },
+                        ],
+                        meta: chosenMeta('assignment_only'),
+                    },
+                ]}
+                actions={
+                    !editing && canManage && policy.policy_revision !== null ? (
+                        <Button
+                            className="frontline-tap frontline-focus"
+                            variant="outline"
+                            onClick={() => {
+                                setSaved(false);
+                                setEditing(true);
+                            }}
                         >
-                            <CheckCircle2 aria-hidden className="size-4" />
-                            Independent review policy saved.
-                        </p>
-                    ) : null}
-                    {editing ? (
+                            Edit independent review
+                        </Button>
+                    ) : undefined
+                }
+            />
+            {policy.mode === null ? (
+                <Note tone="warning" icon={AlertCircle}>
+                    {independenceModeLabel(policy.mode)}. Organisation review has not been recorded.
+                </Note>
+            ) : null}
+            {saved ? (
+                <p role="status" className="text-subtle flex items-center gap-2">
+                    <CheckCircle2 aria-hidden className="size-4" />
+                    Independent review policy saved.
+                </p>
+            ) : null}
+            {editing ? (
+                <Surface title="Edit independent review">
+                    <div className="p-[18px]">
                         <IndependenceEditor
                             policy={policy}
                             canManage={canManage}
@@ -138,59 +145,43 @@ function ActorIndependencePanel({
                                 setSaved(accepted);
                             }}
                         />
-                    ) : null}
-                </CardContent>
-            </Card>
-            <div className="space-y-3">
-                <h3 className="text-section-title">
-                    Independent review policy history
-                </h3>
+                    </div>
+                </Surface>
+            ) : null}
+            <KnowList
+                title="Good to know"
+                items={[
+                    { text: 'Each report retains the policy accepted when independent handling is first recorded.' },
+                    { text: 'Changing this setting does not rewrite existing reports, reassign their owner or resolve their independent review.' },
+                    { tone: 'none', text: 'People who are not yet identified remain marked unknown.' },
+                ]}
+            />
+            <div className="flex flex-col gap-3">
                 {history.data.length ? (
-                    <ul className="space-y-3">
-                        {history.data.map((row) => (
-                            <li key={row.id}>
-                                <Card>
-                                    <CardContent className="space-y-2 p-4">
-                                        <p className="text-subtle">
-                                            Revision {row.revision} ·{' '}
-                                            {independenceModeLabel(row.mode)}
-                                        </p>
-                                        {row.integrity === 'recorded' ? (
-                                            <>
-                                                <p className="text-caption text-muted-foreground">
-                                                    {row.actor?.name ??
-                                                        'Recorded decision-maker unavailable'}{' '}
-                                                    ·{' '}
-                                                    {row.recorded_at
-                                                        ? formatDateTimeLong(
-                                                              row.recorded_at,
-                                                          )
-                                                        : 'Time unavailable'}
-                                                </p>
-                                                <p className="text-subtle whitespace-pre-wrap">
-                                                    {row.reason}
-                                                </p>
-                                            </>
-                                        ) : (
-                                            <p className="text-subtle text-status-warning-foreground">
-                                                This retained decision needs
-                                                repair. Its contents cannot be
-                                                confirmed.
-                                            </p>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </li>
-                        ))}
-                    </ul>
+                    <Log
+                        title="Independent review policy history"
+                        limit={50}
+                        items={history.data.map((row) => ({
+                            key: row.id,
+                            time: row.recorded_at ? formatDate(row.recorded_at) : '',
+                            tone: row.integrity === 'recorded' ? 'info' : 'warning',
+                            title: `Revision ${row.revision} · ${independenceModeLabel(row.mode)}`,
+                            sub:
+                                row.integrity === 'recorded'
+                                    ? [
+                                          row.actor?.name ?? 'Recorded decision-maker unavailable',
+                                          row.recorded_at ? formatDateTimeLong(row.recorded_at) : 'Time unavailable',
+                                          row.reason,
+                                      ]
+                                          .filter(Boolean)
+                                          .join(' · ')
+                                    : 'This retained decision needs repair. Its contents cannot be confirmed.',
+                        }))}
+                    />
                 ) : (
-                    <p className="text-subtle text-muted-foreground">
-                        No organisation decision has been recorded.
-                    </p>
+                    <QuietLine title="Independent review policy history" text="No organisation decision has been recorded." />
                 )}
-                {history.last_page > 1 ? (
-                    <LaravelPagination links={history.links} />
-                ) : null}
+                {history.last_page > 1 ? <LaravelPagination links={history.links} /> : null}
             </div>
         </section>
     );

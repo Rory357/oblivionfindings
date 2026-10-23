@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { EvidenceWindows, Note, Surface } from '@/components/signature/blocks';
 import { Input } from '@/components/ui/input';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
     blankRule, confirmsEvidenceWindowReceipt, EVIDENCE_POLICY_KEY, policyFromDraft, ruleDraft,
     type EvidenceWindowCommand, type EvidenceWindowHistory, type EvidenceWindowOptions,
-    type EvidenceWindowRuleDraft, type EvidenceWindowSnapshot,
+    type EvidenceWindowRule, type EvidenceWindowRuleDraft, type EvidenceWindowSnapshot,
 } from './evidence-window-policy';
 
 const ENDPOINT = '/health-safety/settings/evidence-windows';
@@ -74,59 +74,73 @@ function ActorEvidenceWindowPanel(props: Props) {
             if (request.current === controller) { request.current = null; setLoading(false); }
         }
     };
-    return <section aria-label="Evidence window policy" className="space-y-5" aria-busy={loading}>
-        <Card><CardContent className="space-y-4 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                    <h2 className="text-section-title">Evidence windows</h2>
-                    {!refused ? <StatusBadge variant={policy.configuration_valid ? 'info' : 'warning'}>
-                        {policy.configuration_valid ? <Camera aria-hidden className="size-3.5" /> : <AlertCircle aria-hidden className="size-3.5" />}
-                        {stateLabels[policy.configuration_state]}
-                    </StatusBadge> : null}
-                    <p className="text-subtle text-muted-foreground">Set the time before and after an incident to review. A Site rule takes priority over the organisation rule for the same incident type.</p>
-                </div>
-                {!editing && canManage && policy.policy_revision !== null ?
-                    <Button size="sm" className="frontline-hit" onClick={() => setEditing(true)}>Review evidence windows</Button> : null}
-            </div>
-            <p className="text-subtle text-muted-foreground">Source selections do not grant access or consent, confirm recordings, or preserve footage. Each recorded incident window keeps its original policy and history.</p>
-            {refused ? <p role="alert" className="text-subtle text-status-warning-foreground">Current access could not be confirmed. Scoped settings and history are hidden. Check current access before continuing.</p> : null}
-            {!refused && !policy.scope_complete ? <p role="alert" className="text-subtle text-status-warning-foreground">
-                Some rules are outside your current Site access. You can review the visible rules, but an authorised reviewer with access to all rules must change this policy.
-            </p> : null}
-            {editing ? <EvidenceWindowEditor policy={policy} options={options} actorId={props.actorId}
+    const sub = <>
+        Set the time before and after an incident to review. A Site rule takes priority over the organisation rule for the same incident type.
+        {!refused ? <> · <StatusBadge variant={policy.configuration_valid ? 'info' : 'warning'} size="sm">
+            {policy.configuration_valid ? <Camera aria-hidden className="size-3" /> : <AlertCircle aria-hidden className="size-3" />}
+            {stateLabels[policy.configuration_state]}
+        </StatusBadge></> : null}
+    </>;
+    const buttons = <>
+        {!editing || refused ? <Button variant="outline" size="sm" className="frontline-hit" disabled={loading} onClick={() => void refresh()}>{refused ? 'Check current access' : 'Refresh settings'}</Button> : null}
+        {!editing && canManage && policy.policy_revision !== null ?
+            <Button size="sm" variant="outline" className="frontline-hit" onClick={() => setEditing(true)}>Review evidence windows</Button> : null}
+    </>;
+    const rules = policy.policy_snapshot?.rules ?? [];
+    const min = (seconds: number) => Math.round((seconds / 60) * 10) / 10;
+    const label = (rule: EvidenceWindowRule) => options.triggers.find((item) => item.value === rule.trigger)?.label ?? rule.trigger;
+    const where = (rule: EvidenceWindowRule) => rule.site_id === null ? 'Organisation default' : options.sites.find((site) => site.id === rule.site_id)?.name ?? 'Site unavailable';
+    const sources = (rule: EvidenceWindowRule) => rule.source_types.map((type) => options.source_types.find((item) => item.value === type)?.label ?? type);
+    // How long evidence is reviewed, drawn as time bars around the moment of the incident (approved drawing 24e).
+    return <section aria-label="Evidence window policy" className="flex flex-col gap-5" aria-busy={loading}>
+        {editing ? <Surface title="Review evidence windows" sub={sub}>
+            <div className="p-[18px]"><EvidenceWindowEditor policy={policy} options={options} actorId={props.actorId}
                 onRefused={() => setRefused(true)}
                 canManage={canManage} discard={props.discard} onClose={(saved) => {
                     setEditing(false);
                     if (saved) { setMessage('Evidence-window policy saved.'); void refresh(1, 'Evidence-window policy saved.'); }
-                }} /> :
-                !refused ? <ul className="space-y-3" aria-label="Current evidence rules">
-                    {(policy.policy_snapshot?.rules ?? []).map((rule) => <li key={rule.identifier} className="rounded-lg border border-border p-4 text-subtle">
-                        <p className="font-medium">{options.triggers.find((item) => item.value === rule.trigger)?.label ?? rule.trigger} · {rule.site_id === null ? 'Organisation default' : options.sites.find((site) => site.id === rule.site_id)?.name ?? 'Site unavailable'}</p>
-                        <p>{rule.before_seconds} seconds before · {rule.after_seconds} seconds after</p>
-                        <p className="text-muted-foreground">Maximum: {rule.max_before_seconds} seconds before · {rule.max_after_seconds} seconds after</p>
-                        <p>{rule.source_types.map((type) => options.source_types.find((item) => item.value === type)?.label ?? type).join(', ')}</p>
-                    </li>)}
-                </ul> : null}
-            {message ? <p role="status" className="text-subtle">{message}</p> : null}
-            {!editing || refused ? <Button variant="outline" size="sm" className="frontline-hit" disabled={loading} onClick={() => void refresh()}>{refused ? 'Check current access' : 'Refresh settings'}</Button> : null}
-        </CardContent></Card>
-        {!refused ? <div className="space-y-3">
-            <h3 className="text-section-title">Evidence-window policy history</h3>
-            {history.data.length ? <ul className="space-y-3">{history.data.map((entry) => <li key={entry.id} className="rounded-lg border border-border p-4">
-                <p className="text-subtle font-medium">Revision {entry.revision} · {entry.after_value?.enabled ? 'Enabled' : entry.after_value ? 'Disabled' : 'Unavailable'}</p>
-                <p className="text-caption text-muted-foreground">{entry.actor?.name ?? 'Reviewer unavailable'} · {formatDateTimeLong(entry.recorded_at)}</p>
-                <p className="whitespace-pre-wrap break-words text-subtle">{entry.reason}</p>
-                {entry.after_value?.rules.length ? <details className="mt-2">
-                    <summary className="frontline-tap frontline-focus cursor-pointer text-subtle">Review recorded rules</summary>
-                    <ul className="mt-2 space-y-3">{entry.after_value.rules.map((rule) => <li key={rule.identifier} className="space-y-1 text-subtle">
-                        <p className="font-medium">{options.triggers.find((item) => item.value === rule.trigger)?.label ?? rule.trigger} · {rule.site_id === null ? 'Organisation default' : options.sites.find((site) => site.id === rule.site_id)?.name ?? 'Site unavailable'}</p>
-                        <p>{rule.before_seconds} seconds before · {rule.after_seconds} seconds after</p>
-                        <p className="text-muted-foreground">Maximum: {rule.max_before_seconds} seconds before · {rule.max_after_seconds} seconds after</p>
-                        <p>{rule.source_types.map((type) => options.source_types.find((item) => item.value === type)?.label ?? type).join(', ')}</p>
-                    </li>)}</ul>
-                </details> : null}
-                {!entry.scope_complete ? <p className="text-caption text-muted-foreground">Some Site rules are restricted.</p> : null}
-            </li>)}</ul> : <p className="text-subtle text-muted-foreground">No evidence-window policy decisions have been recorded.</p>}
+                }} /></div>
+        </Surface> : refused || !rules.length ? <Surface title="How long evidence is reviewed" sub={sub}>
+            {!refused ? <p className="sg-quiet">No evidence windows are recorded.</p> : null}
+            <div className="sg-actions">{buttons}</div>
+        </Surface> : <EvidenceWindows
+            aria-label="Current evidence rules"
+            title="How long evidence is reviewed"
+            sub={sub}
+            before={Math.max(1, ...rules.map((rule) => min(rule.max_before_seconds)))}
+            after={Math.max(1, ...rules.map((rule) => min(rule.max_after_seconds)))}
+            rows={rules.map((rule) => ({
+                name: label(rule), where: where(rule),
+                review: [min(rule.before_seconds), min(rule.after_seconds)],
+                max: [min(rule.max_before_seconds), min(rule.max_after_seconds)],
+                sources: sources(rule).map((text) => ({ label: text })),
+            }))}
+            actions={buttons}
+        />}
+        <Note>Source selections do not grant access or consent, confirm recordings, or preserve footage. Each recorded incident window keeps its original policy and history.</Note>
+        {refused ? <p role="alert" className="text-subtle text-status-warning-foreground">Current access could not be confirmed. Scoped settings and history are hidden. Check current access before continuing.</p> : null}
+        {!refused && !policy.scope_complete ? <p role="alert" className="text-subtle text-status-warning-foreground">
+            Some rules are outside your current Site access. You can review the visible rules, but an authorised reviewer with access to all rules must change this policy.
+        </p> : null}
+        {message ? <p role="status" className="text-subtle">{message}</p> : null}
+        {!refused ? <div className="flex flex-col gap-3">
+            <Surface title="Evidence-window policy history" sub="NZ time">
+                {history.data.length ? <ul className="sg-list mt-2">{history.data.map((entry) => <li key={entry.id} className="grid gap-1 px-[18px] py-3">
+                    <p className="text-subtle font-semibold">Revision {entry.revision} · {entry.after_value?.enabled ? 'Enabled' : entry.after_value ? 'Disabled' : 'Unavailable'}</p>
+                    <p className="text-caption text-muted-foreground">{entry.actor?.name ?? 'Reviewer unavailable'} · {formatDateTimeLong(entry.recorded_at)}</p>
+                    <p className="whitespace-pre-wrap break-words text-subtle">{entry.reason}</p>
+                    {entry.after_value?.rules.length ? <details className="mt-1">
+                        <summary className="frontline-tap frontline-focus cursor-pointer text-subtle text-primary">Review recorded rules</summary>
+                        <ul className="mt-2 grid gap-2">{entry.after_value.rules.map((rule) => <li key={rule.identifier} className="text-subtle">
+                            <p className="font-medium">{label(rule)} · {where(rule)}</p>
+                            <p>{rule.before_seconds} seconds before · {rule.after_seconds} seconds after</p>
+                            <p className="text-muted-foreground">Maximum: {rule.max_before_seconds} seconds before · {rule.max_after_seconds} seconds after</p>
+                            <p>{sources(rule).join(', ')}</p>
+                        </li>)}</ul>
+                    </details> : null}
+                    {!entry.scope_complete ? <p className="text-caption text-muted-foreground">Some Site rules are restricted.</p> : null}
+                </li>)}</ul> : <p className="sg-quiet">No evidence-window policy decisions have been recorded.</p>}
+            </Surface>
             <LaravelPagination ariaLabel="Evidence policy history pages" navigation={{
                 currentPage: history.current_page, previousPage: history.current_page > 1 ? history.current_page - 1 : null,
                 nextPage: history.current_page < history.last_page ? history.current_page + 1 : null,
@@ -246,3 +260,4 @@ function EvidenceWindowEditor({ policy, options, actorId, canManage, discard, on
         </div>
     </form>;
 }
+

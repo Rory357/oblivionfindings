@@ -1,14 +1,17 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { KnowList, Log, PersonChip, QuietLine, Ring, Surface } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
     useSafetyDraftState,
     useSafetyForm,
 } from '@/hooks/use-safety-workspace-drafts';
+import { cn } from '@/lib/utils';
 import {
+    formatDate,
+    formatDateTime,
     formatDateTimeLong,
     toDatetimeLocal,
     workerTimeOffset,
@@ -17,10 +20,14 @@ import {
 import axios from 'axios';
 import {
     AlertCircle,
+    ArrowRight,
     CheckCircle2,
+    House,
     Plus,
+    Repeat,
     Settings,
     Trash2,
+    UserRound,
 } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
@@ -953,228 +960,190 @@ function ActorRoutingPanel({
         () => crypto.randomUUID(),
         [snapshot, sites, actorId, canManage],
     );
+    // Where new incidents go, drawn as the approved settings drawing (24c): each Site, its kinds of
+    // incident and the person they go to (with cover), then what happens when nobody can take one.
+    // Names still come from the current approved-Site source (SavedPerson), never from the snapshot.
+    const routes = snapshot.configuration?.routes ?? [];
+    const bySite = sites
+        .map((site) => ({ site, rules: routes.filter((rule) => rule.site_id === site.id) }))
+        .filter((group) => group.rules.length > 0);
+    const unknownSiteRules = routes.filter((rule) => !sites.some((site) => site.id === rule.site_id));
+    const triage = snapshot.configuration?.triage;
+    const allowedFor = (rule: RoutingRule) => canManage && sites.some((site) => site.id === rule.site_id);
+    const stateLabel =
+        snapshot.state === 'configured'
+            ? 'Configuration recorded'
+            : snapshot.state === 'unconfigured'
+              ? 'Not configured'
+              : 'Configuration needs repair';
     return (
-        <section aria-label="Incident routing" className="space-y-5">
-            <Card>
-                <CardContent className="space-y-5 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="space-y-2">
-                            <h2 className="text-section-title">
-                                Incident ownership routing
-                            </h2>
-                            <StatusBadge
-                                variant={
-                                    snapshot.state === 'configured'
-                                        ? 'info'
-                                        : 'warning'
-                                }
-                            >
-                                {snapshot.state === 'configured' ? (
-                                    <CheckCircle2
-                                        aria-hidden
-                                        className="size-3"
-                                    />
-                                ) : (
-                                    <AlertCircle
-                                        aria-hidden
-                                        className="size-3"
-                                    />
-                                )}
-                                {snapshot.state === 'configured'
-                                    ? 'Configuration recorded'
-                                    : snapshot.state === 'unconfigured'
-                                      ? 'Not configured'
-                                      : 'Configuration needs repair'}
-                            </StatusBadge>
-                        </div>
-                        <Button
-                            variant="outline"
-                            className="frontline-tap frontline-focus"
-                            disabled={
-                                !canManage ||
-                                snapshot.revision === null ||
-                                editing
-                            }
-                            onClick={() => {
-                                setSaved(false);
-                                setEditing(true);
-                            }}
-                        >
-                            <Settings aria-hidden className="size-4" />
-                            Edit routing
-                        </Button>
-                    </div>
-                    <p className="text-subtle text-muted-foreground">
-                        New reports use the incident’s recorded site and any
-                        required specialist route. Named cover applies only for
-                        its saved interval. Existing incident owners are
-                        preserved; changing a task assignee does not change the
-                        incident owner.
-                    </p>
-                    <p className="text-subtle text-muted-foreground">
-                        A recorded configuration does not confirm current
-                        staffing, access or complete site coverage. Each
-                        incident rechecks those conditions. An unavailable route
-                        keeps the report saved and shows that it needs an owner
-                        or setup review.
-                    </p>
-                    {saved ? (
-                        <p role="status" className="text-subtle">
-                            Routing configuration saved.
-                        </p>
-                    ) : null}
-                    {snapshot.recorded_at ? (
-                        <p className="text-caption text-muted-foreground">
-                            Revision {snapshot.revision} ·{' '}
-                            {formatDateTimeLong(snapshot.recorded_at)}
-                        </p>
-                    ) : null}
-                    {snapshot.configuration ? (
-                        <div className="space-y-3">
-                            <h3 className="text-section-title">
-                                Saved rules in your approved sites
-                            </h3>
-                            {snapshot.configuration.routes.length ? (
-                                <ul className="space-y-3">
-                                    {snapshot.configuration.routes.map(
-                                        (rule, index) => (
-                                            <li
-                                                key={index}
-                                                className="text-subtle rounded-lg border p-3"
-                                            >
-                                                <p className="font-medium">
-                                                    {sites.find(
-                                                        (site) =>
-                                                            site.id ===
-                                                            rule.site_id,
-                                                    )?.name ??
-                                                        'Site access needs review'}{' '}
-                                                    ·{' '}
-                                                    {rule.scope === 'restricted'
-                                                        ? 'Restricted or specialist incidents'
-                                                        : 'Ordinary incidents'}
-                                                </p>
-                                                <p>
-                                                    Incident lead:{' '}
-                                                    <SavedPerson
-                                                        siteId={rule.site_id}
-                                                        scope={rule.scope}
-                                                        value={
-                                                            rule.lead_user_id
-                                                        }
-                                                        actorId={actorId}
-                                                        readKey={readKey}
-                                                        allowed={
-                                                            canManage &&
-                                                            sites.some(
-                                                                (site) =>
-                                                                    site.id ===
-                                                                    rule.site_id,
-                                                            )
-                                                        }
-                                                    />
-                                                </p>
-                                                {rule.cover_user_id ? (
-                                                    <p>
-                                                        Cover person:{' '}
+        <section aria-label="Incident routing" className="flex flex-col gap-5">
+            <Surface
+                title="Where new incidents go"
+                sub={
+                    <>
+                        By the incident’s Site
+                        {snapshot.recorded_at ? ` · changed ${formatDateTimeLong(snapshot.recorded_at)}` : ''}
+                        {' · '}
+                        <StatusBadge variant={snapshot.state === 'configured' ? 'info' : 'warning'} size="sm">
+                            {snapshot.state === 'configured' ? (
+                                <CheckCircle2 aria-hidden className="size-3" />
+                            ) : (
+                                <AlertCircle aria-hidden className="size-3" />
+                            )}
+                            {stateLabel}
+                        </StatusBadge>
+                    </>
+                }
+            >
+                {snapshot.configuration ? (
+                    <>
+                        {bySite.length || unknownSiteRules.length ? (
+                            <ul className="sg-routes" aria-label="Saved rules in your approved sites">
+                                {[...bySite, ...(unknownSiteRules.length ? [{ site: null, rules: unknownSiteRules }] : [])].map(({ site, rules }) => (
+                                    <li key={site?.id ?? 'unknown'} className="sg-rt">
+                                        <div className="sg-rt-p">
+                                            <House aria-hidden className="size-4 text-primary" />
+                                            <div>
+                                                <b>{site?.name ?? 'Site access needs review'}</b>
+                                                <small>
+                                                    From {formatDateTime(rules[0].effective_from)} ·{' '}
+                                                    {rules[0].effective_until
+                                                        ? `until ${formatDateTime(rules[0].effective_until)}`
+                                                        : 'no end date'}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <span className="sg-arrow" aria-hidden>
+                                            <ArrowRight className="size-4" />
+                                        </span>
+                                        <div className="sg-lanes">
+                                            {rules.map((rule, index) => (
+                                                <div
+                                                    key={`${rule.scope}-${index}`}
+                                                    className={cn('sg-lane', rule.scope === 'restricted' && 'sg-lane--warning')}
+                                                >
+                                                    <small>
+                                                        {rule.scope === 'restricted'
+                                                            ? 'Restricted or specialist incidents'
+                                                            : 'Ordinary incidents'}
+                                                    </small>
+                                                    <span className="sg-person">
+                                                        <span aria-hidden>
+                                                            <UserRound className="size-3" />
+                                                        </span>
+                                                        <span className="sr-only">Incident lead: </span>
                                                         <SavedPerson
-                                                            siteId={
-                                                                rule.site_id
-                                                            }
+                                                            siteId={rule.site_id}
                                                             scope={rule.scope}
-                                                            value={
-                                                                rule.cover_user_id
-                                                            }
+                                                            value={rule.lead_user_id}
                                                             actorId={actorId}
                                                             readKey={readKey}
-                                                            allowed={
-                                                                canManage &&
-                                                                sites.some(
-                                                                    (site) =>
-                                                                        site.id ===
-                                                                        rule.site_id,
-                                                                )
-                                                            }
+                                                            allowed={allowedFor(rule)}
                                                         />
-                                                    </p>
-                                                ) : null}
-                                                <p className="text-caption text-muted-foreground">
-                                                    {formatDateTimeLong(
-                                                        rule.effective_from,
-                                                    )}{' '}
-                                                    to{' '}
-                                                    {rule.effective_until
-                                                        ? formatDateTimeLong(
-                                                              rule.effective_until,
-                                                          )
-                                                        : 'no end recorded'}
-                                                    {rule.cover_user_id
-                                                        ? ' · Named cover recorded'
-                                                        : ''}
-                                                </p>
-                                            </li>
-                                        ),
-                                    )}
-                                </ul>
-                            ) : (
-                                <p className="text-subtle text-muted-foreground">
-                                    No routing rules are recorded for your
-                                    current approved sites.
-                                </p>
-                            )}
-                            <p className="text-subtle">
-                                {snapshot.configuration.triage.visibility ===
-                                'restricted'
-                                    ? 'Monitored triage references are restricted.'
-                                    : snapshot.configuration.triage.values
-                                      ? 'Triage and escalation references are recorded; current eligibility is checked per incident.'
-                                      : 'Monitored triage is not configured.'}
+                                                    </span>
+                                                    {rule.cover_user_id ? (
+                                                        <span className="sg-cover">
+                                                            <Repeat aria-hidden className="size-3" />
+                                                            Cover:{' '}
+                                                            <b>
+                                                                <SavedPerson
+                                                                    siteId={rule.site_id}
+                                                                    scope={rule.scope}
+                                                                    value={rule.cover_user_id}
+                                                                    actorId={actorId}
+                                                                    readKey={readKey}
+                                                                    allowed={allowedFor(rule)}
+                                                                />
+                                                            </b>
+                                                            {rule.cover_from
+                                                                ? ` · ${formatDateTimeLong(rule.cover_from)}${rule.cover_until ? ` – ${formatDateTimeLong(rule.cover_until)}` : ''}`
+                                                                : ''}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="sg-quiet">
+                                <Ring tone="none" />
+                                No routing rules are recorded for your current approved sites.
                             </p>
-                            {canManage &&
-                            snapshot.configuration.triage.visibility ===
-                                'readable' &&
-                            snapshot.configuration.triage.display_names ? (
-                                <dl className="text-subtle grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Triage coordinator
-                                        </dt>
-                                        <dd>
-                                            {
-                                                snapshot.configuration.triage
-                                                    .display_names.user
-                                            }
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Escalation recipient
-                                        </dt>
-                                        <dd>
-                                            {
-                                                snapshot.configuration.triage
-                                                    .display_names.escalation
-                                            }
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Escalation interval
-                                        </dt>
-                                        <dd>
-                                            {
-                                                snapshot.configuration.triage
-                                                    .values
-                                                    ?.escalation_after_minutes
-                                            }{' '}
-                                            minutes
-                                        </dd>
-                                    </div>
-                                </dl>
-                            ) : null}
+                        )}
+                        <div className="sg-fallback">
+                            <strong>If nobody can take it</strong>
+                            <span className="sg-fb-step">
+                                <b>Saved anyway</b>
+                                <small>Shows it needs an owner</small>
+                            </span>
+                            {triage?.visibility === 'readable' && triage.values ? (
+                                <>
+                                    <span className="sg-arrow" aria-hidden>
+                                        <ArrowRight className="size-3.5" />
+                                    </span>
+                                    <span className="sg-fb-step">
+                                        {canManage && triage.display_names ? (
+                                            <PersonChip name={triage.display_names.user} />
+                                        ) : (
+                                            <b>Triage coordinator</b>
+                                        )}
+                                        <small>Triage · gets it, doesn’t become the owner</small>
+                                    </span>
+                                    <span className="sg-arrow" aria-hidden>
+                                        <ArrowRight className="size-3.5" />
+                                    </span>
+                                    <span className="sg-fb-step">
+                                        <b>After {triage.values.escalation_after_minutes} minutes</b>
+                                        <small>Still no owner</small>
+                                    </span>
+                                    <span className="sg-arrow" aria-hidden>
+                                        <ArrowRight className="size-3.5" />
+                                    </span>
+                                    <span className="sg-fb-step">
+                                        {canManage && triage.display_names ? (
+                                            <PersonChip name={triage.display_names.escalation} />
+                                        ) : (
+                                            <b>Escalation recipient</b>
+                                        )}
+                                        <small>Escalates to</small>
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="text-subtle text-muted-foreground">
+                                    {triage?.visibility === 'restricted'
+                                        ? 'Monitored triage references are restricted.'
+                                        : 'Monitored triage is not configured.'}
+                                </span>
+                            )}
                         </div>
-                    ) : null}
-                    {editing ? (
+                    </>
+                ) : null}
+                {saved ? (
+                    <p role="status" className="text-subtle px-[18px] pb-2">
+                        Routing configuration saved.
+                    </p>
+                ) : null}
+                <div className="sg-actions">
+                    <Button
+                        variant="outline"
+                        className="frontline-tap frontline-focus"
+                        disabled={!canManage || snapshot.revision === null || editing}
+                        onClick={() => {
+                            setSaved(false);
+                            setEditing(true);
+                        }}
+                    >
+                        <Settings aria-hidden className="size-4" />
+                        Edit routing
+                    </Button>
+                </div>
+            </Surface>
+            {editing ? (
+                <Surface title="Edit routing">
+                    <div className="p-[18px]">
                         <RoutingEditor
                             snapshot={snapshot}
                             canManage={canManage}
@@ -1187,57 +1156,46 @@ function ActorRoutingPanel({
                                 setSaved(confirmed);
                             }}
                         />
-                    ) : null}
-                </CardContent>
-            </Card>
-            <section
-                aria-label="Incident routing change history"
-                className="space-y-3"
-            >
-                <h2 className="text-section-title">Routing change history</h2>
+                    </div>
+                </Surface>
+            ) : null}
+            <KnowList
+                title="Good to know"
+                items={[
+                    { text: 'New reports use the incident’s recorded site and any required specialist route. Named cover applies only for its saved interval.' },
+                    { text: 'Existing incident owners are preserved; changing a task assignee does not change the incident owner.' },
+                    { tone: 'warning', text: 'A recorded configuration does not confirm current staffing, access or complete site coverage. Each incident rechecks those conditions.' },
+                    { tone: 'success', text: 'An unavailable route keeps the report saved and shows that it needs an owner or setup review.' },
+                ]}
+            />
+            <section aria-label="Incident routing change history" className="flex flex-col gap-3">
                 {history.data.length ? (
-                    <ul className="space-y-3">
-                        {history.data.map((entry) => (
-                            <li
-                                key={entry.id}
-                                className="rounded-lg border p-4"
-                            >
-                                <h3 className="text-subtle font-medium">
-                                    Revision {entry.revision} ·{' '}
-                                    {entry.integrity === 'repair_required'
-                                        ? 'Retained decision needs repair'
-                                        : entry.action === 'kept'
-                                          ? 'Configuration kept'
-                                          : 'Configuration changed'}
-                                </h3>
-                                {entry.integrity === 'recorded' ? (
-                                    <>
-                                        <p className="text-caption text-muted-foreground">
-                                            {formatDateTimeLong(
-                                                entry.recorded_at,
-                                            )}{' '}
-                                            ·{' '}
-                                            {entry.actor?.name ??
-                                                'Decision-maker not recorded'}
-                                        </p>
-                                        <p className="text-subtle whitespace-pre-wrap">
-                                            {entry.reason}
-                                        </p>
-                                        <p className="text-caption text-muted-foreground">
-                                            {entry.configuration?.routes
-                                                .length ?? 0}{' '}
-                                            saved rules visible in your approved
-                                            sites.
-                                        </p>
-                                    </>
-                                ) : null}
-                            </li>
-                        ))}
-                    </ul>
+                    <Log
+                        title="Routing changes"
+                        sub="NZ time"
+                        limit={50}
+                        items={history.data.map((entry) => ({
+                            key: entry.id,
+                            time: entry.recorded_at ? formatDate(entry.recorded_at) : '',
+                            tone: entry.integrity === 'repair_required' ? 'warning' : 'info',
+                            title:
+                                entry.integrity === 'repair_required'
+                                    ? `Revision ${entry.revision} · Retained decision needs repair`
+                                    : `${entry.actor?.name ?? 'Decision-maker not recorded'} ${entry.action === 'kept' ? 'kept the routing' : 'changed the routing'}`,
+                            sub:
+                                entry.integrity === 'recorded'
+                                    ? [
+                                          formatDateTimeLong(entry.recorded_at),
+                                          entry.reason,
+                                          `${entry.configuration?.routes.length ?? 0} saved rules visible in your approved sites`,
+                                      ]
+                                          .filter(Boolean)
+                                          .join(' · ')
+                                    : undefined,
+                        }))}
+                    />
                 ) : (
-                    <p className="text-subtle text-muted-foreground">
-                        No routing decisions are recorded.
-                    </p>
+                    <QuietLine title="Routing changes" text="No routing decisions are recorded." />
                 )}
                 <LaravelPagination
                     links={history.links}
