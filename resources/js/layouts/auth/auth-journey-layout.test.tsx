@@ -1,3 +1,4 @@
+import { formatPageTitle } from '@/lib/page-title';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import type { AnchorHTMLAttributes } from 'react';
@@ -7,10 +8,14 @@ import AuthJourneyLayout from './auth-journey-layout';
 const page = vi.hoisted(() => ({
     url: '/login',
     props: {} as Record<string, unknown>,
+    headTitle: undefined as string | undefined,
 }));
 vi.mock('@inertiajs/react', () => ({
     usePage: () => page,
-    Head: () => null,
+    Head: ({ title }: { title?: string }) => {
+        page.headTitle = title;
+        return null;
+    },
     Link: ({
         href,
         ...props
@@ -28,6 +33,7 @@ vi.mock('@/components/auth/locale-switch', () => ({
 }));
 beforeEach(() => {
     page.props = {};
+    page.headTitle = undefined;
 });
 afterEach(cleanup);
 
@@ -67,6 +73,10 @@ it('shows the client’s photo under the scrims, with Back to website and Powere
             name: 'Back to website',
         }),
     ).toBeInTheDocument();
+    // The client's site: the tab reads "Sign in · Kōwhai Living", with no app-name suffix.
+    expect(formatPageTitle(page.headTitle ?? '', 'Oblivion Findings')).toBe(
+        'Sign in · Kōwhai Living',
+    );
 });
 
 it('greets whānau over a photo instead of the islands line', () => {
@@ -117,4 +127,8 @@ it('keeps the islands as Oblivion’s own default with no client branding, and n
     expect(half).toHaveAttribute('aria-label', 'About staff sign in');
     expect(within(half).queryByText('Powered by')).not.toBeInTheDocument();
     expect(document.querySelector('.journey-auth')).toHaveClass('is-signing');
+    // Oblivion's own default keeps the usual "<page> - <app name>" title.
+    expect(formatPageTitle(page.headTitle ?? '', 'Oblivion Findings')).toBe(
+        'Sign in - Oblivion Findings',
+    );
 });

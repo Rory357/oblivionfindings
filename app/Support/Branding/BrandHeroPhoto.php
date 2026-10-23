@@ -81,7 +81,6 @@ final class BrandHeroPhoto
             $jpeg = ob_get_contents();
         } finally {
             ob_end_clean();
-            imagedestroy($image);
         }
         if (! $written || ! is_string($jpeg) || $jpeg === '') {
             throw ValidationException::withMessages([$field => 'This photo could not be saved. Try another copy.']);
@@ -128,8 +127,9 @@ final class BrandHeroPhoto
         // palette/alpha quirks, and a transparent PNG gets a white ground.
         $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
         imagefill($canvas, 0, 0, imagecolorallocate($canvas, 255, 255, 255));
+        // GD images are freed when no longer referenced (imagedestroy() is a no-op since PHP 8.0
+        // and deprecated in 8.5).
         imagecopyresampled($canvas, $image, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
-        imagedestroy($image);
 
         return $canvas;
     }
@@ -153,7 +153,6 @@ final class BrandHeroPhoto
         if ($angle !== 0) {
             $rotated = imagerotate($image, $angle, 0);
             if ($rotated) {
-                imagedestroy($image);
                 $image = $rotated;
             }
         }

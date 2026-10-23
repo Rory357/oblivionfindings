@@ -5,6 +5,7 @@ import {
     useCustomBrandName,
 } from '@/components/brand/brand-lockup';
 import { JourneyMark } from '@/components/brand/journey-mark';
+import { ownTitle } from '@/lib/page-title';
 import { cn } from '@/lib/utils';
 import { home, privacy, terms } from '@/routes';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -150,7 +151,13 @@ export default function AuthJourneyLayout({
             className={cn('journey-auth', signing && islands && 'is-signing')}
             data-audience={audience}
         >
-            <Head title={title} />
+            {/* With client branding these pages belong to the client's site:
+                "Sign in · Oblivion Living", never our app name. */}
+            <Head
+                title={
+                    customName ? ownTitle(`${title} · ${customName}`) : title
+                }
+            />
 
             <section
                 aria-label={
