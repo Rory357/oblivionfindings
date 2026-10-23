@@ -356,6 +356,26 @@ export interface MyDayNotification {
     title: string;
     at: string;
     tone?: 'primary' | 'info' | 'muted';
+    broadcast?: {
+        schema_version: 1;
+        notification_id: string;
+        recipient_viewer_id: number;
+        reader_read_id: string;
+        href: string;
+    };
+}
+
+/** Server reader association, never a cached permission or an auth-derived grant. */
+export interface MyDayBroadcastReader {
+    schema_version: 1;
+    viewer_id: number;
+    read_id: string;
+    checked_at: string;
+    capabilities: {
+        mark_read: boolean;
+        acknowledge: false;
+        bulk_mark_read: boolean;
+    };
 }
 
 export interface MyDayActiveRound {
@@ -548,6 +568,7 @@ export interface MyDayPageProps {
     } | null;
     hr_tasks?: MyDayHrTask[];
     notifications?: MyDayNotification[];
+    broadcast_updates_reader?: MyDayBroadcastReader | null;
     can_view_medications?: boolean;
     can_record_medications?: boolean;
     can_record_controlled_medications?: boolean;

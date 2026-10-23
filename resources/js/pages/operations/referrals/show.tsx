@@ -46,6 +46,7 @@ import {
 import { ChecklistPanel } from '@/components/referrals/checklist-panel';
 import { CommunicationsPanel } from '@/components/referrals/communications-panel';
 import { DocumentsPanel } from '@/components/referrals/documents-panel';
+import { EnquiryMessage } from '@/components/referrals/enquiry-message';
 import { FormAnswersPanel } from '@/components/referrals/form-answers-panel';
 import { FundingPanel } from '@/components/referrals/funding-panel';
 import { HandoverPanel } from '@/components/referrals/handover-panel';
@@ -59,6 +60,7 @@ import { ReferralStageBadge } from '@/components/referrals/stage-badge';
 import {
     label,
     referralHref,
+    shownReference,
     type Activity,
     type Options,
     type Permissions,
@@ -593,7 +595,7 @@ export default function ReferralProfile({
                             />
                         }
                         subline={[
-                            referral.reference,
+                            shownReference(referral),
                             label(referral.source),
                             referral.site_name ?? 'Central intake',
                         ].join(' · ')}
@@ -865,18 +867,25 @@ export default function ReferralProfile({
                     >
                         {activeTab === 'summary' && (
                             <>
-                                {referral.general_enquiry && (
-                                    <Alert variant="info">
-                                        <AlertTitle>Process enquiry</AlertTitle>
-                                        <AlertDescription>
-                                            Authority to provide another
-                                            person’s information has not been
-                                            confirmed. Keep this enquiry minimal
-                                            until participation and authority
-                                            are reviewed.
-                                        </AlertDescription>
-                                    </Alert>
+                                {referral.is_general_enquiry && (
+                                    <EnquiryMessage referral={referral} />
                                 )}
+                                {referral.general_enquiry &&
+                                    !referral.is_general_enquiry && (
+                                        <Alert variant="info">
+                                            <AlertTitle>
+                                                Process enquiry
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                Authority to provide another
+                                                person’s information has not
+                                                been confirmed. Keep this
+                                                enquiry minimal until
+                                                participation and authority are
+                                                reviewed.
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
                                 <ReferralCaseOverview
                                     referral={referral}
                                     permissions={permissions}

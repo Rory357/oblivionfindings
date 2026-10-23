@@ -85,11 +85,11 @@ export function HandoverRail({
     return (
         <aside className="flex w-full flex-col gap-4">
             <div className="rounded-2xl border border-border bg-card p-4">
-                <h3 className="flex items-center gap-2 text-[13px] font-bold">
+                <h3 className="flex items-center gap-2 text-sm font-bold">
                     <Bell className="h-4 w-4 shrink-0 text-status-warning" />
                     Awaiting acknowledgement
                 </h3>
-                <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                <p className="mt-0.5 text-sm text-muted-foreground">
                     {counts.submitted === 0
                         ? 'No handovers awaiting acknowledgement in this selection.'
                         : awaiting.length === 0
@@ -122,10 +122,10 @@ export function HandoverRail({
                                 />
                             ) : null}
                             <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12.5px] font-semibold">
+                                <span className="block truncate text-sm font-semibold">
                                     {clientName(h.client)}
                                 </span>
-                                <span className="block truncate text-[11px] text-muted-foreground">
+                                <span className="block truncate text-xs text-muted-foreground">
                                     {h.outgoing_staff?.name.split(' ')[0] ??
                                         '—'}{' '}
                                     →{' '}
@@ -141,11 +141,11 @@ export function HandoverRail({
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-4">
-                <h3 className="flex items-center gap-2 text-[13px] font-bold">
+                <h3 className="flex items-center gap-2 text-sm font-bold">
                     <CalendarRange className="h-4 w-4 shrink-0 text-primary" />
                     This week
                 </h3>
-                <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                <p className="mt-0.5 text-sm text-muted-foreground">
                     Loaded handovers per day
                 </p>
                 <div className="mt-3 grid grid-cols-7 gap-1.5">
@@ -157,19 +157,19 @@ export function HandoverRail({
                                 c.isToday && 'border-primary/30 bg-accent',
                             )}
                         >
-                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase">
                                 {c.d
                                     .toLocaleDateString('en-NZ', {
                                         weekday: 'short',
                                     })
                                     .slice(0, 1)}
                             </span>
-                            <span className="text-[13px] font-bold tabular-nums">
+                            <span className="text-sm font-bold tabular-nums">
                                 {c.d.getDate()}
                             </span>
                             <span
                                 className={cn(
-                                    'flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums',
+                                    'flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-xs font-semibold tabular-nums',
                                     c.n > 0
                                         ? 'bg-primary/15 text-primary'
                                         : 'text-muted-foreground/50',
@@ -183,11 +183,11 @@ export function HandoverRail({
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-4">
-                <h3 className="flex items-center gap-2 text-[13px] font-bold">
+                <h3 className="flex items-center gap-2 text-sm font-bold">
                     <Activity className="h-4 w-4 shrink-0 text-primary" />
                     Status breakdown
                 </h3>
-                <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                <p className="mt-0.5 text-sm text-muted-foreground">
                     {onAwaiting
                         ? 'All matching records, across every page'
                         : 'Loaded handovers in the selected week'}
@@ -196,7 +196,7 @@ export function HandoverRail({
                     {legend.map((s) => (
                         <div
                             key={s.label}
-                            className="flex items-center gap-2 text-[12.5px]"
+                            className="flex items-center gap-2 text-sm"
                         >
                             <span
                                 className={cn(

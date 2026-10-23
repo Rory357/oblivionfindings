@@ -79,6 +79,12 @@ final class ReferralSettingsImpact
         if ($b['provider_name'] !== $a['provider_name'] || $b['contact_phone'] !== $a['contact_phone'] || $b['response_hours'] !== $a['response_hours']) {
             $add('intake', 'People enquiring online', 'The website shows updated provider name, phone or response hours.');
         }
+        foreach (ReferralSettings::PUBLIC_CONTACT_DEFAULTS as $key => $blank) {
+            if (trim((string) ($b[$key] ?? $blank)) !== trim((string) ($a[$key] ?? $blank))) {
+                $add('intake', 'People visiting the website', 'The Contact us page shows updated office address, email or opening hours.');
+                break;
+            }
+        }
         if ($b['acknowledgement_enabled'] !== $a['acknowledgement_enabled']) {
             $add('intake', 'People who choose email contact', $a['acknowledgement_enabled']
                 ? 'People who choose email are sent a receipt with their reference.'

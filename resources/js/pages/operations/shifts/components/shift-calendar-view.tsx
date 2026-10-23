@@ -54,7 +54,7 @@ export function ShiftCalendarView({
             unstyled
             className="overflow-hidden rounded-xl border border-border bg-card"
         >
-            <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
                 <span>
                     Week of{' '}
                     {new Date(days[0] + 'T00:00:00').toLocaleDateString(
@@ -77,7 +77,7 @@ export function ShiftCalendarView({
                             className={`border-r border-border px-3 py-2 text-center last:border-r-0 ${isToday ? 'bg-primary/10' : ''}`}
                         >
                             <div
-                                className={`text-[11px] font-semibold tracking-wider uppercase ${isToday ? 'text-primary' : 'text-muted-foreground'}`}
+                                className={`text-xs font-semibold tracking-wider uppercase ${isToday ? 'text-primary' : 'text-muted-foreground'}`}
                             >
                                 {date.toLocaleDateString('en-NZ', {
                                     weekday: 'short',
@@ -114,7 +114,7 @@ export function ShiftCalendarView({
                                     unstyled
                                     type="button"
                                     onClick={() => onCreateOnDay(d)}
-                                    className="flex h-full min-h-[80px] w-full items-center justify-center gap-1 rounded-md border border-dashed border-transparent text-center text-[11px] text-muted-foreground opacity-0 transition group-hover/col:opacity-100 hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                    className="flex h-full min-h-[80px] w-full items-center justify-center gap-1 rounded-md border border-dashed border-transparent text-center text-xs text-muted-foreground opacity-0 transition group-hover/col:opacity-100 hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                 >
                                     <Plus className="h-3 w-3" /> Add shift
                                 </GuardrailButton>
@@ -170,7 +170,7 @@ function CalendarShiftBlock({
                 onContextMenu(shift, e);
             }}
             onClick={onClick}
-            className="group/blk relative cursor-pointer rounded-md border px-2 py-1.5 text-[11px] transition hover:brightness-95"
+            className="group/blk relative cursor-pointer rounded-md border px-2 py-1.5 text-xs transition hover:brightness-95"
             style={{
                 background: tone.bg,
                 borderColor: tone.border,

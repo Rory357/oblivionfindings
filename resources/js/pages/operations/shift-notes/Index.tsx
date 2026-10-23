@@ -277,6 +277,8 @@ export default function ShiftNotesIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/handovers' },
+                { title: 'Handovers', href: '/operations/handovers' },
                 { title: 'Shift notes', href: '/operations/shift-notes' },
             ]}
         >
@@ -492,7 +494,7 @@ export default function ShiftNotesIndex({
                         showContextMenu={false}
                     />
                 )}
-                <div className="space-y-4" aria-busy={query.loading}>
+                <div className="space-y-5" aria-busy={query.loading}>
                     {query.loading ? (
                         <LoadingState message="Loading matching notes…" />
                     ) : query.error ? (

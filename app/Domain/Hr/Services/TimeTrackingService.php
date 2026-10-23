@@ -83,7 +83,19 @@ class TimeTrackingService
      */
     public function closeOpenEntries(User $user, Carbon $clockOut, int $breakMinutes, ?float $mileageKm = null, ?string $notes = null): int
     {
-        return DB::transaction(function () use ($user, $clockOut, $breakMinutes, $mileageKm, $notes): int {
+        return $this->closeSelectedOpenEntry($user, $clockOut, $breakMinutes, $mileageKm, $notes) ? 1 : 0;
+    }
+
+    /** Checked self recovery preserves omitted breaks and binds the exact original entry. */
+    public function closeOpenEntryRecorded(User $user, int $expectedEntryId, ?int $expectedShiftId, Carbon $clockOut, ?int $breakMinutes = null, ?float $mileageKm = null, ?string $notes = null): HrTimeEntry
+    {
+        return $this->closeSelectedOpenEntry($user, $clockOut, $breakMinutes, $mileageKm, $notes, $expectedEntryId, $expectedShiftId)
+            ?? throw new \LogicException('The selected time entry is no longer open.');
+    }
+
+    private function closeSelectedOpenEntry(User $user, Carbon $clockOut, ?int $breakMinutes, ?float $mileageKm, ?string $notes, ?int $expectedEntryId = null, ?int $expectedShiftId = null): ?HrTimeEntry
+    {
+        return DB::transaction(function () use ($user, $clockOut, $breakMinutes, $mileageKm, $notes, $expectedEntryId, $expectedShiftId): ?HrTimeEntry {
             $this->attendanceTimeEntries->lockApplicationPayrollMutex();
 
             $snapshots = HrTimeEntry::query()
@@ -97,7 +109,7 @@ class TimeTrackingService
                 ->get(['id']);
 
             if ($snapshots->isEmpty()) {
-                return 0;
+                return null;
             }
             if ($snapshots->count() !== 1) {
                 throw new \LogicException('Clock-out recovery requires exactly one orphan time entry.');
@@ -111,8 +123,11 @@ class TimeTrackingService
                 throw new \LogicException('An attendance session is still open; orphan time-entry recovery is not permitted.');
             }
 
+            if ($expectedEntryId !== null && (int) $snapshots->first()->id !== $expectedEntryId) {
+                abort(404);
+            }
             $snapshot = HrTimeEntry::query()->findOrFail($snapshots->first()->id);
-            [$lockedEntry] = $this->lockPayAffectingEntry(
+            [$lockedEntry, $lockedTimesheet] = $this->lockPayAffectingEntry(
                 $snapshot,
                 $user,
                 'clocked out',
@@ -122,9 +137,21 @@ class TimeTrackingService
                 throw new \LogicException('The orphan time entry changed before clock-out recovery completed.');
             }
 
+            if ($expectedEntryId !== null && ($lockedEntry->shift_id !== $expectedShiftId || (int) $lockedEntry->id !== $expectedEntryId)) {
+                abort(409, 'The selected time entry has changed.');
+            }
+            $breakMinutes ??= (int) $lockedEntry->break_minutes;
+            $timesheetBefore = $lockedTimesheet?->getRawOriginal();
+            $expected = $this->orphanClockValues($lockedEntry, [
+                'id', 'user_id', 'attendance_session_id', 'shift_id', 'site_id', 'client_id', 'clock_in', 'clock_out', 'break_minutes', 'total_hours', 'status',
+            ]);
+            $expected['clock_out'] = $lockedEntry->fromDateTime($clockOut);
+            $expected['break_minutes'] = $breakMinutes;
+            $expected['status'] = in_array($lockedEntry->status, ['active', null], true) ? 'submitted' : $lockedEntry->status;
             abort_unless($lockedEntry->clock_in instanceof \DateTimeInterface, 404);
             $clockIn = Carbon::instance($lockedEntry->clock_in);
-            $this->validatedWorkedMinutes($clockIn, $clockOut, $breakMinutes);
+            $workedMinutes = $this->validatedWorkedMinutes($clockIn, $clockOut, $breakMinutes);
+            $expected['total_hours'] = number_format(round($workedMinutes / 60, 2), 2, '.', '');
             $this->attendanceTimeEntries->assertNoWorkerTimeOverlap(
                 (int) $lockedEntry->user_id,
                 $clockIn,
@@ -133,10 +160,61 @@ class TimeTrackingService
             );
 
             $fresh = $this->applyClockOut($lockedEntry, $clockOut, $breakMinutes, $mileageKm, $notes);
-            $this->draftTimesheets->fromManualEntry($fresh, $user->id);
-
-            return 1;
+            $timesheet = $this->draftTimesheets->fromManualEntry($fresh, $user->id);
+            if ($expectedEntryId !== null) {
+                $fields = array_keys($expected);
+                $raw = DB::table($fresh->getTable())->where('id', $expectedEntryId)->lockForUpdate()->first($fields);
+                if (! $raw || $this->orphanClockValues($fresh, $fields) !== $expected || $this->orphanClockValues($raw, $fields) !== $expected
+                    || ! is_string($fresh->status) || trim($fresh->status) === '' || strlen($fresh->status) > 255
+                    || in_array($fresh->status, ['active', 'approved', 'voided'], true)
+                    || ! is_finite((float) $fresh->total_hours) || (float) $fresh->total_hours < 0) {
+                    throw new \LogicException('The selected time-entry closure could not be recorded.');
+                }
+                $outcome = 'none';
+                if ($timesheet) {
+                    $tsFields = ['id', 'user_id', 'hr_time_entry_id', 'attendance_session_id', 'starts_at', 'ends_at', 'break_minutes', 'status'];
+                    $tsRaw = DB::table($timesheet->getTable())->where('id', $timesheet->id)->lockForUpdate()->first($tsFields);
+                    if (! $tsRaw || (int) $timesheet->id < 1
+                        || $this->orphanClockValues($timesheet, $tsFields) !== $this->orphanClockValues($tsRaw, $tsFields)
+                        || (int) $timesheet->hr_time_entry_id !== $expectedEntryId
+                        || $timesheet->attendance_session_id !== null || (int) $timesheet->user_id !== (int) $user->id
+                        || $timesheet->fromDateTime($timesheet->starts_at) !== $expected['clock_in']
+                        || $timesheet->fromDateTime($timesheet->ends_at) !== $expected['clock_out']
+                        || (int) $timesheet->break_minutes !== $breakMinutes) {
+                        throw new \LogicException('The time-entry timesheet could not be recorded.');
+                    }
+                    $outcome = $timesheetBefore === null ? 'created'
+                        : ($timesheetBefore === $timesheet->getRawOriginal() ? 'none' : 'updated');
+                }
+                $synced = in_array($outcome, ['created', 'updated'], true);
+                $fresh->setRelation('myHrClockRecordedResult', [
+                    'id' => (int) $fresh->id, 'attendance_session_id' => null,
+                    'shift_id' => $fresh->shift_id === null ? null : (int) $fresh->shift_id,
+                    'status' => $fresh->status,
+                    'clock_in_at' => $fresh->clock_in->toIso8601String(),
+                    'clock_out_at' => $fresh->clock_out->toIso8601String(),
+                    'break_minutes' => (int) $fresh->break_minutes, 'worked_hours' => (float) $fresh->total_hours,
+                    'timesheet_sync_outcome' => $outcome,
+                    'timesheet_id' => $synced ? (int) $timesheet->id : null,
+                    'timesheet_status' => $synced ? $timesheet->status : null,
+                ]);
+                $fresh->setRelation('myHrClockRecordedAuthority', array_intersect_key($expected, array_flip(['id', 'user_id', 'shift_id', 'site_id', 'client_id'])));
+            }
+            return $fresh;
         });
+    }
+
+    private function orphanClockValues(object $row, array $fields): array
+    {
+        $values = [];
+        foreach ($fields as $field) {
+            $value = $row instanceof \Illuminate\Database\Eloquent\Model ? $row->getAttribute($field) : ($row->{$field} ?? null);
+            if ($value instanceof \DateTimeInterface) $value = $row->fromDateTime($value);
+            if ($value !== null && ($field === 'id' || str_ends_with($field, '_id') || $field === 'break_minutes')) $value = (int) $value;
+            if ($value !== null && $field === 'total_hours') $value = number_format((float) $value, 2, '.', '');
+            $values[$field] = $value;
+        }
+        return $values;
     }
 
     /** Apply a clock-out to an entry: hours, NZ break compliance, status. */
@@ -279,8 +357,10 @@ class TimeTrackingService
      */
     public function getWeeklySummary(int $userId, ?string $weekStart = null): array
     {
-        $start = $weekStart ? Carbon::parse($weekStart)->startOfWeek() : now()->startOfWeek();
-        $end = $start->copy()->endOfWeek();
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $start = ($weekStart ? Carbon::parse($weekStart, $timezone)->setTimezone($timezone) : Carbon::now($timezone))
+            ->startOfWeek(Carbon::MONDAY);
+        $end = $start->copy()->endOfWeek(Carbon::SUNDAY);
 
         $entries = HrTimeEntry::query()
             ->forUser($userId)
@@ -288,12 +368,12 @@ class TimeTrackingService
             ->whereNotNull('clock_out')
             ->get();
 
+        $byDate = $entries->groupBy(fn (HrTimeEntry $entry) => $entry->entry_date->toDateString())
+            ->map(fn ($dayEntries) => round((float) $dayEntries->sum('total_hours'), 2));
         $dailyHours = [];
         for ($day = $start->copy(); $day->lte($end); $day->addDay()) {
             $dateStr = $day->toDateString();
-            $dailyHours[$dateStr] = $entries
-                ->where('entry_date', $dateStr)
-                ->sum('total_hours');
+            $dailyHours[$dateStr] = (float) $byDate->get($dateStr, 0.0);
         }
 
         return [

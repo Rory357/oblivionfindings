@@ -321,7 +321,8 @@ final class ReferralMessaging
     {
         return [
             'first_name' => $recipient['first_name'] ?? '',
-            'reference' => $referral->reference,
+            // The reference the person was given (ENQ- for a general enquiry).
+            'reference' => $referral->displayReference(),
             'provider_name' => (string) ($configuration['public']['provider_name'] ?? ''),
             'coordinator_name' => (string) ($referral->owner?->name ?? ''),
             'contact_phone' => (string) ($configuration['public']['contact_phone'] ?? ''),

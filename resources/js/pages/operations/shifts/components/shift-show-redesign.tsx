@@ -1,6 +1,7 @@
 import ClientSafetyRibbon, {
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { cn } from '@/lib/utils';
 import {
     Activity,
@@ -125,20 +126,6 @@ export function buildShiftHeroWorkflowNote(
 
     return 'Shift record is locked for audit history and linked workflow review.';
 }
-
-const tabToneClasses: Record<ShiftShowTabTone, string> = {
-    primary:
-        'bg-primary/10 text-primary [&_.shift-tab-chip]:bg-primary-fill [&_.shift-tab-chip]:text-primary-fill-foreground [&_.shift-tab-bar]:bg-primary',
-    warning:
-        'bg-status-warning-bg text-status-warning [&_.shift-tab-chip]:bg-status-warning [&_.shift-tab-chip]:text-white [&_.shift-tab-bar]:bg-status-warning',
-    success:
-        'bg-status-success-bg text-status-success [&_.shift-tab-chip]:bg-status-success [&_.shift-tab-chip]:text-white [&_.shift-tab-bar]:bg-status-success',
-    info: 'bg-status-info-bg text-status-info [&_.shift-tab-chip]:bg-status-info [&_.shift-tab-chip]:text-white [&_.shift-tab-bar]:bg-status-info',
-    critical:
-        'bg-status-critical-bg text-status-critical [&_.shift-tab-chip]:bg-status-critical [&_.shift-tab-chip]:text-white [&_.shift-tab-bar]:bg-status-critical',
-    neutral:
-        'bg-muted text-foreground [&_.shift-tab-chip]:bg-muted-foreground [&_.shift-tab-chip]:text-card [&_.shift-tab-bar]:bg-muted-foreground',
-};
 
 export function buildShiftShowTabs({
     tasksDone,
@@ -269,6 +256,23 @@ export function buildShiftShowTabs({
     return tabs;
 }
 
+/** "done/total" badges show what is still open; alert tabs use the warning pill. */
+function tierTwoCount(badge: ShiftShowTab['badge']): number | undefined {
+    if (typeof badge === 'number') return badge > 0 ? badge : undefined;
+    const match =
+        typeof badge === 'string' ? /^(\d+)\/(\d+)$/.exec(badge) : null;
+    if (!match) return undefined;
+    const open = Number(match[2]) - Number(match[1]);
+    return open > 0 ? open : undefined;
+}
+
+const ALERT_TABS = new Set<ShiftShowTabKey>(['incidents', 'medications']);
+
+/**
+ * The Shift profile's tier-2 sub-nav: the shared TierTwoTabs strip (neutral at
+ * rest, positional tone when active — NAVIGATION_STYLE_GUIDE.md Rule 2).
+ * Tones in `ShiftShowTab` are kept for the signal rail, not for the tabs.
+ */
 export function ShiftTabStrip({
     tabs,
     activeTab,
@@ -279,59 +283,24 @@ export function ShiftTabStrip({
     onChange: (key: ShiftShowTabKey) => void;
 }) {
     return (
-        <div
-            role="tablist"
-            aria-label="Shift sections"
-            className="flex flex-wrap items-center gap-1 rounded-[14px] border border-border bg-card p-1.5 shadow-sm"
-        >
-            {tabs.map((tab) => {
-                const active = activeTab === tab.key;
-                const Icon = tab.icon;
-
-                return (
-                    // eslint-disable-next-line no-restricted-syntax -- Tab buttons need the custom chip + underline layout, not the shared Button.
-                    <button
-                        key={tab.key}
-                        type="button"
-                        role="tab"
-                        aria-selected={active}
-                        aria-label={
-                            tab.badge !== undefined
-                                ? `${tab.label} ${tab.badge}`
-                                : tab.label
-                        }
-                        onClick={() => onChange(tab.key)}
-                        className={cn(
-                            'relative inline-flex min-h-10 items-center gap-2 rounded-[9px] px-3 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                            active
-                                ? tabToneClasses[tab.tone]
-                                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                        )}
-                    >
-                        <span
-                            className={cn(
-                                'shift-tab-chip inline-flex h-[22px] w-[22px] items-center justify-center rounded-md',
-                                !active && 'bg-muted text-muted-foreground',
-                            )}
-                        >
-                            <Icon className="h-3.5 w-3.5" />
-                        </span>
-                        <span>{tab.label}</span>
-                        {tab.badge !== undefined ? (
-                            <span className="ml-0.5 inline-flex items-center rounded-full bg-background/60 px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
-                                {tab.badge}
-                            </span>
-                        ) : null}
-                        {active ? (
-                            <span
-                                className="shift-tab-bar absolute inset-x-3.5 -bottom-px h-0.5 rounded"
-                                aria-hidden="true"
-                            />
-                        ) : null}
-                    </button>
-                );
+        <TierTwoTabs
+            tabs={tabs.map((tab) => {
+                const n = tierTwoCount(tab.badge);
+                return {
+                    key: tab.key,
+                    label: tab.label,
+                    icon: tab.icon,
+                    ...(ALERT_TABS.has(tab.key)
+                        ? { warningCount: n }
+                        : { count: n }),
+                };
             })}
-        </div>
+            activeTab={activeTab}
+            onTab={(key) => onChange(key as ShiftShowTabKey)}
+            testIdPrefix="shift"
+            ariaLabel="Shift sections"
+            renderLink={() => null}
+        />
     );
 }
 
@@ -489,7 +458,7 @@ export function ShiftSignalRail({
                     <h2 className="text-sm font-bold tracking-tight text-foreground">
                         Needs you
                     </h2>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
                         {signals.length}
                     </span>
                 </header>
@@ -531,10 +500,10 @@ export function ShiftSignalRail({
                                                 <span className="block text-xs leading-tight font-semibold text-foreground">
                                                     {signal.title}
                                                 </span>
-                                                <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                                                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                                                     {signal.body}
                                                 </span>
-                                                <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
+                                                <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary">
                                                     {signal.cta}
                                                     <span aria-hidden="true">
                                                         →

@@ -35,12 +35,15 @@ function asToastText(value: unknown): string | null {
  * The Journey sign-in and account screens show every message in their own
  * designed notices and panels (approved 13 Oct 2026); a toast would repeat
  * them, and in rawer words ("These credentials do not match our records").
+ * The careers apply wizard does the same: its success pane and per-field
+ * errors carry the result.
  */
 function ownsItsMessages(component: string): boolean {
     return (
         component.startsWith('auth/') ||
         component === 'portal/login' ||
-        component === 'portal/invitation'
+        component === 'portal/invitation' ||
+        component === 'careers/apply'
     );
 }
 
@@ -86,11 +89,15 @@ export default function FlashToaster() {
             'operations/rostering/conflicts',
         ].includes(page.component) &&
         ['Shift created.', 'Shift updated.'].includes(rawSuccess ?? '');
+    const endSessionDialogOwnsResult =
+        page.component === 'attendance/index' &&
+        rawSuccess?.startsWith('Session ended for ');
     const success =
         page.component === 'operations/shift-notes/Index' ||
         timesheetDialogOwnsResult ||
         adjustmentDialogOwnsResult ||
-        shiftDialogOwnsResult
+        shiftDialogOwnsResult ||
+        endSessionDialogOwnsResult
             ? null
             : rawSuccess;
     const error = asToastText(flash?.error);

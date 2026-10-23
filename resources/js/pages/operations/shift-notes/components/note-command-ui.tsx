@@ -41,7 +41,7 @@ export function NoteCommandFeedback({
                         <Button
                             asChild
                             variant="outline"
-                            className="mt-3 min-h-11"
+                            className="mt-3 frontline-hit"
                         >
                             <a
                                 href={recoveryUrl}

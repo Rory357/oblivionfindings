@@ -138,6 +138,7 @@ class HandoverController extends Controller
             ))->values();
 
         return inertia('operations/handovers/Index', [
+            'handoverCommandProtocol' => \App\Services\Operations\OperationsHandoverReadiness::available() ? 1 : null,
             'handovers' => $handovers,
             'handoverPagination' => [
                 'current_page' => $handoverPage->currentPage(), 'last_page' => $handoverPage->lastPage(),

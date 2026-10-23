@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrDriverEligibility;
+use App\Domain\Rostering\RosteringFeatureFlags;
 use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\ShiftSeries;
+use App\Models\Site;
 use App\Models\SiteCoverageRequirement;
 use App\Models\User;
 use App\Services\CoverageReservationService;
@@ -16,10 +19,13 @@ use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
 use App\Services\Sites\SiteChecklistScheduler;
+use App\Services\UserSiteAccessService;
 use App\Support\ShiftTaskSupport;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -43,24 +49,53 @@ class CalendarController extends Controller
 
         $data = $request->validate([
             'start' => ['required', 'date'],
-            'end' => ['required', 'date', 'after_or_equal:start'],
+            'end' => ['required', 'date'],
             'staff_id' => ['nullable', 'integer', 'exists:users,id'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'site_id' => ['nullable', function ($attribute, $value, $fail): void {
+                $ids = is_array($value) ? $value : [$value];
+                if (count($ids) > 50 || array_filter($ids, fn ($id) => ! (is_int($id) || (is_string($id) && ctype_digit($id))) || (int) $id < 1)) {
+                    $fail('Select valid Sites.');
+                }
+            }],
         ]);
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
+        // Date-only calendar edges are civil worker dates. Explicit offsets retain
+        // their instants. Both SQL overlap and coverage receive the same UTC edges.
+        $start = Carbon::parse($data['start'], $timezone)->utc();
+        $end = Carbon::parse($data['end'], $timezone)->utc();
+        abort_if($end->lt($start), 422, 'The range end must not precede its start.');
 
         $canManageAny = $auth->canDo('shifts.manageAny');
+        $canReadAny = $canManageAny || $auth->canDo('shifts.viewAny');
+        $access = app(UserSiteAccessService::class);
+        $permittedSiteIds = $access->accessibleSiteIds($auth, ['shifts.manageAny']);
+        sort($permittedSiteIds);
+        $requestedSiteIds = isset($data['site_id'])
+            ? array_values(array_unique(array_map('intval', is_array($data['site_id']) ? $data['site_id'] : [$data['site_id']])))
+            : null;
+        if ($requestedSiteIds !== null) {
+            sort($requestedSiteIds);
+        }
+        $siteIds = $requestedSiteIds === null ? $permittedSiteIds : array_values(array_intersect($permittedSiteIds, $requestedSiteIds));
+        $staffId = $canReadAny && ! empty($data['staff_id']) ? (int) $data['staff_id'] : null;
+        $clientId = $canReadAny && ! empty($data['client_id']) ? (int) $data['client_id'] : null;
+        if ($clientId !== null) {
+            $clientQuery = Client::query()->whereKey($clientId);
+            $access->applyClientScope($clientQuery, $auth, ['shifts.manageAny']);
+            $clientSiteId = $clientQuery->value('site_id');
+            $siteIds = $clientSiteId === null ? [] : array_values(array_intersect($siteIds, [(int) $clientSiteId]));
+        }
 
-        // FullCalendar supplies an inclusive start and an exclusive end.
-        // Use an overlap query so shifts that start before the range but
-        // overlap it are still included.
         $query = Shift::query()
             ->with([
-                'client:id,first_name,last_name',
+                'client:id,first_name,last_name,site_id',
+                'client.site:id,name,type',
                 'site:id,name,type',
                 'staff:id,name',
-                'serviceContext:id,name,type,is_active',
+                'serviceContext' => fn ($context) => $context->availableToSites($permittedSiteIds)->select(['id', 'name', 'type', 'is_active']),
                 'series:id,by_weekday,status',
-                'replacementRequests' => fn ($query) => $query->active(),
+                'replacementRequests' => fn ($replacement) => $access->applyShiftReplacementIntegrityScope($replacement->getQuery())->active(),
                 'tasks:id,shift_id,label,scheduled_time,is_completed,sort_order',
             ])
             ->withCount([
@@ -68,36 +103,34 @@ class CalendarController extends Controller
                 'tasks as tasks_total',
                 'tasks as tasks_completed' => fn ($query) => $query->where('is_completed', true),
             ])
-            ->where('starts_at', '<', $data['end'])
-            ->where('ends_at', '>', $data['start']);
-
-        if (! $canManageAny) {
-            $query
-                ->where('user_id', $auth->id)
-                ->visibleToFrontline();
-        } else {
-            if (! empty($data['staff_id'])) {
-                $query->where('user_id', $data['staff_id']);
-            }
-            if (! empty($data['client_id'])) {
-                $query->where('client_id', $data['client_id']);
-            }
+            ->where('starts_at', '<', $end)
+            ->where('ends_at', '>', $start)
+            ->when($end->equalTo($start), fn ($empty) => $empty->whereRaw('1 = 0'))
+            ->whereColumn('ends_at', '>', 'starts_at')
+            ->where(fn ($linked) => $linked->whereNull('shift_series_id')->orWhereHas('series', fn ($series) => $this->calendarSeriesScope($series, $auth, $permittedSiteIds)))
+            ->where(fn ($site) => $site->whereIn('site_id', $siteIds)->orWhere(fn ($fallback) => $fallback->whereNull('site_id')->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))));
+        $access->applyShiftScope($query, $auth, ['shifts.manageAny']);
+        if (! $canReadAny) {
+            $query->where('user_id', $auth->id)->visibleToFrontline();
         }
+        // Coverage uses the complete canonical Site cohort, before staff/Client
+        // display filtering. A narrow display cannot remove legitimate supply.
+        $cohort = $query->get();
+        $shifts = $cohort->when($staffId !== null, fn ($rows) => $rows->where('user_id', $staffId))
+            ->when($clientId !== null, fn ($rows) => $rows->where('client_id', $clientId))->values();
+        [$coverageWindows, $coverageAssessment] = $this->calendarCoverage($auth, $siteIds, $start, $end, $cohort);
 
-        $shifts = $query->get();
-
-        $siteFilterId = null;
-        if (! empty($data['client_id'])) {
-            $siteFilterId = Client::query()->whereKey($data['client_id'])->value('site_id');
+        // Show has its own reports bypass, not the Calendar management bypass.
+        // Offer a detail action only for the same canonical direct-read boundary.
+        $viewableShiftIds = collect();
+        if ($auth->canDo('shifts.viewAny') || $auth->canDo('shifts.viewAssigned')) {
+            $showQuery = Shift::query()->whereKey($shifts->modelKeys());
+            $access->applyShiftScope($showQuery, $auth, ['reports.viewAny']);
+            if (! $auth->canDo('shifts.viewAny') && ! $canManageAny) {
+                $showQuery->where('user_id', $auth->id)->visibleToFrontline();
+            }
+            $viewableShiftIds = $showQuery->pluck('id')->mapWithKeys(fn ($id) => [(int) $id => true]);
         }
-
-        $coverageWindows = $canManageAny
-            ? collect($this->shiftCoverageService->buildRangeCoverage(
-                Carbon::parse($data['start']),
-                Carbon::parse($data['end']),
-                $siteFilterId,
-            ))
-            : collect();
 
         $shiftCoverageById = $shifts->mapWithKeys(function (Shift $shift) use ($coverageWindows) {
             $siteId = $shift->site_id ?: $shift->client?->site_id;
@@ -111,7 +144,7 @@ class CalendarController extends Controller
             return [$shift->id => $match];
         });
 
-        $shiftEvents = $shifts->map(function (Shift $shift) use ($canManageAny, $shiftCoverageById) {
+        $shiftEvents = $shifts->map(function (Shift $shift) use ($canManageAny, $shiftCoverageById, $viewableShiftIds) {
             $clientName = $shift->client ? ($shift->client->first_name.' '.$shift->client->last_name) : 'Client';
             $staffName = $shift->staff ? $shift->staff->name : 'Staff';
             $coverage = $shiftCoverageById->get($shift->id);
@@ -128,8 +161,9 @@ class CalendarController extends Controller
                 'backgroundColor' => $isRespite ? '#7c3aed' : null,
                 'borderColor' => $isRespite ? 'transparent' : null,
                 'extendedProps' => [
+                    'can_view_shift' => $viewableShiftIds->get((int) $shift->id, false),
                     'client_id' => $shift->client_id,
-                    'service_context_id' => $shift->service_context_id,
+                    'service_context_id' => $shift->serviceContext?->id,
                     'service_context' => $shift->serviceContext ? $shift->serviceContext->name : null,
                     'is_respite' => $isRespite,
                     'respite_booking_id' => $shift->respite_booking_id,
@@ -162,7 +196,7 @@ class CalendarController extends Controller
                     'coverage_state' => $coverage['coverage_state'] ?? null,
                     'coverage_gap_kind' => $coverage['gap_kind'] ?? null,
                     'coverage_recommended_fill_action' => $coverage['recommended_fill_action'] ?? null,
-                    'coverage_missing_staff' => $coverage['missing_staff'] ?? 0,
+                    'coverage_missing_staff' => $coverage['missing_staff'] ?? null,
                     'coverage_required_staff' => $coverage['required_staff'] ?? null,
                     'coverage_assigned_staff' => $coverage['assigned_staff'] ?? null,
                     'coverage_window_label' => $coverage['window_label'] ?? null,
@@ -212,7 +246,107 @@ class CalendarController extends Controller
             ])
             ->values();
 
-        return response()->json($shiftEvents->concat($coverageGapEvents)->values());
+        $assessment = [
+            'id' => 'roster-calendar-assessment', 'title' => '', 'start' => null, 'end' => null,
+            'extendedProps' => [
+                'event_type' => 'calendar_assessment', 'schema_version' => 1, 'actor_id' => (int) $auth->id,
+                'worker_timezone' => $timezone,
+                'range' => ['start' => $start->toIso8601String(), 'end' => $end->toIso8601String(), 'end_exclusive' => true],
+                'filters' => ['staff_id' => empty($data['staff_id']) ? null : (int) $data['staff_id'],
+                    'client_id' => empty($data['client_id']) ? null : (int) $data['client_id'], 'site_ids' => $requestedSiteIds],
+                'scope' => ['kind' => $canReadAny ? 'approved_sites' : 'own', 'site_ids' => $siteIds,
+                    'published_only' => ! $canReadAny && app(RosteringFeatureFlags::class)->publishEnabled(),
+                    'staff_id' => $canReadAny ? $staffId : (int) $auth->id, 'client_id' => $clientId],
+                'coverage' => $coverageAssessment,
+            ],
+        ];
+
+        return response()->json($shiftEvents->concat($coverageGapEvents)->push($assessment)->values());
+    }
+
+    private function calendarSeriesScope(Builder $query, User $actor, array $siteIds): void
+    {
+        $access = app(UserSiteAccessService::class);
+        $query->where(function ($source) use ($access, $actor, $siteIds): void {
+            $source->where(fn ($manual) => $manual->whereNull('client_id')->whereIn('site_id', $siteIds))
+                ->orWhereHas('client', function ($client) use ($access, $actor): void {
+                    $access->applyClientScope($client, $actor, ['shifts.manageAny']);
+                    $client->where(fn ($agreement) => $agreement->whereNull('shift_series.site_id')->orWhereColumn('clients.site_id', 'shift_series.site_id'));
+                });
+        });
+    }
+
+    private function calendarCoverage(User $actor, array $siteIds, Carbon $start, Carbon $end, Collection $cohort): array
+    {
+        if (! $actor->canDo('shifts.manageAny') || $siteIds === []) {
+            return [collect(), ['status' => 'not_assessed', 'reason' => $actor->canDo('shifts.manageAny') ? 'no_sites' : 'permission', 'finding_count' => null]];
+        }
+        $access = app(UserSiteAccessService::class);
+        $seriesQuery = ShiftSeries::query()->with('client:id,site_id');
+        $this->calendarSeriesScope($seriesQuery, $actor, $siteIds);
+        $series = $seriesQuery->get()->keyBy('id');
+        $rules = SiteCoverageRequirement::query()->active()->whereIn('site_id', $siteIds)
+            ->where(fn ($source) => $source->whereNull('preferred_client_id')->orWhereHas('preferredClient', fn ($client) => $client->whereColumn('clients.site_id', 'site_coverage_requirements.site_id')))
+            ->get()->keyBy('id');
+        $siteNames = Site::query()->whereIn('id', $siteIds)->pluck('name', 'id');
+        $shifts = $cohort->keyBy('id');
+        $windows = collect();
+        $incomplete = false;
+        foreach ($siteIds as $siteId) {
+            // Check every service window, including exact supply which does not
+            // appear in gap findings. Do not turn withheld evidence into zero.
+            foreach ($this->shiftCoverageService->buildRangeCoverage($start, $end, $siteId) as $window) {
+                $rule = $rules->get((int) ($window['rule_id'] ?? 0));
+                $safe = $rule && (int) $rule->site_id === $siteId && (int) ($window['site_id'] ?? 0) === $siteId;
+                $windowStart = Carbon::parse($window['starts_at']);
+                $windowEnd = Carbon::parse($window['ends_at']);
+                $safe = $safe && $windowStart->lt($windowEnd) && $windowStart->gte($start) && $windowEnd->lte($end);
+                foreach ($window['contributing_shifts'] ?? [] as $source) {
+                    $shift = $shifts->get((int) ($source['id'] ?? 0));
+                    $safe = $safe && $shift && (int) ($shift->site_id ?? $shift->client?->site_id) === $siteId;
+                }
+                foreach ($window['matching_series'] ?? [] as $source) {
+                    $pattern = $series->get((int) ($source['id'] ?? 0));
+                    $safe = $safe && $pattern && (int) ($pattern->site_id ?? $pattern->client?->site_id) === $siteId;
+                    if ($pattern && $pattern->user_id !== null) {
+                        $worker = User::query()->whereKey($pattern->user_id);
+                        $access->applyFleetRecipientEligibility($worker, $siteId);
+                        $safe = $safe && $worker->exists();
+                    }
+                }
+                foreach ($window['open_shift_ids'] ?? [] as $sourceId) {
+                    $open = $shifts->get((int) $sourceId);
+                    $safe = $safe && $open && $open->user_id === null && ! in_array($open->status, ['completed', 'cancelled'], true)
+                        && (int) ($open->site_id ?? $open->client?->site_id) === $siteId;
+                }
+                if (! $safe) {
+                    $incomplete = true;
+
+                    continue;
+                }
+                // This is an allowlist, not the service's raw related-model DTO.
+                $projected = Arr::only($window, ['rule_id', 'starts_at', 'ends_at', 'window_label', 'coverage_state', 'gap_kind',
+                    'missing_staff', 'required_staff', 'assigned_staff', 'has_actionable_gap']);
+                $projected['site_id'] = $siteId;
+                $projected['site_name'] = $siteNames->get($siteId);
+                $projected['rule_name'] = $rule->name;
+                $projected['preferred_client_id'] = $rule->preferred_client_id;
+                $actions = ['fill_existing_open_shift', 'retag_or_replace_open_shift', 'create_role_specific_shift',
+                    'create_recurring_cover', 'create_cover_shift', 'review_existing_supply', 'rebalance_existing_supply', 'none'];
+                $projected['recommended_fill_action'] = in_array($window['recommended_fill_action'] ?? null, $actions, true) ? $window['recommended_fill_action'] : null;
+                foreach (['role_shortages', 'planned_role_shortages'] as $key) {
+                    $projected[$key] = array_map(fn ($role) => Arr::only($role, ['key', 'label', 'required', 'missing']), $window[$key] ?? []);
+                }
+                $projected['contradictions'] = array_values(array_intersect($window['contradictions'] ?? [], [
+                    'headcount_exact_but_role_gap', 'planned_supply_exact_but_role_gap', 'preferred_client_drift',
+                    'partial_window_undercoverage', 'overfill_not_allowed', 'overfilled_but_wrong_role_mix',
+                ]));
+                $windows->push($projected);
+            }
+        }
+
+        return [$windows, ['status' => $incomplete ? 'partially_assessed' : 'assessed', 'reason' => $incomplete ? 'unsafe_source' : null,
+            'finding_count' => $incomplete ? null : $windows->filter(fn ($window) => ! empty($window['has_actionable_gap']))->count()]];
     }
 
     public function storeShift(Request $request)

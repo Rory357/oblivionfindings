@@ -179,7 +179,7 @@ class AttendanceTimeEntryProjector
         }
 
         $workDate = $session->clock_in_at->copy()
-            ->setTimezone(config('app.worker_timezone', config('app.timezone', 'UTC')))
+            ->setTimezone((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))
             ->toDateString();
         $this->lockPayrollRunsForWorkDate($workDate);
 
@@ -380,7 +380,7 @@ class AttendanceTimeEntryProjector
             );
         }
         $workDate = $session->clock_in_at->copy()
-            ->setTimezone(config('app.worker_timezone', config('app.timezone', 'UTC')))
+            ->setTimezone((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))
             ->toDateString();
 
         // Snapshot identity only selects downstream rows to lock. The unique

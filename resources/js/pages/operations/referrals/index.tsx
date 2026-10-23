@@ -68,6 +68,7 @@ import {
     Inbox,
     LayoutGrid,
     List,
+    MessageSquareText,
     Plus,
     Wallet,
 } from 'lucide-react';
@@ -82,7 +83,12 @@ type Props = {
     followUps: Page<WorkspaceFollowUpRow>;
     followUpGroups: Groups | null;
     stats: WorkspaceStats;
-    counts: { referrals: number; funding: number | null; follow_ups: number };
+    counts: {
+        referrals: number;
+        enquiries?: number;
+        funding: number | null;
+        follow_ups: number;
+    };
     savedViews: WorkspaceSavedView[];
     filters: WorkspaceFilters;
     permissions: Permissions;
@@ -111,6 +117,12 @@ const HEADINGS: Record<
         subline: 'Enquiries, assessment and supported-living handover',
         icon: Inbox,
     },
+    enquiries: {
+        title: 'General enquiries',
+        subline:
+            'Contact us messages and general questions, not counted as referrals',
+        icon: MessageSquareText,
+    },
     funding: {
         title: 'Funding assistance',
         subline: 'Applications, decisions and funding follow-ups',
@@ -135,6 +147,13 @@ const REFERRAL_QUEUES = [
     { value: 'ready_for_handover', label: 'Ready for handover' },
     { value: 'funding_help', label: 'Funding help' },
     { value: 'central', label: 'Central intake' },
+];
+const ENQUIRY_QUEUES = [
+    { value: 'open', label: 'All open' },
+    { value: 'all', label: 'All records' },
+    { value: 'mine', label: 'Assigned to me' },
+    { value: 'unassigned', label: 'Unassigned' },
+    { value: 'overdue', label: 'Reply overdue' },
 ];
 const FUNDING_QUEUES = [
     { value: 'open', label: 'All open cases' },
@@ -317,6 +336,12 @@ export default function Referrals({
             icon: Inbox,
             count: counts.referrals,
         },
+        {
+            key: 'enquiries',
+            label: 'General enquiries',
+            icon: MessageSquareText,
+            count: counts.enquiries ?? 0,
+        },
         ...(permissions['funding.view'] && counts.funding !== null
             ? [
                   {
@@ -409,6 +434,31 @@ export default function Referrals({
                     options={ownerOptions}
                     onChange={pick('owner')}
                 />
+                {layoutToggle}
+            </>
+        ) : view === 'enquiries' ? (
+            <>
+                <PageHeaderFilterSelect
+                    label="Queue"
+                    allValue="open"
+                    value={filters.queue}
+                    options={ENQUIRY_QUEUES}
+                    onChange={(value) => visit({ queue: value })}
+                />
+                {commonFilters}
+                <PageHeaderFilterSelect
+                    label="Owner"
+                    value={filters.owner ?? 'all'}
+                    options={ownerOptions}
+                    onChange={pick('owner')}
+                />
+                <PageHeaderFilterButton
+                    icon={CalendarDays}
+                    active={!!(filters.received_from || filters.received_to)}
+                    onClick={() => setDates(true)}
+                >
+                    {receivedLabel}
+                </PageHeaderFilterButton>
                 {layoutToggle}
             </>
         ) : view === 'follow_ups' ? (
@@ -571,7 +621,7 @@ export default function Referrals({
         ) : referrals.data.length === 0 ? null : (
             <div className="grid gap-5">
                 <ListCaption
-                    title="Referrals"
+                    title={heading.title}
                     caption={`${referrals.data.length} of ${referrals.total} shown`}
                 />
                 <ReferralCollection
@@ -606,7 +656,9 @@ export default function Referrals({
                         subline={heading.subline}
                         titleChip={
                             <PageHeaderStatusChip variant="neutral">
-                                {stats.open} open in your scope
+                                {view === 'enquiries'
+                                    ? `${counts.enquiries ?? 0} open in your scope`
+                                    : `${stats.open} open in your scope`}
                             </PageHeaderStatusChip>
                         }
                         actions={
@@ -787,6 +839,17 @@ export default function Referrals({
                             </AlertDescription>
                         </Alert>
                     )}
+                    {view === 'enquiries' && (
+                        <Alert>
+                            <AlertDescription>
+                                Messages from the website’s Contact us form and
+                                general questions. They aren’t counted as
+                                referrals or in reports. Reply, link or close
+                                each one. To turn one into a referral, review
+                                authority, then complete the intake.
+                            </AlertDescription>
+                        </Alert>
+                    )}
                     {view === 'referrals' && filters.queue === 'unassigned' && (
                         <Alert>
                             <AlertDescription>
@@ -816,8 +879,16 @@ export default function Referrals({
                     ) : (
                         (referralBody ?? (
                             <EmptyState
-                                icon={Inbox}
-                                title="No referrals match this view"
+                                icon={
+                                    view === 'enquiries'
+                                        ? MessageSquareText
+                                        : Inbox
+                                }
+                                title={
+                                    view === 'enquiries'
+                                        ? 'No general enquiries match this view'
+                                        : 'No referrals match this view'
+                                }
                                 description="Change the search, site or stage filter to see other permitted records."
                                 action={
                                     <Button

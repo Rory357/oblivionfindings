@@ -62,6 +62,7 @@ import {
 } from '@/components/eligibility/override-confirmation-dialog';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     SHIFT_TYPES,
     SHIFT_TYPE_ACCENT_CLASSES,
@@ -2227,7 +2228,7 @@ function ShiftDialogForm({
                                                 <CalendarClock className="h-4 w-4" />
                                             </span>
                                             <div className="min-w-0">
-                                                <div className="text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                                <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                     {isEdit
                                                         ? 'Will update'
                                                         : 'Will create'}
@@ -2536,7 +2537,7 @@ function Label({
     return (
         <label
             htmlFor={htmlFor}
-            className="mb-1.5 block text-[13px] font-medium text-foreground"
+            className="mb-1.5 block text-sm font-medium text-foreground"
         >
             {children}
             {required ? (
@@ -2587,7 +2588,7 @@ function ShiftTypePicker({
                             <span className="block text-sm font-semibold text-foreground">
                                 {t.label}
                             </span>
-                            <span className="mt-0.5 block text-[11px] leading-tight text-muted-foreground">
+                            <span className="mt-0.5 block text-xs leading-tight text-muted-foreground">
                                 {t.description}
                             </span>
                         </span>
@@ -2748,7 +2749,7 @@ function StatusPicker({
                             <span className="block text-sm font-medium text-foreground">
                                 {o.label}
                             </span>
-                            <span className="block text-[11px] leading-tight text-muted-foreground">
+                            <span className="block text-xs leading-tight text-muted-foreground">
                                 {o.hint}
                             </span>
                         </span>
@@ -2822,9 +2823,7 @@ function LockedContextCard({ context }: { context: LockedContext }) {
                     <span className="text-sm font-medium text-foreground">
                         {context.site_name ?? 'Coverage gap'}
                     </span>
-                    <span className="inline-flex items-center rounded-full bg-status-info-bg px-2 py-0.5 text-[11px] font-medium text-status-info">
-                        From coverage gap
-                    </span>
+                    <StatusBadge variant="info">From coverage gap</StatusBadge>
                 </div>
                 {context.window_label || context.missing ? (
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -2841,7 +2840,7 @@ function LockedContextCard({ context }: { context: LockedContext }) {
                         {context.role_shortages.map((role) => (
                             <span
                                 key={role.key}
-                                className="inline-flex items-center rounded-full bg-status-warning-bg px-2 py-0.5 text-[11px] font-medium text-status-warning"
+                                className="inline-flex items-center rounded-full bg-status-warning-bg px-2 py-0.5 text-xs font-medium text-status-warning"
                             >
                                 {role.label ?? role.key}
                                 {role.missing ? ` · ${role.missing} short` : ''}
