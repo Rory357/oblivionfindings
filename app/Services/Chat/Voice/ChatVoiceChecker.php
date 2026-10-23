@@ -8,8 +8,9 @@ use Throwable;
 
 /**
  * Oblivion's own voice-note checker (Chat plan item C2.5). It replaces ffprobe for the formats browsers
- * record: WebM with Opus, Ogg with Opus or Vorbis, and MP4 with AAC. It decides from the file's own
- * structure that there is exactly one audio stream, and works out its true length.
+ * record: WebM with Opus, Ogg with Opus, and MP4 with AAC. It decides from the file's own structure that
+ * there is exactly one audio stream, and works out its true length. Ogg Vorbis is refused (no browser
+ * records it, and its length cannot be read without decoding its setup header).
  *
  * Anything it cannot read with certainty is blocked; it never guesses and never throws.
  */

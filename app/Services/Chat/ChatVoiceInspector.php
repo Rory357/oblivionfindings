@@ -24,6 +24,9 @@ class ChatVoiceInspector
     /** The largest length difference allowed between the checker and the ffprobe second opinion. */
     public const AGREEMENT_MS = 20;
 
+    /** The most ffprobe output read for one file (a two-minute browser recording needs well under 1 MiB). */
+    public const PROBE_OUTPUT_LIMIT = 2 * 1024 * 1024;
+
     private ChatVoiceChecker $checker;
 
     public function __construct(private Repository $config, ?ChatVoiceChecker $checker = null, private ?LoggerInterface $logger = null)
@@ -79,22 +82,29 @@ class ChatVoiceInspector
         $output = '';
         $bytes = 0;
         try {
+            // The callback must never throw: the process calls it again while stopping, so an exception
+            // here would escape from the clean-up as well. Output past the limit is dropped instead.
             $process->run(function (string $type, string $chunk) use (&$output, &$bytes) {
                 $bytes += strlen($chunk);
-                if ($bytes > 2 * 1024 * 1024) {
-                    throw new \RuntimeException('Voice inspection output limit exceeded.');
-                }
-                if ($type === Process::OUT) {
+                if ($type === Process::OUT && $bytes <= self::PROBE_OUTPUT_LIMIT) {
                     $output .= $chunk;
                 }
             });
+            if ($bytes > self::PROBE_OUTPUT_LIMIT) {
+                // Far more packets than a browser's two-minute recording has; ffprobe cannot confirm it within bounds.
+                return new ChatVoiceInspection('blocked', errorCode: 'voice_file_invalid');
+            }
             if (! $process->isSuccessful()) {
                 return new ChatVoiceInspection('blocked', errorCode: 'voice_file_invalid');
             }
 
             return $this->analyse(json_decode($output, true, 32, JSON_THROW_ON_ERROR));
         } catch (Throwable) {
-            $process->stop(0);
+            try {
+                $process->stop(0);
+            } catch (Throwable) {
+                // The process is already gone or cannot be stopped; the verdict below does not depend on it.
+            }
 
             return new ChatVoiceInspection('unavailable', errorCode: 'voice_check_failed');
         }
@@ -149,7 +159,8 @@ class ChatVoiceInspector
         $codec = $stream['codec_name'] ?? '';
         $mime = match (true) {
             $format === 'matroska,webm' && $codec === 'opus' => 'audio/webm',
-            $format === 'ogg' && in_array($codec, ['opus', 'vorbis'], true) => 'audio/ogg',
+            // Ogg Vorbis is refused, as the voice checker refuses it (Stephan, 23 October 2026).
+            $format === 'ogg' && $codec === 'opus' => 'audio/ogg',
             $format === 'mov,mp4,m4a,3gp,3g2,mj2' && $codec === 'aac' => 'audio/mp4',
             default => null,
         };

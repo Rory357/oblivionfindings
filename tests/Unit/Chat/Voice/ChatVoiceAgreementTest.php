@@ -63,6 +63,21 @@ final class ChatVoiceAgreementTest extends TestCase
         }
     }
 
+    /** A ten-minute file makes ffprobe write far past its output limit; inspect() still answers, never throws. */
+    public function test_a_long_file_with_ffprobe_configured_is_refused_without_throwing(): void
+    {
+        $inspector = $this->inspector();
+        $path = tempnam(sys_get_temp_dir(), 'oblivion-voice-');
+        try {
+            file_put_contents($path, WebmFixtures::file(['style' => 'firefox', 'seconds' => 600.0])->bytes);
+            self::assertSame('blocked', $inspector->secondOpinion($path)->state);
+            $result = $inspector->inspect($path);
+            self::assertSame(['blocked', 'voice_too_long'], [$result->state, $result->errorCode]);
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function test_both_refuse_opus_inside_mp4(): void
     {
         $inspector = $this->inspector();

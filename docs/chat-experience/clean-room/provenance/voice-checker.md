@@ -31,7 +31,8 @@ None. No source of FFmpeg, ffprobe, mediainfo, music-metadata, mp4box, libwebm, 
 - **Headless Chrome 155, Edge 155 and Firefox 143** recorded the fixtures from a synthetic Web Audio tone. No microphone was used.
 - **ffprobe 8.1.1**, through the existing `ChatVoiceInspector` code path, gave the reference results.
 - **ffmpeg 8.1.1 with libvorbis** encoded three local-only Vorbis files (5 s, 119 s and 3.3 s) for one comparison.
-  - Checker: 5,000, 119,000 and 3,300 ms. ffprobe: 5,003, 119,003 and 3,312 ms.
+  - Before Vorbis was refused, the checker read 5,000, 119,000 and 3,300 ms, and ffprobe 5,003, 119,003 and 3,312 ms. These files confirmed the page and CRC handling on a third muxer.
+  - Since the decision, all three are blocked (`ogg_vorbis`).
   - The files were not committed.
 - **Scratch dump scripts** read their output as raw bytes. They were written in this session from the RFCs and are not committed.
 
@@ -105,10 +106,7 @@ These are cases where the spec left room or real files differed from it.
 14. **Opus length.** The length is (last position − pre-skip) / 48,000, as the spec says. ffprobe counts the pre-skip, so the Firefox files differ from it by 6.5 ms.
 
     An encoder with a long pre-skip would differ by more than 20 ms (3,840 samples is 80 ms). With ffprobe configured as a second opinion, such a file would be blocked. No browser writes one.
-15. **Vorbis.**
-    - The identification header is checked field by field. The comment and setup headers are checked by type only; the setup header is not decoded.
-    - The length is the last position divided by the sample rate.
-    - A position beyond (packets − 1) × long block / 2 is refused. A position below (packets − 2) × short block / 2 is raised to that floor.
+15. **Vorbis is refused** (Stephan's decision, 23 October 2026, after checker finding F1). A Vorbis packet's length depends on block sizes held in its setup header, which the checker does not decode. A file could therefore set its page positions far below its real audio and pass the 2-minute limit: 3 min 15 s of audio passed as 25 s. No browser records Vorbis, and Oblivion's recorder never asks for it, so Ogg now carries Opus only (reason `ogg_vorbis`). The ffprobe interpretation (`analyse()`) refuses Vorbis too, so the two checks agree. Voice notes already stored still play.
 16. **The CRC.** RFC 3533 names the polynomial but not the start value, the bit order or a final XOR.
     - Chosen: start at 0, most significant bit first, no final XOR.
     - Confirmed: every page CRC matches in the fresh Firefox recordings and in the libvorbis files.
@@ -146,18 +144,21 @@ These are cases where the spec left room or real files differed from it.
     - Both checks must agree on the result and the MIME type, with lengths within 20 ms.
     - A disagreement blocks the file (`voice_too_long` if ffprobe found it too long, otherwise `voice_file_invalid`). It is logged as a warning that holds verdicts only: no path, name or content.
     - If ffprobe cannot run, the upload is left `unavailable` for a retry.
+    - If ffprobe writes more than 2 MiB (far more packets than a browser's two-minute recording has), the output past the limit is dropped and the second opinion refuses the file. The output callback never throws, and stopping the process is guarded: before checker finding F2, a long file made `inspect()` throw.
     - When both agree, the longer length is kept.
 25. **Availability.** `configured()` now always answers yes, so `voice_notes_available` is true without ffprobe. `secondOpinionConfigured()` reports ffprobe.
 
-## Test evidence (23 October 2026)
+## Test evidence (23 October 2026, after the checker's findings were fixed)
+
+The last run, through the heavy-lock with ffprobe 8.1.1 configured, passed 203 tests (680 assertions): the voice unit tests, `ChatVoiceInspectorTest`, `ChatServiceHealthTest` and `ChatUploadsTest`.
 
 - **Checker tests:** `ChatVoiceCheckerTest` has 124 cases, all passing:
   - 11 browser recordings plus the Opus-in-MP4 refusal;
-  - 18 generated shapes at 5 s and 119 s;
-  - 67 hand-built bad files, one per rule, each asserting the rule that failed;
+  - 14 generated shapes at 5 s and 119 s (WebM in three styles, Ogg Opus, and MP4 in three layouts);
+  - 67 hand-built bad files, one per rule, each asserting the rule that failed (Vorbis included);
   - Opus R1 to R7 cases;
   - the parts and time limits;
-  - three hostile 20 MiB files, each blocked in under 2 s;
+  - four hostile 20 MiB files, each blocked in under 2 s (one is the checker's padding file from F3);
   - CRC equality.
 - **Mutation test:** `ChatVoiceMutationTest` runs 10,000 cases with a fixed seed, in about 50 s. None threw, the slowest file took 0.03 s, and no provably broken file passed. A file counts as provably broken when:
   - any Ogg file is changed (CRCs plus the end page);
@@ -165,12 +166,16 @@ These are cases where the spec left room or real files differed from it.
   - a critical byte changes (sizes, required IDs and types, fixed values).
 
   A changed size that lands exactly on another element boundary is left undecided. One such case was a valid file: a SimpleBlock grew to swallow its neighbour and still held a valid Opus packet.
-- **Agreement test:** `ChatVoiceAgreementTest` compared the checker with ffprobe 8.1.1 on 25 good files (recordings and generated). Every file agreed within 20 ms, and both refused Opus in MP4. Without `CHAT_VOICE_PROBE_BINARY` the test is skipped.
+- **Agreement test:** `ChatVoiceAgreementTest` has 27 tests.
+  - It compared the checker with ffprobe 8.1.1 on 25 good files, recordings and generated; every file agreed within 20 ms.
+  - Both checks refused Opus in MP4.
+  - A 10-minute file was blocked as `voice_too_long` without throwing.
+  - Without `CHAT_VOICE_PROBE_BINARY` the test is skipped.
 - **Inspector and feature tests:**
-  - `ChatVoiceInspectorTest` has 27 tests, including every agreement case.
+  - `ChatVoiceInspectorTest` has 28 tests: every agreement case, too much ffprobe output, and a failing stop.
   - `ChatUploadsTest` now uploads a real Chrome recording with no ffprobe (ready, 4,860 ms, ignoring the browser's claimed length) and a cut copy (blocked).
 
-## Checker review (23 October 2026)
+## Checker review, first pass (23 October 2026)
 
 By the checker session on branch `claude/voice-checker-signoff-49310d`. Outside source was opened only for the comparison above; none of it is in Oblivion, and the findings below are described in words.
 
@@ -236,6 +241,19 @@ All 25 were reviewed against the RFCs, the fixture bytes and the tests. They are
 
 - `voice_probe_binary` is optional, Service health names the checker, and the register is updated.
 - `docs/chat-experience/IMPLEMENTATION-STATUS.md` still describes ffprobe as the voice inspector; it should be updated when C2.5 merges.
+
+## Checker findings and fixes (23 October 2026)
+
+The checker session (`claude/voice-checker-signoff-49310d`) found the code clean of copied outside code and reported four findings in words only. The builder did not read its source comparisons.
+
+- **F1, Vorbis length could be understated.** Decided by Stephan: Vorbis is refused (decision 15). Hand-built and libvorbis Vorbis files are blocked with `ogg_vorbis`.
+- **F2, `inspect()` could throw with ffprobe configured.** Fixed in `secondOpinion()` (decision 24).
+  - New test: a fake ffprobe writes 3 MiB, and another fails its clean-up stop; both return a verdict.
+  - New agreement test, run with ffprobe: a 10-minute WebM is blocked as `voice_too_long` without throwing.
+- **F3, the Opus padding loop could pass the 2-second limit.** Fixed in `OpusPacket::samples()`: the loop stops as soon as the declared padding can no longer fit in what is left of the packet.
+  - A 20 MiB packet of 0xFF padding bytes took 1.1–1.2 s; it now takes 0.01 s.
+  - The checker's hostile file (400,000 small blocks, then that packet) is a new worst-case test.
+- **F4, fragment sample-description indexes.** `trex` and `tfhd` must now name sample entry 1, the only one in `stsd`. New test: `mp4_sample_entries`.
 
 ## Open questions
 

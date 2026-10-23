@@ -4,8 +4,8 @@ namespace App\Services\Chat\Voice;
 
 /**
  * Reads Ogg voice recordings: pages as RFC 3533 defines them (every CRC must match), carrying one
- * logical stream of Opus (RFC 7845) or Vorbis. The stream must end with its end-of-stream page,
- * so a file cut short between pages is refused rather than guessed at.
+ * logical stream of Opus (RFC 7845). The stream must end with its end-of-stream page, so a file cut
+ * short between pages is refused rather than guessed at. Ogg Vorbis is refused (see identify()).
  */
 final class OggVoiceParser
 {
@@ -19,19 +19,9 @@ final class OggVoiceParser
 
     private int $page = 0;
 
-    private ?string $codec = null;
-
-    private int $headers = 0;
-
     private bool $headersDone = false;
 
     private int $preSkip = 0;
-
-    private int $rate = 0;
-
-    private int $shortBlock = 0;
-
-    private int $longBlock = 0;
 
     private int $samples = 0;
 
@@ -136,7 +126,9 @@ final class OggVoiceParser
             throw new VoiceFormatException('ogg_no_audio');
         }
 
-        return $this->codec === 'opus' ? $this->opusFacts() : $this->vorbisFacts();
+        // The final position less the pre-skip (RFC 7845 section 4.3). Every earlier page's position was
+        // checked against the packets, so the final one can hide at most one packet's end trimming.
+        return new VoiceFacts('audio/ogg', VoiceFacts::nanoseconds($this->granule - $this->preSkip, 48_000));
     }
 
     /** @param  list<string>  $packets  the packets that end on this page */
@@ -165,12 +157,8 @@ final class OggVoiceParser
             }
             $audio++;
             $this->audioPackets++;
-            if ($this->codec === 'opus') {
-                $this->lastPacketSamples = OpusPacket::samples($packet, 0, strlen($packet));
-                $this->samples += $this->lastPacketSamples;
-            } elseif ($packet === '' || (ord($packet[0]) & 0x01) !== 0) {
-                throw new VoiceFormatException('vorbis_audio_packet');
-            }
+            $this->lastPacketSamples = OpusPacket::samples($packet, 0, strlen($packet));
+            $this->samples += $this->lastPacketSamples;
         }
         if ($packets !== [] && $audio === 0 && $granule !== 0) {
             throw new VoiceFormatException('ogg_header_page');
@@ -178,93 +166,40 @@ final class OggVoiceParser
         if ($audio === 0) {
             return;
         }
-        if ($this->codec === 'opus') {
-            // RFC 7845 section 4: each page's position is the running sample count. Only the last page may
-            // end earlier (end trimming), by no more than its last packet, and never before the pre-skip.
-            if (! $last && $granule !== $this->samples) {
-                throw new VoiceFormatException('ogg_granule_mismatch');
-            }
-            if ($last && ($granule > $this->samples || $granule < $this->samples - $this->lastPacketSamples || $granule < $this->preSkip)) {
-                throw new VoiceFormatException('ogg_granule_mismatch');
-            }
-        } elseif ($granule < $this->granule) {
-            throw new VoiceFormatException('ogg_granule_order');
+        // RFC 7845 section 4: each page's position is the running sample count. Only the last page may
+        // end earlier (end trimming), by no more than its last packet, and never before the pre-skip.
+        if (! $last && $granule !== $this->samples) {
+            throw new VoiceFormatException('ogg_granule_mismatch');
+        }
+        if ($last && ($granule > $this->samples || $granule < $this->samples - $this->lastPacketSamples || $granule < $this->preSkip)) {
+            throw new VoiceFormatException('ogg_granule_mismatch');
         }
         $this->granule = $granule;
     }
 
+    /**
+     * The first packet names the codec. Only Opus is accepted. Vorbis is refused (Stephan, 23 October
+     * 2026): a Vorbis packet's length depends on block sizes held in its setup header, which the checker
+     * does not decode, so a Vorbis file could claim to be far shorter than its audio. No browser records it.
+     */
     private function identify(string $packet): void
     {
-        if (str_starts_with($packet, 'OpusHead')) {
-            $this->codec = 'opus';
-            $this->preSkip = OpusPacket::head($packet);
-        } elseif (str_starts_with($packet, "\x01vorbis")) {
-            $this->codec = 'vorbis';
-            $this->vorbisIdentification($packet);
-        } else {
+        if (str_starts_with($packet, "\x01vorbis")) {
+            throw new VoiceFormatException('ogg_vorbis');
+        }
+        if (! str_starts_with($packet, 'OpusHead')) {
             throw new VoiceFormatException('ogg_codec');
         }
-        $this->headers = 1;
+        $this->preSkip = OpusPacket::head($packet);
     }
 
+    /** OpusTags (RFC 7845 section 5.2): magic, vendor string length and the comment count. */
     private function header(string $packet): void
     {
-        if ($this->codec === 'opus') {
-            // OpusTags (RFC 7845 section 5.2): magic, vendor string length and the comment count.
-            if (strlen($packet) < 16 || ! str_starts_with($packet, 'OpusTags') || unpack('V', $packet, 8)[1] > strlen($packet) - 16) {
-                throw new VoiceFormatException('opus_tags');
-            }
-            $this->headersDone = true;
-
-            return;
+        if (strlen($packet) < 16 || ! str_starts_with($packet, 'OpusTags') || unpack('V', $packet, 8)[1] > strlen($packet) - 16) {
+            throw new VoiceFormatException('opus_tags');
         }
-        // Vorbis: the comment header (type 3) and then the setup header (type 5).
-        $expected = $this->headers === 1 ? "\x03vorbis" : "\x05vorbis";
-        if (! str_starts_with($packet, $expected)) {
-            throw new VoiceFormatException('vorbis_header');
-        }
-        $this->headers++;
-        $this->headersDone = $this->headers === 3;
-    }
-
-    /** The Vorbis identification header: 30 bytes with version 0, channels, sample rate and two block sizes. */
-    private function vorbisIdentification(string $packet): void
-    {
-        if (strlen($packet) !== 30) {
-            throw new VoiceFormatException('vorbis_header');
-        }
-        ['version' => $version, 'channels' => $channels, 'rate' => $rate] = unpack('Vversion/Cchannels/Vrate', $packet, 7);
-        $sizes = ord($packet[28]);
-        [$short, $long] = [$sizes & 0x0F, $sizes >> 4];
-        if ($version !== 0 || $channels < 1 || $rate < 1 || $short < 6 || $long > 13 || $short > $long || (ord($packet[29]) & 0x01) !== 1) {
-            throw new VoiceFormatException('vorbis_header');
-        }
-        [$this->rate, $this->shortBlock, $this->longBlock] = [$rate, 1 << $short, 1 << $long];
-    }
-
-    /**
-     * Opus length: the final position less the pre-skip (RFC 7845 section 4.3). Every earlier page's
-     * position was checked against the packets, so the final one can hide at most one packet's trim.
-     */
-    private function opusFacts(): VoiceFacts
-    {
-        return new VoiceFacts('audio/ogg', VoiceFacts::nanoseconds($this->granule - $this->preSkip, 48_000));
-    }
-
-    /**
-     * Vorbis length from the final position. Each packet after the first adds between half a short block
-     * and half a long block of samples, so a position the packets cannot reach is refused, and the
-     * shortest length the packets could have is used if the position claims less.
-     */
-    private function vorbisFacts(): VoiceFacts
-    {
-        $most = ($this->audioPackets - 1) * intdiv($this->longBlock, 2);
-        if ($this->granule > $most) {
-            throw new VoiceFormatException('ogg_granule_range');
-        }
-        $least = max(0, $this->audioPackets - 2) * intdiv($this->shortBlock, 2);
-
-        return new VoiceFacts('audio/ogg', VoiceFacts::nanoseconds(max($this->granule, $least), $this->rate));
+        $this->headersDone = true;
     }
 
     /**
