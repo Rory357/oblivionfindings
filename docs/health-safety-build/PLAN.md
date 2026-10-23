@@ -65,3 +65,33 @@ Control Room response: `ControlRoomHandoverReadAccessService`,
 
 Heavy commands (Pest, tsc, eslint, vitest, builds, installs) run only through
 `bash ~/.claude/heavy-lock.sh "<label>" -- <cmd>`.
+
+## Progress (23 Oct 2026, evening)
+
+Built and committed on `claude/hs-workspace-build` (local only): every group
+except Equipment and chemicals (120–130, a helper is porting it).
+
+| Group | Commits |
+| --- | --- |
+| Shared parts, Overview, hubs, Settings, Trends | 00d547291 … 376455c67 |
+| Reviews and actions (40–43) | ac0f259f7 |
+| Incidents (1–4) | f419de2ac |
+| Safeguarding and participation (21–25, 104) | ec7cc61cb, bb168f44b, 1c7c0f0c9 |
+| Restraints (100–103) | 1eea79418, 257c2fe80 |
+| Risk and prevention (60–66) | a0e8edc3f |
+| People safety (81–88) | f6351bc6e |
+| Port fixes | df39c9daf (upload guards), f480b1bb7 (shared-part merges), injury-form brace in f6351bc6e |
+
+Grant migrations for the new permissions are already in the port
+(`2026_10_07_190100_register_incident_ownership_permissions`,
+`2026_10_08_180510_register_health_safety_approval_policy_permissions`):
+incident-owner permissions to admin, provider_manager and coordinator
+(coordinator without holdRestricted); approval-workflow settings to admin;
+plan approval authority to nobody by default. Stephan confirms these before
+the merge.
+
+Still to do: Equipment and chemicals; backend gaps listed in
+DRAWING-CHANGES.md (incident_stages, register/hub status, risk map, …);
+baseline and full test runs (queued behind other sessions' heavy jobs);
+Prettier on changed files once `npm ci` has run; browser walkthrough as the
+demo admin; then ask Stephan before the single merge.
