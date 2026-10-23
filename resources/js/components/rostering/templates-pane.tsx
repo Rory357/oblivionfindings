@@ -154,7 +154,6 @@ function TemplateCard({
     template,
     actionsBlocked,
     canEdit,
-    canDuplicate,
     canApply,
     onView,
     onEdit,

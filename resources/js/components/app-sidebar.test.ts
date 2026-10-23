@@ -294,6 +294,7 @@ describe('app sidebar workforce navigation', () => {
             'Monitoring',
             'Maintenance',
             'Discovery & collectors',
+            'Agent downloads',
             'Integrations',
             'Settings & audit',
         ]);

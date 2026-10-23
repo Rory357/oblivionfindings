@@ -127,8 +127,14 @@ describe('inline application navigation', () => {
                     ).toHaveAttribute('aria-expanded', 'true'),
                 );
                 expect(operations).toHaveAttribute('aria-expanded', 'false');
+                const workforce = () =>
+                    within(
+                        screen.getByRole('group', {
+                            name: 'Workforce navigation',
+                        }),
+                    );
                 expect(
-                    screen.getByRole('link', { name: label }),
+                    workforce().getByRole('link', { name: label }),
                 ).toHaveAttribute('aria-current', 'page');
                 fireEvent.click(operations);
                 const group = within(
@@ -140,7 +146,7 @@ describe('inline application navigation', () => {
                     group.getByRole('link', { name: 'Dashboard' }),
                 ).not.toHaveAttribute('aria-current');
                 expect(
-                    screen.getByRole('link', { name: label }),
+                    workforce().getByRole('link', { name: label }),
                 ).toHaveAttribute('aria-current', 'page');
             } finally {
                 vi.mocked(usePage).mockReturnValue(original);

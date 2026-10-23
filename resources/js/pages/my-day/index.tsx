@@ -39,7 +39,7 @@ import {
 
 import { BeforeYouFinish } from './components/before-you-finish';
 import { DayWorkList } from './components/day-work-list';
-import { DigestPanel } from './components/digest-panel';
+import { DigestPanel, TeamUpdates } from './components/digest-panel';
 import { MedicinesCard } from './components/medicines-card';
 import {
     MyDayHeader,
@@ -54,6 +54,7 @@ import { TaskDetailDialog } from './components/task-detail-dialog';
 import { TaskHelpInbox } from './components/task-help-inbox';
 import { TomorrowPanel } from './components/tomorrow-panel';
 import { myDayIncidentHref } from './lib/incident-navigation';
+import { useBroadcastUpdates } from './lib/use-broadcast-updates';
 import { residentHue, residentInitials } from './lib/resident-hue';
 import { buildStream } from './lib/stream-grouping';
 import type {
@@ -121,6 +122,12 @@ export default function MyDay() {
         can_record_clinical?: boolean;
     };
     const auth = props.auth;
+    const broadcastUpdates = useBroadcastUpdates({
+        viewerId: auth?.user?.id ?? null,
+        notifications: props.notifications,
+        reader: props.broadcast_updates_reader,
+        url: page.url,
+    });
 
     const availabilityHref =
         auth?.user?.id && auth?.can?.staff?.availabilityUpdateSelf
@@ -650,6 +657,7 @@ export default function MyDay() {
             alertTasks={openItemTasks}
             incidents={props.incidents ?? []}
             notifications={props.notifications ?? []}
+            broadcastUpdates={broadcastUpdates}
             onAckAlert={handleAckAlert}
             onSnoozeAlert={handleSnoozeAlert}
             onConfirmHandoverRead={handleConfirmHandoverRead}
@@ -830,6 +838,9 @@ export default function MyDay() {
                                 props.medications_hidden_controlled_overdue ?? 0
                             }
                         />
+                    )}
+                    {view === 'today' && (
+                        <TeamUpdates notifications={props.notifications ?? []} broadcastUpdates={broadcastUpdates} />
                     )}
                     {view === 'handover' && (
                         <>
