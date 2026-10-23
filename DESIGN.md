@@ -335,6 +335,25 @@ meter row).
   `size-3.5` in dense chrome; default stroke. Icon-only controls always
   carry an `aria-label`.
 - **Stat/KPI cards** — `components/ops-stat-card.tsx` / `fleet-stat-card.tsx`.
+- **Health & safety pages: one strip and signature blocks (approved by
+  Stephan 2026-10-23 with the H&S drawings, design viewer v35).** The
+  `PageHeader` carries at most ONE strip under its identity row
+  (`components/page/page-header-strip.tsx`): `<PageHeaderNumbers>` — up to
+  four equal number boxes, number first, every box a link — for hubs and
+  lists, or `<PageHeaderStages>` — a record's stage line with its next step
+  ("who does what next") on top — for records with a lifecycle; record facts
+  sit above it as `<PageHeaderFacts>` chips. One banner: a record's next step
+  lives in the header, never in a second band under it; a fifth number goes
+  in the page body (a `Tally`), never a fifth box. Page bodies use the
+  signature blocks (`components/signature/blocks.tsx`,
+  `resources/css/signature-blocks.css`): the surface with its horizon line,
+  rings read as state (`Ring`, `RingCard`, `Checks`), the Journey line,
+  `Story`, `Log` (time first), `PeopleCards`/`PlaceCards`, `Tally` (zeros
+  fold into one sentence), `Flow`, `RiskMap` (the H&S bands), `DutyClock`
+  (the law's wording kept as it is), `Queue`, `StageDots` in tables, and the
+  settings pictures `Choices`, `Routes`, `EvidenceWindows`, `KnowList`. Port
+  a page view for view from its drawing; colours stay on the current app
+  tokens (the paused colour refresh does not apply).
 - **Role overview pilot (approved by Stephan 2026-10-13).** The six-role
   Overview (`features/overview/`) is the reference for editable dashboards:
   block cards (title + subtitle, ⋯ menu, footer note + "View details ↗"),

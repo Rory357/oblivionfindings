@@ -3,6 +3,7 @@
 @import 'tw-animate-css';
 @import './maintenance-date-time.css';
 @import './journey-auth.css';
+@import './signature-blocks.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -1056,6 +1057,309 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 }
 .eh-meter-donut-v {
     color: oklch(from var(--status-success) max(l, 0.82) c h);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Header facts and the one strip (approved by Stephan 23 Oct 2026 with the
+ * Health & safety drawings, design viewer v35) — page-header-strip.tsx.
+ * Same dark glass and fixed status floors as the meter blocks: facts are
+ * value + label chips; numbers are up to four equal boxes (number first);
+ * stages are a record's stage line with its next step on top.
+ * ────────────────────────────────────────────────────────────────────────── */
+.eh-fact,
+.eh-number,
+.eh-stages {
+    --eh-glass: color-mix(in oklch, var(--eh-ink, oklch(0.17 0.01 277)) 45%, transparent);
+    --eh-edge: color-mix(in oklch, var(--band-foreground) 16%, transparent);
+    --eh-crit: oklch(from var(--status-critical) max(l, 0.84) c h);
+    --eh-warn: oklch(from var(--status-warning) max(l, 0.82) c h);
+    --eh-ok: oklch(from var(--status-success) max(l, 0.82) c h);
+}
+.eh-fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 0 11px;
+    border-radius: 999px;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+    font-size: calc(12.5rem / 14);
+    white-space: nowrap;
+}
+.eh-fact b {
+    font-weight: 650;
+}
+.eh-fact em {
+    font-style: normal;
+    color: color-mix(in oklch, var(--band-foreground) 78%, transparent);
+}
+.eh-fact > i {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--band-foreground);
+}
+.eh-fact--critical {
+    border-color: color-mix(in oklch, var(--eh-crit) 55%, transparent);
+}
+.eh-fact--critical > i {
+    background: var(--eh-crit);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--eh-crit) 25%, transparent);
+}
+.eh-fact--warning {
+    border-color: color-mix(in oklch, var(--eh-warn) 55%, transparent);
+}
+.eh-fact--warning > i {
+    background: var(--eh-warn);
+}
+.eh-fact--success > i {
+    background: var(--eh-ok);
+}
+.eh-fact--neutral > i {
+    background: color-mix(in oklch, var(--band-foreground) 55%, transparent);
+}
+
+.eh-numbers {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+@media (max-width: 1023px) {
+    .eh-numbers {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+.eh-number {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    text-align: left;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+    transition:
+        transform 0.15s ease,
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+.eh-number:hover {
+    transform: translateY(-1px);
+    background: color-mix(in oklch, var(--eh-ink, oklch(0.17 0.01 277)) 62%, transparent);
+    border-color: color-mix(in oklch, var(--band-foreground) 34%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+    .eh-number,
+    .eh-number:hover {
+        transform: none;
+        transition: none;
+    }
+}
+.eh-number-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: calc(22rem / 14);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.eh-number-text {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+}
+.eh-number-text em {
+    font-style: normal;
+    font-size: calc(12.5rem / 14);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.eh-number-text small {
+    font-size: calc(11.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 75%, transparent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.eh-number-go {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    width: 11px;
+    height: 11px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.eh-number:hover .eh-number-go,
+.eh-number:focus-visible .eh-number-go {
+    opacity: 1;
+}
+.eh-number-ring {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: conic-gradient(
+        currentColor calc(var(--p) * 1%),
+        color-mix(in oklch, var(--band-foreground) 22%, transparent) 0
+    );
+    -webkit-mask: radial-gradient(circle, transparent 0 6px, #000 7px);
+    mask: radial-gradient(circle, transparent 0 6px, #000 7px);
+}
+.eh-number--critical {
+    border-color: color-mix(in oklch, var(--eh-crit) 60%, transparent);
+}
+.eh-number--critical .eh-number-value,
+.eh-number--critical .eh-number-text em {
+    color: var(--eh-crit);
+}
+.eh-number--warning {
+    border-color: color-mix(in oklch, var(--eh-warn) 60%, transparent);
+}
+.eh-number--warning .eh-number-value,
+.eh-number--warning .eh-number-text em {
+    color: var(--eh-warn);
+}
+.eh-number--success .eh-number-value {
+    color: var(--eh-ok);
+}
+
+.eh-stages {
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+}
+.eh-next {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-bottom: 12px;
+}
+.eh-next > b {
+    font-size: calc(15rem / 14);
+    font-weight: 650;
+}
+.eh-next > small {
+    flex-basis: 100%;
+    font-size: calc(12.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
+}
+.eh-next-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: calc(11rem / 14);
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+.eh-next-kicker > i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--band-foreground);
+}
+.eh-next-kicker--critical {
+    color: var(--eh-crit);
+}
+.eh-next-kicker--critical > i {
+    background: var(--eh-crit);
+}
+.eh-next-kicker--warning {
+    color: var(--eh-warn);
+}
+.eh-next-kicker--warning > i {
+    background: var(--eh-warn);
+}
+.eh-next-kicker--success > i {
+    background: var(--eh-ok);
+}
+.eh-stage-line {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.eh-stage-line::before,
+.eh-stage-line::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 7px;
+    height: 2px;
+    border-radius: 2px;
+}
+.eh-stage-line::before {
+    right: 8px;
+    background: color-mix(in oklch, var(--band-foreground) 24%, transparent);
+}
+.eh-stage-line::after {
+    width: calc((100% - 16px) * var(--done, 0));
+    background: var(--band-foreground);
+}
+.eh-stage {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    justify-items: start;
+    align-content: start;
+    gap: 4px;
+    padding-right: 8px;
+}
+.eh-stage:last-child {
+    justify-items: end;
+    padding-right: 0;
+    text-align: right;
+}
+.eh-stage > i {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--eh-ink, oklch(0.17 0.01 277));
+    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--band-foreground) 50%, transparent);
+}
+.eh-stage > b {
+    font-size: calc(12.5rem / 14);
+    font-weight: 650;
+}
+.eh-stage > small {
+    font-size: calc(11.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 75%, transparent);
+}
+.eh-stage--done > i {
+    background: var(--band-foreground);
+    box-shadow: none;
+}
+.eh-stage--todo > b {
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
+}
+.eh-stage--now > i {
+    box-shadow:
+        inset 0 0 0 4px var(--band-foreground),
+        0 0 12px color-mix(in oklch, var(--band-foreground) 55%, transparent);
+}
+.eh-stage--warning > i {
+    box-shadow:
+        inset 0 0 0 4px var(--eh-warn),
+        0 0 12px color-mix(in oklch, var(--eh-warn) 55%, transparent);
+}
+.eh-stage--critical > i {
+    box-shadow:
+        inset 0 0 0 4px var(--eh-crit),
+        0 0 12px color-mix(in oklch, var(--eh-crit) 55%, transparent);
 }
 
 /* Hide scrollbars on icon sidebar */

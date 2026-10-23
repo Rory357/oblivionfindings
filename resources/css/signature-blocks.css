@@ -1,0 +1,1394 @@
+/* signature-blocks.css — the page body parts of the approved Health & safety drawings (Stephan, 23 Oct 2026,
+ * design viewer v35). They replace generic dashboard furniture with Oblivion's own shapes: the surface with its
+ * horizon line, the ring (state and progress) and the Journey line. Components: components/signature/.
+ *
+ * Colours: only app tokens and fixed status pairs (DESIGN.md non-negotiables 1, 2, 6); the derived tokens below
+ * mix from --primary, so Settings → Branding retints them. Type: calc(Npx-equivalent rem / 14) so the user's text
+ * size setting still applies (anti-pattern "pixel font sizes in feature CSS"). Nothing here moves layout on hover.
+ */
+:root {
+    --sg-tint: color-mix(in oklab, var(--primary) 12%, var(--card));
+    --sg-quiet-line: color-mix(in oklab, var(--primary) 16%, var(--border));
+    --sg-ring-rest: color-mix(in oklab, var(--primary) 40%, var(--border));
+    --sg-row-rule: color-mix(in oklab, var(--border) 65%, transparent);
+}
+
+/* ── the ring glyph, inline — the shape carries the state (same language as the status badge) ── */
+.sg-rg {
+    display: inline-block;
+    flex: none;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    vertical-align: -1px;
+    box-shadow: inset 0 0 0 1.7px var(--muted-foreground);
+}
+.sg-rg--info {
+    background: conic-gradient(var(--primary) 0 50%, transparent 0);
+    box-shadow: inset 0 0 0 1.7px var(--primary);
+}
+.sg-rg--warning {
+    background: conic-gradient(var(--status-warning) 0 75%, transparent 0);
+    box-shadow: inset 0 0 0 1.7px var(--status-warning);
+}
+.sg-rg--success {
+    background: radial-gradient(circle, var(--status-success) 0 2.3px, transparent 2.8px);
+    box-shadow: inset 0 0 0 1.7px var(--status-success);
+}
+.sg-rg--critical {
+    background: var(--status-critical);
+    box-shadow: 0 0 0 2.5px color-mix(in oklab, var(--status-critical) 24%, transparent);
+}
+.sg-rg--brand {
+    background: radial-gradient(circle, var(--primary) 0 2.3px, transparent 2.8px);
+    box-shadow: inset 0 0 0 1.7px var(--primary);
+}
+.sg-rg--none {
+    box-shadow: none;
+    outline: 1.5px dashed var(--muted-foreground);
+    outline-offset: -1.5px;
+}
+
+/* ── the surface — the horizon line on its top edge instead of a coloured side border ── */
+.sg-surface {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: 0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+.sg-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: var(--sg-horizon, var(--primary));
+    opacity: 0.85;
+}
+.sg-surface--critical {
+    --sg-horizon: var(--status-critical);
+}
+.sg-surface--warning {
+    --sg-horizon: var(--status-warning);
+}
+.sg-surface--success {
+    --sg-horizon: var(--status-success);
+}
+.sg-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 10px;
+    padding: 14px 18px 0;
+}
+.sg-head > h3 {
+    font-size: calc(14.5rem / 14);
+    font-weight: 650;
+    white-space: nowrap;
+}
+.sg-head > p {
+    font-size: calc(12.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-act {
+    margin-left: auto;
+    font-size: calc(12.5rem / 14);
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--primary);
+    border-radius: 6px;
+    outline: none;
+}
+.sg-act:hover {
+    text-decoration: underline;
+}
+.sg-act:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+/* a section of cards (people, places) — a plain title, no surface */
+.sg-section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 10px;
+    margin-bottom: 10px;
+}
+.sg-section-head > h3 {
+    font-size: calc(14.5rem / 14);
+    font-weight: 650;
+    white-space: nowrap;
+}
+.sg-section-head > p {
+    font-size: calc(12.5rem / 14);
+    color: var(--muted-foreground);
+}
+/* in a narrow side column the caveat sits under the title */
+.sg-side .sg-head > p,
+.sg-side .sg-section-head > p {
+    order: 2;
+    flex-basis: 100%;
+}
+
+/* ── tally — related numbers on one line; zeros fold into a sentence ── */
+.sg-tally {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+}
+.sg-t {
+    display: grid;
+    gap: 2px;
+    padding: 14px 22px 14px 18px;
+}
+.sg-t + .sg-t {
+    border-left: 1px solid var(--border);
+}
+.sg-t > b {
+    font-size: calc(28rem / 14);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+}
+.sg-t > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: calc(12.5rem / 14);
+    font-weight: 550;
+    color: var(--muted-foreground);
+}
+.sg-t > small {
+    font-size: calc(11.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-calm {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: 8px;
+    margin-left: auto;
+    padding: 0 18px;
+    font-size: calc(13rem / 14);
+    color: var(--muted-foreground);
+}
+
+/* ── the Journey, laid flat — steps as stations; done fills the line ── */
+.sg-journey {
+    padding: 16px 18px 18px;
+}
+.sg-line {
+    position: relative;
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    margin: 6px 6px 0;
+    padding: 0;
+    list-style: none;
+}
+.sg-line::before,
+.sg-line::after {
+    content: '';
+    position: absolute;
+    left: 9px;
+    top: 9px;
+    height: 2px;
+    border-radius: 2px;
+}
+.sg-line::before {
+    right: 9px;
+    background: var(--sg-quiet-line);
+}
+.sg-line::after {
+    width: calc((100% - 18px) * var(--done, 0));
+    background: linear-gradient(90deg, color-mix(in oklab, var(--primary) 60%, var(--card)), var(--primary));
+}
+.sg-st {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    align-content: start;
+    justify-items: start;
+    gap: 8px;
+    padding-right: 10px;
+}
+.sg-st:last-child {
+    justify-items: end;
+    padding-right: 0;
+    text-align: right;
+}
+.sg-st > i {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--card);
+    box-shadow: inset 0 0 0 2px var(--sg-ring-rest);
+}
+.sg-st--done > i {
+    background: radial-gradient(circle, var(--primary) 0 4px, var(--card) 4.6px);
+    box-shadow: inset 0 0 0 2px var(--primary);
+}
+.sg-st--now > i {
+    box-shadow:
+        inset 0 0 0 4px var(--primary),
+        0 0 14px -2px var(--primary);
+}
+.sg-st--now.sg-st--critical > i {
+    box-shadow:
+        inset 0 0 0 4px var(--status-critical),
+        0 0 14px -2px var(--status-critical);
+}
+.sg-st--now.sg-st--warning > i {
+    box-shadow:
+        inset 0 0 0 4px var(--status-warning),
+        0 0 14px -2px var(--status-warning);
+}
+.sg-st--now.sg-st--critical > b {
+    color: var(--status-critical-foreground);
+}
+.sg-st--end > i {
+    background: var(--primary);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 18%, transparent);
+}
+.sg-st > b {
+    font-size: calc(12.5rem / 14);
+    font-weight: 600;
+    line-height: 1.3;
+}
+.sg-st > small {
+    font-size: calc(11.5rem / 14);
+    line-height: 1.3;
+    color: var(--muted-foreground);
+}
+.sg-st--todo > b {
+    font-weight: 550;
+    color: var(--muted-foreground);
+}
+.sg-jcap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+    font-size: calc(12.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-jcap b {
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+/* ── the closing ring — progress closes the Oblivion ring; complete = closed with a centre ── */
+.sg-ringrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+}
+.sg-ringrow h3 {
+    font-size: calc(15rem / 14);
+    font-weight: 650;
+}
+.sg-ringrow p {
+    font-size: calc(12.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-ringw {
+    position: relative;
+    flex: none;
+    width: 52px;
+    height: 52px;
+}
+.sg-ringp {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+        var(--primary) calc(var(--p) * 1%),
+        color-mix(in oklab, var(--primary) 14%, var(--border)) 0
+    );
+    -webkit-mask: radial-gradient(circle, transparent 0 20px, #000 21px);
+    mask: radial-gradient(circle, transparent 0 20px, #000 21px);
+}
+.sg-ringw--full::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 10px -1px var(--primary);
+}
+.sg-ringw > em {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: calc(12rem / 14);
+    font-style: normal;
+    font-weight: 700;
+    color: var(--primary);
+}
+/* a state ring: the full ring in its tone around a short mark ("No"), never a percentage */
+.sg-ringw--mark {
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--sg-horizon, var(--primary)) 9%, var(--card));
+    box-shadow: inset 0 0 0 4px color-mix(in oklab, var(--sg-horizon, var(--primary)) 80%, transparent);
+}
+.sg-ringw--mark > em {
+    font-size: calc(13rem / 14);
+}
+.sg-ringw--critical {
+    --sg-horizon: var(--status-critical);
+}
+.sg-ringw--critical > em {
+    color: var(--status-critical-foreground);
+}
+.sg-ringw--warning {
+    --sg-horizon: var(--status-warning);
+}
+.sg-ringw--warning > em {
+    color: var(--status-warning-foreground);
+}
+.sg-ringw--success {
+    --sg-horizon: var(--status-success);
+}
+.sg-ringw--success > em {
+    color: var(--status-success-foreground);
+}
+
+/* ── checks — a checklist read by its rings, no badge per row; one per line when narrow ── */
+.sg-checks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px 20px;
+    padding: 6px 18px 16px;
+}
+.sg-side .sg-checks,
+.sg-row .sg-checks,
+.sg-checks--single {
+    grid-template-columns: minmax(0, 1fr);
+}
+.sg-checks > li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--sg-row-rule);
+    font-size: calc(13rem / 14);
+}
+.sg-checks > li > small {
+    margin-left: auto;
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+    white-space: nowrap;
+}
+
+/* ── log rows — time first, the ring for state, then words; no decorative icon on every row ── */
+.sg-log {
+    display: grid;
+    grid-template-columns: minmax(74px, max-content) 14px minmax(0, 1fr) auto;
+    column-gap: 12px;
+    padding: 4px 0;
+}
+.sg-lr {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--sg-row-rule);
+}
+.sg-lr:last-child {
+    border-bottom: 0;
+}
+.sg-lr > time {
+    font-size: calc(12rem / 14);
+    white-space: nowrap;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+}
+.sg-lr > .sg-rg {
+    align-self: center;
+}
+.sg-lr b {
+    display: block;
+    font-size: calc(13rem / 14);
+    font-weight: 600;
+}
+.sg-lr small {
+    display: block;
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+
+/* ── people and places — card grids; the presence ring on the avatar ── */
+.sg-cards {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+    gap: 14px;
+}
+.sg-p {
+    display: grid;
+    gap: 12px;
+    padding: 14px 16px 12px;
+}
+.sg-ph {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.sg-ph > div {
+    flex: 1;
+    min-width: 0;
+}
+.sg-ph b {
+    display: block;
+    font-size: calc(14rem / 14);
+    font-weight: 650;
+}
+.sg-ph small {
+    display: block;
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-av {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: calc(14rem / 14);
+    font-weight: 700;
+    color: var(--primary);
+    background: var(--sg-tint);
+}
+.sg-av--on {
+    box-shadow:
+        0 0 0 2px var(--card),
+        0 0 0 4px var(--live);
+}
+.sg-av--away {
+    outline: 1.5px dashed var(--muted-foreground);
+    outline-offset: 2px;
+}
+.sg-flag {
+    display: block;
+    margin-top: 6px;
+}
+.sg-pf {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-pf b {
+    font-weight: 600;
+    color: var(--foreground);
+}
+.sg-place {
+    display: grid;
+    gap: 10px;
+    padding: 14px 16px;
+}
+.sg-place .sg-ph b {
+    font-size: calc(15rem / 14);
+}
+.sg-facts2 {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: calc(12.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-facts2--lines {
+    flex-direction: column;
+}
+.sg-facts2 > span {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+.sg-facts2 > span > .sg-rg {
+    margin-top: 3px;
+}
+.sg-facts2 b {
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+/* ── one quiet line for a small empty ── */
+.sg-quiet {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    font-size: calc(13rem / 14);
+    color: var(--muted-foreground);
+}
+
+/* ── facts worth knowing, one per line, read by their rings (a rule's wording kept as it is) ── */
+.sg-know {
+    display: grid;
+    padding: 4px 18px 10px;
+}
+.sg-know > li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--sg-row-rule);
+    font-size: calc(13rem / 14);
+    line-height: 1.45;
+}
+.sg-know > li:last-child {
+    border-bottom: 0;
+}
+.sg-know > li > .sg-rg {
+    margin-top: 3px;
+}
+
+/* ── a story: a row of fact chips, then short headed paragraphs ── */
+.sg-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 18px 2px;
+}
+.sg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 0 11px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--muted);
+    font-size: calc(12.5rem / 14);
+    white-space: nowrap;
+    color: var(--muted-foreground);
+}
+.sg-chip > svg {
+    color: var(--primary);
+}
+.sg-chip b {
+    font-weight: 600;
+    color: var(--foreground);
+}
+.sg-paras {
+    display: grid;
+    padding: 6px 18px 12px;
+}
+.sg-para {
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr);
+    gap: 16px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--sg-row-rule);
+}
+.sg-para:last-child {
+    border-bottom: 0;
+}
+.sg-para > dt {
+    padding-top: 2px;
+    font-size: calc(12.5rem / 14);
+    font-weight: 600;
+    color: var(--muted-foreground);
+}
+.sg-para > dd {
+    font-size: calc(14rem / 14);
+    line-height: 1.6;
+}
+
+/* ── side by side (a map beside its list) ── */
+.sg-row {
+    display: grid;
+    align-items: start;
+    gap: 20px;
+}
+
+/* ── the pipeline: how many wait at each stage, joined by the Journey line ── */
+.sg-flow {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr));
+    padding: 18px 18px 16px;
+}
+.sg-flow::before {
+    content: '';
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    top: 27px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--sg-quiet-line);
+}
+.sg-fs {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 3px;
+    min-width: 0;
+    padding-right: 14px;
+}
+.sg-fs > i {
+    position: relative;
+    z-index: 1;
+    width: 20px;
+    height: 20px;
+    margin-bottom: 9px;
+    border-radius: 50%;
+    background: var(--card);
+    box-shadow: inset 0 0 0 2px var(--sg-ring-rest);
+}
+.sg-fs--critical > i {
+    background: var(--status-critical);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--status-critical) 22%, transparent);
+}
+.sg-fs--warning > i {
+    box-shadow: inset 0 0 0 5px var(--status-warning);
+}
+.sg-fs--info > i {
+    box-shadow: inset 0 0 0 5px var(--primary);
+}
+.sg-fs--success > i {
+    background: radial-gradient(circle, var(--primary) 0 4px, var(--card) 4.6px);
+    box-shadow: inset 0 0 0 2px var(--primary);
+}
+.sg-fs > span {
+    font-size: calc(12.5rem / 14);
+    font-weight: 600;
+    color: var(--muted-foreground);
+}
+.sg-fs > b {
+    font-size: calc(30rem / 14);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+}
+.sg-fs--critical > b {
+    color: var(--status-critical-foreground);
+}
+.sg-fs > small {
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-fs > a {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    margin-top: 6px;
+    font-size: calc(12rem / 14);
+    border-radius: 4px;
+    outline: none;
+}
+.sg-fs > a:hover > span {
+    text-decoration: underline;
+}
+.sg-fs > a:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+.sg-fs > a > span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.sg-foot {
+    padding: 11px 18px;
+    border-top: 1px dashed var(--border);
+    font-size: calc(12.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-foot b {
+    font-weight: 600;
+    color: var(--foreground);
+}
+.sg-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 18px 14px;
+    border-top: 1px dashed var(--border);
+}
+
+/* ── the risk map — likelihood × consequence in the four bands (low 1–4, medium 5–9, high 10–15, extreme 16–25) ── */
+.sg-matrix {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    column-gap: 8px;
+    padding: 14px 18px 8px;
+}
+.sg-matrix-y {
+    align-self: center;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-align: center;
+    font-size: calc(10.5rem / 14);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+.sg-matrix-x {
+    grid-column: 2;
+    padding: 4px 0 0 104px;
+    text-align: center;
+    font-size: calc(10.5rem / 14);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+.sg-mx {
+    display: grid;
+    grid-template-columns: 104px repeat(5, minmax(0, 1fr));
+    gap: 4px;
+}
+.sg-ml {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    font-size: calc(12rem / 14);
+    line-height: 1.2;
+    text-align: right;
+    color: var(--muted-foreground);
+}
+.sg-mc {
+    display: grid;
+    place-items: center;
+    height: 42px;
+    border-radius: 8px;
+    font-variant-numeric: tabular-nums;
+}
+.sg-mc > em {
+    font-size: calc(11rem / 14);
+    font-style: normal;
+    opacity: 0.5;
+}
+.sg-mc > b {
+    font-size: calc(16rem / 14);
+    font-weight: 700;
+}
+.sg-mc--low {
+    background: var(--status-success-bg);
+    color: var(--status-success-foreground);
+}
+.sg-mc--medium {
+    background: var(--status-warning-bg);
+    color: var(--status-warning-foreground);
+}
+.sg-mc--high {
+    background: color-mix(in oklab, var(--status-warning-bg), var(--status-critical-bg));
+    color: var(--status-critical-foreground);
+}
+.sg-mc--extreme {
+    background: var(--status-critical-bg);
+    color: var(--status-critical-foreground);
+}
+.sg-mx .sg-mc:not(.sg-mc--has) {
+    opacity: 0.5;
+}
+.sg-mc--has {
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklab, currentColor 45%, transparent);
+}
+.sg-mc--mark {
+    box-shadow:
+        0 0 0 2px var(--card),
+        0 0 0 4px var(--primary);
+}
+.sg-mcl {
+    padding-top: 6px;
+    font-size: calc(11.5rem / 14);
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    color: var(--muted-foreground);
+}
+.sg-mleg {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 18px 14px;
+    border-top: 1px dashed var(--border);
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-mleg > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.sg-mleg .sg-mc {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+}
+.sg-mleg > em {
+    margin-left: auto;
+    font-style: normal;
+}
+.sg-seg {
+    display: inline-flex;
+    margin: 12px 18px 0;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--muted);
+}
+.sg-seg > button {
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: calc(12.5rem / 14);
+    font-weight: 600;
+    color: var(--muted-foreground);
+    outline: none;
+}
+.sg-seg > button:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+.sg-seg > button[aria-pressed='true'] {
+    background: var(--card);
+    color: var(--foreground);
+    box-shadow: 0 1px 2px color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+/* ── a duty with a clock: how long since we knew, the duty in the law's own words, the action ── */
+.sg-clock-m {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px 12px;
+}
+.sg-cring {
+    display: grid;
+    flex: none;
+    place-content: center;
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    text-align: center;
+    background: color-mix(in oklab, var(--sg-horizon, var(--primary)) 9%, var(--card));
+    box-shadow: inset 0 0 0 4px color-mix(in oklab, var(--sg-horizon, var(--primary)) 80%, transparent);
+}
+.sg-cring > b {
+    font-size: calc(22rem / 14);
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.sg-surface--critical .sg-cring > b {
+    color: var(--status-critical-foreground);
+}
+.sg-cring > small {
+    font-size: calc(10.5rem / 14);
+    font-weight: 650;
+    color: var(--muted-foreground);
+}
+.sg-kick {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: calc(11rem / 14);
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+.sg-surface--critical .sg-kick {
+    color: var(--status-critical-foreground);
+}
+.sg-surface--warning .sg-kick {
+    color: var(--status-warning-foreground);
+}
+.sg-clock-t {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+.sg-clock-t > h3 {
+    font-size: calc(16rem / 14);
+    font-weight: 680;
+}
+.sg-clock-t > p {
+    font-size: calc(12.5rem / 14);
+    line-height: 1.45;
+    color: var(--muted-foreground);
+}
+.sg-clock-l {
+    display: grid;
+    padding: 0 18px 6px;
+}
+.sg-clock-l > li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--sg-row-rule);
+    font-size: calc(13rem / 14);
+}
+
+/* ── a queue in a split workspace — the selected one marked ── */
+.sg-queue {
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+}
+.sg-qi {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    padding: 11px 12px;
+    border-radius: 10px;
+    text-align: left;
+    outline: none;
+}
+.sg-qi:hover {
+    background: var(--muted);
+}
+.sg-qi:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+.sg-qi[aria-current='true'] {
+    background: color-mix(in oklab, var(--primary) 8%, var(--card));
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--primary) 45%, var(--border));
+}
+.sg-qi-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.sg-qi-h > b {
+    font-size: calc(13.5rem / 14);
+    font-weight: 600;
+}
+.sg-qi-h > span {
+    margin-left: auto;
+    font-size: calc(12rem / 14);
+    white-space: nowrap;
+    color: var(--muted-foreground);
+}
+.sg-qi > small,
+.sg-qi > .sg-qb {
+    padding-left: 19px;
+}
+.sg-qi > small {
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-qb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* ── where a record is up to, in a table cell: its stages as dots on the line ── */
+.sg-stg {
+    display: grid;
+    gap: 5px;
+    min-width: 116px;
+}
+.sg-dots {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    width: 110px;
+}
+.sg-dots::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 4px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--sg-quiet-line);
+}
+.sg-dots > i {
+    position: relative;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--card);
+    box-shadow: inset 0 0 0 1.6px var(--sg-ring-rest);
+}
+.sg-dots > i.sg-dot--done {
+    background: var(--primary);
+    box-shadow: none;
+}
+.sg-dots > i.sg-dot--now {
+    box-shadow:
+        inset 0 0 0 3px var(--primary),
+        0 0 8px -2px var(--primary);
+}
+.sg-stg--warning .sg-dots > i.sg-dot--now {
+    box-shadow: inset 0 0 0 3px var(--status-warning);
+}
+.sg-stg--critical .sg-dots > i.sg-dot--now {
+    background: var(--status-critical);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--status-critical) 22%, transparent);
+}
+.sg-stg--success .sg-dots > i {
+    background: var(--primary);
+    box-shadow: none;
+}
+.sg-stg > small {
+    font-size: calc(12rem / 14);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.sg-stg > small + small {
+    font-weight: 500;
+    color: var(--muted-foreground);
+}
+
+/* ── settings as pictures: option tiles, the routing map, evidence time bars ── */
+.sg-choices {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
+    gap: 12px;
+    padding: 12px 18px 16px;
+}
+.sg-ch {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+}
+.sg-ch--on {
+    border-color: color-mix(in oklab, var(--primary) 55%, var(--border));
+    background: color-mix(in oklab, var(--primary) 5%, var(--card));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 12%, transparent);
+}
+.sg-ch-h {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 9px;
+}
+.sg-ch-h > h4 {
+    font-size: calc(14.5rem / 14);
+    font-weight: 650;
+}
+.sg-ch-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--sg-tint);
+    font-size: calc(11.5rem / 14);
+    font-weight: 650;
+    color: var(--primary);
+}
+.sg-ch-on {
+    margin-left: auto;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--status-success-bg);
+    font-size: calc(11.5rem / 14);
+    font-weight: 700;
+    color: var(--status-success-foreground);
+}
+.sg-ch > p {
+    font-size: calc(13rem / 14);
+    line-height: 1.5;
+}
+.sg-chflow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.sg-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 26px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--muted);
+    font-size: calc(12rem / 14);
+    white-space: nowrap;
+}
+.sg-pill > svg {
+    color: var(--primary);
+}
+.sg-arrow {
+    display: inline-grid;
+    place-items: center;
+    color: var(--muted-foreground);
+}
+.sg-can {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 14px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+}
+.sg-can > small {
+    grid-column: 1 / -1;
+    font-size: calc(11.5rem / 14);
+    font-weight: 650;
+    color: var(--muted-foreground);
+}
+.sg-can > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: calc(12.5rem / 14);
+}
+.sg-ch-meta {
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-routes {
+    display: grid;
+    padding: 8px 18px 4px;
+}
+.sg-rt {
+    display: grid;
+    grid-template-columns: 210px 28px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--sg-row-rule);
+}
+.sg-rt:last-child {
+    border-bottom: 0;
+}
+.sg-rt-p {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sg-rt-p b {
+    display: block;
+    font-size: calc(14rem / 14);
+    font-weight: 650;
+}
+.sg-rt-p small {
+    display: block;
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-lanes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.sg-lane {
+    display: grid;
+    gap: 5px;
+    min-width: 220px;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--muted);
+}
+.sg-lane--warning {
+    border-color: color-mix(in oklab, var(--status-warning) 45%, var(--border));
+}
+.sg-lane > small {
+    font-size: calc(11.5rem / 14);
+    font-weight: 600;
+    color: var(--muted-foreground);
+}
+.sg-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: calc(13rem / 14);
+    font-weight: 550;
+}
+.sg-person > span:first-child {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--sg-tint);
+    font-size: calc(10.5rem / 14);
+    font-weight: 700;
+    color: var(--primary);
+}
+.sg-cover {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: calc(11.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-cover b {
+    font-weight: 600;
+    color: var(--foreground);
+}
+.sg-fallback {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 18px 0;
+    padding: 12px 0 14px;
+    border-top: 1px dashed var(--border);
+}
+.sg-fallback > strong {
+    margin-right: 4px;
+    font-size: calc(12.5rem / 14);
+    font-weight: 650;
+    color: var(--muted-foreground);
+}
+.sg-fb-step {
+    display: grid;
+    gap: 2px;
+    padding: 7px 11px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+}
+.sg-fb-step > b {
+    font-size: calc(12.5rem / 14);
+    font-weight: 650;
+}
+.sg-fb-step > small {
+    font-size: calc(11.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-windows {
+    display: grid;
+    padding: 10px 18px 6px;
+}
+.sg-wn-axis,
+.sg-wn-r {
+    display: grid;
+    grid-template-columns: 170px minmax(0, 1fr) 300px;
+    align-items: center;
+    gap: 16px;
+}
+.sg-wn-scale {
+    position: relative;
+    height: 18px;
+    font-size: calc(11rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-wn-scale > span {
+    position: absolute;
+    top: 0;
+    white-space: nowrap;
+}
+.sg-wn-scale > span.sg-wn-incident {
+    transform: translateX(-50%);
+    font-weight: 700;
+    color: var(--status-critical-foreground);
+}
+.sg-wn-r {
+    padding: 12px 0;
+    border-top: 1px solid var(--sg-row-rule);
+}
+.sg-wn-n b {
+    display: block;
+    font-size: calc(13.5rem / 14);
+    font-weight: 650;
+}
+.sg-wn-n small {
+    display: block;
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-wn-bar {
+    position: relative;
+    height: 44px;
+}
+.sg-wn-bar > i {
+    position: absolute;
+    top: 6px;
+    height: 14px;
+    border-radius: 7px;
+}
+.sg-wn-track {
+    left: 0;
+    right: 0;
+    border: 1px solid var(--border);
+    background: var(--muted);
+}
+.sg-wn-max {
+    background: color-mix(in oklab, var(--primary) 30%, var(--card));
+}
+.sg-wn-rev {
+    background: var(--primary);
+}
+.sg-wn-bar > i.sg-wn-mid {
+    top: 1px;
+    width: 2px;
+    height: 24px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--status-critical);
+}
+.sg-wn-lab {
+    position: absolute;
+    left: 0;
+    top: 26px;
+    font-size: calc(11.5rem / 14);
+    white-space: nowrap;
+}
+.sg-wn-lab > em {
+    font-style: normal;
+    color: var(--muted-foreground);
+}
+.sg-wn-s {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.sg-wn-leg {
+    display: flex;
+    gap: 16px;
+    padding: 4px 18px 14px;
+    font-size: calc(12rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-wn-leg > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.sg-wn-leg i {
+    display: inline-block;
+    width: 22px;
+    height: 10px;
+    border-radius: 5px;
+}
+
+@media (max-width: 1023px) {
+    .sg-cards {
+        grid-template-columns: repeat(min(var(--cols, 3), 2), minmax(0, 1fr));
+    }
+    .sg-checks,
+    .sg-can {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .sg-para {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+}
