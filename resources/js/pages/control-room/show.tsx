@@ -13,9 +13,12 @@ import {
 import {
     alertTargets,
     nextOpenTarget,
-    targetCaption,
-    targetHeadline,
 } from '@/components/control-room/alert-record/alert-targets';
+import { OwnerChip } from '@/components/control-room/live-response/alert-glance';
+import {
+    responseClock,
+    useNow,
+} from '@/components/control-room/live-response/response-clock';
 import {
     ActivitySection,
     EvidenceSection,
@@ -67,11 +70,11 @@ const TABS: ReadonlyArray<{
     icon: typeof FileText;
 }> = [
     { key: 'overview', label: 'Overview', icon: FileText },
-    { key: 'timeline', label: 'Response & timeline', icon: Clock },
+    { key: 'timeline', label: 'Timeline', icon: Clock },
     { key: 'procedure', label: 'Procedure', icon: BookOpen },
     { key: 'evidence', label: 'Evidence', icon: Package },
     { key: 'tasks', label: 'Tasks', icon: ListTodo },
-    { key: 'activity', label: 'Notes & activity', icon: MessageSquare },
+    { key: 'activity', label: 'Notes', icon: MessageSquare },
     { key: 'linked', label: 'Linked records', icon: LinkIcon },
 ];
 
@@ -146,7 +149,18 @@ export default function ControlRoomAlertShow(
 
     const status = statusBadge(a.status);
     const severity = severityBadge(a.severity);
-    const targets = alertTargets(d);
+    const now = useNow();
+    const targets = alertTargets(d, now);
+    const next = nextOpenTarget(targets);
+    const clock = responseClock(
+        {
+            raisedAt: a.triggered_at,
+            deadlineAt: next?.deadline ?? null,
+            targetStatus: next?.state === 'missed' ? 'breached' : null,
+        },
+        now,
+    );
+    const finished = ['resolved', 'closed', 'dismissed'].includes(a.status);
     const openTasks = d.tasks.filter((task) => isOpenTask(task.status)).length;
     const run = d.playbook_run;
     const runPercent = run?.total_steps
@@ -177,26 +191,46 @@ export default function ControlRoomAlertShow(
                         : 'Not escalated'}
                 </PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
-            {targets.map((target) => (
-                <PageHeaderMeterBlock
-                    key={target.key}
-                    label={target.label}
-                    tone={
-                        target.state === 'missed'
-                            ? 'critical'
-                            : target.state === 'met'
-                              ? 'success'
-                              : 'brand'
-                    }
-                    onClick={() => selectTab('timeline')}
-                    ariaLabel={`View the ${target.label.toLowerCase()} target`}
-                >
-                    <PageHeaderMeterBig>{targetHeadline(target)}</PageHeaderMeterBig>
-                    <PageHeaderMeterCaption>
-                        {targetCaption(target)}
-                    </PageHeaderMeterCaption>
-                </PageHeaderMeterBlock>
-            ))}
+            <PageHeaderMeterBlock
+                label={next ? `${next.label} target` : 'Response target'}
+                tone={
+                    clock.tone === 'critical'
+                        ? 'critical'
+                        : clock.tone === 'warning'
+                          ? 'warning'
+                          : 'brand'
+                }
+                onClick={() => selectTab('timeline')}
+                ariaLabel="View the response timeline"
+            >
+                <PageHeaderMeterBig>
+                    {finished
+                        ? 'Done'
+                        : clock.mode === 'countdown'
+                          ? clock.words.replace(/^due in /, '')
+                          : clock.mode === 'late'
+                            ? 'Missed'
+                            : 'No target'}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {finished
+                        ? 'response finished'
+                        : clock.mode === 'countdown'
+                          ? 'left on this target'
+                          : clock.words}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Who's on it"
+                tone={a.assigned_to ? 'brand' : 'warning'}
+                onClick={() => (assign ? actions.run('assign') : selectTab('overview'))}
+                ariaLabel={assign ? 'Assign this alert' : 'View who is on this alert'}
+            >
+                <PageHeaderMeterBig>{a.assigned_to?.name ?? 'No one yet'}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {a.assigned_to ? 'owns this alert' : 'take it or assign it'}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
             <PageHeaderMeterBlock
                 label="Procedure"
                 value={run ? `${run.completed_steps}/${run.total_steps}` : undefined}
@@ -210,15 +244,6 @@ export default function ControlRoomAlertShow(
                 <PageHeaderMeterCaption>
                     {run ? run.playbook.name : 'No procedure on this alert'}
                 </PageHeaderMeterCaption>
-            </PageHeaderMeterBlock>
-            <PageHeaderMeterBlock
-                label="Tasks"
-                tone={openTasks > 0 ? 'warning' : 'brand'}
-                onClick={() => selectTab('tasks')}
-                ariaLabel="View the alert's tasks"
-            >
-                <PageHeaderMeterBig>{openTasks}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>open</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
         </>
     );
@@ -245,8 +270,6 @@ export default function ControlRoomAlertShow(
         </>
     );
 
-    const next = nextOpenTarget(targets);
-
     return (
         <ControlRoomPage
             headTitle={`Alert ${ref}`}
@@ -270,17 +293,21 @@ export default function ControlRoomAlertShow(
                 title: alertSummary(a),
                 wrapTitle: true,
                 titleChip: (
-                    <PageHeaderStatusChip variant={status.tone}>
+                    // Info is the brand colour, which disappears on the purple band.
+                    <PageHeaderStatusChip
+                        variant={status.tone === 'info' ? 'neutral' : status.tone}
+                    >
                         {status.label}
                     </PageHeaderStatusChip>
                 ),
-                subline: [ref, who, d.journey_state].filter(Boolean).join(' · '),
+                subline: [who, ref].filter(Boolean).join(' · '),
                 actions: headerActions,
                 meters,
             }}
             rail={
                 <PageHeaderRail
                     ariaLabel="Alert record"
+                    showFind={false}
                     value={tab}
                     onSelect={selectTab}
                     items={TABS.map((t) => ({
@@ -297,7 +324,7 @@ export default function ControlRoomAlertShow(
         >
             {tab === 'overview' ? (
                 <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-                    <Panel title="What needs to happen">
+                    <Panel title="Where it's at">
                         <OverviewSection
                             d={d}
                             onEditMeta={() => actions.run('edit_details')}
@@ -308,70 +335,22 @@ export default function ControlRoomAlertShow(
                         />
                     </Panel>
                     <div className="flex min-w-0 flex-col gap-5">
-                        <Panel title="Owner and next step">
-                            <dl className="grid gap-3 text-sm">
-                                <div>
-                                    <dt className="text-caption">Owner</dt>
-                                    <dd className="font-medium">
-                                        {a.assigned_to?.name ?? 'Unassigned'}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt className="text-caption">Next step</dt>
-                                    <dd className="font-medium">
-                                        {primary?.label ?? 'No response step left'}
-                                    </dd>
-                                </div>
-                                {next ? (
-                                    <div>
-                                        <dt className="text-caption">
-                                            {next.label} target
-                                        </dt>
-                                        <dd
-                                            className={
-                                                next.state === 'missed'
-                                                    ? 'font-medium text-status-critical'
-                                                    : 'font-medium'
-                                            }
-                                        >
-                                            {targetHeadline(next)} ·{' '}
-                                            {targetCaption(next)}
-                                        </dd>
-                                    </div>
-                                ) : null}
-                            </dl>
-                            {primary || assign ? (
-                                <div className="flex flex-wrap gap-2">
-                                    {primary ? (
-                                        <Button
-                                            type="button"
-                                            onClick={() => actions.run(primary.key)}
-                                        >
-                                            {primary.label}
-                                        </Button>
-                                    ) : null}
-                                    {assign ? (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => actions.run('assign')}
-                                        >
-                                            {assign.label}
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            ) : null}
-                        </Panel>
-                        <Panel title="Watching">
+                        <Panel title="Who's on it">
+                            <p className="text-sm">
+                                <OwnerChip name={a.assigned_to?.name} size="md" />
+                            </p>
                             {d.watchers.length ? (
-                                <ul className="grid gap-1.5 text-sm">
-                                    {d.watchers.map((w) => (
-                                        <li key={w.id}>{w.user_name}</li>
-                                    ))}
-                                </ul>
+                                <div className="grid gap-1.5">
+                                    <p className="text-caption">Watching</p>
+                                    <ul className="grid gap-1.5 text-sm">
+                                        {d.watchers.map((w) => (
+                                            <li key={w.id}>{w.user_name}</li>
+                                        ))}
+                                    </ul>
+                                </div>
                             ) : (
                                 <p className="text-subtle">
-                                    No one is watching this alert yet.
+                                    No one else is watching this alert.
                                 </p>
                             )}
                             {d.can.watch ? (

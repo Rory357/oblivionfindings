@@ -18,7 +18,13 @@ import {
     LiveResponseSearch,
     applyLiveResponseFilters,
 } from '@/components/control-room/live-response/live-response-filters';
+import {
+    NeedsYouNowCard,
+    needsYouNow,
+} from '@/components/control-room/live-response/needs-you-now';
+import { longDuration } from '@/components/control-room/live-response/response-clock';
 import { ResponseWorklist } from '@/components/control-room/live-response/response-worklist';
+import { LiveMark } from '@/components/control-room/live-response/target-lens';
 import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
 import {
     PageHeaderGlassButton,
@@ -154,18 +160,31 @@ export function ControlRoomDashboardView({
             copy: (value) => void navigator.clipboard?.writeText(value),
         });
 
-    const updated = `Updated ${formatTime(freshness.updated_at)}`;
+    const updated = `updated ${formatTime(freshness.updated_at)}`;
+    const top = needsYouNow(worklist.data);
+    const rest = top
+        ? {
+              ...worklist,
+              data: worklist.data.filter((row) => row.id !== top.id),
+              meta: { ...worklist.meta, total: Math.max(0, worklist.meta.total - 1) },
+          }
+        : worklist;
+    const oldest = hero.oldest_open_at
+        ? Date.now() - new Date(hero.oldest_open_at).getTime()
+        : null;
 
     return (
         <ControlRoomPage
             header={{
                 subline: (
                     <>
-                        Prioritise urgent work, name the owner and keep the next
-                        step clear ·{' '}
-                        <span aria-live="polite">
-                            {live.refreshing ? 'Refreshing…' : updated}
-                        </span>
+                        <LiveMark
+                            stale={live.stale}
+                            refreshing={live.refreshing}
+                            updatedLabel={updated}
+                        />
+                        <span aria-hidden="true"> · </span>
+                        Alerts that need someone, most urgent first
                     </>
                 ),
                 actions: (
@@ -189,13 +208,15 @@ export function ControlRoomDashboardView({
                 meters: (
                     <>
                         <PageHeaderMeterBlock
-                            label="Open"
+                            label="Need action"
                             href="/control-room"
                             ariaLabel="Show every open alert"
                         >
                             <PageHeaderMeterBig>{hero.active}</PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                in the worklist
+                                {oldest !== null && hero.active > 0
+                                    ? `oldest waiting ${longDuration(oldest)}`
+                                    : 'open alerts'}
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
@@ -205,21 +226,21 @@ export function ControlRoomDashboardView({
                             ariaLabel="Show critical alerts"
                         >
                             <PageHeaderMeterBig>{hero.critical}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>act first</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>answer these first</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
-                            label="Unassigned"
+                            label="No one on it"
                             tone={hero.unassigned > 0 ? 'warning' : 'brand'}
                             href="/control-room?assigned_to=unassigned"
-                            ariaLabel="Show alerts with no owner"
+                            ariaLabel="Show alerts no one has taken"
                         >
                             <PageHeaderMeterBig>{hero.unassigned}</PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                claim or assign
+                                take one or assign it
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
-                            label="Target missed"
+                            label="Missed target"
                             tone={hero.sla_breached > 0 ? 'critical' : 'brand'}
                             href="/control-room/sla/breaches"
                             ariaLabel="Show response targets that were missed"
@@ -247,7 +268,7 @@ export function ControlRoomDashboardView({
                 <PopupCallout tone="warning">
                     <span className="flex flex-wrap items-center justify-between gap-3">
                         <span>
-                            The worklist couldn&apos;t refresh — what you see may
+                            The list couldn&apos;t refresh — what you see may
                             be out of date ({updated.toLowerCase()}).
                         </span>
                         <Button
@@ -266,8 +287,8 @@ export function ControlRoomDashboardView({
                     <span className="flex flex-wrap items-center justify-between gap-3">
                         <span className="font-semibold">
                             {notice.count} new critical{' '}
-                            {notice.count === 1 ? 'alert is' : 'alerts are'} in the
-                            worklist
+                            {notice.count === 1 ? 'alert has' : 'alerts have'} come
+                            in
                         </span>
                         <Button
                             type="button"
@@ -281,22 +302,51 @@ export function ControlRoomDashboardView({
                 </PopupCallout>
             ) : null}
 
-            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+            {top ? (
+                <NeedsYouNowCard
+                    row={top}
+                    onAcknowledge={() => selection.select(top.id, 'acknowledge')}
+                    onTake={() =>
+                        router.post(
+                            `/control-room/alerts/${top.id}/assign-to-me`,
+                            {},
+                            { preserveScroll: true },
+                        )
+                    }
+                />
+            ) : null}
+
+            <div
+                className={
+                    worklist.data.length === 0
+                        ? 'grid min-w-0 gap-5'
+                        : 'grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]'
+                }
+            >
                 <ResponseWorklist
-                    title="Priority worklist"
-                    description="Missed response targets first, then severity, escalation and the next deadline."
-                    worklist={worklist}
+                    title={top ? 'Up next' : 'Needs action'}
+                    description={
+                        top
+                            ? 'Everything else that is open, most urgent first.'
+                            : 'Open alerts, most urgent first. Missed targets go to the top.'
+                    }
+                    worklist={rest}
                     selectedId={selection.selectedId}
                     onSelect={(id) => selection.select(id)}
                     getActions={rowActions}
-                    emptyTitle="Nothing needs a response"
-                    emptyDescription="No open alerts match these filters. Snoozed alerts are under Waiting; finished ones are under History."
+                    emptyTitle={top ? 'Nothing else is waiting' : 'All clear'}
+                    emptyDescription={
+                        top
+                            ? 'The alert above is the only one open.'
+                            : 'No open alerts match these filters. Snoozed alerts are under Snoozed; finished ones are under Done.'
+                    }
                 />
                 <div className="min-w-0 xl:sticky xl:top-5">
                     <AlertPreview
                         row={selection.row}
                         detail={detail}
                         onRun={actions.run}
+                        hideWhenEmpty={worklist.data.length === 0}
                     />
                 </div>
             </div>

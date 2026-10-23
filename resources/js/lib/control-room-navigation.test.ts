@@ -23,15 +23,15 @@ describe('Control Room navigation', () => {
         ]);
     });
 
-    it('keeps the Live response views, Safety handovers included', () => {
+    it('keeps the Live response views, Incident reports included', () => {
         const live = controlRoomDestinations(operator)[0];
         expect(live.views.map((v) => v.label)).toEqual([
-            'Active',
-            'My work',
+            'Needs action',
+            'Mine',
             'Escalated',
-            'Waiting',
-            'Safety handovers',
-            'History',
+            'Snoozed',
+            'Incident reports',
+            'Done',
         ]);
         expect(live.href).toBe('/control-room');
     });
@@ -47,9 +47,9 @@ describe('Control Room navigation', () => {
         expect(destinations.map((d) => d.title)).toEqual(['Live response']);
         expect(destinations[0].href).toBe('/control-room/alerts');
         expect(destinations[0].views.map((v) => v.label)).toEqual([
-            'Active',
-            'Waiting',
-            'History',
+            'Needs action',
+            'Snoozed',
+            'Done',
         ]);
     });
 
@@ -84,6 +84,24 @@ describe('Control Room navigation', () => {
         expect(controlRoomActiveView('/control-room/alerts', keys)).toBe('/control-room');
         expect(controlRoomActiveView('/control-room/alerts/12', keys)).toBe('/control-room');
         expect(controlRoomActiveView('/control-room?severity=critical', keys)).toBe('/control-room');
+    });
+
+    it('lights the first view of a page opened without its tab', () => {
+        const keys = [
+            '/control-room/playbooks',
+            '/control-room/sla',
+            '/control-room/settings?tab=rules',
+            '/control-room/settings?tab=queues',
+        ];
+        expect(controlRoomActiveView('/control-room/settings', keys)).toBe(
+            '/control-room/settings?tab=rules',
+        );
+        expect(controlRoomActiveView('/control-room/settings?tab=queues', keys)).toBe(
+            '/control-room/settings?tab=queues',
+        );
+        expect(controlRoomActiveView('/control-room/playbooks/4', keys)).toBe(
+            '/control-room/playbooks',
+        );
     });
 
     it('describes the hub for the header rail', () => {

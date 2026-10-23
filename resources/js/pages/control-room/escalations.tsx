@@ -4,10 +4,6 @@ import type { AlertWorkspaceDetail } from '@/components/control-room/alert-recor
 import { BulkAlertActionDialog } from '@/components/control-room/bulk-alert-action-dialog';
 import { buildControlRoomAlertRowActions } from '@/components/control-room/control-room-alert-row-actions';
 import { ControlRoomPage } from '@/components/control-room/control-room-page';
-import {
-    EscalationQueueFilters,
-    type EscalationQueueSummary,
-} from '@/components/control-room/escalation-queue-filters';
 import { AlertPreview } from '@/components/control-room/live-response/alert-preview';
 import {
     LiveResponseFilters,
@@ -16,7 +12,9 @@ import {
 } from '@/components/control-room/live-response/live-response-filters';
 import { ResponseWorklist } from '@/components/control-room/live-response/response-worklist';
 import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
+import { LiveMark } from '@/components/control-room/live-response/target-lens';
 import {
+    PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -25,8 +23,17 @@ import { PopupSelectionBar } from '@/components/popup';
 import { Button } from '@/components/ui/button';
 import { formatTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
-import { ArrowUpCircle } from 'lucide-react';
+import { ArrowUpCircle, Inbox } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+
+/** One escalation queue and how full it is. */
+type EscalationQueueSummary = {
+    id: number;
+    name: string;
+    tier: number;
+    alert_count: number;
+    breached_count: number;
+};
 
 type EscalationRow = AlertWorklistRow & {
     escalation_level: number;
@@ -125,7 +132,17 @@ export default function Escalations({
         <ControlRoomPage
             headTitle="Escalated"
             header={{
-                subline: `Alerts that need a higher response level · Updated ${formatTime(serverTime)}`,
+                subline: (
+                    <>
+                        <LiveMark
+                            stale={false}
+                            refreshing={false}
+                            updatedLabel={`updated ${formatTime(serverTime)}`}
+                        />
+                        <span aria-hidden="true"> · </span>
+                        Alerts moved up for a senior response
+                    </>
+                ),
                 actions: (
                     <LiveResponseSearch
                         value={filters.search ?? ''}
@@ -147,7 +164,7 @@ export default function Escalations({
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
-                            label="Target missed"
+                            label="Missed target"
                             tone={summary.breaches > 0 ? 'critical' : 'brand'}
                             href="/control-room/sla/breaches"
                             ariaLabel="Show missed response targets"
@@ -159,43 +176,51 @@ export default function Escalations({
                             label="Critical or high"
                             tone={summary.urgent > 0 ? 'critical' : 'brand'}
                             href={basePath}
-                            ariaLabel="Show the escalation worklist, most urgent first"
+                            ariaLabel="Show escalated alerts, most urgent first"
                         >
                             <PageHeaderMeterBig>{summary.urgent}</PageHeaderMeterBig>
                             <PageHeaderMeterCaption>at the top of the list</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
-                            label="Unassigned"
+                            label="No one on it"
                             tone={summary.unassigned > 0 ? 'warning' : 'brand'}
                             href={basePath}
-                            ariaLabel="Show the escalation worklist"
+                            ariaLabel="Show escalated alerts no one has taken"
                         >
                             <PageHeaderMeterBig>{summary.unassigned}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>claim or assign</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>take one or assign it</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                     </>
                 ),
                 filters: (
-                    <LiveResponseFilters
-                        values={{ severity: filters.severity }}
-                        rows={worklist.data}
-                        onChange={(next) => visit({ severity: next.severity ? String(next.severity) : null })}
-                        show={{ severity: true }}
-                    />
+                    <>
+                        <LiveResponseFilters
+                            values={{ severity: filters.severity }}
+                            rows={worklist.data}
+                            onChange={(next) => visit({ severity: next.severity ? String(next.severity) : null })}
+                            show={{ severity: true }}
+                        />
+                        {queues.length > 1 ? (
+                            <PageHeaderFilterSelect
+                                icon={Inbox}
+                                label="All queues"
+                                value={filters.queue_id ?? 'all'}
+                                onChange={(value) =>
+                                    visit({ queue_id: value === 'all' ? null : value })
+                                }
+                                options={[
+                                    { value: 'all', label: 'All queues' },
+                                    ...queues.map((queue) => ({
+                                        value: String(queue.id),
+                                        label: `${queue.name} · ${queue.alert_count} open${queue.breached_count ? `, ${queue.breached_count} missed` : ''}`,
+                                    })),
+                                ]}
+                            />
+                        ) : null}
+                    </>
                 ),
             }}
         >
-            <EscalationQueueFilters
-                queues={queues}
-                activeQueueId={filters.queue_id}
-                totalAlerts={summary.total_alerts}
-                hasFilters={Boolean(
-                    filters.queue_id || filters.tier || filters.severity || filters.search,
-                )}
-                onSelect={(queueId) => visit({ queue_id: queueId })}
-                onClear={() => router.get(basePath)}
-            />
-
             <PopupSelectionBar
                 count={ticked.size}
                 note={`${escalatable.length} can be escalated`}
@@ -211,10 +236,16 @@ export default function Escalations({
                 </Button>
             </PopupSelectionBar>
 
-            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+            <div
+                className={
+                    worklist.data.length === 0
+                        ? 'grid min-w-0 gap-5'
+                        : 'grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]'
+                }
+            >
                 <ResponseWorklist
-                    title="Escalation worklist"
-                    description="Missed deadlines first, then queue tier, severity, next deadline and time in the queue."
+                    title="Escalated"
+                    description="Missed targets first, then the highest queue and the most urgent."
                     worklist={{
                         data: worklist.data,
                         links: worklist.links,
@@ -229,10 +260,15 @@ export default function Escalations({
                     getActions={rowActions}
                     selection={{ selected: ticked, onChange: setTicked }}
                     emptyTitle="Nothing is escalated"
-                    emptyDescription="No alerts are waiting in an escalation queue that matches these filters."
+                    emptyDescription="No escalated alerts match these filters."
                 />
                 <div className="min-w-0 xl:sticky xl:top-5">
-                    <AlertPreview row={selection.row} detail={detail} onRun={actions.run} />
+                    <AlertPreview
+                        row={selection.row}
+                        detail={detail}
+                        onRun={actions.run}
+                        hideWhenEmpty={worklist.data.length === 0}
+                    />
                 </div>
             </div>
 

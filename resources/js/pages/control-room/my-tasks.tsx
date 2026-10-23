@@ -119,9 +119,9 @@ export default function MyTasks({
 
     return (
         <ControlRoomPage
-            headTitle="My work"
+            headTitle="Mine"
             header={{
-                subline: 'Your assigned alerts, follow-ups and duty',
+                subline: 'Alerts you are on, and the follow-ups you set',
                 actions: (
                     <>
                         <PageHeaderGlassButton icon={CalendarCheck} asChild>
@@ -137,13 +137,13 @@ export default function MyTasks({
                 meters: (
                     <>
                         <PageHeaderMeterBlock
-                            label="Open"
+                            label="On it"
                             tone={stats.my_open > 0 ? 'warning' : 'brand'}
                             onClick={() => scrollToSection('my-alerts')}
                             ariaLabel="Go to my alerts"
                         >
                             <PageHeaderMeterBig>{stats.my_open}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>assigned to me</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>alerts you have</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
                             label="Critical"
@@ -152,7 +152,7 @@ export default function MyTasks({
                             ariaLabel="Go to my critical alerts"
                         >
                             <PageHeaderMeterBig>{stats.my_critical}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>needs attention</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>answer these first</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
                             label="Follow-ups"
@@ -169,7 +169,7 @@ export default function MyTasks({
                             ariaLabel="Show alerts I resolved"
                         >
                             <PageHeaderMeterBig>{stats.my_resolved_today}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>today</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>by you today</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                     </>
                 ),
@@ -179,8 +179,8 @@ export default function MyTasks({
                 <div className="flex min-w-0 flex-col gap-5">
                     <div id="my-alerts" className="scroll-mt-5">
                         <ResponseWorklist
-                            title="My alerts"
-                            description="Assigned to you, most urgent first."
+                            title="Alerts you are on"
+                            description="Most urgent first."
                             worklist={{
                                 data: my_alerts,
                                 links: [],
@@ -193,8 +193,8 @@ export default function MyTasks({
                             selectedId={selection.selectedId}
                             onSelect={(id) => selection.select(id)}
                             getActions={rowActions}
-                            emptyTitle="Nothing assigned to you"
-                            emptyDescription="Alerts you claim or are given appear here. Unowned alerts are under Active."
+                            emptyTitle="You are not on any alerts"
+                            emptyDescription="Alerts you take or are given show here. Alerts no one has taken are under Needs action."
                         />
                     </div>
 

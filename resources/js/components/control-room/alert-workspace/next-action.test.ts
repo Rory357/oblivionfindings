@@ -54,7 +54,7 @@ describe('alert workspace next action', () => {
             expect.objectContaining({
                 key: 'open_incident',
                 label: 'Open incident',
-                statusText: 'Waiting for H&S acceptance',
+                statusText: 'Waiting for Health & Safety to take it on.',
             }),
         );
     });

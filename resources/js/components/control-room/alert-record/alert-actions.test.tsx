@@ -8,7 +8,7 @@ describe('alert actions', () => {
     it('offers the one next step for each state', () => {
         expect(primaryAlertAction(alertDetail())?.label).toBe('Acknowledge');
         expect(primaryAlertAction(alertDetail({ alert: { status: 'ack' } }))?.label).toBe(
-            'Start triage',
+            'Start response',
         );
         expect(primaryAlertAction(alertDetail({ alert: { status: 'triaging' } }))?.label).toBe(
             'Resolve',

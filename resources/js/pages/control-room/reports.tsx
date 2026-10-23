@@ -1,33 +1,52 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import PageShell from '@/components/page-shell';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { plainLabel } from '@/components/control-room/alert-record/alert-labels';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
+    CategoryBars,
+    HeaderDateRange,
+    NOT_MEASURED,
+    ReportPanel,
+    SEVERITY_LABEL,
+    SEVERITY_ORDER,
+    TrendChart,
+    measured,
+    showSection,
+    type ChartRow,
+} from '@/components/control-room/reports/report-parts';
 import {
-    ALERT_SEVERITY_VOCAB,
-    ALERT_STATUS_VOCAB,
-    vocabularyFor,
-} from '@/lib/control-room-vocab';
-import { Head, Link, router } from '@inertiajs/react';
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+} from '@/components/page';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
-    AlertTriangle,
-    ArrowLeft,
-    BarChart3,
-    CheckCircle,
-    Clock,
-    Download,
-    TrendingUp,
-} from 'lucide-react';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { formatDateOnly, toDateInput } from '@/lib/datetime';
+import { ALERT_STATUS_VOCAB } from '@/lib/control-room-vocab';
+import { Link, router, usePage } from '@inertiajs/react';
+import { ArrowUpRight, CalendarRange, Download, Timer, Users } from 'lucide-react';
+
+type SeverityTargets = {
+    total: number;
+    assessed_total: number;
+    met: number;
+    breached: number;
+    in_progress: number;
+    compliance_pct: number | null;
+};
 
 interface Props {
+    /** 7d · 30d · 90d · 1y, or "custom" when date_from and date_to are in the address. */
     period: string;
+    site_id?: number | null;
     stats: {
         total_alerts: number;
         resolved_alerts: number;
@@ -41,27 +60,70 @@ interface Props {
     by_source: Record<string, number>;
     by_alert_type: Record<string, number>;
     daily_trend: { date: string; count: number }[];
+    /** Minutes per severity; the server does not record these yet, so it is often empty. */
     response_time_by_severity: Record<string, number>;
     top_assignees: { user: string; count: number }[];
+    sla?: {
+        total_with_sla: number;
+        avg_acknowledge_minutes: number;
+        avg_response_minutes: number;
+        by_severity?: Record<string, SeverityTargets>;
+    };
+    escalation?: {
+        escalated: number;
+        by_level?: Record<string, number>;
+        stuck_at_high_escalation?: number;
+    };
 }
 
-const severityColors: Record<string, string> = {
-    critical: 'bg-status-critical',
-    high: 'bg-status-warning',
-    medium: 'bg-status-warning',
-    low: 'bg-status-info',
-};
+const BASE = '/control-room/reports';
 
-const statusColors: Record<string, string> = {
-    open: 'bg-status-critical',
-    ack: 'bg-status-warning',
-    triaging: 'bg-status-info',
-    resolved: 'bg-status-success',
-    closed: 'bg-muted',
-};
+const PERIODS = [
+    { value: '7d', label: 'Last 7 days' },
+    { value: '30d', label: 'Last 30 days' },
+    { value: '90d', label: 'Last 90 days' },
+    { value: '1y', label: 'Last year' },
+    { value: 'custom', label: 'Choose dates' },
+];
 
+const DEFAULT_PERIOD = '30d';
+
+function queryOf(url: string) {
+    return new URL(url, 'https://control-room.invalid').searchParams;
+}
+
+/** The report's scope as query params — the same set the export link carries. */
+function scopeParams({
+    period,
+    from,
+    to,
+    siteId,
+}: {
+    period: string;
+    from?: string;
+    to?: string;
+    siteId?: number | null;
+}): Record<string, string> {
+    const params: Record<string, string> =
+        period === 'custom' && from && to
+            ? { date_from: from, date_to: to }
+            : { period };
+    if (siteId) params.site_id = String(siteId);
+    return params;
+}
+
+function minutes(value: number) {
+    return `${Math.round(value)} min`;
+}
+
+/**
+ * Reports › Overview — what happened over a period: alert volume, outcomes,
+ * escalation and response times, with the CSV export of the same scope.
+ * Each header number points at the panel that breaks it down.
+ */
 export default function ControlRoomReports({
     period,
+    site_id: siteId = null,
     stats,
     by_severity,
     by_status,
@@ -70,399 +132,400 @@ export default function ControlRoomReports({
     daily_trend,
     response_time_by_severity,
     top_assignees,
+    sla,
+    escalation,
 }: Props) {
-    const handlePeriodChange = (newPeriod: string) => {
-        router.get(
-            '/control-room/reports',
-            { period: newPeriod },
-            { preserveState: true },
-        );
+    const page = usePage();
+    const query = queryOf(page.url);
+    const from = query.get('date_from') ?? '';
+    const to = query.get('date_to') ?? '';
+    const custom = period === 'custom' && Boolean(from && to);
+    const periodValue = custom ? 'custom' : period;
+    const periodName = custom
+        ? `${formatDateOnly(from)} – ${formatDateOnly(to)}`
+        : (PERIODS.find((p) => p.value === period)?.label ?? 'Last 30 days');
+
+    const visit = (params: Record<string, string>) =>
+        router.get(BASE, params, { preserveState: true, preserveScroll: true });
+
+    const choosePeriod = (value: string) => {
+        if (value === 'custom') {
+            const today = toDateInput(new Date());
+            const start = toDateInput(Date.now() - 30 * 86_400_000);
+            visit(scopeParams({ period: 'custom', from: from || start, to: to || today, siteId }));
+            return;
+        }
+        visit(scopeParams({ period: value, siteId }));
     };
 
-    const handleExport = () => {
-        window.location.href = `/control-room/reports/export?period=${period}`;
-    };
+    const exportHref = `${BASE}/export?${new URLSearchParams(
+        scopeParams({ period: periodValue, from, to, siteId }),
+    ).toString()}`;
 
-    const maxTrend = Math.max(...daily_trend.map((d) => d.count), 1);
+    const total = stats.total_alerts;
+    const resolutionRate = total > 0 ? stats.resolution_rate : null;
+    const escalationRate = total > 0 ? stats.escalation_rate : null;
+    const avgResolution = measured(stats.avg_resolution_hours, { zeroIsMissing: true });
+    const avgAcknowledge = measured(sla?.avg_acknowledge_minutes, { zeroIsMissing: true });
+    const avgResponse = measured(sla?.avg_response_minutes, { zeroIsMissing: true });
+
+    const trendRows: ChartRow[] = (daily_trend ?? []).map((day) => ({
+        key: day.date,
+        label: formatDateOnly(day.date, day.date).replace(/ \d{4}$/, ''),
+        value: Number(day.count) || 0,
+    }));
+    const severityRows: ChartRow[] = SEVERITY_ORDER.map((key) => ({
+        key,
+        label: SEVERITY_LABEL[key],
+        value: Number(by_severity?.[key]) || 0,
+    }));
+    const statusRows: ChartRow[] = Object.entries(by_status ?? {}).map(([key, count]) => ({
+        key,
+        label: ALERT_STATUS_VOCAB[key]?.label ?? plainLabel(key),
+        value: Number(count) || 0,
+    }));
+    const sourceRows: ChartRow[] = Object.entries(by_source ?? {}).map(([key, count]) => ({
+        key,
+        label: plainLabel(key) || 'Not recorded',
+        value: Number(count) || 0,
+    }));
+    const typeRows: ChartRow[] = Object.entries(by_alert_type ?? {})
+        .slice(0, 10)
+        .map(([key, count]) => ({
+            key,
+            label: plainLabel(key) || 'Not recorded',
+            value: Number(count) || 0,
+        }));
+    const levelRows: ChartRow[] = Object.entries(escalation?.by_level ?? {}).map(
+        ([level, count]) => ({
+            key: level,
+            label: `Level ${level}`,
+            value: Number(count) || 0,
+        }),
+    );
+    const stuck = escalation?.stuck_at_high_escalation ?? 0;
+
+    // Only what was measured: a severity with no response targets in the
+    // period is left out, and so is a column that would be empty on every row.
+    const averageEntries: Array<[string, number | null]> = [
+        ['Average time to acknowledge', avgAcknowledge],
+        ['Average time to respond', avgResponse],
+    ];
+    const averages = averageEntries.filter(
+        (entry): entry is [string, number] => entry[1] !== null,
+    );
+    const targetRows = SEVERITY_ORDER.map((key) => ({
+        key,
+        time: measured(response_time_by_severity?.[key], { zeroIsMissing: true }),
+        targets: sla?.by_severity?.[key],
+    })).filter((row) => row.time !== null || (row.targets?.total ?? 0) > 0);
+    const timesKnown = targetRows.some((row) => row.time !== null);
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'Reports', href: '#' },
-            ]}
+        <ControlRoomPage
+            header={{
+                subline: `Alert volume, outcomes and response times · ${periodName}`,
+                actions: (
+                    <PageHeaderGlassButton icon={Download} asChild>
+                        <a href={exportHref}>Export CSV</a>
+                    </PageHeaderGlassButton>
+                ),
+                meters: (
+                    <>
+                        <PageHeaderMeterBlock
+                            label="Total alerts"
+                            onClick={() => showSection('daily-trend')}
+                            ariaLabel="Show alerts by day"
+                        >
+                            <PageHeaderMeterBig>{total}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>raised in this period</PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Resolution rate"
+                            onClick={() => showSection('by-status')}
+                            ariaLabel="Show alerts by status"
+                        >
+                            <PageHeaderMeterBig>
+                                {resolutionRate === null ? NOT_MEASURED : `${resolutionRate}%`}
+                            </PageHeaderMeterBig>
+                            {resolutionRate !== null ? (
+                                <PageHeaderMeterBar percent={resolutionRate} />
+                            ) : null}
+                            <PageHeaderMeterCaption>
+                                {resolutionRate === null
+                                    ? 'no alerts in this period'
+                                    : `${stats.resolved_alerts} resolved or closed`}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Average resolution"
+                            onClick={() => showSection('response-times')}
+                            ariaLabel="Show response times"
+                        >
+                            <PageHeaderMeterBig>
+                                {avgResolution === null ? NOT_MEASURED : `${avgResolution} h`}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {avgResolution === null
+                                    ? 'no timed resolutions yet'
+                                    : 'per alert with a response target'}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Escalation rate"
+                            tone={stats.escalated_count > 0 ? 'warning' : 'brand'}
+                            onClick={() => showSection('escalations')}
+                            ariaLabel="Show escalations by level"
+                        >
+                            <PageHeaderMeterBig>
+                                {escalationRate === null ? NOT_MEASURED : `${escalationRate}%`}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {escalationRate === null
+                                    ? 'no alerts in this period'
+                                    : `${stats.escalated_count} escalated`}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    </>
+                ),
+                filters: (
+                    <>
+                        <PageHeaderFilterSelect
+                            icon={CalendarRange}
+                            label="Last 30 days"
+                            allValue={DEFAULT_PERIOD}
+                            value={periodValue}
+                            options={PERIODS}
+                            onChange={choosePeriod}
+                        />
+                        {custom ? (
+                            <HeaderDateRange
+                                idPrefix="reports-range"
+                                from={from}
+                                to={to}
+                                onChange={(nextFrom, nextTo) =>
+                                    visit(
+                                        scopeParams({
+                                            period: 'custom',
+                                            from: nextFrom,
+                                            to: nextTo,
+                                            siteId,
+                                        }),
+                                    )
+                                }
+                            />
+                        ) : null}
+                    </>
+                ),
+            }}
         >
-            <Head title="Control Room Reports" />
-            <PageShell>
-                <CommandCentrePage
-                    variant="compact"
-                    current="/control-room/reports"
-                    icon={BarChart3}
-                    title="Reports"
-                    description="Review and export accountable Control Room activity and performance."
-                    status="Reporting workspace"
-                    freshness={`Period: ${period}`}
-                    actions={
-                        <div className="flex items-center gap-2">
-                            <Select
-                                value={period}
-                                onValueChange={handlePeriodChange}
+            <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+                <ReportPanel
+                    id="daily-trend"
+                    title="Alerts by day"
+                    description="Every alert raised in the period, by the day it came in."
+                >
+                    <TrendChart
+                        rows={trendRows}
+                        emptyTitle="No alerts in this period"
+                        emptyDescription="Try a longer period."
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="by-severity"
+                    title="By severity"
+                    description="How serious the alerts in this period were."
+                >
+                    <CategoryBars
+                        rows={severityRows}
+                        labelHeading="Severity"
+                        showShare
+                        emptyTitle="No alerts in this period"
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="by-status"
+                    title="By status"
+                    description="Where the alerts raised in this period are now."
+                >
+                    <CategoryBars
+                        rows={statusRows}
+                        labelHeading="Status"
+                        showShare
+                        emptyTitle="No alerts in this period"
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="escalations"
+                    title="Escalations by level"
+                    description="Alerts that needed a higher response level, by the highest level reached."
+                    action={
+                        stuck > 0 ? (
+                            <Link
+                                href="/control-room/escalations"
+                                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                             >
-                                <SelectTrigger className="w-32 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="7d">
-                                        Last 7 days
-                                    </SelectItem>
-                                    <SelectItem value="30d">
-                                        Last 30 days
-                                    </SelectItem>
-                                    <SelectItem value="90d">
-                                        Last 90 days
-                                    </SelectItem>
-                                    <SelectItem value="1y">
-                                        Last year
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleExport}
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Download className="mr-2 h-4 w-4" />
-                                Export CSV
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                asChild
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Link href="/control-room">
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    Dashboard
-                                </Link>
-                            </Button>
-                        </div>
+                                {stuck} still open at level 3 or above
+                                <ArrowUpRight aria-hidden="true" className="size-4" />
+                            </Link>
+                        ) : null
                     }
                 >
-                    {/* Key Metrics */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                    <AlertTriangle className="h-4 w-4" />
-                                    Total Alerts
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.total_alerts}
+                    <CategoryBars
+                        rows={levelRows}
+                        labelHeading="Level"
+                        emptyTitle="Nothing was escalated"
+                        emptyDescription="No alert in this period needed a higher response level."
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="response-times"
+                    title="Response time by severity"
+                    description="How quickly alerts were answered, and how often the response target was met."
+                    className="lg:col-span-2"
+                >
+                    {averages.length ? (
+                        <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
+                            {averages.map(([label, value]) => (
+                                <div
+                                    key={label}
+                                    className="flex items-baseline justify-between gap-3 border-b border-border pb-2"
+                                >
+                                    <dt className="text-muted-foreground">{label}</dt>
+                                    <dd className="font-semibold tabular-nums">{minutes(value)}</dd>
                                 </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                    <CheckCircle className="h-4 w-4" />
-                                    Resolution Rate
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.resolution_rate}%
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    {stats.resolved_alerts} resolved
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                    <Clock className="h-4 w-4" />
-                                    Avg Resolution Time
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.avg_resolution_hours}h
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                    <TrendingUp className="h-4 w-4" />
-                                    Escalation Rate
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.escalation_rate}%
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    {stats.escalated_count} escalated
-                                </p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Charts Row */}
-                    <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                        {/* Daily Trend */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Daily Alert Trend</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {daily_trend.length > 0 ? (
-                                    <div className="flex h-40 items-end gap-1">
-                                        {daily_trend
-                                            .slice(-30)
-                                            .map((day, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="group relative flex-1"
-                                                >
-                                                    <div
-                                                        className="w-full rounded-t bg-primary transition-all hover:bg-primary/80"
-                                                        style={{
-                                                            height: `${(day.count / maxTrend) * 100}%`,
-                                                            minHeight:
-                                                                day.count > 0
-                                                                    ? '4px'
-                                                                    : '0',
-                                                        }}
-                                                    />
-                                                    <div className="absolute bottom-full left-1/2 mb-1 hidden -translate-x-1/2 rounded bg-popover px-2 py-1 text-xs shadow-md group-hover:block">
-                                                        {day.date}: {day.count}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        No data available
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* By Severity */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>By Severity</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-3">
-                                    {['critical', 'high', 'medium', 'low'].map(
-                                        (sev) => {
-                                            const count = by_severity[sev] || 0;
-                                            const pct =
-                                                stats.total_alerts > 0
-                                                    ? (count /
-                                                          stats.total_alerts) *
-                                                      100
-                                                    : 0;
-                                            return (
-                                                <div key={sev}>
-                                                    <div className="mb-1 flex justify-between text-sm">
-                                                        <span>
-                                                            {
-                                                                vocabularyFor(
-                                                                    ALERT_SEVERITY_VOCAB,
-                                                                    sev,
-                                                                ).label
-                                                            }
-                                                        </span>
-                                                        <span className="text-muted-foreground">
-                                                            {count} (
-                                                            {pct.toFixed(1)}
-                                                            %)
-                                                        </span>
-                                                    </div>
-                                                    <div className="h-2 rounded-full bg-muted">
-                                                        <div
-                                                            className={`h-full rounded-full ${severityColors[sev]}`}
-                                                            style={{
-                                                                width: `${pct}%`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            );
-                                        },
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Second Row */}
-                    <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                        {/* By Status */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>By Status</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {Object.entries(by_status).map(
-                                        ([status, count]) => (
-                                            <div
-                                                key={status}
-                                                className="flex items-center justify-between"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <div
-                                                        className={`h-3 w-3 rounded-full ${statusColors[status] || 'bg-muted'}`}
-                                                    />
-                                                    <span className="text-sm">
-                                                        {
-                                                            vocabularyFor(
-                                                                ALERT_STATUS_VOCAB,
-                                                                status,
-                                                            ).label
-                                                        }
+                            ))}
+                        </dl>
+                    ) : null}
+                    {targetRows.length ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Severity</TableHead>
+                                    {timesKnown ? (
+                                        <TableHead className="text-right">Average response</TableHead>
+                                    ) : null}
+                                    <TableHead className="text-right">Targets met</TableHead>
+                                    <TableHead className="text-right">Targets missed</TableHead>
+                                    <TableHead className="text-right">Met on time</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {targetRows.map(({ key, time, targets }) => (
+                                    <TableRow key={key}>
+                                        <TableHead scope="row" className="font-medium text-foreground">
+                                            {SEVERITY_LABEL[key]}
+                                        </TableHead>
+                                        {timesKnown ? (
+                                            <TableCell className="text-right tabular-nums">
+                                                {time === null ? (
+                                                    <span className="text-muted-foreground">
+                                                        {NOT_MEASURED}
                                                     </span>
-                                                </div>
-                                                <span className="text-sm font-medium">
-                                                    {count}
+                                                ) : (
+                                                    minutes(time)
+                                                )}
+                                            </TableCell>
+                                        ) : null}
+                                        <TableCell className="text-right tabular-nums">
+                                            {targets?.met ?? 0}
+                                        </TableCell>
+                                        <TableCell className="text-right tabular-nums">
+                                            {targets?.breached ?? 0}
+                                        </TableCell>
+                                        <TableCell className="text-right tabular-nums">
+                                            {targets?.compliance_pct != null ? (
+                                                `${targets.compliance_pct}%`
+                                            ) : (
+                                                <span className="text-muted-foreground">
+                                                    {targets?.in_progress ? 'Still running' : NOT_MEASURED}
                                                 </span>
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* By Source */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>By Source</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {Object.entries(by_source).map(
-                                        ([source, count]) => (
-                                            <div
-                                                key={source}
-                                                className="flex items-center justify-between"
-                                            >
-                                                <span className="text-sm">
-                                                    {source.replace('_', ' ')}
-                                                </span>
-                                                <span className="text-sm font-medium">
-                                                    {count}
-                                                </span>
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Top Alert Types */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Top Alert Types</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {Object.entries(by_alert_type)
-                                        .slice(0, 5)
-                                        .map(([type, count]) => (
-                                            <div
-                                                key={type}
-                                                className="flex items-center justify-between"
-                                            >
-                                                <span className="truncate text-sm">
-                                                    {type}
-                                                </span>
-                                                <span className="ml-2 text-sm font-medium">
-                                                    {count}
-                                                </span>
-                                            </div>
-                                        ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Third Row */}
-                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                        {/* Response Time by Severity */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>
-                                    Avg Response Time by Severity (minutes)
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-3">
-                                    {['critical', 'high', 'medium', 'low'].map(
-                                        (sev) => {
-                                            const mins =
-                                                response_time_by_severity[
-                                                    sev
-                                                ] || 0;
-                                            return (
-                                                <div
-                                                    key={sev}
-                                                    className="flex items-center justify-between"
-                                                >
-                                                    <span className="capitalize">
-                                                        {sev}
-                                                    </span>
-                                                    <span className="font-medium">
-                                                        {mins > 0
-                                                            ? `${Math.round(mins)} min`
-                                                            : '-'}
-                                                    </span>
-                                                </div>
-                                            );
-                                        },
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Top Assignees */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Top Assignees</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {top_assignees.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {top_assignees.map((a, i) => (
-                                            <div
-                                                key={i}
-                                                className="flex items-center justify-between"
-                                            >
-                                                <span className="text-sm">
-                                                    {a.user}
-                                                </span>
-                                                <span className="text-sm font-medium">
-                                                    {a.count} alerts
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        No assignments in this period
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                </CommandCentrePage>
-            </PageShell>
-        </AppLayout>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <EmptyState
+                            variant="compact"
+                            icon={Timer}
+                            title="No response targets ran in this period"
+                            description="Times show here once alerts with a response target come in."
+                        />
+                    )}
+                    {targetRows.length && !timesKnown ? (
+                        <p className="text-caption">
+                            Average response time by severity isn&apos;t recorded yet.
+                        </p>
+                    ) : null}
+                    <p className="text-caption">
+                        Missed response targets are listed under{' '}
+                        <Link href="/control-room/sla/breaches" className="font-medium text-primary hover:underline">
+                            Target breaches
+                        </Link>
+                        .
+                    </p>
+                </ReportPanel>
+                <ReportPanel
+                    id="by-source"
+                    title="By source"
+                    description="Where the alerts came from."
+                >
+                    <CategoryBars
+                        rows={sourceRows}
+                        labelHeading="Source"
+                        emptyTitle="No alerts in this period"
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="by-type"
+                    title="Top alert types"
+                    description="The ten most common kinds of alert."
+                >
+                    <CategoryBars
+                        rows={typeRows}
+                        labelHeading="Alert type"
+                        emptyTitle="No alerts in this period"
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="assignees"
+                    title="Top assignees"
+                    description="Who handled the most alerts in this period."
+                    className="lg:col-span-2"
+                >
+                    {top_assignees?.length ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Assignee</TableHead>
+                                    <TableHead className="text-right">Alerts handled</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {top_assignees.map((row, index) => (
+                                    <TableRow key={`${row.user}-${index}`}>
+                                        <TableHead scope="row" className="font-medium text-foreground">
+                                            {row.user}
+                                        </TableHead>
+                                        <TableCell className="text-right tabular-nums">
+                                            {row.count}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <EmptyState
+                            variant="compact"
+                            icon={Users}
+                            title="No assignments in this period"
+                            description="No alert in this period was assigned to a person."
+                        />
+                    )}
+                </ReportPanel>
+            </div>
+        </ControlRoomPage>
     );
 }

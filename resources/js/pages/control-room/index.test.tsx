@@ -150,7 +150,7 @@ describe('Live response › Active', () => {
             'href',
             '/control-room?severity=critical',
         );
-        expect(screen.getByRole('link', { name: 'Show alerts with no owner' })).toHaveAttribute(
+        expect(screen.getByRole('link', { name: 'Show alerts no one has taken' })).toHaveAttribute(
             'href',
             '/control-room?assigned_to=unassigned',
         );
@@ -162,16 +162,22 @@ describe('Live response › Active', () => {
             'href',
             '/control-room/alerts?new=1',
         );
-        for (const tab of ['Active', 'My work', 'Escalated', 'Waiting', 'Safety handovers', 'History']) {
+        for (const tab of ['Needs action', 'Mine', 'Escalated', 'Snoozed', 'Incident reports', 'Done']) {
             expect(screen.getAllByText(tab).length).toBeGreaterThan(0);
         }
     });
 
-    it('lists the priority work and previews the first alert', () => {
+    it('puts the urgent top alert in "Needs you now" and previews it', () => {
         render(<ControlRoomDashboardView {...props()} />);
 
-        expect(screen.getByRole('heading', { name: 'Priority worklist' })).toBeInTheDocument();
-        expect(screen.getAllByText('Missed welfare check').length).toBeGreaterThan(0);
+        const card = screen.getByLabelText('Needs you now: Aroha Ngata');
+        expect(within(card).getByText('Missed welfare check')).toBeInTheDocument();
+        expect(within(card).getByText('No one on it yet')).toBeInTheDocument();
+        expect(within(card).getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument();
+        expect(within(card).getByRole('button', { name: 'Take it' })).toBeInTheDocument();
+        // The rest of the list sits under it.
+        expect(screen.getByRole('heading', { name: 'Up next' })).toBeInTheDocument();
+        expect(screen.getByText('Nothing else is waiting')).toBeInTheDocument();
         // Nothing was chosen, so the top alert loads into the preview.
         expect(inertia.get).toHaveBeenCalledWith(
             expect.stringContaining('alert=9'),
@@ -183,6 +189,19 @@ describe('Live response › Active', () => {
             'href',
             '/control-room/alerts/9',
         );
+    });
+
+    it('keeps a calm board calm: no card when the top alert is not urgent', () => {
+        const base = props();
+        const calm = { ...base.worklist.data[0], severity: 'low' as const, sla: { status: 'on_track' as const, next_deadline_at: null } };
+        render(
+            <ControlRoomDashboardView
+                {...props({ worklist: { ...base.worklist, data: [calm] } })}
+            />,
+        );
+        expect(screen.queryByLabelText(/Needs you now/)).not.toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Needs action' })).toBeInTheDocument();
+        expect(screen.getAllByText('Missed welfare check').length).toBeGreaterThan(0);
     });
 
     it('says plainly when the worklist could not refresh', () => {

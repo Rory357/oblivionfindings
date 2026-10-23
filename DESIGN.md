@@ -690,6 +690,24 @@ before.
   module its own header. Control Room pages use `ControlRoomPage`
   (`components/control-room/control-room-page.tsx`), which wraps the shared
   `PageHeader` and the destination's view tabs.
+- **A live board that reads like a generic admin list** (corrected
+  2026-10-24, Control Room Live response: "looks so generic … hard to
+  understand"). A list of reference numbers, device names, small pills and
+  bare dates, with the same words repeated on every row, a "no target"
+  block per target and empty "—" fields, does not tell an operator who
+  needs help or how long is left. Live work leads with the **person and
+  the house**, says **what happened** in one sentence, shows **who is on
+  it** (or "No one on it yet"), and shows **time as age or countdown**
+  ("raised 3 min ago", "due in 4 min", "missed by 12 min") — never a bare
+  time without its date. Use Control Room's marks
+  (`components/control-room/live-response/`): the **countdown lens**
+  (`TargetLens`, `.cr-lens` — the pop-up kit's round lens with a ring that
+  empties toward the target; grey "waiting" when there is no target), the
+  **urgency bar** (`UrgencyBar`, fixed safety colours), the **Live mark**
+  (`LiveMark`) in the header subline, and the **"Needs you now"** card
+  for an urgent top alert (only when it is urgent). Reference numbers stay
+  small and last. Hide empty fields; say a thing once; plain tab names
+  (Needs action · Mine · Escalated · Snoozed · Incident reports · Done).
 - **Page tops that bypass the Event Horizon header** — a page opening
   with a plain heading, a one-off banner, a legacy `PageHero`, or a
   search/filter bar sitting BELOW the header, instead of the fixed

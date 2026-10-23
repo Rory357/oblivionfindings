@@ -4,6 +4,14 @@ import {
     targetBadge,
 } from '@/components/control-room/alert-record/alert-labels';
 import {
+    OwnerChip,
+    rowClock,
+    UrgencyBar,
+    whoAndWhere,
+} from '@/components/control-room/live-response/alert-glance';
+import { raisedWords, useNow } from '@/components/control-room/live-response/response-clock';
+import { TargetLens } from '@/components/control-room/live-response/target-lens';
+import {
     ControlRoomRowActions,
     type ControlRoomRowAction,
 } from '@/components/control-room/control-room-row-actions';
@@ -13,10 +21,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
-import { Inbox } from 'lucide-react';
-import { useId, type ReactNode } from 'react';
+import { Inbox, type LucideIcon } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 export type WorklistPage = {
     data: AlertWorklistRow[];
@@ -24,16 +32,30 @@ export type WorklistPage = {
     meta: { current_page: number; last_page: number; total: number };
 };
 
-const SEVERITY_DOT: Record<string, string> = {
-    critical: 'bg-status-critical',
-    high: 'bg-status-warning',
-    medium: 'bg-status-info',
-    low: 'bg-muted-foreground',
-};
+/** Alerts that arrived after the list first drew, glowing for a moment. */
+function useArrivals(rows: AlertWorklistRow[]): ReadonlySet<number> {
+    const seen = useRef<Set<number> | null>(null);
+    const [fresh, setFresh] = useState<ReadonlySet<number>>(new Set());
+    useEffect(() => {
+        if (seen.current === null) {
+            seen.current = new Set(rows.map((row) => row.id));
+            return;
+        }
+        const arrived = rows.filter((row) => !seen.current!.has(row.id));
+        if (arrived.length === 0) return;
+        arrived.forEach((row) => seen.current!.add(row.id));
+        setFresh(new Set(arrived.map((row) => row.id)));
+        const id = window.setTimeout(() => setFresh(new Set()), 4000);
+        return () => window.clearTimeout(id);
+    }, [rows]);
+    return fresh;
+}
 
 /**
- * The Live response worklist: one ordered list, a row per alert. Selecting a
- * row shows it in the preview beside the list; every row keeps the kebab AND
+ * The Live response list: one row per alert, most urgent first. Each row
+ * leads with the person and the house, says what happened in their words,
+ * who is on it, and counts down to the next response target in the lens.
+ * Selecting a row shows it beside the list; every row keeps the kebab AND
  * the right-click menu with the same items (LIST_STYLE_GUIDE.md).
  */
 export function ResponseWorklist({
@@ -45,6 +67,7 @@ export function ResponseWorklist({
     getActions,
     emptyTitle,
     emptyDescription,
+    emptyIcon = Inbox,
     toolbar,
     selection,
 }: {
@@ -56,6 +79,7 @@ export function ResponseWorklist({
     getActions: (row: AlertWorklistRow) => readonly ControlRoomRowAction[];
     emptyTitle: string;
     emptyDescription: string;
+    emptyIcon?: LucideIcon;
     /** Optional controls on the list's own header row (e.g. sort). */
     toolbar?: ReactNode;
     /** Tick rows for a bulk action (Escalated, the alert lists). */
@@ -66,6 +90,8 @@ export function ResponseWorklist({
 }) {
     const headingId = useId();
     const rows = worklist.data;
+    const now = useNow();
+    const arrivals = useArrivals(rows);
     const allTicked =
         rows.length > 0 && rows.every((row) => selection?.selected.has(row.id));
     const toggleRow = (id: number, on: boolean) => {
@@ -117,7 +143,7 @@ export function ResponseWorklist({
             {rows.length === 0 ? (
                 <div className="px-5 py-10">
                     <EmptyState
-                        icon={Inbox}
+                        icon={emptyIcon}
                         title={emptyTitle}
                         description={emptyDescription}
                     />
@@ -133,6 +159,8 @@ export function ResponseWorklist({
                             {({ rowProps, overflowButton }) => (
                                 <WorklistRow
                                     row={row}
+                                    now={now}
+                                    arrived={arrivals.has(row.id)}
                                     selected={row.id === selectedId}
                                     onSelect={() => onSelect(row.id)}
                                     rowProps={rowProps}
@@ -172,6 +200,8 @@ export function ResponseWorklist({
 
 function WorklistRow({
     row,
+    now,
+    arrived,
     selected,
     onSelect,
     rowProps,
@@ -179,52 +209,48 @@ function WorklistRow({
     ticked,
     onTick,
 }: {
-    /** undefined = this list has no tick boxes. */
-    ticked?: boolean;
-    onTick: (on: boolean) => void;
     row: AlertWorklistRow;
+    now: number;
+    arrived: boolean;
     selected: boolean;
     onSelect: () => void;
     rowProps: { onContextMenu: (event: React.MouseEvent<HTMLElement>) => void; tabIndex: number };
     overflowButton: ReactNode;
+    /** undefined = this list has no tick boxes. */
+    ticked?: boolean;
+    onTick: (on: boolean) => void;
 }) {
     const severity = severityBadge(row.severity);
     const target =
         row.sla.status === 'breached' || row.sla.status === 'at_risk'
             ? targetBadge(row.sla.status)
             : null;
-    const facts = [
-        row.reference_number ?? 'Reference pending',
-        row.source.label,
-        row.site?.name ?? 'Site not recorded',
-        row.person?.name,
-    ].filter(Boolean);
+    const clock = rowClock(row, now);
+    const { who, where } = whoAndWhere(row);
+    const raised = raisedWords(row.triggered_at, now);
 
     return (
         <li
             onContextMenu={rowProps.onContextMenu}
+            data-selected={selected ? 'true' : undefined}
             className={cn(
-                'relative flex items-start gap-3 px-5 py-3.5 transition-colors',
+                'relative flex items-start gap-3 py-3.5 pr-3 pl-5 transition-colors',
                 selected
-                    ? 'bg-primary-fill/10 shadow-[inset_3px_0_0_var(--primary)]'
+                    ? 'bg-primary-fill/10 shadow-[inset_-3px_0_0_var(--primary)]'
                     : 'hover:bg-muted/40',
+                arrived && 'cr-row-new',
             )}
         >
+            <UrgencyBar severity={row.severity} />
             {ticked !== undefined ? (
                 <Checkbox
-                    className="mt-1"
+                    className="mt-3"
                     checked={ticked}
                     onCheckedChange={(on) => onTick(on === true)}
                     aria-label={`Select ${row.reference_number ?? `alert ${row.id}`}`}
                 />
             ) : null}
-            <span
-                aria-hidden="true"
-                className={cn(
-                    'mt-1.5 size-2.5 shrink-0 rounded-full',
-                    SEVERITY_DOT[row.severity] ?? SEVERITY_DOT.low,
-                )}
-            />
+            <TargetLens clock={clock} label="Next response target" />
             <Button
                 unstyled
                 type="button"
@@ -232,18 +258,16 @@ function WorklistRow({
                 aria-current={selected ? 'true' : undefined}
                 className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-                <span className="flex items-start justify-between gap-3">
-                    <span className="min-w-0 font-semibold text-foreground">
-                        {row.summary}
-                    </span>
-                    <span
-                        className="text-caption shrink-0 tabular-nums"
-                        title={formatDateTime(row.triggered_at)}
-                    >
-                        {formatRelative(row.triggered_at)}
-                    </span>
+                <span className="flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="font-semibold text-foreground">{who}</span>
+                    {where ? (
+                        <span className="text-subtle">· {where}</span>
+                    ) : null}
                 </span>
-                <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="mt-0.5 block text-sm break-words text-foreground">
+                    {row.summary}
+                </span>
+                <span className="text-caption mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <StatusBadge variant={severity.tone} size="sm">
                         {severity.label}
                     </StatusBadge>
@@ -252,27 +276,19 @@ function WorklistRow({
                             {target.label}
                         </StatusBadge>
                     ) : null}
-                    <span className="text-caption min-w-0">
-                        {facts.join(' · ')}
-                    </span>
-                </span>
-                <span className="text-caption mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <span
-                        className={
-                            row.assignee ? undefined : 'font-medium text-status-warning'
-                        }
-                    >
-                        {row.assignee?.name ?? 'Unassigned — claim or assign'}
-                    </span>
-                    {row.next_deadline_at ? (
-                        <span>Next deadline {formatRelative(row.next_deadline_at)}</span>
+                    <OwnerChip name={row.assignee?.name} />
+                    {raised ? (
+                        <span title={formatDateTime(row.triggered_at)}>{raised}</span>
                     ) : null}
                     {row.playbook ? (
                         <span>
-                            {row.playbook.completed_steps}/{row.playbook.total_steps}{' '}
+                            {row.playbook.completed_steps} of {row.playbook.total_steps}{' '}
                             procedure steps
                         </span>
                     ) : null}
+                    <span className="tabular-nums">
+                        {row.reference_number ?? `Alert ${row.id}`}
+                    </span>
                 </span>
             </Button>
             <div className="shrink-0">{overflowButton}</div>

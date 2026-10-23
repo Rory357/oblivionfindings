@@ -28,7 +28,7 @@ export type StatusVocabulary = {
 export const ALERT_STATUS_VOCAB: Record<string, StatusVocabulary> = {
     open: { label: 'Open', tone: 'warning', icon: Bell },
     ack: { label: 'Acknowledged', tone: 'info', icon: BadgeCheck },
-    triaging: { label: 'Being triaged', tone: 'warning', icon: Gauge },
+    triaging: { label: 'Responding', tone: 'warning', icon: Gauge },
     confirmed: {
         label: 'Confirmed incident',
         tone: 'critical',

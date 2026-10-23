@@ -1,10 +1,16 @@
+import { alertSummary } from '@/components/control-room/alert-record/alert-labels';
 import { LinkedJourney } from '@/components/control-room/alert-workspace/linked-journey';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
+import { useNow } from '@/components/control-room/live-response/response-clock';
+import { ResponseTrack } from '@/components/control-room/live-response/response-track';
 import { ControlRoomItHandoffDialog } from '@/components/control-room/it-handoff-dialog';
 import {
     JourneyGateList,
     type JourneyGateData,
 } from '@/components/incidents/journey-gate-list';
 import { JourneyTermHelp } from '@/components/journey-term-help';
+import { PopupConfirm } from '@/components/popup';
 import {
     MonitoringIncidentEvidenceCard,
     type MonitoringIncidentEvidence,
@@ -386,12 +392,6 @@ const DOT: Record<string, string> = {
     primary: 'bg-primary',
 };
 
-const SEV_LABEL: Record<string, string> = {
-    low: 'Low',
-    medium: 'Medium',
-    high: 'High',
-    critical: 'Critical',
-};
 const SEV_TONE: Record<string, string> = {
     low: 'info',
     medium: 'warning',
@@ -453,18 +453,21 @@ function titleCase(s: string | null | undefined): string {
     return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-function summarise(alert: WorkspaceAlert): string {
-    const ctx = (alert.context ?? {}) as Record<string, any>;
-    const norm = (ctx.normalized_data ?? ctx) as Record<string, any>;
-    const title =
-        typeof norm.title === 'string' && norm.title.trim()
-            ? norm.title.trim()
-            : null;
-    const desc =
-        typeof norm.description === 'string' && norm.description.trim()
-            ? norm.description.trim()
-            : null;
-    return title ?? desc ?? alert.notes ?? titleCase(alert.alert_type);
+/** The alert's longer description, when it says more than its title. */
+function storyText(alert: WorkspaceAlert): string | null {
+    const title = alertSummary(alert).trim();
+    const ctx = (alert.context ?? {}) as Record<string, unknown>;
+    const norm = (ctx.normalized_data ?? {}) as Record<string, unknown>;
+    for (const value of [ctx.description, norm.description, alert.notes]) {
+        if (typeof value === 'string' && value.trim() && value.trim() !== title)
+            return value.trim();
+    }
+    return null;
+}
+
+/** A review row only when there is something to show (no "—" rows). */
+function FilledRow({ label, value }: { label: string; value: string | null | undefined }) {
+    return value ? <ReviewRow label={label} value={value} /> : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -551,53 +554,47 @@ export function PaneNav({
 }
 
 /** Two-phase row action: click → inline "Sure?" confirm — nothing fires on a single click. */
-export function ConfirmChip({
+/**
+ * A small action that asks first, in a kit confirm pop-up (no inline
+ * "click again to confirm"). The question names what happens.
+ */
+export function ConfirmButton({
     label,
     icon: Icon,
     onConfirm,
+    question,
+    description,
     destructive,
     title,
 }: {
     label: string;
     icon: ComponentType<{ className?: string }>;
     onConfirm: () => void;
+    /** e.g. "Remove this task?" */
+    question: string;
+    description?: ReactNode;
     destructive?: boolean;
     title?: string;
 }) {
-    const [arming, setArming] = useState(false);
-    if (!arming) {
-        return (
-            <Button
-                variant="outline"
-                size="sm"
-                title={title}
-                onClick={() => setArming(true)}
-            >
+    const [open, setOpen] = useState(false);
+    return (
+        <>
+            <Button variant="outline" size="sm" title={title} onClick={() => setOpen(true)}>
                 <Icon className="mr-1.5 h-3.5 w-3.5" /> {label}
             </Button>
-        );
-    }
-    return (
-        <span className="inline-flex items-center gap-1">
-            <Button
-                variant={destructive ? 'destructive' : 'default'}
-                size="sm"
-                onClick={() => {
+            <PopupConfirm
+                open={open}
+                onClose={() => setOpen(false)}
+                onConfirm={() => {
+                    setOpen(false);
                     onConfirm();
-                    setArming(false);
                 }}
-            >
-                <Check className="mr-1 h-3.5 w-3.5" /> {label}?
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setArming(false)}
-                aria-label="Cancel"
-            >
-                <X className="h-3.5 w-3.5" />
-            </Button>
-        </span>
+                variant={destructive ? 'destructive' : 'plain'}
+                title={question}
+                description={description}
+                confirmLabel={label}
+            />
+        </>
     );
 }
 
@@ -676,7 +673,7 @@ export function SnoozeBanner({ d }: { d: AlertWorkspaceDetail }) {
                             : '—'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                        Off the worklist
+                        Off Needs action
                         {a.snoozed_by
                             ? ` · snoozed by ${a.snoozed_by.name}`
                             : ''}{' '}
@@ -739,16 +736,31 @@ export function OverviewSection({
               }
             | undefined
     )?.tracker_event;
+    const now = useNow();
+    const story = storyText(a);
+    const place = {
+        person: d.client?.name,
+        asset: a.asset ? `${a.asset.name} (${a.asset.asset_tag})` : undefined,
+        location: d.location?.description ?? undefined,
+    };
+    const working = {
+        priority: a.priority ? titleCase(a.priority) : undefined,
+        category: a.category ? titleCase(a.category) : undefined,
+        due: a.due_at ? formatDateTime(a.due_at) : undefined,
+        resolution: a.resolution_code ? titleCase(a.resolution_code) : undefined,
+    };
     return (
         <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex justify-end sm:col-span-2">
+            <div className="flex items-start justify-between gap-4 sm:col-span-2">
+                {a.status === 'confirmed' || a.status === 'dismissed' ? (
+                    <StatusFlow a={a} />
+                ) : (
+                    <ResponseTrack detail={d} now={now} className="min-w-0 flex-1" />
+                )}
                 <JourneyTermHelp
                     terms={['status', 'severity', 'priority', 'escalation']}
                     label="Explain alert status terms"
                 />
-            </div>
-            <div className="sm:col-span-2">
-                <StatusFlow a={a} />
             </div>
             {d.monitoring_recovery ? (
                 <div className="sm:col-span-2">
@@ -850,111 +862,61 @@ export function OverviewSection({
                     </p>
                 </ReviewCard>
             )}
-            <ReviewCard icon={FileText} title="What's happening" span>
-                {(() => {
-                    const summary = summarise(a);
-                    return (
-                        <>
-                            <p className="text-sm whitespace-pre-wrap text-foreground">
-                                {summary}
-                            </p>
-                            {a.notes && a.notes.trim() !== summary.trim() ? (
-                                <p className="mt-2 border-t border-border pt-2 text-xs whitespace-pre-wrap text-muted-foreground">
-                                    {a.notes}
-                                </p>
-                            ) : null}
-                        </>
-                    );
-                })()}
-            </ReviewCard>
+            {story ? (
+                <ReviewCard icon={FileText} title="What happened" span>
+                    <p className="text-sm whitespace-pre-wrap text-foreground">{story}</p>
+                </ReviewCard>
+            ) : null}
 
-            <ReviewCard icon={RadioTower} title="Alert">
-                <ReviewRow label="Type" value={titleCase(a.alert_type)} />
-                <ReviewRow label="Source" value={titleCase(a.source)} />
-                <ReviewRow
-                    label="Severity"
-                    value={SEV_LABEL[a.severity] ?? titleCase(a.severity)}
-                />
-                <ReviewRow
+            <ReviewCard icon={RadioTower} title="About this alert">
+                <FilledRow label="Type" value={titleCase(a.alert_type)} />
+                <FilledRow label="Came from" value={titleCase(a.source)} />
+                <FilledRow
                     label="Escalation"
-                    value={
-                        a.escalation_level > 0
-                            ? `Level ${a.escalation_level}`
-                            : 'None'
-                    }
+                    value={a.escalation_level > 0 ? `Level ${a.escalation_level}` : undefined}
                 />
-                <ReviewRow
-                    label="Triggered"
-                    value={
-                        a.triggered_at
-                            ? formatDateTime(a.triggered_at)
-                            : undefined
-                    }
+                <FilledRow
+                    label="Raised"
+                    value={a.triggered_at ? formatDateTime(a.triggered_at) : undefined}
                 />
             </ReviewCard>
 
-            <ReviewCard icon={User} title="People & place">
-                <ReviewRow label="Client" value={d.client?.name} />
-                <ReviewRow
-                    label="Asset"
-                    value={
-                        a.asset
-                            ? `${a.asset.name} (${a.asset.asset_tag})`
-                            : undefined
-                    }
-                />
-                <ReviewRow
-                    label="Assigned to"
-                    value={a.assigned_to?.name ?? 'Unassigned'}
-                />
-                <ReviewRow
-                    label="Location"
-                    value={d.location?.description ?? undefined}
-                />
-                {d.location ? (
-                    <div className="pt-1.5">
-                        <a
-                            href={`https://www.google.com/maps?q=${d.location.lat},${d.location.lng}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                        >
-                            <MapPin className="h-3.5 w-3.5" /> Open in Google
-                            Maps
-                        </a>
+            {place.person || place.asset || place.location ? (
+                <ReviewCard icon={User} title="Who and where">
+                    <FilledRow label="Person" value={place.person} />
+                    <FilledRow label="Device or vehicle" value={place.asset} />
+                    <FilledRow label="Location" value={place.location} />
+                    {d.location ? (
+                        <div className="pt-1.5">
+                            <a
+                                href={`https://www.google.com/maps?q=${d.location.lat},${d.location.lng}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            >
+                                <MapPin className="h-3.5 w-3.5" /> Open in Google
+                                Maps
+                            </a>
+                        </div>
+                    ) : null}
+                </ReviewCard>
+            ) : null}
+
+            {working.priority || working.category || working.due || working.resolution ? (
+                <ReviewCard
+                    icon={ClipboardList}
+                    title="Working details"
+                    onEdit={d.can.manage ? onEditMeta : undefined}
+                    span
+                >
+                    <div className="grid gap-x-6 sm:grid-cols-2">
+                        <FilledRow label="Priority" value={working.priority} />
+                        <FilledRow label="Category" value={working.category} />
+                        <FilledRow label="Due" value={working.due} />
+                        <FilledRow label="Resolution code" value={working.resolution} />
                     </div>
-                ) : null}
-            </ReviewCard>
-
-            <ReviewCard
-                icon={ClipboardList}
-                title="Working details"
-                onEdit={d.can.manage ? onEditMeta : undefined}
-                span
-            >
-                <div className="grid gap-x-6 sm:grid-cols-2">
-                    <ReviewRow
-                        label="Priority"
-                        value={a.priority ? titleCase(a.priority) : undefined}
-                    />
-                    <ReviewRow
-                        label="Category"
-                        value={a.category ? titleCase(a.category) : undefined}
-                    />
-                    <ReviewRow
-                        label="Due"
-                        value={a.due_at ? formatDateTime(a.due_at) : undefined}
-                    />
-                    <ReviewRow
-                        label="Resolution code"
-                        value={
-                            a.resolution_code
-                                ? titleCase(a.resolution_code)
-                                : undefined
-                        }
-                    />
-                </div>
-            </ReviewCard>
+                </ReviewCard>
+            ) : null}
 
             {fleet ? (
                 <ReviewCard icon={Truck} title="Fleet context" span>
@@ -1234,13 +1196,13 @@ export function PlaybookSection({
                 <div className="rounded-xl border border-dashed border-border py-10 text-center">
                     <BookOpen className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
                     <p className="text-sm text-muted-foreground">
-                        No playbook attached to this alert.
+                        No response procedure is running on this alert.
                     </p>
                     {d.can.manage &&
-                    d.available_playbooks.length &&
+                    d.available_playbooks.length > 0 &&
                     OPEN_STATES.includes(d.alert.status) ? (
                         <Button size="sm" className="mt-3" onClick={onStart}>
-                            <Play className="mr-1.5 h-4 w-4" /> Start a playbook
+                            <Play className="mr-1.5 h-4 w-4" /> Start a response procedure
                         </Button>
                     ) : null}
                 </div>
@@ -1319,14 +1281,17 @@ export function PlaybookSection({
                             </div>
                             {active && d.can.manage ? (
                                 <div className="flex shrink-0 items-center gap-1.5">
-                                    <ConfirmChip
+                                    <ConfirmButton
                                         label="Complete step"
                                         icon={Check}
+                                        question="Mark this step complete?"
                                         onConfirm={advance}
                                     />
-                                    <ConfirmChip
+                                    <ConfirmButton
                                         label="Skip"
                                         icon={SkipForward}
+                                        question="Skip this step?"
+                                        description="The procedure moves on without it. The skip is kept in the history."
                                         onConfirm={skip}
                                     />
                                 </div>
@@ -1599,10 +1564,11 @@ function EvidencePackCard({
                                     </p>
                                 </div>
                                 {canManage && collecting ? (
-                                    <ConfirmChip
+                                    <ConfirmButton
                                         label="Remove"
                                         icon={Trash2}
                                         destructive
+                                        question="Remove this from the evidence pack?"
                                         onConfirm={() => removeItem(item.id)}
                                     />
                                 ) : null}
@@ -1822,15 +1788,16 @@ function EvidenceCctvForm({
                         placeholder="e.g. CAM-LOUNGE-2"
                     />
                 </Field>
-                <Field label="Timestamp" required error={form.errors.timestamp}>
-                    <Input
-                        type="datetime-local"
+                <div className="sm:col-span-2">
+                    <DateTimeField
+                        id="cctv-timestamp"
+                        label="When the footage starts"
                         value={form.data.timestamp}
-                        onChange={(e) =>
-                            form.setData('timestamp', e.target.value)
-                        }
+                        onChange={(value) => form.setData('timestamp', value)}
+                        error={form.errors.timestamp}
+                        clearable={false}
                     />
-                </Field>
+                </div>
             </div>
             <div className="flex justify-end gap-2">
                 <Button
@@ -2054,9 +2021,10 @@ function TaskRow({
                         >
                             <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <ConfirmChip
+                        <ConfirmButton
                             label="Done"
                             icon={Check}
+                            question="Mark this task done?"
                             onConfirm={() =>
                                 router.post(
                                     `/control-room/alerts/${d.alert.id}/tasks/${t.id}/status`,
@@ -2065,10 +2033,11 @@ function TaskRow({
                                 )
                             }
                         />
-                        <ConfirmChip
+                        <ConfirmButton
                             label="Remove"
                             icon={Trash2}
                             destructive
+                            question="Remove this task?"
                             onConfirm={() =>
                                 router.delete(
                                     `/control-room/alerts/${d.alert.id}/tasks/${t.id}`,
@@ -2108,9 +2077,10 @@ function TaskRow({
                             {d.can.manage &&
                             st.status !== 'completed' &&
                             st.status !== 'cancelled' ? (
-                                <ConfirmChip
+                                <ConfirmButton
                                     label="Done"
                                     icon={Check}
+                                    question="Mark this subtask done?"
                                     onConfirm={() =>
                                         router.post(
                                             `/control-room/alerts/${d.alert.id}/tasks/${st.id}/status`,
@@ -2226,10 +2196,13 @@ function EditTaskForm({
                     />
                 </Field>
                 <Field label="Due">
-                    <Input
-                        type="date"
+                    <DatePicker
+                        id={`task-due-${t.id}`}
+                        label="Due"
                         value={form.data.due_at}
-                        onChange={(e) => form.setData('due_at', e.target.value)}
+                        onChange={(value) => form.setData('due_at', value)}
+                        allowClear
+                        compact
                     />
                 </Field>
             </div>
@@ -2388,10 +2361,13 @@ function AddTaskForm({
                     />
                 </Field>
                 <Field label="Due">
-                    <Input
-                        type="date"
+                    <DatePicker
+                        id="task-due-new"
+                        label="Due"
                         value={form.data.due_at}
-                        onChange={(e) => form.setData('due_at', e.target.value)}
+                        onChange={(value) => form.setData('due_at', value)}
+                        allowClear
+                        compact
                     />
                 </Field>
             </div>
@@ -2558,9 +2534,10 @@ function TimeTracking({ d }: { d: AlertWorkspaceDetail }) {
                 </p>
                 <div className="flex items-center gap-1.5">
                     {myRunning ? (
-                        <ConfirmChip
+                        <ConfirmButton
                             label="Stop timer"
                             icon={Timer}
+                            question="Stop your timer?"
                             onConfirm={() =>
                                 router.post(
                                     `/control-room/alerts/${alertId}/time-entries/${myRunning.id}/stop`,
@@ -2568,12 +2545,13 @@ function TimeTracking({ d }: { d: AlertWorkspaceDetail }) {
                                     { preserveScroll: true },
                                 )
                             }
-                            title={`Running since ${myRunning.started_at ? formatDateTime(myRunning.started_at) : '—'}`}
+                            title={myRunning.started_at ? `Running since ${formatDateTime(myRunning.started_at)}` : undefined}
                         />
                     ) : (
-                        <ConfirmChip
+                        <ConfirmButton
                             label="Start timer"
                             icon={Timer}
+                            question="Start a timer for you on this alert?"
                             onConfirm={() =>
                                 router.post(
                                     `/control-room/alerts/${alertId}/time-entries/start`,
@@ -2633,10 +2611,11 @@ function TimeTracking({ d }: { d: AlertWorkspaceDetail }) {
                                 {formatDateTime(t.created_at)}
                             </span>
                             {!t.is_running ? (
-                                <ConfirmChip
+                                <ConfirmButton
                                     label="Remove"
                                     icon={Trash2}
                                     destructive
+                                    question="Remove this time entry?"
                                     onConfirm={() =>
                                         router.delete(
                                             `/control-room/alerts/${alertId}/time-entries/${t.id}`,
@@ -2985,10 +2964,11 @@ function DiscussionEntry({
                     </Button>
                 ) : null}
                 {!deleted && (isOwner || canManage) ? (
-                    <ConfirmChip
+                    <ConfirmButton
                         label="Delete"
                         icon={Trash2}
                         destructive
+                        question="Delete this comment?"
                         onConfirm={() =>
                             router.delete(
                                 `/control-room/alerts/${alertId}/discussions/${entry.id}`,
@@ -3073,7 +3053,7 @@ export function LinkedSection({
                               work.status ? titleCase(work.status) : null,
                               work.assignee
                                   ? `with ${work.assignee.name}`
-                                  : 'awaiting IT triage',
+                                  : 'waiting for IT to pick it up',
                               work.monitoring_recovered_at
                                   ? 'monitoring recovered; technician closure still required'
                                   : null,

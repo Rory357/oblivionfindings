@@ -45,36 +45,33 @@ class ControlRoomShellConsistencyTest extends TestCase
         }
     }
 
-    public function test_every_specialist_page_uses_the_compact_command_centre_shell(): void
+    public function test_every_other_control_room_page_uses_the_same_frame(): void
     {
-        $pages = [
-            'map.tsx' => 'Live map',
-            'stats.tsx' => 'Operational analytics',
-            'reports.tsx' => 'Reports',
-            'messaging.tsx' => 'Messaging',
-            'settings.tsx' => 'Settings',
-            'devices/index.tsx' => 'Device signals',
-            'playbooks/index.tsx' => 'Playbooks',
-            'sla/index.tsx' => 'SLA performance',
-            'broadcast.tsx' => 'Broadcasts',
-        ];
-
-        foreach ($pages as $file => $title) {
-            $source = file_get_contents(resource_path('js/pages/control-room/'.$file));
-            $this->assertStringContainsString('CommandCentrePage', $source, $file);
-            $this->assertStringContainsString('variant="compact"', $source, $file);
-            $this->assertStringContainsString('title="'.$title.'"', $source, $file);
-        }
-
+        // 24 Oct 2026: Monitoring, Communications, Duty handover, Reports and
+        // Settings moved off the old compact command-centre shell onto the
+        // same ControlRoomPage frame as Live response.
         foreach ([
+            'map.tsx',
+            'devices/index.tsx',
             'devices/show.tsx',
-            'playbooks/show.tsx',
-            'sla/breaches.tsx',
+            'broadcast.tsx',
             'broadcast-show.tsx',
+            'messaging.tsx',
+            'shifts.tsx',
+            'shifts/handover.tsx',
+            'reports.tsx',
+            'stats.tsx',
+            'sla/breaches.tsx',
+            'sla/index.tsx',
+            'playbooks/index.tsx',
+            'playbooks/show.tsx',
+            'settings.tsx',
         ] as $file) {
             $source = file_get_contents(resource_path('js/pages/control-room/'.$file));
-            $this->assertStringContainsString('CommandCentrePage', $source, $file);
-            $this->assertStringContainsString('variant="compact"', $source, $file);
+            $this->assertStringContainsString('<ControlRoomPage', $source, $file);
+            $this->assertStringNotContainsString('CommandCentrePage', $source, $file);
+            $this->assertStringNotContainsString('<PageHero', $source, $file);
+            $this->assertStringNotContainsString('WorkspaceStrip', $source, $file);
         }
     }
 
@@ -97,15 +94,11 @@ class ControlRoomShellConsistencyTest extends TestCase
         }
 
         $escalations = file_get_contents(resource_path('js/pages/control-room/escalations.tsx'));
-        $this->assertStringContainsString('<EscalationQueueFilters', $escalations);
+        // The queue choice lives in the header (no strip above the list).
+        $this->assertStringContainsString('label="All queues"', $escalations);
+        $this->assertStringNotContainsString('EscalationQueueFilters', $escalations);
         $this->assertStringContainsString('worklist.links', $escalations);
         $this->assertStringNotContainsString('QueueColumn', $escalations);
         $this->assertStringNotContainsString('grid-cols-3', $escalations);
-
-        $queueFilters = file_get_contents(
-            resource_path('js/components/control-room/escalation-queue-filters.tsx'),
-        );
-        $this->assertStringContainsString('capacity_explanation', $queueFilters);
-        $this->assertStringContainsString('overflow-x-auto', $queueFilters);
     }
 }

@@ -167,8 +167,8 @@ const SORTS = [
 ];
 
 /**
- * Live response views served by the alerts list: Waiting (snoozed), History,
- * and Active for people who can work alerts but not open the desk. One list
+ * Live response views served by the alerts list: Snoozed, Done,
+ * and Needs action for people who can work alerts but not open the desk. One list
  * and a preview beside it, the same as every other Live response view.
  */
 export default function AlertsIndex({
@@ -233,16 +233,16 @@ export default function AlertsIndex({
     const subline = !canonical
         ? (pageDescription ?? 'Alerts raised by connected systems')
         : view === 'waiting'
-          ? 'Snoozed alerts. Each comes back to the worklist on its own when its time is up.'
+          ? 'Snoozed alerts. Each one comes back by itself when its time is up.'
           : view === 'history'
-            ? 'Finished response work, with who did what and when'
+            ? 'Finished alerts: who did what, and when'
             : 'Every open alert, most urgent first';
 
     const meters = canonical ? (
         <>
-            <PageHeaderMeterBlock label="Open" href="/control-room/alerts" ariaLabel="Show open alerts">
+            <PageHeaderMeterBlock label="Need action" href="/control-room/alerts" ariaLabel="Show open alerts">
                 <PageHeaderMeterBig>{stats.open}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>actionable now</PageHeaderMeterCaption>
+                <PageHeaderMeterCaption>open alerts</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock
                 label="Critical"
@@ -251,31 +251,31 @@ export default function AlertsIndex({
                 ariaLabel="Show critical alerts"
             >
                 <PageHeaderMeterBig>{stats.critical}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>act first</PageHeaderMeterCaption>
+                <PageHeaderMeterCaption>answer these first</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock
-                label="Unassigned"
+                label="No one on it"
                 tone={stats.unassigned > 0 ? 'warning' : 'brand'}
                 href="/control-room/alerts?assigned_to=unassigned"
-                ariaLabel="Show alerts with no owner"
+                ariaLabel="Show alerts no one has taken"
             >
                 <PageHeaderMeterBig>{stats.unassigned}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>claim or assign</PageHeaderMeterCaption>
+                <PageHeaderMeterCaption>take one or assign it</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock
-                label="Waiting"
+                label="Snoozed"
                 href="/control-room/alerts?lens=snoozed"
                 ariaLabel="Show snoozed alerts"
             >
                 <PageHeaderMeterBig>{stats.snoozed}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>snoozed for now</PageHeaderMeterCaption>
+                <PageHeaderMeterCaption>back on their own later</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
         </>
     ) : undefined;
 
     return (
         <ControlRoomPage
-            headTitle={!canonical ? pageTitle : view === 'waiting' ? 'Waiting' : view === 'history' ? 'History' : 'Active'}
+            headTitle={!canonical ? pageTitle : view === 'waiting' ? 'Snoozed' : view === 'history' ? 'Done' : 'Needs action'}
             rail={canonical ? undefined : null}
             header={{
                 title: canonical ? undefined : (pageTitle ?? 'Integration alerts'),
@@ -345,15 +345,21 @@ export default function AlertsIndex({
                 </PopupSelectionBar>
             ) : null}
 
-            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+            <div
+                className={
+                    rows.length === 0
+                        ? 'grid min-w-0 gap-5'
+                        : 'grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]'
+                }
+            >
                 <ResponseWorklist
-                    title={view === 'waiting' ? 'Waiting' : view === 'history' ? 'Finished alerts' : 'Open alerts'}
+                    title={view === 'waiting' ? 'Snoozed' : view === 'history' ? 'Done' : 'Needs action'}
                     description={
                         view === 'history'
-                            ? 'Resolved, closed and dismissed alerts. Your access is checked again when you open one.'
+                            ? 'Resolved, closed and dismissed alerts, newest first.'
                             : view === 'waiting'
-                              ? 'Snoozed alerts keep their response targets running.'
-                              : 'Missed response targets first, then severity and the next deadline.'
+                              ? 'Response targets keep running while an alert is snoozed.'
+                              : 'Missed targets first, then the most urgent.'
                     }
                     worklist={{
                         data: rows,
@@ -390,8 +396,8 @@ export default function AlertsIndex({
                         view === 'waiting'
                             ? 'Nothing is snoozed'
                             : view === 'history'
-                              ? 'No finished alerts here'
-                              : 'Nothing needs a response'
+                              ? 'Nothing finished in this period'
+                              : 'All clear'
                     }
                     emptyDescription={
                         view === 'history'
@@ -400,7 +406,12 @@ export default function AlertsIndex({
                     }
                 />
                 <div className="min-w-0 xl:sticky xl:top-5">
-                    <AlertPreview row={selection.row} detail={detail} onRun={actions.run} />
+                    <AlertPreview
+                        row={selection.row}
+                        detail={detail}
+                        onRun={actions.run}
+                        hideWhenEmpty={rows.length === 0}
+                    />
                 </div>
             </div>
 

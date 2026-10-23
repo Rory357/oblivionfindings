@@ -283,7 +283,9 @@ class ControlRoomIncidentController extends Controller
             ],
         };
 
-        return $worklist + [
+        // array_merge, not +: the journey's own next step must replace the
+        // generic "Continue response" the worklist row carries.
+        return array_merge($worklist, [
             'alert' => [
                 'id' => $alert->id,
                 'reference_number' => $alert->reference_number ?: null,
@@ -314,7 +316,7 @@ class ControlRoomIncidentController extends Controller
             ] : null,
             'stage' => $stage,
             'next_action' => $nextAction,
-        ];
+        ]);
     }
 
     /** @return array<string, mixed> */

@@ -256,7 +256,7 @@ class ControlRoomPlaybookController extends Controller
         ]);
 
         return redirect()->route('control-room.playbooks.show', $playbook)
-            ->with('success', 'Playbook created.');
+            ->with('success', 'Procedure added.');
     }
 
     /**
@@ -361,7 +361,7 @@ class ControlRoomPlaybookController extends Controller
             'version' => $playbook->version,
         ]);
 
-        return back()->with('success', 'Playbook updated to version '.$playbook->fresh()->version.'.');
+        return back()->with('success', 'Procedure saved as version '.$playbook->fresh()->version.'.');
     }
 
     /**
@@ -403,7 +403,7 @@ class ControlRoomPlaybookController extends Controller
             'is_active' => $playbook->is_active,
         ]);
 
-        return back()->with('success', $playbook->is_active ? 'Playbook activated.' : 'Playbook deactivated.');
+        return back()->with('success', $playbook->is_active ? 'Procedure turned on.' : 'Procedure turned off.');
     }
 
     /**
@@ -422,7 +422,7 @@ class ControlRoomPlaybookController extends Controller
         $playbook = Playbook::findOrFail($data['playbook_id']);
 
         if (! $playbook->is_active) {
-            return back()->withErrors(['playbook' => 'Cannot start an inactive playbook.']);
+            return back()->withErrors(['playbook' => "This procedure is turned off, so it can't be started."]);
         }
 
         $run = DB::transaction(function () use ($playbook, $alert, $user): PlaybookRun {
@@ -436,7 +436,7 @@ class ControlRoomPlaybookController extends Controller
                 );
                 if (in_array($existingRun->status, ['pending', 'in_progress'], true)) {
                     throw ValidationException::withMessages([
-                        'playbook' => 'Alert already has an active playbook run.',
+                        'playbook' => 'This alert already has a procedure in progress.',
                     ]);
                 }
             }
@@ -463,7 +463,7 @@ class ControlRoomPlaybookController extends Controller
             return $run;
         }, self::TRANSACTION_ATTEMPTS);
 
-        return back()->with('success', 'Playbook run started.');
+        return back()->with('success', 'Procedure started.');
     }
 
     /**
@@ -486,7 +486,7 @@ class ControlRoomPlaybookController extends Controller
             $run = $this->nestedAlertResources()->playbookRun($user, $alert, $runId, true);
             if ($run->status !== PlaybookRun::STATUS_IN_PROGRESS) {
                 throw ValidationException::withMessages([
-                    'playbook' => 'This playbook run is no longer active.',
+                    'playbook' => 'This procedure has already finished on this alert.',
                 ]);
             }
 
@@ -529,7 +529,7 @@ class ControlRoomPlaybookController extends Controller
 
         return back()->with(
             'success',
-            $completed ? 'Playbook run completed.' : 'Step completed, advanced to next step.',
+            $completed ? 'Procedure finished.' : 'Step done — on to the next one.',
         );
     }
 
@@ -551,7 +551,7 @@ class ControlRoomPlaybookController extends Controller
             $run = $this->nestedAlertResources()->playbookRun($user, $alert, $runId, true);
             if ($run->status !== PlaybookRun::STATUS_IN_PROGRESS) {
                 throw ValidationException::withMessages([
-                    'playbook' => 'This playbook run is no longer active.',
+                    'playbook' => 'This procedure has already finished on this alert.',
                 ]);
             }
 
@@ -561,14 +561,14 @@ class ControlRoomPlaybookController extends Controller
                 ->first();
             if (! $currentStep) {
                 throw ValidationException::withMessages([
-                    'step' => 'No active step to skip.',
+                    'step' => 'There is no step in progress to skip.',
                 ]);
             }
 
             $playbookStep = $currentStep->step;
             if ($playbookStep && $playbookStep->is_required && $playbookStep->is_blocking) {
                 throw ValidationException::withMessages([
-                    'step' => 'This step is required and blocking. It cannot be skipped.',
+                    'step' => "This step must be done before the next one, so it can't be skipped.",
                 ]);
             }
 

@@ -5,9 +5,9 @@ import {
     BookOpen,
     Clock,
     FileText,
-    HeartPulse,
-    History,
-    Hourglass,
+    BellOff,
+    CircleCheck,
+    FileWarning,
     LayoutDashboard,
     ListChecks,
     ListTodo,
@@ -84,13 +84,13 @@ function views(can: Can, key: ControlRoomDestinationKey): ControlRoomView[] {
                 return [
                     {
                         key: read(can) ? '/control-room' : '/control-room/alerts',
-                        label: 'Active',
+                        label: 'Needs action',
                         icon: Bell,
                         allowed: alertList(can),
                     },
                     {
                         key: '/control-room/my-tasks',
-                        label: 'My work',
+                        label: 'Mine',
                         icon: ListTodo,
                         allowed: read(can),
                     },
@@ -102,20 +102,20 @@ function views(can: Can, key: ControlRoomDestinationKey): ControlRoomView[] {
                     },
                     {
                         key: '/control-room/alerts?lens=snoozed',
-                        label: 'Waiting',
-                        icon: Hourglass,
+                        label: 'Snoozed',
+                        icon: BellOff,
                         allowed: alertList(can),
                     },
                     {
                         key: '/control-room/incidents',
-                        label: 'Safety handovers',
-                        icon: HeartPulse,
+                        label: 'Incident reports',
+                        icon: FileWarning,
                         allowed: read(can),
                     },
                     {
                         key: '/control-room/alerts?lens=history',
-                        label: 'History',
-                        icon: History,
+                        label: 'Done',
+                        icon: CircleCheck,
                         allowed: alertList(can),
                     },
                 ];
@@ -333,6 +333,12 @@ export function controlRoomActiveView(url: string, keys: string[]): string {
         );
         if (active) return active;
     }
+    // Same page, no matching query (/control-room/settings with no tab):
+    // the first view on that page.
+    const samePage = keys.find(
+        (key) => new URL(key, current.origin).pathname === current.pathname,
+    );
+    if (samePage) return samePage;
     const child = keys.find((key) =>
         current.pathname.startsWith(`${pathOf(key)}/`),
     );

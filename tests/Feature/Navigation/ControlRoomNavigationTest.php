@@ -21,6 +21,6 @@ it('builds the Control Room sidebar from the six approved destinations', functio
         ->toContain("title: 'Duty handover'")
         ->toContain("title: 'Reports'")
         ->toContain("title: 'Settings'")
-        ->toContain("label: 'My work'")
-        ->toContain("label: 'Safety handovers'");
+        ->toContain("label: 'Mine'")
+        ->toContain("label: 'Incident reports'");
 });

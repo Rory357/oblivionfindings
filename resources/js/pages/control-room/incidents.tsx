@@ -1,8 +1,5 @@
 import { useAlertActions } from '@/components/control-room/alert-record/alert-actions';
-import {
-    severityBadge,
-    statusBadge,
-} from '@/components/control-room/alert-record/alert-labels';
+import { severityBadge } from '@/components/control-room/alert-record/alert-labels';
 import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
 import type { AlertWorkspaceDetail } from '@/components/control-room/alert-record/alert-sections';
 import { ControlRoomPage } from '@/components/control-room/control-room-page';
@@ -16,6 +13,14 @@ import {
     LiveResponseSearch,
     applyLiveResponseFilters,
 } from '@/components/control-room/live-response/live-response-filters';
+import {
+    OwnerChip,
+    rowClock,
+    UrgencyBar,
+    whoAndWhere,
+} from '@/components/control-room/live-response/alert-glance';
+import { raisedWords, useNow } from '@/components/control-room/live-response/response-clock';
+import { TargetLens } from '@/components/control-room/live-response/target-lens';
 import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
 import {
     PageHeaderFilterSelect,
@@ -27,7 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import { ArrowUpRight, Copy, ExternalLink, Eye, HeartPulse, Layers } from 'lucide-react';
@@ -160,7 +165,7 @@ function asRow(journey: SafetyJourney): AlertWorklistRow {
         id: journey.alert.id,
         reference_number: journey.alert.reference_number,
         summary: journey.alert.summary,
-        source: { key: 'safety_handover', label: 'Safety handover' },
+        source: { key: 'incident_report', label: 'Incident report' },
         status: journey.alert.status as AlertWorklistRow['status'],
         severity: journey.alert.severity as AlertWorklistRow['severity'],
         priority: journey.priority,
@@ -200,7 +205,7 @@ function asRow(journey: SafetyJourney): AlertWorklistRow {
 }
 
 /**
- * Live response › Safety handovers — alerts on their way into an incident
+ * Live response › Incident reports — alerts on their way into an incident
  * report and H&S follow-up (its own tab, Stephan 23 Oct 2026). Each row says
  * which step it is at and who owns it; the preview shows the alert.
  */
@@ -215,6 +220,7 @@ export default function SafetyHandovers({
     const rows = useMemo(() => journeys.data.map(asRow), [journeys.data]);
     const actions = useAlertActions(detail);
     const selection = useAlertSelection({ rows, detail, runAction: actions.run });
+    const now = useNow();
     const lens = filters.lens ?? 'attention';
 
     useEffect(() => {
@@ -252,9 +258,9 @@ export default function SafetyHandovers({
 
     return (
         <ControlRoomPage
-            headTitle="Safety handovers"
+            headTitle="Incident reports"
             header={{
-                subline: 'Alerts going into an incident report and H&S follow-up',
+                subline: 'Alerts that need an incident report, and how H&S is getting on with them',
                 actions: (
                     <LiveResponseSearch
                         value={filters.search ?? ''}
@@ -299,11 +305,17 @@ export default function SafetyHandovers({
                 ),
             }}
         >
-            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+            <div
+                className={
+                    journeys.data.length === 0
+                        ? 'grid min-w-0 gap-5'
+                        : 'grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]'
+                }
+            >
                 <Card className="min-w-0 gap-0 overflow-hidden py-0">
                     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
                         <div className="min-w-0">
-                            <h2 className="text-section-title">Safety handovers</h2>
+                            <h2 className="text-section-title">Incident reports</h2>
                             <p className="text-subtle mt-0.5">
                                 {lenses.find((l) => l.key === lens)?.help ??
                                     'Each alert with the step it is at and who owns it.'}
@@ -317,7 +329,7 @@ export default function SafetyHandovers({
                         <div className="px-5 py-10">
                             <EmptyState
                                 icon={HeartPulse}
-                                title="Nothing in this step"
+                                title="Nothing here"
                                 description="Try another step or clear a filter."
                             />
                         </div>
@@ -327,6 +339,7 @@ export default function SafetyHandovers({
                                 <JourneyRow
                                     key={journey.id}
                                     journey={journey}
+                                    now={now}
                                     selected={journey.alert.id === selection.selectedId}
                                     onSelect={() => selection.select(journey.alert.id)}
                                     onReport={() => selection.select(journey.alert.id, 'report_incident')}
@@ -370,7 +383,12 @@ export default function SafetyHandovers({
                     ) : null}
                 </Card>
                 <div className="min-w-0 xl:sticky xl:top-5">
-                    <AlertPreview row={selection.row} detail={detail} onRun={actions.run} />
+                    <AlertPreview
+                        row={selection.row}
+                        detail={detail}
+                        onRun={actions.run}
+                        hideWhenEmpty={journeys.data.length === 0}
+                    />
                 </div>
             </div>
             {actions.host}
@@ -388,17 +406,18 @@ const STAGE_LENS = {
 
 function JourneyRow({
     journey,
+    now,
     selected,
     onSelect,
     onReport,
 }: {
     journey: SafetyJourney;
+    now: number;
     selected: boolean;
     onSelect: () => void;
     onReport: () => void;
 }) {
     const stage = STAGE[journey.stage];
-    const status = statusBadge(journey.alert.status);
     const severity = severityBadge(journey.alert.severity);
     const reference = journey.alert.reference_number ?? `Alert ${journey.alert.id}`;
     const owner = journey.health_safety?.owner?.name ?? journey.assignee?.name ?? null;
@@ -438,18 +457,31 @@ function JourneyRow({
         onSelect: () => void navigator.clipboard?.writeText(reference),
     });
 
+    const row = asRow(journey);
+    const clock = rowClock(row, now);
+    const { who, where } = whoAndWhere(row);
+    const raised = raisedWords(journey.triggered_at, now);
+    const refs = [
+        journey.incident?.reference_number ? `Incident ${journey.incident.reference_number}` : null,
+        journey.health_safety?.reference_number ? `H&S ${journey.health_safety.reference_number}` : null,
+        reference,
+    ].filter(Boolean);
+
     return (
         <ControlRoomRowActions label={`Actions for ${reference}`} items={items}>
             {({ rowProps, overflowButton }) => (
                 <li
                     onContextMenu={rowProps.onContextMenu}
+                    data-selected={selected ? 'true' : undefined}
                     className={cn(
-                        'flex items-start gap-3 px-5 py-3.5 transition-colors',
+                        'relative flex items-start gap-3 py-3.5 pr-3 pl-5 transition-colors',
                         selected
-                            ? 'bg-primary-fill/10 shadow-[inset_3px_0_0_var(--primary)]'
+                            ? 'bg-primary-fill/10 shadow-[inset_-3px_0_0_var(--primary)]'
                             : 'hover:bg-muted/40',
                     )}
                 >
+                    <UrgencyBar severity={journey.alert.severity} />
+                    <TargetLens clock={clock} label="Next response target" />
                     <Button
                         unstyled
                         type="button"
@@ -457,49 +489,27 @@ function JourneyRow({
                         aria-current={selected ? 'true' : undefined}
                         className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                        <span className="flex items-start justify-between gap-3">
-                            <span className="min-w-0 font-semibold text-foreground">
-                                {journey.summary}
-                            </span>
-                            <span
-                                className="text-caption shrink-0 tabular-nums"
-                                title={formatDateTime(journey.triggered_at)}
-                            >
-                                {formatRelative(journey.triggered_at)}
-                            </span>
+                        <span className="flex flex-wrap items-baseline gap-x-1.5">
+                            <span className="font-semibold text-foreground">{who}</span>
+                            {where ? <span className="text-subtle">· {where}</span> : null}
                         </span>
-                        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="mt-0.5 block text-sm break-words text-foreground">
+                            {journey.summary}
+                        </span>
+                        <span className="text-caption mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
                             <StatusBadge variant={stage.tone} size="sm">
                                 {stage.label}
                             </StatusBadge>
                             <StatusBadge variant={severity.tone} size="sm">
                                 {severity.label}
                             </StatusBadge>
-                            <StatusBadge variant={status.tone} size="sm">
-                                {status.label}
-                            </StatusBadge>
+                            <OwnerChip name={owner} />
+                            {raised ? (
+                                <span title={formatDateTime(journey.triggered_at)}>{raised}</span>
+                            ) : null}
+                            <span className="tabular-nums">{refs.join(' · ')}</span>
                         </span>
-                        <span className="text-caption mt-1 block">
-                            {[
-                                reference,
-                                journey.incident?.reference_number
-                                    ? `Incident ${journey.incident.reference_number}`
-                                    : null,
-                                journey.health_safety?.reference_number
-                                    ? `H&S ${journey.health_safety.reference_number}`
-                                    : null,
-                                journey.site?.name,
-                                journey.person?.name,
-                            ]
-                                .filter(Boolean)
-                                .join(' · ')}
-                        </span>
-                        <span className="text-caption mt-1 block">
-                            {stage.explanation}{' '}
-                            {owner ? `Owner: ${owner}.` : (
-                                <span className="font-medium text-status-warning">No owner yet.</span>
-                            )}
-                        </span>
+                        <span className="text-caption mt-1 block">{stage.explanation}</span>
                     </Button>
                     <div className="flex shrink-0 items-center gap-1">
                         <Button type="button" size="sm" variant="outline" onClick={runNext}>

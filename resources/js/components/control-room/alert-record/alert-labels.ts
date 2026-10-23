@@ -28,14 +28,21 @@ export function alertReference(alert: {
     return alert.reference_number ?? `Alert ${alert.id}`;
 }
 
-/** The alert's own words: its title, else its description, else its notes, else its type. */
+/**
+ * The alert's own words, in the same order the list uses
+ * (AlertWorklistPresenter::summary): its title, summary or description,
+ * then the signal's, then its notes, else its type — so a row and its
+ * preview never word the same alert differently.
+ */
 export function alertSummary(alert: WorkspaceAlert): string {
     const ctx = (alert.context ?? {}) as Record<string, unknown>;
-    const norm = ((ctx.normalized_data as Record<string, unknown>) ??
-        ctx) as Record<string, unknown>;
+    const norm = (ctx.normalized_data ?? {}) as Record<string, unknown>;
     const pick = (value: unknown) =>
         typeof value === 'string' && value.trim() ? value.trim() : null;
     return (
+        pick(ctx.title) ??
+        pick(ctx.summary) ??
+        pick(ctx.description) ??
         pick(norm.title) ??
         pick(norm.description) ??
         pick(alert.notes) ??

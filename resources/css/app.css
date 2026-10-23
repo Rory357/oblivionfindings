@@ -1613,3 +1613,142 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
         transparent 100%
     );
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Control Room's own marks (Stephan, 24 Oct 2026: "light board + Oblivion
+ * details"; components/control-room/live-response/target-lens.tsx).
+ *   .cr-lens  the countdown lens — the pop-up kit's round lens with a ring
+ *             that empties as a response target gets closer. Brand while
+ *             there's time; the fixed warning / critical pairs when it's
+ *             close or missed (safety tones never follow the brand); grey
+ *             when there's no target and it shows how long it has waited.
+ *   .cr-live  the "Live · updated 9:46 am" mark on the header band.
+ * ────────────────────────────────────────────────────────────────────────── */
+.cr-lens {
+    --cr-lens-tone: var(--primary);
+    --cr-lens-left: 100%;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: var(--cr-lens-tone);
+    background:
+        radial-gradient(
+            closest-side,
+            color-mix(in oklch, var(--cr-lens-tone) 7%, var(--card)) calc(100% - 4px),
+            transparent calc(100% - 3.5px)
+        ),
+        conic-gradient(
+            var(--cr-lens-tone) var(--cr-lens-left),
+            color-mix(in oklch, var(--cr-lens-tone) 16%, transparent) 0
+        );
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--cr-lens-tone) 7%, transparent);
+    font-variant-numeric: tabular-nums;
+}
+.cr-lens-value {
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.01em;
+}
+.cr-lens-unit {
+    margin-top: 2px;
+    font-size: 9.5px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--muted-foreground);
+}
+.cr-lens--lg {
+    width: 68px;
+    height: 68px;
+    box-shadow: 0 0 0 6px color-mix(in oklch, var(--cr-lens-tone) 8%, transparent);
+}
+.cr-lens--lg .cr-lens-value {
+    font-size: 18px;
+}
+.cr-lens--warning {
+    --cr-lens-tone: var(--status-warning);
+}
+.cr-lens--critical {
+    --cr-lens-tone: var(--status-critical);
+}
+.cr-lens--neutral {
+    --cr-lens-tone: var(--muted-foreground);
+}
+.cr-lens--late {
+    background:
+        radial-gradient(
+            closest-side,
+            var(--status-critical-bg) calc(100% - 4px),
+            transparent calc(100% - 3.5px)
+        ),
+        var(--status-critical);
+}
+
+.cr-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.cr-live-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: oklch(from var(--live) 0.86 calc(c * 1.4) h);
+}
+.cr-live--stale .cr-live-dot {
+    background: oklch(from var(--status-warning) 0.86 c h);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .cr-live:not(.cr-live--stale) .cr-live-dot::after {
+        content: '';
+        position: absolute;
+        inset: -3px;
+        border-radius: 50%;
+        border: 2px solid oklch(from var(--live) 0.86 calc(c * 1.4) h);
+        animation: cr-live-pulse 2.4s ease-out infinite;
+    }
+    .cr-lens--late {
+        animation: cr-lens-late 2.4s ease-in-out infinite;
+    }
+}
+@keyframes cr-live-pulse {
+    0% {
+        opacity: 0.9;
+        transform: scale(0.6);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.9);
+    }
+}
+@keyframes cr-lens-late {
+    0%,
+    100% {
+        box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-critical) 10%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 7px color-mix(in oklch, var(--status-critical) 18%, transparent);
+    }
+}
+/* A row that arrived since the list first drew glows once (the critical
+   notice above the list says it in words). */
+@media (prefers-reduced-motion: no-preference) {
+    .cr-row-new {
+        animation: cr-row-new 4s ease-out 1;
+    }
+}
+@keyframes cr-row-new {
+    0%,
+    30% {
+        background-color: color-mix(in oklch, var(--live) 16%, transparent);
+    }
+    100% {
+        background-color: transparent;
+    }
+}

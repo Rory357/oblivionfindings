@@ -31,9 +31,10 @@ import {
 import { useState } from 'react';
 
 /**
- * Playbook builder — creates or edits a response playbook through guided
- * steps: basics → response steps → automation & SLA → review. Replaces the
- * old inline mega-forms on the playbook list and detail pages.
+ * Response procedure builder (code name: playbook) — adds or edits a
+ * procedure through guided steps: basics → response steps → when it starts
+ * and time targets → review. The words say "procedure"; the fields sent to
+ * the server keep their playbook names.
  */
 
 export type EditablePlaybookStep = {
@@ -58,6 +59,14 @@ export type EditablePlaybook = {
     sla_resolution_minutes: string;
     required_evidence: string[];
     steps: EditablePlaybookStep[];
+    /**
+     * Saved settings this wizard has no fields for. They are sent back
+     * unchanged on save, so editing a procedure never clears which alerts
+     * it starts for or when it escalates.
+     */
+    trigger_alert_types?: string[];
+    trigger_severities?: string[];
+    escalation_after_minutes?: number | null;
 };
 
 const EVIDENCE_OPTIONS = [
@@ -73,7 +82,7 @@ const STEPS = [
     {
         key: 'basics',
         label: 'Basics',
-        blurb: 'Name & category',
+        blurb: 'Name and category',
         icon: BookOpen,
     },
     {
@@ -84,14 +93,14 @@ const STEPS = [
     },
     {
         key: 'automation',
-        label: 'Automation & SLA',
-        blurb: 'Attach rules & clocks',
+        label: 'Starting and targets',
+        blurb: 'When it starts, time targets',
         icon: Zap,
     },
     {
         key: 'review',
         label: 'Review',
-        blurb: 'Check & save',
+        blurb: 'Check and save',
         icon: CheckCircle2,
     },
 ] as const;
@@ -106,8 +115,10 @@ const emptyStep = (): EditablePlaybookStep => ({
     time_limit_minutes: '',
 });
 
-function titleCase(s: string): string {
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+/** "witness_statement" → "Witness statement" (sentence case). */
+function sentenceCase(s: string): string {
+    const words = s.replace(/_/g, ' ').trim().toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 export function PlaybookWizard({
@@ -121,7 +132,7 @@ export function PlaybookWizard({
     onClose: () => void;
     categories: Record<string, string>;
     stepTypes: Record<string, string>;
-    /** Present = edit that playbook; absent = create a new one. */
+    /** Present = edit that procedure; absent = add a new one. */
     playbook?: EditablePlaybook | null;
 }) {
     const editing = playbook !== null;
@@ -190,6 +201,22 @@ export function PlaybookWizard({
                 ? Number(data.sla_resolution_minutes)
                 : null,
             required_evidence: data.required_evidence,
+            ...(editing && playbook
+                ? {
+                      ...(playbook.trigger_alert_types !== undefined
+                          ? { trigger_alert_types: playbook.trigger_alert_types }
+                          : {}),
+                      ...(playbook.trigger_severities !== undefined
+                          ? { trigger_severities: playbook.trigger_severities }
+                          : {}),
+                      ...(playbook.escalation_after_minutes !== undefined
+                          ? {
+                                escalation_after_minutes:
+                                    playbook.escalation_after_minutes,
+                            }
+                          : {}),
+                  }
+                : {}),
             steps: data.steps
                 .filter((s) => s.title.trim())
                 .map((s) => ({
@@ -224,10 +251,14 @@ export function PlaybookWizard({
         <WizardShell
             open={open}
             onClose={close}
-            title={editing ? 'Edit playbook' : 'New playbook'}
+            title={
+                editing ? 'Edit response procedure' : 'Add response procedure'
+            }
             description="Build a step-by-step response procedure for alerts"
             railIcon={BookOpen}
-            railTitle={editing ? 'Edit playbook' : 'New playbook'}
+            railTitle={
+                editing ? 'Edit response procedure' : 'Add response procedure'
+            }
             railSub={
                 editing
                     ? form.data.name || 'Response procedure'
@@ -239,13 +270,11 @@ export function PlaybookWizard({
             success={
                 submitted ? (
                     <WizardSuccessPane
-                        title={
-                            editing ? 'Playbook updated' : 'Playbook created'
-                        }
+                        title={editing ? 'Procedure saved' : 'Procedure added'}
                         blurb={
                             form.data.auto_attach
-                                ? 'It will attach automatically to matching new alerts, and operators can start it manually from any alert workspace.'
-                                : 'Operators can start it from any alert workspace (Playbook section → Start a playbook).'
+                                ? 'It starts on its own for matching new alerts, and operators can also start it from any alert.'
+                                : 'Operators can start it from any alert (Procedure tab → Start a response procedure).'
                         }
                         actions={<Button onClick={close}>Done</Button>}
                     />
@@ -254,7 +283,7 @@ export function PlaybookWizard({
             footerStart={
                 <span className="text-xs text-muted-foreground">
                     {validSteps.length} step{validSteps.length === 1 ? '' : 's'}{' '}
-                    defined
+                    added
                 </span>
             }
             footerEnd={
@@ -286,7 +315,7 @@ export function PlaybookWizard({
                                 validSteps.length === 0
                             }
                         >
-                            {editing ? 'Save playbook' : 'Create playbook'}
+                            Save procedure
                         </Button>
                     )}
                 </>
@@ -297,8 +326,8 @@ export function PlaybookWizard({
                     <div className="flex flex-col gap-4">
                         <StepHead
                             icon={BookOpen}
-                            title="What's this playbook for?"
-                            blurb="A playbook is the step-by-step procedure an operator follows for a type of alert."
+                            title="What's this procedure for?"
+                            blurb="A procedure is the list of steps an operator follows for a type of alert."
                         />
                         <Field label="Name" required error={err.name}>
                             <Input
@@ -321,7 +350,7 @@ export function PlaybookWizard({
                         </Field>
                         <Field
                             label="Description"
-                            hint="Optional — when should this playbook be used?"
+                            hint="Optional — when should this procedure be used?"
                         >
                             <Textarea
                                 rows={3}
@@ -341,7 +370,7 @@ export function PlaybookWizard({
                         <StepHead
                             icon={ListChecks}
                             title="What should the operator do, in order?"
-                            blurb="Each step becomes a tick-box on the alert. Blocking steps must finish before the next one starts."
+                            blurb="Each step becomes a tick-box on the alert. A step marked “Must finish first” has to be done before the next one starts."
                         />
                         {err.steps ? (
                             <InfoCard icon={ListChecks} tone="crit">
@@ -364,7 +393,7 @@ export function PlaybookWizard({
                                                 size="sm"
                                                 onClick={() => moveStep(i, -1)}
                                                 disabled={i === 0}
-                                                aria-label="Move up"
+                                                aria-label="Move step up"
                                             >
                                                 <ChevronUp className="h-3.5 w-3.5" />
                                             </Button>
@@ -376,7 +405,7 @@ export function PlaybookWizard({
                                                     i ===
                                                     form.data.steps.length - 1
                                                 }
-                                                aria-label="Move down"
+                                                aria-label="Move step down"
                                             >
                                                 <ChevronDown className="h-3.5 w-3.5" />
                                             </Button>
@@ -467,7 +496,7 @@ export function PlaybookWizard({
                                                     })
                                                 }
                                             />
-                                            Blocking
+                                            Must finish first
                                         </label>
                                         <label className="flex items-center gap-2 text-muted-foreground">
                                             <Timer className="h-3.5 w-3.5" />
@@ -482,9 +511,10 @@ export function PlaybookWizard({
                                                             e.target.value,
                                                     })
                                                 }
-                                                placeholder="mins"
+                                                placeholder="min"
+                                                aria-label="Minutes to do this step"
                                             />
-                                            time limit
+                                            minutes to do it
                                         </label>
                                     </div>
                                 </div>
@@ -509,8 +539,8 @@ export function PlaybookWizard({
                     <div className="flex flex-col gap-4">
                         <StepHead
                             icon={Zap}
-                            title="Automation & clocks"
-                            blurb="Optional — attach automatically, require sign-off, and set response-time targets."
+                            title="When it starts and time targets"
+                            blurb="Optional — start it on its own, ask for sign-off, and set time targets."
                         />
                         <label className="flex items-center gap-3 rounded-xl border border-border p-3">
                             <Switch
@@ -521,11 +551,11 @@ export function PlaybookWizard({
                             />
                             <span className="text-sm">
                                 <span className="font-medium text-foreground">
-                                    Attach automatically
+                                    Start on its own
                                 </span>{' '}
                                 <span className="text-muted-foreground">
-                                    — new matching alerts start this playbook on
-                                    their own
+                                    — matching new alerts start this procedure
+                                    automatically
                                 </span>
                             </span>
                         </label>
@@ -538,11 +568,11 @@ export function PlaybookWizard({
                             />
                             <span className="text-sm">
                                 <span className="font-medium text-foreground">
-                                    Requires approval
+                                    Needs sign-off
                                 </span>{' '}
                                 <span className="text-muted-foreground">
-                                    — a manager signs off before the run
-                                    completes
+                                    — a manager signs off before it&apos;s
+                                    finished
                                 </span>
                             </span>
                         </label>
@@ -627,7 +657,7 @@ export function PlaybookWizard({
                                             }
                                             className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
                                         >
-                                            {titleCase(opt)}
+                                            {sentenceCase(opt)}
                                         </Button>
                                     );
                                 })}
@@ -660,31 +690,45 @@ export function PlaybookWizard({
                         </ReviewCard>
                         <ReviewCard
                             icon={Zap}
-                            title="Automation & SLA"
+                            title="Starting and targets"
                             onEdit={() => setStep(2)}
                         >
                             <ReviewRow
-                                label="Auto-attach"
+                                label="Starts on its own"
                                 value={form.data.auto_attach ? 'Yes' : 'No'}
                             />
                             <ReviewRow
-                                label="Approval"
+                                label="Sign-off"
                                 value={
                                     form.data.requires_approval
-                                        ? 'Required'
-                                        : 'Not required'
+                                        ? 'Needed'
+                                        : 'Not needed'
                                 }
                             />
                             <ReviewRow
-                                label="Ack / Respond / Resolve"
-                                value={`${form.data.sla_acknowledge_minutes || '—'} / ${form.data.sla_response_minutes || '—'} / ${form.data.sla_resolution_minutes || '—'} min`}
+                                label="Time targets"
+                                value={
+                                    [
+                                        form.data.sla_acknowledge_minutes
+                                            ? `acknowledge ${form.data.sla_acknowledge_minutes} min`
+                                            : null,
+                                        form.data.sla_response_minutes
+                                            ? `respond ${form.data.sla_response_minutes} min`
+                                            : null,
+                                        form.data.sla_resolution_minutes
+                                            ? `resolve ${form.data.sla_resolution_minutes} min`
+                                            : null,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ') || undefined
+                                }
                             />
                             <ReviewRow
                                 label="Evidence"
                                 value={
                                     form.data.required_evidence.length
                                         ? form.data.required_evidence
-                                              .map(titleCase)
+                                              .map(sentenceCase)
                                               .join(', ')
                                         : undefined
                                 }
@@ -699,7 +743,7 @@ export function PlaybookWizard({
                             {validSteps.map((s, i) => (
                                 <ReviewRow
                                     key={i}
-                                    label={`${i + 1}. ${stepTypes[s.type] ?? titleCase(s.type)}`}
+                                    label={`${i + 1}. ${stepTypes[s.type] ?? sentenceCase(s.type)}`}
                                     value={s.title}
                                 />
                             ))}

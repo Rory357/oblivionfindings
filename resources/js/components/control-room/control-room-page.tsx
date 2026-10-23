@@ -39,6 +39,8 @@ export function ControlRoomHubRail({
     return (
         <PageHeaderRail
             ariaLabel={`${hub.destination.title} views`}
+            // Six views at most — they all fit, so no "Find a view".
+            showFind={false}
             value={hub.activeView}
             onSelect={(key) => {
                 if (key !== hub.activeView) router.visit(key);

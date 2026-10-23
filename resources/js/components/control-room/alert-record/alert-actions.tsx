@@ -97,7 +97,7 @@ export function primaryAlertAction(
     if (a.status === 'open')
         return { key: 'acknowledge', label: 'Acknowledge', icon: UserCheck };
     if (a.status === 'ack')
-        return { key: 'triage', label: 'Start triage', icon: Eye };
+        return { key: 'triage', label: 'Start response', icon: Eye };
     if (a.status === 'triaging')
         return { key: 'resolve', label: 'Resolve', icon: CheckCircle2 };
     if (a.status === 'resolved')
@@ -120,7 +120,7 @@ export function alertActions(d: AlertWorkspaceDetail): AlertActionItem[] {
         d.can.manage && a.status === 'open',
     );
     add(
-        { key: 'triage', label: 'Start triage', icon: Eye },
+        { key: 'triage', label: 'Start response', icon: Eye },
         d.can.manage && (a.status === 'open' || a.status === 'ack'),
     );
     add(
@@ -304,12 +304,18 @@ function AlertActionPopup({
 /*  Shared pieces                                                      */
 /* ------------------------------------------------------------------ */
 
+/** The alert a pop-up acts on, person first (the same reading as the list). */
 function contextRow(d: AlertWorkspaceDetail): PopupContextRow {
     const a = d.alert;
+    const who = d.client?.name ?? a.asset?.name ?? null;
     return {
         icon: RadioTower,
-        title: `${alertReference(a)} · ${alertSummary(a)}`,
-        tag: d.client?.name ?? a.asset?.name ?? undefined,
+        // Don't say the name twice when the summary already has it.
+        title:
+            who && !alertSummary(a).includes(who)
+                ? `${who} · ${alertSummary(a)}`
+                : alertSummary(a),
+        tag: alertReference(a),
         note: `${statusBadge(a.status).label} · ${severityBadge(a.severity).label}${
             a.triggered_at ? ` · raised ${formatDateTime(a.triggered_at)}` : ''
         }`,
@@ -381,7 +387,7 @@ function textareaProps(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Acknowledge · Start triage                                         */
+/*  Acknowledge · Start response                                        */
 /* ------------------------------------------------------------------ */
 
 function NoteActionPopup({
@@ -482,12 +488,12 @@ function TriagePopup({
             d={d}
             onClose={onClose}
             icon={Eye}
-            title="Start triage"
+            title="Start the response"
             description="Marks the alert as being worked on, and stops the response target."
             endpoint={`/control-room/alerts/${d.alert.id}/triage`}
             noteLabel="What are you doing?"
             placeholder="e.g. Calling the site lead to check"
-            submitLabel="Start triage"
+            submitLabel="Start response"
         />
     );
 }
@@ -590,7 +596,7 @@ function ResolvePopup({
                 }
                 icon={CheckCircle2}
                 title="Resolve this alert?"
-                description="The live response ends and the alert leaves the worklist. This is kept in the alert's history."
+                description="The response ends and the alert moves to Done. This is kept in the alert's history."
                 cancelLabel="Back"
                 confirmLabel={submit.unconfirmed ? 'Check result' : 'Resolve alert'}
                 processing={form.processing}
@@ -825,7 +831,7 @@ function AssignPopup({
                 }}
                 icon={UserMinus}
                 title={`Unassign ${a.assigned_to?.name ?? 'this alert'}?`}
-                description="The alert goes back to the worklist with no owner until someone claims it. This is kept in the history."
+                description="The alert goes back to Needs action with no one on it until someone takes it. This is kept in the history."
                 cancelLabel="Back"
                 confirmLabel={unassign.unconfirmed ? 'Check result' : 'Unassign'}
                 processing={unassignBusy}
@@ -926,7 +932,7 @@ function SnoozePopup({
             size="md"
             icon={BellOff}
             title="Snooze alert"
-            description="Takes it off the worklist for a while. It stays open, its targets keep running, and it comes back on its own."
+            description="Takes it off Needs action for a while. It stays open, its targets keep running, and it comes back on its own."
             context={contextRow(d)}
             error={
                 serverError(form.errors) ??
@@ -1101,7 +1107,7 @@ function ReportIncidentPopup({
                 size="md"
                 icon={FileWarning}
                 title="Report incident"
-                description="Creates the official incident record from this alert and hands it to Health & Safety."
+                description="Makes an incident report from this alert and hands the follow-up to Health & Safety."
                 context={contextRow(d)}
                 error={serverError(form.errors) ?? submit.flashError}
                 dirty={form.isDirty}
@@ -1173,7 +1179,7 @@ function ReportIncidentPopup({
                 }
                 icon={FileWarning}
                 title="Report this incident?"
-                description="One official incident is created and Health & Safety is asked to take over its follow-up. The alert stays open until the response is done."
+                description="An incident report is made and Health & Safety is asked to take over the follow-up. The alert stays open until the response is done."
                 cancelLabel="Back"
                 confirmLabel={submit.unconfirmed ? 'Check result' : 'Report incident'}
                 processing={form.processing}
