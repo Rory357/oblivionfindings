@@ -71,3 +71,12 @@ the viewer can be brought up to date later. Newest last.
 | 104 | "Schedule meeting", More (New consultation, Export board report) and "Add representative" show only to people who manage participation | Same gate as the old New menu; Export was hidden in a right-click menu before |
 | 104b | Meetings are "Coming up" and "Held" (completed or cancelled), each row with View, a kebab and right-click | The view follows the period filter, so "this quarter" isn't promised |
 | 104d | The unavailable state keeps the code's wording ("Participation is unavailable" …) | Access wording stays as it is |
+| 100, 100b | Restraint states keep the code's words: "Reported outside plan" / "Reported within plan", "Current revision reviewed", the "Source revision" column, "Published version recorded" / "No retained published version" | Restraint wording stays word for word; the drawing's "Within the plan", "Latest version reviewed", "Version 4" paraphrased it |
+| 100, 100b | Both numbers (Needs review, Plan reviews due) show on both views; the 30-day and injury counts stay on the tabs | One header for the register; the drawing dropped the plan number on the plans view |
+| 100b | The primary button reads "Add behaviour-support plan" (was "Create plan") | Drawing wording |
+| 101 | While a plan is under review, the primary button is "Record approval decision" for people who can approve, matching the next step | The drawing showed "Record plan review" as primary |
+| 101 | Facts read "Current candidate", "Published version" and "Review due" | The code's labels; "In use" would claim more than the publication record says |
+| 101 | The stage line's decision step shows done only when a decision is on record ("Not on record" otherwise); archived plans have no stage line | Approval is never inferred |
+| 101 | Overview adds "On record" (status, developer, workflow, publication) and the server's approval explanation as the note | The code showed these; the drawing's note paraphrased the explanation |
+| 101d | Each approval decision is a card with every fact on record (exact candidate, approver, origin, workflow, effective dates, entered by, basis, evidence) | Nothing about an approval is dropped |
+| 101b–101g | Reviews, history and connections keep the code's wording ("Actual reviewer", "Recorded status", "Identity retained", "Intervention 9") | Approval and reviewer wording stays word for word; connected interventions carry only an id |

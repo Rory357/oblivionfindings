@@ -1,22 +1,48 @@
+/**
+ * Restrictive interventions register (approved H&S drawings pg-hsn-100,
+ * 100b — Stephan 23 Oct 2026): one header with the two numbers that need
+ * someone, the filters (the quieter ones under More filters) and the status
+ * views as rail tabs; then Interventions or Behaviour-support plans as a
+ * table. Every row opens its record; its kebab and right-click carry Open and,
+ * for reviewers, Review. Restraint wording — reported plan use, injury, the
+ * current source revision and its review — stays exactly as the records say it.
+ */
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import {
+    RecordIdentity,
+    RecordPerson,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
+import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
-    PageHeaderViewToggle,
     PageLayout,
 } from '@/components/page';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { SelectInput } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
+import { formatDate, formatDateOnly, formatTime } from '@/lib/datetime';
 import {
     RESTRAINT_REGISTER,
     restraintHref,
@@ -26,12 +52,16 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ClipboardCheck,
     Download,
+    Eye,
     FileText,
     Plus,
     ShieldAlert,
+    SlidersHorizontal,
+    X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
+    PLAN_STATUS_META,
     RESTRAINT_TYPE_OPTIONS,
     SEVERITY_OPTIONS,
     titleCase,
@@ -85,6 +115,8 @@ type Props = {
     sites: { id: number; name: string }[];
     can: { create: boolean; review: boolean; manage: boolean };
 };
+type Next = Record<string, string | number | null>;
+
 const EVENT_TABS = [
     { key: 'all', label: 'All interventions' },
     { key: 'unreviewed', label: 'Needs review' },
@@ -101,6 +133,22 @@ const PLAN_TABS = [
     { key: 'under_review', label: 'Under review' },
     { key: 'archived', label: 'Archived' },
 ];
+const LENSES: GroupedProfileNavTab[] = [
+    { key: 'events', label: 'Interventions', icon: ShieldAlert },
+    { key: 'plans', label: 'Behaviour-support plans', icon: FileText },
+];
+/** A header number opens its view with every narrowing filter cleared. */
+const CLEAR: Next = {
+    client_id: null,
+    site_id: null,
+    q: null,
+    restraint_type: null,
+    severity: null,
+    within_plan: null,
+    review_state: null,
+    from: null,
+    to: null,
+};
 
 export default function RestraintWorkspaceIndex({
     lens,
@@ -118,22 +166,18 @@ export default function RestraintWorkspaceIndex({
     const origin = restraintReturn(url);
     const [search, setSearch] = useState(filters.q ?? '');
     useEffect(() => setSearch(filters.q ?? ''), [filters.q]);
-    const params = (next: Record<string, string | number | null> = {}) =>
+    const params = (next: Next = {}) =>
         Object.fromEntries(
             Object.entries({ ...filters, lens, tab, ...next }).filter(
                 ([, value]) => value !== null && value !== '',
             ),
         );
-    const query = (next: Record<string, string | number | null> = {}) =>
+    const query = (next: Next = {}) =>
         new URLSearchParams(
-            Object.entries(params(next)).map(([key, value]) => [
-                key,
-                String(value),
-            ]),
+            Object.entries(params(next)).map(([key, value]) => [key, String(value)]),
         );
-    const href = (next: Record<string, string | number | null> = {}) =>
-        `${RESTRAINT_REGISTER}?${query(next)}`;
-    const go = (next: Record<string, string | number | null>) =>
+    const href = (next: Next = {}) => `${RESTRAINT_REGISTER}?${query(next)}`;
+    const go = (next: Next) =>
         router.get(RESTRAINT_REGISTER, params(next), {
             preserveState: true,
             preserveScroll: true,
@@ -141,518 +185,480 @@ export default function RestraintWorkspaceIndex({
         });
     const report = (kind: 'event' | 'plan') =>
         `${RESTRAINT_REGISTER}/report?${new URLSearchParams({ kind, return_to: origin, ...(filters.client_id ? { client_id: String(filters.client_id) } : {}), ...(filters.site_id ? { site_id: String(filters.site_id) } : {}) })}`;
-    const filter = (
-        key: keyof RestraintFilters,
-        label: string,
-        options: { value: string; label: string }[],
-    ) => (
-        <PageHeaderFilterSelect
-            key={key}
-            label={label}
-            value={String(filters[key] ?? 'all')}
-            options={[{ value: 'all', label: 'All' }, ...options]}
-            onChange={(value) => go({ [key]: value === 'all' ? null : value })}
-        />
-    );
     const tabs = lens === 'events' ? EVENT_TABS : PLAN_TABS;
     const rows = lens === 'events' ? events : plans;
+    const moreActive = [
+        filters.restraint_type,
+        lens === 'events' ? filters.severity : null,
+        lens === 'events' ? filters.within_plan : null,
+        filters.review_state,
+        filters.from,
+        filters.to,
+    ].filter(Boolean).length;
+    const narrowed = !!(
+        filters.q ||
+        filters.client_id ||
+        filters.site_id ||
+        moreActive ||
+        (filters.period && filters.period !== '30d') ||
+        tab !== 'all'
+    );
+    const pager = (
+        <>
+            <p className="text-subtle">
+                Showing {rows.data.length} of {rows.total}
+            </p>
+            {rows.last_page > 1 ? <LaravelPagination links={rows.links} /> : null}
+        </>
+    );
+    const open = (kind: 'events' | 'plans', id: number) =>
+        router.visit(restraintHref(kind, id, { returnTo: origin }));
+    const review = (kind: 'events' | 'plans', id: number) =>
+        router.visit(
+            restraintHref(kind, id, { workspace: 'review', section: 'review', returnTo: origin }),
+        );
+    const menuFor = (kind: 'events' | 'plans', id: number): MenuItem[] =>
+        compactMenu([
+            { label: kind === 'events' ? 'Open record' : 'Open plan', icon: Eye, onClick: () => open(kind, id) },
+            can.review && {
+                label: kind === 'events' ? 'Review record' : 'Review plan',
+                icon: ClipboardCheck,
+                onClick: () => review(kind, id),
+            },
+        ]);
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Restrictive interventions',
-                    href: RESTRAINT_REGISTER,
-                },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Safety registers', href: '/health-safety/registers' },
+                { title: 'Restrictive interventions', href: RESTRAINT_REGISTER },
             ]}
         >
             <Head title="Restrictive interventions and behaviour support" />
             <PageLayout
                 hero={
                     <PageHeader
-                        frontline
                         wrapTitle
                         icon={ShieldAlert}
                         title="Restrictive interventions"
-                        subline="Recorded interventions, behaviour-support plans and separate review work"
+                        subline="Interventions, behaviour-support plans and their reviews"
                         actions={
                             <>
                                 <PageHeaderSearch
                                     value={search}
                                     onChange={setSearch}
                                     onKeyDown={(event) => {
-                                        if (event.key === 'Enter')
-                                            go({ q: search.trim() || null });
+                                        if (event.key === 'Enter') go({ q: search.trim() || null });
                                     }}
                                     placeholder="Search person or record text"
                                     ariaLabel="Search restrictive interventions and plans"
                                 />
                                 <PageHeaderGlassButton asChild>
-                                    <a
-                                        href={`${RESTRAINT_REGISTER}/export?${query()}`}
-                                    >
+                                    <a href={`${RESTRAINT_REGISTER}/export?${query()}`}>
                                         <Download className="size-4" />
                                         Export filtered records
                                     </a>
                                 </PageHeaderGlassButton>
                                 {can.create && (
                                     <PageHeaderPrimaryButton asChild>
-                                        <Link
-                                            href={report(
-                                                lens === 'plans'
-                                                    ? 'plan'
-                                                    : 'event',
-                                            )}
-                                        >
+                                        <Link href={report(lens === 'plans' ? 'plan' : 'event')}>
                                             <Plus className="size-4" />
-                                            {lens === 'plans'
-                                                ? 'Create plan'
-                                                : 'Record intervention'}
+                                            {lens === 'plans' ? 'Add behaviour-support plan' : 'Record intervention'}
                                         </Link>
                                     </PageHeaderPrimaryButton>
                                 )}
                             </>
                         }
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Interventions · 30 days"
-                                    href={href({
-                                        lens: 'events',
-                                        tab: '30d',
-                                        period: 'all',
-                                        client_id: null,
-                                        site_id: null,
-                                        q: null,
-                                        restraint_type: null,
-                                        severity: null,
-                                        within_plan: null,
-                                        review_state: null,
-                                        from: null,
-                                        to: null,
-                                    })}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {hero.live.events_30d}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        All currently accessible records
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
+                        strip={
+                            <PageHeaderNumbers>
+                                <PageHeaderNumber
                                     label="Needs review"
-                                    href={href({
-                                        lens: 'events',
-                                        tab: 'unreviewed',
-                                        period: 'all',
-                                        client_id: null,
-                                        site_id: null,
-                                        q: null,
-                                        restraint_type: null,
-                                        severity: null,
-                                        within_plan: null,
-                                        review_state: null,
-                                        from: null,
-                                        to: null,
-                                    })}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {hero.attention.unreviewed}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Current source revision not reviewed
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Injury recorded · 30 days"
-                                    href={href({
-                                        lens: 'events',
-                                        tab: 'injury',
-                                        period: '30d',
-                                        client_id: null,
-                                        site_id: null,
-                                        q: null,
-                                        restraint_type: null,
-                                        severity: null,
-                                        within_plan: null,
-                                        review_state: null,
-                                        from: null,
-                                        to: null,
-                                    })}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {hero.live.injuries}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Recorded facts need individual review
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
+                                    value={hero.attention.unreviewed}
+                                    caption="Current source revision not reviewed"
+                                    tone={hero.attention.unreviewed > 0 ? 'warning' : undefined}
+                                    href={href({ ...CLEAR, lens: 'events', tab: 'unreviewed', period: 'all' })}
+                                />
+                                <PageHeaderNumber
                                     label="Plan reviews due"
-                                    href={href({
-                                        lens: 'plans',
-                                        tab: 'review_due',
-                                        period: 'all',
-                                        client_id: null,
-                                        site_id: null,
-                                        q: null,
-                                        restraint_type: null,
-                                        severity: null,
-                                        within_plan: null,
-                                        review_state: null,
-                                        from: null,
-                                        to: null,
-                                    })}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {hero.attention.plans_review_due}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Active plans with a due review
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
+                                    value={hero.attention.plans_review_due}
+                                    caption="Active plans with a due review"
+                                    tone={hero.attention.plans_review_due > 0 ? 'warning' : undefined}
+                                    href={href({ ...CLEAR, lens: 'plans', tab: 'review_due', period: 'all' })}
+                                />
+                            </PageHeaderNumbers>
                         }
                         filters={
                             <>
-                                <PageHeaderViewToggle
-                                    value={lens}
-                                    onChange={(value) =>
-                                        go({
-                                            lens: value,
-                                            tab: 'all',
-                                            review_state: null,
-                                        })
-                                    }
+                                <PageHeaderFilterSelect
+                                    label="Site"
+                                    value={String(filters.site_id ?? 'all')}
                                     options={[
-                                        {
-                                            value: 'events',
-                                            label: 'Interventions',
-                                            icon: ShieldAlert,
-                                        },
-                                        {
-                                            value: 'plans',
-                                            label: 'Behaviour-support plans',
-                                            icon: FileText,
-                                        },
+                                        { value: 'all', label: 'All sites' },
+                                        ...sites.map((item) => ({ value: String(item.id), label: item.name })),
                                     ]}
-                                    ariaLabel="Register record type"
+                                    onChange={(value) => go({ site_id: value === 'all' ? null : value })}
                                 />
-                                {filter(
-                                    'client_id',
-                                    'Person',
-                                    clients.map((item) => ({
-                                        value: String(item.id),
-                                        label: item.name,
-                                    })),
-                                )}
-                                {filter(
-                                    'site_id',
-                                    'Site',
-                                    sites.map((item) => ({
-                                        value: String(item.id),
-                                        label: item.name,
-                                    })),
-                                )}
-                                {filter(
-                                    'restraint_type',
-                                    'Type',
-                                    RESTRAINT_TYPE_OPTIONS,
-                                )}
-                                {lens === 'events' && (
-                                    <>
-                                        {filter(
-                                            'severity',
-                                            'Severity',
-                                            SEVERITY_OPTIONS,
-                                        )}
-                                        {filter(
-                                            'within_plan',
-                                            'Reported plan use',
-                                            [
-                                                {
-                                                    value: 'yes',
-                                                    label: 'Reported within plan',
-                                                },
-                                                {
-                                                    value: 'no',
-                                                    label: 'Reported outside plan',
-                                                },
-                                            ],
-                                        )}
-                                        {filter('review_state', 'Review', [
-                                            {
-                                                value: 'reviewed',
-                                                label: 'Current revision reviewed',
-                                            },
-                                            {
-                                                value: 'unreviewed',
-                                                label: 'Current revision needs review',
-                                            },
-                                        ])}
-                                    </>
-                                )}
-                                {lens === 'plans' &&
-                                    filter('review_state', 'Review date', [
-                                        {
-                                            value: 'due',
-                                            label: 'Due within 30 days',
-                                        },
-                                        { value: 'overdue', label: 'Overdue' },
-                                    ])}
                                 <PageHeaderFilterSelect
                                     label="Period"
                                     value={filters.period ?? '30d'}
                                     options={[
                                         { value: 'week', label: 'Last 7 days' },
                                         { value: '30d', label: 'Last 30 days' },
-                                        {
-                                            value: 'quarter',
-                                            label: 'Last 3 months',
-                                        },
+                                        { value: 'quarter', label: 'Last 3 months' },
                                         { value: 'all', label: 'All time' },
                                     ]}
                                     onChange={(value) => go({ period: value })}
                                 />
-                                <DatePicker
-                                    compact
-                                    id="restraint-register-from"
-                                    label="From"
-                                    value={filters.from ?? ''}
-                                    onChange={(value) =>
-                                        go({ from: value || null })
-                                    }
-                                    allowClear
+                                <PageHeaderFilterSelect
+                                    label="Person"
+                                    value={String(filters.client_id ?? 'all')}
+                                    options={[
+                                        { value: 'all', label: 'All people' },
+                                        ...clients.map((item) => ({ value: String(item.id), label: item.name })),
+                                    ]}
+                                    onChange={(value) => go({ client_id: value === 'all' ? null : value })}
                                 />
-                                <DatePicker
-                                    compact
-                                    id="restraint-register-to"
-                                    label="To"
-                                    value={filters.to ?? ''}
-                                    onChange={(value) =>
-                                        go({ to: value || null })
-                                    }
-                                    allowClear
-                                />
-                                <PageHeaderGlassButton
-                                    type="button"
-                                    onClick={() =>
-                                        go({
-                                            q: null,
-                                            client_id: null,
-                                            site_id: null,
-                                            restraint_type: null,
-                                            severity: null,
-                                            within_plan: null,
-                                            review_state: null,
-                                            period: '30d',
-                                            from: null,
-                                            to: null,
-                                            tab: 'all',
-                                        })
-                                    }
-                                >
-                                    Clear filters
-                                </PageHeaderGlassButton>
+                                <MoreFilters lens={lens} filters={filters} active={moreActive} onChange={go} />
+                                {narrowed ? (
+                                    <PageHeaderFilterButton
+                                        icon={X}
+                                        onClick={() => go({ ...CLEAR, period: '30d', tab: 'all' })}
+                                    >
+                                        Clear filters
+                                    </PageHeaderFilterButton>
+                                ) : null}
                             </>
                         }
                         rail={
                             <PageHeaderRail
                                 value={tab}
-                                onChange={(value) => go({ tab: value })}
+                                onSelect={(value) => go({ tab: value })}
+                                ariaLabel={lens === 'events' ? 'Intervention views' : 'Plan views'}
                                 items={tabs.map((item) => ({
                                     ...item,
-                                    count: (
-                                        tabCounts[lens] as Record<
-                                            string,
-                                            number
-                                        >
-                                    )[item.key],
+                                    count: (tabCounts[lens] as Record<string, number>)[item.key],
                                 }))}
                             />
                         }
                     />
                 }
+                tabs={
+                    <TierTwoTabs
+                        tabs={LENSES}
+                        activeTab={lens}
+                        onTab={(value) => go({ lens: value, tab: 'all', review_state: null })}
+                        testIdPrefix="restraint-register"
+                        ariaLabel="Register record type"
+                        panelId="restraint-register-panel"
+                        renderLink={() => null}
+                    />
+                }
             >
-                <Card>
-                    <CardContent className="space-y-5 pt-5">
-                        <p className="text-caption text-muted-foreground">
-                            {rows.total} matching{' '}
-                            {lens === 'events'
-                                ? 'intervention records'
-                                : 'plans'}
-                            . Open a record for its evidence, history and
-                            connected work.
-                        </p>
-                        {rows.data.length === 0 ? (
-                            <p role="status" className="text-subtle">
-                                No records match these filters.
-                            </p>
-                        ) : lens === 'events' ? (
-                            <ul className="space-y-3">
-                                {events.data.map((row) => (
-                                    <li
-                                        key={row.id}
-                                        className="grid gap-3 rounded-xl border border-border p-4 lg:grid-cols-[minmax(0,1fr)_auto]"
-                                    >
-                                        <div className="min-w-0 space-y-2">
-                                            <Link
-                                                href={restraintHref(
-                                                    'events',
-                                                    row.id,
-                                                    { returnTo: origin },
-                                                )}
-                                                className="frontline-hit text-subtle inline-flex font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                                            >
-                                                {row.reference} ·{' '}
-                                                {row.client.name}
-                                            </Link>
-                                            <p className="text-caption">
-                                                {titleCase(row.restraint_type)}{' '}
-                                                ·{' '}
-                                                {row.started_at
-                                                    ? formatDateTimeLong(
-                                                          row.started_at,
-                                                      )
-                                                    : 'Time not recorded'}{' '}
-                                                ·{' '}
-                                                {row.site?.name ??
-                                                    'Site not recorded'}
-                                            </p>
-                                            <p className="text-caption text-muted-foreground">
-                                                {row.within_support_plan
-                                                    ? 'Reported within plan'
-                                                    : 'Reported outside plan'}{' '}
-                                                ·{' '}
-                                                {row.injury_occurred
-                                                    ? 'Injury recorded'
-                                                    : 'No injury recorded'}
-                                                {row.duration_minutes !== null
-                                                    ? ' · ' +
-                                                      row.duration_minutes +
-                                                      ' minutes'
-                                                    : ''}{' '}
-                                                · Source revision{' '}
-                                                {row.source_revision}
-                                            </p>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <StatusBadge status={row.severity}>
-                                                {titleCase(row.severity)}
-                                            </StatusBadge>
-                                            <StatusBadge
-                                                status={
-                                                    row.needs_review
-                                                        ? 'warning'
-                                                        : 'neutral'
-                                                }
-                                            >
-                                                {row.needs_review
-                                                    ? 'Needs review'
-                                                    : 'Current revision reviewed'}
-                                            </StatusBadge>
-                                            {can.review && (
-                                                <Link
-                                                    href={restraintHref(
-                                                        'events',
-                                                        row.id,
-                                                        {
-                                                            workspace: 'review',
-                                                            section: 'review',
-                                                            returnTo: origin,
-                                                        },
-                                                    )}
-                                                    className="frontline-hit text-caption inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring"
-                                                >
-                                                    <ClipboardCheck className="size-4" />
-                                                    Review record
-                                                </Link>
-                                            )}
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <ul className="space-y-3">
-                                {plans.data.map((row) => (
-                                    <li
-                                        key={row.id}
-                                        className="grid gap-3 rounded-xl border border-border p-4 lg:grid-cols-[minmax(0,1fr)_auto]"
-                                    >
-                                        <div className="min-w-0 space-y-2">
-                                            <Link
-                                                href={restraintHref(
-                                                    'plans',
-                                                    row.id,
-                                                    { returnTo: origin },
-                                                )}
-                                                className="frontline-hit text-subtle inline-flex font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                                            >
-                                                {row.reference} · {row.title}
-                                            </Link>
-                                            <p className="text-caption">
-                                                {row.client.name} ·{' '}
-                                                {row.restrictive_practice_type
-                                                    ? titleCase(
-                                                          row.restrictive_practice_type,
-                                                      )
-                                                    : 'Practice type not recorded'}{' '}
-                                                ·{' '}
-                                                {row.review_date
-                                                    ? 'Review ' +
-                                                      formatDateOnly(
-                                                          row.review_date,
-                                                      )
-                                                    : 'Review date not recorded'}
-                                            </p>
-                                            <p className="text-caption text-muted-foreground">
-                                                {row.published_version_id
-                                                    ? 'Published version recorded; open for applicable approval evidence'
-                                                    : 'No retained published version'}{' '}
-                                                · Approval applicability needs
-                                                the individual record.
-                                            </p>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <StatusBadge status={row.status}>
-                                                {titleCase(row.status)}
-                                            </StatusBadge>
-                                            {row.review_state !== 'ok' && (
-                                                <StatusBadge status="warning">
-                                                    {row.review_state ===
-                                                    'overdue'
-                                                        ? 'Review overdue'
-                                                        : 'Review due'}
-                                                </StatusBadge>
-                                            )}
-                                            {can.review && (
-                                                <Link
-                                                    href={restraintHref(
-                                                        'plans',
-                                                        row.id,
-                                                        {
-                                                            workspace: 'review',
-                                                            section: 'review',
-                                                            returnTo: origin,
-                                                        },
-                                                    )}
-                                                    className="frontline-hit text-caption inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring"
-                                                >
-                                                    <ClipboardCheck className="size-4" />
-                                                    Review plan
-                                                </Link>
-                                            )}
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        {rows.last_page > 1 && (
-                            <LaravelPagination links={rows.links} frontline />
-                        )}
-                    </CardContent>
-                </Card>
+                <div id="restraint-register-panel" role="tabpanel" className="grid min-w-0 gap-5">
+                    {lens === 'events' ? (
+                        <EventTable
+                            rows={events.data}
+                            onOpen={(row) => open('events', row.id)}
+                            menuFor={(row) => menuFor('events', row.id)}
+                            footer={pager}
+                        />
+                    ) : (
+                        <PlanTable
+                            rows={plans.data}
+                            onOpen={(row) => open('plans', row.id)}
+                            menuFor={(row) => menuFor('plans', row.id)}
+                            footer={pager}
+                        />
+                    )}
+                </div>
             </PageLayout>
         </AppLayout>
+    );
+}
+
+/** Type, severity, reported plan use, review and an exact date range — the quieter filters. */
+function MoreFilters({
+    lens,
+    filters,
+    active,
+    onChange,
+}: {
+    lens: 'events' | 'plans';
+    filters: RestraintFilters;
+    active: number;
+    onChange: (next: Next) => void;
+}) {
+    const select = (key: keyof RestraintFilters, label: string, all: string, options: { value: string; label: string }[]) => (
+        <FilterField label={label}>
+            <SelectInput
+                ariaLabel={label}
+                placeholder={all}
+                value={String(filters[key] ?? 'all')}
+                onChange={(value) => onChange({ [key]: value === 'all' ? null : value })}
+                options={[{ value: 'all', label: all }, ...options]}
+            />
+        </FilterField>
+    );
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <PageHeaderFilterButton icon={SlidersHorizontal} active={active > 0}>
+                    {active > 0 ? `More filters · ${active}` : 'More filters'}
+                </PageHeaderFilterButton>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="grid w-80 max-w-[calc(100vw-2rem)] gap-3">
+                {select('restraint_type', 'Type', 'All types', RESTRAINT_TYPE_OPTIONS)}
+                {lens === 'events' ? (
+                    <>
+                        {select('severity', 'Severity', 'All severities', SEVERITY_OPTIONS)}
+                        {select('within_plan', 'Reported plan use', 'All', [
+                            { value: 'yes', label: 'Reported within plan' },
+                            { value: 'no', label: 'Reported outside plan' },
+                        ])}
+                        {select('review_state', 'Review', 'All', [
+                            { value: 'reviewed', label: 'Current revision reviewed' },
+                            { value: 'unreviewed', label: 'Current revision needs review' },
+                        ])}
+                    </>
+                ) : (
+                    select('review_state', 'Review date', 'All', [
+                        { value: 'due', label: 'Due within 30 days' },
+                        { value: 'overdue', label: 'Overdue' },
+                    ])
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                    <DatePicker
+                        compact
+                        id="restraint-register-from"
+                        label="From"
+                        value={filters.from ?? ''}
+                        onChange={(value) => onChange({ from: value || null })}
+                        allowClear
+                    />
+                    <DatePicker
+                        compact
+                        id="restraint-register-to"
+                        label="To"
+                        value={filters.to ?? ''}
+                        onChange={(value) => onChange({ to: value || null })}
+                        allowClear
+                    />
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="grid gap-1.5">
+            <span className="text-caption font-semibold">{label}</span>
+            {children}
+        </div>
+    );
+}
+
+const EMPTY = (
+    <p role="status" className="sg-quiet px-4 py-6">
+        <span>No records match these filters.</span>
+    </p>
+);
+
+function EventTable({
+    rows,
+    onOpen,
+    menuFor,
+    footer,
+}: {
+    rows: EventRow[];
+    onOpen: (row: EventRow) => void;
+    menuFor: (row: EventRow) => MenuItem[];
+    footer: ReactNode;
+}) {
+    const columns: RecordTableColumn<EventRow>[] = [
+        {
+            key: 'person',
+            label: 'Person',
+            className: 'min-w-[14rem]',
+            cell: (row) => (
+                <RecordIdentity
+                    title={row.client.name}
+                    sub={[row.reference, titleCase(row.restraint_type), row.site?.name ?? 'Site not recorded'].join(' · ')}
+                />
+            ),
+        },
+        {
+            key: 'when',
+            label: 'When',
+            nowrap: true,
+            cell: (row) =>
+                row.started_at ? (
+                    <RecordIdentity
+                        title={formatDate(row.started_at)}
+                        sub={`${formatTime(row.started_at)} · ${row.duration_minutes !== null ? `${row.duration_minutes} minutes` : 'duration not recorded'}`}
+                    />
+                ) : (
+                    <span className="text-muted-foreground">Time not recorded</span>
+                ),
+        },
+        {
+            key: 'plan',
+            label: 'Plan use (as reported)',
+            nowrap: true,
+            cell: (row) =>
+                row.within_support_plan ? (
+                    'Reported within plan'
+                ) : (
+                    <StatusBadge variant="critical">Reported outside plan</StatusBadge>
+                ),
+        },
+        {
+            key: 'injury',
+            label: 'Injury',
+            nowrap: true,
+            cell: (row) =>
+                row.injury_occurred ? (
+                    <StatusBadge variant="warning">Injury recorded</StatusBadge>
+                ) : (
+                    'No injury recorded'
+                ),
+        },
+        {
+            key: 'severity',
+            label: 'Severity',
+            nowrap: true,
+            cell: (row) => <StatusBadge status={row.severity}>{titleCase(row.severity)}</StatusBadge>,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            nowrap: true,
+            cell: (row) =>
+                row.needs_review ? (
+                    <StatusBadge variant="warning">Needs review</StatusBadge>
+                ) : (
+                    <StatusBadge variant="success">Current revision reviewed</StatusBadge>
+                ),
+        },
+        { key: 'revision', label: 'Source revision', nowrap: true, cell: (row) => row.source_revision },
+    ];
+    return (
+        <RecordTable
+            title="Interventions"
+            sub="Newest first · click a row to open it, right-click for more"
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.id}
+            onOpen={onOpen}
+            actionsFor={menuFor}
+            menuTitle={(row) => `${row.reference} · ${row.client.name}`}
+            menuIcon={ShieldAlert}
+            empty={EMPTY}
+            footer={footer}
+        />
+    );
+}
+
+function PlanTable({
+    rows,
+    onOpen,
+    menuFor,
+    footer,
+}: {
+    rows: PlanRow[];
+    onOpen: (row: PlanRow) => void;
+    menuFor: (row: PlanRow) => MenuItem[];
+    footer: ReactNode;
+}) {
+    const columns: RecordTableColumn<PlanRow>[] = [
+        {
+            key: 'plan',
+            label: 'Plan',
+            className: 'min-w-[16rem] max-w-[24rem]',
+            cell: (row) => <RecordIdentity title={row.title} sub={row.reference} />,
+        },
+        { key: 'person', label: 'Person', nowrap: true, cell: (row) => <RecordPerson name={row.client.name} /> },
+        {
+            key: 'practice',
+            label: 'Practice type',
+            nowrap: true,
+            cell: (row) =>
+                row.restrictive_practice_type ? (
+                    titleCase(row.restrictive_practice_type)
+                ) : (
+                    <span className="text-muted-foreground">Not recorded</span>
+                ),
+        },
+        {
+            key: 'next',
+            label: 'Next review',
+            nowrap: true,
+            cell: (row) =>
+                row.review_date ? (
+                    formatDateOnly(row.review_date)
+                ) : (
+                    <span className="text-muted-foreground">Review date not recorded</span>
+                ),
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            nowrap: true,
+            cell: (row) =>
+                row.review_state === 'overdue' ? (
+                    <StatusBadge variant="critical">Review overdue</StatusBadge>
+                ) : row.review_state === 'due' ? (
+                    <StatusBadge variant="warning">Review due</StatusBadge>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
+            key: 'version',
+            label: 'Published version',
+            nowrap: true,
+            cell: (row) =>
+                row.published_version_id ? (
+                    'Published version recorded'
+                ) : (
+                    <span className="text-muted-foreground">No retained published version</span>
+                ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            nowrap: true,
+            cell: (row) => {
+                const meta = PLAN_STATUS_META[row.status];
+                return (
+                    <StatusBadge
+                        variant={
+                            meta?.tone === 'success' || meta?.tone === 'warning' || meta?.tone === 'critical'
+                                ? meta.tone
+                                : 'neutral'
+                        }
+                    >
+                        {meta?.label ?? titleCase(row.status)}
+                    </StatusBadge>
+                );
+            },
+        },
+    ];
+    return (
+        <RecordTable
+            title="Behaviour-support plans"
+            sub="Open a plan to see if and how it was approved · approval applicability needs the individual record"
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.id}
+            onOpen={onOpen}
+            actionsFor={menuFor}
+            menuTitle={(row) => `${row.reference} · ${row.title}`}
+            menuIcon={FileText}
+            empty={EMPTY}
+            footer={footer}
+        />
     );
 }
