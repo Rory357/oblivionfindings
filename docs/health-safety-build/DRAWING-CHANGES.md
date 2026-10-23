@@ -22,3 +22,6 @@ the viewer can be brought up to date later. Newest last.
 | 24c | Route lanes show a person icon, not initials | The lead's name is looked up from current access after the page loads |
 | 24e | The consent caveat sits as a note under the time bars; the history has its own card | The drawing didn't show the caveat or the history |
 | 24–24e | Each section can be opened from a link (`?view=routing` …) | Shareable links; not visible in the drawing |
+| 45 | "This period" also counts incidents | Incidents are the first thing a manager looks for; the drawing listed them only under harm |
+| 45 | "Incidents by type" keeps the clickable rows under the bars | The rows open the drill-in and its right-click menu |
+| 45 (Sites) | The site league is titled "Sites side by side" and the heatmap "Where the load sits" | Same plain words as the overview; the drawing didn't show this tab |

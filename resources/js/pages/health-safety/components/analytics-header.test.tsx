@@ -8,9 +8,11 @@ import {
 import type { AnchorHTMLAttributes } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsHeader, AnalyticsPeriodSummary } from './analytics-header';
+import { Scorecard } from './analytics-scorecard';
 
 vi.mock('@inertiajs/react', () => ({
     Link: (props: AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props} />,
+    usePage: () => ({ props: { auth: { user: { id: 7 }, can: { hazards: { view: true } } } } }),
 }));
 afterEach(cleanup);
 const props = {
@@ -93,41 +95,19 @@ function setup(overrides = {}) {
     );
     return { ...view, onReload, onPeriod, onTabChange };
 }
+/** The tally entry that carries a measure's label (its number, label and sub-line live together). */
+function measure(label: string): HTMLElement {
+    return screen.getByText(label).closest('.sg-t') as HTMLElement;
+}
 
 describe('Analytics shared header', () => {
-    it('keeps an unconfirmed measure free of a stale current delta', () => {
-        setup({
-            filters: { ...props.filters, lens: 'manager' },
-            scorecard: {
-                ...props.scorecard,
-                leading: [
-                    {
-                        key: 'training_pct',
-                        label: 'Training',
-                        value: null,
-                        suffix: '%',
-                        delta: 5,
-                        dir: 'watch',
-                    },
-                ],
-            },
-        });
-        const training = within(
-            screen.getByRole('button', { name: 'View training' }),
-        );
-        expect(training.getByText('Not confirmed')).toBeInTheDocument();
-        expect(
-            training.queryByText(/Increased by|Decreased by/),
-        ).not.toBeInTheDocument();
-    });
-
-    it('keeps six interactive meters, scoped export and the connected view rail in the shared header', () => {
-        const { onTabChange } = setup();
+    it('keeps the numbers out of the header; scoped export, the overview link and the connected view rail stay', () => {
+        setup();
         const header = screen
-            .getByRole('heading', { name: 'Health & Safety analytics' })
+            .getByRole('heading', { name: 'Health & safety analytics' })
             .closest('header')!;
         expect(header).toHaveClass('eh-header');
-        expect(header.querySelectorAll('.eh-meter')).toHaveLength(6);
+        expect(header.querySelectorAll('.eh-meter, .eh-number')).toHaveLength(0);
         expect(screen.getByRole('link', { name: 'Export' })).toHaveAttribute(
             'href',
             props.exportHref,
@@ -135,76 +115,9 @@ describe('Analytics shared header', () => {
         expect(
             screen.getByRole('link', { name: 'Safety overview' }),
         ).toHaveAttribute('href', '/health-safety');
-        fireEvent.click(screen.getByRole('button', { name: 'View incidents' }));
-        expect(onTabChange).toHaveBeenCalledWith('breakdowns');
-        fireEvent.click(screen.getByRole('button', { name: 'View ltifr' }));
-        expect(onTabChange).toHaveBeenCalledWith('trends');
         expect(
             within(header).getByRole('tablist', { name: 'Analytics views' }),
         ).toBeInTheDocument();
-    });
-
-    it.each([null, 0, 45])(
-        'retains the recorded LTI interval without claiming the full organisation is injury-free (%s)',
-        (value) => {
-            const { onTabChange } = setup({
-                scorecard: {
-                    ...props.scorecard,
-                    lagging: [
-                        ...props.scorecard.lagging,
-                        {
-                            key: 'days_since_lti',
-                            label: 'Days LTI-free',
-                            value,
-                            suffix: '',
-                            delta: null,
-                            dir: 'flat',
-                        },
-                    ],
-                },
-            });
-            const meter = screen.getByRole('button', {
-                name: 'View days since lti',
-            });
-            expect(
-                within(meter).getByText('Days since LTI'),
-            ).toBeInTheDocument();
-            expect(
-                within(meter).getByText(value === null ? '—' : String(value)),
-            ).toBeInTheDocument();
-            expect(
-                within(meter).getByText(
-                    value === null
-                        ? 'Not confirmed'
-                        : 'Last readable lost-time injury',
-                ),
-            ).toBeInTheDocument();
-            expect(screen.queryByText('Days LTI-free')).not.toBeInTheDocument();
-            fireEvent.click(meter);
-            expect(onTabChange).toHaveBeenCalledWith('overview');
-        },
-    );
-
-    it('keeps unconfirmed rates and incomplete drills truthful', () => {
-        setup();
-        expect(
-            within(
-                screen.getByRole('button', { name: 'View ltifr' }),
-            ).getByText('—'),
-        ).toBeInTheDocument();
-        expect(
-            within(
-                screen.getByRole('button', { name: 'View ltifr' }),
-            ).getByText('Not confirmed'),
-        ).toBeInTheDocument();
-        expect(screen.getByText('1/4')).toBeInTheDocument();
-        expect(
-            screen.getByText('Recorded completed drills'),
-        ).toBeInTheDocument();
-        expect(
-            screen.queryByText(/overdue|all clear|all compliant/i),
-        ).not.toBeInTheDocument();
-        expect(screen.getByText('Decreased by')).toBeInTheDocument();
     });
 
     it('switches lens and Site through the existing filter callbacks without silently clearing a withdrawn Site', () => {
@@ -222,9 +135,6 @@ describe('Analytics shared header', () => {
             />,
         );
         expect(screen.getByText(/Site access unconfirmed/)).toBeInTheDocument();
-        expect(
-            screen.getByRole('button', { name: 'View training' }),
-        ).toHaveTextContent('85%');
         expect(onReload).toHaveBeenCalledTimes(1);
     });
 
@@ -309,27 +219,86 @@ describe('Analytics shared header', () => {
         expect(report).toHaveAttribute('target', '_blank');
         expect(report).toHaveAttribute('rel', 'noopener noreferrer');
     });
+});
 
-    it('preserves the expandable recorded activity without a fabricated action percentage', () => {
+describe('Analytics scorecard tallies', () => {
+    it('keeps an unconfirmed measure free of a stale current delta', () => {
+        render(
+            <Scorecard
+                leading={[
+                    {
+                        key: 'training_pct',
+                        label: 'Training',
+                        value: null,
+                        suffix: '%',
+                        delta: 5,
+                        dir: 'watch',
+                    },
+                ]}
+                lagging={[]}
+            />,
+        );
+        const training = within(measure('Training and audits up to date'));
+        expect(training.getByText('—')).toBeInTheDocument();
+        expect(training.getByText('Not confirmed')).toBeInTheDocument();
+        expect(training.queryByText(/vs last month/)).not.toBeInTheDocument();
+    });
+
+    it.each([null, 0, 45])(
+        'retains the recorded LTI interval without claiming the full organisation is injury-free (%s)',
+        (value) => {
+            render(
+                <Scorecard
+                    leading={[]}
+                    lagging={[
+                        {
+                            key: 'days_since_lti',
+                            label: 'Days LTI-free',
+                            value,
+                            suffix: '',
+                            delta: null,
+                            dir: 'flat',
+                        },
+                    ]}
+                />,
+            );
+            const interval = within(measure('Days since a lost-time injury'));
+            expect(
+                interval.getByText(value === null ? '—' : String(value)),
+            ).toBeInTheDocument();
+            expect(
+                interval.getByText(value === null ? 'Not confirmed' : 'No earlier data'),
+            ).toBeInTheDocument();
+            expect(screen.queryByText('Days LTI-free')).not.toBeInTheDocument();
+        },
+    );
+
+    it('keeps unconfirmed rates truthful and shows a recorded change', () => {
+        render(<Scorecard leading={props.scorecard.leading} lagging={props.scorecard.lagging} />);
+        const rate = within(measure('Lost-time injury rate'));
+        expect(rate.getByText('—')).toBeInTheDocument();
+        expect(rate.getByText('Not confirmed')).toBeInTheDocument();
+        expect(within(measure('Incidents')).getByText(/−1 vs last month/)).toBeInTheDocument();
+        expect(within(measure('Training and audits up to date')).getByText('85%')).toBeInTheDocument();
+        expect(screen.queryByText(/overdue|all clear|all compliant/i)).not.toBeInTheDocument();
+    });
+});
+
+describe('Analytics period tally', () => {
+    it('keeps incomplete drills and expiring sheets truthful without a fabricated action percentage', () => {
         render(
             <AnalyticsPeriodSummary
                 summary={props.period_summary}
                 sdsExpiring={2}
+                sourceCompleteness="unknown"
             />,
         );
+        expect(within(measure('Drills complete')).getByText('1/4')).toBeInTheDocument();
+        expect(within(measure('Expiring safety data sheets')).getByText('2')).toBeInTheDocument();
+        expect(screen.queryByText(/%/)).not.toBeInTheDocument();
         expect(
-            screen.getByText('Actions on time unconfirmed'),
+            screen.getByText(/These measures cover records you can access/),
         ).toBeInTheDocument();
-        expect(
-            screen.getByText('2 expiring safety data sheets'),
-        ).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Hide activity' }));
-        expect(
-            screen.queryByText('2 expiring safety data sheets'),
-        ).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Show activity' }));
-        expect(
-            screen.getByText('2 expiring safety data sheets'),
-        ).toBeInTheDocument();
+        expect(screen.queryByText(/all clear|all compliant/i)).not.toBeInTheDocument();
     });
 });
