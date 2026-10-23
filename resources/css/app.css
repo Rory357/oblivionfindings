@@ -1548,8 +1548,7 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
  *                   square). Critical/warning lenses use the fixed status
  *                   pairs — safety tones never follow the brand.
  *   .popup-horizon  the 2px horizon line on the top edge of anything that
- *                   floats (dialog, confirm); .popup-horizon-left is the side
- *                   panel's edge where it meets the page.
+ *                   floats (dialog, confirm, selection bar).
  * ────────────────────────────────────────────────────────────────────────── */
 .popup-lens {
     display: grid;
@@ -1585,9 +1584,9 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     color: var(--status-warning);
     background: var(--status-warning-bg);
 }
-.popup-horizon {
-    position: relative;
-}
+/* No `position` here: this rule is outside Tailwind's layers, so it would
+   beat the dialog's `fixed` and drop the pop-up to the foot of the page.
+   Every frame that uses it is already fixed, sticky or `relative`. */
 .popup-horizon::after {
     content: '';
     position: absolute;
@@ -1611,32 +1610,6 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
                 transparent
             )
             80%,
-        transparent 100%
-    );
-}
-.popup-horizon-left::after {
-    content: '';
-    position: absolute;
-    inset: 0 auto 0 -1px;
-    width: 2px;
-    pointer-events: none;
-    z-index: 4;
-    background: linear-gradient(
-        180deg,
-        transparent 0%,
-        color-mix(
-                in oklch,
-                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
-                transparent
-            )
-            18%,
-        var(--primary) 50%,
-        color-mix(
-                in oklch,
-                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
-                transparent
-            )
-            82%,
         transparent 100%
     );
 }

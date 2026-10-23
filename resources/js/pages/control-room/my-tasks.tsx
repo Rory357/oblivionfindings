@@ -98,6 +98,7 @@ export default function MyTasks({
         const poll = window.setInterval(() => {
             if (document.hidden) return;
             router.reload({
+                async: true,
                 only: ['my_alerts', 'my_followups', 'my_shift', 'stats', 'detail'],
             });
         }, 30_000);

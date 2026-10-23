@@ -79,10 +79,12 @@ export function targetHeadline(target: AlertTarget): string {
     }
 }
 
-/** The line under it, e.g. "due Tue 20 Oct 2026, 9:29 am". */
+/** The line under it, e.g. "was due Tue 20 Oct 2026, 9:29 am". */
 export function targetCaption(target: AlertTarget): string {
     if (target.state === 'met' && target.doneAt)
         return `done ${formatDateTime(target.doneAt)}`;
+    if (target.state === 'missed' && target.deadline)
+        return `was due ${formatDateTime(target.deadline)}`;
     if (target.deadline) return `due ${formatDateTime(target.deadline)}`;
     return 'none set for this alert';
 }

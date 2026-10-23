@@ -221,6 +221,7 @@ export default function SafetyHandovers({
         const poll = window.setInterval(() => {
             if (!document.hidden)
                 router.reload({
+                    async: true,
                     only: ['journeys', 'lenses', 'stats', 'detail'],
                     preserveScroll: true,
                 });

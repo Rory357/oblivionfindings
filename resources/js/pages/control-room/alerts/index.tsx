@@ -206,7 +206,7 @@ export default function AlertsIndex({
     useEffect(() => {
         const poll = window.setInterval(() => {
             if (!document.hidden)
-                router.reload({ only: ['alerts', 'stats', 'detail'], preserveScroll: true });
+                router.reload({ async: true, only: ['alerts', 'stats', 'detail'], preserveScroll: true });
         }, 30_000);
         return () => window.clearInterval(poll);
     }, []);

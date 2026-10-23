@@ -95,6 +95,7 @@ export default function Escalations({
         const poll = window.setInterval(() => {
             if (document.hidden) return;
             router.reload({
+                async: true,
                 only: ['queues', 'worklist', 'summary', 'serverTime', 'detail'],
                 preserveScroll: true,
             });

@@ -43,6 +43,8 @@ export function useAlertSelection({
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
+                // async: a background refresh never cancels this load.
+                async: true,
                 only: ['detail'],
             },
         );

@@ -76,6 +76,8 @@ function useLiveRefresh(freshness: ControlRoomDashboardProps['freshness']) {
     const refresh = () => {
         setRefreshing(true);
         router.reload({
+            // async: a refresh never cancels the preview loading a row.
+            async: true,
             only: [...LIVE_PROPS],
             preserveScroll: true,
             onSuccess: () => setFailed(false),

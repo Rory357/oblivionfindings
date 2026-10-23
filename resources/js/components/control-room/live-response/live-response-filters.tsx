@@ -36,7 +36,7 @@ export function applyLiveResponseFilters(
 export function LiveResponseSearch({
     value,
     onApply,
-    placeholder = 'Search reference, person or site',
+    placeholder = 'Search alerts',
 }: {
     value: string;
     onApply: (q: string) => void;
