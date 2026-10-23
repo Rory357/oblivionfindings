@@ -154,7 +154,9 @@ describe('Reports › Overview', () => {
         expect(screen.getByRole('button', { name: 'Show response times' })).toHaveTextContent(
             'Not measured',
         );
-        expect(screen.getByText('No response targets ran in this period')).toBeInTheDocument();
+        // Nothing raised in the period: one message instead of a page of empty panels.
+        expect(screen.getByText('No alerts in this period')).toBeInTheDocument();
+        expect(screen.queryByText('No response targets ran in this period')).not.toBeInTheDocument();
         expect(screen.queryByText('Average time to acknowledge')).not.toBeInTheDocument();
     });
 

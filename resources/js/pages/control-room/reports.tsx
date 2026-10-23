@@ -321,7 +321,11 @@ export default function ControlRoomReports({
             }}
         >
             {total === 0 ? (
-                <Card className="min-w-0 px-5 py-10">
+                <Card
+                    id="report-empty"
+                    tabIndex={-1}
+                    className="min-w-0 px-5 py-10 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                     <EmptyState
                         icon={CalendarRange}
                         title="No alerts in this period"

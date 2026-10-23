@@ -49,7 +49,11 @@ export function measured(
 
 /** Scroll a report panel into view and move focus to it (meter blocks use this). */
 export function showSection(id: string) {
-    const el = typeof document === 'undefined' ? null : document.getElementById(id);
+    // With nothing in the period there is one empty card instead of panels.
+    const el =
+        typeof document === 'undefined'
+            ? null
+            : (document.getElementById(id) ?? document.getElementById('report-empty'));
     if (!el) return;
     const reduce =
         typeof window !== 'undefined' &&
