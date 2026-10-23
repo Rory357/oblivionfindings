@@ -319,7 +319,7 @@ final class MyDayBroadcastRecipientTest extends TestCase
     {
         $this->publish('Private scope failure update');
         $draft = $this->draft();
-        $before = $draft->getRawOriginal();
+        $before = $draft->fresh()->getRawOriginal();
         $reached = false;
         $connection = DB::connection();
         $dispatcher = $connection->getEventDispatcher();
@@ -447,7 +447,7 @@ final class MyDayBroadcastRecipientTest extends TestCase
     {
         $notification = $this->publish('Private final-proof update');
         $draft = $this->draft();
-        $before = $draft->getRawOriginal();
+        $before = $draft->fresh()->getRawOriginal();
 
         foreach ([false, true] as $partial) {
             HrEmployeeProfile::query()->where('user_id', $this->worker->id)->update(['is_active' => true]);
