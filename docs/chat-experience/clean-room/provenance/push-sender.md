@@ -48,6 +48,43 @@
 - The RFC 8292 section 2.4 example token verifies with the tests' R ‖ S handling.
 - 23 October, before removal: `tests/Unit/Push`, all of `tests/Unit/Chat`, `tests/Feature/PushNotificationsWebPushTest.php`, `tests/Feature/Chat/ChatBrowserPushTest.php` and `tests/Feature/Chat/ChatBrowserDeviceTest.php` gave 264 passed and 1 failed. The failure was the new `webpush:vapid --show` test reading Windows `\r\n` output; it was fixed in `b17dad5da`. After `composer remove minishlink/web-push` (which dropped exactly web-push, jwt-library, base64url and pki-framework, changing no other package), the same set plus `PushPackageGuardTest` gave 268 passed, 0 failed (1,243 assertions).
 
+## Similarity check
+
+**Clean: no copied code.** Checked by the C2.3 checker session on 23 October 2026. Only the checker read the replaced source. It stayed in the checker's own scratchpad, never in this worktree, its `vendor/` or the main checkout.
+
+- **New code compared:** `app/Services/Push/*.php`, `tests/Unit/Push/*.php`, the three callers (`ChatBrowserPushTransport`, `WebPushProvider`, `GenerateVapidKeys`) and their tests (`tests/Feature/PushNotificationsWebPushTest.php`, `tests/Unit/Chat/ChatBrowserPushTransportTest.php`). That is the code as of `5de20c477`, so it includes the Edge change (decision 8).
+- **Replaced source:** minishlink/web-push v10.1.0, web-token/jwt-library 4.1.6, spomky-labs/base64url 2.0.4 and spomky-labs/pki-framework 1.4.2. Each was fetched from GitHub at the commit the old `composer.lock` recorded, with its own tests (jwt-library's tests live in web-token/jwt-framework 4.1.6). In total: 1,003 PHP files, about 330,000 tokens.
+- **Tool:** a PHP script built on `token_get_all`. It drops comments, whitespace and file-level `namespace`, `use` and `declare` lines. It then finds every maximal run of tokens shared with any library file, in three modes:
+  - **normalised:** identifiers, variables, strings and numbers each become one placeholder. Threshold: 12 tokens against all four packages, 10 against web-push and base64url alone.
+  - **literal:** names and values are kept. Threshold: 8 tokens, or 6 against web-push and base64url.
+  - **comment words:** threshold 8 words.
+- **Controls:**
+  - A web-push file run through the tool scored 100 % in every mode.
+  - 15 unrelated Oblivion files from `app/Services` scored 24–68 % normalised coverage (longest run 14–41 tokens) and 0–6 % literal coverage.
+- **Results:**
+  - **Comments:** no shared run of 8 words anywhere.
+  - **Literal:** the longest run is 14 tokens, a `=== false` check before `throw new RuntimeException(`. Coverage per engine file is 0–13 %, except `Base64Url` at 34 % (the usual `strtr` and `base64_encode` idiom). Every run was reviewed by hand. Each one is one of these:
+    - a common PHP idiom: false checks, `catch (Throwable)`, PHPUnit data providers;
+    - the shape of a PHP function call: `hash_hmac`, `openssl_encrypt`, `openssl_pkey_new` with EC parameters, `chunk_split` for PEM;
+    - a value the standards fix: the HKDF step PRK = HMAC-SHA-256(salt, IKM) (RFC 8291 section 3.4), the `aud`, `exp` and `sub` claims with the `typ` and `alg` header (RFC 8292 section 2), or the RFC 8291 Appendix A keys.
+  - **Normalised:** engine files score 34–72 % coverage with a longest run of 26 tokens, within the unrelated-file range. `Base64Url` (88 tokens) is the 72 %. The longest runs in the tests (up to 37 tokens) are string lists in data providers and rows of constants.
+  - **Structure:**
+    - Key derivation: the new code writes RFC 8291's HMAC steps inline. The library goes through key objects and shared helper functions.
+    - DER keys: the new code builds them from binary constants and parses them with its own reader. jwt-library packs hex strings instead.
+  - **Test keys:** the VAPID pair in `WebPushSenderTest` first appears in `d06f0f123` and in no library file, so the builder generated it. The browser key and auth secret in the tests are the RFC 8291 Appendix A values.
+- **Removal:**
+  - Before and after `3a584dbe9`, `composer.lock` differs by exactly the four packages. brick/math stays: laravel/framework and ramsey/uuid need it.
+  - No licence copies or notice entries for the four ever existed in `deploy/chat-calling/licenses/` or `scripts/chat-license-notices.mjs`.
+  - No `Minishlink\`, `Jose\` or `SpomkyLabs\` use remains in `app`, `config`, `routes`, `database`, `resources` or `tests` (the guard test names the packages on purpose).
+- **Spec section 6:** each automated item has a test:
+  - the RFC 8291 vector: `WebPushEncryptionTest`;
+  - the round trip: `WebPushEncryptionTest` and `WebPushSenderTest`;
+  - VAPID (the token verifies, `aud` has no path, `exp` is within 24 hours, the signature is 64 bytes): `WebPushSenderTest` with `BrowserSide::verifyVapid`;
+  - every section 2 status and no response: `WebPushSenderTest`;
+  - stored keys in unpadded, padded and standard base64: `VapidKeysTest` and `WebPushSenderTest`, plus the 300-pair black-box check above.
+- **Tests re-run by the checker** at `5de20c477`, through heavy-lock with `OPENSSL_CONF` set to Herd's `openssl.cnf`. The run covered `tests/Unit/Push`, `tests/Unit/Chat`, `tests/Feature/PushNotificationsWebPushTest.php`, `tests/Feature/Chat/ChatBrowserPushTest.php` and `tests/Feature/Chat/ChatBrowserDeviceTest.php`. Result: 287 passed (1,263 assertions), none failed or skipped, `PushPackageGuardTest` included.
+- **Still open, and not the checker's to close:** the manual browser checks (Chrome, Edge, Firefox, Safari 16.4+) and the live-key tinker check on the test server.
+
 ## Open questions
 
 - **Edge host check.** Decided (decision 8), but the host pattern comes from general knowledge of Microsoft's push service, not from a subscription Oblivion has seen. On the test server, confirm a real Edge subscription's endpoint ends in `.notify.windows.com` before the Edge manual check. If the server's `.env` sets `CHAT_BROWSER_PUSH_HOSTS`, add `.notify.windows.com` there.
