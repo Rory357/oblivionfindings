@@ -8,8 +8,9 @@
  */
 import { Link } from '@inertiajs/react';
 import { ArrowRight, Repeat, type LucideIcon } from 'lucide-react';
-import { Fragment, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 
+import { EntityKebab, type MenuItem } from '@/components/lists/entity-menu';
 import { cn } from '@/lib/utils';
 
 /* ------------------------------------------------------------------ */
@@ -151,27 +152,40 @@ export interface TallyItem {
     label: string;
     sub?: ReactNode;
     tone?: SgTone;
+    /** Where the number lives — the number and its label become a link. */
+    href?: string;
 }
 
 /** Related numbers on one line. Zeros fold into one calm sentence ("Nothing overdue or unassigned"). */
-export function Tally({ title, sub, action, items, calm }: Omit<SurfaceProps, 'children'> & { items: TallyItem[]; calm?: string }) {
-    const isZero = (v: ReactNode) => String(v).trim() === '0';
+export function Tally({ title, sub, action, items, calm, keepZeros = false }: Omit<SurfaceProps, 'children'> & { items: TallyItem[]; calm?: string; /** Measures where zero is a fact to show (rates, days since). */ keepZeros?: boolean }) {
+    const isZero = (v: ReactNode) => !keepZeros && String(v).trim() === '0';
     const zeros = items.filter((i) => isZero(i.value));
     const shown = items.filter((i) => !isZero(i.value));
     const sentence = calm ?? (zeros.length ? `Nothing ${zeros.map((z) => z.label.toLowerCase()).join(' or ')}` : '');
     return (
         <Surface title={title} sub={sub} action={action}>
             <div className="sg-tally">
-                {shown.map((i) => (
-                    <div key={i.label} className="sg-t">
-                        <b>{i.value}</b>
-                        <span>
-                            {i.tone ? <Ring tone={i.tone} /> : null}
-                            {i.label}
-                        </span>
-                        {i.sub ? <small>{i.sub}</small> : null}
-                    </div>
-                ))}
+                {shown.map((i) => {
+                    const body = (
+                        <>
+                            <b>{i.value}</b>
+                            <span>
+                                {i.tone ? <Ring tone={i.tone} /> : null}
+                                {i.label}
+                            </span>
+                            {i.sub ? <small>{i.sub}</small> : null}
+                        </>
+                    );
+                    return i.href ? (
+                        <Link key={i.label} href={i.href} className="sg-t sg-t--link">
+                            {body}
+                        </Link>
+                    ) : (
+                        <div key={i.label} className="sg-t">
+                            {body}
+                        </div>
+                    );
+                })}
                 {sentence ? (
                     <p className="sg-calm">
                         <Ring tone="success" />
@@ -332,11 +346,15 @@ export function RingCard({
 /* ------------------------------------------------------------------ */
 
 export interface LogItem {
+    key?: string | number;
     time?: ReactNode;
     tone?: SgTone;
     title: ReactNode;
     sub?: ReactNode;
     action?: SgAction | null;
+    /** The row's menu: a kebab at the end, and the same items on right-click (DESIGN.md entity rows). */
+    menu?: MenuItem[];
+    onContextMenu?: (event: MouseEvent<HTMLElement>) => void;
 }
 
 /** Log rows — time first, the ring for state, then words. */
@@ -345,14 +363,17 @@ export function Log({ title, sub, action, items, limit = 8 }: Omit<SurfaceProps,
         <Surface title={title} sub={sub} action={action}>
             <ol className="sg-log">
                 {items.slice(0, limit).map((i, n) => (
-                    <li key={n} className="sg-lr">
+                    <li key={i.key ?? n} className="sg-lr" onContextMenu={i.onContextMenu}>
                         <time>{i.time ?? ''}</time>
                         {i.tone ? <Ring tone={i.tone} /> : <span />}
                         <div className="min-w-0">
                             <b>{i.title}</b>
                             {i.sub ? <small>{i.sub}</small> : null}
                         </div>
-                        {i.action ? <ActionLink action={i.action} className="ml-0" /> : <span />}
+                        <span className="inline-flex items-center gap-2">
+                            {i.action ? <ActionLink action={i.action} className="ml-0" /> : null}
+                            {i.menu?.length ? <EntityKebab actions={i.menu} /> : null}
+                        </span>
                     </li>
                 ))}
             </ol>
@@ -1008,6 +1029,129 @@ export function EvidenceWindows({ title, sub, action, before = 60, after = 120, 
                 </span>
             </div>
             {actions ? <div className="sg-actions">{actions}</div> : null}
+        </Surface>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Row list, fact rows, note                                          */
+/* ------------------------------------------------------------------ */
+
+export interface RowItem {
+    key?: string | number;
+    title: ReactNode;
+    sub?: ReactNode;
+    /** Right side: a <StatusBadge> (one status per row). */
+    badge?: ReactNode;
+    /** Right side, after the badge: a short time ("2 days ago"). */
+    time?: ReactNode;
+    /** Left: an icon or avatar in the tint circle. */
+    leading?: ReactNode;
+    /** The whole row opens the record. */
+    href?: string;
+    /** The row's menu: a kebab at the end, and the same items on right-click (DESIGN.md entity rows). */
+    menu?: MenuItem[];
+    onContextMenu?: (event: MouseEvent<HTMLElement>) => void;
+}
+
+/** A list of records in a surface: title and sub-line, one status on the right; the whole row opens it. */
+export function RowList({ title, sub, action, items, empty, limit }: Omit<SurfaceProps, 'children'> & { items: RowItem[]; empty?: ReactNode; limit?: number }) {
+    const shown = limit ? items.slice(0, limit) : items;
+    return (
+        <Surface title={title} sub={sub} action={action}>
+            {shown.length ? (
+                <ul className={cn('sg-list', title && 'mt-2')}>
+                    {shown.map((i, n) => {
+                        const body = (
+                            <>
+                                {i.leading ? <span className="sg-li-lead">{i.leading}</span> : null}
+                                <span className="sg-li-t">
+                                    <b>{i.title}</b>
+                                    {i.sub ? <small>{i.sub}</small> : null}
+                                </span>
+                                {i.badge ?? null}
+                                {i.time ? <span className="sg-li-time">{i.time}</span> : null}
+                            </>
+                        );
+                        return (
+                            <li key={i.key ?? n} className="flex items-center" onContextMenu={i.onContextMenu}>
+                                {i.href ? (
+                                    <Link href={i.href} className="sg-li min-w-0 flex-1">
+                                        {body}
+                                    </Link>
+                                ) : (
+                                    <div className="sg-li min-w-0 flex-1">{body}</div>
+                                )}
+                                {i.menu?.length ? <EntityKebab actions={i.menu} className="mr-3" /> : null}
+                            </li>
+                        );
+                    })}
+                </ul>
+            ) : empty ? (
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>{empty}</span>
+                </p>
+            ) : null}
+        </Surface>
+    );
+}
+
+/** Facts as label and value rows. */
+export function FactRows({ title, sub, action, rows }: Omit<SurfaceProps, 'children'> & { rows: [ReactNode, ReactNode][] }) {
+    return (
+        <Surface title={title} sub={sub} action={action}>
+            <dl className={cn('sg-kv', title && 'mt-1')}>
+                {rows.map(([k, v], i) => (
+                    <Fragment key={i}>
+                        <dt>{k}</dt>
+                        <dd>{v}</dd>
+                    </Fragment>
+                ))}
+            </dl>
+        </Surface>
+    );
+}
+
+/** A note in its place: one tinted line with its icon. Status tones for warnings; keep safety wording as it is. */
+export function Note({ tone, icon: Icon, children }: { tone?: SgStatusTone; icon?: LucideIcon; children: ReactNode }) {
+    return (
+        <div role={tone === 'critical' ? 'alert' : 'note'} className={cn('sg-note', tone && `sg-note--${tone}`)}>
+            {Icon ? <Icon aria-hidden="true" className="size-4" /> : null}
+            <div className="min-w-0">{children}</div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  A chart with a point                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Bars with their values written on: the latest in the brand, the rest quiet, and one sentence that says what
+ * the chart shows (the drawings' "point" chart). For dense or multi-series data use the module's chart instead.
+ */
+export function PointBars({ title, sub, action, values, labels, note, height = 140 }: Omit<SurfaceProps, 'children'> & { values: number[]; labels: string[]; note?: ReactNode; height?: number }) {
+    const max = Math.max(1, ...values);
+    const summary = values.map((v, i) => `${labels[i] ?? ''} ${v}`).join(', ');
+    return (
+        <Surface title={title} sub={sub} action={action}>
+            <div className="sg-chart">
+                <div className="sg-bars" style={{ height }} role="img" aria-label={`${title ?? 'Chart'}: ${summary}`}>
+                    {values.map((v, i) => (
+                        <div key={i} className={cn(i === values.length - 1 && 'sg-bar--last')}>
+                            <b aria-hidden="true">{v}</b>
+                            <i aria-hidden="true" style={{ height: Math.max(4, (v / max) * (height - 36)) }} />
+                        </div>
+                    ))}
+                </div>
+                <div className="sg-xl" aria-hidden="true">
+                    {labels.map((l, i) => (
+                        <span key={i}>{l}</span>
+                    ))}
+                </div>
+                {note ? <p className="sg-chart-note">{note}</p> : null}
+            </div>
         </Surface>
     );
 }

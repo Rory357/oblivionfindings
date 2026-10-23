@@ -1,17 +1,15 @@
 /* H&S previews open the canonical record or register. Optional summaries are
  * read-only; shared card actions work with touch, keyboard and right-click. */
 import { worksafeLabel } from '@/components/health-safety/event-detail-dialog';
-import { EntityCard } from '@/components/lists/entity-card';
 import { EntityContextMenu, useEntityContextMenu, type MenuItem } from '@/components/lists/entity-menu';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Log, QuietLine, RowList } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
-import { Link, router, usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowRight,
     CalendarClock,
     Check,
     ClipboardCheck,
@@ -27,7 +25,7 @@ import {
     User,
     UserCog,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 
 import { type HsDetail, HsDetailDialog } from './hs-detail-dialog';
 
@@ -139,14 +137,6 @@ export type WorklistKey =
 
 type PillTone = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
 
-/* Tinted section icons use the existing semantic status tokens. */
-const BADGE_TONE: Record<PillTone, string> = {
-    success: 'bg-status-success-bg text-status-success',
-    warning: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-    info: 'bg-status-info-bg text-status-info',
-    neutral: 'bg-accent text-primary',
-};
 function titleCase(value?: string | null): string {
     if (!value) return '—';
     return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -418,17 +408,21 @@ function expiringRows(rows: ExpiringRow[]): NormRow[] {
                 ? {
                       label:
                           r.days_until != null
-                              ? `Expired ${Math.abs(r.days_until)}d`
+                              ? `Expired ${Math.abs(r.days_until)} day${Math.abs(r.days_until) === 1 ? '' : 's'} ago`
                               : 'Overdue',
                       tone: 'critical',
                   }
                 : {
                       label:
-                          r.days_until != null ? `${r.days_until} days` : 'Due',
+                          r.days_until == null
+                              ? 'Due'
+                              : r.days_until === 0
+                                ? 'Due today'
+                                : `In ${r.days_until} day${r.days_until === 1 ? '' : 's'}`,
                       tone: 'warning',
                   },
             title: repair ? 'Equipment facts need review' : r.label ?? r.type_label,
-            sub: r.type_label,
+            sub: [r.type_label, r.site].filter(Boolean).join(' · '),
             owner: null,
             due: repair ? null : formatDateOnly(r.due_date, 'Due date not recorded'),
             clientId: null,
@@ -516,10 +510,10 @@ export function HsWorklists({
             key: 'acceptance',
             icon: ShieldAlert,
             iconTone: 'warning',
-            title: worklists.attention[0]?.label ?? 'Awaiting H&S acceptance',
+            title: 'Waiting for Health & safety to accept',
             subtitle:
                 worklists.attention[0]?.help ??
-                'A named H&S owner must accept governance responsibility.',
+                'A named Health & safety owner must accept responsibility for each one',
             registerUrl: null,
             registerLabel: 'Open action',
             rows: acceptanceRows(worklists.attention[0]?.items ?? []),
@@ -532,7 +526,7 @@ export function HsWorklists({
             icon: Clock,
             iconTone: 'critical',
             title: 'Overdue corrective actions',
-            subtitle: 'Past-due actions in this preview',
+            subtitle: 'Past their due date · right-click a row for options',
             registerUrl: '/health-safety/corrective-actions',
             registerLabel: 'View register',
             rows: correctiveActionRows(worklists.overdue_corrective_actions),
@@ -543,7 +537,7 @@ export function HsWorklists({
             icon: Search,
             iconTone: 'info',
             title: 'Open investigations',
-            subtitle: 'Active investigations in this preview',
+            subtitle: 'Investigations under way',
             registerUrl: '/health-safety/events',
             registerLabel: 'View all',
             rows: investigationRows(worklists.open_investigations),
@@ -553,8 +547,8 @@ export function HsWorklists({
             key: 'notifiable',
             icon: FileText,
             iconTone: 'critical',
-            title: 'WorkSafe-notifiable events',
-            subtitle: 'Notified or awaiting notification in this preview',
+            title: 'WorkSafe notifiable events',
+            subtitle: 'Notified, or still to notify',
             registerUrl: worksafeRegisterUrl,
             registerLabel: 'Register',
             rows: notifiableRows(
@@ -567,8 +561,8 @@ export function HsWorklists({
             key: 'expiring',
             icon: CalendarClock,
             iconTone: 'warning',
-            title: 'Due reviews and equipment attention',
-            subtitle: 'Risk assessments · SDS · drills · equipment',
+            title: 'Reviews and equipment due',
+            subtitle: 'Risk assessments, safety data sheets, drills and equipment. A due list only — it doesn’t confirm equipment is fit to use.',
             registerUrl: null,
             registerLabel: 'View registers',
             rows: expiringRows(worklists.expiring.filter((row) => worklists.ppe_expiring_state?.source_integrity !== 'restricted' || !row.type.startsWith('ppe_'))),
@@ -588,79 +582,88 @@ export function HsWorklists({
         if (context.ctx !== null && !contextRow) closeContext();
     }, [detailKey, detail, context.ctx, contextRow, closeContext]);
 
+    // Drawn as the approved H&S drawings' lists (23 Oct): time-first logs for dated work, plain
+    // rows with one status for the rest. Every row keeps its link, its kebab and the same menu on
+    // right-click, and "View recorded summary" still opens the detail pop-up.
+    const PILL_RING = { critical: 'critical', warning: 'warning', success: 'success', info: 'info', neutral: 'none' } as const;
+    const rowMenu = (row: NormRow) => ({
+        href: row.actionUrl ?? row.registerUrl,
+        menu: actions(row),
+        onContextMenu: (event: MouseEvent<HTMLElement>) => context.open(event, row),
+    });
+    const pill = (row: NormRow) => (
+        <StatusBadge variant={row.pill.tone} size="sm">
+            {row.pill.icon && <row.pill.icon aria-hidden="true" className="size-3" />}
+            {row.pill.label}
+        </StatusBadge>
+    );
+    const head = (cfg: CardConfig) => ({
+        title: cfg.title,
+        sub: cfg.subtitle,
+        action: cfg.registerUrl ? { label: cfg.registerLabel, href: cfg.registerUrl } : null,
+    });
+    const block = (cfg: CardConfig) => {
+        if (cfg.key === 'corrective_actions' || cfg.key === 'investigations') {
+            return cfg.rows.length ? (
+                <Log
+                    key={cfg.key}
+                    {...head(cfg)}
+                    limit={50}
+                    items={cfg.rows.map((row) => ({
+                        key: row.key,
+                        time: row.due ?? '',
+                        tone: PILL_RING[row.pill.tone],
+                        title: row.title,
+                        sub: [row.pill.label, row.sub, row.owner].filter(Boolean).join(' · '),
+                        menu: actions(row),
+                        onContextMenu: (event: MouseEvent<HTMLElement>) => context.open(event, row),
+                        action: { label: 'Open', href: row.actionUrl ?? row.registerUrl },
+                    }))}
+                />
+            ) : (
+                <QuietLine key={cfg.key} title={cfg.title} text={cfg.emptyText} />
+            );
+        }
+        const status =
+            cfg.key === 'expiring'
+                ? worklists.ppe_expiring_state?.source_integrity === 'restricted'
+                    ? 'Equipment attention requires current safety and Site access.'
+                    : worklists.ppe_expiring_state?.source_integrity === 'repair_required'
+                      ? 'Some equipment facts are unconfirmed. Open the equipment record to review its source status.'
+                      : !worklists.ppe_expiring_state
+                        ? 'Equipment attention is not confirmed.'
+                        : null
+                : null;
+        return (
+            <RowList
+                key={cfg.key}
+                {...head(cfg)}
+                sub={
+                    <>
+                        {status ?? cfg.subtitle}
+                        {cfg.key === 'expiring' && worklists.ppe_expiring_state?.truncated
+                            ? ' Some equipment items are outside this preview. Open the PPE register for the remaining records.'
+                            : ''}
+                        {cfg.count !== undefined ? <span aria-label={cfg.countLabel}>{` · ${cfg.count} waiting`}</span> : null}
+                    </>
+                }
+                empty={cfg.emptyText}
+                items={cfg.rows.map((row) => ({
+                    key: row.key,
+                    title: row.title,
+                    sub: row.sub,
+                    badge: pill(row),
+                    leading: cfg.key === 'notifiable' ? <ShieldAlert aria-hidden="true" className="size-4" /> : undefined,
+                    ...rowMenu(row),
+                }))}
+            />
+        );
+    };
+
     return (
         <>
-            <div
-                className={cn(
-                    'grid gap-4',
-                    configs.length > 1 && 'lg:grid-cols-2',
-                )}
-            >
-                {configs.map((cfg) => (
-                    <Card key={cfg.key}>
-                        <CardHeader className="flex flex-row items-start justify-between gap-2 pb-3">
-                            <div className="flex items-center gap-2.5">
-                                <span
-                                    className={cn(
-                                        'inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]',
-                                        BADGE_TONE[cfg.iconTone],
-                                    )}
-                                >
-                                    <cfg.icon className="h-4 w-4" />
-                                </span>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <CardTitle className="text-section-title">
-                                            {cfg.title}
-                                        </CardTitle>
-                                        {cfg.count !== undefined ? (
-                                            <StatusBadge variant="warning" aria-label={cfg.countLabel}>{cfg.count}</StatusBadge>
-                                        ) : null}
-                                    </div>
-                                    <p className="text-subtle mt-0.5">
-                                        {cfg.subtitle}
-                                    </p>
-                                </div>
-                            </div>
-                            {cfg.registerUrl ? (
-                                <Link
-                                    href={cfg.registerUrl}
-                                    className="frontline-tap frontline-focus inline-flex shrink-0 items-center gap-1 text-caption font-semibold text-primary hover:underline"
-                                >
-                                    {cfg.registerLabel}
-                                    <ArrowRight className="h-3 w-3" />
-                                </Link>
-                            ) : null}
-                        </CardHeader>
-                        <CardContent className="space-y-1.5">
-                            {cfg.key === 'expiring' && <p role="status" className="text-subtle mb-3">
-                                {worklists.ppe_expiring_state?.source_integrity === 'restricted' ? 'Equipment attention requires current safety and Site access.' :
-                                    worklists.ppe_expiring_state?.source_integrity === 'repair_required' ? 'Some equipment facts are unconfirmed. Open the equipment record to review its source status.' :
-                                        !worklists.ppe_expiring_state ? 'Equipment attention is not confirmed.' : 'This is a preview of recorded due items; it does not confirm equipment suitability.'}
-                                {worklists.ppe_expiring_state?.truncated && ' Some equipment items are outside this preview. Open the PPE register for the remaining records.'}
-                            </p>}
-                            {cfg.rows.length === 0 ? (
-                                <p className="text-subtle py-6 text-center">
-                                    {cfg.emptyText}
-                                </p>
-                            ) : (
-                                <ul className="grid gap-4" aria-label={cfg.title}>{cfg.rows.map((row) => (
-                                    <li key={row.key}><EntityCard
-                                        icon={cfg.icon}
-                                        meridian={row.pill.tone === 'critical' ? 'critical' : row.pill.tone === 'warning' ? 'warning' : 'neutral'}
-                                        name={row.title} subline={row.sub}
-                                        href={row.actionUrl ?? row.registerUrl} linkLabel={row.actionLabel ?? `Open: ${row.title}`}
-                                        onOpen={() => visit(row.actionUrl ?? row.registerUrl)}
-                                        onContextMenu={(event) => context.open(event, row)} actions={actions(row)}
-                                        chips={<StatusBadge variant={row.pill.tone}>{row.pill.icon && <row.pill.icon aria-hidden="true" className="size-3" />}{row.pill.label}</StatusBadge>}
-                                        alerts={row.due ? <p className="text-subtle">Recorded due date: {row.due}</p> : undefined}
-                                        footer={{ personName: row.owner, primary: row.owner ?? 'Owner not recorded in this preview', secondary: row.meta }}
-                                    /></li>
-                                ))}</ul>
-                            )}
-                        </CardContent>
-                    </Card>
-                ))}
+            <div className={cn('grid items-start gap-5', configs.length > 1 && 'lg:grid-cols-2')}>
+                {configs.map(block)}
             </div>
 
             {context.ctx && contextRow && <EntityContextMenu x={context.ctx.x} y={context.ctx.y} title={contextRow.title} items={actions(contextRow)} onClose={context.close} />}

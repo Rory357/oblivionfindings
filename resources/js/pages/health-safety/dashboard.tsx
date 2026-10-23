@@ -1,9 +1,19 @@
 import { PageHeaderRail, PageLayout } from '@/components/page';
+import {
+    Flow,
+    Log,
+    PointBars,
+    RowList,
+    SideColumn,
+    Tally,
+    type LogItem,
+    type TallyItem,
+} from '@/components/signature/blocks';
+import { formatDateTimeLong } from '@/lib/datetime';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-import { Card as GuardrailCard } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
     IncidentTrendCard,
@@ -112,6 +122,8 @@ type Props = {
     };
     restraints?: RestraintDashboardData;
     worklists: WorklistsPayload;
+    /** Where open incidents are up to, by stage (optional: hidden until the source sends it). */
+    incident_stages?: IncidentStagesData | null;
 };
 
 type RestraintDashboardData = {
@@ -180,8 +192,14 @@ export default function HealthSafetyDashboard({
     first_aid = { treatments: null, ambulance: null, hospital: null },
     restraints = EMPTY_RESTRAINTS,
     worklists,
+    incident_stages = null,
 }: Props) {
-    const [tab, setTab] = useState<string>('overview');
+    // A tab can be opened from a link (?tab=leading); unknown values fall back to the overview.
+    const pageUrl = usePage().url;
+    const [tab, setTab] = useState<string>(() => {
+        const requested = new URLSearchParams(pageUrl.split('?')[1] ?? '').get('tab');
+        return requested && ['overview', 'leading', 'lagging', 'compliance'].includes(requested) ? requested : 'overview';
+    });
     const [launcherOpen, setLauncherOpen] = useState(false);
     const [activeWizard, setActiveWizard] = useState<string | null>(null);
     const [search, setSearch] = useState('');
@@ -200,16 +218,79 @@ export default function HealthSafetyDashboard({
         worklists.open_investigations.length,
         worklists.expiring.length,
     );
+    // Destinations keep the selected Site (the destination registers read site_id).
+    const destination = (path: string, params: Record<string, string> = {}) => {
+        const query = new URLSearchParams(params);
+        if (filters.site !== null) query.set('site_id', String(filters.site));
+        return path + (query.size ? '?' + query.toString() : '');
+    };
+    const fleetUnresolved = kpis.fleet_unresolved ?? null;
+    const fleet30 = kpis.fleet_incidents_30d ?? null;
+    const openSafeguarding = kpis.open_safeguarding ?? null;
+    const fleetRestricted =
+        'Access restricted — Health & safety access doesn’t include Fleet records';
+    // The header carries four numbers; the lens's other two measures open the body (approved drawings).
+    const measures: TallyItem[] =
+        filters.lens === 'governance'
+            ? [
+                  {
+                      value: openSafeguarding === null ? '—' : String(openSafeguarding),
+                      label: 'Safeguarding',
+                      sub: openSafeguarding === null ? 'Not confirmed' : 'Open concerns now',
+                      href: destination('/safeguarding', { tab: 'open' }),
+                  },
+                  {
+                      value: fleetUnresolved === null ? '—' : String(fleetUnresolved),
+                      label: 'Fleet incidents',
+                      sub: fleetUnresolved === null ? fleetRestricted : 'Unresolved now',
+                      href:
+                          fleetUnresolved === null
+                              ? undefined
+                              : destination('/fleet-assets/incidents', { tab: 'open' }),
+                  },
+              ]
+            : [
+                  {
+                      value: String(procedures.approved),
+                      label: 'Procedures',
+                      sub:
+                          procedures.review_due > 0
+                              ? String(procedures.review_due) + ' due for review'
+                              : procedures.coverage_gap_categories > 0
+                                ? String(procedures.coverage_gap_categories) + ' coverage gaps'
+                                : 'Approved',
+                      tone:
+                          procedures.coverage_gap_categories > 0
+                              ? 'critical'
+                              : procedures.review_due > 0
+                                ? 'warning'
+                                : undefined,
+                      href: destination('/health-safety/procedures', { tab: 'approved' }),
+                  },
+                  {
+                      value: fleet30 === null ? '—' : String(fleet30),
+                      label: 'Fleet incidents',
+                      sub: fleet30 === null ? fleetRestricted : 'Last 30 days',
+                      href: fleet30 === null ? undefined : destination('/fleet-assets/incidents'),
+                  },
+              ];
+    const attention = (
+        <CommandCentreAttention
+            expiring={worklists.expiring}
+            ppeState={worklists.ppe_expiring_state}
+            worksafePending={backbone?.events.worksafe_pending ?? null}
+            activeAlerts={kpis.active_alerts ?? null}
+        />
+    );
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Dashboard', href: '/health-safety/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
             ]}
         >
-            <Head title="Health & Safety Dashboard" />
+            <Head title="Health & safety" />
 
             <PageLayout
                 hero={
@@ -236,7 +317,6 @@ export default function HealthSafetyDashboard({
                                 items={tabItems.map((item) => ({
                                     key: item.id,
                                     label: item.label,
-                                    icon: item.icon,
                                     count:
                                         typeof item.badge === 'number'
                                             ? item.badge
@@ -244,7 +324,7 @@ export default function HealthSafetyDashboard({
                                 }))}
                                 value={tab}
                                 onSelect={setTab}
-                                ariaLabel="Health & Safety views"
+                                ariaLabel="Health & safety views"
                             />
                         }
                     />
@@ -262,14 +342,12 @@ export default function HealthSafetyDashboard({
                             for your shift, medicines and reporting tasks.
                         </p>
                     )}
-                    <CommandCentreAttention
-                        expiring={worklists.expiring}
-                        ppeState={worklists.ppe_expiring_state}
-                        worksafePending={
-                            backbone?.events.worksafe_pending ?? null
-                        }
-                        activeAlerts={kpis.active_alerts ?? null}
-                    />
+                    {source_completeness === 'unknown' && (
+                        <p className="text-subtle" role="status">
+                            These measures cover records you can access. The
+                            full picture may be incomplete.
+                        </p>
+                    )}
                     {search.trim() && (
                         <p className="text-subtle" role="status">
                             Search matches the items loaded on this overview.
@@ -280,41 +358,48 @@ export default function HealthSafetyDashboard({
                     )}
 
                     {tab === 'overview' && (
-                        <div className="flex flex-col gap-4">
-                            {/* First attention queue — direct H&S governance acceptance. */}
-                            <HsWorklists
-                                worklists={visibleWorklists}
-                                show={['acceptance']}
-                            />
-                            {/* Next row — overdue corrective actions (1.5fr) + site safety league (1fr) */}
-                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                                <HsWorklists
-                                    worklists={visibleWorklists}
-                                    show={['corrective_actions']}
-                                />
-                                <SiteSafetyComparisonCard data={visibleSites} />
+                        <>
+                            {filters.lens !== 'governance' && incident_stages ? (
+                                <IncidentStagesFlow data={incident_stages} />
+                            ) : null}
+                            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                                <div className="grid min-w-0 gap-5">
+                                    <Tally items={measures} keepZeros />
+                                    {filters.lens === 'governance' ? (
+                                        <>
+                                            {attention}
+                                            <HsWorklists worklists={visibleWorklists} show={['acceptance']} />
+                                            <HsWorklists worklists={visibleWorklists} show={['corrective_actions']} />
+                                            <HsWorklists worklists={visibleWorklists} show={['notifiable']} />
+                                            <IncidentTrendCard
+                                                bars={incident_trends}
+                                                frequency={frequency_trends}
+                                                variant="full"
+                                                title="Incidents and near misses"
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <NeedsYouNow worklists={visibleWorklists} />
+                                            <IncidentBars bars={incident_trends} />
+                                        </>
+                                    )}
+                                </div>
+                                <SideColumn>
+                                    <SiteSafetyComparisonCard data={visibleSites} />
+                                    <HsWorklists worklists={visibleWorklists} show={['expiring']} />
+                                </SideColumn>
                             </div>
-                            {/* Row 2 — WorkSafe-notifiable events + expiring soon (1fr 1fr) */}
-                            <HsWorklists
-                                worklists={visibleWorklists}
-                                show={['notifiable', 'expiring']}
-                            />
-                            {/* Row 3 — full-width incident & near-miss trend */}
-                            <IncidentTrendCard
-                                bars={incident_trends}
-                                frequency={frequency_trends}
-                                variant="full"
-                            />
-                        </div>
+                        </>
                     )}
 
                     {tab === 'leading' && (
-                        <div className="flex flex-col gap-4">
-                            <FirstAidStrip data={first_aid} />
+                        <>
+                            <Tally items={measures} keepZeros />
+                            {attention}
+                            <FirstAidTally data={first_aid} />
                             <LeadingPanel
-                                data={leading_lagging.leading}
                                 workerParticipation={worker_participation}
-                                siteCount={sites.length}
                                 filters={filters}
                             />
                             <LeadingCharts
@@ -322,49 +407,40 @@ export default function HealthSafetyDashboard({
                                 operands={frequency_operands}
                                 burndown={hazard_burndown}
                                 drillPct={kpis.drill_compliance_pct ?? null}
-                                trainingPct={
-                                    leading_lagging.leading.training_pct
-                                }
+                                trainingPct={leading_lagging.leading.training_pct}
                                 openHazards={open_hazards_list}
                             />
-                        </div>
+                        </>
                     )}
 
                     {tab === 'lagging' && (
-                        <div className="flex flex-col gap-4">
-                            <LaggingPanel
-                                data={leading_lagging.lagging}
-                                filters={filters}
-                            />
+                        <>
+                            <Tally items={measures} keepZeros />
+                            {attention}
+                            <LaggingPanel data={leading_lagging.lagging} filters={filters} />
                             <LaggingCharts
                                 bars={incident_trends}
                                 frequency={frequency_trends}
                                 severity={backbone?.events?.events_by_severity}
                                 category={incidents_by_category}
                             />
-                            <RestraintStrip data={restraints} />
-                            <HsWorklists
-                                worklists={visibleWorklists}
-                                show={['investigations']}
-                            />
-                        </div>
+                            <RestraintSection data={restraints} />
+                            <HsWorklists worklists={visibleWorklists} show={['investigations']} />
+                        </>
                     )}
 
                     {tab === 'compliance' && (
-                        <div className="flex flex-col gap-4">
+                        <>
+                            <Tally items={measures} keepZeros />
+                            {attention}
                             <CompliancePanel
                                 site={filters.site}
                                 expiring={worklists.expiring}
-                                worksafePending={
-                                    backbone?.events.worksafe_pending ?? null
-                                }
+                                worksafePending={backbone?.events.worksafe_pending ?? null}
                             />
-                            <HsWorklists
-                                worklists={visibleWorklists}
-                                show={['expiring']}
-                            />
+                            <HsWorklists worklists={visibleWorklists} show={['expiring']} />
                             <GovernanceExports />
-                        </div>
+                        </>
                     )}
 
                     <ReportLauncher
@@ -422,281 +498,292 @@ export default function HealthSafetyDashboard({
     );
 }
 
-/**
- * First-aid activity strip (Leading tab) — three deep-link stat cards into the First Aid
- * Register. A leading care-activity signal: first-aid-only treatment is NOT recordable and
- * is deliberately excluded from TRIFR, so it lives here rather than among the lagging rates.
- */
-function FirstAidStrip({
-    data,
-}: {
-    data: {
-        treatments: number | null;
-        ambulance: number | null;
-        hospital: number | null;
-    };
-}) {
-    const cards: {
+/* ------------------------------------------------------------------ */
+/*  Overview sections (approved H&S drawings, 23 Oct 2026)            */
+/* ------------------------------------------------------------------ */
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** "17 Oct" from a civil date (YYYY-MM-DD) or an instant, in the worker time zone. */
+function shortDay(value: string | null | undefined): string {
+    if (!value) return '';
+    const civil = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (civil) return `${Number(civil[3])} ${MONTHS[Number(civil[2]) - 1] ?? ''}`;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date
+        .toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short' })
+        .replace(/,/g, '');
+}
+
+/** Where open incidents are up to, by the step each is waiting on (sent by the source when available). */
+export type IncidentStagesData = {
+    stages: Array<{
+        key: string;
         label: string;
-        value: number | null;
-        href: string;
-        tone: 'neutral' | 'warning' | 'critical';
-    }[] = [
-        {
-            label: 'First-aid treatments',
-            value: data.treatments,
-            href: '/health-safety/first-aid',
-            tone: 'neutral',
-        },
-        {
-            label: 'Ambulance called',
-            value: data.ambulance,
-            href: '/health-safety/first-aid?tab=ambulance',
-            tone: 'warning',
-        },
-        {
-            label: 'Hospital referrals',
-            value: data.hospital,
-            href: '/health-safety/first-aid?treatment_outcome=sent_to_hospital',
-            tone: 'critical',
-        },
-    ];
+        count: number;
+        sub?: string | null;
+        tone?: 'critical' | 'warning' | 'info' | 'success' | null;
+        items?: Array<{ text: string; href: string; tone?: 'critical' | 'warning' | 'info' | 'success' | 'none' | null }>;
+    }>;
+    note?: string | null;
+};
 
-    const valueClass = (
-        tone: 'neutral' | 'warning' | 'critical',
-        value: number | null,
-    ) => {
-        const colour =
-            value === null || value <= 0
-                ? 'text-foreground'
-                : tone === 'critical'
-                  ? 'text-status-critical'
-                  : tone === 'warning'
-                    ? 'text-status-warning'
-                    : 'text-foreground';
-        return `mt-1 text-3xl font-bold tabular-nums ${colour}`;
-    };
-
+function IncidentStagesFlow({ data }: { data: IncidentStagesData }) {
     return (
-        <div className="grid gap-3 sm:grid-cols-3">
-            {cards.map((c) => (
-                <Link
-                    key={c.label}
-                    href={c.href}
-                    className="group flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                >
-                    <span className="text-xs font-medium text-muted-foreground">
-                        {c.label}
-                    </span>
-                    <span className={valueClass(c.tone, c.value)}>
-                        {c.value ?? '—'}
-                    </span>
-                    <span className="mt-1 text-[11px] text-muted-foreground">
-                        {c.value === null
-                            ? 'Not confirmed'
-                            : 'last 30 days · readable records'}
-                    </span>
-                </Link>
-            ))}
-        </div>
+        <Flow
+            title="Where incidents are up to"
+            sub="Every open incident you can see, by the step it’s waiting on"
+            stages={data.stages.map((stage) => ({
+                label: stage.label,
+                n: stage.count,
+                sub: stage.sub ?? undefined,
+                tone: stage.tone ?? undefined,
+                items: (stage.items ?? []).map((item) => ({
+                    text: item.text,
+                    href: item.href,
+                    tone: item.tone ?? undefined,
+                })),
+            }))}
+            note={
+                data.note ?? (
+                    <>
+                        <b>Needs an owner</b> means nobody has accepted it yet — the site manager picks someone. Closing
+                        an incident, its safety review and its actions are separate steps.
+                    </>
+                )
+            }
+        />
     );
 }
 
 /**
- * Restraint & behaviour-support governance strip (Lagging tab) — least-restrictive
- * practice (Ngā Paerewa NZS 8134:2021). Stat tiles deep-link into the restraints
- * register's matching tab; the "needs review" list opens each event in its review
- * queue. Kept self-contained here so the restraints module surfaces on the command
- * centre without churning the shared dashboard-tab components.
+ * "Needs you now": open and due work from the overview's own previews, the most urgent first — WorkSafe
+ * notifications still to make, overdue corrective actions, safety reviews waiting for acceptance and expired
+ * register items. A preview, not the whole picture: the line says so and links to All tasks.
  */
-function RestraintStrip({ data }: { data: RestraintDashboardData }) {
-    const s = data.summary;
-    const tiles: {
-        label: string;
-        value: number | null;
-        caption: string;
-        href: string;
-        tone: 'neutral' | 'warning' | 'critical';
-    }[] = [
-        {
-            label: 'Restraint events',
-            value: s.events_in_period,
-            caption: 'this period',
-            href: '/health-safety/restraints?lens=events&tab=30d',
-            tone: 'neutral',
-        },
-        {
-            label: 'Out of plan',
-            value: s.out_of_plan,
-            caption: 'deviations',
-            href: '/health-safety/restraints?lens=events&tab=out_of_plan',
+function NeedsYouNow({ worklists }: { worklists: WorklistsPayload }) {
+    type Row = LogItem & { rank: number; sortAt: string };
+    const rows: Row[] = [];
+    for (const n of worklists.notifiable_events) {
+        if (n.status !== 'pending') continue;
+        rows.push({
+            key: `ntf-${n.id}`,
+            rank: 0,
+            sortAt: n.occurred_at ?? '',
+            time: shortDay(n.occurred_at),
             tone: 'critical',
-        },
-        {
-            label: 'With injury',
-            value: s.with_injury,
-            caption: 'harm occurred',
-            href: '/health-safety/restraints?lens=events&tab=injury',
+            title: `Notify WorkSafe — ${n.title ?? n.event_reference}`,
+            sub: [n.event_reference, n.occurred_at ? `known since ${formatDateTimeLong(n.occurred_at)}` : null]
+                .filter(Boolean)
+                .join(' · '),
+            action: { label: 'Record notification', href: `/health-safety/events/${n.id}` },
+        });
+    }
+    for (const c of worklists.overdue_corrective_actions) {
+        rows.push({
+            key: `ca-${c.id}`,
+            rank: 1,
+            sortAt: c.due_date ?? '',
+            time: shortDay(c.due_date),
             tone: 'critical',
-        },
-        {
-            label: 'Unreviewed',
-            value: s.unreviewed,
-            caption: 'need review',
-            href: '/health-safety/restraints?lens=events&tab=unreviewed',
+            title: `Corrective action overdue — ${c.title ?? c.reference ?? `#${c.id}`}`,
+            sub: [
+                c.reference,
+                c.priority ? c.priority.charAt(0).toUpperCase() + c.priority.slice(1) : null,
+                c.owner,
+                c.days_overdue != null ? `${c.days_overdue} days overdue` : 'Overdue',
+            ]
+                .filter(Boolean)
+                .join(' · '),
+            action: { label: 'Open', href: `/health-safety/corrective-actions/${c.id}` },
+        });
+    }
+    for (const accept of worklists.attention[0]?.items ?? []) {
+        rows.push({
+            key: `acc-${accept.id}`,
+            rank: 2,
+            sortAt: accept.reported_at ?? '',
+            time: shortDay(accept.reported_at),
             tone: 'warning',
-        },
-        {
-            label: 'Active BSPs',
-            value: s.active_plans,
-            caption: 'in place',
-            href: '/health-safety/restraints?lens=plans&tab=active',
-            tone: 'neutral',
-        },
-        {
-            label: 'Plans review due',
-            value: s.plans_review_due,
-            caption: 'within 30 days',
-            href: '/health-safety/restraints?lens=plans&tab=review_due',
+            title: `Accept for Health & safety — ${accept.title}`,
+            sub: [accept.event_reference, accept.client, accept.site, accept.owner ? `proposed owner ${accept.owner}` : null]
+                .filter(Boolean)
+                .join(' · '),
+            action: { label: 'Accept', href: accept.action_url },
+        });
+    }
+    for (const due of worklists.expiring) {
+        if (due.days_until == null || due.days_until >= 0 || due.type === 'ppe_repair') continue;
+        rows.push({
+            key: `exp-${due.type}-${due.label ?? ''}-${due.due_date ?? ''}`,
+            rank: 3,
+            sortAt: due.due_date ?? '',
+            time: shortDay(due.due_date),
             tone: 'warning',
-        },
-    ];
+            title: `${due.type_label} expired — ${due.label ?? due.type_label}`,
+            sub: [due.site, `expired ${Math.abs(due.days_until)} day${Math.abs(due.days_until) === 1 ? '' : 's'} ago`]
+                .filter(Boolean)
+                .join(' · '),
+            action: { label: 'Review', href: due.register_url },
+        });
+    }
+    rows.sort((x, y) => x.rank - y.rank || x.sortAt.localeCompare(y.sortAt));
+    return rows.length ? (
+        <Log
+            title="Needs you now"
+            sub="Open and due work from records you can see — it may not be everything. Open a register for the full list."
+            action={{ label: 'All tasks', href: '/tasks' }}
+            items={rows}
+        />
+    ) : (
+        <RowList
+            title="Needs you now"
+            sub="Open and due work from records you can see — it may not be everything."
+            items={[]}
+            empty="Nothing in this preview needs you now. Open a register for the full list."
+        />
+    );
+}
 
-    const valueClass = (
-        tone: 'neutral' | 'warning' | 'critical',
-        value: number | null,
-    ) => {
-        const colour =
-            value === null || value <= 0
-                ? 'text-foreground'
-                : tone === 'critical'
-                  ? 'text-status-critical'
-                  : tone === 'warning'
-                    ? 'text-status-warning'
-                    : 'text-foreground';
-        return `mt-1 text-2xl font-bold tabular-nums ${colour}`;
-    };
-
-    const sevTone = (sev: string | null): 'neutral' | 'warning' | 'critical' =>
-        sev === 'critical' || sev === 'high'
-            ? 'critical'
-            : sev === 'medium'
-              ? 'warning'
-              : 'neutral';
+/** Incidents and near misses each month: the latest in the brand, one sentence for what changed. */
+function IncidentBars({ bars }: { bars: Array<{ month: string; count: number }> }) {
+    if (!bars.length) return null;
+    const labelOf = (ym: string) => MONTHS[Number(ym.split('-')[1]) - 1] ?? ym;
+    const latest = bars[bars.length - 1];
+    const previous = bars.length > 1 ? bars[bars.length - 2] : null;
+    const diff = previous ? latest.count - previous.count : 0;
+    const month = MONTHS_LONG[Number(latest.month.split('-')[1]) - 1] ?? latest.month;
     return (
-        <GuardrailCard
-            unstyled
-            className="rounded-xl border border-border bg-card p-4 shadow-sm"
-        >
-            <div className="flex items-center justify-between gap-3">
-                <div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                        Restraint &amp; behaviour support
-                    </h3>
-                    <p className="text-[11px] text-muted-foreground">
-                        Least-restrictive practice — Ngā Paerewa NZS 8134:2021
-                    </p>
-                </div>
-                <Link
-                    href="/health-safety/restraints"
-                    className="shrink-0 text-xs font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                >
-                    Open register →
-                </Link>
-            </div>
+        <PointBars
+            title="Incidents and near misses"
+            sub="Each month, records you can see"
+            values={bars.map((b) => b.count)}
+            labels={bars.map((b) => labelOf(b.month))}
+            note={
+                <>
+                    <b>
+                        {latest.count} so far in {month}
+                    </b>
+                    {previous
+                        ? diff === 0
+                            ? ` — the same as ${labelOf(previous.month)}.`
+                            : ` — ${Math.abs(diff)} ${diff > 0 ? 'more' : 'fewer'} than ${labelOf(previous.month)}.`
+                        : '.'}
+                </>
+            }
+        />
+    );
+}
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                {tiles.map((t) => (
-                    <Link
-                        key={t.label}
-                        href={t.href}
-                        className="group flex flex-col rounded-lg border border-border bg-background p-3 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                    >
-                        <span className="text-[11px] font-medium text-muted-foreground">
-                            {t.label}
-                        </span>
-                        <span className={valueClass(t.tone, t.value)}>
-                            {t.value ?? '—'}
-                        </span>
-                        <span className="mt-0.5 text-[10px] text-muted-foreground">
-                            {t.value === null ? 'Not confirmed' : t.caption}
-                        </span>
-                    </Link>
-                ))}
-            </div>
+/**
+ * First aid (Prevention tab). A leading care-activity signal: first-aid-only treatment is NOT recordable and is
+ * deliberately excluded from the recordable injury rate, so it lives here rather than among the rates.
+ */
+function FirstAidTally({
+    data,
+}: {
+    data: { treatments: number | null; ambulance: number | null; hospital: number | null };
+}) {
+    const item = (
+        value: number | null,
+        label: string,
+        href: string,
+        tone?: 'warning' | 'critical',
+    ): TallyItem => ({
+        value: value === null ? '—' : String(value),
+        label,
+        sub: value === null ? 'Not confirmed' : undefined,
+        tone: value !== null && value > 0 ? tone : undefined,
+        href,
+    });
+    return (
+        <Tally
+            title="First aid"
+            sub="Last 30 days · records you can see · first aid alone isn’t a recordable injury, so it’s left out of the recordable injury rate"
+            keepZeros
+            items={[
+                item(data.treatments, 'First-aid treatments', '/health-safety/first-aid'),
+                item(data.ambulance, 'Ambulance called', '/health-safety/first-aid?tab=ambulance', 'warning'),
+                item(
+                    data.hospital,
+                    'Hospital referrals',
+                    '/health-safety/first-aid?treatment_outcome=sent_to_hospital',
+                    'critical',
+                ),
+            ]}
+        />
+    );
+}
 
-            <p className="text-subtle mt-3 text-muted-foreground">
-                {s.source_access === 'restricted'
-                    ? 'Access to restraint measures is restricted.'
-                    : 'Measures cover readable records; the full picture may be incomplete.'}
-            </p>
-            {data.unreviewed !== null && data.unreviewed.length > 0 ? (
-                <div className="mt-4">
-                    <div className="mb-2 flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">
-                            Needs review
-                        </span>
-                        <Link
-                            href="/health-safety/restraints?lens=events&tab=unreviewed"
-                            className="text-[11px] font-medium text-primary hover:underline"
-                        >
-                            View all
-                        </Link>
-                    </div>
-                    <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-                        {data.unreviewed.map((e) => (
-                            <li key={e.id}>
-                                <Link
-                                    href={`/health-safety/restraints?lens=events&tab=unreviewed&event=${e.id}`}
-                                    className="flex items-center gap-3 px-3 py-2 text-sm transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none focus-visible:ring-inset"
-                                >
-                                    <span className="font-mono text-[11px] text-muted-foreground">
-                                        {e.reference}
-                                    </span>
-                                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                                        {e.client ??
-                                            'Client details unavailable'}
-                                    </span>
-                                    {e.restraint_type ? (
-                                        <span className="hidden truncate text-xs text-muted-foreground sm:inline">
-                                            {e.restraint_type}
-                                        </span>
-                                    ) : null}
-                                    {!e.within_support_plan ? (
-                                        <StatusBadge
-                                            variant="critical"
-                                            size="sm"
-                                        >
-                                            Out of plan
-                                        </StatusBadge>
-                                    ) : null}
-                                    {e.injury_occurred ? (
-                                        <StatusBadge
-                                            variant="critical"
-                                            size="sm"
-                                        >
-                                            Injury
-                                        </StatusBadge>
-                                    ) : null}
-                                    {e.severity ? (
-                                        <StatusBadge
-                                            variant={sevTone(e.severity)}
-                                            status={e.severity}
-                                            size="sm"
-                                        />
-                                    ) : null}
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            ) : (
-                <p className="mt-4 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                    {data.unreviewed === null
+/**
+ * Restraint & behaviour support (Harm & injuries tab) — least-restrictive practice (Ngā Paerewa NZS 8134:2021).
+ * Each number opens the restraints register's matching tab; the review list opens each event in its queue.
+ */
+function RestraintSection({ data }: { data: RestraintDashboardData }) {
+    const s = data.summary;
+    const n = (value: number | null) => (value === null ? '—' : String(value));
+    const nc = (value: number | null, caption: string) => (value === null ? 'Not confirmed' : caption);
+    const items: TallyItem[] = [
+        { value: n(s.events_in_period), label: 'Restraint events', sub: nc(s.events_in_period, 'This period'), href: '/health-safety/restraints?lens=events&tab=30d' },
+        { value: n(s.out_of_plan), label: 'Out of plan', sub: nc(s.out_of_plan, 'Not as the plan says'), tone: (s.out_of_plan ?? 0) > 0 ? 'critical' : undefined, href: '/health-safety/restraints?lens=events&tab=out_of_plan' },
+        ...(s.with_injury !== 0
+            ? [{ value: n(s.with_injury), label: 'With injury', sub: nc(s.with_injury, 'Harm occurred'), tone: (s.with_injury ?? 0) > 0 ? ('critical' as const) : undefined, href: '/health-safety/restraints?lens=events&tab=injury' }]
+            : []),
+        { value: n(s.unreviewed), label: 'Not reviewed', sub: nc(s.unreviewed, 'Need a review'), tone: (s.unreviewed ?? 0) > 0 ? 'warning' : undefined, href: '/health-safety/restraints?lens=events&tab=unreviewed' },
+        { value: n(s.active_plans), label: 'Behaviour-support plans', sub: nc(s.active_plans, 'Active'), href: '/health-safety/restraints?lens=plans&tab=active' },
+        { value: n(s.plans_review_due), label: 'Plan reviews due', sub: nc(s.plans_review_due, 'In the next 30 days'), tone: (s.plans_review_due ?? 0) > 0 ? 'warning' : undefined, href: '/health-safety/restraints?lens=plans&tab=review_due' },
+    ];
+    const sevVariant = (sev: string | null): 'neutral' | 'warning' | 'critical' =>
+        sev === 'critical' || sev === 'high' ? 'critical' : sev === 'medium' ? 'warning' : 'neutral';
+    return (
+        <>
+            <Tally
+                title="Restraint & behaviour support"
+                sub={
+                    s.source_access === 'restricted'
+                        ? 'Least-restrictive practice — Ngā Paerewa NZS 8134:2021 · Access to restraint measures is restricted.'
+                        : 'Least-restrictive practice — Ngā Paerewa NZS 8134:2021 · Measures cover readable records; the full picture may be incomplete.'
+                }
+                action={{ label: 'Open register', href: '/health-safety/restraints' }}
+                keepZeros
+                items={items}
+                calm={s.with_injury === 0 ? 'Nobody was hurt in a restraint event' : undefined}
+            />
+            <RowList
+                title="Needs review"
+                sub="Restraint events waiting for review"
+                action={{ label: 'View all', href: '/health-safety/restraints?lens=events&tab=unreviewed' }}
+                empty={
+                    data.unreviewed === null
                         ? 'The review queue is not available.'
-                        : 'No matching readable restraint events awaiting review.'}
-                </p>
-            )}
-        </GuardrailCard>
+                        : 'No matching readable restraint events awaiting review.'
+                }
+                items={(data.unreviewed ?? []).map((e) => ({
+                    key: e.id,
+                    title: e.client ?? 'Client details unavailable',
+                    sub: [e.reference, e.restraint_type].filter(Boolean).join(' · '),
+                    href: `/health-safety/restraints?lens=events&tab=unreviewed&event=${e.id}`,
+                    badge: (
+                        <span className="inline-flex flex-wrap justify-end gap-1.5">
+                            {!e.within_support_plan ? (
+                                <StatusBadge variant="critical" size="sm">
+                                    Out of plan
+                                </StatusBadge>
+                            ) : null}
+                            {e.injury_occurred ? (
+                                <StatusBadge variant="critical" size="sm">
+                                    Injury
+                                </StatusBadge>
+                            ) : null}
+                            {e.severity ? (
+                                <StatusBadge variant={sevVariant(e.severity)} status={e.severity} size="sm" />
+                            ) : null}
+                        </span>
+                    ),
+                }))}
+            />
+        </>
     );
 }

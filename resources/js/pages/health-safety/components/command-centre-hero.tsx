@@ -4,21 +4,21 @@ import {
     PageHeader,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderSearch,
-    type PageHeaderMeterTone,
 } from '@/components/page/page-header';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+    type PageHeaderStripTone,
+} from '@/components/page/page-header-strip';
+import { Tally, type TallyItem } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateOnly, toDateInput, workerDayRange } from '@/lib/datetime';
 import type { SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
@@ -114,26 +114,20 @@ function presetRange(
 }
 const fmt = (value: number | null, suffix = '') =>
     value === null ? '—' : String(value) + suffix;
-type Meter = {
+/** One of the four header numbers (the drawing's labels; every number links to where it lives). */
+type Headline = {
     label: string;
     value: string;
-    caption: string;
-    href?: string;
-    ariaLabel?: string;
-    tone?: PageHeaderMeterTone;
+    caption?: string;
+    href: string;
+    tone?: PageHeaderStripTone;
 };
 
 export function CommandCentreHero({
-    sourceCompleteness,
     leadingLagging,
     filters,
     sites,
-    openSafeguarding,
-    fleetUnresolved,
-    fleetIncidents30d,
-    procedures,
     onReport,
-    orgName,
     rail,
     search,
 }: CommandCentreHeroProps) {
@@ -145,7 +139,6 @@ export function CommandCentreHero({
         `${filters.from}:${filters.to}`,
     );
     const [datesOpen, setDatesOpen] = useState(false);
-    const [fleetAccessNotice, setFleetAccessNotice] = useState(false);
     useEffect(() => {
         setCustomFrom(filters.from);
         setCustomTo(filters.to);
@@ -182,7 +175,7 @@ export function CommandCentreHero({
     const activeSite = sites.find((site) => site.id === filters.site);
     const siteLabel =
         filters.site === null
-            ? 'All approved sites'
+            ? 'All sites'
             : (activeSite?.name ?? 'Site access unconfirmed');
     const lagging = leadingLagging.lagging;
     const leading = leadingLagging.leading;
@@ -199,126 +192,74 @@ export function CommandCentreHero({
         ...selectedPeriod,
         lens: filters.lens,
     });
-    const outcomes: Meter[] = [
-        {
-            label: 'Incidents',
-            value: fmt(lagging.incidents),
-            caption: 'selected period · excludes near misses',
-            href: destination('/incidents', {
-                ...selectedPeriod,
-                kind: 'incidents',
-                tab: 'all',
-            }),
-            tone: lagging.incidents > 0 ? 'warning' : 'brand',
-        },
-        {
-            label: 'LTIFR',
-            value: fmt(lagging.ltifr),
-            caption: 'year basis · per million hours',
-            href: analytics,
-        },
-        {
-            label: 'TRIFR',
-            value: fmt(lagging.trifr),
-            caption: 'year basis · per million hours',
-            href: analytics,
-        },
-        {
-            label: 'Days since LTI',
-            value: fmt(lagging.days_since_lti),
-            caption:
-                lagging.days_since_lti === null
-                    ? 'Not confirmed'
-                    : 'last readable lost-time injury',
-            href: analytics,
-        },
-        {
-            label: 'Safeguarding',
-            value: fmt(openSafeguarding),
-            caption:
-                openSafeguarding === null
-                    ? 'Not confirmed'
-                    : 'open concerns now',
-            href: destination('/safeguarding', { tab: 'open' }),
-            tone: (openSafeguarding ?? 0) > 0 ? 'warning' : 'brand',
-        },
-        {
-            label: 'Fleet incidents',
-            value: fmt(fleetUnresolved),
-            caption:
-                fleetUnresolved === null
-                    ? 'Access restricted'
-                    : 'unresolved now',
-            href:
-                fleetUnresolved === null
-                    ? undefined
-                    : destination('/fleet-assets/incidents', { tab: 'open' }),
-            tone: (fleetUnresolved ?? 0) > 0 ? 'warning' : 'brand',
-        },
-    ];
-    const prevention: Meter[] = [
-        {
-            label: 'Near-miss ratio',
-            value: fmt(leading.near_miss_ratio, '×'),
-            caption: 'year basis · per recordable injury',
-            href: analytics,
-        },
-        {
-            label: 'Actions on time',
-            value: fmt(leading.actions_on_time_pct, '%'),
-            caption: 'due in selected period',
-            href: destination('/health-safety/corrective-actions', {
-                ...selectedPeriod,
-                tab: 'all',
-            }),
-        },
-        {
-            label: 'Training',
-            value: fmt(leading.training_pct, '%'),
-            caption: 'current recorded compliance',
-            href: analytics,
-        },
-        {
-            label: 'Open hazards',
-            value: fmt(leading.open_hazards),
-            caption: 'open and in progress now',
-            href: destination('/compliance/hazards', { tab: 'active' }),
-            tone: leading.open_hazards > 0 ? 'warning' : 'brand',
-        },
-        {
-            label: 'Procedures',
-            value: fmt(procedures.approved),
-            caption:
-                procedures.review_due > 0
-                    ? String(procedures.review_due) + ' review due'
-                    : procedures.coverage_gap_categories > 0
-                      ? String(procedures.coverage_gap_categories) +
-                        ' coverage gaps'
-                      : 'approved records',
-            href: destination('/health-safety/procedures', { tab: 'approved' }),
-            tone:
-                procedures.coverage_gap_categories > 0
-                    ? 'critical'
-                    : procedures.review_due > 0
-                      ? 'warning'
-                      : 'brand',
-        },
-        // Fleet's register currently accepts civil-date filters, while this
-        // source is a rolling-instant count. Do not invent a matching range.
-        {
-            label: 'Fleet · 30 days',
-            value: fmt(fleetIncidents30d),
-            caption:
-                fleetIncidents30d === null
-                    ? 'Access restricted'
-                    : '30-day count · full register',
-            href:
-                fleetIncidents30d === null
-                    ? undefined
-                    : destination('/fleet-assets/incidents'),
-            ariaLabel: 'Open full fleet incident register',
-        },
-    ];
+    // Four header numbers per lens (approved H&S drawings, 23 Oct). The fifth and sixth
+    // measures (procedures and fleet, or safeguarding and fleet) live in the page body.
+    const headline: Headline[] =
+        filters.lens === 'governance'
+            ? [
+                  {
+                      label: 'Incidents',
+                      value: fmt(lagging.incidents),
+                      caption: 'This period',
+                      href: destination('/incidents', {
+                          ...selectedPeriod,
+                          kind: 'incidents',
+                          tab: 'all',
+                      }),
+                  },
+                  {
+                      label: 'Lost-time injury rate',
+                      value: fmt(lagging.ltifr),
+                      caption: 'LTIFR',
+                      href: analytics,
+                  },
+                  {
+                      label: 'Recordable injury rate',
+                      value: fmt(lagging.trifr),
+                      caption: 'TRIFR',
+                      href: analytics,
+                  },
+                  {
+                      label: 'Days since a lost-time injury',
+                      value: fmt(lagging.days_since_lti),
+                      caption:
+                          lagging.days_since_lti === null
+                              ? 'Not confirmed'
+                              : undefined,
+                      href: analytics,
+                  },
+              ]
+            : [
+                  {
+                      label: 'Near misses per injury',
+                      value: fmt(leading.near_miss_ratio, '×'),
+                      caption: 'This year',
+                      href: analytics,
+                  },
+                  {
+                      label: 'Actions on time',
+                      value: fmt(leading.actions_on_time_pct, '%'),
+                      caption: 'Due this period',
+                      href: destination('/health-safety/corrective-actions', {
+                          ...selectedPeriod,
+                          tab: 'all',
+                      }),
+                  },
+                  {
+                      label: 'Training',
+                      value: fmt(leading.training_pct, '%'),
+                      caption: 'Up to date',
+                      href: analytics,
+                  },
+                  {
+                      label: 'Open hazards',
+                      value: fmt(leading.open_hazards),
+                      caption: 'Open or in progress',
+                      href: destination('/compliance/hazards', {
+                          tab: 'active',
+                      }),
+                  },
+              ];
     const validRange =
         !!formatDateOnly(customFrom, '') &&
         !!formatDateOnly(customTo, '') &&
@@ -328,10 +269,9 @@ export function CommandCentreHero({
             frontline={filters.lens === 'frontline'}
             wrapTitle
             icon={ShieldCheck}
-            title="Health & Safety"
+            title="Health & safety"
             subline={[
                 siteLabel,
-                orgName,
                 formatDateOnly(filters.from) +
                     ' – ' +
                     formatDateOnly(filters.to),
@@ -379,36 +319,19 @@ export function CommandCentreHero({
                     )}
                 </>
             }
-            meters={
-                <>
-                    {(filters.lens === 'governance'
-                        ? outcomes
-                        : prevention
-                    ).map((meter) => (
-                        <PageHeaderMeterBlock
-                            key={meter.label}
-                            label={meter.label}
-                            {...(meter.href
-                                ? { href: meter.href }
-                                : {
-                                      onClick: () => setFleetAccessNotice(true),
-                                  })}
-                            ariaLabel={
-                                meter.href
-                                    ? meter.ariaLabel
-                                    : 'Explain restricted Fleet access'
-                            }
-                            tone={meter.tone}
-                        >
-                            <PageHeaderMeterBig>
-                                {meter.value}
-                            </PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>
-                                {meter.caption}
-                            </PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
+            strip={
+                <PageHeaderNumbers>
+                    {headline.map((n) => (
+                        <PageHeaderNumber
+                            key={n.label}
+                            value={n.value}
+                            label={n.label}
+                            caption={n.caption}
+                            tone={n.tone}
+                            href={n.href}
+                        />
                     ))}
-                </>
+                </PageHeaderNumbers>
             }
             filters={
                 <>
@@ -532,27 +455,6 @@ export function CommandCentreHero({
                         ]}
                         onChange={(lens) => go({ lens })}
                     />
-                    {sourceCompleteness === 'unknown' && (
-                        <p
-                            role="status"
-                            className="text-subtle text-band-foreground"
-                        >
-                            These measures cover records you can access. The
-                            full picture may be incomplete.
-                        </p>
-                    )}
-                    {fleetAccessNotice &&
-                        (fleetUnresolved === null ||
-                            fleetIncidents30d === null) && (
-                            <p
-                                role="status"
-                                className="text-subtle text-band-foreground"
-                            >
-                                Fleet access is restricted for the selected
-                                sites. Health & Safety access does not grant
-                                Fleet record access.
-                            </p>
-                        )}
                 </>
             }
             mobileSummary="Safety overview · filters and measures"
@@ -561,101 +463,78 @@ export function CommandCentreHero({
     );
 }
 
-/** Recorded counts and capped previews describe attention, never overall safety clearance. */
+/**
+ * Recorded counts and capped previews describe attention, never overall safety clearance.
+ * Drawn as one tally (approved H&S drawings, 23 Oct): each number opens its register; zeros fold
+ * into one sentence; an unconfirmed count shows a dash with the reason, never a zero.
+ */
 export function CommandCentreAttention({
     expiring,
     ppeState,
     worksafePending,
     activeAlerts,
 }: AttentionProps) {
-    const ppeDue =
-        ppeState?.source_integrity === 'restricted'
-            ? 0
-            : expiring.filter(
-                  (item) =>
-                      item.type === 'ppe_inspection' ||
-                      item.type === 'ppe_expiry',
-              ).length;
-    const ppeLabel =
-        ppeState?.source_integrity === 'restricted'
-            ? 'PPE access restricted'
-            : ppeState?.source_integrity === 'repair_required'
-              ? 'PPE facts need review'
-              : !ppeState
-                ? 'PPE attention unconfirmed'
-                : ppeDue > 0
-                  ? String(ppeDue) +
-                    ' PPE due in preview' +
-                    (ppeState.truncated ? ' · more records' : '')
-                  : ppeState.truncated
-                    ? 'PPE preview incomplete'
-                    : 'No matching PPE due in preview';
-    const notices = [
+    const ppeRestricted = ppeState?.source_integrity === 'restricted';
+    const ppeDue = ppeRestricted
+        ? null
+        : expiring.filter(
+              (item) =>
+                  item.type === 'ppe_inspection' || item.type === 'ppe_expiry',
+          ).length;
+    const ppeNote = ppeRestricted
+        ? 'Access restricted'
+        : ppeState?.source_integrity === 'repair_required'
+          ? 'Facts need review'
+          : !ppeState
+            ? 'Not confirmed'
+            : ppeState.truncated
+              ? 'More records than shown'
+              : undefined;
+    const count = (type: string) =>
+        expiring.filter((item) => item.type === type).length;
+    const items: TallyItem[] = [
         {
-            label:
-                worksafePending === null
-                    ? 'WorkSafe review count unconfirmed'
-                    : String(worksafePending) + ' pending WorkSafe reviews',
+            value: worksafePending === null ? '—' : String(worksafePending),
+            label: 'WorkSafe reviews to do',
+            sub: worksafePending === null ? 'Not confirmed' : undefined,
+            tone: (worksafePending ?? 0) > 0 ? 'critical' : undefined,
             href: '/health-safety/events',
-            tone: (worksafePending ?? 0) > 0 ? 'critical' : 'neutral',
         },
         {
-            label:
-                activeAlerts === null
-                    ? 'Lone-worker alert count unconfirmed'
-                    : String(activeAlerts) +
-                      ' recorded active lone-worker alerts',
+            value: activeAlerts === null ? '—' : String(activeAlerts),
+            label: 'Lone-worker alerts active',
+            sub: activeAlerts === null ? 'Not confirmed' : undefined,
+            tone: (activeAlerts ?? 0) > 0 ? 'critical' : undefined,
             href: '/health-safety/lone-workers',
-            tone: (activeAlerts ?? 0) > 0 ? 'critical' : 'neutral',
         },
         {
-            label:
-                String(expiring.filter((item) => item.type === 'sds').length) +
-                ' SDS reviews in preview',
+            value: String(count('sds')),
+            label: 'Safety data sheets to review',
             href: '/health-safety/substances',
-            tone: 'neutral',
         },
         {
-            label:
-                String(
-                    expiring.filter((item) => item.type === 'drill').length,
-                ) + ' drills in preview',
+            value: String(count('drill')),
+            label: 'Drills due',
             href: '/health-safety/drills',
-            tone: 'neutral',
         },
         {
-            label: ppeLabel,
-            href: '/health-safety/ppe',
+            value: ppeDue === null ? '—' : String(ppeDue),
+            label: 'Protective equipment (PPE) due',
+            sub: ppeNote,
             tone:
-                ppeDue > 0 || ppeState?.source_integrity === 'repair_required'
+                (ppeDue ?? 0) > 0 ||
+                ppeState?.source_integrity === 'repair_required'
                     ? 'warning'
-                    : 'neutral',
+                    : undefined,
+            href: '/health-safety/ppe',
         },
-    ] as const;
+    ];
     return (
-        <Card>
-            <CardContent className="space-y-3 p-4">
-                <h2 className="text-section-title">Safety attention</h2>
-                <p className="text-subtle">
-                    Recorded open work and due-item previews. Open the register
-                    for the full current scope.
-                </p>
-                <ul className="flex flex-wrap gap-3">
-                    {notices.map((notice) => (
-                        <li key={notice.href}>
-                            <Link
-                                href={notice.href}
-                                className="frontline-hit inline-flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                                <StatusBadge variant={notice.tone}>
-                                    {notice.label}
-                                </StatusBadge>
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-            </CardContent>
-        </Card>
+        <Tally
+            title="Needs attention"
+            sub="Open and due work from records you can see — it may not be everything. Open a register for the full list."
+            items={items}
+        />
     );
 }
 export default CommandCentreHero;

@@ -1392,3 +1392,200 @@
         gap: 4px;
     }
 }
+
+/* ── a list of records — title and sub-line, a status on the right; the whole row opens it ── */
+.sg-list {
+    display: grid;
+}
+.sg-li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 11px 18px;
+}
+.sg-list > li {
+    border-top: 1px solid var(--sg-row-rule);
+}
+.sg-list > li:first-child {
+    border-top: 0;
+}
+a.sg-li {
+    outline: none;
+}
+a.sg-li:hover {
+    background: color-mix(in oklab, var(--muted) 70%, transparent);
+}
+a.sg-li:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--ring);
+}
+.sg-li-t {
+    flex: 1;
+    min-width: 0;
+}
+.sg-li-t > b {
+    display: block;
+    font-size: calc(13.5rem / 14);
+    font-weight: 600;
+}
+.sg-li-t > small {
+    display: block;
+    overflow: hidden;
+    font-size: calc(12rem / 14);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--muted-foreground);
+}
+.sg-li-lead {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--sg-tint);
+    color: var(--primary);
+}
+.sg-li-time {
+    flex: none;
+    font-size: calc(12rem / 14);
+    white-space: nowrap;
+    color: var(--muted-foreground);
+}
+
+/* ── facts as label and value rows ── */
+.sg-kv {
+    display: grid;
+    grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+    padding: 6px 18px 12px;
+}
+.sg-kv > dt,
+.sg-kv > dd {
+    padding: 9px 0;
+    border-top: 1px solid var(--sg-row-rule);
+    font-size: calc(13rem / 14);
+}
+.sg-kv > dt:first-of-type,
+.sg-kv > dd:first-of-type {
+    border-top: 0;
+}
+.sg-kv > dt {
+    padding-right: 16px;
+    color: var(--muted-foreground);
+}
+
+/* ── a note in its place — one tinted line with its icon; status tones for warnings ── */
+.sg-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 14px;
+    border: 1px solid color-mix(in oklab, var(--primary) 18%, var(--border));
+    border-radius: 12px;
+    background: color-mix(in oklab, var(--primary) 6%, var(--card));
+    font-size: calc(13rem / 14);
+    line-height: 1.5;
+}
+.sg-note > svg {
+    flex: none;
+    margin-top: 2px;
+    color: var(--primary);
+}
+.sg-note--warning {
+    border-color: color-mix(in oklab, var(--status-warning) 35%, var(--border));
+    background: var(--status-warning-bg);
+    color: var(--status-warning-foreground);
+}
+.sg-note--warning > svg {
+    color: var(--status-warning-foreground);
+}
+.sg-note--critical {
+    border-color: color-mix(in oklab, var(--status-critical) 35%, var(--border));
+    background: var(--status-critical-bg);
+    color: var(--status-critical-foreground);
+}
+.sg-note--critical > svg {
+    color: var(--status-critical-foreground);
+}
+.sg-note--success {
+    border-color: color-mix(in oklab, var(--status-success) 35%, var(--border));
+    background: var(--status-success-bg);
+    color: var(--status-success-foreground);
+}
+.sg-note--success > svg {
+    color: var(--status-success-foreground);
+}
+.sg-note a {
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+/* a tally number that opens where it lives */
+.sg-t--link {
+    outline: none;
+}
+.sg-t--link:hover > span {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.sg-t--link:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--ring);
+}
+
+/* ── a chart with a point: the latest value in the brand, the rest quiet, values written on ── */
+.sg-chart {
+    padding: 10px 18px 14px;
+}
+.sg-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+}
+.sg-bars > div {
+    display: grid;
+    flex: 1;
+    align-content: end;
+    justify-items: center;
+    gap: 6px;
+    height: 100%;
+}
+.sg-bars > div > i {
+    display: block;
+    width: 100%;
+    max-width: 46px;
+    border-radius: 4px 4px 0 0;
+    background: color-mix(in oklab, var(--muted-foreground) 30%, var(--card));
+}
+.sg-bars > div.sg-bar--last > i {
+    background: var(--primary);
+}
+.sg-bars > div > b {
+    font-size: calc(12rem / 14);
+    font-weight: 650;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+}
+.sg-bars > div.sg-bar--last > b {
+    color: var(--primary);
+}
+.sg-xl {
+    display: flex;
+    gap: 14px;
+    padding-top: 6px;
+    font-size: calc(11.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-xl > span {
+    flex: 1;
+    text-align: center;
+}
+.sg-chart-note {
+    margin-top: 10px;
+    font-size: calc(12.5rem / 14);
+    color: var(--muted-foreground);
+}
+.sg-chart-note b {
+    color: var(--foreground);
+}

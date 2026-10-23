@@ -2,10 +2,11 @@
  * Radial gauges + ratio/severity donuts are token-driven SVG ports (exact geometry: r=48,
  * circumference ≈301.6); the incident trend (bars + LTIFR/TRIFR lines) and hazard burn-down
  * use recharts tuned to match. Colours are semantic tokens via var(--…); no raw hex/oklch. */
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Ring, RingCard, RowList, SectionHead } from '@/components/signature/blocks';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import { Building2, type LucideIcon } from 'lucide-react';
+import { type LucideIcon } from 'lucide-react';
 import {
     Bar,
     CartesianGrid,
@@ -62,13 +63,13 @@ const BADGE_TONE = {
 } as const;
 type BadgeTone = keyof typeof BADGE_TONE;
 
+/** Every overview chart sits on the signature surface (approved H&S drawings, 23 Oct): title · sub-line, the
+ * legend or a link on the right; no icon square. `icon`/`iconTone` are kept for callers but no longer drawn. */
 function ChartCard({
     title,
     subtitle,
     children,
     className,
-    icon: Icon,
-    iconTone = 'primary',
     headerRight,
 }: {
     title: string;
@@ -80,36 +81,14 @@ function ChartCard({
     headerRight?: React.ReactNode;
 }) {
     return (
-        <Card className={className}>
-            <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                        {Icon ? (
-                            <span
-                                className={cn(
-                                    'inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]',
-                                    BADGE_TONE[iconTone],
-                                )}
-                            >
-                                <Icon className="h-4 w-4" />
-                            </span>
-                        ) : null}
-                        <div>
-                            <CardTitle className="text-sm leading-tight font-bold">
-                                {title}
-                            </CardTitle>
-                            {subtitle ? (
-                                <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                                    {subtitle}
-                                </p>
-                            ) : null}
-                        </div>
-                    </div>
-                    {headerRight ?? null}
-                </div>
-            </CardHeader>
-            <CardContent>{children}</CardContent>
-        </Card>
+        <section className={cn('sg-surface', className)}>
+            <div className="sg-head">
+                <h3>{title}</h3>
+                {subtitle ? <p>{subtitle}</p> : null}
+                {headerRight ? <div className="ml-auto">{headerRight}</div> : null}
+            </div>
+            <div className="px-[18px] pt-2 pb-4">{children}</div>
+        </section>
     );
 }
 
@@ -200,7 +179,7 @@ export function RatioDonutCard({
     const fillPct = confirmed && total > 0 ? operands.near_misses / total : 0;
     const offset = CIRC * (1 - fillPct);
     return (
-        <ChartCard title="Near-miss : recordable injury ratio">
+        <ChartCard title="Near misses for each recordable injury" subtitle="Reports you can see · last 12 months">
             <div className="flex items-center gap-4">
                 <svg
                     viewBox="0 0 120 120"
@@ -319,8 +298,8 @@ export function SeverityDonutCard({ data }: { data: SeverityCounts }) {
     let cumulative = 0;
     return (
         <ChartCard
-            title="Severity breakdown"
-            subtitle="Open H&S events by severity"
+            title="By severity"
+            subtitle="Open safety reviews by severity"
         >
             <div className="flex items-center gap-4">
                 <svg
@@ -382,8 +361,8 @@ export function CategoryBarsCard({
     const max = Math.max(...data.map((d) => d.count), 1);
     return (
         <ChartCard
-            title="Incidents by category"
-            subtitle="Readable incidents in the selected period"
+            title="Incidents by type"
+            subtitle="Incidents you can see, this period"
         >
             {data.length === 0 ? (
                 <p className="py-6 text-center text-xs text-muted-foreground">
@@ -537,7 +516,7 @@ export function HazardBurndownCard({
     const last = series[series.length - 1]?.open ?? 0;
     return (
         <ChartCard
-            title="Hazard burn-down"
+            title="Open hazards coming down"
             subtitle={`${first} open → ${last} open over ${series.length} weeks`}
         >
             <ResponsiveContainer width="100%" height={140}>
@@ -576,65 +555,61 @@ export function SiteSafetyComparisonCard({
         hazards: number | null;
     }>;
 }) {
+    // A–Z, never ranked: reporting activity is not a safety rating (approved H&S drawings, 23 Oct).
     const sites = [...data].sort(
         (a, b) => a.name.localeCompare(b.name, 'en-NZ') || a.id - b.id,
     );
     return (
-        <ChartCard
-            title="Site safety comparison"
-            subtitle="Safety reports in the selected period · hazards open now"
-            icon={Building2}
-        >
-            <p className="text-subtle mb-3">
-                Counts cover records you can currently read. Reporting activity
-                is not a safety rating. Fewer reports do not prove a safer site;
-                these counts do not measure harm, hours worked or reporting
-                completeness.
-            </p>
+        <section className="sg-side" aria-label="Sites side by side">
+            <SectionHead
+                title="Sites side by side"
+                sub="Reports this period and hazards open now, A–Z, from records you can see. This isn't a safety rating: fewer reports don't mean a safer site."
+            />
             {sites.length === 0 ? (
-                <p className="text-subtle py-5">
+                <p className="sg-surface sg-quiet">
+                    <Ring tone="none" />
                     No sites are available in this view.
                 </p>
             ) : (
-                <>
-                    <p className="text-caption mb-2">
-                        {sites.length} sites in the current view · alphabetical
-                        order
-                    </p>
-                    <ul className="max-h-72 space-y-2 overflow-y-auto">
-                        {sites.map((site) => (
-                            <li key={site.id}>
-                                <Link
-                                    href={`/sites/${site.id}`}
-                                    aria-label={`Open ${site.name} safety comparison`}
-                                    className="frontline-tap flex flex-col gap-2 rounded-lg border border-border px-3 py-2 transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    <span className="text-subtle font-semibold text-foreground">
-                                        {site.name}
-                                    </span>
-                                    <dl className="text-caption flex flex-wrap gap-x-5 gap-y-1">
-                                        <div className="flex gap-2">
-                                            <dt>Safety reports</dt>
-                                            <dd className="text-foreground tabular-nums">
+                <ul className="grid gap-3">
+                    {sites.map((site) => (
+                        <li key={site.id} className="sg-surface sg-place">
+                            <Link
+                                href={`/sites/${site.id}`}
+                                aria-label={`Open ${site.name} safety comparison`}
+                                className="frontline-tap grid gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <span className="sg-ph">
+                                    <b>{site.name}</b>
+                                </span>
+                                <span className="sg-facts2">
+                                    <span>
+                                        <Ring tone="none" />
+                                        <span>
+                                            <b className="tabular-nums">
                                                 {site.incidents}
-                                            </dd>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <dt>Open hazards</dt>
-                                            <dd className="text-foreground tabular-nums">
+                                            </b>{' '}
+                                            safety reports
+                                        </span>
+                                    </span>
+                                    <span>
+                                        <Ring tone="none" />
+                                        <span>
+                                            <b className="tabular-nums">
                                                 {site.hazards === null
                                                     ? 'Restricted'
                                                     : site.hazards}
-                                            </dd>
-                                        </div>
-                                    </dl>
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
-                </>
+                                            </b>{' '}
+                                            open hazards
+                                        </span>
+                                    </span>
+                                </span>
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
             )}
-        </ChartCard>
+        </section>
     );
 }
 /** Retain the previous import contract while the dashboard uses the neutral comparison. */
@@ -652,82 +627,44 @@ export type OpenHazardRow = {
     site: string | null;
 };
 
-const HAZARD_TONE: Record<string, { label: string; cls: string }> = {
-    extreme: {
-        label: 'High',
-        cls: 'bg-status-critical-bg text-status-critical',
-    },
-    high: { label: 'High', cls: 'bg-status-critical-bg text-status-critical' },
-    medium: { label: 'Med', cls: 'bg-status-warning-bg text-status-warning' },
-    low: { label: 'Low', cls: 'bg-muted text-muted-foreground' },
+const HAZARD_LABEL: Record<string, string> = {
+    extreme: 'Extreme',
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low',
+};
+const HAZARD_VARIANT: Record<string, 'critical' | 'warning' | 'neutral'> = {
+    extreme: 'critical',
+    high: 'critical',
+    medium: 'warning',
+    low: 'neutral',
 };
 
 export function OpenHazardsCard({ hazards }: { hazards: OpenHazardRow[] }) {
     return (
-        <Card>
-            <CardHeader className="pb-2">
-                <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-sm leading-tight font-bold">
-                        Open hazards
-                    </CardTitle>
-                    <Link
-                        href="/compliance/hazards"
-                        className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                    >
-                        Register →
-                    </Link>
-                </div>
-            </CardHeader>
-            <CardContent>
-                {hazards.length === 0 ? (
-                    <p className="py-6 text-center text-xs text-muted-foreground">
-                        No open hazards.
-                    </p>
-                ) : (
-                    <div className="flex flex-col gap-1">
-                        {hazards.map((h) => {
-                            const tone = HAZARD_TONE[
-                                (h.risk_rating ?? '').toLowerCase()
-                            ] ?? {
-                                label: 'Low',
-                                cls: 'bg-muted text-muted-foreground',
-                            };
-                            const inner = (
-                                <>
-                                    <span
-                                        className={cn(
-                                            'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold',
-                                            tone.cls,
-                                        )}
-                                    >
-                                        {tone.label}
-                                    </span>
-                                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-foreground">
-                                        {h.title}
-                                    </span>
-                                </>
-                            );
-                            return h.site_id ? (
-                                <Link
-                                    key={h.id}
-                                    href={`/sites/${h.site_id}`}
-                                    className="flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-border hover:bg-muted/50"
-                                >
-                                    {inner}
-                                </Link>
-                            ) : (
-                                <div
-                                    key={h.id}
-                                    className="flex items-center gap-2.5 rounded-lg px-2.5 py-2"
-                                >
-                                    {inner}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+        <RowList
+            title="Open hazards"
+            sub="Register"
+            action={{ label: 'Open register', href: '/compliance/hazards' }}
+            empty="No open hazards in this view."
+            items={hazards.map((h) => {
+                const rating = (h.risk_rating ?? '').toLowerCase();
+                return {
+                    key: h.id,
+                    title: h.title,
+                    sub: h.site ?? undefined,
+                    href: h.site_id ? `/sites/${h.site_id}` : undefined,
+                    badge: (
+                        <StatusBadge
+                            variant={HAZARD_VARIANT[rating] ?? 'neutral'}
+                            size="sm"
+                        >
+                            {HAZARD_LABEL[rating] ?? 'Low'}
+                        </StatusBadge>
+                    ),
+                };
+            })}
+        />
     );
 }
 
@@ -740,7 +677,6 @@ export function LeadingCharts({
     operands,
     burndown,
     drillPct,
-    trainingPct,
     openHazards,
 }: {
     ratio: number | null;
@@ -750,17 +686,18 @@ export function LeadingCharts({
     trainingPct: number | null;
     openHazards: OpenHazardRow[];
 }) {
+    // Prevention (approved H&S drawings, 23 Oct): one block per row; training is a header number.
     return (
-        <div className="flex flex-col gap-3">
-            <div className="grid gap-3 lg:grid-cols-2">
-                <RatioDonutCard ratio={ratio} operands={operands} />
-                <HazardBurndownCard series={burndown} />
-            </div>
-            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.4fr]">
-                <GaugeCard pct={drillPct} title="Drill compliance" />
-                <GaugeCard pct={trainingPct} title="Training compliance" />
-                <OpenHazardsCard hazards={openHazards} />
-            </div>
+        <div className="flex flex-col gap-5">
+            <RatioDonutCard ratio={ratio} operands={operands} />
+            <HazardBurndownCard series={burndown} />
+            <RingCard
+                value={drillPct ?? 0}
+                mark={drillPct === null ? '—' : undefined}
+                label={drillPct === null ? 'Drills done on schedule' : `Drills done on schedule — ${drillPct}%`}
+                sub={drillPct === null ? 'Not confirmed' : undefined}
+            />
+            <OpenHazardsCard hazards={openHazards} />
         </div>
     );
 }
@@ -781,17 +718,15 @@ export function LaggingCharts({
     category: Array<{ label: string; count: number }>;
 }) {
     return (
-        <div className={cn('flex flex-col gap-3')}>
+        <div className="flex flex-col gap-5">
             <IncidentTrendCard
                 bars={bars}
                 frequency={frequency}
                 variant="full"
-                title="Incident trend with LTIFR & TRIFR"
+                title="Incidents with the injury rates"
             />
-            <div className="grid gap-3 lg:grid-cols-2">
-                <SeverityDonutCard data={mapSeverity(severity)} />
-                <CategoryBarsCard data={category} />
-            </div>
+            <SeverityDonutCard data={mapSeverity(severity)} />
+            <CategoryBarsCard data={category} />
         </div>
     );
 }
