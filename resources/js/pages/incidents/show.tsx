@@ -1,91 +1,141 @@
+/**
+ * The incident page (approved H&S drawings pg-hsn-2 … 2j, Stephan 23 Oct
+ * 2026): one record header with the facts, the six-stage line and who does
+ * what next; one row of tabs (Overview, Follow-ups, Safety review, Evidence,
+ * History); the owner, the closing checks and the linked records in the side
+ * column. Every command keeps its own guarded dialog.
+ */
 import {
     ACTION_META,
     FollowupsSection,
+    incidentWorksafe,
     InvestigationSection,
-    LinkedSection,
-    OverviewSection,
+    linkedRecordItems,
     PhotosSection,
+    safeguardingEscalation,
+    SafeguardingEscalationText,
     TimelineSection,
     type IncidentDetail,
     type LifecycleAction,
 } from '@/components/incidents/incident-detail-dialog';
-import { IncidentOwnershipPanel } from '@/components/incidents/incident-ownership-panel';
-import { RecordingWindowEditor } from '@/components/incidents/recording-window-editor';
-import { RecordingReferenceChooser } from '@/components/incidents/recording-reference-chooser';
-import type { RecordingPreview } from '@/components/incidents/recording-window-command';
+import {
+    IncidentOwnershipPanel,
+    incidentAssignLabel,
+} from '@/components/incidents/incident-ownership-panel';
 import { IncidentRecordActionDialog } from '@/components/incidents/incident-record-action-dialog';
 import { IncidentResponseRequestDialog } from '@/components/incidents/incident-response-request-dialog';
-import { JourneyGateList } from '@/components/incidents/journey-gate-list';
+import {
+    dateTimeWithYear,
+    dateWithYear,
+    daysSince,
+    incidentNextStep,
+    incidentStageLine,
+    incidentTypeLabel,
+    ownerNeeded,
+    plural,
+    SEVERITY_LABELS,
+    SEVERITY_VARIANT,
+    shortWhen,
+    INCIDENT_STATUS_LABELS,
+    worksafePending,
+} from '@/components/incidents/incident-stages';
+import { LinkedOperationalEvidence } from '@/components/incidents/linked-operational-evidence';
+import { RecordingReferenceChooser } from '@/components/incidents/recording-reference-chooser';
 import {
     RecordingReferenceEvidence,
     type RecordingReferenceEvidenceData,
 } from '@/components/incidents/recording-reference-evidence';
+import type { RecordingPreview } from '@/components/incidents/recording-window-command';
+import { RecordingWindowEditor } from '@/components/incidents/recording-window-editor';
 import {
     PageHeader,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderRail,
-    PageHeaderSearchTrigger,
     PageHeaderStatusChip,
     PageLayout,
     type PageHeaderRailItem,
 } from '@/components/page';
 import {
     TabSearchPalette,
-    TierTwoTabs,
     useGroupedProfileSearchShortcut,
     type GroupedProfileNavGroup,
 } from '@/components/page/grouped-profile-nav';
+import {
+    PageHeaderFacts,
+    PageHeaderStages,
+    type PageHeaderFact,
+} from '@/components/page/page-header-strip';
+import {
+    DutyClock,
+    Log,
+    Note,
+    PeopleCards,
+    Ring,
+    RingCard,
+    RowList,
+    SideColumn,
+    Story,
+    Surface,
+    type LogItem,
+    type PersonCardItem,
+} from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { ReviewRow } from '@/components/wizard/shell';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { useIncidentWorkspaceDrafts } from '@/hooks/use-incident-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDate, formatTime } from '@/lib/datetime';
 import { incidentRegisterReturn, incidentReturnLabel } from '@/lib/incidents/navigation';
+import { JOURNEY_TERM_DEFINITIONS } from '@/lib/journey-labels';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    CheckCircle2,
     Clock,
     FileText,
-    LinkIcon,
     ListTodo,
+    MapPin,
     Paperclip,
     Pencil,
     RadioTower,
+    RotateCw,
     Search,
-    Users,
+    ShieldAlert,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 
-type Section =
-    | 'overview'
-    | 'followups'
-    | 'evidence'
-    | 'investigation'
-    | 'linked'
-    | 'history';
+type Section = 'overview' | 'followups' | 'investigation' | 'evidence' | 'history';
 type IncidentWorkspaceDetail = IncidentDetail & {
     recording_evidence?: RecordingReferenceEvidenceData;
     recording_preview?: RecordingPreview;
 };
-const SECTIONS: PageHeaderRailItem<Section>[] = [
+
+const SECTIONS: (PageHeaderRailItem<Section> & { icon: typeof FileText })[] = [
     { key: 'overview', label: 'Overview', icon: FileText },
     { key: 'followups', label: 'Follow-ups', icon: ListTodo },
+    { key: 'investigation', label: 'Safety review', icon: Search },
     { key: 'evidence', label: 'Evidence', icon: Paperclip },
-    { key: 'investigation', label: 'Investigation', icon: Search },
-    { key: 'linked', label: 'Linked records', icon: LinkIcon },
     { key: 'history', label: 'History', icon: Clock },
 ];
+/** Older deep links: linked records now sit beside every tab. */
+const LEGACY_SECTIONS: Record<string, Section> = { linked: 'overview' };
 
-function label(value: string): string {
-    const text = value.replaceAll('_', ' ');
-    return text.charAt(0).toUpperCase() + text.slice(1);
-}
+const SOURCE_STORY: Record<string, string> = {
+    manual: 'Staff report',
+    control_room: 'Control room',
+    sensor: 'Sensor',
+    automated: 'Automated',
+};
+
+const BREADCRUMB_ROOT = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Health & safety', href: '/health-safety' },
+];
 
 /** Permanent record workspace; only bounded edits and decisions open a dialog. */
 export default function IncidentShow({
@@ -104,22 +154,24 @@ export default function IncidentShow({
         return (
             <AppLayout
                 breadcrumbs={[
-                    { title: 'Home', href: '/dashboard' },
-                    { title: 'Health & Safety', href: '/health-safety' },
+                    ...BREADCRUMB_ROOT,
                     { title: 'Incidents', href: '/incidents' },
+                    { title: 'Incident unavailable', href: url },
                 ]}
             >
-                <Head title="Incident" />
+                <Head title="Incident unavailable" />
                 <PageLayout
                     hero={
                         <PageHeader
-                            title="Incident"
+                            variant="profile"
+                            backHref="/incidents"
+                            title="Incident unavailable"
                             icon={AlertTriangle}
-                            frontline
                             wrapTitle
-                            subline="Incident information is unavailable for your current account."
+                            subline="You can’t see this incident with your current access"
                             actions={
                                 <PageHeaderPrimaryButton
+                                    icon={RotateCw}
                                     onClick={() =>
                                         router.get(
                                             url,
@@ -134,13 +186,14 @@ export default function IncidentShow({
                         />
                     }
                 >
-                    <p
-                        role="alert"
-                        className="text-subtle text-status-warning-foreground"
-                    >
-                        Reload to check current access before opening incident
-                        information or taking action.
-                    </p>
+                    <div className="max-w-[54rem]">
+                        <Note tone="warning" icon={AlertTriangle}>
+                            <p role="alert">
+                                Reload the page to check your access before you
+                                open or change anything.
+                            </p>
+                        </Note>
+                    </div>
                 </PageLayout>
             </AppLayout>
         );
@@ -150,41 +203,88 @@ export default function IncidentShow({
     );
 }
 
+/** The record's status guide: what the incident's words mean. */
+function StatusGuide() {
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <PageHeaderGlassButton>
+                    Status guide
+                </PageHeaderGlassButton>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80">
+                <p className="mb-2 text-sm font-semibold">
+                    What these terms mean
+                </p>
+                <dl className="space-y-2">
+                    {(['status', 'severity', 'priority'] as const).map(
+                        (term) => (
+                            <div key={term}>
+                                <dt className="text-xs font-semibold">
+                                    {JOURNEY_TERM_DEFINITIONS[term].label}
+                                </dt>
+                                <dd className="text-caption">
+                                    {JOURNEY_TERM_DEFINITIONS[term].definition}
+                                </dd>
+                            </div>
+                        ),
+                    )}
+                </dl>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
 export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDetail }) {
     const drafts = useIncidentWorkspaceDrafts(d.id);
     const { url, props } = usePage<SharedData>();
     const params = new URLSearchParams(url.split('?')[1] ?? '');
-    const requested = params.get('section');
+    const requested = params.get('section') ?? '';
     const returnTo = incidentRegisterReturn(params.get('return_to'));
-    const section =
-        SECTIONS.find((item) => item.key === requested)?.key ?? 'overview';
+    const section: Section =
+        SECTIONS.find((item) => item.key === requested)?.key ??
+        LEGACY_SECTIONS[requested] ??
+        'overview';
     const [action, setAction] = useState<LifecycleAction | 'edit' | null>(null);
     const [requestResponse, setRequestResponse] = useState(false);
+    const [assignOpen, setAssignOpen] = useState(false);
     const [findOpen, setFindOpen] = useState(false);
     const [recordingsLoading, setRecordingsLoading] = useState(false);
     const recordingVisitPending = useRef(false);
-    const rememberedSections = useRef<Record<string, Section>>({});
     const openFind = useCallback(() => {
-        if (!action && !requestResponse) setFindOpen(true);
-    }, [action, requestResponse]);
+        if (!action && !requestResponse && !assignOpen) setFindOpen(true);
+    }, [action, requestResponse, assignOpen]);
     useGroupedProfileSearchShortcut(openFind);
+
     const reference = d.ref ?? `INC-${d.id}`;
     const person = d.client
         ? `${d.client.first_name} ${d.client.last_name}`.trim()
         : 'No person linked';
-    const openFollowups = d.followups.filter(
-        (followup) => !followup.completed_at,
+    const typeLabel = incidentTypeLabel(d.type);
+    const title = d.client ? `${typeLabel} — ${person}` : typeLabel;
+    const ownership = d.ownership;
+    const needed =
+        !['draft', 'closed'].includes(d.status) && ownerNeeded(ownership);
+    const canAssign = Boolean(ownership?.can_assign);
+    const overdueFollowups = d.followups.filter(
+        (item) => !item.completed_at && item.overdue,
     ).length;
-    const outstandingSafetyActions = d.hs_event
-        ? d.hs_event.corrective_actions.filter(
-              (item) => !['verified', 'closed'].includes(item.status),
-          ).length
-        : d.linked_access?.health_safety === 'absent'
-          ? 0
-          : null;
-    const remainingChecks = d.close_gate.requirements.filter(
-        (item) => !item.complete,
-    ).length;
+    const openFollowups = d.followups.filter((item) => !item.completed_at).length;
+    const worksafe = incidentWorksafe(d);
+    const readOnly = !(
+        d.can.update ||
+        d.can.submit ||
+        d.can.review ||
+        d.can.close ||
+        d.can.reopen ||
+        d.can.followupsManage ||
+        d.can.followupsComplete ||
+        d.can.raiseCorrectiveAction ||
+        d.can.portalManage ||
+        d.can.requestResponse ||
+        canAssign
+    );
+
     const recordAction: LifecycleAction | null =
         d.status === 'draft' && d.can.submit
             ? 'submit'
@@ -198,26 +298,30 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
     const responseActive = d.journey_state === 'Operational response active';
     const responseHref = responseActive ? d.control_room_alert?.url : null;
     const canEditDraft = d.can.update && d.status === 'draft';
-    const headerAction = responseHref
+    const primary = responseHref
         ? 'response'
-        : recordAction
-          ? 'record'
-          : canEditDraft
-            ? 'edit'
-            : d.can.requestResponse
-              ? 'request'
-              : null;
-    const bodyOrder =
-        section !== 'overview'
-            ? ['details', 'actions', 'summary']
-            : responseActive
-              ? ['actions', 'summary', 'details']
-              : ['summary', 'actions', 'details'];
-    const onSection = (next: Section) =>
+        : needed && canAssign
+          ? 'assign'
+          : recordAction
+            ? 'record'
+            : canEditDraft
+              ? 'edit'
+              : d.can.requestResponse
+                ? 'request'
+                : null;
+
+    const line = incidentStageLine(d);
+    const next = incidentNextStep(d, line, {
+        readOnly,
+        responseActive,
+        responseHref,
+    });
+
+    const onSection = (nextSection: Section) =>
         router.get(
             `/incidents/${d.id}`,
             {
-                section: next,
+                section: nextSection,
                 ...(returnTo !== '/incidents' ? { return_to: returnTo } : {}),
             },
             { preserveState: true, preserveScroll: true },
@@ -251,74 +355,151 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
             {},
             { preserveScroll: true },
         );
-    const sections = SECTIONS.map((item) => ({
-        ...item,
-        ...(item.key === 'followups' ? { count: openFollowups } : {}),
-        ...(item.key === 'evidence' ? { count: d.attachments.length } : {}),
-        ...(item.key === 'investigation' && outstandingSafetyActions !== null
-            ? { count: outstandingSafetyActions }
+
+    const railItems: PageHeaderRailItem<Section>[] = SECTIONS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        ...(item.key === 'followups' && openFollowups
+            ? { count: openFollowups }
+            : {}),
+        ...(item.key === 'evidence' && d.attachments.length
+            ? { count: d.attachments.length }
             : {}),
     }));
-    const groups: GroupedProfileNavGroup[] = [
-        { key: 'incident', label: 'Incident', icon: FileText, tabs: [] },
-        { key: 'review', label: 'Safety review', icon: Search, tabs: [] },
-        {
-            key: 'records',
-            label: 'Evidence & history',
-            icon: Paperclip,
-            tabs: [],
-        },
+    const findGroups: GroupedProfileNavGroup[] = [
+        { key: 'incident', label: 'Incident', icon: FileText, tabs: SECTIONS },
     ];
-    for (const item of sections) {
-        const group =
-            item.key === 'overview' || item.key === 'followups'
-                ? groups[0]
-                : item.key === 'investigation' || item.key === 'linked'
-                  ? groups[1]
-                  : groups[2];
-        group.tabs.push({ ...item, icon: item.icon ?? FileText });
-    }
-    const activeGroup =
-        groups.find((group) =>
-            group.tabs.some((item) => item.key === section),
-        ) ?? groups[0];
-    useEffect(() => {
-        rememberedSections.current[activeGroup.key] = section;
-    }, [activeGroup.key, section]);
     const selectSection = (key: string) => {
-        const next = SECTIONS.find((item) => item.key === key);
-        if (next) onSection(next.key);
+        const target = SECTIONS.find((item) => item.key === key);
+        if (target) onSection(target.key);
     };
-    const selectGroup = (key: string) => {
-        const group = groups.find((item) => item.key === key);
-        if (!group || group.key === activeGroup.key) return;
-        const remembered = rememberedSections.current[group.key];
-        selectSection(
-            group.tabs.some((item) => item.key === remembered)
-                ? remembered
-                : group.tabs[0].key,
+
+    const facts: PageHeaderFact[] = [
+        d.type === 'near_miss' && d.potential_severity
+            ? {
+                  value: SEVERITY_LABELS[d.potential_severity] ?? d.potential_severity,
+                  label: 'Potential severity',
+                  tone: SEVERITY_VARIANT[d.potential_severity],
+              }
+            : {
+                  value: SEVERITY_LABELS[d.severity] ?? d.severity,
+                  label: 'Severity',
+                  tone: SEVERITY_VARIANT[d.severity],
+              },
+        needed
+            ? {
+                  value: needed === 'unassigned' ? 'Needs an owner' : 'Owner needs replacing',
+                  label: 'Owner',
+                  tone: 'warning' as const,
+              }
+            : d.status === 'closed'
+              ? { value: dateWithYear(d.closed_at, ''), label: 'Closed' }
+              : (() => {
+                    const days = daysSince(d.occurred_at);
+                    return days === null
+                        ? { value: '' }
+                        : { value: plural(days, 'day'), label: 'Open for' };
+                })(),
+        ...(worksafePending(worksafe.notifiable, worksafe.status)
+            ? [{ value: 'To notify', label: 'WorkSafe', tone: 'warning' as const }]
+            : []),
+        ...(overdueFollowups
+            ? [
+                  {
+                      value: overdueFollowups,
+                      label: overdueFollowups === 1 ? 'Overdue follow-up' : 'Overdue follow-ups',
+                      tone: 'critical' as const,
+                  },
+              ]
+            : []),
+    ];
+
+    const recordButton = (glass: boolean) => {
+        if (!recordAction) return null;
+        const Comp = glass ? PageHeaderGlassButton : PageHeaderPrimaryButton;
+        return (
+            <Comp
+                onClick={() => setAction(recordAction)}
+                disabled={recordAction === 'close' && !d.close_gate.allowed}
+            >
+                {ACTION_META[recordAction].title}
+            </Comp>
         );
     };
+    const actions = (
+        <>
+            {canAssign && primary !== 'assign' ? (
+                <PageHeaderGlassButton onClick={() => setAssignOpen(true)}>
+                    {incidentAssignLabel(ownership!)}
+                </PageHeaderGlassButton>
+            ) : null}
+            {recordAction && primary !== 'record' ? recordButton(true) : null}
+            {canEditDraft && primary !== 'edit' ? (
+                <PageHeaderGlassButton icon={Pencil} onClick={() => setAction('edit')}>
+                    Edit draft
+                </PageHeaderGlassButton>
+            ) : null}
+            {d.can.requestResponse && primary !== 'request' ? (
+                <PageHeaderGlassButton icon={RadioTower} onClick={() => setRequestResponse(true)}>
+                    Request Control Room response
+                </PageHeaderGlassButton>
+            ) : null}
+            <StatusGuide />
+            {primary === 'response' && responseHref ? (
+                <PageHeaderPrimaryButton asChild icon={RadioTower}>
+                    <Link href={responseHref}>Open response</Link>
+                </PageHeaderPrimaryButton>
+            ) : primary === 'assign' ? (
+                <PageHeaderPrimaryButton onClick={() => setAssignOpen(true)}>
+                    {incidentAssignLabel(ownership!)}
+                </PageHeaderPrimaryButton>
+            ) : primary === 'record' ? (
+                recordButton(false)
+            ) : primary === 'edit' ? (
+                <PageHeaderPrimaryButton icon={Pencil} onClick={() => setAction('edit')}>
+                    Edit draft
+                </PageHeaderPrimaryButton>
+            ) : primary === 'request' ? (
+                <PageHeaderPrimaryButton icon={RadioTower} onClick={() => setRequestResponse(true)}>
+                    Request Control Room response
+                </PageHeaderPrimaryButton>
+            ) : null}
+        </>
+    );
+
+    const occurred = d.occurred_at ? dateTimeWithYear(d.occurred_at) : 'Occurrence time not recorded';
+    const subline = [
+        reference,
+        d.client ? (d.client.site ?? person) : 'No person linked',
+        occurred,
+        ownership?.state === 'assigned' && ownership.owner ? `Owner ${ownership.owner.name}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+    const linkedItems = linkedRecordItems(d, person);
+    const linkedList = linkedItems.length ? (
+        <RowList title={readOnly ? 'Other linked records' : 'Linked records'} items={linkedItems} />
+    ) : null;
+    const showGate = !readOnly && d.status !== 'closed' && d.close_gate.requirements.length > 0;
 
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Health & Safety', href: '/health-safety' },
+                ...BREADCRUMB_ROOT,
                 { title: incidentReturnLabel(returnTo), href: returnTo },
-                { title: reference, href: `/incidents/${d.id}` },
+                { title, href: `/incidents/${d.id}` },
             ]}
         >
-            <Head title={`Incident ${reference}`} />
+            <Head title={`${title} · ${reference}`} />
             <PageLayout
                 hero={
                     <PageHeader
                         variant="profile"
-                        frontline
                         wrapTitle
                         backHref={returnTo}
                         icon={AlertTriangle}
-                        title={reference}
+                        title={title}
                         titleChip={
                             <PageHeaderStatusChip
                                 variant={
@@ -329,440 +510,129 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                                           : 'info'
                                 }
                             >
-                                {label(d.status)}
+                                {INCIDENT_STATUS_LABELS[d.status] ?? incidentTypeLabel(d.status)}
                             </PageHeaderStatusChip>
                         }
-                        subline={`${label(d.type)} · ${person} · ${d.occurred_at ? formatDateTime(d.occurred_at) : 'Occurrence time not recorded'} · ${label(d.severity)} severity`}
-                        search={
-                            <PageHeaderSearchTrigger
-                                placeholder="Find an incident section…"
-                                onOpen={openFind}
+                        subline={subline}
+                        actions={actions}
+                        facts={<PageHeaderFacts items={facts} />}
+                        strip={
+                            <PageHeaderStages
+                                steps={line.steps}
+                                next={next}
+                                ariaLabel="Where the incident is up to"
                             />
-                        }
-                        actions={
-                            headerAction ? (
-                                <>
-                                    {headerAction === 'response' && responseHref ? (
-                                        <PageHeaderPrimaryButton
-                                            asChild
-                                            icon={RadioTower}
-                                        >
-                                            <Link href={responseHref}>
-                                                Open response
-                                            </Link>
-                                        </PageHeaderPrimaryButton>
-                                    ) : headerAction === 'record' && recordAction ? (
-                                        <PageHeaderPrimaryButton
-                                            onClick={() => setAction(recordAction)}
-                                            disabled={
-                                                recordAction === 'close' &&
-                                                !d.close_gate.allowed
-                                            }
-                                        >
-                                            {ACTION_META[recordAction].title}
-                                        </PageHeaderPrimaryButton>
-                                    ) : headerAction === 'edit' ? (
-                                        <PageHeaderPrimaryButton
-                                            icon={Pencil}
-                                            onClick={() => setAction('edit')}
-                                        >
-                                            Edit draft
-                                        </PageHeaderPrimaryButton>
-                                    ) : headerAction === 'request' ? (
-                                        <PageHeaderPrimaryButton
-                                            icon={RadioTower}
-                                            onClick={() => setRequestResponse(true)}
-                                        >
-                                            Request Control Room response
-                                        </PageHeaderPrimaryButton>
-                                    ) : null}
-                                    {canEditDraft && headerAction !== 'edit' ? (
-                                        <PageHeaderGlassButton
-                                            icon={Pencil}
-                                            onClick={() => setAction('edit')}
-                                        >
-                                            Edit draft
-                                        </PageHeaderGlassButton>
-                                    ) : null}
-                                </>
-                            ) : undefined
-                        }
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Open follow-ups"
-                                    onClick={() => onSection('followups')}
-                                    pressed={section === 'followups'}
-                                    tone={
-                                        openFollowups > 0 ? 'warning' : 'brand'
-                                    }
-                                >
-                                    <PageHeaderMeterBig>
-                                        {openFollowups}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Incident follow-ups to finish
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Evidence"
-                                    onClick={() => onSection('evidence')}
-                                    pressed={section === 'evidence'}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {d.attachments.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Incident attachments
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Safety actions"
-                                    onClick={() => onSection('investigation')}
-                                    pressed={section === 'investigation'}
-                                    tone={
-                                        outstandingSafetyActions !== null &&
-                                        outstandingSafetyActions > 0
-                                            ? 'warning'
-                                            : 'brand'
-                                    }
-                                >
-                                    <PageHeaderMeterBig>
-                                        {outstandingSafetyActions ?? '—'}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {outstandingSafetyActions === null
-                                            ? d.linked_access?.health_safety ===
-                                              'restricted'
-                                                ? 'Safety review access restricted'
-                                                : 'Safety review status unavailable'
-                                            : d.hs_event
-                                              ? 'Actions still awaiting verification'
-                                              : 'No linked safety review'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Closure checks"
-                                    onClick={() => onSection('overview')}
-                                    pressed={section === 'overview'}
-                                    tone={
-                                        remainingChecks > 0
-                                            ? 'warning'
-                                            : 'brand'
-                                    }
-                                >
-                                    <PageHeaderMeterBig>
-                                        {remainingChecks}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Recorded checks still outstanding
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
                         }
                         rail={
                             <PageHeaderRail
-                                items={groups.map((group) => ({
-                                    key: group.key,
-                                    label: group.label,
-                                    icon: group.icon,
-                                    count: group.tabs.some(
-                                        (item) => item.count !== undefined,
-                                    )
-                                        ? group.tabs.reduce(
-                                              (sum, item) =>
-                                                  sum + (item.count ?? 0),
-                                              0,
-                                          )
-                                        : undefined,
-                                }))}
-                                value={activeGroup.key}
-                                onSelect={selectGroup}
+                                items={railItems}
+                                value={section}
+                                onSelect={onSection}
                                 onFind={openFind}
-                                ariaLabel="Incident groups"
+                                ariaLabel="Incident sections"
                             />
                         }
                     />
                 }
-                tabs={
-                    <TierTwoTabs
-                        tabs={activeGroup.tabs}
-                        activeTab={section}
-                        onTab={selectSection}
-                        testIdPrefix="incident-workspace"
-                        ariaLabel="Incident sections"
-                        panelId="incident-workspace-panel"
-                        renderLink={(tab, className, inner, accessibility) => (
-                            <button
-                                type="button"
-                                className={className}
-                                {...accessibility}
-                                onClick={() => selectSection(tab.key)}
-                            >
-                                {inner}
-                            </button>
-                        )}
-                    />
-                }
             >
-                <div
-                    id="incident-workspace-panel"
-                    role="tabpanel"
-                    aria-labelledby={`incident-workspace-tab-${section}`}
-                    className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]"
-                >
-                    {[
-                        <section
-                            key="summary"
-                            hidden={section !== 'overview'}
-                            aria-label="Incident summary"
-                            className="min-w-0 xl:col-start-1 xl:row-start-1"
-                        >
-                            <OverviewSection
+                <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                    <div
+                        id="incident-workspace-panel"
+                        role="tabpanel"
+                        aria-label={SECTIONS.find((item) => item.key === section)?.label}
+                        className="grid min-w-0 gap-5"
+                    >
+                        {/* Keep entered follow-up/action text mounted when changing sections. */}
+                        <section hidden={section !== 'overview'} aria-label="Incident summary" className="grid min-w-0 gap-5">
+                            <OverviewMain
                                 d={d}
-                                isNearMiss={d.type === 'near_miss'}
-                                part="summary"
+                                person={person}
+                                readOnly={readOnly}
+                                linkedList={readOnly ? linkedList : null}
+                                onHistory={() => onSection('history')}
                             />
-                        </section>,
-                        <aside
-                            key="actions"
-                            className="space-y-5 xl:col-start-2 xl:row-span-2 xl:row-start-1"
-                            aria-label="Incident next step and responsibilities"
-                        >
-                            <Card>
-                                <CardHeader>
-                                    <h2 className="text-section-title">
-                                        Next step
-                                    </h2>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <p className="text-sm font-semibold">
-                                        {d.journey_state}
-                                    </p>
-                                    {responseActive ? (
-                                        <div className="space-y-3">
-                                            <p className="text-sm text-muted-foreground">
-                                                The operational response is
-                                                still active. Response and
-                                                incident review are separate
-                                                decisions.
-                                            </p>
-                                            {!responseHref ? (
-                                                <p className="text-sm text-muted-foreground">
-                                                    A permitted Control Room
-                                                    responder must continue the
-                                                    response.
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-                                    {d.can.requestResponse &&
-                                    headerAction !== 'request' ? (
-                                        <Button
-                                            variant="outline"
-                                            className="frontline-tap w-full"
-                                            onClick={() =>
-                                                setRequestResponse(true)
-                                            }
-                                        >
-                                            <RadioTower className="size-4" />
-                                            Request Control Room response
-                                        </Button>
-                                    ) : null}
-                                    {recordAction && headerAction !== 'record' ? (
-                                        <Button
-                                            className="frontline-tap w-full"
-                                            variant={
-                                                responseActive
-                                                    ? 'outline'
-                                                    : 'default'
-                                            }
-                                            onClick={() =>
-                                                setAction(recordAction)
-                                            }
-                                            disabled={
-                                                recordAction === 'close' &&
-                                                !d.close_gate.allowed
-                                            }
-                                        >
-                                            {ACTION_META[recordAction].title}
-                                        </Button>
-                                    ) : !recordAction ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            {d.journey_state ===
-                                            'Journey closed'
-                                                ? 'The connected journey is closed.'
-                                                : 'No incident transition is available for your role at this stage.'}
-                                        </p>
-                                    ) : null}
-                                    {d.status !== 'closed' &&
-                                    d.close_gate.requirements.length > 0 ? (
-                                        <details
-                                            open={recordAction === 'close'}
-                                        >
-                                            <summary className="frontline-tap frontline-focus flex cursor-pointer items-center rounded-md text-sm font-medium">
-                                                {d.close_gate.allowed
-                                                    ? 'Closure requirements complete'
-                                                    : `${d.close_gate.requirements.filter((requirement) => !requirement.complete).length} requirements remain before closure`}
-                                            </summary>
-                                            <JourneyGateList
-                                                gate={d.close_gate}
-                                            />
-                                        </details>
-                                    ) : null}
-                                    {d.status === 'closed' &&
-                                    d.journey_state !== 'Journey closed' ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            The incident report is closed.
-                                            Linked response or safety work still
-                                            has its own completion requirements.
-                                        </p>
-                                    ) : null}
-                                </CardContent>
-                            </Card>
-                            {d.ownership ? (
+                        </section>
+                        <section hidden={section !== 'followups'} aria-label="Incident follow-ups">
+                            <FollowupsSection
+                                d={d}
+                                onComplete={completeFollowup}
+                                onDraftStateChange={drafts.onFollowupDraft}
+                            />
+                        </section>
+                        <section hidden={section !== 'investigation'} aria-label="Incident safety review" className="grid min-w-0 gap-5">
+                            <InvestigationSection
+                                d={d}
+                                onDraftStateChange={drafts.onCorrectiveActionDraft}
+                            />
+                            {d.linked_operational_evidence?.access !== 'restricted' ? (
+                                <LinkedOperationalEvidence
+                                    evidence={d.linked_operational_evidence}
+                                    showSource={false}
+                                />
+                            ) : null}
+                        </section>
+                        <section hidden={section !== 'evidence'} aria-label="Incident evidence" className="grid min-w-0 gap-5">
+                            <PhotosSection d={d} />
+                            <RecordingWindowEditor
+                                preview={d.recording_preview}
+                                actorId={props.auth.user.id}
+                                incidentId={d.id}
+                                refreshing={recordingsLoading}
+                                onDraftStateChange={drafts.onRecordingWindowDraft}
+                                requestDiscard={drafts.request}
+                                onSaved={() => onRecordingPageChange(1)}
+                                onRefresh={() => onRecordingPageChange(d.recording_evidence?.references.page ?? 1)}
+                            />
+                            <RecordingReferenceChooser
+                                actorId={props.auth.user.id}
+                                incidentId={d.id}
+                                preview={d.recording_preview}
+                                evidence={d.recording_evidence}
+                                refreshing={recordingsLoading}
+                                onDraftStateChange={drafts.onRecordingReferenceDraft}
+                                requestDiscard={drafts.request}
+                                onSaved={() => onRecordingPageChange(1)}
+                                onRefresh={() => onRecordingPageChange(d.recording_evidence?.references.page ?? 1)}
+                            />
+                            {d.recording_evidence ? (
+                                <RecordingReferenceEvidence
+                                    incidentId={d.id}
+                                    evidence={d.recording_evidence}
+                                    onPageChange={onRecordingPageChange}
+                                    loading={recordingsLoading}
+                                />
+                            ) : (
+                                <p role="status" className="text-subtle">
+                                    Recording reference information is unavailable. Reload the incident to check current access.
+                                </p>
+                            )}
+                        </section>
+                        <section hidden={section !== 'history'} aria-label="Incident history">
+                            <TimelineSection d={d} />
+                        </section>
+                    </div>
+                    <aside aria-label="Incident owner, closing checks and linked records">
+                        <SideColumn>
+                            {ownership ? (
                                 <IncidentOwnershipPanel
                                     incidentId={d.id}
                                     reference={reference}
-                                    ownership={d.ownership}
+                                    ownership={ownership}
+                                    assignOpen={assignOpen}
+                                    onAssignOpenChange={setAssignOpen}
+                                    showAssign={false}
                                 />
                             ) : null}
-                            <Card>
-                                <CardHeader>
-                                    <h2 className="text-section-title flex items-center gap-2">
-                                        <Users className="size-4 text-primary" />
-                                        Responsibilities
-                                    </h2>
-                                </CardHeader>
-                                <CardContent>
-                                    <ReviewRow
-                                        label="Reported by"
-                                        value={
-                                            d.reporter?.name ?? 'Not recorded'
-                                        }
-                                    />
-                                    {d.hs_event ? (
-                                        <ReviewRow
-                                            label="Safety review owner"
-                                            value={
-                                                d.hs_event.handover.owner
-                                                    ?.name ?? 'Not assigned'
-                                            }
-                                        />
-                                    ) : null}
-                                    {d.investigator ? (
-                                        <ReviewRow
-                                            label="Historical investigator"
-                                            value={d.investigator}
-                                        />
-                                    ) : null}
-                                    <p className="mt-3 text-sm text-muted-foreground">
-                                        Follow-ups and corrective actions keep
-                                        their own assignees.
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        </aside>,
-                        <div
-                            key="details"
-                            className={`min-w-0 space-y-5 xl:col-start-1 ${section === 'overview' ? 'xl:row-start-2' : 'xl:row-start-1'}`}
-                        >
-                            {/* Keep entered follow-up/action text mounted when changing sections. */}
-                            <section
-                                hidden={section !== 'overview'}
-                                aria-label="Incident overview"
-                            >
-                                <OverviewSection
-                                    d={d}
-                                    isNearMiss={d.type === 'near_miss'}
-                                    part="details"
-                                />
-                            </section>
-                            <section
-                                hidden={section !== 'followups'}
-                                aria-label="Incident follow-ups"
-                            >
-                                <FollowupsSection
-                                    d={d}
-                                    onComplete={completeFollowup}
-                                    onDraftStateChange={drafts.onFollowupDraft}
-                                />
-                            </section>
-                            <section
-                                hidden={section !== 'evidence'}
-                                aria-label="Incident evidence"
-                                className="space-y-4"
-                            >
-                                <PhotosSection d={d} />
-                                <RecordingWindowEditor
-                                        preview={d.recording_preview}
-                                        actorId={props.auth.user.id}
-                                        incidentId={d.id}
-                                        refreshing={recordingsLoading}
-                                        onDraftStateChange={drafts.onRecordingWindowDraft}
-                                        requestDiscard={drafts.request}
-                                        onSaved={() => onRecordingPageChange(1)}
-                                        onRefresh={() => onRecordingPageChange(d.recording_evidence?.references.page ?? 1)}
-                                />
-                                <RecordingReferenceChooser
-                                    actorId={props.auth.user.id}
-                                    incidentId={d.id}
-                                    preview={d.recording_preview}
-                                    evidence={d.recording_evidence}
-                                    refreshing={recordingsLoading}
-                                    onDraftStateChange={drafts.onRecordingReferenceDraft}
-                                    requestDiscard={drafts.request}
-                                    onSaved={() => onRecordingPageChange(1)}
-                                    onRefresh={() => onRecordingPageChange(d.recording_evidence?.references.page ?? 1)}
-                                />
-                                {d.recording_evidence ? (
-                                    <RecordingReferenceEvidence
-                                        incidentId={d.id}
-                                        evidence={d.recording_evidence}
-                                        onPageChange={onRecordingPageChange}
-                                        loading={recordingsLoading}
-                                    />
-                                ) : (
-                                    <p role="status" className="text-subtle text-muted-foreground">
-                                        Recording reference information is unavailable. Reload the incident to check current access.
-                                    </p>
-                                )}
-                            </section>
-                            <section
-                                hidden={section !== 'investigation'}
-                                aria-label="Incident investigation"
-                            >
-                                <InvestigationSection
-                                    d={d}
-                                    onDraftStateChange={
-                                        drafts.onCorrectiveActionDraft
-                                    }
-                                />
-                            </section>
-                            <section
-                                hidden={section !== 'linked'}
-                                aria-label="Linked incident records"
-                            >
-                                <LinkedSection d={d} clientName={person} />
-                            </section>
-                            <section
-                                hidden={section !== 'history'}
-                                aria-label="Incident history"
-                            >
-                                <TimelineSection d={d} />
-                            </section>
-                        </div>,
-                    ].sort(
-                        (left, right) =>
-                            bodyOrder.indexOf(String(left.key)) -
-                            bodyOrder.indexOf(String(right.key)),
-                    )}
+                            {showGate ? <ClosingChecks d={d} /> : null}
+                            {readOnly ? null : linkedList}
+                        </SideColumn>
+                    </aside>
                 </div>
             </PageLayout>
             <TabSearchPalette
                 open={findOpen}
                 onClose={() => setFindOpen(false)}
-                groups={groups}
+                groups={findGroups}
                 onTab={selectSection}
                 testIdPrefix="incident-workspace"
                 searchLabel="Find an incident section"
@@ -783,5 +653,259 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                 />
             ) : null}
         </AppLayout>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Overview                                                           */
+/* ------------------------------------------------------------------ */
+
+function OverviewMain({
+    d,
+    person,
+    readOnly,
+    linkedList,
+    onHistory,
+}: {
+    d: IncidentWorkspaceDetail;
+    person: string;
+    readOnly: boolean;
+    linkedList: ReactNode;
+    onHistory: () => void;
+}) {
+    const worksafe = incidentWorksafe(d);
+    const evidence = d.linked_operational_evidence;
+    const crRestricted =
+        evidence?.access === 'restricted' ||
+        (!evidence?.source && d.linked_access?.control_room === 'restricted');
+    const isNearMiss = d.type === 'near_miss';
+    const story = (
+        <Story
+            title="What happened"
+            sub={
+                d.reporter?.name
+                    ? `From ${d.reporter.name}’s report${d.submitted_at ? ` · ${dateTimeWithYear(d.submitted_at)}` : ''}`
+                    : undefined
+            }
+            facts={[
+                ...(d.client?.site ? [{ icon: MapPin, text: d.client.site }] : []),
+                ...(d.occurred_at
+                    ? [
+                          {
+                              icon: Clock,
+                              text: (
+                                  <>
+                                      <b>{formatDate(d.occurred_at)}</b>, {formatTime(d.occurred_at)}
+                                  </>
+                              ),
+                          },
+                      ]
+                    : []),
+                { icon: FileText, text: SOURCE_STORY[d.source] ?? incidentTypeLabel(d.source) },
+                ...(isNearMiss && d.potential_severity
+                    ? [{ icon: ShieldAlert, text: `Could have been ${(SEVERITY_LABELS[d.potential_severity] ?? d.potential_severity).toLowerCase()}` }]
+                    : []),
+            ]}
+            paras={[
+                { h: 'What happened', t: d.description || 'Not recorded' },
+                { h: 'What staff did straight away', t: d.immediate_action_taken || 'Not recorded' },
+                ...(d.witnesses ? [{ h: 'Witnesses', t: d.witnesses }] : []),
+                ...(isNearMiss && d.potential_consequence ? [{ h: 'Could have caused', t: d.potential_consequence }] : []),
+            ]}
+        />
+    );
+    const timeline = minuteByMinute(d);
+    const people = peopleInvolved(d, person);
+    return (
+        <>
+            {safeguardingEscalation(d) ? (
+                <Note tone="warning" icon={ShieldAlert}>
+                    <SafeguardingEscalationText d={d} />
+                </Note>
+            ) : null}
+            {worksafe.notifiable ? <WorksafeClock d={d} /> : null}
+            {story}
+            {!readOnly && timeline.items.length > 2 ? (
+                <Log
+                    title="Minute by minute"
+                    sub={timeline.sub}
+                    action={{ label: 'Full history', onClick: onHistory }}
+                    items={timeline.items}
+                    limit={timeline.items.length}
+                />
+            ) : null}
+            {crRestricted ? (
+                <Surface title="From the Control room" aria-label="Linked Control Room evidence">
+                    <p className="sg-quiet">
+                        <Ring tone="none" />
+                        <span>
+                            This incident has a linked Control Room record. Your access does not include its notes or files.
+                        </span>
+                    </p>
+                </Surface>
+            ) : null}
+            {!readOnly && people.length > 1 ? <PeopleCards title="People involved" cols={2} items={people} /> : null}
+            {linkedList}
+        </>
+    );
+}
+
+function WorksafeClock({ d }: { d: IncidentWorkspaceDetail }) {
+    const worksafe = incidentWorksafe(d);
+    const known = d.submitted_at ?? d.occurred_at;
+    const acknowledged = worksafe.status === 'acknowledged';
+    const days = worksafe.notified ? daysSince(worksafe.notifiedAt) : daysSince(known);
+    return (
+        <DutyClock
+            tone={acknowledged ? 'success' : worksafe.notified ? 'warning' : 'critical'}
+            big={acknowledged ? <CheckCircle2 aria-label="Acknowledged" className="size-5" /> : (days ?? '—')}
+            unit={acknowledged ? undefined : days === 1 ? 'day' : 'days'}
+            kicker="WorkSafe NZ notifiable event"
+            title={acknowledged ? 'Acknowledged by WorkSafe' : worksafe.notified ? 'Notified — awaiting acknowledgement' : 'Not notified yet'}
+            sub={worksafe.text}
+            lines={
+                known && !worksafe.notified
+                    ? [
+                          {
+                              state: 'critical',
+                              text: (
+                                  <>
+                                      {d.submitted_at ? 'Reported' : 'Happened'} <b>{dateTimeWithYear(known)}</b>
+                                  </>
+                              ),
+                          },
+                      ]
+                    : []
+            }
+            actions={
+                d.hs_event?.url ? (
+                    <Button asChild size="sm">
+                        <Link href={d.hs_event.url}>Open safety review</Link>
+                    </Button>
+                ) : undefined
+            }
+        />
+    );
+}
+
+/** What the incident page knows, in time order: the report and the Control Room notes together. */
+function minuteByMinute(d: IncidentWorkspaceDetail): { items: LogItem[]; sub: string } {
+    const evidence = d.linked_operational_evidence;
+    const readable = evidence && evidence.access !== 'restricted' && evidence.source ? evidence : null;
+    const ref = readable?.source?.reference ?? null;
+    const events: (LogItem & { at: string })[] = [];
+    const add = (at: string | null | undefined, item: LogItem) => {
+        if (at) events.push({ ...item, at, time: shortWhen(at) });
+    };
+    add(d.occurred_at, { title: 'Incident happened', tone: 'critical', sub: d.client?.site ?? undefined });
+    if (d.control_room_alert) {
+        add(d.control_room_alert.triggered_at, {
+            title: 'Control room alert raised',
+            tone: 'critical',
+            sub: [ref, incidentTypeLabel(d.control_room_alert.alert_type), SEVERITY_LABELS[d.control_room_alert.severity] ?? d.control_room_alert.severity]
+                .filter(Boolean)
+                .join(' · '),
+        });
+    }
+    for (const note of readable?.notes ?? []) {
+        add(note.created_at, {
+            title: note.purpose_label,
+            tone: 'warning',
+            sub: `${note.author?.name ?? 'Unknown operator'} · ${note.content}`,
+        });
+    }
+    if (d.control_room_alert) {
+        add(d.control_room_alert.resolved_at, { title: 'Control room alert resolved', tone: 'success', sub: ref ?? undefined });
+    }
+    add(d.submitted_at, { title: 'Reported', tone: 'info', sub: d.reporter?.name });
+    const firstOwner = [...(d.ownership?.history ?? [])].reverse()[0];
+    if (firstOwner) {
+        add(firstOwner.changed_at, { title: 'Given an owner', tone: 'info', sub: `${firstOwner.owner} · by ${firstOwner.changed_by}` });
+    }
+    events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+    return {
+        items: events,
+        sub: ref ? `From the report and Control room alert ${ref}` : 'From the report',
+    };
+}
+
+function peopleInvolved(d: IncidentWorkspaceDetail, person: string): PersonCardItem[] {
+    const people: PersonCardItem[] = [];
+    const seen = new Set<string>();
+    const add = (item: PersonCardItem) => {
+        const key = item.name.trim().toLowerCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        people.push(item);
+    };
+    if (d.client) {
+        add({
+            name: person,
+            sub: `Client${d.client.site ? ` · ${d.client.site}` : ''}`,
+            href: `/operations/clients/${d.client.id}/care`,
+        });
+    }
+    if (d.reporter?.name) add({ name: d.reporter.name, sub: 'Reported it' });
+    for (const witness of (d.witnesses ?? '').split(/[,;\n]/)) {
+        if (witness.trim()) add({ name: witness.trim(), sub: 'Witness' });
+    }
+    const evidence = d.linked_operational_evidence;
+    if (evidence && evidence.access !== 'restricted') {
+        for (const note of evidence.notes) {
+            if (note.author?.name) {
+                add({
+                    name: note.author.name,
+                    sub: `Control room${evidence.source?.reference ? ` · ${evidence.source.reference}` : ''}`,
+                });
+            }
+        }
+    }
+    return people;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Side column                                                        */
+/* ------------------------------------------------------------------ */
+
+const GATE_LABELS: Record<string, string> = {
+    incident_review: 'Finish the manager review',
+    incident_followups: 'Finish all follow-ups',
+    incident_investigation: 'Finish the investigation',
+};
+
+/** The server's closing checks, read by their rings; unmet ones link to where they're finished. */
+function ClosingChecks({ d }: { d: IncidentWorkspaceDetail }) {
+    const done = d.close_gate.requirements.filter((item) => item.complete).length;
+    return (
+        <section aria-label="Transition requirements">
+            <RingCard
+                value={done}
+                of={d.close_gate.requirements.length}
+                label={d.close_gate.allowed ? 'Ready to close' : 'Not closed yet'}
+                sub={d.close_gate.allowed ? 'Everything needed to close is done' : 'Finish these before you close it'}
+                checks={d.close_gate.requirements.map((item) => {
+                    const label = item.complete
+                        ? item.label
+                        : item.key === 'health_safety_governance' && item.href && d.hs_event
+                          ? `Close safety review ${d.hs_event.reference_number}`
+                          : (GATE_LABELS[item.key] ?? item.label);
+                    return {
+                        state: item.complete ? ('success' as const) : ('warning' as const),
+                        label:
+                            !item.complete && item.href ? (
+                                <Link
+                                    href={item.href}
+                                    aria-label={label}
+                                    className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                >
+                                    {label}
+                                </Link>
+                            ) : (
+                                label
+                            ),
+                    };
+                })}
+            />
+        </section>
     );
 }

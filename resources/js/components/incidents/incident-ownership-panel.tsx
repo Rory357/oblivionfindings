@@ -1,5 +1,6 @@
+import { QuietLine } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Command,
     CommandInput,
@@ -18,8 +19,8 @@ import { Field } from '@/components/wizard/primitives';
 import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
 import { formatDateTime } from '@/lib/datetime';
 import { router, useForm } from '@inertiajs/react';
-import { Check, UserRound } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { Check } from 'lucide-react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 
 export type IncidentOwnership = {
     revision: number;
@@ -49,7 +50,7 @@ export type IncidentOwnership = {
 
 export function incidentOwnerLabel(ownership: IncidentOwnership): string {
     if (ownership.state === 'replacement_needed')
-        return 'Owner needs replacement';
+        return 'Owner needs replacing';
     if (ownership.state === 'unassigned') return 'Needs an owner';
     return (
         ownership.owner?.name ??
@@ -58,147 +59,238 @@ export function incidentOwnerLabel(ownership: IncidentOwnership): string {
     );
 }
 
+/** The owner-assignment entry label for the current ownership state. */
+export function incidentAssignLabel(ownership: IncidentOwnership): string {
+    if (ownership.state === 'unassigned') return 'Assign someone';
+    if (ownership.state === 'replacement_needed') return 'Choose a new owner';
+    return 'Change owner';
+}
+
+const DELIVERY_TEXT = {
+    delivered: 'Delivered in the app',
+    skipped: 'No longer applicable or permitted',
+    failed: 'Delivery failed',
+    pending: 'Pending delivery',
+} as const;
+
+/**
+ * The incident owner (drawing pg-hsn-2 side column): who owns it, who assigned
+ * them and whether they were told, the owner history on demand, and the one
+ * assign dialog. The page can open that dialog from its header through
+ * `assignOpen` / `onAssignOpenChange`; `showAssign={false}` drops the in-card
+ * button when the header already carries it.
+ */
 export function IncidentOwnershipPanel({
     incidentId,
     reference,
     ownership,
+    assignOpen,
+    onAssignOpenChange,
+    showAssign = true,
 }: {
     incidentId: number;
     reference: string;
     ownership: IncidentOwnership;
+    assignOpen?: boolean;
+    onAssignOpenChange?: (open: boolean) => void;
+    showAssign?: boolean;
 }) {
-    const [open, setOpen] = useState(false);
+    const [ownOpen, setOwnOpen] = useState(false);
+    const open = assignOpen ?? ownOpen;
+    const setOpen = (next: boolean) => {
+        if (onAssignOpenChange) onAssignOpenChange(next);
+        else setOwnOpen(next);
+    };
     const [retrying, setRetrying] = useState<string | null>(null);
+    const [historyOpen, setHistoryOpen] = useState(false);
+    const historyId = useId();
     const history = ownership.history ?? [];
     const latest = history[0];
-    return (
+    const assignLabel = incidentAssignLabel(ownership);
+    const named =
+        ownership.owner?.name ?? ownership.last_owner_name ?? 'Not recorded';
+    const incomingDelivered = latest?.deliveries.some(
+        (delivery) =>
+            delivery.role === 'incoming' && delivery.status === 'delivered',
+    );
+    const deliveryLines = (latest?.deliveries ?? []).filter(
+        (delivery) =>
+            !(delivery.role === 'incoming' && delivery.status === 'delivered'),
+    );
+    const assignedLine = latest ? (
         <>
-            <Card>
-                <CardHeader>
-                    <h2 className="text-section-title flex items-center gap-2">
-                        <UserRound
-                            aria-hidden
-                            className="size-4 text-primary"
-                        />
-                        Incident owner
-                    </h2>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    <p className="text-subtle">
-                        {incidentOwnerLabel(ownership)}
+            Assigned by {latest.changed_by} ·{' '}
+            {formatDateTime(latest.changed_at)}
+            {incomingDelivered ? ' · told in the app' : ''}
+        </>
+    ) : null;
+    const deliveries = deliveryLines.length ? (
+        <div className="mt-1.5 space-y-1.5">
+            {deliveryLines.map((delivery) => (
+                <div key={delivery.id} className="space-y-1">
+                    <p>
+                        {delivery.role === 'incoming'
+                            ? 'New owner'
+                            : 'Previous owner'}{' '}
+                        notification: {DELIVERY_TEXT[delivery.status]}
                     </p>
-                    {ownership.state === 'replacement_needed' ? (
-                        <p className="text-subtle text-muted-foreground">
-                            Previous owner:{' '}
-                            {ownership.owner?.name ??
-                                ownership.last_owner_name ??
-                                'Not recorded'}
-                            . Their current access or eligibility no longer
-                            supports this assignment.
-                        </p>
-                    ) : null}
-                    {ownership.state === 'unassigned' ? (
-                        <p className="text-subtle text-muted-foreground">
-                            An authorized coordinator needs to assign an
-                            eligible person to follow this incident through.
-                        </p>
-                    ) : null}
-                    {ownership.state === 'historical' ? (
-                        <p className="text-subtle text-muted-foreground">
-                            Historical ownership. Reopen the incident through
-                            its normal controls before reassigning it.
-                        </p>
-                    ) : null}
-                    {ownership.can_assign ? (
+                    {delivery.status === 'failed' &&
+                    ownership.can_retry_delivery ? (
                         <Button
-                            className="frontline-tap frontline-focus w-full"
                             variant="outline"
-                            onClick={() => setOpen(true)}
+                            size="sm"
+                            className="frontline-hit frontline-focus"
+                            disabled={retrying !== null}
+                            onClick={() => {
+                                setRetrying(delivery.id);
+                                router.post(
+                                    `/incidents/${incidentId}/owner-deliveries/${delivery.id}/retry`,
+                                    {},
+                                    {
+                                        preserveScroll: true,
+                                        onFinish: () => setRetrying(null),
+                                    },
+                                );
+                            }}
                         >
-                            {ownership.revision > 0
-                                ? 'Reassign owner'
-                                : 'Assign owner'}
+                            Retry notification
                         </Button>
                     ) : null}
-                    {latest ? (
-                        <div className="text-subtle space-y-2">
-                            <p className="text-muted-foreground">
-                                Assigned by {latest.changed_by} ·{' '}
-                                {formatDateTime(latest.changed_at)}
-                            </p>
-                            {latest.deliveries.map((delivery) => (
-                                <div key={delivery.id} className="space-y-1">
-                                    <p>
-                                        {delivery.role === 'incoming'
-                                            ? 'New owner'
-                                            : 'Previous owner'}{' '}
-                                        notification:{' '}
-                                        {delivery.status === 'delivered'
-                                            ? 'Delivered in the app'
-                                            : delivery.status === 'skipped'
-                                              ? 'No longer applicable or permitted'
-                                              : delivery.status === 'failed'
-                                                ? 'Delivery failed'
-                                                : 'Pending delivery'}
-                                    </p>
-                                    {delivery.status === 'failed' &&
-                                    ownership.can_retry_delivery ? (
-                                        <Button
-                                            variant="outline"
-                                            className="frontline-tap frontline-focus"
-                                            disabled={retrying !== null}
-                                            onClick={() => {
-                                                setRetrying(delivery.id);
-                                                router.post(
-                                                    `/incidents/${incidentId}/owner-deliveries/${delivery.id}/retry`,
-                                                    {},
-                                                    {
-                                                        preserveScroll: true,
-                                                        onFinish: () =>
-                                                            setRetrying(null),
-                                                    },
-                                                );
-                                            }}
-                                        >
-                                            Retry notification
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            ))}
-                        </div>
+                </div>
+            ))}
+        </div>
+    ) : null;
+    const assignButton =
+        ownership.can_assign && showAssign ? (
+            <Button
+                variant="outline"
+                size="sm"
+                className="frontline-hit frontline-focus mt-3"
+                onClick={() => setOpen(true)}
+            >
+                {assignLabel}
+            </Button>
+        ) : null;
+
+    return (
+        <>
+            <section aria-label="Incident owner" className="min-w-0">
+                <div className="sg-section-head">
+                    <h3>Owner</h3>
+                    {history.length ? (
+                        <p>
+                            {history.length === 1
+                                ? '1 change'
+                                : `${history.length} changes`}
+                        </p>
                     ) : null}
                     {history.length ? (
-                        <details>
-                            <summary className="frontline-tap frontline-focus text-subtle flex cursor-pointer items-center rounded-md">
-                                Ownership history ({history.length})
-                            </summary>
-                            <ol className="mt-2 space-y-3">
-                                {history.map((change) => (
-                                    <li
-                                        key={change.id}
-                                        className="text-subtle space-y-1 border-l-2 border-border pl-3"
-                                    >
-                                        <p className="font-medium">
-                                            {change.previous_owner
-                                                ? `${change.previous_owner} → ${change.owner}`
-                                                : `Assigned to ${change.owner}`}
-                                        </p>
-                                        <p className="text-muted-foreground">
-                                            {change.changed_by} ·{' '}
-                                            {formatDateTime(change.changed_at)}
-                                        </p>
-                                        {change.reason ? (
-                                            <p className="whitespace-pre-wrap">
-                                                {change.reason}
-                                            </p>
-                                        ) : null}
-                                    </li>
-                                ))}
-                            </ol>
-                        </details>
+                        <Button
+                            unstyled
+                            type="button"
+                            className="sg-act"
+                            aria-expanded={historyOpen}
+                            aria-controls={historyId}
+                            onClick={() => setHistoryOpen((value) => !value)}
+                        >
+                            {historyOpen ? 'Hide owner history' : 'Owner history'}
+                        </Button>
                     ) : null}
-                </CardContent>
-            </Card>
+                </div>
+                {ownership.state === 'unassigned' ? (
+                    <QuietLine
+                        text={
+                            <>
+                                No owner yet. An authorised coordinator needs to
+                                assign an eligible person to follow this
+                                incident through.
+                            </>
+                        }
+                        action={
+                            ownership.can_assign
+                                ? { label: assignLabel, onClick: () => setOpen(true) }
+                                : null
+                        }
+                    />
+                ) : (
+                    <div className="sg-surface sg-p">
+                        <div className="sg-ph">
+                            <span aria-hidden="true" className="sg-av">
+                                {initialsOf(named)}
+                            </span>
+                            <div>
+                                <b>{named}</b>
+                                <small>
+                                    {ownership.state === 'replacement_needed'
+                                        ? 'Previous owner'
+                                        : ownership.state === 'historical'
+                                          ? 'Owner when it closed'
+                                          : 'Incident owner'}
+                                </small>
+                                {ownership.state === 'replacement_needed' ? (
+                                    <span className="sg-flag">
+                                        <StatusBadge variant="warning">
+                                            {incidentOwnerLabel(ownership)}
+                                        </StatusBadge>
+                                    </span>
+                                ) : null}
+                            </div>
+                        </div>
+                        <div className="sg-pf">
+                          <div className="grid w-full gap-1">
+                            {ownership.state === 'replacement_needed' ? (
+                                <p>
+                                    Previous owner: {named}. Their current
+                                    access or eligibility no longer supports
+                                    this assignment.
+                                </p>
+                            ) : null}
+                            {ownership.state === 'historical' ? (
+                                <p>
+                                    Historical ownership. Reopen the incident
+                                    through its normal controls before
+                                    reassigning it.
+                                </p>
+                            ) : null}
+                            {assignedLine ? <p>{assignedLine}</p> : null}
+                            {deliveries}
+                            {assignButton ? <div>{assignButton}</div> : null}
+                          </div>
+                        </div>
+                    </div>
+                )}
+                {history.length ? (
+                    <ol
+                        id={historyId}
+                        hidden={!historyOpen}
+                        aria-label="Ownership history"
+                        className="sg-surface sg-log mt-2.5"
+                    >
+                        {history.map((change) => (
+                            <li key={change.id} className="sg-lr">
+                                <time>{formatDateTime(change.changed_at)}</time>
+                                <span />
+                                <div className="min-w-0">
+                                    <b>
+                                        {change.previous_owner
+                                            ? `${change.previous_owner} → ${change.owner}`
+                                            : `Assigned to ${change.owner}`}
+                                    </b>
+                                    <small>
+                                        By {change.changed_by}
+                                        {change.reason ? (
+                                            <span className="block whitespace-pre-wrap">
+                                                {change.reason}
+                                            </span>
+                                        ) : null}
+                                    </small>
+                                </div>
+                                <span />
+                            </li>
+                        ))}
+                    </ol>
+                ) : null}
+            </section>
             {open ? (
                 <AssignIncidentOwner
                     incidentId={incidentId}
@@ -208,6 +300,18 @@ export function IncidentOwnershipPanel({
                 />
             ) : null}
         </>
+    );
+}
+
+function initialsOf(name: string): string {
+    return (
+        name
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((part) => part[0])
+            .join('')
+            .toUpperCase() || '?'
     );
 }
 
@@ -242,7 +346,8 @@ function readOwnerOptions(
     return owners;
 }
 
-function AssignIncidentOwner({
+/** The one owner-assignment dialog (eligible staff search, reason, revision guard). */
+export function AssignIncidentOwner({
     incidentId,
     reference,
     ownership,

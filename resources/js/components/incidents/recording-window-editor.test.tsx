@@ -37,7 +37,7 @@ function setup(data = preview()) {
 }
 function fillAndSubmit() {
     fireEvent.click(screen.getByRole('checkbox', { name: /Entrance/ }));
-    fireEvent.change(screen.getByLabelText('Reason for this period and selection'), { target: { value: 'Review the entrance around the incident.' } });
+    fireEvent.change(screen.getByLabelText('Why this time and these cameras'), { target: { value: 'Review the entrance around the incident.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Record evidence window' }));
 }
 
@@ -67,15 +67,15 @@ describe('incident evidence window commands', () => {
         vi.mocked(axios.post).mockRejectedValueOnce(new Error('connection lost'));
         const view = setup();
         fillAndSubmit();
-        await screen.findByRole('button', { name: 'Check save result' });
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Check save result' })).not.toBeDisabled());
+        await screen.findByRole('button', { name: 'Check if it saved' });
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Check if it saved' })).not.toBeDisabled());
         const command = vi.mocked(axios.post).mock.calls.at(-1)![1] as RecordingWindowCommand;
         expect(command.approved_sources).toEqual([{ camera_id: 30, recorder_device_id: 40, site_id: 5 }]);
         const confirmed = receipt(command);
         confirmed.current = { incident_evidence_version: 4, evidence_window_revision: 3 };
         vi.mocked(axios.get).mockResolvedValueOnce({ status: 200, data: confirmed });
         const posts = vi.mocked(axios.post).mock.calls.length;
-        fireEvent.click(screen.getByRole('button', { name: 'Check save result' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Check if it saved' }));
         await waitFor(() => expect(view.onSaved).toHaveBeenCalledTimes(1));
         expect(axios.get).toHaveBeenLastCalledWith(
             `/incidents/9/evidence-window-commands/${command.idempotency_key}?expected_actor_id=7`, expect.any(Object),
@@ -91,11 +91,11 @@ describe('incident evidence window commands', () => {
         });
         const view = setup();
         fillAndSubmit();
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Retry same submission' })).not.toBeDisabled());
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Try the same save again' })).not.toBeDisabled());
         const original = vi.mocked(axios.post).mock.calls.at(-1)![1] as RecordingWindowCommand;
         expect(view.onSaved).not.toHaveBeenCalled();
         vi.mocked(axios.post).mockResolvedValueOnce({ status: 200, data: receipt(original) });
-        fireEvent.click(screen.getByRole('button', { name: 'Retry same submission' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Try the same save again' }));
         await waitFor(() => expect(view.onSaved).toHaveBeenCalledTimes(1));
         expect(vi.mocked(axios.post).mock.calls.at(-1)![1]).toBe(original);
     });
@@ -117,7 +117,7 @@ describe('incident evidence window commands', () => {
 
     it('requires explicit discard before replacing a stale edited camera selection', () => {
         const view = setup();
-        fireEvent.change(screen.getByLabelText('Reason for this period and selection'), { target: { value: 'Keep these unsaved details.' } });
+        fireEvent.change(screen.getByLabelText('Why this time and these cameras'), { target: { value: 'Keep these unsaved details.' } });
         const next = preview(); next.sources.items = [];
         view.rerender(<RecordingWindowEditor {...view.props} preview={next} />);
         expect(screen.getByRole('button', { name: 'Record evidence window' })).toBeDisabled();
@@ -131,18 +131,18 @@ describe('incident evidence window commands', () => {
         vi.mocked(axios.post).mockRejectedValueOnce({ isAxiosError: true, response: { status: 403 } });
         const view = setup();
         fillAndSubmit();
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Retry same submission' })).toBeDisabled());
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Try the same save again' })).toBeDisabled());
         const original = vi.mocked(axios.post).mock.calls.at(-1)![1] as RecordingWindowCommand;
         expect(screen.queryByText('Entrance')).not.toBeInTheDocument();
         vi.mocked(axios.get).mockRejectedValueOnce({ isAxiosError: true, response: { status: 404 } });
-        fireEvent.click(screen.getByRole('button', { name: 'Check save result' }));
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Check save result' })).not.toBeDisabled());
+        fireEvent.click(screen.getByRole('button', { name: 'Check if it saved' }));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Check if it saved' })).not.toBeDisabled());
         expect(view.onSaved).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: 'Refresh access and choices' }));
         expect(view.onRefresh).toHaveBeenCalledTimes(1);
         view.rerender(<RecordingWindowEditor {...view.props} preview={preview()} />);
         vi.mocked(axios.post).mockResolvedValueOnce({ status: 200, data: receipt(original) });
-        fireEvent.click(screen.getByRole('button', { name: 'Retry same submission' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Try the same save again' }));
         await waitFor(() => expect(view.onSaved).toHaveBeenCalledTimes(1));
         expect(vi.mocked(axios.post).mock.calls.at(-1)![1]).toBe(original);
     });
@@ -151,17 +151,17 @@ describe('incident evidence window commands', () => {
         vi.mocked(axios.post).mockRejectedValueOnce(new Error('lost response'));
         const view = setup();
         fillAndSubmit();
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Check save result' })).not.toBeDisabled());
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Check if it saved' })).not.toBeDisabled());
         const original = vi.mocked(axios.post).mock.calls.at(-1)![1] as RecordingWindowCommand;
         const malformed = preview(); malformed.policy.rule!.default_end_at = 'broken';
         view.rerender(<RecordingWindowEditor {...view.props}
             preview={kind === 'malformed' ? malformed : kind === 'null' ? null : undefined} />);
         expect(screen.queryByText('Entrance')).not.toBeInTheDocument();
         expect(screen.queryByDisplayValue(original.reason)).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Retry same submission' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Try the same save again' })).toBeDisabled();
         expect(view.onDraftStateChange).toHaveBeenLastCalledWith({ dirty: true, busy: false, uncertain: true });
         vi.mocked(axios.get).mockResolvedValueOnce({ status: 200, data: receipt(original) });
-        fireEvent.click(screen.getByRole('button', { name: 'Check save result' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Check if it saved' }));
         await waitFor(() => expect(view.onSaved).toHaveBeenCalledTimes(1));
         expect(axios.get).toHaveBeenLastCalledWith(
             `/incidents/9/evidence-window-commands/${original.idempotency_key}?expected_actor_id=7`, expect.any(Object));

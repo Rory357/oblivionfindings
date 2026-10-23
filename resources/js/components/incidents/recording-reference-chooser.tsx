@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { formatDateTimeLong } from '@/lib/datetime';
 import {
     matchesRecordingRequest, recordingBase, recordingDetail, recordingPage, recordingRecoveryBase,
@@ -174,30 +175,40 @@ function Chooser({ actorId, incidentId, preview, evidence, refreshing = false, o
     };
     const matching = page?.references.items.filter((item) => item.recorder.id === source?.recorder.id &&
         item.requested_start_at === basis?.start && item.requested_end_at === basis?.end) ?? [];
-    return <section aria-label="Link a recording reference" aria-busy={busy} className="space-y-4 rounded-lg border border-border p-4">
-        <div className="space-y-2">
-            <h3 className="text-section-title">Link a recording reference</h3>
-            <p className="text-subtle text-muted-foreground">Choose an existing reference or create one for the exact approved period, then link it here. A reference does not retrieve, verify or preserve footage.</p>
-        </div>
-        {!valid ? <p role="status" className="text-subtle text-muted-foreground">Review the current evidence window and camera access before linking references. Any unconfirmed submission remains privately in this tab.</p> : null}
-        {canShow && basis ? <>
-            <p className="text-subtle">Approved period (NZ time): {formatDateTimeLong(basis.start)} – {formatDateTimeLong(basis.end)}</p>
-            <div className="flex flex-wrap gap-2" aria-label="Approved cameras">
-                {basis.sources.map((choice) => <Button key={recordingChoiceKey(choice)} type="button" size="sm"
-                    variant={source && recordingChoiceKey(source) === recordingChoiceKey(choice) ? 'secondary' : 'outline'}
-                    aria-pressed={!!source && recordingChoiceKey(source) === recordingChoiceKey(choice)} className="frontline-hit min-w-0 max-w-full"
-                    disabled={blocked || uncertain} onClick={() => choose(choice)}><span className="truncate">{choice.camera.name} · {choice.recorder.name}</span></Button>)}
+    return <section aria-label="Link a recording reference" aria-busy={busy}
+        className="min-w-0 overflow-hidden rounded-[14px] border border-border bg-card text-card-foreground shadow-xs">
+        <div className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-border px-4 py-3.5">
+            <div className="grid min-w-0 flex-[1_1_220px] gap-0.5">
+                <h3 className="text-section-title">Link a recording</h3>
+                <p className="text-subtle">Choose an existing reference or create one for the exact approved period, then link it here. A reference does not retrieve, verify or preserve footage.</p>
             </div>
-            {source ? <p className="break-words text-subtle">{source.camera.name} · {source.recorder.name}</p> : null}
-            {!basis.sources.length ? <p className="text-subtle text-muted-foreground">No currently readable camera is included in this window.</p> : null}
-            {page && !uncertain ? <div className="space-y-3">
+            <Button type="button" variant="outline" size="sm" className="frontline-hit shrink-0" disabled={blocked} onClick={onRefresh}>Check my access again</Button>
+        </div>
+        {!valid ? <p role="status" className="text-subtle px-4 py-3">Review the current evidence window and camera access before linking references. Any unconfirmed submission remains privately in this tab.</p> : null}
+        {canShow && basis ? <>
+            <ul className="divide-y divide-border" aria-label="Approved cameras">
+                {basis.sources.map((choice) => {
+                    const on = !!source && recordingChoiceKey(source) === recordingChoiceKey(choice);
+                    const name = `${choice.camera.name} · ${choice.recorder.name}`;
+                    return <li key={recordingChoiceKey(choice)}>
+                        <Button unstyled type="button" aria-label={name} aria-pressed={on} disabled={blocked || uncertain} onClick={() => choose(choice)}
+                            className={cn('frontline-focus block w-full px-4 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                                on ? 'bg-primary-fill/10' : 'hover:bg-muted/60')}>
+                            <b className={cn('block truncate text-sm font-semibold', on ? 'text-primary' : 'text-foreground')}>{name}</b>
+                            <span className="text-caption block">Approved time: {formatDateTimeLong(basis.start)} – {formatDateTimeLong(basis.end)} (NZ time)</span>
+                        </Button>
+                    </li>;
+                })}
+            </ul>
+            {!basis.sources.length ? <p className="text-subtle px-4 py-3">No currently readable camera is included in this window.</p> : null}
+            {page && !uncertain ? <div className="space-y-3 border-t border-border px-4 py-3.5">
                 <h4 className="font-medium">Existing references for this period</h4>
                 {matching.length ? <ul className="space-y-2">{matching.map((item) => <li key={item.reference_uuid}>
                     <Button type="button" variant="outline" size="sm" className="frontline-hit min-w-0 max-w-full" disabled={blocked}
                         onClick={() => source && void read(source, undefined, item.reference_uuid)}>
                         <span className="truncate">Review reference created {formatDateTimeLong(item.created_at)}</span>
                     </Button>
-                </li>)}</ul> : <p className="text-subtle text-muted-foreground">No exact match on this page. Check other pages or create a reference for the approved period.</p>}
+                </li>)}</ul> : <p className="text-subtle">No exact match on this page. Check other pages or create a reference for the approved period.</p>}
                 <LaravelPagination ariaLabel="Available recording references" cursor={{
                     previousHref: page.references.previous_href, nextHref: page.references.next_href,
                     pending: blocked, onPageChange: (href) => { if (source) void read(source, href); },
@@ -206,24 +217,24 @@ function Chooser({ actorId, incidentId, preview, evidence, refreshing = false, o
                     <label className="block space-y-2 text-subtle">Purpose of the new camera reference
                         <Textarea value={createPurpose} disabled={blocked} onChange={(event) => setCreatePurpose(event.target.value)} rows={3} />
                     </label>
-                    <p className="text-caption text-muted-foreground">Use one line of 10 to 500 characters.</p>
-                    <p className="text-caption text-muted-foreground">The period is fixed to this incident window. Creation and incident linking are separate steps.</p>
+                    <p className="text-caption">Use one line of 10 to 500 characters.</p>
+                    <p className="text-caption">The period is fixed to this incident window. Creation and incident linking are separate steps.</p>
                     <Button type="submit" size="sm" className="frontline-hit" disabled={blocked}>Create camera reference</Button>
-                </form> : !detail ? <p className="text-subtle text-muted-foreground">A new reference is unavailable for this camera, your access or this period. Existing matching references can still be reviewed.</p> : null}
+                </form> : !detail ? <p className="text-subtle">A new reference is unavailable for this camera, your access or this period. Existing matching references can still be reviewed.</p> : null}
             </div> : null}
-            {detail && !uncertain ? <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void attach(false); }}>
+            {detail && !uncertain ? <form className="space-y-3 border-t border-border px-4 py-3.5" onSubmit={(event) => { event.preventDefault(); void attach(false); }}>
                 <h4 className="font-medium">Selected reference</h4>
-                <p className="break-words text-subtle">{detail.reference.purpose}</p>
-                <p className="text-caption text-muted-foreground">Created by {detail.reference.created_by.name} · {formatDateTimeLong(detail.reference.created_at)} · Reference only</p>
+                <p className="break-words text-subtle text-foreground">{detail.reference.purpose}</p>
+                <p className="text-caption">Created by {detail.reference.created_by.name} · {formatDateTimeLong(detail.reference.created_at)} · Reference only</p>
                 <label className="block space-y-2 text-subtle">Why this reference belongs with the incident
                     <Textarea value={linkPurpose} disabled={blocked} onChange={(event) => setLinkPurpose(event.target.value)} rows={3} />
                 </label>
-                <p className="text-caption text-muted-foreground">Use one line of 10 to 500 characters.</p>
+                <p className="text-caption">Use one line of 10 to 500 characters.</p>
                 <Button type="submit" size="sm" className="frontline-hit" disabled={blocked}>Link reference</Button>
             </form> : null}
         </> : null}
-        {message ? <p role="status" className="text-subtle">{message}</p> : null}
-        <div className="flex flex-wrap gap-3">
+        {message ? <p role="status" className="text-subtle border-t border-border px-4 py-3 text-foreground">{message}</p> : null}
+        {createRequest || attachRequest || (source && valid && !saved) || (current && (!valid || saved) && !uncertain) ? <div className="flex flex-wrap gap-3 border-t border-border px-4 py-3">
             {createRequest ? <>
                 <Button type="button" size="sm" className="frontline-hit" disabled={blocked} onClick={() => void create(true)}>Check reference creation</Button>
                 <Button type="button" variant="outline" size="sm" className="frontline-hit" disabled={blocked || !canCreate} onClick={() => void create(false)}>Retry same reference creation</Button>
@@ -234,9 +245,8 @@ function Chooser({ actorId, incidentId, preview, evidence, refreshing = false, o
             </> : null}
             {source && valid && !saved ? <Button type="button" variant="outline" size="sm" className="frontline-hit" disabled={blocked}
                 onClick={() => void read(source)}>Refresh camera references</Button> : null}
-            <Button type="button" variant="outline" size="sm" className="frontline-hit" disabled={blocked} onClick={onRefresh}>Refresh incident access</Button>
             {current && (!valid || saved) && !uncertain ? <Button type="button" variant="outline" size="sm" className="frontline-hit" disabled={blocked}
                 onClick={() => dirty ? requestDiscard(reset) : reset()}>Review current window</Button> : null}
-        </div>
+        </div> : null}
     </section>;
 }

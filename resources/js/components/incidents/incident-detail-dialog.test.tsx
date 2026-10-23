@@ -338,7 +338,7 @@ describe('IncidentDetailDialog H&S handover', () => {
         expect(
             screen.getByText(/Your access does not include its notes or files/),
         ).toBeInTheDocument();
-        expect(screen.getByText('Health & Safety record')).toBeInTheDocument();
+        expect(screen.getByText('Health & safety record')).toBeInTheDocument();
         expect(screen.queryByText('CR-2026-0011')).not.toBeInTheDocument();
         expect(
             screen.queryByRole('link', { name: /Control Room alert/i }),
@@ -380,7 +380,7 @@ describe('IncidentDetailDialog H&S handover', () => {
 
         render(<InvestigationSection d={detail} />);
         fireEvent.click(
-            screen.getByRole('button', { name: 'Raise corrective action' }),
+            screen.getByRole('button', { name: 'Add corrective action' }),
         );
         fireEvent.click(screen.getByRole('combobox', { name: 'Choose owner' }));
 

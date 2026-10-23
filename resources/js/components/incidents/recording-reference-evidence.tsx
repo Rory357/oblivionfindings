@@ -1,8 +1,9 @@
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Note, Ring } from '@/components/signature/blocks';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { formatDateLong, formatDateTimeLong, formatTime } from '@/lib/datetime';
 import { AlertCircle, Camera, FileText, LockKeyhole } from 'lucide-react';
+import { RecordIdentity, RecordTable } from './record-table';
 
 export type RecordingReferenceEvidenceData = {
     schema_version: 1;
@@ -80,117 +81,123 @@ export function RecordingReferenceEvidence({
     }
 
     const { window, references } = evidence;
-    const headingId = `incident-recording-references-${incidentId}`;
+    type Item = RecordingReferenceEvidenceData['references']['items'][number];
+    const range = (start: string, end: string) =>
+        formatDateLong(start) === formatDateLong(end)
+            ? `${formatTime(start)} – ${formatTime(end)}`
+            : `${formatTime(start)} – ${formatDateTimeLong(end)}`;
     return (
-        <Card role="region" aria-labelledby={headingId} aria-busy={loading}>
-            <CardHeader>
-                <h2 id={headingId} className="flex items-center gap-2 text-section-title">
-                    <Camera aria-hidden="true" className="h-5 w-5 shrink-0" />
-                    Recording references
-                </h2>
-                <p className="text-subtle text-muted-foreground">
-                    Linked camera references record a requested time window.
-                    They do not confirm that footage exists, has been viewed or
-                    has been preserved.
-                </p>
-            </CardHeader>
-            <CardContent className="space-y-5">
-                {window ? (
-                    <div className="space-y-2 rounded-lg border border-border p-4">
-                        <h3 className="text-section-title">Current evidence window</h3>
-                        <p className="text-subtle">
-                            {formatDateTimeLong(window.start_at)} – {formatDateTimeLong(window.end_at)}
-                        </p>
-                        <p className="text-caption text-muted-foreground">
-                            Window {window.revision} · Rule revision {window.rule_revision}
-                        </p>
-                        {window.context_state === 'changed' ? (
-                            <p className="flex items-start gap-2 text-subtle text-status-warning-foreground">
-                                <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-                                Incident details changed after this window was
-                                recorded. Review the window before linking more
-                                references. Earlier links remain in the history.
-                            </p>
-                        ) : null}
-                    </div>
-                ) : (
-                    <p className="text-subtle text-muted-foreground">
-                        No active evidence window is recorded.
-                    </p>
-                )}
-
-                {references.total === 0 ? (
-                    <p className="rounded-lg border border-dashed border-border p-4 text-subtle text-muted-foreground">
-                        No recording references have been linked to this incident.
-                    </p>
-                ) : references.items.length === 0 ? (
-                    <p className="text-subtle text-muted-foreground">
-                        No recording references are on this page. Use the page
-                        controls to return to the recorded history.
-                    </p>
-                ) : (
-                    <ul className="space-y-3" aria-label="Linked recording references">
-                        {references.items.map((item) => {
-                            const reference = item.access === 'readable' ? item.reference : null;
+        <RecordTable<Item>
+            title="Recording references"
+            ariaLabel="Recording references"
+            sub="Linked camera references record a requested time window. They do not confirm that footage exists, has been viewed or has been preserved."
+            rows={references.items}
+            rowKey={(item) => item.attachment_uuid}
+            className={loading ? 'opacity-80' : undefined}
+            columns={[
+                {
+                    key: 'reference',
+                    label: 'Reference',
+                    cell: (item) => {
+                        const reference =
+                            item.access === 'readable' ? item.reference : null;
+                        return reference ? (
+                            <RecordIdentity
+                                leading={<Camera aria-hidden="true" className="size-4" />}
+                                title={<span className="break-words">{reference.camera.name}</span>}
+                                sub={
+                                    <>
+                                        <span className="block break-words">
+                                            {reference.site.name} · {reference.recorder.name}
+                                        </span>
+                                        <span className="block break-words text-foreground">
+                                            {reference.purpose}
+                                        </span>
+                                    </>
+                                }
+                            />
+                        ) : (
+                            <RecordIdentity
+                                leading={<LockKeyhole aria-hidden="true" className="size-4" />}
+                                title="Restricted recording reference"
+                                sub="Your current access does not include this source. Camera details and the reference purpose are hidden."
+                            />
+                        );
+                    },
+                },
+                {
+                    key: 'requested',
+                    label: 'Requested window (NZ time)',
+                    nowrap: true,
+                    cell: (item) => (
+                        <RecordIdentity
+                            title={formatDateLong(item.requested_start_at)}
+                            sub={range(item.requested_start_at, item.requested_end_at)}
+                        />
+                    ),
+                },
+                {
+                    key: 'linked',
+                    label: 'Linked to incident',
+                    nowrap: true,
+                    cell: (item) => (
+                        <RecordIdentity
+                            title={formatDateLong(item.recorded_at)}
+                            sub={`${formatTime(item.recorded_at)} · Window ${item.window_revision}`}
+                        />
+                    ),
+                },
+                {
+                    key: 'source',
+                    label: 'Source',
+                    cell: (item) => {
+                        const reference =
+                            item.access === 'readable' ? item.reference : null;
+                        if (!reference) {
                             return (
-                                <li key={item.attachment_uuid} className="space-y-3 rounded-lg border border-border p-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                        <h3 className="min-w-0 break-words font-medium">
-                                            {reference ? reference.camera.name : 'Restricted recording reference'}
-                                        </h3>
-                                        <StatusBadge variant="neutral">
-                                            {reference ? <FileText aria-hidden="true" className="h-3.5 w-3.5" /> : <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5" />}
-                                            {reference ? 'Reference only' : 'Access restricted'}
-                                        </StatusBadge>
-                                    </div>
-                                    <dl className="grid gap-3 text-subtle sm:grid-cols-2">
-                                        <div>
-                                            <dt className="text-muted-foreground">Requested window (NZ time)</dt>
-                                            <dd>{formatDateTimeLong(item.requested_start_at)} – {formatDateTimeLong(item.requested_end_at)}</dd>
-                                        </div>
-                                        <div>
-                                            <dt className="text-muted-foreground">Linked to incident</dt>
-                                            <dd>{formatDateTimeLong(item.recorded_at)} · Window {item.window_revision}</dd>
-                                        </div>
-                                        {reference ? (
-                                            <>
-                                                <div><dt className="text-muted-foreground">Site</dt><dd className="break-words">{reference.site.name}</dd></div>
-                                                <div><dt className="text-muted-foreground">Recorder</dt><dd className="break-words">{reference.recorder.name}</dd></div>
-                                            </>
-                                        ) : null}
-                                    </dl>
-                                    {reference ? (
-                                        <>
-                                            <p className="break-words text-subtle">{reference.purpose}</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                <StatusBadge variant={reference.current_source.state === 'ready' ? 'info' : 'warning'}>
-                                                    <Camera aria-hidden="true" className="h-3.5 w-3.5" />
-                                                    {SOURCE_LABELS[reference.current_source.state]}
-                                                </StatusBadge>
-                                                <StatusBadge variant="neutral">Coverage not verified</StatusBadge>
-                                                <StatusBadge variant="neutral">Preservation not confirmed</StatusBadge>
-                                            </div>
-                                            <p className="text-caption text-muted-foreground">
-                                                Recording availability and retention are unknown.
-                                                Source availability does not confirm recording coverage.
-                                            </p>
-                                        </>
-                                    ) : (
-                                        <p className="text-subtle text-muted-foreground">
-                                            Your current access does not include
-                                            this source. Camera details and the
-                                            reference purpose are hidden.
-                                        </p>
-                                    )}
-                                </li>
+                                <StatusBadge variant="neutral">
+                                    <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5" />
+                                    Access restricted
+                                </StatusBadge>
                             );
-                        })}
-                    </ul>
-                )}
-
-                {references.total > 0 ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-subtle text-muted-foreground" aria-live="polite">
+                        }
+                        return (
+                            <div className="grid max-w-[18rem] gap-1.5">
+                                <div className="flex flex-wrap gap-1.5">
+                                    <StatusBadge variant="neutral">
+                                        <FileText aria-hidden="true" className="h-3.5 w-3.5" />
+                                        Reference only
+                                    </StatusBadge>
+                                    <StatusBadge variant={reference.current_source.state === 'ready' ? 'info' : 'warning'}>
+                                        <Camera aria-hidden="true" className="h-3.5 w-3.5" />
+                                        {SOURCE_LABELS[reference.current_source.state]}
+                                    </StatusBadge>
+                                    <StatusBadge variant="neutral">Coverage not verified</StatusBadge>
+                                    <StatusBadge variant="neutral">Preservation not confirmed</StatusBadge>
+                                </div>
+                                <p className="text-caption">
+                                    Recording availability and retention are unknown.
+                                    Source availability does not confirm recording coverage.
+                                </p>
+                            </div>
+                        );
+                    },
+                },
+            ]}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>
+                        {references.total === 0
+                            ? 'No recording references have been linked to this incident.'
+                            : 'No recording references are on this page. Use the page controls to return to the recorded history.'}
+                    </span>
+                </p>
+            }
+            footer={
+                references.total > 0 ? (
+                    <>
+                        <p className="text-subtle" aria-live="polite">
                             {loading ? 'Loading recording references…' : `Page ${references.page} · ${references.total} linked ${references.total === 1 ? 'reference' : 'references'}`}
                         </p>
                         <LaravelPagination
@@ -203,9 +210,30 @@ export function RecordingReferenceEvidence({
                                 onPageChange,
                             }}
                         />
-                    </div>
-                ) : null}
-            </CardContent>
-        </Card>
+                    </>
+                ) : undefined
+            }
+        >
+            <div className="grid gap-2 border-b border-border px-4 py-3">
+                {window ? (
+                    <>
+                        <p className="text-subtle">
+                            <span className="font-semibold text-foreground">Current evidence window:</span>{' '}
+                            {formatDateTimeLong(window.start_at)} – {formatDateTimeLong(window.end_at)}
+                            <span className="text-caption"> · Window {window.revision} · Rule revision {window.rule_revision}</span>
+                        </p>
+                        {window.context_state === 'changed' ? (
+                            <Note tone="warning" icon={AlertCircle}>
+                                Incident details changed after this window was
+                                recorded. Review the window before linking more
+                                references. Earlier links remain in the history.
+                            </Note>
+                        ) : null}
+                    </>
+                ) : (
+                    <p className="text-subtle">No active evidence window is recorded.</p>
+                )}
+            </div>
+        </RecordTable>
     );
 }

@@ -81,7 +81,7 @@ describe('Incident ownership controls', () => {
     it('locks the submitted selection and reason until the server responds and rejects duplicate submission', async () => {
         const record = ownership();
         const view = render(panel(record));
-        fireEvent.click(screen.getByRole('button', { name: 'Assign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
         fireEvent.click(
             await screen.findByRole('option', {
                 name: 'Test Eligible Coordinator',
@@ -124,7 +124,7 @@ describe('Incident ownership controls', () => {
 
     it('retries unchanged input with one identity and uses a new identity when submitted input changes', async () => {
         render(panel(ownership()));
-        fireEvent.click(screen.getByRole('button', { name: 'Assign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
         fireEvent.click(
             await screen.findByRole('option', {
                 name: 'Test Eligible Coordinator',
@@ -161,7 +161,7 @@ describe('Incident ownership controls', () => {
     it('keeps an open draft disabled after assignment authority is withdrawn and requires a fresh eligible selection on restoration', async () => {
         const record = ownership();
         const view = render(panel(record));
-        fireEvent.click(screen.getByRole('button', { name: 'Assign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
         fireEvent.click(
             await screen.findByRole('option', {
                 name: 'Test Eligible Coordinator',
@@ -211,7 +211,7 @@ describe('Incident ownership controls', () => {
 
     it('preserves the draft after an unrelated successful response and closes only for its exact persisted owner change', async () => {
         render(panel(ownership()));
-        fireEvent.click(screen.getByRole('button', { name: 'Assign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
         fireEvent.click(
             await screen.findByRole('option', {
                 name: 'Test Eligible Coordinator',
@@ -294,7 +294,7 @@ describe('Incident ownership controls', () => {
                 }),
             ),
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Reassign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Change owner' }));
         fireEvent.click(
             await screen.findByRole('option', {
                 name: 'Test Eligible Coordinator',
@@ -329,7 +329,7 @@ describe('Incident ownership controls', () => {
             owner: { id: 7, name: 'Original Owner' },
         });
         const view = render(panel(original));
-        fireEvent.click(screen.getByRole('button', { name: 'Reassign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Change owner' }));
         fireEvent.click(
             await screen.findByRole('option', {
                 name: 'Test Eligible Coordinator',
@@ -390,7 +390,7 @@ describe('Incident ownership controls', () => {
                 }),
             ),
         );
-        expect(screen.getByText('Owner needs replacement')).toBeVisible();
+        expect(screen.getByText('Owner needs replacing')).toBeVisible();
         expect(screen.getByText(/Previous owner: Former Owner/)).toBeVisible();
         expect(
             screen.getByText(/New owner notification: Delivery failed/),
@@ -410,7 +410,7 @@ describe('Incident ownership controls', () => {
             new Error('Synthetic connection loss'),
         );
         render(panel(ownership()));
-        fireEvent.click(screen.getByRole('button', { name: 'Assign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
         fireEvent.change(
             screen.getByLabelText(/Reason for this ownership change/),
             { target: { value: 'Keep this reason.' } },
@@ -455,7 +455,7 @@ describe('Incident ownership controls', () => {
             json: async () => response,
         });
         render(panel(ownership()));
-        fireEvent.click(screen.getByRole('button', { name: 'Assign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
         fireEvent.change(
             screen.getByLabelText(/Reason for this ownership change/),
             { target: { value: 'Keep the agreed handover.' } },
@@ -491,7 +491,7 @@ describe('Incident ownership controls', () => {
             json: async () => ({ owners: [] }),
         });
         render(panel(ownership()));
-        fireEvent.click(screen.getByRole('button', { name: 'Assign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
         expect(
             await screen.findByText('No eligible staff match this search.'),
         ).toBeVisible();
@@ -503,7 +503,7 @@ describe('Incident ownership controls', () => {
 
     it('blocks a retained selection during lookup failure and retries the same owner command after recovery', async () => {
         render(panel(ownership()));
-        fireEvent.click(screen.getByRole('button', { name: 'Assign owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
         fireEvent.click(
             await screen.findByRole('option', {
                 name: 'Test Eligible Coordinator',
@@ -544,7 +544,7 @@ describe('Incident ownership controls', () => {
         expect(screen.getByText('Owner not recorded')).toBeVisible();
         expect(screen.queryByText('Needs an owner')).not.toBeInTheDocument();
         expect(
-            screen.queryByRole('button', { name: 'Assign owner' }),
+            screen.queryByRole('button', { name: 'Assign someone' }),
         ).not.toBeInTheDocument();
     });
 });

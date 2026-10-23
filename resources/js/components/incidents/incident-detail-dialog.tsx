@@ -3,7 +3,21 @@ import {
     DateTimeField,
     validLocalDateTime,
 } from '@/components/fleet-assets/maintenance/date-time-field';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { JourneyTermHelp } from '@/components/journey-term-help';
+import { compactMenu } from '@/components/lists/entity-menu';
+import {
+    FactRows,
+    Journey,
+    Log,
+    QuietLine,
+    Ring,
+    RowList,
+    type JourneyStep,
+    type LogItem,
+    type RowItem,
+    type SgTone,
+} from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -21,6 +35,7 @@ import type { IncidentDraftState } from '@/hooks/use-incident-workspace-drafts';
 import {
     formatDateOnly,
     formatDateTime,
+    formatTime,
     toDatetimeLocal,
 } from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
@@ -30,9 +45,12 @@ import {
     Clock,
     Download,
     ExternalLink,
+    Eye,
+    EyeOff,
     FileText,
     Hand,
     HeartPulse,
+    Image as ImageIcon,
     LinkIcon,
     ListTodo,
     Paperclip,
@@ -43,14 +61,15 @@ import {
     RotateCcw,
     Search,
     Send,
+    Shield,
     ShieldAlert,
     Trash2,
     Truck,
     User,
     Users,
-    X,
 } from 'lucide-react';
 import {
+    useCallback,
     useEffect,
     useId,
     useRef,
@@ -59,11 +78,13 @@ import {
     type FormEvent,
 } from 'react';
 import type { IncidentOwnership } from './incident-ownership-panel';
+import { dateWithYear, HS_STATUS_LABELS } from './incident-stages';
 import { JourneyGateList, type JourneyGateData } from './journey-gate-list';
 import {
     LinkedOperationalEvidence,
     type LinkedOperationalEvidenceData,
 } from './linked-operational-evidence';
+import { RecordIdentity, RecordPerson, RecordTable } from './record-table';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirrors IncidentController::buildIncidentDetail()           */
@@ -1253,19 +1274,12 @@ export function EditPane({
 /*  Sections                                                           */
 /* ------------------------------------------------------------------ */
 
-export function OverviewSection({
-    d,
-    isNearMiss,
-    part = 'all',
-}: {
-    d: IncidentDetail;
-    isNearMiss: boolean;
-    part?: 'all' | 'summary' | 'details';
-}) {
-    const concerns = d.safeguarding_concerns ?? [];
-    const escalation = concerns.length
-        ? (concerns.find((c) => c.can_view) ?? concerns[0])
-        : null;
+/**
+ * The incident's WorkSafe NZ duty from its canonical source (the linked H&S
+ * event when there is one), with the duty sentence exactly as the incident
+ * workflow words it.
+ */
+export function incidentWorksafe(d: IncidentDetail) {
     const worksafe = d.hs_event
         ? {
               notifiable: d.hs_event.worksafe_notifiable,
@@ -1281,9 +1295,65 @@ export function OverviewSection({
               notifiedAt: d.worksafe_notified_at,
               acknowledgedAt: null,
           };
-    const handover = d.hs_event?.handover ?? null;
-    const worksafeNotified =
+    const notified =
         worksafe.status === 'notified' || worksafe.status === 'acknowledged';
+    const text =
+        worksafe.status === 'acknowledged'
+            ? `Acknowledged by WorkSafe${worksafe.acknowledgedAt ? ` ${formatDateTime(worksafe.acknowledgedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''}.`
+            : notified
+              ? `Notified${worksafe.notifiedAt ? ` ${formatDateTime(worksafe.notifiedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''} — awaiting acknowledgement.`
+              : 'Notification to WorkSafe NZ is still pending with Health & Safety.';
+    return { ...worksafe, notified, text };
+}
+
+/** The safeguarding concern raised from this incident — the readable one first. */
+export function safeguardingEscalation(d: IncidentDetail) {
+    const concerns = d.safeguarding_concerns ?? [];
+    return concerns.length
+        ? (concerns.find((c) => c.can_view) ?? concerns[0])
+        : null;
+}
+
+/** The escalation sentence, word for word; need-to-know when the viewer can't open it. */
+export function SafeguardingEscalationText({ d }: { d: IncidentDetail }) {
+    const escalation = safeguardingEscalation(d);
+    if (!escalation) return null;
+    return (
+        <>
+            <span className="font-semibold">Escalated to safeguarding.</span>{' '}
+            {escalation.can_view ? (
+                <>
+                    Concern {escalation.reference_number}
+                    {escalation.status
+                        ? ` · ${titleCase(escalation.status)}`
+                        : ''}
+                    .{' '}
+                    <Link
+                        href={`/safeguarding/${escalation.id}`}
+                        className="font-medium text-primary hover:underline"
+                    >
+                        Open concern
+                    </Link>
+                </>
+            ) : (
+                'A safeguarding concern was raised from this incident (restricted — need-to-know).'
+            )}
+        </>
+    );
+}
+
+export function OverviewSection({
+    d,
+    isNearMiss,
+    part = 'all',
+}: {
+    d: IncidentDetail;
+    isNearMiss: boolean;
+    part?: 'all' | 'summary' | 'details';
+}) {
+    const escalation = safeguardingEscalation(d);
+    const worksafe = incidentWorksafe(d);
+    const handover = d.hs_event?.handover ?? null;
     return (
         <div className="grid gap-4 sm:grid-cols-2">
             {part !== 'details' ? (
@@ -1297,26 +1367,7 @@ export function OverviewSection({
                     {escalation ? (
                         <div className="sm:col-span-2">
                             <InfoCard icon={ShieldAlert} tone="warn">
-                                <span className="font-semibold">
-                                    Escalated to safeguarding.
-                                </span>{' '}
-                                {escalation.can_view ? (
-                                    <>
-                                        Concern {escalation.reference_number}
-                                        {escalation.status
-                                            ? ` · ${titleCase(escalation.status)}`
-                                            : ''}
-                                        .{' '}
-                                        <Link
-                                            href={`/safeguarding/${escalation.id}`}
-                                            className="font-medium text-primary hover:underline"
-                                        >
-                                            Open concern
-                                        </Link>
-                                    </>
-                                ) : (
-                                    'A safeguarding concern was raised from this incident (restricted — need-to-know).'
-                                )}
+                                <SafeguardingEscalationText d={d} />
                             </InfoCard>
                         </div>
                     ) : null}
@@ -1327,11 +1378,7 @@ export function OverviewSection({
                                 <span className="font-semibold">
                                     WorkSafe NZ notifiable event.
                                 </span>{' '}
-                                {worksafe.status === 'acknowledged'
-                                    ? `Acknowledged by WorkSafe${worksafe.acknowledgedAt ? ` ${formatDateTime(worksafe.acknowledgedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''}.`
-                                    : worksafeNotified
-                                      ? `Notified${worksafe.notifiedAt ? ` ${formatDateTime(worksafe.notifiedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''} — awaiting acknowledgement.`
-                                      : 'Notification to WorkSafe NZ is still pending with Health & Safety.'}
+                                {worksafe.text}
                             </InfoCard>
                         </div>
                     ) : null}
@@ -1438,228 +1485,264 @@ export function OverviewSection({
     );
 }
 
-export function TimelineSection({ d }: { d: IncidentDetail }) {
-    type TLEvent = {
-        at: string;
-        label: string;
-        tone: string;
-        icon: ComponentType<{ className?: string }>;
+/* ------------------------------------------------------------------ */
+/*  History                                                            */
+/* ------------------------------------------------------------------ */
+
+/** Every dated change to the incident, oldest first (drawing pg-hsn-2f). */
+export function incidentHistoryItems(d: IncidentDetail): (LogItem & {
+    at: string;
+})[] {
+    const events: (LogItem & { at: string })[] = [];
+    const push = (
+        at: string | null | undefined,
+        title: string,
+        tone?: SgTone,
+        detail?: string | null,
+    ) => {
+        if (!at) return;
+        events.push({
+            at,
+            time: formatTime(at),
+            tone,
+            title,
+            sub: [detail, dateWithYear(at)].filter(Boolean).join(' · '),
+        });
     };
-    const events: TLEvent[] = [];
-    if (d.occurred_at)
-        events.push({
-            at: d.occurred_at,
-            label: 'Incident occurred',
-            tone: 'neutral',
-            icon: AlertTriangle,
-        });
-    if (d.control_room_alert?.triggered_at)
-        events.push({
-            at: d.control_room_alert.triggered_at,
-            label: 'Control Room alert raised',
-            tone: 'critical',
-            icon: RadioTower,
-        });
-    if (d.submitted_at)
-        events.push({
-            at: d.submitted_at,
-            label: 'Submitted for review',
-            tone: 'info',
-            icon: Send,
-        });
-    if (d.reviewed_at)
-        events.push({
-            at: d.reviewed_at,
-            label: 'Reviewed',
-            tone: 'primary',
-            icon: CheckCircle2,
-        });
-    if (d.reopened_at)
-        events.push({
-            at: d.reopened_at,
-            label: `Reopened${d.reopened_reason ? ` · ${d.reopened_reason}` : ''}`,
-            tone: 'warning',
-            icon: RotateCcw,
-        });
-    if (d.closed_at)
-        events.push({
-            at: d.closed_at,
-            label: `Closed${d.closed_outcome ? ` · ${d.closed_outcome}` : ''}`,
-            tone: 'success',
-            icon: CheckCircle2,
-        });
-    events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
-
-    if (!events.length)
-        return (
-            <p className="text-sm text-muted-foreground">
-                No timeline events yet.
-            </p>
+    const alertRef = d.linked_operational_evidence?.source?.reference ?? null;
+    push(d.occurred_at, 'Incident happened', 'none');
+    push(
+        d.control_room_alert?.triggered_at,
+        'Control room alert raised',
+        'critical',
+        alertRef,
+    );
+    push(
+        d.control_room_alert?.resolved_at,
+        'Control room alert resolved',
+        'success',
+        alertRef,
+    );
+    push(d.submitted_at, 'Submitted for review', 'info', d.reporter?.name);
+    for (const change of [...(d.ownership?.history ?? [])].reverse()) {
+        const told = change.deliveries.some(
+            (delivery) =>
+                delivery.role === 'incoming' && delivery.status === 'delivered',
         );
-
-    return (
-        <ol className="relative ml-2 border-l border-border">
-            {events.map((e, i) => {
-                const Icon = e.icon;
-                return (
-                    <li key={i} className="mb-5 ml-5">
-                        <span
-                            className={`absolute -left-[7px] flex h-3.5 w-3.5 items-center justify-center rounded-full ${DOT[e.tone] ?? DOT.neutral}`}
-                        />
-                        <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-foreground">
-                                {e.label}
-                            </span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            {formatDateTime(e.at)}
-                        </p>
-                    </li>
-                );
-            })}
-        </ol>
+        push(
+            change.changed_at,
+            change.previous_owner
+                ? `Owner changed: ${change.previous_owner} → ${change.owner}`
+                : `Owner assigned: ${change.owner}`,
+            'info',
+            `By ${change.changed_by}${told ? ' · told in the app' : ''}`,
+        );
+    }
+    push(d.reviewed_at, 'Reviewed', 'success', d.review_notes);
+    for (const attachment of d.attachments) {
+        push(
+            attachment.created_at,
+            `File added: ${attachment.name}`,
+            undefined,
+            attachment.uploaded_by,
+        );
+    }
+    for (const followup of d.followups) {
+        const task = followup.notes || 'Follow-up task';
+        if (followup.completed_at) {
+            push(
+                followup.completed_at,
+                `Follow-up done: ${task}`,
+                'success',
+                followup.assigned_to,
+            );
+        } else if (followup.overdue) {
+            push(
+                followup.due_at,
+                `Follow-up overdue: ${task}`,
+                'critical',
+                followup.assigned_to,
+            );
+        }
+    }
+    push(d.reopened_at, 'Reopened', 'warning', d.reopened_reason);
+    push(d.closed_at, 'Closed', 'success', d.closed_outcome);
+    return events.sort(
+        (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
     );
 }
+
+export function TimelineSection({ d }: { d: IncidentDetail }) {
+    const items = incidentHistoryItems(d);
+    const first = items[0]?.at;
+    const last = items.at(-1)?.at;
+    if (!items.length)
+        return (
+            <QuietLine title="History" text="No timeline events yet." />
+        );
+    return (
+        <Log
+            title="History"
+            sub={`Every change to this incident, newest last${first ? ` · ${dateWithYear(first)}${last && dateWithYear(last) !== dateWithYear(first) ? ` – ${dateWithYear(last)}` : ''}` : ''}`}
+            items={items}
+            limit={items.length}
+        />
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Files                                                              */
+/* ------------------------------------------------------------------ */
 
 export function PhotosSection({ d }: { d: IncidentDetail }) {
     // Attachments are only mutable while the incident is a draft (server guardrail).
     const canEdit = d.status === 'draft' && d.can.update;
-    return (
-        <div className="flex flex-col gap-3">
-            {canEdit ? (
-                <AttachmentUploader
-                    endpoint={`/incidents/${d.id}/attachments`}
-                    hint="PDF, Word, images — up to 10 MB each"
-                />
-            ) : null}
-
-            {d.attachments.length ? (
-                <div className="flex flex-col gap-2">
-                    {d.attachments.map((a) => (
-                        <AttachmentRow
-                            key={a.id}
-                            a={a}
-                            incidentId={d.id}
-                            canEdit={canEdit}
-                            canPortal={d.can.portalManage}
-                        />
-                    ))}
-                </div>
-            ) : (
-                <div className="rounded-xl border border-dashed border-border py-10 text-center">
-                    <Paperclip className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                    <p className="text-sm text-muted-foreground">
-                        No photos or documents attached.
-                    </p>
-                    {!canEdit ? (
-                        <p className="mt-1 text-xs text-muted-foreground/70">
-                            Attachments can only be added while the incident is
-                            a draft.
-                        </p>
-                    ) : null}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function AttachmentRow({
-    a,
-    incidentId,
-    canEdit,
-    canPortal,
-}: {
-    a: IncidentDetail['attachments'][number];
-    incidentId: number;
-    canEdit: boolean;
-    canPortal: boolean;
-}) {
-    // Two-phase remove — evidence deletion should never be a single mis-click.
-    const [removeArming, setRemoveArming] = useState(false);
-    const remove = () =>
-        router.delete(`/incidents/${incidentId}/attachments/${a.id}`, {
-            preserveScroll: true,
-        });
-    const togglePortal = () =>
+    const canPortal = d.can.portalManage;
+    const [removing, setRemoving] = useState<
+        IncidentDetail['attachments'][number] | null
+    >(null);
+    const togglePortal = (a: IncidentDetail['attachments'][number]) =>
         router.patch(
-            `/incidents/${incidentId}/attachments/${a.id}`,
+            `/incidents/${d.id}/attachments/${a.id}`,
             { portal_visible: !a.portal_visible },
             { preserveScroll: true },
         );
     return (
-        <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-            <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">
-                    {a.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                    {fmtSize(a.size)}
-                    {a.uploaded_by ? ` · ${a.uploaded_by}` : ''}
-                    {a.created_at ? ` · ${formatDateTime(a.created_at)}` : ''}
-                    {a.portal_visible ? ' · shared to portal' : ''}
-                </p>
-                {a.notes ? (
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                        {a.notes}
+        <>
+            <RecordTable
+                title="Files"
+                sub={
+                    canPortal
+                        ? 'Share puts a file on the family portal; Unshare takes it off · download from ⋮'
+                        : 'Download from ⋮'
+                }
+                ariaLabel="Official incident attachments"
+                rows={d.attachments}
+                rowKey={(a) => a.id}
+                menuTitle={(a) => a.name}
+                menuIcon={FileText}
+                actionsFor={(a) =>
+                    compactMenu([
+                        {
+                            label: 'Download',
+                            icon: Download,
+                            onClick: () => window.location.assign(a.download_url),
+                        },
+                        canPortal && {
+                            label: a.portal_visible ? 'Unshare' : 'Share',
+                            icon: a.portal_visible ? EyeOff : Eye,
+                            onClick: () => togglePortal(a),
+                        },
+                        canEdit && { separator: true },
+                        canEdit && {
+                            label: 'Remove',
+                            icon: Trash2,
+                            danger: true,
+                            onClick: () => setRemoving(a),
+                        },
+                    ])
+                }
+                columns={[
+                    {
+                        key: 'file',
+                        label: 'File',
+                        cell: (a) => (
+                            <RecordIdentity
+                                leading={
+                                    a.mime?.startsWith('image/') ? (
+                                        <ImageIcon className="size-4" />
+                                    ) : (
+                                        <FileText className="size-4" />
+                                    )
+                                }
+                                title={a.name}
+                                sub={
+                                    [fmtSize(a.size), a.notes]
+                                        .filter(Boolean)
+                                        .join(' · ') || undefined
+                                }
+                            />
+                        ),
+                    },
+                    {
+                        key: 'by',
+                        label: 'Added by',
+                        nowrap: true,
+                        cell: (a) => a.uploaded_by ?? 'Not recorded',
+                    },
+                    {
+                        key: 'added',
+                        label: 'Added',
+                        nowrap: true,
+                        cell: (a) =>
+                            a.created_at ? (
+                                <RecordIdentity
+                                    title={dateWithYear(a.created_at)}
+                                    sub={formatTime(a.created_at)}
+                                />
+                            ) : (
+                                'Not recorded'
+                            ),
+                    },
+                    {
+                        key: 'portal',
+                        label: 'Family portal',
+                        nowrap: true,
+                        cell: (a) =>
+                            a.portal_visible ? (
+                                <StatusBadge variant="info">
+                                    On the family portal
+                                </StatusBadge>
+                            ) : (
+                                <StatusBadge variant="neutral">
+                                    Not shared
+                                </StatusBadge>
+                            ),
+                    },
+                ]}
+                empty={
+                    <p className="sg-quiet">
+                        <Ring tone="none" />
+                        <span>
+                            No photos or documents attached.
+                            {!canEdit
+                                ? ' Attachments can only be added while the incident is a draft.'
+                                : ''}
+                        </span>
                     </p>
-                ) : null}
-            </div>
-            {canPortal ? (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={togglePortal}
-                    title={
-                        a.portal_visible
-                            ? 'Stop sharing to the family portal'
-                            : 'Share to the family portal'
-                    }
-                >
-                    {a.portal_visible ? 'Unshare' : 'Share'}
-                </Button>
-            ) : null}
-            <a
-                href={a.download_url}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted"
+                }
             >
-                <Download className="h-3.5 w-3.5" /> Download
-            </a>
-            {canEdit ? (
-                removeArming ? (
-                    <span className="inline-flex items-center gap-1">
-                        <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={remove}
-                        >
-                            Remove?
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setRemoveArming(false)}
-                            aria-label="Keep attachment"
-                        >
-                            <X className="h-3.5 w-3.5" />
-                        </Button>
-                    </span>
-                ) : (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setRemoveArming(true)}
-                        title="Remove attachment"
-                        className="text-status-critical hover:text-status-critical"
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                )
-            ) : null}
-        </div>
+                {canEdit ? (
+                    <div className="border-b border-border p-4">
+                        <AttachmentUploader
+                            endpoint={`/incidents/${d.id}/attachments`}
+                            hint="PDF, Word, images — up to 10 MB each"
+                        />
+                    </div>
+                ) : null}
+            </RecordTable>
+            <ConfirmDialog
+                open={removing !== null}
+                onClose={() => setRemoving(null)}
+                onConfirm={() => {
+                    if (!removing) return;
+                    router.delete(
+                        `/incidents/${d.id}/attachments/${removing.id}`,
+                        { preserveScroll: true },
+                    );
+                    setRemoving(null);
+                }}
+                title="Remove this file?"
+                description={`${removing?.name ?? 'This file'} is removed from the incident draft. Evidence removal can't be undone.`}
+                confirmText="Remove file"
+            />
+        </>
     );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Follow-ups                                                         */
+/* ------------------------------------------------------------------ */
 
 export function FollowupsSection({
     d,
@@ -1670,93 +1753,157 @@ export function FollowupsSection({
     onComplete: (id: number) => void;
     onDraftStateChange?: (state: IncidentDraftState) => void;
 }) {
+    const [formOpen, setFormOpen] = useState(false);
+    const [draft, setDraft] = useState({ dirty: false, busy: false });
+    const closed = d.status === 'closed';
+    const report = useCallback(
+        (state: IncidentDraftState) => {
+            setDraft({ dirty: state.dirty, busy: state.busy });
+            onDraftStateChange?.(state);
+        },
+        [onDraftStateChange],
+    );
+    const statusOf = (f: IncidentDetail['followups'][number]) =>
+        f.completed_at ? 'Completed' : f.overdue ? 'Overdue' : 'Open';
     return (
-        <div className="flex flex-col gap-3">
+        <RecordTable
+            title="Follow-ups"
+            sub={
+                d.can.followupsComplete
+                    ? 'Each follow-up has a task, a person and a due date · mark one done from ⋮'
+                    : 'Each follow-up has a task, a person and a due date'
+            }
+            ariaLabel="Incident follow-ups"
+            actions={
+                d.can.followupsManage && !formOpen ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="frontline-hit"
+                        disabled={closed || draft.busy}
+                        onClick={() => setFormOpen(true)}
+                    >
+                        <Plus className="size-3.5" />
+                        {draft.dirty ? 'Continue follow-up' : 'Add follow-up'}
+                    </Button>
+                ) : null
+            }
+            rows={d.followups}
+            rowKey={(f) => f.id}
+            menuTitle={(f) => f.notes || 'Follow-up task'}
+            menuIcon={ListTodo}
+            actionsFor={
+                d.can.followupsComplete
+                    ? (f) =>
+                          f.completed_at
+                              ? []
+                              : [
+                                    {
+                                        label: 'Mark done',
+                                        icon: CheckCircle2,
+                                        onClick: () => onComplete(f.id),
+                                    },
+                                ]
+                    : undefined
+            }
+            columns={[
+                {
+                    key: 'task',
+                    label: 'Follow-up',
+                    cell: (f) => (
+                        <b className="font-semibold break-words whitespace-pre-wrap text-foreground">
+                            {f.notes || 'Follow-up task'}
+                        </b>
+                    ),
+                },
+                {
+                    key: 'assigned',
+                    label: 'Assigned to',
+                    nowrap: true,
+                    cell: (f) =>
+                        f.assigned_to ? (
+                            <RecordPerson name={f.assigned_to} />
+                        ) : (
+                            <span className="text-muted-foreground">
+                                Unassigned
+                            </span>
+                        ),
+                },
+                {
+                    key: 'due',
+                    label: 'Due',
+                    nowrap: true,
+                    cell: (f) =>
+                        f.due_at ? (
+                            <RecordIdentity
+                                title={dateWithYear(f.due_at)}
+                                sub={`${formatTime(f.due_at)}${f.completed_at ? ` · done at ${formatTime(f.completed_at)}` : ''}`}
+                            />
+                        ) : (
+                            <span className="text-muted-foreground">
+                                No due date
+                                {f.completed_at
+                                    ? ` · done ${formatDateTime(f.completed_at)}`
+                                    : ''}
+                            </span>
+                        ),
+                },
+                {
+                    key: 'status',
+                    label: 'Status',
+                    nowrap: true,
+                    cell: (f) => (
+                        <StatusBadge
+                            variant={
+                                f.completed_at
+                                    ? 'success'
+                                    : f.overdue
+                                      ? 'critical'
+                                      : 'warning'
+                            }
+                        >
+                            {statusOf(f)}
+                        </StatusBadge>
+                    ),
+                },
+            ]}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>No follow-ups on this incident.</span>
+                </p>
+            }
+            footer={
+                closed && d.can.followupsManage && !formOpen ? (
+                    <p className="text-subtle">
+                        Reopen the incident before adding a follow-up.
+                    </p>
+                ) : undefined
+            }
+        >
             {d.can.followupsManage ? (
                 <AddFollowupForm
                     d={d}
-                    onDraftStateChange={onDraftStateChange}
+                    open={formOpen}
+                    onHide={() => setFormOpen(false)}
+                    onDraftStateChange={report}
                 />
             ) : null}
-
-            {d.followups.length ? (
-                <div className="flex flex-col gap-2">
-                    {d.followups.map((f) => (
-                        <div
-                            key={f.id}
-                            className="flex items-start gap-3 rounded-lg border border-border p-3"
-                        >
-                            <ListTodo
-                                className={`mt-0.5 h-4 w-4 shrink-0 ${f.completed_at ? 'text-status-success' : f.overdue ? 'text-status-critical' : 'text-status-warning'}`}
-                            />
-                            <div className="min-w-0 flex-1">
-                                <p className="text-subtle break-words whitespace-pre-wrap text-foreground">
-                                    {f.notes || 'Follow-up task'}
-                                </p>
-                                <p className="text-caption text-muted-foreground">
-                                    {f.assigned_to
-                                        ? `${f.assigned_to}`
-                                        : 'Unassigned'}
-                                    {f.due_at
-                                        ? ` · due ${formatDateTime(f.due_at)}`
-                                        : ' · no due date'}
-                                    {f.completed_at
-                                        ? ` · completed ${formatDateTime(f.completed_at)}`
-                                        : f.overdue
-                                          ? ' · overdue'
-                                          : ''}
-                                </p>
-                                <StatusBadge
-                                    variant={
-                                        f.completed_at
-                                            ? 'success'
-                                            : f.overdue
-                                              ? 'critical'
-                                              : 'warning'
-                                    }
-                                    className="mt-1"
-                                >
-                                    {f.completed_at
-                                        ? 'Completed'
-                                        : f.overdue
-                                          ? 'Overdue'
-                                          : 'Open'}
-                                </StatusBadge>
-                            </div>
-                            {!f.completed_at && d.can.followupsComplete ? (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="frontline-tap shrink-0"
-                                    onClick={() => onComplete(f.id)}
-                                >
-                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />{' '}
-                                    Complete
-                                </Button>
-                            ) : null}
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="rounded-xl border border-dashed border-border py-10 text-center">
-                    <ListTodo className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                    <p className="text-sm text-muted-foreground">
-                        No follow-ups on this incident.
-                    </p>
-                </div>
-            )}
-        </div>
+        </RecordTable>
     );
 }
 
 function AddFollowupForm({
     d,
+    open,
+    onHide,
     onDraftStateChange,
 }: {
     d: IncidentDetail;
+    open: boolean;
+    onHide: () => void;
     onDraftStateChange?: (state: IncidentDraftState) => void;
 }) {
-    const [open, setOpen] = useState(false);
     const assignmentId = useId();
     const assignmentLabelId = useId();
     const assignmentErrorId = useId();
@@ -1787,27 +1934,8 @@ function AddFollowupForm({
         [onDraftStateChange],
     );
 
-    if (!open) {
-        return (
-            <div className="flex flex-col items-start gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="frontline-tap self-start"
-                    disabled={closed || form.processing}
-                    onClick={() => setOpen(true)}
-                >
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />{' '}
-                    {form.isDirty ? 'Continue follow-up' : 'Add follow-up'}
-                </Button>
-                {closed ? (
-                    <p className="text-subtle text-muted-foreground">
-                        Reopen the incident before adding a follow-up.
-                    </p>
-                ) : null}
-            </div>
-        );
-    }
+    // Hidden drafts stay mounted so their text survives section changes.
+    if (!open) return null;
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -1822,13 +1950,17 @@ function AddFollowupForm({
                 if ((page.props as { flash?: { error?: string } }).flash?.error)
                     return;
                 form.reset();
-                setOpen(false);
+                onHide();
             },
         });
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-5">
+        <form
+            onSubmit={submit}
+            aria-label="Add a follow-up"
+            className="flex flex-col gap-5 border-b border-border bg-muted/30 p-4"
+        >
             {closed ? (
                 <p
                     role="status"
@@ -1953,7 +2085,7 @@ function AddFollowupForm({
                     variant="outline"
                     size="sm"
                     className="frontline-tap"
-                    onClick={() => setOpen(false)}
+                    onClick={onHide}
                 >
                     Hide draft
                 </Button>
@@ -1970,6 +2102,10 @@ function AddFollowupForm({
     );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Safety review                                                      */
+/* ------------------------------------------------------------------ */
+
 const METHODOLOGY_LABELS: Record<string, string> = {
     '5_whys': '5 Whys',
     fishbone: 'Fishbone (Ishikawa)',
@@ -1979,6 +2115,29 @@ const METHODOLOGY_LABELS: Record<string, string> = {
     other: 'Other',
 };
 
+const HS_STEPS = [
+    ['open', 'Open'],
+    ['investigating', 'Investigating'],
+    ['corrective_action', 'Corrective action'],
+    ['monitoring', 'Monitoring'],
+    ['closed', 'Closed'],
+] as const;
+
+/** The handover from the incident to Health & safety, as label and value rows. */
+export function HandoverFacts({ d }: { d: IncidentDetail }) {
+    const handover = d.hs_event?.handover;
+    if (!handover) return null;
+    const rows: [string, string][] = [
+        ['Status', handoverStatusLabel(handover.status)],
+        ['H&S owner', handover.owner?.name ?? 'No H&S owner assigned'],
+    ];
+    if (handover.accepted_by) rows.push(['Accepted by', handover.accepted_by.name]);
+    if (handover.accepted_at)
+        rows.push(['Accepted at', formatDateTime(handover.accepted_at)]);
+    if (handover.notes) rows.push(['Acceptance notes', handover.notes]);
+    return <FactRows title="Handover to Health & safety" rows={rows} />;
+}
+
 export function InvestigationSection({
     d,
     onDraftStateChange,
@@ -1986,162 +2145,207 @@ export function InvestigationSection({
     d: IncidentDetail;
     onDraftStateChange?: (state: IncidentDraftState) => void;
 }) {
+    const [formOpen, setFormOpen] = useState(false);
+    const [draft, setDraft] = useState({ dirty: false, busy: false });
+    const report = useCallback(
+        (state: IncidentDraftState) => {
+            setDraft({ dirty: state.dirty, busy: state.busy });
+            onDraftStateChange?.(state);
+        },
+        [onDraftStateChange],
+    );
     if (!d.hs_event) {
         return (
-            <div className="rounded-xl border border-dashed border-border py-12 text-center">
-                <Search className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                    {d.linked_access?.health_safety === 'restricted'
+            <QuietLine
+                title="Safety review"
+                text={
+                    d.linked_access?.health_safety === 'restricted'
                         ? 'This incident has a linked Health & Safety record. Your access does not include its details.'
                         : d.linked_access?.health_safety === 'absent'
                           ? 'No Health & Safety event recorded for this incident.'
-                          : 'The safety review is unavailable. Reload the incident to check its current connection.'}
-                </p>
-            </div>
+                          : 'The safety review is unavailable. Reload the incident to check its current connection.'
+                }
+            />
         );
     }
     const ev = d.hs_event;
     const inv = ev.investigation;
+    const index = HS_STEPS.findIndex(([key]) => key === ev.status);
+    const steps: JourneyStep[] = HS_STEPS.map(([key, label], i) => ({
+        label,
+        state:
+            ev.status === 'closed' || (index >= 0 && i < index)
+                ? ('done' as const)
+                : i === index
+                  ? ('now' as const)
+                  : ('todo' as const),
+        meta:
+            i === index && ev.status !== 'closed'
+                ? handoverStatusLabel(ev.handover.status)
+                : undefined,
+    }));
+    const owner = ev.handover.owner?.name;
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                <div>
-                    <p className="text-sm font-semibold text-foreground">
-                        {ev.reference_number}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        H&amp;S event · {titleCase(ev.status)}
-                        {ev.investigation_required
-                            ? ' · investigation required'
-                            : ''}
-                    </p>
-                </div>
-                {ev.url ? (
-                    <Link
-                        href={ev.url}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted"
-                    >
-                        <ExternalLink className="h-3.5 w-3.5" /> Open in Health
-                        &amp; Safety
-                    </Link>
-                ) : (
-                    <span className="text-xs text-muted-foreground">
-                        H&amp;S access required to open
-                    </span>
-                )}
-            </div>
-
-            {inv ? (
-                <ReviewCard
-                    icon={Search}
-                    title={`Investigation ${inv.reference_number}`}
-                    span
-                >
-                    <ReviewRow label="Status" value={titleCase(inv.status)} />
-                    <ReviewRow
-                        label="Methodology"
-                        value={
-                            inv.methodology
-                                ? (METHODOLOGY_LABELS[inv.methodology] ??
-                                  inv.methodology.replace(/_/g, ' '))
-                                : undefined
-                        }
-                    />
-                    {inv.root_causes?.length ? (
-                        <ReviewRow
-                            label="Root causes"
-                            value={inv.root_causes
-                                .map((c) => c.description)
-                                .filter(Boolean)
-                                .join('; ')}
-                        />
-                    ) : null}
-                    {inv.recommendations?.length ? (
-                        <ReviewRow
-                            label="Recommendations"
-                            value={inv.recommendations
-                                .map((r) => r.description)
-                                .filter(Boolean)
-                                .join('; ')}
-                        />
-                    ) : null}
-                    {inv.lessons_learned ? (
-                        <ReviewRow
-                            label="Lessons learned"
-                            value={inv.lessons_learned}
-                        />
-                    ) : null}
-                </ReviewCard>
-            ) : (
-                <p className="text-sm text-muted-foreground">
-                    No investigation has been opened yet.
-                </p>
-            )}
-
-            <div>
-                <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">
-                        Corrective actions
-                    </p>
-                    {ev.corrective_actions_url ? (
-                        <Link
-                            href={ev.corrective_actions_url}
-                            className="text-xs font-medium text-primary hover:underline"
-                        >
-                            Open register
-                        </Link>
-                    ) : null}
-                </div>
-                {ev.corrective_actions.length ? (
-                    <div className="flex flex-col gap-2">
-                        {ev.corrective_actions.map((ca) => (
-                            <div
-                                key={ca.id}
-                                className="flex items-center justify-between rounded-lg border border-border p-2.5 text-sm"
+        <div className="grid min-w-0 gap-5">
+            <Journey
+                title={`Safety review ${ev.reference_number}`}
+                sub={[
+                    HS_STATUS_LABELS[ev.status] ?? titleCase(ev.status),
+                    owner ? `owner ${owner}` : null,
+                    ev.investigation_required ? 'investigation required' : null,
+                ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                action={
+                    ev.url ? { label: 'Open safety review', href: ev.url } : null
+                }
+                steps={steps}
+                caption={
+                    ev.url ? undefined : (
+                        <span className="text-caption">
+                            H&amp;S access required to open
+                        </span>
+                    )
+                }
+            />
+            <section
+                aria-label="Corrective actions"
+                className="sg-surface min-w-0"
+            >
+                <div className="sg-head">
+                    <h3>Corrective actions</h3>
+                    <span className="ml-auto flex flex-wrap items-center gap-3">
+                        {ev.corrective_actions_url ? (
+                            <Link
+                                href={ev.corrective_actions_url}
+                                className="sg-act"
                             >
-                                <div className="min-w-0">
-                                    <p className="truncate font-medium text-foreground">
-                                        {ca.reference_number} · {ca.title}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {titleCase(ca.status)}
-                                        {ca.assigned_to
-                                            ? ` · ${ca.assigned_to}`
-                                            : ''}
-                                        {ca.due_date
-                                            ? ` · due ${formatDateOnly(ca.due_date)}`
-                                            : ''}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-xs text-muted-foreground">
-                        No corrective actions raised. Formal remediation is
-                        raised and governed in the Health &amp; Safety register.
-                    </p>
-                )}
-
+                                Open register
+                            </Link>
+                        ) : null}
+                        {d.can.raiseCorrectiveAction && !formOpen ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="frontline-hit"
+                                disabled={draft.busy}
+                                onClick={() => setFormOpen(true)}
+                            >
+                                <Plus className="size-3.5" />
+                                {draft.dirty
+                                    ? 'Continue corrective action'
+                                    : 'Add corrective action'}
+                            </Button>
+                        ) : null}
+                    </span>
+                </div>
                 {d.can.raiseCorrectiveAction ? (
                     <RaiseCorrectiveActionForm
                         d={d}
-                        onDraftStateChange={onDraftStateChange}
+                        open={formOpen}
+                        onHide={() => setFormOpen(false)}
+                        onDraftStateChange={report}
                     />
                 ) : null}
-            </div>
+                {ev.corrective_actions.length ? (
+                    <ul className="sg-list mt-1">
+                        {ev.corrective_actions.map((ca) => (
+                            <li key={ca.id} className="sg-li">
+                                <span className="sg-li-t">
+                                    <b>{ca.title}</b>
+                                    <small>
+                                        {[
+                                            ca.reference_number,
+                                            ca.assigned_to,
+                                            ca.due_date
+                                                ? `due ${formatDateOnly(ca.due_date)}`
+                                                : null,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    </small>
+                                </span>
+                                <StatusBadge status={ca.status} />
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="sg-quiet">
+                        <Ring tone="none" />
+                        <span>
+                            No corrective actions raised. Formal remediation is
+                            raised and governed in the Health &amp; Safety
+                            register.
+                        </span>
+                    </p>
+                )}
+            </section>
+            <HandoverFacts d={d} />
+            {inv ? (
+                <FactRows
+                    title={`Investigation ${inv.reference_number}`}
+                    rows={[
+                        ['Status', titleCase(inv.status)],
+                        ...(inv.methodology
+                            ? ([
+                                  [
+                                      'Methodology',
+                                      METHODOLOGY_LABELS[inv.methodology] ??
+                                          inv.methodology.replace(/_/g, ' '),
+                                  ],
+                              ] as [string, string][])
+                            : []),
+                        ...(inv.root_causes?.length
+                            ? ([
+                                  [
+                                      'Root causes',
+                                      inv.root_causes
+                                          .map((c) => c.description)
+                                          .filter(Boolean)
+                                          .join('; '),
+                                  ],
+                              ] as [string, string][])
+                            : []),
+                        ...(inv.recommendations?.length
+                            ? ([
+                                  [
+                                      'Recommendations',
+                                      inv.recommendations
+                                          .map((r) => r.description)
+                                          .filter(Boolean)
+                                          .join('; '),
+                                  ],
+                              ] as [string, string][])
+                            : []),
+                        ...(inv.lessons_learned
+                            ? ([['Lessons learned', inv.lessons_learned]] as [
+                                  string,
+                                  string,
+                              ][])
+                            : []),
+                    ]}
+                />
+            ) : (
+                <QuietLine
+                    title="Investigation"
+                    text="No investigation has been opened yet."
+                />
+            )}
         </div>
     );
 }
 
 function RaiseCorrectiveActionForm({
     d,
+    open,
+    onHide,
     onDraftStateChange,
 }: {
     d: IncidentDetail;
+    open: boolean;
+    onHide: () => void;
     onDraftStateChange?: (state: IncidentDraftState) => void;
 }) {
-    const [open, setOpen] = useState(false);
     const form = useForm<{
         title: string;
         description: string;
@@ -2166,24 +2370,8 @@ function RaiseCorrectiveActionForm({
         [onDraftStateChange],
     );
 
-    if (!d.hs_event) {
+    if (!d.hs_event || !open) {
         return null; // need an H&S event to attach the action to
-    }
-
-    if (!open) {
-        return (
-            <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => setOpen(true)}
-            >
-                <Plus className="mr-1.5 h-3.5 w-3.5" />{' '}
-                {form.isDirty
-                    ? 'Continue corrective action'
-                    : 'Raise corrective action'}
-            </Button>
-        );
     }
 
     const submit = (e: FormEvent) => {
@@ -2210,7 +2398,7 @@ function RaiseCorrectiveActionForm({
                     !(page.props as { flash?: { error?: string } }).flash?.error
                 ) {
                     form.reset();
-                    setOpen(false);
+                    onHide();
                     // Stay in the incident — the refreshed detail shows the new
                     // action in the list; the register link is there for follow-up.
                 }
@@ -2221,9 +2409,10 @@ function RaiseCorrectiveActionForm({
     return (
         <form
             onSubmit={submit}
-            className="mt-2 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3"
+            aria-label="Add a corrective action"
+            className="mx-[18px] mt-2 mb-3 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3"
         >
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption">
                 Creates a row in the H&amp;S Corrective Actions register, linked
                 to {d.hs_event.reference_number}.
             </p>
@@ -2287,7 +2476,7 @@ function RaiseCorrectiveActionForm({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setOpen(false)}
+                    onClick={onHide}
                 >
                     Hide draft
                 </Button>
@@ -2308,6 +2497,131 @@ function RaiseCorrectiveActionForm({
     );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Linked records                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Every record this incident links to, as list rows (drawing pg-hsn-2 side
+ * column, pg-hsn-2h "Other linked records"). Restricted records keep their
+ * need-to-know wording and never carry a link or a reference.
+ */
+export function linkedRecordItems(
+    d: IncidentDetail,
+    clientName: string,
+    { includeControlRoom = true }: { includeControlRoom?: boolean } = {},
+): RowItem[] {
+    const lead = (Icon: ComponentType<{ className?: string }>) => (
+        <Icon className="size-4" />
+    );
+    const items: RowItem[] = [];
+    const source = d.linked_operational_evidence?.source;
+    if (
+        includeControlRoom &&
+        source &&
+        d.linked_operational_evidence?.access !== 'restricted'
+    ) {
+        items.push({
+            key: 'cr',
+            leading: lead(RadioTower),
+            title: `Control room alert${source.reference ? ` ${source.reference}` : ''}`,
+            sub: [
+                titleCase(source.alert_type),
+                source.resolved_at
+                    ? `resolved ${formatTime(source.resolved_at)}`
+                    : titleCase(source.status),
+            ].join(' · '),
+            href: source.href ?? undefined,
+        });
+    }
+    for (const c of d.safeguarding_concerns ?? []) {
+        items.push(
+            c.can_view
+                ? {
+                      key: `sg-${c.id}`,
+                      leading: lead(Shield),
+                      title: `Safeguarding concern${c.reference_number ? ` ${c.reference_number}` : ''}`,
+                      sub: c.status ? titleCase(c.status) : undefined,
+                      href: `/safeguarding/${c.id}`,
+                  }
+                : {
+                      key: `sg-${c.id}`,
+                      leading: lead(Shield),
+                      title: 'Safeguarding concern raised · restricted (need-to-know)',
+                  },
+        );
+    }
+    if (d.linked_access?.health_safety === 'restricted' && !d.hs_event) {
+        items.push({
+            key: 'hs-restricted',
+            leading: lead(ShieldAlert),
+            title: 'Health & safety record',
+            sub: 'Linked record — access restricted',
+        });
+    }
+    if (d.hs_event) {
+        items.push({
+            key: 'hs',
+            leading: lead(ShieldAlert),
+            title: `Safety review ${d.hs_event.reference_number}`,
+            sub: [
+                HS_STATUS_LABELS[d.hs_event.status] ??
+                    titleCase(d.hs_event.status),
+                d.hs_event.handover.owner?.name,
+            ]
+                .filter(Boolean)
+                .join(' · '),
+            href: d.hs_event.url ?? undefined,
+        });
+    }
+    if (d.fleet_incident) {
+        items.push({
+            key: 'fleet',
+            leading: lead(Truck),
+            title: 'Fleet incident',
+            sub: `${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`,
+            href: `/fleet-assets/incidents?incident=${d.fleet_incident.id}`,
+        });
+    }
+    if (d.medication_error) {
+        items.push({
+            key: 'med',
+            leading: lead(Pill),
+            title: 'Medication error report',
+            sub: `${d.medication_error.summary ?? 'Details are held in the medication error record.'}${d.medication_error.ready_to_close ? ' Ready to close — medication error closed.' : ''}`,
+            href: d.medication_error.url,
+        });
+    }
+    for (const r of d.restraint_events ?? []) {
+        items.push({
+            key: `re-${r.id}`,
+            leading: lead(Hand),
+            title: 'Restraint event',
+            sub: `${r.reference} · ${titleCase(r.restraint_type)} · ${titleCase(r.severity)}${r.within_support_plan ? '' : ' · out of plan'}${r.injury_occurred ? ' · injury' : ''}`,
+            href: `/health-safety/restraints?event=${r.id}`,
+        });
+    }
+    for (const r of d.first_aid_records ?? []) {
+        items.push({
+            key: `fa-${r.id}`,
+            leading: lead(HeartPulse),
+            title: 'First-aid treatment',
+            sub: `${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`,
+            href: r.href,
+        });
+    }
+    if (d.client) {
+        items.push({
+            key: 'client',
+            leading: lead(User),
+            title: 'Client record',
+            sub: clientName,
+            href: `/operations/clients/${d.client.id}/care`,
+        });
+    }
+    return items;
+}
+
 export function LinkedSection({
     d,
     clientName,
@@ -2316,151 +2630,17 @@ export function LinkedSection({
     clientName: string;
 }) {
     return (
-        <div className="flex flex-col gap-4">
+        <div className="grid min-w-0 gap-5">
             <LinkedOperationalEvidence
                 evidence={d.linked_operational_evidence}
             />
-            <section aria-labelledby="other-linked-records-heading">
-                <h2
-                    id="other-linked-records-heading"
-                    className="mb-2 text-sm font-bold text-foreground"
-                >
-                    Other linked records
-                </h2>
-                <div className="flex flex-col gap-2">
-                    {d.linked_access?.health_safety === 'restricted' ? (
-                        <LinkedRow
-                            icon={ShieldAlert}
-                            title="Health & Safety record"
-                            sub="Linked record — access restricted"
-                            href={null}
-                        />
-                    ) : null}
-                    {d.hs_event ? (
-                        <LinkedRow
-                            icon={ShieldAlert}
-                            title="Health & Safety event"
-                            sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`}
-                            href={d.hs_event.url}
-                        />
-                    ) : null}
-                    {(d.safeguarding_concerns ?? []).map((c) =>
-                        c.can_view ? (
-                            <LinkedRow
-                                key={c.id}
-                                icon={ShieldAlert}
-                                title="Safeguarding concern"
-                                sub={`${c.reference_number}${c.status ? ` · ${titleCase(c.status)}` : ''}`}
-                                href={`/safeguarding/${c.id}`}
-                            />
-                        ) : (
-                            <div
-                                key={c.id}
-                                className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground"
-                            >
-                                <ShieldAlert className="h-4 w-4 shrink-0" />
-                                <span className="text-sm">
-                                    Safeguarding concern raised · restricted
-                                    (need-to-know)
-                                </span>
-                            </div>
-                        ),
-                    )}
-                    {d.fleet_incident ? (
-                        <LinkedRow
-                            icon={Truck}
-                            title="Fleet incident"
-                            sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`}
-                            href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`}
-                        />
-                    ) : null}
-                    {d.medication_error ? (
-                        <LinkedRow
-                            icon={Pill}
-                            title="Medication error report"
-                            sub={`${d.medication_error.summary ?? 'Details are held in the medication error record.'}${d.medication_error.ready_to_close ? ' Ready to close — medication error closed.' : ''}`}
-                            href={d.medication_error.url}
-                        />
-                    ) : null}
-                    {(d.restraint_events ?? []).map((r) => (
-                        <LinkedRow
-                            key={`re-${r.id}`}
-                            icon={Hand}
-                            title="Restraint event"
-                            sub={`${r.reference} · ${titleCase(r.restraint_type)} · ${titleCase(r.severity)}${r.within_support_plan ? '' : ' · out of plan'}${r.injury_occurred ? ' · injury' : ''}`}
-                            href={`/health-safety/restraints?event=${r.id}`}
-                        />
-                    ))}
-                    {(d.first_aid_records ?? []).map((r) => (
-                        <LinkedRow
-                            key={`fa-${r.id}`}
-                            icon={HeartPulse}
-                            title="First-aid treatment"
-                            sub={`${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`}
-                            href={r.href}
-                        />
-                    ))}
-                    {d.client ? (
-                        <LinkedRow
-                            icon={User}
-                            title="Client record"
-                            sub={clientName}
-                            href={`/operations/clients/${d.client.id}/care`}
-                        />
-                    ) : null}
-                    {!d.hs_event &&
-                    !d.client &&
-                    !d.fleet_incident &&
-                    !d.medication_error &&
-                    !(d.safeguarding_concerns ?? []).length &&
-                    !(d.restraint_events ?? []).length &&
-                    !(d.first_aid_records ?? []).length ? (
-                        <p className="text-sm text-muted-foreground">
-                            No other linked records.
-                        </p>
-                    ) : null}
-                </div>
-            </section>
-        </div>
-    );
-}
-
-function LinkedRow({
-    icon: Icon,
-    title,
-    sub,
-    href,
-}: {
-    icon: ComponentType<{ className?: string }>;
-    title: string;
-    sub: string;
-    href: string | null;
-}) {
-    const content = (
-        <>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                <Icon className="h-4 w-4 text-muted-foreground" />
-            </span>
-            <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">{title}</p>
-                <p className="truncate text-xs text-muted-foreground">{sub}</p>
-            </div>
-            {href ? (
-                <ExternalLink className="h-4 w-4 text-muted-foreground" />
-            ) : null}
-        </>
-    );
-
-    return href ? (
-        <Link
-            href={href}
-            className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
-        >
-            {content}
-        </Link>
-    ) : (
-        <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-            {content}
+            <RowList
+                title="Other linked records"
+                items={linkedRecordItems(d, clientName, {
+                    includeControlRoom: false,
+                })}
+                empty="No other linked records."
+            />
         </div>
     );
 }

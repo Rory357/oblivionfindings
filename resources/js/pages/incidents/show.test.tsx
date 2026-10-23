@@ -86,7 +86,7 @@ describe('inline incident evidence window integration', () => {
         const form = screen.getByRole('form', { name: 'Record evidence window' });
         expect(form).toBeVisible();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-        fireEvent.change(within(form).getByLabelText('Reason for this period and selection'), {
+        fireEvent.change(within(form).getByLabelText('Why this time and these cameras'), {
             target: { value: 'Review the original incident period.' },
         });
         const updated = windowPreview(); updated.policy.revision = 3;
@@ -320,31 +320,19 @@ describe('Permanent incident workspace', () => {
         ).not.toBeInTheDocument();
     });
 
-    it('opens a deep section in its correct group with a linked keyboard-accessible panel', () => {
+    it('opens a deep section on its rail tab with a labelled panel and keeps the return context', () => {
         state.url =
             '/incidents/42?section=history&return_to=%2Fincidents%3Fowner%3Dme';
         render(<IncidentShow detail={detail()} />);
-        const groups = screen.getByRole('tablist', { name: 'Incident groups' });
-        expect(within(groups).getAllByRole('tab')).toHaveLength(3);
-        expect(
-            within(groups).getByRole('tab', { name: /Evidence & history/ }),
-        ).toHaveAttribute('aria-selected', 'true');
         const sections = screen.getByRole('tablist', {
             name: 'Incident sections',
         });
-        const history = within(sections).getByRole('tab', { name: 'History' });
-        expect(within(sections).getAllByRole('tab')).toHaveLength(2);
-        expect(history).toHaveAttribute('aria-selected', 'true');
-        expect(history).toHaveAttribute(
-            'aria-controls',
-            'incident-workspace-panel',
-        );
-        expect(screen.getByRole('tabpanel', { name: 'History' })).toBeVisible();
-        history.focus();
-        fireEvent.keyDown(history, { key: 'ArrowLeft' });
+        expect(within(sections).getAllByRole('tab')).toHaveLength(5);
         expect(
-            within(sections).getByRole('tab', { name: 'Evidence' }),
-        ).toHaveFocus();
+            within(sections).getByRole('tab', { name: 'History' }),
+        ).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('tabpanel', { name: 'History' })).toBeVisible();
+        fireEvent.click(within(sections).getByRole('tab', { name: 'Evidence' }));
         expect(state.get).toHaveBeenCalledWith(
             '/incidents/42',
             { section: 'evidence', return_to: '/incidents?owner=me' },
@@ -352,7 +340,20 @@ describe('Permanent incident workspace', () => {
         );
     });
 
-    it('remembers the last section of each group while preserving an unsent follow-up', () => {
+    it('reads the older linked-records deep link as the overview', () => {
+        state.url = '/incidents/42?section=linked';
+        render(<IncidentShow detail={detail()} />);
+        expect(
+            within(
+                screen.getByRole('tablist', { name: 'Incident sections' }),
+            ).getByRole('tab', { name: 'Overview' }),
+        ).toHaveAttribute('aria-selected', 'true');
+        expect(
+            screen.getByRole('region', { name: 'Incident summary' }),
+        ).toBeVisible();
+    });
+
+    it('keeps an unsent follow-up while moving between tabs', () => {
         state.url = '/incidents/42?section=followups';
         const incident = detail();
         incident.can.followupsManage = true;
@@ -366,40 +367,21 @@ describe('Permanent incident workspace', () => {
         });
         fireEvent.click(
             within(
-                screen.getByRole('tablist', { name: 'Incident groups' }),
-            ).getByRole('tab', { name: /Safety review/ }),
+                screen.getByRole('tablist', { name: 'Incident sections' }),
+            ).getByRole('tab', { name: 'Safety review' }),
         );
         expect(state.get).toHaveBeenLastCalledWith(
             '/incidents/42',
             { section: 'investigation' },
             { preserveState: true, preserveScroll: true },
         );
-        state.url = '/incidents/42?section=linked';
+        state.url = '/incidents/42?section=investigation';
         view.rerender(<IncidentShow detail={incident} />);
-        fireEvent.click(
-            within(
-                screen.getByRole('tablist', { name: 'Incident groups' }),
-            ).getByRole('tab', { name: /^Incident/ }),
-        );
-        expect(state.get).toHaveBeenLastCalledWith(
-            '/incidents/42',
-            { section: 'followups' },
-            { preserveState: true, preserveScroll: true },
-        );
+        expect(input).not.toBeVisible();
         state.url = '/incidents/42?section=followups';
         view.rerender(<IncidentShow detail={incident} />);
         expect(input).toHaveValue('Discuss the agreed plan at handover.');
         expect(input).toBeVisible();
-        fireEvent.click(
-            within(
-                screen.getByRole('tablist', { name: 'Incident groups' }),
-            ).getByRole('tab', { name: /Safety review/ }),
-        );
-        expect(state.get).toHaveBeenLastCalledWith(
-            '/incidents/42',
-            { section: 'linked' },
-            { preserveState: true, preserveScroll: true },
-        );
     });
 
     it('finds all sections without intercepting typing or opening a second decision dialog', () => {
@@ -421,10 +403,9 @@ describe('Permanent incident workspace', () => {
         for (const name of [
             'Overview, Incident',
             'Follow-ups, Incident',
-            'Investigation, Safety review',
-            'Linked records, Safety review',
-            'Evidence, Evidence & history',
-            'History, Evidence & history',
+            'Safety review, Incident',
+            'Evidence, Incident',
+            'History, Incident',
         ]) {
             expect(within(find).getByRole('button', { name })).toBeVisible();
         }
@@ -436,18 +417,18 @@ describe('Permanent incident workspace', () => {
         );
         expect(
             within(find).queryByRole('button', {
-                name: 'History, Evidence & history',
+                name: 'History, Incident',
             }),
         ).not.toBeInTheDocument();
         fireEvent.click(
             within(find).getByRole('button', {
-                name: 'Linked records, Safety review',
+                name: 'Safety review, Incident',
             }),
         );
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(state.get).toHaveBeenLastCalledWith(
             '/incidents/42',
-            { section: 'linked' },
+            { section: 'investigation' },
             { preserveState: true, preserveScroll: true },
         );
         fireEvent.click(
@@ -511,49 +492,53 @@ describe('Permanent incident workspace', () => {
         ).toHaveValue('');
     });
 
-    it('uses one clickable meter row and keeps the existing return context when opening evidence', () => {
-        state.url =
-            '/incidents/42?return_to=%2Fincidents%3Fowner%3Dme%26page%3D2';
-        render(<IncidentShow detail={detail()} />);
+    it('shows the record facts and one stage line with the next step in the header', () => {
+        const incident = detail();
+        incident.followups = [
+            {
+                id: 3,
+                notes: 'Overdue synthetic follow-up',
+                assigned_to: null,
+                due_at: '2026-10-08T01:00:00Z',
+                completed_at: null,
+                created_by: null,
+                overdue: true,
+            },
+        ];
+        render(<IncidentShow detail={incident} />);
         const header = screen.getByRole('banner');
-        for (const name of [
-            'View open follow-ups',
-            'View evidence',
-            'View safety actions',
-            'View closure checks',
-        ]) {
-            expect(within(header).getByRole('button', { name })).toBeVisible();
-        }
-        fireEvent.click(
-            within(header).getByRole('button', { name: 'View evidence' }),
-        );
-        expect(state.get).toHaveBeenCalledWith(
-            '/incidents/42',
-            { section: 'evidence', return_to: '/incidents?owner=me&page=2' },
-            { preserveState: true, preserveScroll: true },
-        );
+        expect(within(header).getByText('Severity')).toBeVisible();
+        expect(within(header).getByText('Overdue follow-up')).toBeVisible();
+        const stages = within(header).getByRole('list', {
+            name: /Where the incident is up to/,
+        });
+        expect(within(stages).getAllByRole('listitem')).toHaveLength(6);
+        expect(within(header).getByText('Next step')).toBeVisible();
+        expect(
+            within(header).getByRole('tab', { name: /Follow-ups/ }),
+        ).toHaveTextContent('1');
     });
 
-    it('keeps restricted or unavailable safety work unknown instead of claiming zero actions', () => {
+    it('keeps restricted or unavailable safety work unknown instead of claiming none', () => {
         const incident = detail();
         incident.linked_access = {
             control_room: 'absent',
             health_safety: 'restricted',
         };
         const view = render(<IncidentShow detail={incident} />);
-        const meter = screen.getByRole('button', {
-            name: 'View safety actions',
-        });
-        expect(within(meter).getByText('—')).toBeVisible();
-        expect(
-            within(meter).getByText('Safety review access restricted'),
-        ).toBeVisible();
+        const stages = () =>
+            within(screen.getByRole('banner')).getByRole('list', {
+                name: /Where the incident is up to/,
+            });
+        expect(within(stages()).getByText('Access restricted')).toBeVisible();
         incident.linked_access.health_safety = 'absent';
         view.rerender(<IncidentShow detail={incident} />);
-        expect(within(meter).getByText('0')).toBeVisible();
         expect(
-            within(meter).getByText('No linked safety review'),
+            within(stages()).getByText('No safety review linked'),
         ).toBeVisible();
+        expect(
+            within(stages()).queryByText('Access restricted'),
+        ).not.toBeInTheDocument();
     });
 
     it('does not call an unknown safety-review connection absent in its detail section', () => {
@@ -607,13 +592,10 @@ describe('Permanent incident workspace', () => {
             ),
         };
         render(<IncidentShow detail={incident} />);
-        const meter = screen.getByRole('button', {
-            name: 'View safety actions',
+        const stages = within(screen.getByRole('banner')).getByRole('list', {
+            name: /Where the incident is up to/,
         });
-        expect(within(meter).getByText('2')).toBeVisible();
-        expect(
-            within(meter).getByText('Actions still awaiting verification'),
-        ).toBeVisible();
+        expect(within(stages).getByText('2 corrective actions')).toBeVisible();
     });
 
     it('keeps an unsaved follow-up through hiding and section navigation', () => {
@@ -795,7 +777,10 @@ describe('Permanent incident workspace', () => {
     it('opens as a page with visible context and guarded closure, without an always-open dialog', () => {
         render(<IncidentShow detail={detail()} />);
         expect(
-            screen.getByRole('heading', { name: 'INC-2026-0042', level: 1 }),
+            screen.getByRole('heading', { name: 'Fall', level: 1 }),
+        ).toBeVisible();
+        expect(
+            within(screen.getByRole('banner')).getByText(/INC-2026-0042/),
         ).toBeVisible();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(screen.getByText('A person fell in the lounge.')).toBeVisible();
@@ -864,15 +849,15 @@ describe('Permanent incident workspace', () => {
         );
     });
 
-    it('keeps the active section ahead of supporting responsibilities without remounting hidden drafts', () => {
+    it('keeps the active section ahead of the side column without remounting hidden drafts', () => {
         const incident = detail();
         const view = render(<IncidentShow detail={incident} />);
         const summary = screen.getByRole('region', {
             name: 'Incident summary',
         });
-        const actions = screen.getByRole('complementary');
+        const side = screen.getByRole('complementary');
         expect(
-            summary.compareDocumentPosition(actions) &
+            summary.compareDocumentPosition(side) &
                 Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
         state.url = '/incidents/42?section=followups';
@@ -881,23 +866,26 @@ describe('Permanent incident workspace', () => {
             name: 'Incident follow-ups',
         });
         expect(
-            followups.compareDocumentPosition(actions) &
+            followups.compareDocumentPosition(side) &
                 Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
-        state.url = '/incidents/42';
-        view.rerender(
+        expect(summary).toBeInTheDocument();
+    });
+
+    it('puts the next step for an active response in the header, with its wording kept', () => {
+        render(
             <IncidentShow
                 detail={{
-                    ...incident,
+                    ...detail(),
                     journey_state: 'Operational response active',
                 }}
             />,
         );
         expect(
-            actions.compareDocumentPosition(
-                screen.getByRole('region', { name: 'Incident summary' }),
-            ) & Node.DOCUMENT_POSITION_FOLLOWING,
-        ).toBeTruthy();
+            within(screen.getByRole('banner')).getByText(
+                /The operational response is still active\. Response and incident review are separate decisions\./,
+            ),
+        ).toBeVisible();
     });
 
     it('prioritizes the live response and does not invent a source link for restricted viewers', () => {
@@ -922,7 +910,7 @@ describe('Permanent incident workspace', () => {
             screen.getAllByRole('link', { name: 'Open response' }),
         ).toHaveLength(1);
         expect(
-            within(screen.getByRole('complementary')).getByRole('button', {
+            within(screen.getByRole('banner')).getByRole('button', {
                 name: 'Close incident',
             }),
         ).toBeDisabled();
@@ -950,10 +938,10 @@ describe('Permanent incident workspace', () => {
             '/incidents?tab=review&page=3',
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'Find an incident section…' }),
+            screen.getByRole('button', { name: 'Find a section' }),
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'History, Evidence & history' }),
+            screen.getByRole('button', { name: 'History, Incident' }),
         );
         expect(state.get).toHaveBeenCalledWith(
             '/incidents/42',

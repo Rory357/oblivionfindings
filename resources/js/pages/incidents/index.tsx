@@ -1,3 +1,10 @@
+/**
+ * Incidents (approved H&S drawings pg-hsn-1, 1b, 1c, 1d — Stephan 23 Oct
+ * 2026): one header with four number boxes and the register filters, the
+ * register views as a tier-two strip, then the view itself — every incident
+ * with where it is up to (stage dots), the open follow-ups, the near-miss
+ * picture, or the site manager's "Needs an owner" queue.
+ */
 import {
     SafetyDateFilter,
     SafetyRegisterSearch,
@@ -5,31 +12,63 @@ import {
 } from '@/components/health-safety/workspace-header';
 import {
     IncidentDetailDialog,
+    incidentWorksafe,
     type IncidentDetail,
 } from '@/components/incidents/incident-detail-dialog';
 import {
-    incidentOwnerLabel,
+    AssignIncidentOwner,
     type IncidentOwnership,
 } from '@/components/incidents/incident-ownership-panel';
 import { IncidentReportDialog } from '@/components/incidents/incident-report-dialog';
 import {
+    dateTimeWithYear,
+    dateWithYear,
+    daysSince,
+    INCIDENT_STATUS_LABELS,
+    incidentRowStage,
+    incidentTypeLabel,
+    plural,
+    SEVERITY_LABELS,
+    SEVERITY_VARIANT,
+    SOURCE_LABELS,
+    worksafePending,
+} from '@/components/incidents/incident-stages';
+import {
+    RecordIdentity,
+    RecordPerson,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
+import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
+    PageLayout,
 } from '@/components/page';
 import {
-    EntityFilter,
-    ShiftContextMenu,
-    type RosterTabItem,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
+import { EntityFilter } from '@/components/rostering';
+import {
+    DutyClock,
+    Note,
+    QuietLine,
+    Queue,
+    Ring,
+    StageDots,
+    Story,
+    Surface,
+    Tally,
+} from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Popover,
@@ -37,37 +76,32 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { SelectInput } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDate, formatTime } from '@/lib/datetime';
 import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
-import { fmt, type Tone } from '@/pages/health-safety/components/hs-hero-kit';
 import type { SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    Bot,
-    Calendar,
+    AlertTriangle,
     CheckCircle2,
     CircleDot,
     Clock,
-    Cpu,
     Eye,
     FileEdit,
     LayoutList,
     ListTodo,
-    MoreHorizontal,
-    Paperclip,
+    MapPin,
     Plus,
     RadioTower,
-    Search,
     Send,
     ShieldAlert,
-    Stethoscope,
+    SlidersHorizontal,
     User,
-    UserCog,
-    Wrench,
+    UserPlus,
     X,
 } from 'lucide-react';
-import { useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -117,6 +151,9 @@ type Paginated<T> = {
     data: T[];
     links: { url: string | null; label: string; active: boolean }[];
     last_page: number;
+    total?: number;
+    from?: number | null;
+    to?: number | null;
 };
 
 type Filters = {
@@ -183,74 +220,37 @@ type Props = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Token maps                                                          */
+/*  Views                                                              */
 /* ------------------------------------------------------------------ */
 
-const SEV: Record<string, { tone: Tone; label: string }> = {
-    low: { tone: 'success', label: 'Low' },
-    medium: { tone: 'warning', label: 'Medium' },
-    high: { tone: 'critical', label: 'High' },
-    critical: { tone: 'critical', label: 'Critical' },
-};
-
-const TONE_TEXT: Record<Tone, string> = {
-    success: 'text-status-success',
-    warning: 'text-status-warning',
-    critical: 'text-status-critical',
-    neutral: 'text-muted-foreground',
-};
-const TONE_BG: Record<Tone, string> = {
-    success: 'bg-status-success-bg text-status-success',
-    warning: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-    neutral: 'bg-muted text-muted-foreground',
-};
-const TONE_DOT: Record<Tone, string> = {
-    success: 'bg-status-success',
-    warning: 'bg-status-warning',
-    critical: 'bg-status-critical',
-    neutral: 'bg-muted-foreground',
-};
-
-const STATUS: Record<
-    string,
-    { label: string; cls: string; icon: typeof Clock }
-> = {
-    draft: { label: 'Draft', cls: 'bg-muted text-foreground', icon: FileEdit },
-    submitted: {
-        label: 'Submitted',
-        cls: 'bg-status-info-bg text-status-info',
-        icon: Clock,
-    },
-    reviewed: {
-        label: 'Reviewed',
-        cls: 'bg-primary/10 text-primary',
-        icon: CheckCircle2,
-    },
-    closed: {
-        label: 'Closed',
-        cls: 'bg-status-success-bg text-status-success',
-        icon: CheckCircle2,
-    },
-};
-
-const SOURCE: Record<string, { label: string; icon: typeof User }> = {
-    manual: { label: 'Staff-reported', icon: User },
-    control_room: { label: 'Control Room', icon: RadioTower },
-    sensor: { label: 'Sensor', icon: Cpu },
-    automated: { label: 'Automated', icon: Bot },
-};
+/** The register's views. The first seven are drawn; the rest stay reachable. */
+const VIEWS: { key: string; label: string; icon: GroupedProfileNavTab['icon']; drawn: boolean }[] = [
+    { key: 'all', label: 'All', icon: LayoutList, drawn: true },
+    { key: 'needs_owner', label: 'Needs an owner', icon: UserPlus, drawn: true },
+    { key: 'open', label: 'Open', icon: CircleDot, drawn: true },
+    { key: 'review', label: 'Awaiting review', icon: Clock, drawn: true },
+    { key: 'followups', label: 'Follow-ups', icon: ListTodo, drawn: true },
+    { key: 'near_misses', label: 'Near misses', icon: Eye, drawn: true },
+    { key: 'closed', label: 'Closed', icon: CheckCircle2, drawn: true },
+    { key: 'investigation', label: 'Under investigation', icon: CircleDot, drawn: false },
+    { key: 'worksafe', label: 'WorkSafe-notifiable', icon: ShieldAlert, drawn: false },
+    { key: 'reported_recent', label: 'Reported in the past 30 days', icon: Clock, drawn: false },
+    { key: 'closed_recent', label: 'Closed in the past 30 days', icon: CheckCircle2, drawn: false },
+    { key: 'worksafe_pending', label: 'WorkSafe to notify', icon: ShieldAlert, drawn: false },
+];
 
 const SEV_ORDER = ['critical', 'high', 'medium', 'low'];
 
-function deltaStr(d: number): string | undefined {
-    if (d > 0) return `▲ ${d}`;
-    if (d < 0) return `▼ ${Math.abs(d)}`;
-    return undefined;
+function clientName(row: IncidentRow): string | null {
+    return row.client
+        ? `${row.client.first_name} ${row.client.last_name}`.trim()
+        : null;
 }
 
-function titleCase(s: string): string {
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+function comparedWith(delta: number): string {
+    if (delta > 0) return `${delta} more than the 30 days before`;
+    if (delta < 0) return `${Math.abs(delta)} fewer than the 30 days before`;
+    return 'Same as the 30 days before';
 }
 
 /* ------------------------------------------------------------------ */
@@ -267,37 +267,43 @@ export default function IncidentsIndex(props: Props) {
             <AppLayout
                 breadcrumbs={[
                     { title: 'Home', href: '/dashboard' },
+                    { title: 'Health & safety', href: '/health-safety' },
                     { title: 'Incidents', href: '/incidents' },
                 ]}
             >
                 <Head title="Incidents" />
-                <PageHeader
-                    title="Incidents"
-                    icon={ShieldAlert}
-                    frontline
-                    wrapTitle
-                    subline="Incident information is unavailable for your current account."
-                    actions={
-                        <PageHeaderPrimaryButton
-                            onClick={() =>
-                                router.get(
-                                    '/incidents',
-                                    {},
-                                    { preserveState: false },
-                                )
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            title="Incidents"
+                            icon={ShieldAlert}
+                            wrapTitle
+                            subline="Incident information is unavailable for your current account."
+                            actions={
+                                <PageHeaderPrimaryButton
+                                    onClick={() =>
+                                        router.get(
+                                            '/incidents',
+                                            {},
+                                            { preserveState: false },
+                                        )
+                                    }
+                                >
+                                    Reload incidents
+                                </PageHeaderPrimaryButton>
                             }
-                        >
-                            Reload incidents
-                        </PageHeaderPrimaryButton>
+                        />
                     }
-                />
-                <p
-                    role="alert"
-                    className="text-subtle mt-5 text-status-warning-foreground"
                 >
-                    Reload to check current access before opening incident
-                    information or reporting.
-                </p>
+                    <div className="max-w-[54rem]">
+                        <Note tone="warning" icon={AlertTriangle}>
+                            <p role="alert">
+                                Reload to check current access before opening
+                                incident information or reporting.
+                            </p>
+                        </Note>
+                    </div>
+                </PageLayout>
             </AppLayout>
         );
     }
@@ -321,7 +327,6 @@ function CurrentActorIncidentsIndex({
     can,
     detail,
 }: Props) {
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [reportMode, setReportMode] = useState<
         'incident' | 'near_miss' | null
     >(report ?? null);
@@ -345,6 +350,23 @@ function CurrentActorIncidentsIndex({
             { preserveScroll: true },
         );
 
+    const needsOwnerView = filters.owner === 'needs_owner';
+    const activeView = needsOwnerView ? 'needs_owner' : tab;
+    const selectView = (key: string) => {
+        if (key === activeView) return;
+        router.get(
+            '/incidents',
+            key === 'needs_owner'
+                ? { ...filters, owner: 'needs_owner', tab: 'all' }
+                : {
+                      ...filters,
+                      tab: key,
+                      owner: needsOwnerView ? 'all' : filters.owner,
+                  },
+            { preserveScroll: true },
+        );
+    };
+
     const registerUrl = usePage().url;
     const reportReturnParams = new URLSearchParams(registerUrl.split('?')[1]?.split('#')[0] ?? '');
     const reportReturnTo = reportReturnParams.getAll('return_to').length === 1
@@ -367,6 +389,12 @@ function CurrentActorIncidentsIndex({
             { preserveState: true, preserveScroll: true, replace: true },
         );
 
+    const moreActive = [
+        !!filters.kind && filters.kind !== 'all',
+        !!filters.client_id,
+        !!filters.source,
+        !!filters.severity,
+    ].filter(Boolean).length;
     const hasFilters = !!(
         filters.q ||
         filters.severity ||
@@ -379,544 +407,299 @@ function CurrentActorIncidentsIndex({
         (!!filters.kind && filters.kind !== 'all')
     );
 
-    /* ---- hero stat clusters ---- */
     const p = hero.period;
     const a = hero.attention;
+    const datesFiltered = !!(filters.from || filters.to);
 
-    /* ---- tabs ---- */
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'all',
-            label: 'All',
-            icon: LayoutList,
-            tone: 'primary',
-            badge: tabCounts.all || undefined,
-        },
-        {
-            id: 'open',
-            label: 'Open',
-            icon: CircleDot,
-            tone: 'info',
-            badge: tabCounts.open || undefined,
-        },
-        {
-            id: 'investigation',
-            label: 'Under investigation',
-            icon: Search,
-            tone: 'primary',
-            badge: tabCounts.investigation || undefined,
-        },
-        {
-            id: 'followups',
-            label: 'Open follow-ups',
-            icon: ListTodo,
-            tone: 'warning',
-            badge: tabCounts.followups || undefined,
-        },
-        {
-            id: 'worksafe',
-            label: 'WorkSafe-notifiable',
-            icon: ShieldAlert,
-            tone: 'critical',
-            badge: tabCounts.worksafe || undefined,
-        },
-        {
-            id: 'near_misses',
-            label: 'Near misses',
-            icon: Eye,
-            tone: 'success',
-            badge: tabCounts.near_misses || undefined,
-        },
-        {
-            id: 'review',
-            label: 'Awaiting review',
-            icon: Clock,
-            tone: 'info',
-            badge: tabCounts.review || undefined,
-        },
-        {
-            id: 'closed',
-            label: 'Closed',
-            icon: CheckCircle2,
-            tone: 'success',
-            badge: tabCounts.closed || undefined,
-        },
-    ];
+    const views: GroupedProfileNavTab[] = VIEWS.filter(
+        (view) => view.drawn || view.key === activeView,
+    ).map((view) => ({
+        key: view.key,
+        label: view.label,
+        icon: view.icon,
+        count:
+            view.key === 'needs_owner'
+                ? needsOwnerView
+                    ? tabCounts.all
+                    : undefined
+                : tabCounts[view.key],
+    }));
 
-    /* ---- source filter (segmented pill on dark) ---- */
-    TABS.push(
-        {
-            id: 'reported_recent',
-            label: 'Occurred in past 30 days',
-            icon: Calendar,
-            tone: 'primary',
-        },
-        {
-            id: 'closed_recent',
-            label: 'Closed in past 30 days',
-            icon: CheckCircle2,
-            tone: 'success',
-        },
-        {
-            id: 'worksafe_pending',
-            label: 'Awaiting WorkSafe notification',
-            icon: ShieldAlert,
-            tone: 'warning',
-        },
-    );
-    const SOURCE_ITEMS = [
-        { key: 'all', label: 'All sources' },
-        { key: 'manual', label: 'Staff' },
-        { key: 'control_room', label: 'Control Room' },
-        { key: 'sensor', label: 'Sensor' },
-        { key: 'automated', label: 'Automated' },
-    ];
-
-    /* ---- right-click context menu (incident rows) ---- */
-    const openRowCtx = (e: ReactMouseEvent, i: IncidentRow) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const sev = SEV[i.severity] ?? SEV.low;
-        const clientName = i.client
-            ? `${i.client.first_name} ${i.client.last_name}`.trim()
-            : 'No client';
-        const items: ShiftCtxItem[] = [
+    const incidentActions = (i: IncidentRow): MenuItem[] =>
+        compactMenu([
             {
-                icon: <Eye className="h-3.5 w-3.5" />,
                 label: 'View incident',
-                sub: `${titleCase(i.type)}${i.occurred_at ? ` · ${formatDateTime(i.occurred_at)}` : ''}`,
-                tone: 'primary',
+                icon: Eye,
                 onClick: () => openDetail(i.id),
             },
-            ...(i.status === 'draft'
-                ? [
-                      {
-                          icon: <FileEdit className="h-3.5 w-3.5" />,
-                          label: 'Continue draft',
-                          sub: 'Edit & submit',
-                          onClick: () => openDetail(i.id),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            { sep: true },
-            ...(i.client
-                ? [
-                      {
-                          icon: <User className="h-3.5 w-3.5" />,
-                          label: 'View client',
-                          sub: clientName,
-                          onClick: () =>
-                              router.visit(
-                                  `/operations/clients/${i.client!.id}/care`,
-                              ),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(i.control_room_alert_id
-                ? [
-                      {
-                          icon: <RadioTower className="h-3.5 w-3.5" />,
-                          label: 'View Control Room alert',
-                          onClick: () =>
-                              router.visit(
-                                  `/control-room/alerts/${i.control_room_alert_id}`,
-                              ),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
+            i.status === 'draft' && {
+                label: 'Continue draft',
+                icon: FileEdit,
+                onClick: () => openDetail(i.id),
+            },
+            { separator: true },
+            i.client && {
+                label: 'View client',
+                icon: User,
+                onClick: () =>
+                    router.visit(`/operations/clients/${i.client!.id}/care`),
+            },
+            i.control_room_alert_id && {
+                label: 'View Control Room alert',
+                icon: RadioTower,
+                onClick: () =>
+                    router.visit(
+                        `/control-room/alerts/${i.control_room_alert_id}`,
+                    ),
+            },
             // Submitting is guided — open the incident so the submit pane shows
             // what's being locked in (no instant POST from a context menu).
-            ...(i.status === 'draft'
-                ? [
-                      { sep: true } satisfies ShiftCtxItem,
-                      {
-                          icon: <Send className="h-3.5 w-3.5" />,
-                          label: 'Submit for review',
-                          sub: 'Opens the incident to confirm',
-                          onClick: () => openDetail(i.id),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-        ];
-        const anchor = e.currentTarget.getBoundingClientRect();
-        setCtx({
-            x: e.clientX || anchor.left + 12,
-            y: e.clientY || anchor.bottom,
-            tag: (sev.label ?? i.severity).toUpperCase(),
-            meta: `${clientName} · ${titleCase(i.type)}`,
-            items,
-        });
-    };
+            i.status === 'draft' && { separator: true },
+            i.status === 'draft' && {
+                label: 'Submit for review',
+                icon: Send,
+                onClick: () => openDetail(i.id),
+            },
+        ]);
 
     const incidentRows =
         rowsKind === 'incidents' ? (rows.data as IncidentRow[]) : [];
     const followupRows =
         rowsKind === 'followups' ? (rows.data as FollowupRow[]) : [];
+    const pager = (
+        <>
+            <p className="text-subtle">
+                {rows.total !== undefined
+                    ? `Showing ${rows.data.length} of ${rows.total}`
+                    : `Showing ${rows.data.length}`}
+            </p>
+            {rows.last_page > 1 ? <LaravelPagination links={rows.links} /> : null}
+        </>
+    );
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Incidents', href: '/incidents' },
             ]}
         >
             <Head title="Incidents" />
-
-            <div className="flex min-w-0 flex-col gap-5">
-                <PageHeader
-                    title="Incidents"
-                    icon={ShieldAlert}
-                    wrapTitle
-                    frontline
-                    subline={`Report and follow up safety concerns${a.alerts.value === null ? '' : ` · ${a.alerts.value} incidents linked to active Control Room alerts you can view`}`}
-                    mobileSummary={`${p.open.value} open incidents · ${a.followups.value} open follow-ups`}
-                    actions={
-                        <>
-                            <SafetyRegisterSearch
-                                key={filters.q}
-                                query={filters.q ?? ''}
-                                onSearch={(q) => go({ q })}
-                                placeholder="Search incidents"
-                            />
-                            {can.templatesManage && (
-                                <PageHeaderGlassButton
-                                    onClick={() =>
-                                        router.visit('/incidents/templates')
-                                    }
-                                >
-                                    Templates
-                                </PageHeaderGlassButton>
-                            )}
-                            {(can.create || can.reportSafeguarding) && (
-                                <Popover
-                                    open={launcherOpen}
-                                    onOpenChange={setLauncherOpen}
-                                >
-                                    <PopoverTrigger asChild>
-                                        <PageHeaderPrimaryButton icon={Plus}>
-                                            Report
-                                        </PageHeaderPrimaryButton>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                        align="end"
-                                        className="w-72 max-w-[calc(100vw-2rem)] p-1.5"
+            <PageLayout
+                hero={
+                    <PageHeader
+                        title="Incidents"
+                        icon={ShieldAlert}
+                        wrapTitle
+                        subline="Report incidents and follow them through until they’re closed"
+                        actions={
+                            <>
+                                <SafetyRegisterSearch
+                                    key={filters.q}
+                                    query={filters.q ?? ''}
+                                    onSearch={(q) => go({ q })}
+                                    placeholder="Search incidents"
+                                />
+                                {can.templatesManage && (
+                                    <PageHeaderGlassButton
+                                        onClick={() =>
+                                            router.visit('/incidents/templates')
+                                        }
                                     >
-                                        {can.create && (
-                                            <>
-                                                <Button
-                                                    unstyled
-                                                    type="button"
-                                                    onClick={() =>
-                                                        openReport('incident')
-                                                    }
-                                                    className="frontline-tap frontline-focus flex w-full items-start gap-2.5 rounded-md p-2.5 text-left hover:bg-muted"
-                                                >
-                                                    <ShieldAlert
-                                                        aria-hidden
-                                                        className="mt-0.5 size-4 shrink-0 text-status-critical"
-                                                    />
-                                                    <span>
-                                                        <span className="block text-sm font-medium">
-                                                            An incident
-                                                        </span>
-                                                        <span className="block text-xs text-muted-foreground">
-                                                            Something happened
-                                                            to a client or
-                                                            worker.
-                                                        </span>
-                                                    </span>
-                                                </Button>
-                                                <Button
-                                                    unstyled
-                                                    type="button"
-                                                    onClick={() =>
-                                                        openReport('near_miss')
-                                                    }
-                                                    className="frontline-tap frontline-focus flex w-full items-start gap-2.5 rounded-md p-2.5 text-left hover:bg-muted"
-                                                >
-                                                    <Eye
-                                                        aria-hidden
-                                                        className="mt-0.5 size-4 shrink-0 text-primary"
-                                                    />
-                                                    <span>
-                                                        <span className="block text-sm font-medium">
-                                                            A near miss
-                                                        </span>
-                                                        <span className="block text-xs text-muted-foreground">
-                                                            An event that could
-                                                            have caused harm.
-                                                        </span>
-                                                    </span>
-                                                </Button>
-                                            </>
-                                        )}
-                                        {can.reportSafeguarding && (
-                                            <Button
-                                                unstyled
-                                                type="button"
-                                                onClick={() =>
-                                                    router.visit(
-                                                        `/safeguarding/create?${new URLSearchParams({ return_to: registerUrl })}`,
-                                                    )
-                                                }
-                                                className="frontline-tap frontline-focus flex w-full items-start gap-2.5 rounded-md p-2.5 text-left hover:bg-muted"
-                                            >
-                                                <ShieldAlert
-                                                    aria-hidden
-                                                    className="mt-0.5 size-4 shrink-0 text-status-warning"
-                                                />
-                                                <span>
-                                                    <span className="block text-sm font-medium">
-                                                        A safeguarding concern
-                                                    </span>
-                                                    <span className="block text-xs text-muted-foreground">
-                                                        Raise a concern about
-                                                        abuse, neglect or
-                                                        exploitation.
-                                                    </span>
-                                                </span>
-                                            </Button>
-                                        )}
-                                    </PopoverContent>
-                                </Popover>
-                            )}
-                        </>
-                    }
-                    meters={
-                        <div className="grid grid-cols-2 gap-px sm:grid-cols-4 xl:grid-cols-7">
-                            {[
-                                {
-                                    label: 'Occurred · 30 days',
-                                    value: p.reported.value,
-                                    tab: 'reported_recent',
-                                    caption:
-                                        !filters.from && !filters.to
-                                            ? deltaStr(p.reported.delta)
-                                                ? `${deltaStr(p.reported.delta)} versus previous 30 days`
-                                                : 'No change from previous 30 days'
-                                            : 'Within the selected filters',
-                                },
-                                {
-                                    label: 'Open',
-                                    value: p.open.value,
-                                    tab: 'open',
-                                    caption: 'Not yet closed',
-                                },
-                                {
-                                    label: 'Investigating',
-                                    value: p.investigation.value,
-                                    tab: 'investigation',
-                                    caption: 'Pending or underway',
-                                },
-                                {
-                                    label: 'Closed · 30 days',
-                                    value: p.closed.value,
-                                    tab: 'closed_recent',
-                                    caption:
-                                        !filters.from && !filters.to
-                                            ? deltaStr(p.closed.delta)
-                                                ? `${deltaStr(p.closed.delta)} versus previous 30 days`
-                                                : 'No change from previous 30 days'
-                                            : 'Among matching incidents',
-                                },
-                                {
-                                    label: 'Open follow-ups',
-                                    value: a.followups.value,
-                                    tab: 'followups',
-                                    caption: `${a.followups.overdue} overdue`,
-                                },
-                                {
-                                    label: 'Awaiting review',
-                                    value: a.review.value,
-                                    tab: 'review',
-                                    caption: 'Submitted incidents',
-                                },
-                                {
-                                    label: 'WorkSafe pending',
-                                    value: a.worksafe.value,
-                                    tab: 'worksafe_pending',
-                                    caption: 'Awaiting notification',
-                                },
-                            ].map((meter) => (
-                                <PageHeaderMeterBlock
-                                    key={meter.tab}
-                                    label={meter.label}
-                                    tone={
-                                        meter.tab === 'worksafe_pending' &&
-                                        meter.value > 0
-                                            ? 'critical'
-                                            : meter.tab === 'followups' &&
-                                                a.followups.overdue > 0
-                                              ? 'warning'
-                                              : 'brand'
+                                        Templates
+                                    </PageHeaderGlassButton>
+                                )}
+                                {(can.create || can.reportSafeguarding) && (
+                                    <ReportLauncher
+                                        open={launcherOpen}
+                                        onOpenChange={setLauncherOpen}
+                                        canCreate={can.create}
+                                        canSafeguarding={!!can.reportSafeguarding}
+                                        onReport={openReport}
+                                        onSafeguarding={() =>
+                                            router.visit(
+                                                `/safeguarding/create?${new URLSearchParams({ return_to: registerUrl })}`,
+                                            )
+                                        }
+                                    />
+                                )}
+                            </>
+                        }
+                        strip={
+                            <PageHeaderNumbers>
+                                <PageHeaderNumber
+                                    label="Reported · 30 days"
+                                    value={p.reported.value}
+                                    caption={
+                                        datesFiltered
+                                            ? 'Within the selected filters'
+                                            : comparedWith(p.reported.delta)
                                     }
-                                    onClick={() => setTab(meter.tab)}
-                                    pressed={tab === meter.tab}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {fmt(meter.value)}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {meter.caption}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            ))}
-                        </div>
-                    }
-                    filters={
-                        <>
-                            <PageHeaderFilterSelect
-                                label="Incident view"
-                                value={tab}
-                                options={TABS.map((item) => ({
-                                    value: item.id,
-                                    label: `${item.label} (${tabCounts[item.id] ?? 0})`,
-                                }))}
-                                onChange={setTab}
-                            />
-                            <PageHeaderFilterSelect
-                                label="Incident owner"
-                                value={filters.owner ?? 'all'}
-                                options={[
-                                    {
-                                        value: 'all',
-                                        label: 'All incident owners',
-                                    },
-                                    { value: 'me', label: 'My incidents' },
-                                    {
-                                        value: 'needs_owner',
-                                        label: 'Needs an owner',
-                                    },
-                                ]}
-                                onChange={(value) =>
-                                    go({ owner: value as Filters['owner'] })
-                                }
-                            />
-                            <PageHeaderFilterSelect
-                                label="Report kind"
-                                value={filters.kind ?? 'all'}
-                                options={[
-                                    { value: 'all', label: 'All reports' },
-                                    {
-                                        value: 'incidents',
-                                        label: 'Incidents only',
-                                    },
-                                    {
-                                        value: 'near_misses',
-                                        label: 'Near misses only',
-                                    },
-                                ]}
-                                onChange={(value) =>
-                                    go({ kind: value as Filters['kind'] })
-                                }
-                            />
-                            <SafetyDateFilter
-                                from={filters.from}
-                                to={filters.to}
-                                onChange={go}
-                            />
-                            {sites?.length ? (
-                                <EntityFilter
-                                    label="Site"
-                                    allLabel="All sites"
-                                    items={sites}
-                                    value={filters.site_id}
-                                    onChange={(id) => go({ site_id: id })}
-                                    onDark
+                                    onClick={() => setTab('reported_recent')}
+                                    pressed={tab === 'reported_recent'}
                                 />
-                            ) : null}
-                            {clients?.length ? (
-                                <EntityFilter
-                                    label="Client"
-                                    allLabel="All clients"
-                                    items={clients.map((client) => ({
-                                        id: client.id,
-                                        name: `${client.first_name} ${client.last_name}`.trim(),
-                                    }))}
-                                    value={filters.client_id}
-                                    onChange={(id) => go({ client_id: id })}
-                                    onDark
+                                <PageHeaderNumber
+                                    label="Closed · 30 days"
+                                    value={p.closed.value}
+                                    caption={
+                                        datesFiltered
+                                            ? 'Among matching incidents'
+                                            : comparedWith(p.closed.delta)
+                                    }
+                                    onClick={() => setTab('closed_recent')}
+                                    pressed={tab === 'closed_recent'}
                                 />
-                            ) : null}
-                            <PageHeaderFilterSelect
-                                label="Source"
-                                value={filters.source ?? 'all'}
-                                options={SOURCE_ITEMS.map((item) => ({
-                                    value: item.key,
-                                    label: item.label,
-                                }))}
-                                onChange={(key) =>
-                                    go({ source: key === 'all' ? null : key })
-                                }
+                                <PageHeaderNumber
+                                    label="WorkSafe to notify"
+                                    value={a.worksafe.value}
+                                    caption={
+                                        a.worksafe.value > 0
+                                            ? 'Notification due'
+                                            : 'None waiting'
+                                    }
+                                    tone={
+                                        a.worksafe.value > 0
+                                            ? 'warning'
+                                            : undefined
+                                    }
+                                    onClick={() => setTab('worksafe_pending')}
+                                    pressed={tab === 'worksafe_pending'}
+                                />
+                                {a.alerts.value !== null ? (
+                                    <PageHeaderNumber
+                                        label="Control room alerts"
+                                        value={a.alerts.value}
+                                        caption="Linked and still active"
+                                        tone={
+                                            a.alerts.value > 0
+                                                ? 'critical'
+                                                : undefined
+                                        }
+                                        href="/control-room/alerts"
+                                    />
+                                ) : null}
+                            </PageHeaderNumbers>
+                        }
+                        filters={
+                            <>
+                                {sites?.length ? (
+                                    <EntityFilter
+                                        label="Site"
+                                        allLabel="All sites"
+                                        items={sites}
+                                        value={filters.site_id}
+                                        onChange={(id) => go({ site_id: id })}
+                                        onDark
+                                    />
+                                ) : null}
+                                <PageHeaderFilterSelect
+                                    label="Any owner"
+                                    value={filters.owner ?? 'all'}
+                                    options={[
+                                        { value: 'all', label: 'Any owner' },
+                                        { value: 'me', label: 'My incidents' },
+                                        {
+                                            value: 'needs_owner',
+                                            label: 'Needs an owner',
+                                        },
+                                    ]}
+                                    onChange={(value) =>
+                                        go({ owner: value as Filters['owner'] })
+                                    }
+                                />
+                                <SafetyDateFilter
+                                    from={filters.from}
+                                    to={filters.to}
+                                    onChange={go}
+                                />
+                                <MoreFilters
+                                    active={moreActive}
+                                    filters={filters}
+                                    tab={tab}
+                                    tabCounts={tabCounts}
+                                    clients={clients}
+                                    onTab={setTab}
+                                    onChange={go}
+                                />
+                                {hasFilters && (
+                                    <PageHeaderFilterButton
+                                        icon={X}
+                                        onClick={clearFilters}
+                                    >
+                                        Clear filters
+                                    </PageHeaderFilterButton>
+                                )}
+                            </>
+                        }
+                        rail={
+                            <SafetyWorkspaceRail
+                                hub="concerns"
+                                current="incidents"
                             />
-                            <PageHeaderFilterSelect
-                                label="Severity"
-                                value={filters.severity ?? 'all'}
-                                options={[
-                                    { value: 'all', label: 'All severities' },
-                                    ...SEV_ORDER.map((value) => ({
-                                        value,
-                                        label: SEV[value].label,
-                                    })),
-                                ]}
-                                onChange={(value) =>
-                                    go({
-                                        severity:
-                                            value === 'all' ? null : value,
-                                    })
-                                }
-                            />
-                            {hasFilters && (
-                                <PageHeaderGlassButton
-                                    icon={X}
-                                    onClick={clearFilters}
-                                >
-                                    Clear filters
-                                </PageHeaderGlassButton>
-                            )}
-                        </>
+                        }
+                    />
+                }
+                tabs={
+                    <TierTwoTabs
+                        tabs={views}
+                        activeTab={activeView}
+                        onTab={selectView}
+                        testIdPrefix="incident-register"
+                        ariaLabel="Incident views"
+                        panelId="incident-register-panel"
+                        // Views carry no href, so the strip renders its own buttons.
+                        renderLink={() => null}
+                    />
+                }
+            >
+                <div
+                    id="incident-register-panel"
+                    role="tabpanel"
+                    aria-label={
+                        VIEWS.find((view) => view.key === activeView)?.label ??
+                        'Incidents'
                     }
-                    rail={
-                        <SafetyWorkspaceRail
-                            hub="concerns"
-                            current="incidents"
+                    className="grid min-w-0 gap-5"
+                >
+                    {needsOwnerView ? (
+                        <NeedsOwnerQueue
+                            rows={incidentRows}
+                            detail={detail}
+                            filters={filters}
+                            url={registerUrl}
+                            onOpen={openDetail}
                         />
-                    }
-                />
-
-                {/* ---- Near-miss insights strip ---- */}
-                {tab === 'near_misses' ? (
-                    <NearMissInsights insights={nearMissInsights} />
-                ) : null}
-
-                {/* ---- Rows ---- */}
-                <Card>
-                    <CardContent className="p-0">
-                        {rowsKind === 'incidents' ? (
+                    ) : rowsKind === 'followups' ? (
+                        <FollowupTable
+                            rows={followupRows}
+                            onOpen={openDetail}
+                            overdue={a.followups.overdue}
+                            footer={pager}
+                        />
+                    ) : tab === 'near_misses' ? (
+                        <>
+                            <NearMissInsights insights={nearMissInsights} />
                             <IncidentTable
                                 rows={incidentRows}
-                                onRowCtx={openRowCtx}
+                                actionsFor={incidentActions}
                                 onOpen={openDetail}
+                                variant="near_miss"
+                                footer={pager}
                             />
-                        ) : (
-                            <FollowupTable
-                                rows={followupRows}
-                                onOpen={openDetail}
-                            />
-                        )}
-                    </CardContent>
-                </Card>
+                        </>
+                    ) : (
+                        <IncidentTable
+                            rows={incidentRows}
+                            actionsFor={incidentActions}
+                            onOpen={openDetail}
+                            footer={pager}
+                        />
+                    )}
+                </div>
+            </PageLayout>
 
-                {rows.last_page > 1 ? (
-                    <LaravelPagination links={rows.links} />
-                ) : null}
-            </div>
-
-            {ctx ? (
-                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
-            ) : null}
-
-            {detail ? (
+            {detail && !needsOwnerView ? (
                 <IncidentDetailDialog
                     detail={detail}
                     open
@@ -961,108 +744,210 @@ function CurrentActorIncidentsIndex({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Near-miss insights                                                 */
+/*  Header parts                                                       */
 /* ------------------------------------------------------------------ */
 
-function NearMissInsights({
-    insights,
+function ReportLauncher({
+    open,
+    onOpenChange,
+    canCreate,
+    canSafeguarding,
+    onReport,
+    onSafeguarding,
 }: {
-    insights: Props['nearMissInsights'];
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    canCreate: boolean;
+    canSafeguarding: boolean;
+    onReport: (mode: 'incident' | 'near_miss') => void;
+    onSafeguarding: () => void;
 }) {
-    const total = SEV_ORDER.reduce(
-        (sum, k) => sum + (insights.by_potential[k] ?? 0),
-        0,
-    );
+    const choice =
+        'frontline-tap frontline-focus flex w-full items-start gap-2.5 rounded-md p-2.5 text-left hover:bg-muted';
     return (
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-xl border border-status-success/30 bg-status-success-bg/40 px-4 py-3">
-            <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-status-success" />
-                <span className="text-sm font-semibold text-foreground">
-                    Near-miss reporting
-                </span>
-                <span className="text-xs text-muted-foreground">
-                    leading safety indicator
-                </span>
-            </div>
-            <Metric
-                label="Reporting trend (30d)"
-                value={
-                    insights.trend_pct === null
-                        ? '—'
-                        : `${insights.trend_pct > 0 ? '+' : ''}${insights.trend_pct}%`
-                }
-                tone={
-                    insights.trend_pct !== null && insights.trend_pct >= 0
-                        ? 'success'
-                        : 'warning'
-                }
-            />
-            <Metric
-                label="Near-miss : incident (90d)"
-                value={insights.ratio === null ? '—' : `${insights.ratio} : 1`}
-                tone="success"
-            />
-            <div className="min-w-[180px] flex-1">
-                <p className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                    What could have happened
-                </p>
-                {total === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                        No near misses with a recorded potential severity yet.
-                    </p>
-                ) : (
-                    <div className="flex flex-col gap-1">
-                        {SEV_ORDER.filter(
-                            (k) => (insights.by_potential[k] ?? 0) > 0,
-                        ).map((k) => {
-                            const v = insights.by_potential[k] ?? 0;
-                            const tone = SEV[k]?.tone ?? 'neutral';
-                            return (
-                                <div
-                                    key={k}
-                                    className="flex items-center gap-2"
-                                >
-                                    <span className="w-16 text-xs text-muted-foreground capitalize">
-                                        {k}
-                                    </span>
-                                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                                        <div
-                                            className={`h-full rounded-full ${TONE_DOT[tone]}`}
-                                            style={{
-                                                width: `${Math.round((v / total) * 100)}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <span className="w-6 text-right text-xs text-foreground tabular-nums">
-                                        {v}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
+        <Popover open={open} onOpenChange={onOpenChange}>
+            <PopoverTrigger asChild>
+                <PageHeaderPrimaryButton icon={Plus}>
+                    Report incident
+                </PageHeaderPrimaryButton>
+            </PopoverTrigger>
+            <PopoverContent
+                align="end"
+                className="w-72 max-w-[calc(100vw-2rem)] p-1.5"
+            >
+                {canCreate && (
+                    <>
+                        <Button
+                            unstyled
+                            type="button"
+                            onClick={() => onReport('incident')}
+                            className={choice}
+                        >
+                            <ShieldAlert
+                                aria-hidden
+                                className="mt-0.5 size-4 shrink-0 text-status-critical"
+                            />
+                            <span>
+                                <span className="block text-sm font-medium">
+                                    An incident
+                                </span>
+                                <span className="text-caption block">
+                                    Something happened to a client or worker.
+                                </span>
+                            </span>
+                        </Button>
+                        <Button
+                            unstyled
+                            type="button"
+                            onClick={() => onReport('near_miss')}
+                            className={choice}
+                        >
+                            <Eye
+                                aria-hidden
+                                className="mt-0.5 size-4 shrink-0 text-primary"
+                            />
+                            <span>
+                                <span className="block text-sm font-medium">
+                                    A near miss
+                                </span>
+                                <span className="text-caption block">
+                                    An event that could have caused harm.
+                                </span>
+                            </span>
+                        </Button>
+                    </>
                 )}
-            </div>
-        </div>
+                {canSafeguarding && (
+                    <Button
+                        unstyled
+                        type="button"
+                        onClick={onSafeguarding}
+                        className={choice}
+                    >
+                        <ShieldAlert
+                            aria-hidden
+                            className="mt-0.5 size-4 shrink-0 text-status-warning"
+                        />
+                        <span>
+                            <span className="block text-sm font-medium">
+                                A safeguarding concern
+                            </span>
+                            <span className="text-caption block">
+                                Raise a concern about abuse, neglect or
+                                exploitation.
+                            </span>
+                        </span>
+                    </Button>
+                )}
+            </PopoverContent>
+        </Popover>
     );
 }
 
-function Metric({
-    label,
-    value,
-    tone,
+/** The four quieter register filters, plus every register view, in one place. */
+function MoreFilters({
+    active,
+    filters,
+    tab,
+    tabCounts,
+    clients,
+    onTab,
+    onChange,
 }: {
-    label: string;
-    value: string;
-    tone: Tone;
+    active: number;
+    filters: Filters;
+    tab: string;
+    tabCounts: Record<string, number>;
+    clients: Props['clients'];
+    onTab: (tab: string) => void;
+    onChange: (next: Partial<Filters>) => void;
 }) {
+    const [open, setOpen] = useState(false);
+    const views = VIEWS.filter((view) => view.key !== 'needs_owner');
     return (
-        <div>
-            <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                {label}
-            </p>
-            <p className={`text-lg font-bold tabular-nums ${TONE_TEXT[tone]}`}>
-                {value}
-            </p>
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <PageHeaderFilterButton icon={SlidersHorizontal} active={active > 0}>
+                    {active > 0 ? `More filters · ${active}` : 'More filters'}
+                </PageHeaderFilterButton>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="grid w-80 max-w-[calc(100vw-2rem)] gap-3">
+                <FilterField label="Incident view">
+                    <SelectInput
+                        ariaLabel="Incident view"
+                        placeholder="Incident view"
+                        value={tab}
+                        onChange={(value) => {
+                            setOpen(false);
+                            onTab(value);
+                        }}
+                        options={views.map((view) => ({
+                            value: view.key,
+                            label: `${view.label} (${tabCounts[view.key] ?? 0})`,
+                        }))}
+                    />
+                </FilterField>
+                <FilterField label="Report kind">
+                    <SelectInput
+                        ariaLabel="Report kind"
+                        placeholder="All reports"
+                        value={filters.kind ?? 'all'}
+                        onChange={(value) => onChange({ kind: value as Filters['kind'] })}
+                        options={[
+                            { value: 'all', label: 'All reports' },
+                            { value: 'incidents', label: 'Incidents only' },
+                            { value: 'near_misses', label: 'Near misses only' },
+                        ]}
+                    />
+                </FilterField>
+                {clients?.length ? (
+                    <FilterField label="Client">
+                        <EntityFilter
+                            label="Client"
+                            allLabel="All clients"
+                            items={clients.map((client) => ({
+                                id: client.id,
+                                name: `${client.first_name} ${client.last_name}`.trim(),
+                            }))}
+                            value={filters.client_id}
+                            onChange={(id) => onChange({ client_id: id })}
+                        />
+                    </FilterField>
+                ) : null}
+                <FilterField label="Source">
+                    <SelectInput
+                        ariaLabel="Source"
+                        placeholder="All sources"
+                        value={filters.source ?? 'all'}
+                        onChange={(key) => onChange({ source: key === 'all' ? null : key })}
+                        options={[
+                            { value: 'all', label: 'All sources' },
+                            ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label })),
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Severity">
+                    <SelectInput
+                        ariaLabel="Severity"
+                        placeholder="All severities"
+                        value={filters.severity ?? 'all'}
+                        onChange={(value) => onChange({ severity: value === 'all' ? null : value })}
+                        options={[
+                            { value: 'all', label: 'All severities' },
+                            ...SEV_ORDER.map((value) => ({ value, label: SEVERITY_LABELS[value] })),
+                        ]}
+                    />
+                </FilterField>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="grid gap-1.5">
+            <span className="text-caption font-semibold">{label}</span>
+            {children}
         </div>
     );
 }
@@ -1071,349 +956,175 @@ function Metric({
 /*  Incident table                                                     */
 /* ------------------------------------------------------------------ */
 
+function ownerCell(row: IncidentRow) {
+    const ownership = row.ownership;
+    if (!ownership)
+        return <span className="text-muted-foreground">Owner not recorded</span>;
+    if (ownership.state === 'unassigned')
+        return <StatusBadge variant="warning">Needs an owner</StatusBadge>;
+    if (ownership.state === 'replacement_needed')
+        return <StatusBadge variant="warning">Owner needs replacing</StatusBadge>;
+    const name = ownership.owner?.name ?? ownership.last_owner_name;
+    return name ? (
+        <RecordPerson name={name} />
+    ) : (
+        <span className="text-muted-foreground">Owner not recorded</span>
+    );
+}
+
+function severityCell(row: IncidentRow) {
+    const potential = row.type === 'near_miss' && row.potential_severity;
+    const key = potential ? row.potential_severity! : row.severity;
+    const label = SEVERITY_LABELS[key] ?? key;
+    return (
+        <StatusBadge variant={SEVERITY_VARIANT[key] ?? 'neutral'}>
+            {potential ? `Potential: ${label}` : label}
+        </StatusBadge>
+    );
+}
+
 export function IncidentTable({
     rows,
-    onRowCtx,
+    actionsFor,
     onOpen,
+    variant = 'stages',
+    footer,
 }: {
     rows: IncidentRow[];
-    onRowCtx: (e: ReactMouseEvent, i: IncidentRow) => void;
+    actionsFor: (row: IncidentRow) => MenuItem[];
     onOpen: (id: number) => void;
+    variant?: 'stages' | 'near_miss';
+    footer?: ReactNode;
 }) {
-    if (!rows.length) {
-        return (
-            <div className="px-4 py-16 text-center">
-                <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                <p className="font-medium text-muted-foreground">
-                    No incidents here
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                    Nothing matches this tab and filters.
-                </p>
-            </div>
-        );
-    }
+    const nearMiss = variant === 'near_miss';
+    const columns: RecordTableColumn<IncidentRow>[] = [
+        {
+            key: 'incident',
+            label: 'Incident',
+            className: 'min-w-[16rem] max-w-[22rem]',
+            cell: (i) => (
+                <RecordIdentity
+                    title={
+                        <Link
+                            href={`/incidents/${i.id}`}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onOpen(i.id);
+                            }}
+                            aria-label={`Open incident ${i.ref ?? `INC-${i.id}`}`}
+                            className="rounded-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            {incidentTypeLabel(i.type)}
+                        </Link>
+                    }
+                    sub={
+                        <span className="line-clamp-2">
+                            {i.ref ?? `INC-${i.id}`}
+                            {i.description ? ` · ${i.description}` : ''}
+                        </span>
+                    }
+                />
+            ),
+        },
+        {
+            key: 'when',
+            label: 'When',
+            nowrap: true,
+            cell: (i) =>
+                i.occurred_at ? (
+                    <RecordIdentity
+                        title={formatDate(i.occurred_at)}
+                        sub={`${formatTime(i.occurred_at)} · ${
+                            nearMiss && i.source === 'manual'
+                                ? 'Reported by staff'
+                                : (SOURCE_LABELS[i.source] ?? incidentTypeLabel(i.source))
+                        }`}
+                    />
+                ) : (
+                    <span className="text-muted-foreground">Time not recorded</span>
+                ),
+        },
+        {
+            key: 'client',
+            label: 'Client',
+            nowrap: true,
+            cell: (i) =>
+                clientName(i) ? (
+                    <RecordIdentity title={clientName(i)} sub={i.client?.site ?? undefined} />
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        { key: 'owner', label: 'Owner', nowrap: true, cell: ownerCell },
+        { key: 'severity', label: 'Severity', nowrap: true, cell: severityCell },
+        ...(nearMiss
+            ? ([
+                  {
+                      key: 'status',
+                      label: 'Status',
+                      nowrap: true,
+                      cell: (i) => (
+                          <StatusBadge
+                              status={i.status}
+                              label={INCIDENT_STATUS_LABELS[i.status] ?? incidentTypeLabel(i.status)}
+                          />
+                      ),
+                  },
+                  {
+                      key: 'flags',
+                      label: 'Flags',
+                      cell: (i) => {
+                          const flags = [
+                              i.open_followups_count > 0 ? plural(i.open_followups_count, 'follow-up') : null,
+                              i.control_room_alert_id ? 'Control room alert' : null,
+                              i.is_notifiable ? 'WorkSafe-notifiable' : null,
+                              i.attachments_count > 0 ? plural(i.attachments_count, 'attachment') : null,
+                          ].filter(Boolean);
+                          return flags.length ? flags.join(' · ') : <span className="text-muted-foreground">—</span>;
+                      },
+                  },
+              ] satisfies RecordTableColumn<IncidentRow>[])
+            : ([
+                  {
+                      key: 'stage',
+                      label: 'Where it’s up to',
+                      nowrap: true,
+                      cell: (i) => {
+                          const stage = incidentRowStage(i);
+                          return (
+                              <StageDots
+                                  stage={stage.stage}
+                                  of={6}
+                                  label={stage.label}
+                                  note={stage.note}
+                                  tone={stage.tone}
+                              />
+                          );
+                      },
+                  },
+              ] satisfies RecordTableColumn<IncidentRow>[])),
+    ];
     return (
-        <>
-            <ul aria-label="Incidents" className="min-w-0 divide-y md:hidden">
-                {rows.map((incident) => (
-                    <li key={incident.id} className="min-w-0 space-y-3 p-4">
-                        <div className="flex items-start justify-between gap-2">
-                            <Button
-                                unstyled
-                                className="frontline-tap frontline-focus min-w-0 rounded-md text-left font-semibold [overflow-wrap:anywhere] text-primary"
-                                onClick={() => onOpen(incident.id)}
-                                aria-label={`Open incident ${incident.ref ?? 'INC-' + incident.id}`}
-                            >
-                                {incident.ref ?? `INC-${incident.id}`} ·{' '}
-                                {titleCase(incident.type)}
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="frontline-tap shrink-0"
-                                aria-label={`Options for ${incident.ref ?? 'INC-' + incident.id}`}
-                                onClick={(event) => onRowCtx(event, incident)}
-                            >
-                                <MoreHorizontal
-                                    aria-hidden
-                                    className="size-4"
-                                />
-                            </Button>
-                        </div>
-                        {incident.description && (
-                            <p className="line-clamp-3 text-sm [overflow-wrap:anywhere] text-muted-foreground">
-                                {incident.description}
-                            </p>
-                        )}
-                        <dl className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="col-span-2">
-                                <dt className="text-caption text-muted-foreground">
-                                    When
-                                </dt>
-                                <dd>
-                                    {incident.occurred_at
-                                        ? formatDateTime(incident.occurred_at)
-                                        : 'Time not recorded'}
-                                </dd>
-                            </div>
-                            <div className="min-w-0">
-                                <dt className="text-caption text-muted-foreground">
-                                    Client
-                                </dt>
-                                <dd className="[overflow-wrap:anywhere]">
-                                    {incident.client
-                                        ? `${incident.client.first_name} ${incident.client.last_name}`
-                                        : 'No client recorded'}
-                                    {incident.client?.site && (
-                                        <span className="block text-xs text-muted-foreground">
-                                            {incident.client.site}
-                                        </span>
-                                    )}
-                                </dd>
-                            </div>
-                            <div className="min-w-0">
-                                <dt className="text-caption text-muted-foreground">
-                                    Incident owner
-                                </dt>
-                                <dd className="[overflow-wrap:anywhere]">
-                                    {incident.ownership
-                                        ? incidentOwnerLabel(incident.ownership)
-                                        : 'Owner not recorded'}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-caption text-muted-foreground">
-                                    Severity
-                                </dt>
-                                <dd className="mt-1">
-                                    <StatusBadge
-                                        status={
-                                            incident.type === 'near_miss' &&
-                                            incident.potential_severity
-                                                ? incident.potential_severity
-                                                : incident.severity
-                                        }
-                                        label={
-                                            incident.type === 'near_miss' &&
-                                            incident.potential_severity
-                                                ? `Potential: ${SEV[incident.potential_severity]?.label ?? incident.potential_severity}`
-                                                : (SEV[incident.severity]
-                                                      ?.label ??
-                                                  incident.severity)
-                                        }
-                                    />
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-caption text-muted-foreground">
-                                    Status
-                                </dt>
-                                <dd className="mt-1">
-                                    <StatusBadge
-                                        status={incident.status}
-                                        label={
-                                            STATUS[incident.status]?.label ??
-                                            titleCase(incident.status)
-                                        }
-                                    />
-                                </dd>
-                            </div>
-                            <div className="col-span-2">
-                                <dt className="text-caption text-muted-foreground">
-                                    Source
-                                </dt>
-                                <dd>
-                                    {SOURCE[incident.source]?.label ??
-                                        titleCase(incident.source)}
-                                </dd>
-                            </div>
-                        </dl>
-                        <div className="flex flex-wrap gap-3 text-xs">
-                            {incident.is_notifiable && (
-                                <span className="inline-flex items-center gap-1 text-status-critical">
-                                    <ShieldAlert
-                                        aria-hidden
-                                        className="size-4"
-                                    />
-                                    WorkSafe-notifiable
-                                </span>
-                            )}
-                            {incident.open_followups_count > 0 && (
-                                <span className="inline-flex items-center gap-1">
-                                    <ListTodo aria-hidden className="size-4" />
-                                    {incident.open_followups_count} open
-                                    follow-ups
-                                </span>
-                            )}
-                            {incident.attachments_count > 0 && (
-                                <span className="inline-flex items-center gap-1">
-                                    <Paperclip aria-hidden className="size-4" />
-                                    {incident.attachments_count} attachments
-                                </span>
-                            )}
-                        </div>
-                    </li>
-                ))}
-            </ul>
-            <div
-                role="region"
-                aria-label="Incidents table"
-                tabIndex={0}
-                className="hidden max-w-full overflow-x-auto overscroll-x-contain focus-visible:ring-2 focus-visible:ring-ring md:block"
-            >
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                            <th className="px-4 py-2.5">When</th>
-                            <th className="px-4 py-2.5">Incident</th>
-                            <th className="px-4 py-2.5">Client</th>
-                            <th className="px-4 py-2.5">Incident owner</th>
-                            <th className="px-4 py-2.5">Severity</th>
-                            <th className="px-4 py-2.5">Status</th>
-                            <th className="px-4 py-2.5">Source</th>
-                            <th className="px-4 py-2.5">Flags</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {rows.map((i) => {
-                            const sev = SEV[i.severity] ?? SEV.low;
-                            const stat = STATUS[i.status] ?? STATUS.draft;
-                            const StatusIcon = stat.icon;
-                            const src = SOURCE[i.source] ?? SOURCE.manual;
-                            const SrcIcon = src.icon;
-                            const clientName = i.client
-                                ? `${i.client.first_name} ${i.client.last_name}`.trim()
-                                : null;
-                            const isNearMiss = i.type === 'near_miss';
-                            return (
-                                <tr
-                                    key={i.id}
-                                    onClick={() => onOpen(i.id)}
-                                    onContextMenu={(e) => onRowCtx(e, i)}
-                                    className="cursor-pointer transition-colors hover:bg-muted/40"
-                                >
-                                    <td className="px-4 py-3 align-top whitespace-nowrap">
-                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                            <Calendar className="h-3 w-3" />
-                                            {i.occurred_at
-                                                ? formatDateTime(i.occurred_at)
-                                                : '—'}
-                                        </div>
-                                        <Button
-                                            unstyled
-                                            className="frontline-focus mt-0.5 min-h-11 rounded-md text-left text-xs font-medium text-primary"
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                onOpen(i.id);
-                                            }}
-                                            aria-label={`Open incident ${i.ref ?? 'INC-' + i.id}`}
-                                        >
-                                            {i.ref ?? `INC-${i.id}`}
-                                        </Button>
-                                    </td>
-                                    <td className="px-4 py-3 align-top">
-                                        <div className="flex items-center gap-2">
-                                            <span
-                                                className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`}
-                                            />
-                                            <span className="font-medium capitalize">
-                                                {titleCase(i.type)}
-                                            </span>
-                                        </div>
-                                        {i.description ? (
-                                            <p className="mt-0.5 line-clamp-1 max-w-md text-xs text-muted-foreground">
-                                                {i.description}
-                                            </p>
-                                        ) : null}
-                                    </td>
-                                    <td className="px-4 py-3 align-top">
-                                        {clientName ? (
-                                            <div className="flex items-center gap-2">
-                                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-                                                    {clientName
-                                                        .split(' ')
-                                                        .map((n) => n[0])
-                                                        .slice(0, 2)
-                                                        .join('')}
-                                                </span>
-                                                <span className="min-w-0">
-                                                    <span className="block truncate font-medium">
-                                                        {clientName}
-                                                    </span>
-                                                    {i.client?.site ? (
-                                                        <span className="block truncate text-xs text-muted-foreground">
-                                                            {i.client.site}
-                                                        </span>
-                                                    ) : null}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground">
-                                                —
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 align-top">
-                                        {i.ownership
-                                            ? incidentOwnerLabel(i.ownership)
-                                            : 'Owner not recorded'}
-                                    </td>
-                                    <td className="px-4 py-3 align-top">
-                                        <span
-                                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[sev.tone]}`}
-                                        >
-                                            {isNearMiss && i.potential_severity
-                                                ? `Potential: ${SEV[i.potential_severity]?.label ?? i.potential_severity}`
-                                                : sev.label}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 align-top">
-                                        <span
-                                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${stat.cls}`}
-                                        >
-                                            <StatusIcon className="h-3 w-3" />
-                                            {stat.label}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 align-top">
-                                        <span
-                                            className="inline-flex items-center gap-1 text-xs text-muted-foreground"
-                                            title={src.label}
-                                        >
-                                            <SrcIcon className="h-3.5 w-3.5" />
-                                            {src.label}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 align-top">
-                                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                                            {i.control_room_alert_id ? (
-                                                <RadioTower
-                                                    className="h-3.5 w-3.5 text-status-info"
-                                                    aria-label="Linked to Control Room alert"
-                                                />
-                                            ) : null}
-                                            {i.investigation_status &&
-                                            i.investigation_status !==
-                                                'not_required' ? (
-                                                <Search
-                                                    className="h-3.5 w-3.5 text-primary"
-                                                    aria-label="Investigation"
-                                                />
-                                            ) : null}
-                                            {i.is_notifiable ? (
-                                                <ShieldAlert
-                                                    className="h-3.5 w-3.5 text-status-critical"
-                                                    aria-label="WorkSafe-notifiable"
-                                                />
-                                            ) : null}
-                                            {i.open_followups_count > 0 ? (
-                                                <span
-                                                    className="inline-flex items-center gap-0.5 text-xs text-status-warning"
-                                                    aria-label="Open follow-ups"
-                                                >
-                                                    <ListTodo className="h-3.5 w-3.5" />
-                                                    {i.open_followups_count}
-                                                </span>
-                                            ) : null}
-                                            {i.attachments_count > 0 ? (
-                                                <span
-                                                    className="inline-flex items-center gap-0.5 text-xs"
-                                                    aria-label="Attachments"
-                                                >
-                                                    <Paperclip className="h-3.5 w-3.5" />
-                                                    {i.attachments_count}
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </>
+        <RecordTable
+            title={nearMiss ? 'Near misses' : 'Incidents'}
+            sub={nearMiss ? undefined : 'Newest first · click a row to open it, right-click for more'}
+            ariaLabel="Incidents table"
+            rows={rows}
+            rowKey={(i) => i.id}
+            onOpen={(i) => onOpen(i.id)}
+            actionsFor={actionsFor}
+            menuTitle={(i) => `${i.ref ?? `INC-${i.id}`} · ${incidentTypeLabel(i.type)}`}
+            menuIcon={ShieldAlert}
+            columns={columns}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>No incidents match this view and its filters.</span>
+                </p>
+            }
+            footer={rows.length ? footer : undefined}
+        />
     );
 }
 
@@ -1424,172 +1135,399 @@ export function IncidentTable({
 export function FollowupTable({
     rows,
     onOpen,
+    overdue,
+    footer,
 }: {
     rows: FollowupRow[];
     onOpen: (id: number) => void;
+    overdue?: number;
+    footer?: ReactNode;
 }) {
-    if (!rows.length) {
+    return (
+        <RecordTable
+            title="Open follow-ups"
+            sub={`${overdue !== undefined ? `${overdue} overdue · ` : ''}soonest first · click a row to open its incident`}
+            ariaLabel="Incident follow-ups table"
+            rows={rows}
+            rowKey={(f) => f.id}
+            onOpen={(f) => onOpen(f.incident_id)}
+            actionsFor={(f) => [
+                {
+                    label: 'Open incident',
+                    icon: Eye,
+                    onClick: () => onOpen(f.incident_id),
+                },
+            ]}
+            menuTitle={(f) => f.notes ?? 'Follow-up task'}
+            menuIcon={ListTodo}
+            columns={[
+                {
+                    key: 'task',
+                    label: 'Follow-up',
+                    className: 'min-w-[16rem]',
+                    cell: (f) => (
+                        <b className="font-semibold text-foreground">
+                            {f.notes ?? 'Follow-up task'}
+                        </b>
+                    ),
+                },
+                {
+                    key: 'incident',
+                    label: 'Incident',
+                    nowrap: true,
+                    cell: (f) => (
+                        <RecordIdentity
+                            title={
+                                <Link
+                                    href={`/incidents/${f.incident_id}`}
+                                    onClick={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        onOpen(f.incident_id);
+                                    }}
+                                    aria-label={`Open incident ${f.incident_ref ?? `INC-${f.incident_id}`}`}
+                                    className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                >
+                                    {f.incident_ref ?? `INC-${f.incident_id}`}
+                                </Link>
+                            }
+                            sub={f.incident_type ? incidentTypeLabel(f.incident_type) : undefined}
+                        />
+                    ),
+                },
+                {
+                    key: 'client',
+                    label: 'Client',
+                    nowrap: true,
+                    cell: (f) => f.client_name ?? <span className="text-muted-foreground">—</span>,
+                },
+                {
+                    key: 'owner',
+                    label: 'Owner',
+                    nowrap: true,
+                    cell: (f) =>
+                        f.assigned_to ? (
+                            <RecordPerson name={f.assigned_to} />
+                        ) : (
+                            <span className="text-muted-foreground">Unassigned</span>
+                        ),
+                },
+                {
+                    key: 'due',
+                    label: 'Due',
+                    nowrap: true,
+                    cell: (f) =>
+                        !f.due_at ? (
+                            <span className="text-muted-foreground">No due date</span>
+                        ) : f.overdue ? (
+                            <StatusBadge variant="critical">
+                                {dateTimeWithYear(f.due_at)} · overdue
+                            </StatusBadge>
+                        ) : (
+                            <RecordIdentity title={dateWithYear(f.due_at)} sub={formatTime(f.due_at)} />
+                        ),
+                },
+            ]}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>No open follow-ups match this view and its filters.</span>
+                </p>
+            }
+            footer={rows.length ? footer : undefined}
+        />
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Near misses                                                        */
+/* ------------------------------------------------------------------ */
+
+function NearMissInsights({
+    insights,
+}: {
+    insights: Props['nearMissInsights'];
+}) {
+    const counts = SEV_ORDER.map((key) => ({
+        key,
+        label: SEVERITY_LABELS[key],
+        value: insights.by_potential[key] ?? 0,
+    }));
+    const total = counts.reduce((sum, item) => sum + item.value, 0);
+    const max = Math.max(1, ...counts.map((item) => item.value));
+    return (
+        <>
+            <Tally
+                title="Near misses reported"
+                sub="Near misses warn us before someone gets hurt"
+                items={[
+                    {
+                        value:
+                            insights.trend_pct === null
+                                ? '—'
+                                : `${insights.trend_pct > 0 ? '+' : ''}${insights.trend_pct}%`,
+                        label: 'Change in reports · 30 days',
+                        tone:
+                            insights.trend_pct === null
+                                ? 'none'
+                                : insights.trend_pct >= 0
+                                  ? 'success'
+                                  : 'warning',
+                    },
+                    {
+                        value: insights.ratio === null ? '—' : `${insights.ratio} : 1`,
+                        label: 'Near misses for each incident · 90 days',
+                        tone: insights.ratio === null ? 'none' : 'success',
+                    },
+                ]}
+                calm=""
+            />
+            <Surface title="What could have happened">
+                {total === 0 ? (
+                    <p className="sg-quiet">
+                        <Ring tone="none" />
+                        <span>No near misses with a recorded potential severity yet.</span>
+                    </p>
+                ) : (
+                    <ul
+                        aria-label="Near misses by what could have happened"
+                        className="mx-[18px] mt-3 mb-4 grid h-40 grid-cols-4 items-end gap-6 border-b border-border"
+                    >
+                        {counts.map((item) => (
+                            <li
+                                key={item.key}
+                                className="flex h-full flex-col items-center justify-end gap-1.5"
+                                title={`${item.label}: ${plural(item.value, 'near miss', 'near misses')}`}
+                            >
+                                <span className="text-sm font-semibold text-foreground tabular-nums">
+                                    {item.value}
+                                </span>
+                                <span
+                                    aria-hidden="true"
+                                    className="w-10 max-w-full rounded-t-[4px] bg-[var(--chart-1)]"
+                                    style={{ height: `${Math.max(item.value ? 4 : 0, (item.value / max) * 100)}%` }}
+                                />
+                                <span className="sr-only">
+                                    {item.label}: {plural(item.value, 'near miss', 'near misses')}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {total > 0 ? (
+                    <div aria-hidden="true" className="mx-[18px] mb-4 grid grid-cols-4 gap-6 text-center">
+                        {counts.map((item) => (
+                            <span key={item.key} className="text-caption">
+                                {item.label}
+                            </span>
+                        ))}
+                    </div>
+                ) : null}
+            </Surface>
+        </>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Needs an owner — the site manager's queue                         */
+/* ------------------------------------------------------------------ */
+
+function NeedsOwnerQueue({
+    rows,
+    detail,
+    filters,
+    url,
+    onOpen,
+}: {
+    rows: IncidentRow[];
+    detail: IncidentDetail | null;
+    filters: Filters;
+    url: string;
+    onOpen: (id: number) => void;
+}) {
+    const queue = [...rows].reverse(); // oldest first
+    const requested = Number(new URLSearchParams(url.split('?')[1] ?? '').get('incident'));
+    const selectedId = queue.some((row) => row.id === requested)
+        ? requested
+        : (queue[0]?.id ?? null);
+    const selectedRow = queue.find((row) => row.id === selectedId) ?? null;
+    const loaded = detail && detail.id === selectedId ? detail : null;
+    const asked = useRef<number | null>(null);
+    const select = (id: number) => {
+        asked.current = id;
+        router.get(
+            '/incidents',
+            { ...filters, incident: id },
+            { preserveState: true, preserveScroll: true, replace: true, only: ['detail'] },
+        );
+    };
+    useEffect(() => {
+        // Load the chosen incident's details beside the queue (the register's detail prop).
+        if (selectedId !== null && !loaded && asked.current !== selectedId) select(selectedId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedId, loaded]);
+
+    if (!queue.length) {
         return (
-            <div className="px-4 py-16 text-center">
-                <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-status-success/50" />
-                <p className="font-medium text-muted-foreground">
-                    No open follow-ups
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                    No open follow-ups match this view and its filters.
-                </p>
-            </div>
+            <QuietLine
+                title="Needs an owner"
+                text="Every incident you can see has an owner."
+            />
         );
     }
     return (
-        <>
-            <ul
-                aria-label="Open incident follow-ups"
-                className="min-w-0 divide-y md:hidden"
-            >
-                {rows.map((followup) => (
-                    <li key={followup.id} className="min-w-0 space-y-3 p-4">
-                        <Button
-                            unstyled
-                            className="frontline-tap frontline-focus block w-full rounded-md text-left font-semibold [overflow-wrap:anywhere] text-primary"
-                            onClick={() => onOpen(followup.incident_id)}
-                            aria-label={`Open incident ${followup.incident_ref ?? 'INC-' + followup.incident_id}`}
-                        >
-                            {followup.incident_ref ??
-                                `INC-${followup.incident_id}`}
-                            {followup.incident_type
-                                ? ` · ${titleCase(followup.incident_type)}`
-                                : ''}
-                        </Button>
-                        <p className="text-sm [overflow-wrap:anywhere]">
-                            {followup.notes ?? 'Follow-up task'}
-                        </p>
-                        <dl className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="min-w-0">
-                                <dt className="text-caption text-muted-foreground">
-                                    Client
-                                </dt>
-                                <dd className="[overflow-wrap:anywhere]">
-                                    {followup.client_name ??
-                                        'No client recorded'}
-                                </dd>
-                            </div>
-                            <div className="min-w-0">
-                                <dt className="text-caption text-muted-foreground">
-                                    Owner
-                                </dt>
-                                <dd className="[overflow-wrap:anywhere]">
-                                    {followup.assigned_to ?? 'Unassigned'}
-                                </dd>
-                            </div>
-                            <div className="col-span-2">
-                                <dt className="text-caption text-muted-foreground">
-                                    Due
-                                </dt>
-                                <dd>
-                                    {followup.due_at
-                                        ? formatDateTime(followup.due_at)
-                                        : 'No due date'}
-                                    {followup.overdue && (
-                                        <StatusBadge
-                                            className="ml-2"
-                                            status="overdue"
-                                        />
-                                    )}
-                                </dd>
-                            </div>
-                        </dl>
-                    </li>
-                ))}
-            </ul>
-            <div
-                role="region"
-                aria-label="Incident follow-ups table"
-                tabIndex={0}
-                className="hidden max-w-full overflow-x-auto overscroll-x-contain focus-visible:ring-2 focus-visible:ring-ring md:block"
-            >
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                            <th className="px-4 py-2.5">Follow-up</th>
-                            <th className="px-4 py-2.5">Incident</th>
-                            <th className="px-4 py-2.5">Client</th>
-                            <th className="px-4 py-2.5">Owner</th>
-                            <th className="px-4 py-2.5">Due</th>
-                            <th className="px-4 py-2.5"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {rows.map((f) => (
-                            <tr
-                                key={f.id}
-                                onClick={() => onOpen(f.incident_id)}
-                                className="cursor-pointer transition-colors hover:bg-muted/40"
-                            >
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex items-start gap-2">
-                                        <Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
-                                        <span className="line-clamp-2 max-w-md">
-                                            {f.notes ?? 'Follow-up task'}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3 align-top whitespace-nowrap text-muted-foreground">
-                                    <Button
-                                        unstyled
-                                        className="frontline-focus min-h-11 rounded-md text-left font-medium text-primary"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            onOpen(f.incident_id);
-                                        }}
-                                        aria-label={`Open incident ${f.incident_ref ?? 'INC-' + f.incident_id}`}
-                                    >
-                                        {f.incident_ref ??
-                                            `INC-${f.incident_id}`}
-                                    </Button>
-                                    {f.incident_type ? (
-                                        <span className="block text-xs capitalize">
-                                            {titleCase(f.incident_type)}
-                                        </span>
-                                    ) : null}
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    {f.client_name ?? '—'}
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                        {f.assigned_to ? (
-                                            <UserCog className="h-3.5 w-3.5" />
-                                        ) : null}
-                                        {f.assigned_to ?? 'Unassigned'}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 align-top whitespace-nowrap">
-                                    {f.due_at ? (
-                                        <span
-                                            className={`inline-flex items-center gap-1 text-xs ${f.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}
-                                        >
-                                            <Clock className="h-3.5 w-3.5" />
-                                            {formatDateTime(f.due_at)}
-                                            {f.overdue ? ' · overdue' : ''}
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground">
-                                            No due date
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 text-right align-top">
-                                    <span className="inline-flex items-center gap-1 text-xs text-primary">
-                                        <Stethoscope className="h-3.5 w-3.5" />{' '}
-                                        Open
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+        <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+            <Queue
+                title="Needs an owner"
+                sub="Oldest first"
+                selected={selectedId}
+                onSelect={(key) => select(Number(key))}
+                items={queue.map((row) => {
+                    const days = daysSince(row.occurred_at);
+                    return {
+                        key: row.id,
+                        title: `${incidentTypeLabel(row.type)}${clientName(row) ? ` — ${clientName(row)}` : ''}`,
+                        tone: ['high', 'critical'].includes(row.severity) ? ('critical' as const) : ('warning' as const),
+                        age: days !== null ? plural(days, 'day') : undefined,
+                        sub: [
+                            row.ref ?? `INC-${row.id}`,
+                            row.client?.site,
+                            row.occurred_at ? `${formatDate(row.occurred_at)}, ${formatTime(row.occurred_at)}` : null,
+                        ]
+                            .filter(Boolean)
+                            .join(' · '),
+                        badges: (
+                            <>
+                                {severityCell(row)}
+                                {worksafePending(row.is_notifiable, row.worksafe_notification_status) ? (
+                                    <StatusBadge variant="warning">WorkSafe to notify</StatusBadge>
+                                ) : null}
+                                {row.ownership?.state === 'replacement_needed' ? (
+                                    <StatusBadge variant="warning">Owner needs replacing</StatusBadge>
+                                ) : null}
+                            </>
+                        ),
+                    };
+                })}
+            />
+            <div className="grid min-w-0 gap-5">
+                {selectedRow && loaded ? (
+                    <QueueDetail row={selectedRow} detail={loaded} onOpen={onOpen} />
+                ) : selectedRow ? (
+                    <QuietLine
+                        title={incidentTypeLabel(selectedRow.type)}
+                        text="Loading this incident…"
+                        action={{ label: 'Open incident', onClick: () => onOpen(selectedRow.id) }}
+                    />
+                ) : null}
             </div>
+        </div>
+    );
+}
+
+function QueueDetail({
+    row,
+    detail: d,
+    onOpen,
+}: {
+    row: IncidentRow;
+    detail: IncidentDetail;
+    onOpen: (id: number) => void;
+}) {
+    const [assigning, setAssigning] = useState(false);
+    const reference = d.ref ?? `INC-${d.id}`;
+    const ownership = d.ownership;
+    const waited = daysSince(d.submitted_at ?? d.occurred_at);
+    const worksafe = incidentWorksafe(d);
+    const replacing = ownership?.state === 'replacement_needed';
+    const known = d.submitted_at ?? d.occurred_at;
+    return (
+        <>
+            <Surface tone="critical" aria-label="Chosen incident">
+                <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+                    <span
+                        aria-hidden="true"
+                        className="grid size-[46px] shrink-0 place-items-center rounded-full bg-status-critical-bg text-status-critical ring-2 ring-status-critical/60 ring-offset-2 ring-offset-card"
+                    >
+                        <UserPlus className="size-5" />
+                    </span>
+                    <div className="grid min-w-0 flex-1 gap-0.5">
+                        <span className="text-caption flex items-center gap-1.5 font-bold tracking-wide text-status-critical-foreground uppercase">
+                            <Ring tone="critical" />
+                            {replacing ? 'Owner needs replacing' : 'Needs an owner'}
+                            {waited !== null ? ` · waiting ${plural(waited, 'day')}` : ''}
+                        </span>
+                        <b className="text-section-title">
+                            {incidentTypeLabel(d.type)}
+                            {d.client ? ` — ${`${d.client.first_name} ${d.client.last_name}`.trim()}` : ''}
+                        </b>
+                        <span className="text-subtle">
+                            {reference} · {d.client?.site ?? 'No person linked'}
+                            {d.reporter?.name ? (
+                                <>
+                                    {' '}· reported by{' '}
+                                    <b className="font-semibold text-foreground">{d.reporter.name}</b>
+                                </>
+                            ) : null}
+                        </span>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => onOpen(row.id)}>
+                            Open incident
+                        </Button>
+                        {ownership?.can_assign ? (
+                            <Button size="sm" onClick={() => setAssigning(true)}>
+                                {replacing ? 'Choose a new owner' : 'Assign someone'}
+                            </Button>
+                        ) : null}
+                    </div>
+                </div>
+                <p className="flex items-center gap-2.5 border-t border-dashed border-border bg-muted/50 px-5 py-2.5 text-subtle">
+                    <Ring tone="none" />
+                    The owner finishes the manager review; then Health &amp; safety
+                    accepts it for the safety review
+                </p>
+            </Surface>
+            {worksafe.notifiable ? (
+                <DutyClock
+                    tone={worksafe.notified ? 'warning' : 'critical'}
+                    big={(worksafe.notified ? daysSince(worksafe.notifiedAt) : daysSince(known)) ?? '—'}
+                    unit="days"
+                    kicker="WorkSafe NZ notifiable event"
+                    title={worksafe.notified ? 'Notified — awaiting acknowledgement' : 'Not notified yet'}
+                    sub={worksafe.text}
+                />
+            ) : null}
+            <Story
+                title="What happened"
+                facts={[
+                    ...(d.client?.site ? [{ icon: MapPin, text: d.client.site }] : []),
+                    ...(d.occurred_at
+                        ? [
+                              {
+                                  icon: Clock,
+                                  text: (
+                                      <>
+                                          <b>{formatDate(d.occurred_at)}</b>, {formatTime(d.occurred_at)}
+                                      </>
+                                  ),
+                              },
+                          ]
+                        : []),
+                ]}
+                paras={[
+                    { h: 'What happened', t: d.description || 'Not recorded' },
+                    { h: 'What staff did straight away', t: d.immediate_action_taken || 'Not recorded' },
+                ]}
+            />
+            {assigning && ownership ? (
+                <AssignIncidentOwner
+                    incidentId={d.id}
+                    reference={reference}
+                    ownership={ownership}
+                    onClose={() => setAssigning(false)}
+                />
+            ) : null}
         </>
     );
 }

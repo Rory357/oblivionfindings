@@ -34,6 +34,7 @@ vi.mock('@/layouts/app-layout', () => ({
 }));
 vi.mock('@/components/incidents/incident-detail-dialog', () => ({
     IncidentDetailDialog: () => null,
+    incidentWorksafe: () => ({ notifiable: false, notified: false, text: '' }),
 }));
 vi.mock('@/components/incidents/incident-report-dialog', () => ({
     IncidentReportDialog: ({ mode }: { mode: string }) => (
@@ -99,7 +100,7 @@ describe('incident register header', () => {
     it('changes the owner lens while preserving the existing Site, severity and search filters', () => {
         const data = props();
         render(<IncidentsIndex {...data} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Incident owner' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Any owner' }));
         fireEvent.click(screen.getByRole('button', { name: 'My incidents' }));
         expect(state.get).toHaveBeenCalledWith(
             '/incidents',
@@ -120,7 +121,7 @@ describe('incident register header', () => {
             screen.queryByRole('searchbox', { name: 'Search incidents' }),
         ).not.toBeInTheDocument();
         expect(
-            screen.queryByRole('button', { name: 'Report' }),
+            screen.queryByRole('button', { name: 'Report incident' }),
         ).not.toBeInTheDocument();
         expect(
             screen.queryByRole('dialog', { name: 'Report near_miss' }),
@@ -137,7 +138,7 @@ describe('incident register header', () => {
 
     it('resets the prior account reporting state when a fresh register for another account arrives', () => {
         const view = render(<IncidentsIndex {...props()} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Report' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
         fireEvent.click(screen.getByRole('button', { name: /A near miss/ }));
         expect(
             screen.getByRole('dialog', { name: 'Report near_miss' }),
@@ -155,6 +156,7 @@ describe('incident register header', () => {
         expect(
             screen.queryByText(/linked to active Control Room/),
         ).not.toBeInTheDocument();
+        expect(screen.queryByText('Control room alerts')).not.toBeInTheDocument();
     });
     it('uses one header with permitted sibling destinations and no workflow ribbon', () => {
         render(<IncidentsIndex {...props()} />);
@@ -175,9 +177,9 @@ describe('incident register header', () => {
     });
 
     it.each([
-        ['View occurred · 30 days', 'reported_recent'],
+        ['View reported · 30 days', 'reported_recent'],
         ['View closed · 30 days', 'closed_recent'],
-        ['View worksafe pending', 'worksafe_pending'],
+        ['View worksafe to notify', 'worksafe_pending'],
     ])('opens the exact %s worklist while retaining filters', (name, tab) => {
         const data = props();
         render(<IncidentsIndex {...data} />);
@@ -206,7 +208,7 @@ describe('incident register header', () => {
 
     it('keeps near-miss reporting and adds the independently permitted safeguarding choice', () => {
         render(<IncidentsIndex {...props()} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Report' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
         expect(
             screen.getByRole('button', { name: /A safeguarding concern/ }),
         ).toBeInTheDocument();
@@ -231,7 +233,7 @@ describe('incident register header', () => {
             />,
         );
         expect(
-            screen.queryByRole('button', { name: 'Report' }),
+            screen.queryByRole('button', { name: 'Report incident' }),
         ).not.toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: 'Templates' }),
@@ -240,7 +242,7 @@ describe('incident register header', () => {
 
     it('keeps the incident register context when starting safeguarding reporting', () => {
         render(<IncidentsIndex {...props()} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Report' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
         fireEvent.click(
             screen.getByRole('button', { name: /A safeguarding concern/ }),
         );
@@ -280,8 +282,8 @@ describe('incident register header', () => {
     });
 });
 
-describe('incident mobile worklists', () => {
-    it('retains status, severity, ownership, source and flags beside accessible record/menu controls', () => {
+describe('incident worklists', () => {
+    it('shows severity, ownership and where each incident is up to, with one action list behind the row and its menu', () => {
         const incident: IncidentRow = {
             id: 4,
             ref: 'INC-4',
@@ -309,36 +311,38 @@ describe('incident mobile worklists', () => {
             reporter: { name: 'Sam' },
         };
         const onOpen = vi.fn();
-        const onRowCtx = vi.fn();
+        const view = vi.fn();
+        const actionsFor = vi.fn(() => [
+            { label: 'View incident', onClick: view },
+        ]);
         render(
             <IncidentTable
                 rows={[incident]}
                 onOpen={onOpen}
-                onRowCtx={onRowCtx}
+                actionsFor={actionsFor}
             />,
         );
-        const cards = screen.getByRole('list', { name: 'Incidents' });
-        expect(cards).toHaveClass('md:hidden');
-        expect(
-            screen.getByRole('region', { name: 'Incidents table' }),
-        ).toHaveClass('hidden', 'md:block', 'overflow-x-auto');
+        const table = screen.getByRole('region', { name: 'Incidents table' });
         for (const label of [
             'Potential: High',
             'Owner not recorded',
-            'Sensor',
-            'WorkSafe-notifiable',
-            '1 open follow-ups',
-            '2 attachments',
+            'Manager review',
+            'Waiting for review · WorkSafe to notify',
         ])
-            expect(within(cards).getByText(label)).toBeInTheDocument();
-        fireEvent.click(
-            within(cards).getByRole('button', { name: 'Open incident INC-4' }),
-        );
+            expect(within(table).getByText(label)).toBeInTheDocument();
+        fireEvent.click(within(table).getByText('Kauri House'));
         expect(onOpen).toHaveBeenCalledWith(4);
+        fireEvent.contextMenu(within(table).getAllByRole('row')[1]);
         fireEvent.click(
-            within(cards).getByRole('button', { name: 'Options for INC-4' }),
+            screen.getByRole('menuitem', { name: 'View incident' }),
         );
-        expect(onRowCtx).toHaveBeenCalledWith(expect.anything(), incident);
+        expect(view).toHaveBeenCalledTimes(1);
+        expect(actionsFor).toHaveBeenCalledWith(incident);
+        expect(
+            within(table).getByRole('button', {
+                name: 'Actions for INC-4 · Near miss',
+            }),
+        ).toBeInTheDocument();
     });
 
     it('does not claim that all follow-ups are complete when the filtered worklist is empty', () => {

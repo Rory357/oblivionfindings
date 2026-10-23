@@ -1,10 +1,13 @@
+import { Note } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDateTimeLong } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import axios from 'axios';
-import { useEffect, useId, useRef, useState } from 'react';
+import { AlertTriangle, Info } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
     confirmsRecordingWindow, recordingChoiceKey, recordingWindowInterval, validRecordingPreview,
     type RecordingPreview, type RecordingWindowCommand,
@@ -133,67 +136,113 @@ function WindowEditor({ preview, previewAvailable, actorId, incidentId, refreshi
                 setRefusalBasis(latest.current.preview);
                 setMessage('Your access or session needs checking. The original submission remains in this tab; its save is not confirmed.');
             } else {
-                setMessage('This save is not confirmed. Check its result or retry the same submission before changing it.');
+                setMessage('Check it, or try the same save again, before you change anything.');
             }
         } finally {
             if (request.current === controller) { request.current = null; setBusy(false); }
         }
     };
 
-    return <form aria-label="Record evidence window" className="space-y-4 rounded-lg border border-border p-4"
+    const selectedSources = basis.sources.items.filter((source) => selected.includes(recordingChoiceKey(source)));
+    const showDetails = canRecord && !sourceScopeChanged && !!rule;
+    const savedPeriod = submitted
+        ? { requested_start_at: submitted.requested_start_at, requested_end_at: submitted.requested_end_at }
+        : period;
+    return <form aria-label="Record evidence window" className="grid min-w-0 gap-5"
         onSubmit={(event) => { event.preventDefault(); void send(false); }}>
-        <div className="space-y-2">
-            <h3 className="text-section-title">Review period and cameras</h3>
-            <p className="text-subtle text-muted-foreground">Record the period to review and the cameras included. This does not retrieve or preserve footage. Earlier windows and links remain in the history.</p>
-        </div>
-        {!canRecord ? <p role="alert" className="text-subtle text-muted-foreground">You cannot record a new evidence window with your current access.</p> : null}
-        {!previewAvailable ? <p role="alert" className="text-subtle text-muted-foreground">Current choices could not be verified. Any original submission is retained privately in this tab; refresh access or check its save result.</p> : null}
-        {stale ? <p role="alert" className="text-subtle text-muted-foreground">Incident details or camera choices changed. Check any pending save before reviewing the latest choices.</p> : null}
-        {canRecord && !sourceScopeChanged && rule ? <fieldset disabled={blocked} className="space-y-4">
-            <legend className="sr-only">Evidence window details</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-2 text-subtle">Seconds before the incident
-                    <Input className="frontline-tap" type="number" min={rule.before_seconds} step={1} max={preview.permissions.can_expand ? rule.max_before_seconds : rule.before_seconds}
-                        value={before} onChange={(event) => { setBefore(event.target.value); setDirty(true); }} />
-                </label>
-                <label className="space-y-2 text-subtle">Seconds after the incident
-                    <Input className="frontline-tap" type="number" min={rule.after_seconds} step={1} max={preview.permissions.can_expand ? rule.max_after_seconds : rule.after_seconds}
-                        value={after} onChange={(event) => { setAfter(event.target.value); setDirty(true); }} />
-                </label>
+        {submitted ? <Note tone="warning" icon={AlertTriangle}>
+            <p role="status"><b>We couldn&rsquo;t confirm this save.</b> {message || 'Check it, or try the same save again, before you change anything.'}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" className="frontline-hit" disabled={busy || refreshing} onClick={() => void send(true)}>Check if it saved</Button>
+                <Button type="button" variant="outline" size="sm" className="frontline-hit" disabled={busy || refreshing || refused || !previewAvailable} onClick={() => void send(false)}>Try the same save again</Button>
             </div>
-            <p className="text-caption text-muted-foreground">60 seconds = 1 minute. {preview.permissions.can_expand
-                ? 'You can extend the period within the configured limits; explain the extension below.'
-                : 'Use the standard review period. Extending it requires additional permission.'}</p>
-            {period ? <p className="text-subtle">Review period (NZ time): {formatDateTimeLong(period.requested_start_at)} – {formatDateTimeLong(period.requested_end_at)}</p> : null}
-            <fieldset className="space-y-2">
-                <legend className="text-subtle font-medium">Cameras to include</legend>
-                {basis.sources.items.filter((source) => source.can_record_window).map((source) => {
-                    const key = recordingChoiceKey(source);
-                    return <label key={key} htmlFor={`${fieldId}-${key}`} className="frontline-tap flex cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 text-subtle">
-                        <Checkbox id={`${fieldId}-${key}`} className="shrink-0"
-                            checked={selected.includes(key)} onCheckedChange={(checked) => {
-                                setDirty(true); setSelected((current) => checked === true ? [...current, key] : current.filter((item) => item !== key));
-                            }} />
-                        <span className="min-w-0 break-words">{source.camera.name}<span className="block text-caption text-muted-foreground">{source.recorder.name}</span></span>
-                    </label>;
-                })}
-                {!basis.sources.complete ? <p className="text-caption text-muted-foreground">This is a limited list of eligible cameras. Saving includes only your explicit selections.</p> : null}
-                <p className="text-caption text-muted-foreground">{selected.length ? `${selected.length} selected.` : 'No cameras selected. Saving records a review period without camera access or links.'}</p>
-            </fieldset>
-            <label className="block space-y-2 text-subtle">Reason for this period and selection
-                <Textarea value={reason} onChange={(event) => { setReason(event.target.value); setDirty(true); }} rows={3} />
-            </label>
-        </fieldset> : null}
-        {message ? <p role="status" className="text-subtle">{message}</p> : null}
-        <div className="flex flex-wrap gap-3">
-            {submitted ? <>
-                <Button type="button" size="sm" className="frontline-hit" disabled={busy || refreshing} onClick={() => void send(true)}>Check save result</Button>
-                <Button type="button" variant="outline" size="sm" className="frontline-hit" disabled={busy || refreshing || refused || !previewAvailable} onClick={() => void send(false)}>Retry same submission</Button>
-            </> : <Button type="submit" size="sm" className="frontline-hit" disabled={blocked}>Record evidence window</Button>}
-            {(stale || saved) && !submitted ? <Button type="button" variant="outline" size="sm" className="frontline-hit" disabled={!previewAvailable || busy || refreshing || saved && !stale}
-                onClick={() => dirty ? requestDiscard(adoptCurrent) : adoptCurrent()}>Review current choices</Button> : null}
-            {(!previewAvailable || refused || saved || submitted !== null) ? <Button type="button" variant="outline" size="sm" className="frontline-hit"
-                disabled={busy || refreshing} onClick={onRefresh}>Refresh access and choices</Button> : null}
-        </div>
+        </Note> : null}
+        <section aria-label="Review period and cameras" className="min-w-0 overflow-hidden rounded-[14px] border border-border bg-card text-card-foreground shadow-xs">
+            <div className="grid gap-0.5 border-b border-border px-4 py-3.5">
+                <h3 className="text-section-title">Review period and cameras</h3>
+                <p className="text-subtle">Record the period to review and the cameras included. This does not retrieve or preserve footage. Earlier windows and links remain in the history.</p>
+            </div>
+            <div className="space-y-4 p-4 sm:px-9 sm:py-5">
+                {!canRecord ? <p role="alert" className="text-subtle">You cannot record a new evidence window with your current access.</p> : null}
+                {!previewAvailable ? <p role="alert" className="text-subtle">Current choices could not be verified. Any original submission is retained privately in this tab; refresh access or check its save result.</p> : null}
+                {stale ? <p role="alert" className="text-subtle">Incident details or camera choices changed. Check any pending save before reviewing the latest choices.</p> : null}
+                {showDetails && submitted ? <dl className="grid gap-4 sm:grid-cols-2">
+                    <ReadOnly label="Seconds before the incident">{before}</ReadOnly>
+                    <ReadOnly label="Seconds after the incident">{after}</ReadOnly>
+                    {savedPeriod ? <ReadOnly label="Time to review (NZ time)" wide>{formatDateTimeLong(savedPeriod.requested_start_at)} – {formatDateTimeLong(savedPeriod.requested_end_at)}</ReadOnly> : null}
+                    <ReadOnly label="Cameras to include" wide>{selectedSources.length
+                        ? selectedSources.map((source) => `${source.camera.name} · ${source.recorder.name}`).join('; ')
+                        : 'No cameras selected'}</ReadOnly>
+                    <ReadOnly label="Why this time and these cameras" wide>{reason}</ReadOnly>
+                </dl> : null}
+                {showDetails && rule && !submitted ? <fieldset disabled={blocked} className="space-y-4">
+                    <legend className="sr-only">Evidence window details</legend>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="grid gap-1.5 text-sm font-semibold text-foreground">Seconds before the incident
+                            <span className="relative block">
+                                <Input className="frontline-tap pr-20 font-normal" type="number" min={rule.before_seconds} step={1}
+                                    max={preview.permissions.can_expand ? rule.max_before_seconds : rule.before_seconds}
+                                    value={before} onChange={(event) => { setBefore(event.target.value); setDirty(true); }} />
+                                <span aria-hidden="true" className="text-caption pointer-events-none absolute inset-y-0 right-3 flex items-center">seconds</span>
+                            </span>
+                        </label>
+                        <label className="grid gap-1.5 text-sm font-semibold text-foreground">Seconds after the incident
+                            <span className="relative block">
+                                <Input className="frontline-tap pr-20 font-normal" type="number" min={rule.after_seconds} step={1}
+                                    max={preview.permissions.can_expand ? rule.max_after_seconds : rule.after_seconds}
+                                    value={after} onChange={(event) => { setAfter(event.target.value); setDirty(true); }} />
+                                <span aria-hidden="true" className="text-caption pointer-events-none absolute inset-y-0 right-3 flex items-center">seconds</span>
+                            </span>
+                        </label>
+                    </div>
+                    <Note icon={Info}>60 seconds = 1 minute. {preview.permissions.can_expand
+                        ? 'You can extend the period within the configured limits; explain the extension below.'
+                        : 'Use the standard review period. Extending it requires additional permission.'}</Note>
+                    {period ? <div className="grid gap-1">
+                        <span className="text-sm font-semibold text-foreground">Time to review (NZ time)</span>
+                        <span className="text-sm font-semibold text-foreground">{formatDateTimeLong(period.requested_start_at)} – {formatDateTimeLong(period.requested_end_at)}</span>
+                    </div> : null}
+                    <fieldset className="space-y-2">
+                        <legend className="text-sm font-semibold text-foreground">Cameras to include{' '}
+                            <span className="text-caption font-normal">{selected.length ? `${selected.length} selected.` : 'No cameras selected. Saving records a review period without camera access or links.'}</span>
+                        </legend>
+                        <div className="flex flex-wrap gap-2">
+                            {basis.sources.items.filter((source) => source.can_record_window).map((source) => {
+                                const key = recordingChoiceKey(source);
+                                const on = selected.includes(key);
+                                return <label key={key} htmlFor={`${fieldId}-${key}`}
+                                    className={cn('frontline-hit inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium focus-within:ring-2 focus-within:ring-ring',
+                                        on ? 'border-primary/40 bg-primary-fill/10 text-primary' : 'border-border bg-card text-foreground hover:bg-muted')}>
+                                    <Checkbox id={`${fieldId}-${key}`} className="shrink-0"
+                                        checked={on} onCheckedChange={(checked) => {
+                                            setDirty(true); setSelected((current) => checked === true ? [...current, key] : current.filter((item) => item !== key));
+                                        }} />
+                                    <span className="min-w-0 break-words">{source.camera.name}<span> · {source.recorder.name}</span></span>
+                                </label>;
+                            })}
+                        </div>
+                        {!basis.sources.complete ? <p className="text-caption">This is a limited list of eligible cameras. Saving includes only your explicit selections.</p> : null}
+                    </fieldset>
+                    <label className="grid gap-1.5 text-sm font-semibold text-foreground">Why this time and these cameras
+                        <Textarea className="font-normal" value={reason} onChange={(event) => { setReason(event.target.value); setDirty(true); }} rows={3} />
+                    </label>
+                </fieldset> : null}
+                {message && !submitted ? <p role="status" className="text-subtle">{message}</p> : null}
+                <div className="flex flex-wrap gap-3">
+                    {submitted ? null : <Button type="submit" size="sm" className="frontline-hit" disabled={blocked}>Record evidence window</Button>}
+                    {(stale || saved) && !submitted ? <Button type="button" variant="outline" size="sm" className="frontline-hit" disabled={!previewAvailable || busy || refreshing || saved && !stale}
+                        onClick={() => dirty ? requestDiscard(adoptCurrent) : adoptCurrent()}>Review current choices</Button> : null}
+                    {(!previewAvailable || refused || saved || submitted !== null) ? <Button type="button" variant="outline" size="sm" className="frontline-hit"
+                        disabled={busy || refreshing} onClick={onRefresh}>Refresh access and choices</Button> : null}
+                </div>
+            </div>
+        </section>
     </form>;
+}
+
+function ReadOnly({ label, wide = false, children }: { label: string; wide?: boolean; children: ReactNode }) {
+    return <div className={cn('grid gap-1', wide && 'sm:col-span-2')}>
+        <dt className="text-sm font-semibold text-foreground">{label}</dt>
+        <dd className="text-sm font-semibold break-words text-foreground">{children}</dd>
+    </div>;
 }
