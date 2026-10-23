@@ -39,8 +39,7 @@
         "prettier-plugin-organize-imports": "^4.1.0",
         "prettier-plugin-tailwindcss": "^0.6.11",
         "typescript-eslint": "^8.23.0",
-        "vitest": "^4.1.5",
-        "ws": "^8.22.0"
+        "vitest": "^4.1.5"
     },
     "dependencies": {
         "@dnd-kit/core": "^6.3.1",

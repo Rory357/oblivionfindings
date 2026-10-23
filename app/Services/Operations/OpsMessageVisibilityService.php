@@ -65,19 +65,12 @@ class OpsMessageVisibilityService
             return false;
         }
 
-        $participantIds = $conversation->participants()
-            ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        if ($participantIds->isEmpty()) {
-            return false;
-        }
-
-        return $this->visibleCurrentStaffQuery($user)
-            ->whereIn('users.id', $participantIds)
-            ->count() === $participantIds->count();
+        // A staff conversation stays with its members (membership is checked by the caller): a
+        // colleague moving Site keeps their name in it and nobody loses the chat (Stephan, 23 Oct
+        // 2026). A managed channel follows its Site, checked above. Who may be added is decided when
+        // people are added: new groups need everyone to see everyone, and an addition needs the adder
+        // and the new person to see each other (ChatInvitations::eligible()).
+        return true;
     }
 
     /**
@@ -116,7 +109,7 @@ class OpsMessageVisibilityService
                 ->when(config('chat.shared_experience') && $this->isCurrentStaff($user), fn (Builder $cover) => $cover->orWhere(fn (Builder $family) => $family->where('conversation_type', 'family')->where('care_team_cover', true)
                     ->whereHas('client', fn (Builder $clients) => $this->familyCommunicationAccess->scopeViewableClients($clients, $user)))))
             ->with('client:id,site_id')
-            ->get(config('chat.shared_experience') ? ['id', 'conversation_type', 'client_id', 'channel_site_id'] : ['id', 'conversation_type', 'client_id']);
+            ->get(config('chat.shared_experience') ? ['id', 'conversation_type', 'client_id', 'channel_site_id', 'is_managed_channel'] : ['id', 'conversation_type', 'client_id']);
 
         if (! config('chat.shared_experience')) {
             $conversations = $conversations->filter(fn ($conversation) => $conversation->participants()->where('user_id', $user->id)->first()?->history_after_id === null);
@@ -214,37 +207,11 @@ class OpsMessageVisibilityService
             && $conversation->client_id === null
             && (! $conversation->channel_site_id || in_array((int) $conversation->channel_site_id, $siteIds, true)));
 
-        if ($isCurrent && $staff->isNotEmpty()) {
-            $participantsByConversation = DB::table('ops_conversation_participants')
-                ->whereIn('conversation_id', $staff->pluck('id'))
-                ->get(['conversation_id', 'user_id'])
-                ->groupBy('conversation_id');
-
-            $allParticipantIds = $participantsByConversation
-                ->flatten(1)
-                ->pluck('user_id')
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values();
-
-            $visibleStaffIds = $allParticipantIds->isEmpty()
-                ? new Collection
-                : $this->visibleCurrentStaffQuery($user)
-                    ->whereIn('users.id', $allParticipantIds)
-                    ->pluck('users.id')
-                    ->map(fn ($id) => (int) $id)
-                    ->flip();
-
+        // Same as canViewConversation(): a current staff member keeps the staff conversations they
+        // belong to (the caller's query is by membership); a channel's Site is checked above.
+        if ($isCurrent) {
             foreach ($staff as $conversation) {
-                $participantIds = ($participantsByConversation->get($conversation->id) ?? new Collection)
-                    ->pluck('user_id')
-                    ->map(fn ($id) => (int) $id)
-                    ->unique();
-
-                if ($participantIds->isNotEmpty()
-                    && $participantIds->every(fn (int $id) => $visibleStaffIds->has($id))) {
-                    $visible->push($conversation->id);
-                }
+                $visible->push($conversation->id);
             }
         }
 
