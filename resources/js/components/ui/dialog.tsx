@@ -117,8 +117,11 @@ function DialogContent({
         <CompactDateTimeContext.Provider value={true}>
           {children}
         </CompactDateTimeContext.Provider>
+        {/* 16px, not right-4 (14px at the 14px root): the ✕'s 44px touch
+            area must end inside the dialog, or a scrolling dialog gains a
+            1px sideways scrollbar. */}
         {showCloseButton && (
-          <DialogPrimitive.Close data-slot="dialog-close" className="frontline-hit ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4">
+          <DialogPrimitive.Close data-slot="dialog-close" className="frontline-hit ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-[16px] right-[16px] rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4">
             <XIcon />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>

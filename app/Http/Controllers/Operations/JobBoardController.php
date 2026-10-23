@@ -62,14 +62,18 @@ class JobBoardController extends Controller
         $skill = trim((string) ($filters['skill'] ?? ''));
         $fit = $filters['fit'] ?? null;
 
+        // Weeks and quick ranges follow the worker's calendar (Monday to Sunday
+        // in the worker timezone). Shift times are stored in UTC, so every query
+        // compares the UTC instants of these bounds.
+        $localNow = $readAt->copy()->setTimezone($this->workerTimezone());
         $weekFilterRequested = ! empty($filters['week']);
         $weekAnchor = $weekFilterRequested
-            ? Carbon::createFromFormat('Y-m-d', $filters['week'])->startOfDay()
-            : $readAt->copy()->startOfWeek(Carbon::MONDAY);
+            ? Carbon::createFromFormat('!Y-m-d', $filters['week'], $this->workerTimezone())
+            : $localNow->copy();
         $weekStart = $weekAnchor->copy()->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
         $dateRangeBounds = ! empty($filters['date_range'])
-            ? $this->jobBoardDateRangeBounds($filters['date_range'], $readAt) : null;
+            ? $this->jobBoardDateRangeBounds($filters['date_range'], $localNow) : null;
 
         $positions = ShiftOpenPosition::query()
             ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
@@ -118,7 +122,7 @@ class JobBoardController extends Controller
             })
             ->when($weekFilterRequested && $scope !== 'mine', function ($query) use ($weekStart, $weekEnd) {
                 $query->whereHas('shift', fn ($shiftQuery) => $shiftQuery
-                    ->whereBetween('starts_at', [$weekStart, $weekEnd]));
+                    ->whereBetween('starts_at', [$weekStart->copy()->utc(), $weekEnd->copy()->utc()]));
             })
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->when($search !== '', function ($query) use ($search, $searchSensitive) {
@@ -245,8 +249,8 @@ class JobBoardController extends Controller
         $sitesWorkedThisWeek = Shift::query()
             ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth))
             ->where('shifts.user_id', $auth->id)
-            ->where('shifts.starts_at', '>=', $weekStart)
-            ->where('shifts.starts_at', '<=', $weekEnd)
+            ->where('shifts.starts_at', '>=', $weekStart->copy()->utc())
+            ->where('shifts.starts_at', '<=', $weekEnd->copy()->utc())
             ->join('clients', 'clients.id', '=', 'shifts.client_id')
             ->whereNotNull('clients.site_id')
             ->distinct('clients.site_id')
@@ -288,7 +292,7 @@ class JobBoardController extends Controller
                 'end_label' => $weekEnd->format('j M'),
                 'prev' => $weekStart->copy()->subWeek()->toDateString(),
                 'next' => $weekStart->copy()->addWeek()->toDateString(),
-                'is_current' => $weekStart->equalTo($readAt->copy()->startOfWeek(Carbon::MONDAY)),
+                'is_current' => $weekStart->equalTo($localNow->copy()->startOfWeek(Carbon::MONDAY)),
             ],
             'viewer' => [
                 'first_name' => $this->viewerFirstName($auth),
@@ -1056,10 +1060,11 @@ class JobBoardController extends Controller
 
     protected function applyDateRangeFilter($query, string $dateRange, ?array $bounds = null): void
     {
-        [$startsAt, $endsAt] = $bounds ?? $this->jobBoardDateRangeBounds($dateRange, Carbon::now());
+        [$startsAt, $endsAt] = $bounds
+            ?? $this->jobBoardDateRangeBounds($dateRange, Carbon::now()->setTimezone($this->workerTimezone()));
 
         $query->whereHas('shift', fn ($shiftQuery) => $shiftQuery
-            ->whereBetween('starts_at', [$startsAt, $endsAt]));
+            ->whereBetween('starts_at', [$startsAt->copy()->utc(), $endsAt->copy()->utc()]));
     }
 
     protected function weekendRange(): array
@@ -1420,8 +1425,9 @@ class JobBoardController extends Controller
         $format = DB::connection()->getQueryGrammar()->getDateFormat();
 
         return [
-            'starts_at_utc' => Carbon::parse($bounds[0]->format($format), 'UTC')->toISOString(),
-            'ends_at_utc' => Carbon::parse($bounds[1]->format($format), 'UTC')->toISOString(),
+            // The UTC instant each bound is bound as in SQL (at the grammar's precision).
+            'starts_at_utc' => Carbon::parse($bounds[0]->copy()->utc()->format($format), 'UTC')->toISOString(),
+            'ends_at_utc' => Carbon::parse($bounds[1]->copy()->utc()->format($format), 'UTC')->toISOString(),
             'end_inclusive' => true,
             'anchor_timezone' => $bounds[0]->getTimezone()->getName(),
             'storage_timezone' => 'UTC',

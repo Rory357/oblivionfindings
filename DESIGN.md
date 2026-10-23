@@ -854,6 +854,11 @@ before.
   ancestor. Check any tap target by measuring the rendered px
   (`getBoundingClientRect`, or `elementFromPoint` 21 px from the centre
   for `.frontline-hit`), not by its class name or a "44px" comment.
+  The same 14 px root put the dialog ✕ (`right-4` = 14 px) so its 44 px
+  area ended exactly on the dialog edge, and every scrolling dialog showed
+  a 1 px sideways scrollbar (fixed app-wide 2026-10-24, Stephan: the ✕ now
+  sits at 16 px). Keep a `.frontline-hit` control's area at least 2 px
+  inside a scrolling container's edge.
   Guardrail: `design/no-rem-tap-floor` rejects `min-h-11` / `min-w-11` in
   the medication screens (`pages/emar`, `components/emar`, `pages/meds`;
   EA-210, 2026-10-10).

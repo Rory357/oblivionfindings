@@ -98,27 +98,30 @@ class WorkforceJobBoardRangeProvenanceTest extends TestCase
 
     public static function workerZones(): iterable
     {
-        yield 'NZ worker' => ['Pacific/Auckland'];
-        yield 'LA worker' => ['America/Los_Angeles'];
+        // Mon 19 Oct 00:00 to Sun 25 Oct 23:59:59 on the worker's own clock.
+        yield 'NZ worker' => ['Pacific/Auckland', '2026-10-18T11:00:00Z', '2026-10-25T10:59:59Z'];
+        yield 'LA worker' => ['America/Los_Angeles', '2026-10-19T07:00:00Z', '2026-10-26T06:59:59Z'];
     }
 
     #[DataProvider('workerZones')]
-    public function test_explicit_week_describes_exact_legacy_sql_bounds_without_claiming_worker_local_week(string $zone): void
+    public function test_explicit_week_is_the_worker_local_monday_to_sunday(string $zone, string $start, string $end): void
     {
         config(['app.worker_timezone' => $zone]);
-        $this->position('2026-10-18T23:59:59Z');
-        $first = $this->position('2026-10-19T00:00:00Z');
-        $last = $this->position('2026-10-25T23:59:59Z');
-        $this->position('2026-10-26T00:00:00Z');
+        $this->position(Carbon::parse($start)->subSecond()->toISOString());
+        $first = $this->position($start);
+        $last = $this->position($end);
+        $this->position(Carbon::parse($end)->addSecond()->toISOString());
         $props = $this->read(['week' => '2026-10-21']);
         $this->assertSame([$first->id, $last->id], array_column($props['jobs']['data'], 'id'));
         $this->assertSame('2026-10-19', $props['filters']['week']);
+        $this->assertSame('2026-10-19', $props['week']['start']);
+        $this->assertSame('2026-10-25', $props['week']['end']);
         $this->assertSame('selected_week', $props['provenance']['list']['range_kind']);
         $this->assertTrue($props['provenance']['list']['week_applied']);
-        $this->assertSame('2026-10-19T00:00:00.000000Z', $props['provenance']['list']['shift_start_window']['starts_at_utc']);
-        $this->assertSame('2026-10-25T23:59:59.000000Z', $props['provenance']['list']['shift_start_window']['ends_at_utc']);
+        $this->assertSame(Carbon::parse($start)->toISOString(), $props['provenance']['list']['shift_start_window']['starts_at_utc']);
+        $this->assertSame(Carbon::parse($end)->toISOString(), $props['provenance']['list']['shift_start_window']['ends_at_utc']);
         $this->assertTrue($props['provenance']['list']['shift_start_window']['end_inclusive']);
-        $this->assertSame('UTC', $props['provenance']['list']['shift_start_window']['anchor_timezone']);
+        $this->assertSame($zone, $props['provenance']['list']['shift_start_window']['anchor_timezone']);
         $this->assertSame($zone, $props['provenance']['worker_timezone']);
     }
 
@@ -293,9 +296,10 @@ class WorkforceJobBoardRangeProvenanceTest extends TestCase
 
     public static function relativeRanges(): iterable
     {
-        yield 'tonight' => ['tonight', '2026-10-20T18:00:00Z', '2026-10-21T06:00:00Z', '2026-10-21T04:00:00Z'];
-        yield 'installed next7days' => ['next_7_days', '2026-10-20T00:00:00Z', '2026-10-27T23:59:59Z', '2026-10-27T10:00:00Z'];
-        yield 'this weekend' => ['this_weekend', '2026-10-24T00:00:00Z', '2026-10-25T23:59:59Z', '2026-10-24T10:00:00Z'];
+        // Now is Wed 21 Oct 11:13 NZDT (UTC+13); ranges follow the NZ clock.
+        yield 'tonight' => ['tonight', '2026-10-21T05:00:00Z', '2026-10-21T17:00:00Z', '2026-10-21T10:00:00Z'];
+        yield 'installed next7days' => ['next_7_days', '2026-10-20T11:00:00Z', '2026-10-28T10:59:59Z', '2026-10-27T10:00:00Z'];
+        yield 'this weekend' => ['this_weekend', '2026-10-23T11:00:00Z', '2026-10-25T10:59:59Z', '2026-10-24T10:00:00Z'];
     }
 
     #[DataProvider('relativeRanges')]
