@@ -91,9 +91,20 @@ describe('Job Board owning-page search', () => {
                     last_page: 2,
                     total: 15,
                     links: [
+                        { url: null, label: '&laquo; Previous', active: false },
+                        {
+                            url: '/operations/job-board?q=Old&page=1',
+                            label: '1',
+                            active: true,
+                        },
                         {
                             url: '/operations/job-board?q=Old&page=2',
                             label: '2',
+                            active: false,
+                        },
+                        {
+                            url: '/operations/job-board?q=Old&page=2',
+                            label: 'Next &raquo;',
                             active: false,
                         },
                     ],

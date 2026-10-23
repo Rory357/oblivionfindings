@@ -69,7 +69,7 @@ export class HandoverCommandSession {
             if (sameReadableAttempt && ['saving', 'uncertain'].includes(this.state.phase)) {
                 // Invalidate the old write callback, while permitting a NEW
                 // read-only lookup under the newly committed current frame.
-                this.state = Object.freeze({ phase: 'uncertain', message: 'This record or your write access changed. Check the original save; it will not be sent again.', saved: null });
+                this.state = Object.freeze({ phase: 'uncertain', message: 'This handover or your access changed. Check whether your save went through; it will not be sent again.', saved: null });
             } else if (editedVersionChanged || !['editing', 'confirmed'].includes(this.state.phase)) {
                 this.active = false;
                 this.state = Object.freeze({ phase: 'unavailable', message: 'This handover or your access changed. Reopen Handovers to continue.', saved: null });
@@ -92,7 +92,7 @@ export class HandoverCommandSession {
     private withdrawRead(): void {
         ++this.epoch;
         this.active = false;
-        this.publish('unavailable', 'This handover is no longer available in your current access.');
+        this.publish('unavailable', 'You no longer have access to this handover.');
     }
     canEdit(): boolean { return this.active && this.canWrite && this.state.phase === 'editing'; }
     confirmedFor(saved: HandoverCommandSaved, actorId: number): boolean {
@@ -114,7 +114,7 @@ export class HandoverCommandSession {
         credential?: string | null, submitOnly = false): Promise<HandoverCommandSaved | null> {
         if (!this.canEdit()) return null;
         if (this.context && (this.context.shiftId !== shiftId || this.context.recordId !== recordId || this.context.version !== version)) {
-            this.publish('editing', 'This handover selection changed. Nothing was sent; review the selected record.');
+            this.publish('editing', 'The selected handover changed. Nothing was sent. Check the handover you have open.');
             return null;
         }
         const epoch = this.epoch;
@@ -123,7 +123,7 @@ export class HandoverCommandSession {
         const preparationShown = this.publish('preparing', 'Checking this shift before saving…');
         if (!current()) return null;
         if (!preparationShown) {
-            this.publish('editing', 'The page could not prepare the save. Nothing was sent; your typing is retained.');
+            this.publish('editing', 'The handover could not be saved. Nothing was sent, and your typing is still here.');
             return null;
         }
         let source: HandoverCommandSource | null;
@@ -133,11 +133,11 @@ export class HandoverCommandSession {
             if ([401, 403, 404].includes(response.status)) { this.withdrawRead(); return null; }
             source = response.status === 200 ? currentHandoverCommandSource(response.data, actorId, shiftId) : null;
         } catch {
-            if (current()) this.publish('editing', 'The shift could not be checked. Your typing is still here; try again when connected.');
+            if (current()) this.publish('editing', 'The shift could not be checked. Your typing is still here. Try again once you are connected.');
             return null;
         }
         if (!source || source.handover_id !== recordId || source.expected_version !== version) {
-            this.publish('editing', 'This handover has changed or is unavailable. Nothing was sent. Review the current record before saving.');
+            this.publish('editing', 'This handover has changed or is no longer available. Nothing was sent. Check the latest version before saving.');
             return null;
         }
         let command: PreparedHandoverCommand | null;
@@ -145,12 +145,12 @@ export class HandoverCommandSession {
             command = await prepareHandoverCommand({ source, isCurrent: current },
                 submitOnly ? 'submit' : recordId === null ? 'create' : 'update', crypto.randomUUID(), fields);
         } catch {
-            if (current()) this.publish('editing', 'This browser could not prepare the save. Nothing was sent; your typing is still here.');
+            if (current()) this.publish('editing', 'Your browser could not save this handover. Nothing was sent, and your typing is still here.');
             return null;
         }
         if (!current()) return null;
         if (!command) {
-            this.publish('editing', 'This handover cannot be sent with the current access or fields. Your typing is still here.');
+            this.publish('editing', 'This handover cannot be saved with your current access or entries. Your typing is still here.');
             return null;
         }
         this.attempt = command;
@@ -161,7 +161,7 @@ export class HandoverCommandSession {
         if (!savingShown) {
             this.attempt = null;
             this.invoked = false;
-            this.publish('editing', 'The page could not start the save. Nothing was sent; your typing is retained.');
+            this.publish('editing', 'The handover could not be saved. Nothing was sent, and your typing is still here.');
             return null;
         }
         const identity = command.identity;
@@ -188,7 +188,7 @@ export class HandoverCommandSession {
                 return null;
             }
         } catch { /* A transport error says nothing about a committed save. */ }
-        if (current()) this.publish('uncertain', 'The save could not be confirmed. Keep this window open and check the original save before trying anything else.');
+        if (current()) this.publish('uncertain', 'The save could not be confirmed. Keep this window open and check whether it saved before trying anything else.');
         return null;
     }
 
@@ -204,16 +204,16 @@ export class HandoverCommandSession {
             expected_version: String(identity.expected_version ?? 'none'),
             expected_source: identity.expected_source, intent_hash: identity.intent_hash });
         try {
-            this.publish('uncertain', 'Checking the original save…');
+            this.publish('uncertain', 'Checking whether your handover saved…');
             if (!current()) return null;
             const response = await this.transport.request('get', `/operations/shifts/${identity.shift_id}/handover-attempts/${identity.request_id}?${query}`);
             if (!current()) return null;
             if ([401, 403, 404].includes(response.status)) { this.withdrawRead(); return null; }
             const result = recoveredHandoverCommand(response.data, identity, attempt.expectedStatus, response.status);
             if (result?.saved) { this.confirmationEpoch = epoch; this.publish('confirmed', null, result.saved); return current() ? result.saved : null; }
-            this.publish('uncertain', 'The original save is still unconfirmed. Your typing has been kept; checking again will not send it twice.');
+            this.publish('uncertain', 'The save still cannot be confirmed. Your typing is kept, and checking again will not send it twice.');
         } catch {
-            if (current()) this.publish('uncertain', 'The original save could not be checked. Reconnect, then check again.');
+            if (current()) this.publish('uncertain', 'The save could not be checked. Reconnect, then check again.');
         } finally { this.recovering = false; }
         return null;
     }

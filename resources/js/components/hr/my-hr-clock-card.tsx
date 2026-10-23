@@ -71,12 +71,13 @@ export function MyHrClockCard({
     const [breakOverride, setBreakOverride] = useState('');
     const entryKey = entry ? `${read!.actor_id}:${entry.id}:${entry.shift_id}` : null;
     useEffect(() => setBreakOverride(''), [entryKey]);
+    const tickingKey = session ? `session:${session.id}` : entry ? `entry:${entry.id}` : null;
     useEffect(() => {
-        if (!session && !entry) return;
+        if (tickingKey === null) return;
         setNow(Date.now());
         const handle = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(handle);
-    }, [session?.id, entry?.id]);
+    }, [tickingKey]);
 
     const recorded = session ?? entry;
     const runningBreakSeconds = session?.is_on_break && session.break_started_at

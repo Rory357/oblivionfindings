@@ -39,12 +39,13 @@ export function MyHrNextShiftCard({
     timezone?: string;
 }) {
     const [now, setNow] = useState(() => Date.now());
+    const shiftId = shift?.id ?? null;
     useEffect(() => {
-        if (!shift) return;
+        if (shiftId === null) return;
         setNow(Date.now());
         const handle = setInterval(() => setNow(Date.now()), 30_000);
         return () => clearInterval(handle);
-    }, [shift?.id]);
+    }, [shiftId]);
     const start = instant(shift?.starts_at ?? null);
     const end = instant(shift?.ends_at ?? null);
     const hasWindow = start !== null && end !== null && end > start;

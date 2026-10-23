@@ -69,10 +69,7 @@ import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
 import { retainHandoverDraft } from './handover-work-lifetime';
 import { useOperationsHandoverCommand } from './use-operations-handover-command';
 import { handoverCommandWeek } from './handover-command-week';
-import {
-    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 const SELECT_CLASS =
     'h-10 w-full max-md:min-h-[44px] rounded-lg border border-input bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60';
@@ -494,7 +491,7 @@ export function HandoverWizard({
                 event.preventDefault();
                 toast.warning(commandSession?.canClose()
                     ? 'Save or discard your handover typing before leaving.'
-                    : 'Check the original handover save before leaving.');
+                    : 'Check whether your handover saved before leaving.');
             }
         });
         window.addEventListener('beforeunload', unload);
@@ -509,7 +506,7 @@ export function HandoverWizard({
             if (!commandSession?.belongsTo(currentUser.id)) return;
             toast.warning(commandSession.canClose()
                 ? 'Save or discard your handover typing before using Back or Forward.'
-                : 'Check the original handover save before leaving.');
+                : 'Check whether your handover saved before leaving.');
         });
     }, [historyBlocked, commandSession, currentUser.id]);
 
@@ -1041,12 +1038,12 @@ export function HandoverWizard({
             footerEnd={footerEnd}
         >
             {historyBlocked && !draftHistoryNavigation() ? (
-                <div role="status" className="mb-4 rounded-lg border border-border bg-muted p-3 text-sm">
-                    Browser Back and Forward cannot protect this handover here. Use the page controls until you save, discard unsent typing, or check the original save.
+                <div role="status" className="mb-4 rounded-lg border border-border bg-muted p-3 text-subtle">
+                    Browser Back and Forward cannot protect this handover here. Use the buttons in this window until you have saved, discarded your typing, or checked whether your save went through.
                 </div>
             ) : null}
             {commandMode && commandState.message ? (
-                <div role="status" className="mb-4 rounded-lg border border-border bg-muted p-3 text-sm">
+                <div role="status" className="mb-4 rounded-lg border border-border bg-muted p-3 text-subtle">
                     <p>{commandState.message}</p>
                     {commandState.phase === 'uncertain' ? (
                         <Button className="mt-2" variant="outline" onClick={() => {
@@ -1054,10 +1051,10 @@ export function HandoverWizard({
                                 if (!saved || !commandSession?.confirmedFor(saved, currentUser.id)) return;
                                 setInitialDraft(draftKey);
                                 onOpenChange(false);
-                                toast.success('Original handover save confirmed');
+                                toast.success(saved.status === 'draft' ? 'Handover saved as draft' : 'Handover submitted');
                                 if (commandTargetWeek.current) onSubmitted(commandTargetWeek.current);
                             });
-                        }}>Check original save</Button>
+                        }}>Check if it saved</Button>
                     ) : null}
                 </div>
             ) : null}
@@ -1595,27 +1592,24 @@ export function HandoverWizard({
                 </WizardStepPane>
             ) : null}
         </WizardShell>
-        <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Discard unsaved handover typing?</AlertDialogTitle>
-                    <AlertDialogDescription>Your changes have not been sent. Save as a draft to keep them, or discard them to close this window.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Keep editing</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => {
-                        if (!commandSession?.canClose() || commandSession.snapshot().phase !== 'editing') return;
-                        seededRecord.current = undefined;
-                        setInitialDraft(null);
-                        clearWitnessCredential();
-                        setF(emptyForm());
-                        setStepIndex(0);
-                        setErrors({});
-                        onOpenChange(false);
-                    }}>Discard typing</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+            open={discardOpen}
+            onClose={() => setDiscardOpen(false)}
+            title="Discard unsaved handover typing?"
+            description="Your changes have not been sent. Save as a draft to keep them, or discard them to close this window."
+            cancelText="Keep editing"
+            confirmText="Discard typing"
+            onConfirm={() => {
+                if (!commandSession?.canClose() || commandSession.snapshot().phase !== 'editing') return;
+                seededRecord.current = undefined;
+                setInitialDraft(null);
+                clearWitnessCredential();
+                setF(emptyForm());
+                setStepIndex(0);
+                setErrors({});
+                onOpenChange(false);
+            }}
+        />
         </>
     );
 }

@@ -75,7 +75,7 @@ class JobBoardController extends Controller
                 'shift.tasks:id,shift_id,label,sort_order',
                 'claimer:id,name',
                 'approver:id,name',
-                'replacementRequest:id,shift_id,requested_by,current_staff_id,replacement_user_id,status,reason,requested_at,claimed_at,approved_at,cancelled_at',
+                'replacementRequest:id,shift_id,requested_by,current_staff_id,replacement_user_id,status,requested_at,claimed_at,approved_at,cancelled_at',
                 'replacementRequest.requester:id,name',
                 'replacementRequest.currentStaff:id,name',
                 'replacementRequest.replacementStaff:id,name',
@@ -117,10 +117,11 @@ class JobBoardController extends Controller
             })
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->when($search !== '', function ($query) use ($search) {
+                // Posting notes are not shown on the board, and older replacement
+                // postings copied the absent worker's reason into them, so they are
+                // never searched (a search must not reveal why someone is away).
                 $query->where(function ($nested) use ($search) {
-                    $nested->where('notes', 'like', '%'.$search.'%')
-                        ->orWhereHas('replacementRequest', fn ($replacementQuery) => $replacementQuery->where('reason', 'like', '%'.$search.'%'))
-                        ->orWhereHas('shift', fn ($shiftQuery) => $shiftQuery->where('location', 'like', '%'.$search.'%'))
+                    $nested->whereHas('shift', fn ($shiftQuery) => $shiftQuery->where('location', 'like', '%'.$search.'%'))
                         ->orWhereHas('shift.client', fn ($clientQuery) => $clientQuery
                             ->where('first_name', 'like', '%'.$search.'%')
                             ->orWhere('last_name', 'like', '%'.$search.'%'));
@@ -708,7 +709,6 @@ class JobBoardController extends Controller
             'replacement' => $position->replacementRequest ? [
                 'id' => $position->replacementRequest->id,
                 'status' => $position->replacementRequest->status,
-                'reason' => $canViewSensitiveDetails ? $position->replacementRequest->reason : null,
                 'requested_at' => optional($position->replacementRequest->requested_at)->toISOString(),
                 'current_staff' => $canViewSensitiveDetails && $position->replacementRequest->currentStaff
                     ? ['id' => $position->replacementRequest->currentStaff->id, 'name' => $position->replacementRequest->currentStaff->name]
@@ -1116,7 +1116,7 @@ class JobBoardController extends Controller
             if (in_array($position->shift->status, ['completed', 'cancelled'], true)) {
                 $results[$position->id] = new EligibilityResult(
                     is_allowed: false,
-                    blocking_reasons: ['This shift can no longer be claimed from the job board.'],
+                    blocking_reasons: ['This shift can no longer be claimed.'],
                     warnings: [],
                     checked_rules: [],
                     overrideable_warnings: [],
@@ -1218,7 +1218,7 @@ class JobBoardController extends Controller
         if (in_array($position->shift->status, ['completed', 'cancelled'], true)) {
             return new EligibilityResult(
                 is_allowed: false,
-                blocking_reasons: ['This shift can no longer be claimed from the job board.'],
+                blocking_reasons: ['This shift can no longer be claimed.'],
                 warnings: [],
                 checked_rules: [],
                 overrideable_warnings: [],

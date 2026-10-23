@@ -33,21 +33,21 @@ describe('Operations handover command owner', () => {
 
     it('publishes actor withdrawal before descendant layout callbacks can use the old owner', () => {
         let allowed: boolean | null = null;
-        let owner!: HandoverCommandSession;
+        const owners: HandoverCommandSession[] = [];
         function Child({ actor, session }: { actor: number; session: HandoverCommandSession }) {
             useLayoutEffect(() => { if (actor === 5) allowed = session.belongsTo(4); }, [actor, session]);
             return null;
         }
         function Host({ actor }: { actor: number }) {
             const { session } = useOperationsHandoverCommand(true, actor, context);
-            owner = session!;
+            useLayoutEffect(() => { owners.push(session!); });
             return <Child actor={actor} session={session!} />;
         }
         const page = render(<Host actor={4} />);
         page.rerender(<Host actor={5} />);
         expect(allowed).toBe(false);
         page.rerender(<Host actor={4} />);
-        expect(owner.canEdit()).toBe(false);
+        expect(owners.at(-1)!.canEdit()).toBe(false);
     });
 
     it('publishes current read withdrawal and conceals the previous record even if access later returns', () => {

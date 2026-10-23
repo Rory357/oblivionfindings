@@ -93,7 +93,7 @@ class ShiftReplacementService
 
                 if ($existingPosition) {
                     throw ValidationException::withMessages([
-                        'publish_to_job_board' => 'This shift already has an active open position on the job board.',
+                        'publish_to_job_board' => 'This shift is already posted in Available shifts.',
                     ]);
                 }
 
@@ -103,7 +103,7 @@ class ShiftReplacementService
                     'status' => 'open',
                     'required_skills' => array_values($data['required_skills'] ?? []),
                     'coverage_roles' => $lockedShift->coverage_roles ?? [],
-                    'notes' => $this->buildOpenPositionNotes($lockedShift, (string) $data['reason'], $data['notes'] ?? null),
+                    'notes' => $this->buildOpenPositionNotes($lockedShift, $data['notes'] ?? null),
                     'expires_at' => $data['expires_at'] ?? null,
                 ]);
 
@@ -589,11 +589,12 @@ class ShiftReplacementService
         ])->filter()->implode(' · ');
     }
 
-    protected function buildOpenPositionNotes(Shift $shift, string $reason, ?string $notes): string
+    /** Everyone who can claim the posting can reach its notes, so they never
+     * carry why the rostered person is away (private HR information). */
+    protected function buildOpenPositionNotes(Shift $shift, ?string $notes): string
     {
         return collect([
             'Replacement needed',
-            'Reason: '.$reason,
             $notes ? 'Notes: '.$notes : null,
             $shift->staff?->name ? 'Current staff: '.$shift->staff->name : null,
         ])->filter()->implode("\n");

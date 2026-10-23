@@ -630,7 +630,7 @@ class JobBoardControllerTest extends TestCase
                 ->where('jobs.data.0.privacy.can_view_sensitive_details', false)
                 ->where('jobs.data.0.client.display_name', 'A. B.')
                 ->where('jobs.data.0.client.suburb', 'Kingsland')
-                ->where('jobs.data.0.replacement.reason', null)
+                ->missing('jobs.data.0.replacement.reason')
                 ->where('jobs.data.0.replacement.current_staff', null));
 
         $this->actingAs($this->manager)
@@ -639,8 +639,36 @@ class JobBoardControllerTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('jobs.data.0.privacy.can_view_sensitive_details', true)
                 ->where('jobs.data.0.client.display_name', 'Aroha Brown')
-                ->where('jobs.data.0.replacement.reason', 'Needs cover for readiness test')
+                ->missing('jobs.data.0.replacement.reason')
                 ->where('jobs.data.0.replacement.current_staff.name', $this->currentStaff->name));
+    }
+
+    public function test_replacement_cover_never_reveals_or_searches_the_absent_workers_reason(): void
+    {
+        $position = $this->positionForShift($this->shiftForSite());
+        $position->replacementRequest->forceFill(['reason' => 'Sick leave'])->save();
+        // Older replacement postings copied the reason into the posting notes.
+        $position->forceFill(['notes' => "Replacement needed\nReason: Sick leave"])->save();
+
+        $this->allowEligibility();
+
+        foreach ([$this->worker, $this->manager] as $viewer) {
+            $response = $this->actingAs($viewer)
+                ->get(route('operations.job_board.index', ['scope' => 'all']))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('jobs.data.0.id', $position->id)
+                    ->where('jobs.data.0.replacement.id', $position->replacement_request_id)
+                    ->missing('jobs.data.0.replacement.reason'));
+            $this->assertStringNotContainsString('Sick leave', $response->getContent());
+
+            // A search can't be used to find out why someone is away.
+            $this->actingAs($viewer)
+                ->get(route('operations.job_board.index', ['scope' => 'all', 'q' => 'Sick leave']))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('jobs.data', fn ($jobs) => collect($jobs)->pluck('id')->doesntContain($position->id)));
+        }
     }
 
     public function test_create_position_refuses_a_shift_from_another_site(): void

@@ -43,7 +43,7 @@ class OperationsCheckedHandoverService extends ShiftHandoverService
             && $read['descriptor']['expected_version'] === $intent->expectedVersion && $read['descriptor']['can'][$intent->action] === true, 409);
         // Current record/read authority precedes private field or credential feedback.
         if ($credential !== null && (strlen($credential) > 255 || str_contains($credential, "\0"))) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['cd_witness_credential' => 'Check the witness credential.']);
+            throw \Illuminate\Validation\ValidationException::withMessages(['cd_witness_credential' => 'Check the witness PIN.']);
         }
         $intent->validateFields();
         if ($intent->action === 'submit') { return $read; }
@@ -58,7 +58,7 @@ class OperationsCheckedHandoverService extends ShiftHandoverService
             array_key_exists('incoming_staff_id', $data) ? $data['incoming_staff_id'] : (array_key_exists('incoming_shift_id', $data) ? null : $read['row']?->incoming_staff_id),
             (int) $client->site_id, verifyCurrentStaff: false);
         if ($data['submit'] && ($incoming === null || $incomingStaff === null)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['incoming_shift_id' => 'Assign the exact current incoming Shift before submitting.']);
+            throw \Illuminate\Validation\ValidationException::withMessages(['incoming_shift_id' => 'Assign the incoming shift before submitting.']);
         }
         [$current, $users] = $this->lockCurrentHandoverAuthority($client, $shift, $actor,
             ['handovers.create', 'shifts.update', 'shifts.viewAssigned', 'shifts.manageAny', 'clients.update'],

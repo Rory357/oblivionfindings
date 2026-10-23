@@ -18,8 +18,11 @@ vi.mock('@/components/wizard/shell', () => ({
         open: boolean; title: string; children: ReactNode; footerStart: ReactNode; footerEnd: ReactNode;
         onClose: () => void; onStepClick: (step: number) => void;
     }) => open ? <section aria-label={title}>
+        {/* eslint-disable-next-line no-restricted-syntax -- lightweight WizardShell test double control */}
         <button onClick={onClose}>Header close</button>
+        {/* eslint-disable-next-line no-restricted-syntax -- lightweight WizardShell test double control */}
         <button onClick={() => onStepClick(1)}>Narrative step</button>
+        {/* eslint-disable-next-line no-restricted-syntax -- lightweight WizardShell test double control */}
         <button onClick={() => onStepClick(3)}>Review step</button>
         {children}{footerStart}{footerEnd}
     </section> : null,
@@ -99,7 +102,7 @@ describe('mounted Operations handover wizard', () => {
         render(<HandoverWizard {...props} checkedCommands />);
         fireEvent.click(screen.getByRole('button', { name: 'Review step' }));
         fireEvent.click(screen.getByRole('button', { name: 'Save as draft' }));
-        await screen.findByRole('button', { name: 'Check original save' });
+        await screen.findByRole('button', { name: 'Check if it saved' });
         fireEvent.click(screen.getByRole('button', { name: 'Header close' }));
         expect(props.onOpenChange).not.toHaveBeenCalled();
         const preventDefault = vi.fn();

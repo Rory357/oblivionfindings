@@ -262,12 +262,22 @@ final class OperationsHandoverCommands
     {
         // No arbitrary server message, name or source record is reflected into the wizard.
         $copy = ['handover_notes' => 'Enter handover notes within 5,000 characters.', 'client_mood' => 'Check the mood entry.',
-            'incoming_shift_id' => 'Select the exact current incoming shift before submitting.', 'incoming_staff_id' => 'Select the current incoming worker.',
+            'incoming_shift_id' => 'Choose the incoming shift before submitting.', 'incoming_staff_id' => 'Choose the incoming worker.',
             'cd_result' => 'Choose the controlled-drug count result.', 'cd_witness_id' => 'Check the witnessing worker.',
-            'cd_witness_credential' => 'Check the witness credential.', 'cd_notes' => 'Describe the discrepancy within 2,000 characters.',
+            'cd_witness_credential' => 'Check the witness PIN.', 'cd_notes' => 'Describe the discrepancy within 2,000 characters.',
             'medications_due_text' => 'Check this entry.', 'incidents_to_note_text' => 'Check this entry.',
             'follow_up_items_text' => 'Check this entry.', 'tasks_pending_text' => 'Check this entry.'];
         $errors = $error instanceof ValidationException ? array_intersect_key($copy, $error->errors()) : [];
-        return $errors ?: ['handover' => 'This form cannot be saved from its current source. Refresh the handover and review your entries.'];
+        if ($error instanceof ValidationException) {
+            // The eMAR witness checks word their own messages for staff ("Incorrect PIN", when a
+            // locked PIN unlocks, a missing competency). The shared handover save shows them; keep them.
+            foreach (['cd_witness_id', 'cd_witness_credential'] as $key) {
+                $message = $error->errors()[$key][0] ?? null;
+                if (isset($errors[$key]) && is_string($message) && trim($message) !== '' && mb_strlen($message) <= 300) {
+                    $errors[$key] = $message;
+                }
+            }
+        }
+        return $errors ?: ['handover' => 'This handover changed after you opened it. Refresh it, then check your entries.'];
     }
 }

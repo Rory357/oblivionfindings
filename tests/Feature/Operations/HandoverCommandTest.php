@@ -20,18 +20,20 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Database\Events\TransactionCommitting;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
-use Tests\TestCase;
+use Tests\Support\CommittedDatabaseTestCase;
 
-/** Real route/model/root integration; runs only against the isolated MySQL test database. */
-class HandoverCommandTest extends TestCase
+/**
+ * Real route/model/root integration; runs only against the isolated MySQL test database.
+ * The handover root needs a connection with no open transaction, so fixtures commit and
+ * CommittedDatabaseTestCase restores every changed table after each test (DatabaseMigrations
+ * would rebuild the whole schema per test, several minutes each).
+ */
+class HandoverCommandTest extends CommittedDatabaseTestCase
 {
-    use DatabaseMigrations;
-
     private User $worker;
     private User $incoming;
     private User $other;
@@ -370,23 +372,40 @@ class HandoverCommandTest extends TestCase
     public function test_partial_schema_is_not_advertised_and_cannot_start_a_writer(): void
     {
         $body = $this->body(); $reached = false;
-        Schema::drop('operations_handover_witnesses'); // This class owns its freshly migrated isolated test database.
-        $this->assertFalse(\App\Services\Operations\OperationsHandoverReadiness::available());
-        $this->get('/operations/handovers')->assertInertia(fn (Assert $page) => $page->where('handoverCommandProtocol', null));
-        $this->get('/attendance')->assertInertia(fn (Assert $page) => $page->where('handoverCommandProtocol', null));
-        $this->withModelListener(ShiftHandover::class, 'saving', function () use (&$reached): void { $reached = true; },
-            fn () => $this->send($body)->assertStatus(202)->assertJsonPath('outcome', 'unconfirmed'));
-        $this->assertFalse($reached);
-        $this->assertSame(0, ShiftHandover::query()->count());
-        $this->assertSame(0, DB::table('operations_handover_attempts')->count());
+        Schema::drop('operations_handover_witnesses');
+        try {
+            $this->assertFalse(\App\Services\Operations\OperationsHandoverReadiness::available());
+            $this->get('/operations/handovers')->assertInertia(fn (Assert $page) => $page->where('handoverCommandProtocol', null));
+            $this->get('/attendance')->assertInertia(fn (Assert $page) => $page->where('handoverCommandProtocol', null));
+            $this->withModelListener(ShiftHandover::class, 'saving', function () use (&$reached): void { $reached = true; },
+                fn () => $this->send($body)->assertStatus(202)->assertJsonPath('outcome', 'unconfirmed'));
+            $this->assertFalse($reached);
+            $this->assertSame(0, ShiftHandover::query()->count());
+            $this->assertSame(0, DB::table('operations_handover_attempts')->count());
+        } finally {
+            // The schema is shared with later tests in this process: reinstall the evidence tables.
+            $this->reinstallHandoverEvidenceSchema();
+        }
     }
 
     public function test_missing_original_uuid_unique_constraint_holds_protocol_readiness(): void
     {
         Schema::table('operations_handover_attempts', fn ($table) => $table->dropUnique(['actor_id', 'request_id']));
-        $this->assertFalse(\App\Services\Operations\OperationsHandoverReadiness::available());
-        $this->getJson($this->sourceUrl())->assertStatus(503);
-        $this->assertSame(0, ShiftHandover::query()->count());
+        try {
+            $this->assertFalse(\App\Services\Operations\OperationsHandoverReadiness::available());
+            $this->getJson($this->sourceUrl())->assertStatus(503);
+            $this->assertSame(0, ShiftHandover::query()->count());
+        } finally {
+            $this->reinstallHandoverEvidenceSchema();
+        }
+    }
+
+    private function reinstallHandoverEvidenceSchema(): void
+    {
+        $migration = require database_path('migrations/2026_10_12_235100_create_operations_handover_command_evidence.php');
+        $migration->down();
+        $migration->up();
+        $this->assertTrue(\App\Services\Operations\OperationsHandoverReadiness::available());
     }
 
     public function test_committed_reservation_listener_failure_is_unknown_and_never_invokes_or_replays(): void
@@ -464,7 +483,7 @@ class HandoverCommandTest extends TestCase
             $wire = [...$body, 'cd_witness_credential' => $credential];
             $this->send($wire)->assertStatus(422)->assertJsonPath('outcome', 'refused')->assertJsonPath('saved', null)
                 ->assertJsonPath('identity', $this->identity($body))
-                ->assertJsonPath('errors.cd_witness_credential', 'Check the witness credential.');
+                ->assertJsonPath('errors.cd_witness_credential', 'Check the witness PIN.');
         }
         $this->assertSame(0, DB::table('operations_handover_attempts')->count());
         $this->assertSame(0, ShiftHandover::query()->count());

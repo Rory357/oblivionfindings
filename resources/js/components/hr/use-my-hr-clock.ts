@@ -42,8 +42,10 @@ export function useMyHrClock(context: MyHrClockExpectation | null) {
     const revision = useRef(0);
 
     useLayoutEffect(() => {
+        // A counter ref, not a DOM node: unmount retires any reply still in flight.
+        const attempts = revision;
         alive.current = true;
-        return () => { alive.current = false; revision.current++; };
+        return () => { alive.current = false; attempts.current++; };
     }, []);
     useLayoutEffect(() => {
         if (contextKey === currentKey.current) return;

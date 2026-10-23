@@ -122,10 +122,12 @@ export function useAttendanceBreak(
     const refreshBusy = useRef(false);
     const contextKey = key(context);
     useLayoutEffect(() => {
+        // A counter ref, not a DOM node: unmount retires any reply still in flight.
+        const attempts = revision;
         alive.current = true;
         return () => {
             alive.current = false;
-            revision.current++;
+            attempts.current++;
         };
     }, []);
     useLayoutEffect(() => {

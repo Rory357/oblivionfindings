@@ -360,7 +360,7 @@ final class JobBoardActionCommand
             $p->status !== 'open' => 'This position is no longer open for claims.',
             $p->expires_at && $p->expires_at->lte(now()) => 'This position has expired and can no longer be claimed.',
             (int) $source['shift']->user_id === (int) $actor->id => 'You are already assigned to this shift.',
-            default => 'This shift can no longer be claimed from the job board.',
+            default => 'This shift can no longer be claimed.',
         };
         throw ValidationException::withMessages([$action === 'claim' ? 'claim' : 'position' => $message]);
     }
