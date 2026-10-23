@@ -60,3 +60,6 @@ the viewer can be brought up to date later. Newest last.
 | 22g | Access reads "Sensitive", "Restricted" or "Not marked sensitive", not "Everyone working on the concern" | No access rule is claimed that the code doesn't enforce |
 | 22h | "Client record" shows only for a client subject; the incident link opens the incident's own page | The old link opened the legacy register dialog |
 | 22i | The restricted page keeps the code's wording ("It is visible only to the assigned lead, the reporter, and staff cleared to view sensitive concerns.") | Need-to-know wording stays word for word |
+| 23–23e | Next, Back and Raise concern stay in the footer under the step; the step's fields keep the wizard's own layout | The capture wizard is unchanged (its checks decide when Next is allowed); only its page frame follows the drawing |
+| 23–23e | Each step on the stage line is a button, so any step can be reopened | The old step rail allowed it; kept |
+| 25 | Times keep "· Pacific/Auckland", and the two invitation notes keep the code's wording; "Back to My day" sits under Your invitation | Invitation wording and its tests stay as they are; the drawing left the way back to the back arrow only |

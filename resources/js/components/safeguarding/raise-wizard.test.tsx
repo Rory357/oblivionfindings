@@ -78,7 +78,7 @@ it('opens a real reporting page without a concern register or capture dialog', (
         }),
     ).toBeInTheDocument();
     expect(
-        screen.getByRole('tablist', { name: 'Reporting steps' }),
+        screen.getByRole('list', { name: /^Reporting steps/ }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ it('submits the existing canonical intake payload from the page review step', ()
         requires_external_referral: 'no',
     };
     render(<SafeguardingCreate {...props} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     expect(screen.getByRole('region', { name: 'Review' })).toHaveFocus();
     expect(screen.getByText('Step 6 of 6 · Review')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Raise concern' }));

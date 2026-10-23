@@ -1,13 +1,18 @@
-import {
-    PageHeader,
-    PageHeaderGlassButton,
-    PageHeaderRail,
-} from '@/components/page';
+import { PageHeader, PageHeaderGlassButton, PageLayout } from '@/components/page';
+import { PageHeaderStages } from '@/components/page/page-header-strip';
 import { WizardShell } from '@/components/wizard/shell';
 import { ShieldAlert, X } from 'lucide-react';
 import { useEffect, useRef, type ComponentProps } from 'react';
 
-/** Reuse the capture steps on a real page without mounting a register or dialog. */
+/**
+ * Raise a safeguarding concern as a full page (approved drawings pg-hsn-23 …
+ * 23e). The capture steps, fields, checks and footer are the wizard's own and
+ * stay unchanged; this shell only lays them out as a page: the steps as the
+ * header's stage line (each step a button, so any step can be reopened), the
+ * current step in one card, Back / Next / Raise concern underneath. No
+ * register or dialog is mounted, so a reporter without register access can use
+ * it.
+ */
 export function SafeguardingRaisePageShell({
     title,
     description,
@@ -27,53 +32,58 @@ export function SafeguardingRaisePageShell({
         previousStep.current = stepIndex;
     }, [stepIndex]);
     return (
-        <div className="frontline-dialog flex min-w-0 flex-col gap-5">
-            <PageHeader
-                frontline
-                icon={ShieldAlert}
-                title={title}
-                wrapTitle
-                subline={
-                    success
-                        ? description
-                        : `Step ${stepIndex + 1} of ${steps.length} · ${steps[stepIndex].label}`
-                }
-                actions={
-                    <PageHeaderGlassButton icon={X} onClick={onClose}>
-                        Close reporting
-                    </PageHeaderGlassButton>
-                }
-                rail={
-                    !success && (
-                        <PageHeaderRail
-                            ariaLabel="Reporting steps"
-                            items={[...steps]}
-                            value={steps[stepIndex].key}
-                            onSelect={(key) =>
-                                onStepClick(
-                                    steps.findIndex((step) => step.key === key),
-                                )
-                            }
-                        />
-                    )
-                }
-            />
-            <section
-                ref={body}
-                tabIndex={-1}
-                aria-label={
-                    success ? 'Concern recorded' : steps[stepIndex].label
-                }
-                className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
-            >
-                {success ?? children}
-            </section>
-            {!success && (
-                <footer className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
-                    {footerStart}
-                    {footerEnd}
-                </footer>
-            )}
-        </div>
+        <PageLayout
+            hero={
+                <PageHeader
+                    icon={ShieldAlert}
+                    title={title}
+                    wrapTitle
+                    subline={
+                        success
+                            ? description
+                            : `Step ${stepIndex + 1} of ${steps.length} · ${steps[stepIndex].label}`
+                    }
+                    actions={
+                        <PageHeaderGlassButton icon={X} onClick={onClose}>
+                            Close reporting
+                        </PageHeaderGlassButton>
+                    }
+                    strip={
+                        success ? undefined : (
+                            <PageHeaderStages
+                                ariaLabel="Reporting steps"
+                                steps={steps.map((step, i) => ({
+                                    label: step.label,
+                                    state:
+                                        i < stepIndex
+                                            ? 'done'
+                                            : i === stepIndex
+                                              ? 'now'
+                                              : 'todo',
+                                }))}
+                                onSelect={onStepClick}
+                            />
+                        )
+                    }
+                />
+            }
+        >
+            <div className="grid min-w-0 gap-5">
+                <section
+                    ref={body}
+                    tabIndex={-1}
+                    aria-label={success ? 'Concern recorded' : steps[stepIndex].label}
+                    className="sg-surface min-w-0 p-5 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-6"
+                >
+                    {success ?? children}
+                </section>
+                {!success && (
+                    <footer className="sg-surface flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                        {footerStart}
+                        {footerEnd}
+                    </footer>
+                )}
+            </div>
+        </PageLayout>
     );
 }

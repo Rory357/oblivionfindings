@@ -316,14 +316,15 @@ describe('Current named meeting invitation page', () => {
             if (field === 'status') record.meeting.status = value;
             else record.meeting.attendance.response = value;
             await loaded(record);
-            // The real header and detail card must agree; the known sibling
-            // field must keep its own label after current native admission.
+            // Status shows once (the header chip) and the response once (Your
+            // invitation); the known sibling field must keep its own label
+            // after current native admission.
             expect(
                 screen.getAllByText(
                     field === 'status' ? 'Status not confirmed' : 'Scheduled',
                     { exact: true },
                 ),
-            ).toHaveLength(2);
+            ).toHaveLength(1);
             expect(
                 screen.getAllByText(
                     field === 'response'
@@ -331,7 +332,7 @@ describe('Current named meeting invitation page', () => {
                         : 'Awaiting response',
                     { exact: true },
                 ),
-            ).toHaveLength(2);
+            ).toHaveLength(1);
             expect(
                 screen.queryByText('Accepted', { exact: true }),
             ).not.toBeInTheDocument();

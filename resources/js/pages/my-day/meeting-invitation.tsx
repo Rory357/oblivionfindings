@@ -1,20 +1,36 @@
+/**
+ * My day › Meeting invitation (approved H&S drawings pg-hsn-25, 25b): the
+ * worker's own invitation — when and where, their recorded response and
+ * attendance — and nothing from the committee's register. Details show only
+ * after a current server check admits them (useCurrentInvitation, unchanged);
+ * opening the page never accepts the invitation or records attendance.
+ */
 import {
     PageHeader,
     PageHeaderGlassButton,
-    PageHeaderMeterBig,
-    PageHeaderMeterBlock,
-    PageHeaderMeterCaption,
-    PageHeaderRail,
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
+import {
+    KnowList,
+    Note,
+    SideColumn,
+    Story,
+} from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateLong, formatDateTimeLong, formatTime } from '@/lib/datetime';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { CalendarClock, RefreshCw, ShieldAlert, Users } from 'lucide-react';
+import {
+    Building2,
+    CalendarClock,
+    Info,
+    MapPin,
+    RefreshCw,
+    ShieldAlert,
+    Users,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -297,6 +313,10 @@ export default function MeetingInvitationPage(props: MeetingInvitation) {
             {state === 'checking' ? 'Checking access' : 'Refresh invitation'}
         </PageHeaderGlassButton>
     );
+    const response = d ? responseLabel(d.attendance.response) : '';
+    const unanswered = d
+        ? ['pending', 'invited'].includes(d.attendance.response)
+        : false;
     return (
         <AppLayout
             breadcrumbs={[
@@ -315,7 +335,6 @@ export default function MeetingInvitationPage(props: MeetingInvitation) {
                 hero={
                     <PageHeader
                         variant="profile"
-                        frontline
                         wrapTitle
                         title="Meeting invitation"
                         icon={Users}
@@ -335,81 +354,6 @@ export default function MeetingInvitationPage(props: MeetingInvitation) {
                                 : 'Your meeting invitation'
                         }
                         actions={check}
-                        meters={
-                            d ? (
-                                <>
-                                    <PageHeaderMeterBlock
-                                        label="When"
-                                        href="#meeting-details"
-                                        tone="neutral"
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {formatDateLong(d.scheduled_at)}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            {d.scheduled_at
-                                                ? `${formatTime(d.scheduled_at)} · Pacific/Auckland`
-                                                : 'Time not recorded'}
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Where"
-                                        href="#meeting-details"
-                                        tone="neutral"
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {d.location || 'Not recorded'}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            {d.site?.name ??
-                                                'Site ownership not confirmed'}
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Your response"
-                                        href="#your-invitation"
-                                        tone="neutral"
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {responseLabel(
-                                                d.attendance.response,
-                                            )}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Recorded invitation response
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                    <PageHeaderMeterBlock
-                                        label="Attendance"
-                                        href="#your-invitation"
-                                        tone="neutral"
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {d.attendance.attended
-                                                ? 'Recorded'
-                                                : 'Not recorded'}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Viewing does not confirm attendance
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                </>
-                            ) : undefined
-                        }
-                        rail={
-                            <PageHeaderRail
-                                items={[
-                                    {
-                                        key: 'invitation',
-                                        label: 'Invitation details',
-                                        icon: CalendarClock,
-                                    },
-                                ]}
-                                value="invitation"
-                                onSelect={() => {}}
-                                showFind={false}
-                            />
-                        }
                     />
                 }
             >
@@ -426,94 +370,101 @@ export default function MeetingInvitationPage(props: MeetingInvitation) {
                           : 'Invitation details could not be confirmed.'}
                 </p>
                 {d ? (
-                    <div className="grid gap-5 lg:grid-cols-2">
-                        <Card id="meeting-details" tabIndex={-1}>
-                            <CardHeader>
-                                <CardTitle>Meeting details</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <dl className="divide-y">
-                                    <Detail
-                                        label="Committee"
-                                        value={d.committee.name}
-                                    />
-                                    <Detail
-                                        label="When"
-                                        value={
-                                            d.scheduled_at
-                                                ? `${formatDateTimeLong(d.scheduled_at)} · Pacific/Auckland`
-                                                : 'Not recorded'
-                                        }
-                                    />
-                                    <Detail
-                                        label="Location"
-                                        value={d.location || 'Not recorded'}
-                                    />
-                                    <Detail
-                                        label="Site"
-                                        value={
+                    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+                        <div
+                            id="meeting-details"
+                            tabIndex={-1}
+                            className="grid min-w-0 gap-5 outline-none"
+                        >
+                            <Story
+                                title={d.committee.name}
+                                sub="Meeting details"
+                                facts={[
+                                    {
+                                        icon: CalendarClock,
+                                        text: d.scheduled_at
+                                            ? `${formatDateTimeLong(d.scheduled_at)} · Pacific/Auckland`
+                                            : 'Time not recorded',
+                                    },
+                                    {
+                                        icon: MapPin,
+                                        text: d.location || 'Not recorded',
+                                    },
+                                    {
+                                        icon: Building2,
+                                        text:
                                             d.site?.name ??
-                                            'Site ownership not confirmed'
-                                        }
-                                    />
-                                    <Detail
-                                        label="Status"
-                                        value={statusLabel(d.status)}
-                                    />
-                                </dl>
-                                {d.site_ownership === 'unconfirmed' && (
-                                    <p role="note" className="text-subtle mt-4">
-                                        No Site is recorded. The original Site
-                                        may be missing; this does not confirm
-                                        organisation-wide ownership.
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-                        <Card id="your-invitation" tabIndex={-1}>
-                            <CardHeader>
-                                <CardTitle>Your invitation</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <dl className="divide-y">
-                                    <Detail
-                                        label="Response"
-                                        value={responseLabel(
-                                            d.attendance.response,
-                                        )}
-                                    />
-                                    <Detail
-                                        label="Attendance"
-                                        value={
-                                            d.attendance.attended
-                                                ? 'Recorded'
-                                                : 'Not recorded'
-                                        }
-                                    />
-                                </dl>
-                                <p className="text-subtle">
-                                    Opening this page does not accept the
-                                    invitation or confirm that you attended.
-                                </p>
-                                <p className="text-subtle rounded-lg bg-muted p-4">
-                                    Minutes, private actions and unshared agenda
-                                    details are handled in the H&amp;S register.
-                                </p>
+                                            'Site ownership not confirmed',
+                                    },
+                                ]}
+                                paras={[]}
+                            />
+                            {d.site_ownership === 'unconfirmed' && (
+                                <Note icon={Info}>
+                                    No Site is recorded. The original Site may
+                                    be missing; this does not confirm
+                                    organisation-wide ownership.
+                                </Note>
+                            )}
+                        </div>
+                        <aside
+                            id="your-invitation"
+                            tabIndex={-1}
+                            aria-label="Your invitation"
+                            className="min-w-0 outline-none"
+                        >
+                            <SideColumn>
+                                <KnowList
+                                    title="Your invitation"
+                                    items={[
+                                        {
+                                            tone:
+                                                d.attendance.response ===
+                                                'accepted'
+                                                    ? 'success'
+                                                    : 'none',
+                                            text: (
+                                                <>
+                                                    <b>{response}</b>
+                                                    {unanswered
+                                                        ? ' — you haven’t replied yet'
+                                                        : ' — your recorded response'}
+                                                </>
+                                            ),
+                                        },
+                                        {
+                                            tone: d.attendance.attended
+                                                ? 'success'
+                                                : 'none',
+                                            text: (
+                                                <>
+                                                    <b>Attendance</b> —{' '}
+                                                    <span>
+                                                        {d.attendance.attended
+                                                            ? 'Recorded'
+                                                            : 'Not recorded'}
+                                                    </span>
+                                                </>
+                                            ),
+                                        },
+                                        {
+                                            tone: 'info',
+                                            text: 'Opening this page does not accept the invitation or confirm that you attended.',
+                                        },
+                                        {
+                                            tone: 'info',
+                                            text: 'Minutes, private actions and unshared agenda details are handled in the H&S register.',
+                                        },
+                                    ]}
+                                />
                                 <div className="flex flex-wrap gap-3">
-                                    <Button
-                                        variant="outline"
-                                        asChild
-                                        className="frontline-tap frontline-focus"
-                                    >
+                                    <Button variant="outline" asChild>
                                         <Link href="/my-day">
                                             Back to My day
                                         </Link>
                                     </Button>
                                     {canOpenRegister && (
-                                        <Button
-                                            asChild
-                                            className="frontline-tap frontline-focus"
-                                        >
+                                        <Button asChild>
                                             <Link
                                                 href={
                                                     payload!.context
@@ -525,8 +476,8 @@ export default function MeetingInvitationPage(props: MeetingInvitation) {
                                         </Button>
                                     )}
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </SideColumn>
+                        </aside>
                     </div>
                 ) : (
                     <EmptyState
@@ -542,11 +493,7 @@ export default function MeetingInvitationPage(props: MeetingInvitation) {
                                 : 'Your account or access may have changed. Return to My day or contact the meeting organiser.'
                         }
                         action={
-                            <Button
-                                variant="outline"
-                                asChild
-                                className="frontline-tap frontline-focus"
-                            >
+                            <Button variant="outline" asChild>
                                 <Link href="/my-day">Back to My day</Link>
                             </Button>
                         }
@@ -554,14 +501,5 @@ export default function MeetingInvitationPage(props: MeetingInvitation) {
                 )}
             </PageLayout>
         </AppLayout>
-    );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3">
-            <dt className="text-subtle">{label}</dt>
-            <dd className="m-0 text-right font-medium break-words">{value}</dd>
-        </div>
     );
 }

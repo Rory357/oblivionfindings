@@ -155,10 +155,13 @@ export function PageHeaderStages({
     steps,
     next,
     ariaLabel = 'Progress',
+    onSelect,
 }: {
     steps: PageHeaderStage[];
     next?: PageHeaderNextStep | null;
     ariaLabel?: string;
+    /** A full-page form's steps: each label becomes a button that moves to that step. */
+    onSelect?: (index: number) => void;
 }) {
     if (!steps.length) return null;
     const done = steps.filter((s) => s.state === 'done').length;
@@ -194,7 +197,13 @@ export function PageHeaderStages({
                         )}
                     >
                         <i aria-hidden="true" />
-                        <b>{s.label}</b>
+                        {onSelect ? (
+                            <button type="button" className="eh-stage-pick" onClick={() => onSelect(i)}>
+                                {s.label}
+                            </button>
+                        ) : (
+                            <b>{s.label}</b>
+                        )}
                         {s.meta ? <small>{s.meta}</small> : null}
                         <span className="sr-only">
                             {s.state === 'done' ? ' (done)' : s.state === 'now' ? ' (current)' : ' (not started)'}
