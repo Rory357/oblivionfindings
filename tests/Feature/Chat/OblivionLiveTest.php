@@ -21,6 +21,7 @@ use App\Services\Clients\ClientPortalMembershipService;
 use App\Support\SecurityPolicy;
 use App\Support\Signing\CompactToken;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -265,7 +266,8 @@ it('tells someone removed from a group by ID, since they no longer pass allows()
     $group->participants()->create(['user_id' => $owner->id, 'role' => 'admin']);
     $group->participants()->create(['user_id' => $member->id, 'role' => 'member']);
     $group->participants()->create(['user_id' => $leaver->id, 'role' => 'member']);
-    liveAs($this, $owner)->patchJson(route('chat.management', $group), ['action' => 'remove', 'user_id' => $leaver->id, 'version' => (int) $group->chat_version])->assertSuccessful();
+    // chat_version comes from the database default, so read it back.
+    liveAs($this, $owner)->patchJson(route('chat.management', $group), ['action' => 'remove', 'user_id' => $leaver->id, 'version' => (int) $group->fresh()->chat_version])->assertSuccessful();
 
     $removed = collect(liveEvents())->firstWhere('type', 'inbox.changed');
     expect($removed)->toMatchArray(['to' => [$leaver->id], 'data' => ['reason' => 'removed']]);
@@ -339,8 +341,12 @@ it('accepts only signed, fresh, single-use presence reports from the gateway', f
 it('publishes presence to staff who share a conversation, at most once a minute', function () {
     Bus::fake([PublishChatPresence::class, DeliverChatMessageNotifications::class]);
     [$conversation, $relative, $worker, $cover] = liveFamily();
-    $colleague = liveStaff(Site::factory()->create());
+    // A private chat is visible only to someone who can see every member, so the colleague
+    // works at the same Site; a colleague elsewhere is not told.
+    $colleague = liveStaff(Site::findOrFail($worker->hrEmployeeProfile->primary_site_id));
+    $elsewhere = liveStaff(Site::factory()->create());
     liveDirect($worker, $colleague);
+    liveDirect($worker, $elsewhere);
     DB::table('chat_preferences')->insert(['user_id' => $worker->id, 'availability' => 'available', 'created_at' => now(), 'updated_at' => now()]);
 
     liveSigned($this, ['user_id' => $worker->id, 'state' => 'online', 'nonce' => 'b1'])->assertNoContent();
@@ -348,7 +354,7 @@ it('publishes presence to staff who share a conversation, at most once a minute'
     expect($presence)->toHaveCount(1);
     expect($presence[0]['data'])->toBe(['user_id' => $worker->id, 'state' => 'available']);
     // Staff only: the relative in the shared family conversation is not told.
-    expect($presence[0]['to'])->toContain($colleague->id)->not->toContain($relative->id, $worker->id);
+    expect($presence[0]['to'])->toContain($colleague->id)->not->toContain($relative->id, $worker->id, $elsewhere->id);
 
     liveSigned($this, ['user_id' => $worker->id, 'state' => 'offline', 'nonce' => 'b2'])->assertNoContent();
     liveSigned($this, ['user_id' => $worker->id, 'state' => 'online', 'nonce' => 'b3'])->assertNoContent();
@@ -441,6 +447,8 @@ it('signs every gateway call with a fresh timestamp and a nonce', function () {
 });
 
 it('reports gateway health in Settings without publishing anything', function () {
+    // The first matching stub wins, so replace the catch-all from beforeEach.
+    Http::swap(new HttpFactory);
     Http::fake(['127.0.0.1:8092/internal/health' => Http::response(['status' => 'ok', 'connections' => 12, 'users' => 7, 'version' => '1.0.0', 'uptime_seconds' => 30])]);
     $row = collect(app(ChatServiceHealth::class)->snapshot()['services'])->firstWhere('id', 'realtime');
     expect($row['state'])->toBe('passed')->and($row['detail'])->toContain('1 node, 12 open connections');
