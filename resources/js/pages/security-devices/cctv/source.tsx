@@ -1,4 +1,8 @@
-import { PageHeader } from '@/components/page/page-header';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,7 +105,7 @@ export function CameraSourceWorkspace({ setup }: { setup: CctvSourceSetup }) {
             ]}
         >
             <Head title={camera.name + ' · Camera setup'} />
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
                 <PageHeader
                     variant="profile"
                     title={camera.name}
@@ -111,15 +115,17 @@ export function CameraSourceWorkspace({ setup }: { setup: CctvSourceSetup }) {
                     subline={camera.site.name + ' · Camera setup'}
                     actions={
                         <>
-                            <Button variant="secondary" asChild>
+                            <PageHeaderGlassButton asChild>
                                 <Link href={base}>Camera details</Link>
-                            </Button>
-                            <Button onClick={() => setMode('configure')}>
-                                <Settings2 aria-hidden="true" />
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={Settings2}
+                                onClick={() => setMode('configure')}
+                            >
                                 {source
                                     ? 'Edit connection'
                                     : 'Set up connection'}
-                            </Button>
+                            </PageHeaderPrimaryButton>
                         </>
                     }
                 />
@@ -246,10 +252,10 @@ export function CameraSourceWorkspace({ setup }: { setup: CctvSourceSetup }) {
                             </p>
                             {source?.enabled && (
                                 <Button
-                                    variant="outline"
+                                    variant="destructive"
                                     onClick={() => setMode('disable')}
                                 >
-                                    Turn off viewing in Oblivion
+                                    Turn off viewing
                                 </Button>
                             )}
                         </CardContent>
@@ -279,7 +285,7 @@ export function CameraSourceWorkspace({ setup }: { setup: CctvSourceSetup }) {
                             <p className="text-subtle">
                                 UniFi Protect supplies the camera stream. The
                                 Site collector carries video to authorised
-                                viewers in Oblivion.
+                                viewers here.
                             </p>
                             {source?.stream_verified_at && (
                                 <p className="text-caption text-muted-foreground">

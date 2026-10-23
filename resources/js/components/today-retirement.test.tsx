@@ -49,7 +49,8 @@ const roles: {
     can: Record<string, unknown>;
     overview: boolean;
 }[] = [
-    { role: 'support_worker', can: {}, overview: false },
+    // Overview is every staff role's home since 753a7f396 (six role workspaces).
+    { role: 'support_worker', can: {}, overview: true },
     {
         role: 'provider_manager',
         can: { shifts: { manageAny: true } },

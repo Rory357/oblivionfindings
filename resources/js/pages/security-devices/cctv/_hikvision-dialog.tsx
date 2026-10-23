@@ -173,7 +173,7 @@ export function HikvisionSetupDialog({
           ];
     const effect =
         mode === 'disable'
-            ? 'This stops current viewing sessions using this connection and turns off viewing through it in Oblivion. Camera recordings are unchanged.'
+            ? 'This stops current viewing sessions using this connection and turns off viewing through it here. Camera recordings are unchanged.'
             : mode === 'enable'
               ? 'This allows viewing attempts through the selected connection. Each attempt still checks access, credentials and the camera. Enabling does not verify video.'
               : 'A camera check only reads the approved camera identity and channels. Saving creates a separate connection with viewing off. The existing connection stays as it is until you turn it off.';
