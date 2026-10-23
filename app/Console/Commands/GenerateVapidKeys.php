@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Push\VapidKeys;
 use Illuminate\Console\Command;
-use Minishlink\WebPush\VAPID;
 
 class GenerateVapidKeys extends Command
 {
@@ -14,7 +14,9 @@ class GenerateVapidKeys extends Command
     public function handle(): int
     {
         try {
-            ['publicKey' => $publicKey, 'privateKey' => $privateKey] = VAPID::createVapidKeys();
+            $keys = VapidKeys::generate();
+            $publicKey = $keys->publicKey;
+            $privateKey = $keys->privateKey;
         } catch (\Throwable $e) {
             $this->error('Could not generate VAPID keys: '.$e->getMessage());
 
