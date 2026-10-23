@@ -17,7 +17,7 @@
 - Outside code consulted: none. No file under `vendor/minishlink`, `vendor/web-token` or `vendor/spomky-labs` was opened or searched (only the folder names were listed while checking the worktree), and no web-push or JWT library source in any language was fetched.
 - Black-box use of the replaced package: before removing it, a scratch script called the old package's public key generator 300 times and loaded each pair with the new `VapidKeys::fromStored()`, signed with it and used its public key as a browser key for encryption. All 300 loaded unchanged (87-character public, 43-character private). This checked the stored key format only; no package source was read.
 - New outside packages: none. The sender uses PHP's OpenSSL extension and Laravel's HTTP client, both platform.
-- Similarity check: to be done by the checker session.
+- Similarity check: a PHP `token_get_all` k-gram comparison; shared runs of 12 normalised tokens, 8 literal tokens and 8 comment words, and 10 normalised / 6 literal against web-push and base64url alone; every literal run reviewed by hand. **No copied code.** By the C2.3 checker session, 23 October 2026. Details under [Similarity check](#similarity-check).
 
 ## What was built
 
@@ -28,7 +28,7 @@
 | `app/Services/Push/WebPushEncryption.php` | RFC 8291 key agreement and the RFC 8188 single record (spec section 3). `withFixedInputs()` exists only to reproduce the RFC vector. |
 | `app/Services/Push/VapidKeys.php` | `generate()` and `fromStored()` for the `.env` forms; `signingKey()` proves the two halves belong together before first use. |
 | `app/Services/Push/P256.php` | DER wrappers so OpenSSL can read raw P-256 keys, and DER-to-R ‖ S signature conversion. |
-| `app/Services/Push/PushEndpoints.php` | The push-host allow-list check, moved unchanged out of `ChatBrowserPushTransport` so the medication path can use it too. |
+| `app/Services/Push/PushEndpoints.php` | The push-host allow-list check, moved out of `ChatBrowserPushTransport` so the medication path can use it too, and since decision 8 able to allow hosts below a domain. |
 | `app/Services/Push/Base64Url.php` | Unpadded base64url, tolerant of padding and the standard alphabet on input, as the old transport's key check was. |
 
 ## Decisions
@@ -37,7 +37,8 @@
 2. **Keys for OpenSSL as DER.** Raw keys are wrapped as RFC 5915 `ECPrivateKey` and RFC 5480 `SubjectPublicKeyInfo`. The tests build keys a second way (PHP's `openssl_pkey_new` with EC parameters) so the DER code is checked against an independent route.
 3. **Order of checks.** Malformed options, endpoint scheme, keys or an oversized payload return `rejected` with no network call. Encryption runs before VAPID signing, so a bad subscription is `rejected` even when VAPID settings are also broken (the old transport behaved the same). Missing, malformed or mismatched VAPID settings return `unavailable`. Any exception from the HTTP call returns `retry`.
 4. **Medication-alert path (`WebPushProvider`).** It now sends one subscription at a time through the sender and applies the same push-host allow-list as Chat (spec section 5). It still disables subscriptions on 404/410 by provider and token. Its warning log now records the subscription ID and result instead of the endpoint URL and provider reason, because endpoints are bearer addresses.
-5. **TTL and urgency for `WebPushProvider`.** The spec left these open. All four notifications that use it (medication alert, second-person confirmation, witness PIN reminder, shift task due) are time-sensitive care reminders, so it uses `TTL: 43200` (12 hours, about a shift) and `Urgency: high` (RFC 8030 section 5.3: "time-sensitive alert"). Stephan to confirm.
+5. **TTL and urgency for `WebPushProvider`.** The spec left these open. All four notifications that use it (medication alert, second-person confirmation, witness PIN reminder, shift task due) are time-sensitive care reminders, so it uses `TTL: 43200` (12 hours, about a shift) and `Urgency: high` (RFC 8030 section 5.3: "time-sensitive alert"). Stephan confirmed both on 23 October 2026.
+8. **Edge.** Edge subscribes through Microsoft's push service, whose hosts vary under `notify.windows.com`. Stephan approved allowing it on 23 October 2026. `PushEndpoints` now reads a list entry starting with a dot as "any host below this domain" (never the bare domain, never a look-alike such as `xnotify.windows.com`). `.notify.windows.com` joins the default `CHAT_BROWSER_PUSH_HOSTS`. Exact entries still match exactly.
 6. **Token cache.** `WebPushSender` is a singleton, so a worker reuses one token per push service. The cache key includes both keys and the subject, so a key change takes effect at once; the cache is cleared if it ever holds 32 entries.
 7. **Private keys without a leading zero byte** are widened to 32 bytes on read, in case any stored key was written that way. The black-box check above found the old generator always wrote 32 bytes.
 
@@ -49,6 +50,6 @@
 
 ## Open questions
 
-- **Microsoft Edge.** Edge subscribes through Microsoft's push service, whose endpoints sit on varying hosts under `notify.windows.com`. The exact-host allow-list (`fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`) does not include them, so Chat push has always skipped Edge (`browser-push.md` already says other hosts need an allow-list review), and with this change medication alerts skip it too. The spec's Edge acceptance needs Stephan to decide whether to allow that domain; it would need suffix matching, not just one more host. Check a real Edge subscription's host first.
+- **Edge host check.** Decided (decision 8), but the host pattern comes from general knowledge of Microsoft's push service, not from a subscription Oblivion has seen. On the test server, confirm a real Edge subscription's endpoint ends in `.notify.windows.com` before the Edge manual check. If the server's `.env` sets `CHAT_BROWSER_PUSH_HOSTS`, add `.notify.windows.com` there.
 - **Live keys.** No local `.env` holds VAPID keys, so the test server's own pair has only been checked by format (the black-box check). After deploy, run `php artisan tinker --execute="App\Services\Push\VapidKeys::fromStored(config('services.webpush.public_key'), config('services.webpush.private_key'))->signingKey(); echo 'ok';"` on the server, then the manual browser checks in spec section 6.
 - Ownership of AI-written code: see the clean-room README; a lawyer should confirm before commercial reliance.

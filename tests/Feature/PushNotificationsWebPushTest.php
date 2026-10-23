@@ -154,15 +154,18 @@ it('honours shift task due notification channel preferences before push dispatch
     expect((new ShiftTaskDueNotification($task))->via($user))->toBe([]);
 });
 
-function webPushTestKeys(): array
+/** @param  list<string>|null  $hosts  null keeps the shipped push-host list */
+function webPushTestKeys(?array $hosts = ['fcm.googleapis.com']): array
 {
     $vapid = App\Services\Push\VapidKeys::generate();
     config([
         'services.webpush.public_key' => $vapid->publicKey,
         'services.webpush.private_key' => $vapid->privateKey,
         'services.webpush.subject' => 'mailto:push@oblivion.example',
-        'chat.notifications.push_hosts' => ['fcm.googleapis.com'],
     ]);
+    if ($hosts !== null) {
+        config(['chat.notifications.push_hosts' => $hosts]);
+    }
 
     return ['p256dh' => App\Services\Push\VapidKeys::generate()->publicKey, 'auth' => rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=')];
 }
@@ -186,6 +189,26 @@ it('sends notification pushes through Oblivion\'s sender to allowed push service
         && $request->header('Urgency') === [WebPushProvider::URGENCY]
         && str_starts_with($request->header('Authorization')[0] ?? '', 'vapid t=')
         && ! str_contains($request->body(), 'Medication'));
+});
+
+it('reaches Chrome, Firefox, Safari and Edge push services with the shipped host list', function () {
+    $keys = webPushTestKeys(hosts: null);
+    $user = User::factory()->create();
+    $endpoints = [
+        'https://fcm.googleapis.com/fcm/send/chrome',
+        'https://updates.push.services.mozilla.com/wpush/v2/firefox',
+        'https://web.push.apple.com/safari',
+        'https://wns2-bl2p.notify.windows.com/w/?token=edge',
+    ];
+    foreach ($endpoints as $endpoint) {
+        $user->pushSubscriptions()->create(['provider' => 'webpush', 'token' => $endpoint, 'keys' => $keys, 'platform' => 'web', 'enabled' => true]);
+    }
+    Illuminate\Support\Facades\Http::fake(['*' => Illuminate\Support\Facades\Http::response('', 201)]);
+
+    app(WebPushProvider::class)->sendToSubscriptions($user->pushSubscriptions()->get(), ['title' => 'Medication due', 'body' => 'Open Oblivion.', 'data' => []]);
+
+    expect(config('chat.notifications.push_hosts'))->toContain('.notify.windows.com')
+        ->and(Illuminate\Support\Facades\Http::recorded()->map(fn ($pair) => $pair[0]->url())->sort()->values()->all())->toBe(collect($endpoints)->sort()->values()->all());
 });
 
 it('turns off a browser subscription once its push service says it has gone', function () {

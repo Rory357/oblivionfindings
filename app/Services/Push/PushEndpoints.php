@@ -6,8 +6,12 @@ use Illuminate\Contracts\Config\Repository;
 
 /**
  * Which push resource URLs Oblivion will post to. Browsers hand the server any URL they
- * like, so only known push services are contacted: https on port 443, a host listed in
+ * like, so only known push services are contacted: https on port 443, a host allowed by
  * chat.notifications.push_hosts (CHAT_BROWSER_PUSH_HOSTS), no IP address, credentials or fragment.
+ *
+ * A list entry is an exact host ("fcm.googleapis.com"), or, starting with a dot, any host
+ * below that domain (".notify.windows.com" for Microsoft's push service, whose host varies
+ * per subscription; the bare domain itself is not included).
  */
 final class PushEndpoints
 {
@@ -24,8 +28,20 @@ final class PushEndpoints
             return false;
         }
         $host = strtolower($url['host'] ?? '');
+        if ($host === '' || filter_var($host, FILTER_VALIDATE_IP)) {
+            return false;
+        }
+        foreach ((array) $this->config->get('chat.notifications.push_hosts', []) as $allowed) {
+            $allowed = strtolower(trim((string) $allowed));
+            if ($allowed === $host) {
+                return true;
+            }
+            // ".notify.windows.com" needs at least one label in front: "x.notify.windows.com".
+            if (strlen($allowed) > 1 && $allowed[0] === '.' && strlen($host) > strlen($allowed) && str_ends_with($host, $allowed)) {
+                return true;
+            }
+        }
 
-        return $host !== '' && ! filter_var($host, FILTER_VALIDATE_IP)
-            && in_array($host, (array) $this->config->get('chat.notifications.push_hosts', []), true);
+        return false;
     }
 }
