@@ -143,8 +143,9 @@ final class SiteSafetyComparisonTest extends TestCase
             $this->viewer->hrEmployeeProfile()->update($change); $this->noCountBeforeDenial(fn () => $this->comparison(), 403);
             $this->viewer->hrEmployeeProfile()->update(['is_active' => true, 'end_date' => null]);
         }
-        $this->viewer->updateQuietly(['external_clinical_account' => true]); $this->noCountBeforeDenial(fn () => $this->comparison(), 403);
-        $this->viewer->updateQuietly(['external_clinical_account' => false, 'approved_at' => null]); $this->noCountBeforeDenial(fn () => $this->comparison(), 403);
+        // Main's User model doesn't mass-assign these flags, so the fixture sets them directly.
+        $this->viewer->forceFill(['external_clinical_account' => true])->saveQuietly(); $this->noCountBeforeDenial(fn () => $this->comparison(), 403);
+        $this->viewer->forceFill(['external_clinical_account' => false, 'approved_at' => null])->saveQuietly(); $this->noCountBeforeDenial(fn () => $this->comparison(), 403);
     }
     public function test_site_reassignment_does_not_reuse_primary_secondary_or_site_cache(): void
     {

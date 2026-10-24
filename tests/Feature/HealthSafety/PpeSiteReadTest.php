@@ -267,7 +267,7 @@ final class PpeSiteReadTest extends PpeReadTestCase
         $this->assertSame([], $this->obligations());
         $this->site->update(['archived_at' => null]);
         $external = $this->staff(['hazards.view']);
-        $external->update(['external_clinical_account' => true]);
+        $external->forceFill(['external_clinical_account' => true])->save(); // not mass-assignable on main's User
         $this->denied(fn () => $this->read()->obligationsForViewer([$this->site->id], $this->start(), $this->end(), $external), 403);
         $this->assertCount(1, $this->obligations());
     }

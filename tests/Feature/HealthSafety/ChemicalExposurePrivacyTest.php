@@ -178,7 +178,7 @@ final class ChemicalExposurePrivacyTest extends TestCase
         $this->noPrivateSql($queries);
         HrEmployeeProfile::where('user_id', $this->viewer->id)->update(['is_active' => true]);
         $external = $this->staff(['hazards.view', 'hr.wellbeing.view']);
-        $external->update(['external_clinical_account' => true]);
+        $external->forceFill(['external_clinical_account' => true])->save(); // not mass-assignable on main's User
         $this->denied(fn () => $this->read()->detail($external, $this->exposure->id));
         $this->assertSame('readable', $this->read()->detail($this->viewer, $this->exposure->id)['exposure_access']);
     }
