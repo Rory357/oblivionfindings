@@ -99,13 +99,13 @@ final class InjurySourceProjectionService
 
     private function metricLifetime(Builder $query, CurrentAuthorizationReads $reads): Builder
     {
-        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
         $day = now($timezone)->toDateString();
         $query->whereRaw(new class($reads, $timezone, $day) extends Expression {
             public function __construct(private readonly CurrentAuthorizationReads $reads, private readonly string $timezone, private readonly string $day) { parent::__construct('1 = 1'); }
             public function getValue(Grammar $grammar) {
                 $this->reads->assertActive();
-                if ((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')) !== $this->timezone || now($this->timezone)->toDateString() !== $this->day) {
+                if ((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC') !== $this->timezone || now($this->timezone)->toDateString() !== $this->day) {
                     throw new LogicException('Original injury metric date evidence changed.');
                 }
                 return parent::getValue($grammar);

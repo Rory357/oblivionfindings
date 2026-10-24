@@ -56,7 +56,7 @@ final class PpeCommandValues
             || ! checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
             self::invalid($field, 'Use a real YYYY-MM-DD calendar date.');
         }
-        if ($past && $value > now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString()) {
+        if ($past && $value > now(config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC')->toDateString()) {
             self::invalid($field, 'A completed fact cannot be dated in the future.');
         }
         return $value;

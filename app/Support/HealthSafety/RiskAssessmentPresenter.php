@@ -290,7 +290,7 @@ class RiskAssessmentPresenter
             return ['kind' => 'none', 'days' => null];
         }
 
-        $days = (int) Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay()->diffInDays(Carbon::parse($ra->review_due_at->toDateString(), config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay(), false);
+        $days = (int) Carbon::now(config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC')->startOfDay()->diffInDays(Carbon::parse($ra->review_due_at->toDateString(), config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay(), false);
 
         return match (true) {
             $days < 0 => ['kind' => 'overdue', 'days' => $days],

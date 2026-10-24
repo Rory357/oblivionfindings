@@ -118,7 +118,7 @@ final class EmergencyDrillPresenter
 
     private function findingOverdue(EmergencyDrillFinding $finding): bool
     {
-        return $finding->due_date !== null && $finding->due_date->toDateString() < now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString()
+        return $finding->due_date !== null && $finding->due_date->toDateString() < now(config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC')->toDateString()
             && ! in_array($finding->status, ['resolved', 'closed', 'accepted'], true);
     }
 

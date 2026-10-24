@@ -103,7 +103,7 @@ final class WorkerParticipationAccessService
                 if ($proof === null) { throw new LogicException('Participation reads require the active outer materialisation collector.'); }
                 abort_unless($current->approved_at !== null && ! $current->isExternalClinicianAccount() && $current->canDo('hazards.view'), 403);
                 abort_unless($reads->query(User::query()->staff())->whereKey($current->id)->exists(), 403);
-                $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+                $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
                 $day = now($timezone)->toDateString();
                 $wide = $this->sites->canBypass($current, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
                 $approved = $this->sites->accessibleSiteIds($current, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, $reads);

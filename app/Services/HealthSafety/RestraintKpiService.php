@@ -38,7 +38,7 @@ class RestraintKpiService
             $count = fn (Builder $query): int => $proof->protect($query)->count();
             $clients = $proof->protect((clone $events)->whereNotNull('client_id')->distinct())->pluck('client_id');
             $active = $proof->protect((clone $plans)->whereIn('client_id', $clients)->where('status', 'active')->distinct())->pluck('client_id');
-            $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+            $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
             return [
                 'events_in_period' => $count(clone $period),
                 'out_of_plan' => $count((clone $period)->where('within_support_plan', false)),

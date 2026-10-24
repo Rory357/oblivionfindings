@@ -482,10 +482,10 @@ class HsRiskAssessmentService
             $sites = DB::table('sites')->whereIn('id', $siteIds);
             $rows = $reads->query(clone $sites)->get(['id', 'is_active', 'archived', 'archived_at', 'deleted_at'])->map(fn ($row) => (array) $row)->all();
             $this->expectedSet($proof, $sites, $rows, ['id']);
-            $zone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')); $day = now($zone)->toDateString();
+            $zone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'); $day = now($zone)->toDateString();
             $proof->whereRaw(new class($reads, $zone, $day) extends \Illuminate\Database\Query\Expression {
                 public function __construct(private readonly CurrentAuthorizationReads $reads, private readonly string $zone, private readonly string $day) { parent::__construct('1 = 1'); }
-                public function getValue(\Illuminate\Database\Grammar $grammar) { $this->reads->assertActive(); if ((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')) !== $this->zone || now($this->zone)->toDateString() !== $this->day) { throw new LogicException('Risk authorization date evidence changed during materialisation.'); } return parent::getValue($grammar); }
+                public function getValue(\Illuminate\Database\Grammar $grammar) { $this->reads->assertActive(); if ((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC') !== $this->zone || now($this->zone)->toDateString() !== $this->day) { throw new LogicException('Risk authorization date evidence changed during materialisation.'); } return parent::getValue($grammar); }
             });
             return $reads->query($proof);
         });

@@ -1935,7 +1935,7 @@ SQL;
         $userColumn = $query->qualifyColumn('user_id');
         $clientSite = "(SELECT `site_id` FROM `clients` AS `shift_client_site` WHERE `shift_client_site`.`id` = {$row}.`client_id` LIMIT 1)";
         $authoritativeSite = "COALESCE({$row}.`site_id`, {$clientSite})";
-        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))->toDateString();
+        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->toDateString();
 
         return $query
             ->where(function (Builder $siteIntegrity) use ($siteColumn) {
@@ -2226,7 +2226,7 @@ SQL;
 
     private function applyCurrentEmployeeProfileScope(Builder $query): Builder
     {
-        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))->toDateString();
+        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->toDateString();
 
         return $query
             ->where($query->qualifyColumn('is_active'), true)
@@ -2242,7 +2242,7 @@ SQL;
 
     private function isCurrentEmployeeProfile(HrEmployeeProfile $profile): bool
     {
-        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))->toDateString();
+        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->toDateString();
 
         return ! $profile->trashed()
             && (bool) $profile->is_active

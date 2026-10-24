@@ -40,7 +40,7 @@ final class FirstAidAccessService
     {
         return DB::transaction(fn () => CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($viewer, $operation) {
             $current = $this->authorization->lockForUserWithoutWaiting($viewer, self::PERMISSIONS);
-            $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+            $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
             $preparedSourceDate = [$timezone, now($timezone)->toDateString()];
             abort_unless($reads->query($this->staff->currentUsersQuery())->whereKey($current->id)->exists(), 403);
             $current->setRelation('hrEmployeeProfile', $reads->query(HrEmployeeProfile::query())->where('user_id', $current->id)->first());

@@ -38,7 +38,7 @@ class CommitteeMeetingScheduled extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $workerTimezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $workerTimezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
         $when = $this->meeting->scheduled_at?->copy()->setTimezone($workerTimezone)->format('D j M Y, g:ia');
         if ($when !== null) { $when .= ' ('.$workerTimezone.')'; }
         $name = $this->committee?->name ?? 'H&S committee';

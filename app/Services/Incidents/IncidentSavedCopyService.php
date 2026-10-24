@@ -331,7 +331,7 @@ final class IncidentSavedCopyService
         $membershipScope = DB::table('client_user')->where('user_id', $current->id)->where('client_id', $identity->source_tuple['client_id']);
         $memberships = $reads->query(clone $membershipScope)->get(['id', 'client_id', 'user_id'])->map(fn ($row) => (array) $row)->all();
         $this->expectedSet($guard, $membershipScope, $memberships, ['id']);
-        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')); $day = now($timezone)->toDateString();
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'); $day = now($timezone)->toDateString();
         // Nested EXISTS compilation does not execute an embedded Builder's beforeQuery callbacks.
         // The expression keeps the ORIGINAL read lifetime, even if another viewer wraps it in new reads.
         $guard->whereRaw(new class($reads, $timezone, $day) extends Expression {
@@ -343,7 +343,7 @@ final class IncidentSavedCopyService
             public function getValue(Grammar $grammar)
             {
                 $this->originalReads->assertActive();
-                if ((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')) !== $this->timezone || now($this->timezone)->toDateString() !== $this->day) {
+                if ((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC') !== $this->timezone || now($this->timezone)->toDateString() !== $this->day) {
                     throw new LogicException('Copy authorization date evidence changed during materialisation.');
                 }
                 return parent::getValue($grammar);

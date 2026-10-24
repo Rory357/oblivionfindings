@@ -63,7 +63,7 @@ class WorkerParticipationObligationProvider extends ObligationProvider
     {
         $items = [];
         $base = '/health-safety/worker-participation';
-        $workerTimezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $workerTimezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
         $workerToday = Carbon::today($workerTimezone)->toDateString();
 
         /* ---- Committee meetings (scheduled_at) ---------------------- */
@@ -178,7 +178,7 @@ class WorkerParticipationObligationProvider extends ObligationProvider
     private function nextCadenceDate(HsCommittee $committee, WorkerParticipationAccessService $access, HealthSafetyReadContext $context): ?Carbon
     {
         $last = $access->relatedQuery('committees', 'meetings', $context, null, $committee->id)->max('scheduled_at');
-        $workerTimezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $workerTimezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
         // Stored meeting instants are UTC; cadence arithmetic belongs to the worker's civil calendar.
         // Established-at is a DATE, so attach the zone without shifting its literal day.
         $from = $last ? Carbon::parse($last, 'UTC')->setTimezone($workerTimezone)

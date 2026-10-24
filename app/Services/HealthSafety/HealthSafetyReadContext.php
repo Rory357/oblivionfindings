@@ -155,14 +155,14 @@ final class HealthSafetyReadContext
             }
             $guard->whereNotExists($extra->selectRaw('1'));
         }
-        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
         [$timezone, $day] = $originalDate ?? [$timezone, now($timezone)->toDateString()];
         $guard->whereRaw(new class($reads, $timezone, $day) extends \Illuminate\Database\Query\Expression {
             public function __construct(private readonly CurrentAuthorizationReads $reads, private readonly string $timezone, private readonly string $day) { parent::__construct('1 = 1'); }
             public function getValue(\Illuminate\Database\Grammar $grammar)
             {
                 $this->reads->assertActive();
-                if ((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')) !== $this->timezone || now($this->timezone)->toDateString() !== $this->day) {
+                if ((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC') !== $this->timezone || now($this->timezone)->toDateString() !== $this->day) {
                     throw new LogicException('Original source date evidence changed during materialisation.');
                 }
                 return parent::getValue($grammar);
@@ -177,7 +177,7 @@ final class HealthSafetyReadContext
         return DB::transaction(fn () => CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($viewer, $permissionKeys, $consumer) {
             $permissionKeys = array_values(array_unique($permissionKeys));
             $current = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($viewer, $permissionKeys);
-            $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+            $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
             $preparedSourceDate = [$timezone, now($timezone)->toDateString()];
             $currentStaff = $current->approved_at !== null && ! $current->isExternalClinicianAccount()
                 && $reads->query(app(HrCurrentStaffService::class)->currentUsersQuery())->whereKey($current->id)->exists();

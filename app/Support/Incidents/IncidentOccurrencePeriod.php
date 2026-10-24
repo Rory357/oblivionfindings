@@ -9,7 +9,7 @@ final class IncidentOccurrencePeriod
 {
     public static function timezone(): string
     {
-        return (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        return (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
     }
 
     /** Validated dates describe whole worker calendar days, including DST. */

@@ -241,7 +241,7 @@ final class PpeCommandService
         return $this->execute('inventory', $this->id($inventory), $actor, 'inspect', 'inspect', $values,
             function ($root, $subject, $current, $reads, $sites, $payload) {
                 $this->requireConstraint($root, 'inspect');
-                $root->last_inspected_at = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+                $root->last_inspected_at = now(config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC')->toDateString();
                 if (array_key_exists('next_inspection_due', $payload)) {
                     $root->next_inspection_due = $payload['next_inspection_due'];
                 }
@@ -456,7 +456,7 @@ final class PpeCommandService
         $freshType ??= PpeType::whereKey($item->ppe_type_id)->lock('for share nowait')->first();
         $typeActive = $freshType && (int) $freshType->id === (int) $item->ppe_type_id && $freshType->is_active && $this->sourceState($freshType) !== 'repair_required';
         $terminal = in_array($item->status, ['condemned', 'disposed'], true);
-        $expired = $item->expiry_date && $item->expiry_date->toDateString() < now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $expired = $item->expiry_date && $item->expiry_date->toDateString() < now(config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC')->toDateString();
         $definitions = [
             'hold' => [in_array($item->status, ['available', 'allocated'], true), 'Only live stock can be placed on a new maintenance hold.'],
             'allocate' => [$item->status === 'available' && $activeAllocationCount === 0 && $item->quantity > 0 && ! $expired && $item->condition !== 'condemned' && $typeActive, 'Only available, in-date stock without an active issue can be allocated.'],

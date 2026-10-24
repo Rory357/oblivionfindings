@@ -57,7 +57,7 @@ final readonly class WorkerParticipationRecipientSourceOrigin
             || (int) (auth()->id() ?? 0) !== $this->receiverId) {
             throw new LogicException('Recipient origin belongs to its original authenticated request receiver.');
         }
-        $zone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $zone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
         abort_unless($zone === $this->timezone && now($zone)->toDateString() === $this->day, 404, 'Original recipient date evidence changed.');
     }
 }

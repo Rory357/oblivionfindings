@@ -32,7 +32,7 @@ final class WorkerParticipationMetricsReadService
     public function monthly(?User $viewer, CarbonInterface $from, CarbonInterface $to, int|array|null $requestedSites = null, ?HealthSafetyReadContext $context = null, bool $workerCivilDates = false): array
     {
         return $this->consume($viewer, $requestedSites, $context, ['engagement' => null, 'consultation' => null], function (HealthSafetyReadContext $active) use ($requestedSites, $from, $to, $workerCivilDates): array {
-            $zone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+            $zone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
             $start = $workerCivilDates ? CarbonImmutable::parse($from->format('Y-m-d'), $zone)->startOfDay()->utc() : CarbonImmutable::instance($from)->utc();
             $end = $workerCivilDates ? CarbonImmutable::parse($to->format('Y-m-d'), $zone)->endOfDay()->utc() : CarbonImmutable::instance($to)->utc();
             $buckets = []; $bindings = [];

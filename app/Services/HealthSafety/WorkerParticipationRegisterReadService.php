@@ -75,7 +75,7 @@ final class WorkerParticipationRegisterReadService
     /** Preserve recent plus every upcoming meeting/consultation; representatives remain unbounded. */
     private function periodStart(?string $period): ?Carbon
     {
-        $now = now((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')));
+        $now = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'));
         return match ($period) {
             'week' => $now->startOfWeek(), '30d' => $now->subDays(30)->startOfDay(),
             'year' => $now->startOfYear(), 'quarter' => $now->startOfQuarter(), default => null,

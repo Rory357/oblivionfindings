@@ -160,7 +160,7 @@ final class WorkerParticipationRecipientSourceService
                     $reads->query(app(HrCurrentStaffService::class)->currentUsersQuery())->whereKey($current->id)->selectRaw('1')->toBase());
                 abort_unless((clone $query)->exists(), 404);
                 [$sql, $bindings] = $this->fixedSql($query);
-                $zone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+                $zone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
                 return ['receiver_id' => (int) $current->id, 'sql' => $sql, 'bindings' => $bindings, 'timezone' => $zone, 'day' => now($zone)->toDateString()];
             });
         $parts = $context === null ? HealthSafetyReadContext::within($recipient, self::PERMISSIONS, $capture) : $capture($context);
@@ -368,7 +368,7 @@ final class WorkerParticipationRecipientSourceService
     private function assertReceiverFrame(User $recipient, array $frame): void
     {
         $this->assertOwnReceiver($recipient);
-        $zone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $zone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
         abort_unless($frame['receiver_id'] === (int) $recipient->id && $zone === $frame['timezone'] && now($zone)->toDateString() === $frame['day'], 404);
         abort_unless((bool) (DB::selectOne('SELECT EXISTS ('.$frame['sql'].') AS admitted', $frame['bindings'])->admitted ?? false), 404);
     }

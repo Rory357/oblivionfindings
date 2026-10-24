@@ -165,7 +165,7 @@ class HsRiskAssessment extends Model
     /** The worker calendar; an empty setting falls back to the application timezone. */
     private static function workerTimezone(): string
     {
-        return (string) (config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone', 'UTC'));
+        return (string) (config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC');
     }
 
     public function scopeDueForReview($query)
