@@ -153,3 +153,14 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
 - **Decision for Stephan: restraint refusals answer 403, not 404.** Codex's restraint access returns 403 for another Site's restraint records, where main answered 404. Access and content are still refused, but someone who already holds restraint permissions can tell that a record number exists at another Site. Injuries and PPE still answer 404. Switching restraints to 404 means changing Codex's access contract and its tests, so it's left as is for his call.
 - **Injury capture with mismatched Site/Client**: still saves nothing, but now fails with an internal error (500) instead of main's 403.
 - **Test gap (code enforces it)**: no test refuses a restraint debrief marked not done or declined without a reason; `RestraintService` enforces it.
+
+## Stephan's answers (25 Oct ~08:40, relayed by the coordinator)
+
+1. **Merge timing**: wait for a full pass. Every test passes or fails the same way on main; no known-failures merge.
+2. **Site hazards list/export**: keep the house check (`sites.viewAny`) on both. `HazardWorklistHeaderTest` expects it.
+3. **Restraint refusals**: keep Codex's 403 ("not allowed") for another Site's restraint records.
+4. **Staff Assignments clients**: `/staff/{user}/assignments` lists and accepts only clients at Sites the viewer can access (`sites.viewAll` bypass), following main's staff Site rule (1f3a1e855).
+5. **H&S data needs a current HR profile**: kept. The .com demo H&S officer accounts must have a current HR profile at their Sites (demo-only data step).
+6. **HealthSafetyTaskContextTest**: narrow the "no SQL naming permission_user" rule so it still blocks anything that could grant access but allows the deny-only equality check.
+7. **Respite restraint**: main's working respite restraint form stays for this merge; the 2 contradicting `RespiteRestraintReadTest` cases are updated to main's behaviour.
+   - **Follow-up (logged so it isn't lost):** Codex's dedicated "record a restraint for this stay" page and its workspace restraint lists, rebuilt later on top of main's newer respite privacy rules (`RespiteWorkspaceMedicationPrivacyTest`).
