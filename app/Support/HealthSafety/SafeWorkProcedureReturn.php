@@ -84,8 +84,12 @@ final class SafeWorkProcedureReturn
             $keys = ['section', 'version', 'revision', 'request'];
         }
         $safe = [];
-        foreach ($keys as $key) {
-            $item = $query[$key] ?? null;
+        // The origin's own key order is kept, so a supported link returns unchanged.
+        foreach (array_keys($query) as $key) {
+            if (! in_array($key, $keys, true)) {
+                continue;
+            }
+            $item = $query[$key];
             if (! is_string($item) || $item === '' || strlen($item) > 200 || preg_match('/[\x00-\x1f\x7f]/', $item)) {
                 continue;
             }
