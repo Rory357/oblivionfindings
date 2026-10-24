@@ -732,7 +732,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $event = $this->hs($source);
         $viewer = $this->staff(['hazards.view', 'restraints.view', 'clients.viewAny']);
         $action = $this->action($event, $viewer, ['title' => 'Source restricted corrective action']);
-        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['source_type' => null, 'source_id' => null, 'site_id' => $this->site->id]));
+        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id]));
         $ordinaryAction = $this->action($ordinary, $viewer);
         $this->actingAs($viewer)->get('/health-safety/corrective-actions/'.$action->id)->assertOk()
             ->assertInertia(fn (Assert $page) => $page->component('health-safety/corrective-actions/show')->where('workspace.action.id', $action->id));
@@ -750,7 +750,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $event = $this->hs($source, ['reference_number' => 'HS-PRIVATE-RESTRAINT-NEEDLE']);
         $viewer = $this->staff(['hazards.view', 'restraints.view', 'clients.viewAny']);
         $action = $this->action($event, $viewer);
-        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id, 'source_type' => null, 'source_id' => null, 'reference_number' => 'HS-ORDINARY-NEEDLE']));
+        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id, 'reference_number' => 'HS-ORDINARY-NEEDLE']));
         $ordinaryAction = $this->action($ordinary, $viewer);
         $this->actingAs($viewer)->get('/health-safety/corrective-actions?'.http_build_query(['q' => $event->reference_number, 'site_id' => $this->site->id]))
             ->assertOk()->assertInertia(fn (Assert $page) => $page->has('actions.data', 1)->where('actions.data.0.id', $action->id)->where('tabCounts.all', 1));
@@ -789,10 +789,10 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
     {
         $viewer = $this->staff(['controlRoom.viewAny', 'controlRoom.alerts.view', 'hazards.view']);
         $localAlert = ControlRoomAlert::withoutEvents(fn () => ControlRoomAlert::factory()->create(['site_id' => $this->site->id, 'status' => 'open', 'severity' => 'medium', 'context' => []]));
-        $local = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id, 'control_room_alert_id' => $localAlert->id, 'source_type' => null, 'source_id' => null, 'reference_number' => 'HS-ORDINARY-SEARCH-LOCAL', 'handover_status' => HsEvent::HANDOVER_ACCEPTED]));
+        $local = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id, 'control_room_alert_id' => $localAlert->id, 'reference_number' => 'HS-ORDINARY-SEARCH-LOCAL', 'handover_status' => HsEvent::HANDOVER_ACCEPTED]));
         $otherSite = Site::factory()->create();
         $foreignAlert = ControlRoomAlert::withoutEvents(fn () => ControlRoomAlert::factory()->create(['site_id' => $otherSite->id, 'status' => 'open', 'severity' => 'medium', 'context' => []]));
-        $foreign = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $otherSite->id, 'control_room_alert_id' => $foreignAlert->id, 'source_type' => null, 'source_id' => null, 'reference_number' => 'HS-ORDINARY-SEARCH-FOREIGN', 'handover_status' => HsEvent::HANDOVER_ACCEPTED]));
+        $foreign = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $otherSite->id, 'control_room_alert_id' => $foreignAlert->id, 'reference_number' => 'HS-ORDINARY-SEARCH-FOREIGN', 'handover_status' => HsEvent::HANDOVER_ACCEPTED]));
         $query = app(AlertWorklistQuery::class);
         $this->assertSame([$localAlert->id], $query->forUser($viewer, ['q' => $local->reference_number])->pluck('control_room_alerts.id')->all());
         $this->assertSame([], $query->forUser($viewer, ['q' => $foreign->reference_number])->pluck('control_room_alerts.id')->all());

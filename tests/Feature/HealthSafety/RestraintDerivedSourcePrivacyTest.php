@@ -70,7 +70,7 @@ class RestraintDerivedSourcePrivacyTest extends RestraintEventCommandTestCase
     {
         $source = $this->event();
         $event = $this->hs($source);
-        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['source_type' => null, 'source_id' => null, 'site_id' => $this->site->id]));
+        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id]));
         $viewer = $this->staff(['hazards.view', 'clients.viewAny']);
         $access = app(HsEventAccessService::class);
         $keys = [...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS, ...InjuryAccessService::PERMISSIONS];
@@ -86,7 +86,7 @@ class RestraintDerivedSourcePrivacyTest extends RestraintEventCommandTestCase
     public function test_filtered_ordinary_hs_read_does_not_fetch_unrelated_private_restraint_sources(): void
     {
         $private = $this->hs($this->event());
-        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['source_type' => null, 'source_id' => null, 'site_id' => $this->site->id]));
+        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id]));
         $viewer = $this->staff(['hazards.view', 'restraints.view', 'clients.viewAny']);
         $access = app(HsEventAccessService::class);
         $this->assertTrue($access->canView($private, $viewer));

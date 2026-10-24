@@ -76,7 +76,7 @@ final class ChemicalExposureHsFamilyIntegrationTest extends ChemicalExposureComm
     }
     private function ordinary(): HsEvent
     {
-        return HsEvent::factory()->createQuietly(['source_type' => null, 'source_id' => null, 'site_id' => $this->site->id,
+        return HsEvent::factory()->createQuietly(['site_id' => $this->site->id,
             'created_by' => $this->manager->id, 'idempotency_key' => (string) Str::uuid()]);
     }
     private function noPrivateSql(array $queries): void

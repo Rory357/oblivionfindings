@@ -303,7 +303,7 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
     public function test_unrelated_hse_keeps_ordinary_authority_when_incident_permission_is_withdrawn(): void
     {
         $fixture = $this->source();
-        $ordinary = HsEvent::factory()->create(['site_id' => $this->site->id, 'source_type' => null, 'source_id' => null]);
+        $ordinary = HsEvent::factory()->create(['site_id' => $this->site->id]);
         $this->allow($this->manager, 'incidents.viewAny', false);
         $this->within($this->manager, function ($context) use ($fixture, $ordinary): array {
             $query = app(HsEventAccessService::class)->applyReadableScope(HsEvent::query()->whereIn('id', [$fixture['event']->id, $ordinary->id]), $this->manager, $context);

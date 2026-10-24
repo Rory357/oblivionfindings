@@ -299,7 +299,7 @@ class HsDerivedSourceCandidatePrivacyTest extends TestCase
 
     private function ordinary(): HsEvent
     {
-        return HsEvent::factory()->createQuietly(['source_type' => null, 'source_id' => null, 'site_id' => $this->site->id,
+        return HsEvent::factory()->createQuietly(['site_id' => $this->site->id,
             'created_by' => $this->viewer->id, 'idempotency_key' => (string) Str::uuid()]);
     }
 

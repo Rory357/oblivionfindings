@@ -379,7 +379,7 @@ class HsRiskAssessmentWorkspaceTest extends TestCase
     public function test_initial_risk_key_union_preserves_route_links_and_non_alert_tasks_without_cr_grant(): void
     {
         $event = HsEvent::factory()->createQuietly(['site_id' => $this->site->id,
-            'event_category' => HsEvent::CATEGORY_HAZARD, 'source_type' => null, 'source_id' => null]);
+            'event_category' => HsEvent::CATEGORY_HAZARD]);
         $assessment = $this->risk(['hs_event_id' => $event->id]);
         $viewer = $this->reader(['hazards.view']);
         $response = $this->actingAs($viewer)->get('/health-safety/risk-assessments/'.$assessment->id)->assertOk();

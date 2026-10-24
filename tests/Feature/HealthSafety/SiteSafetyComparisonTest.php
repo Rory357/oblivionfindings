@@ -57,7 +57,7 @@ final class SiteSafetyComparisonTest extends TestCase
     private function event(?Site $site = null, array $fields = []): HsEvent
     {
         return HsEvent::factory()->createQuietly(['site_id' => ($site ?? $this->alpha)->id, 'created_by' => $this->viewer->id,
-            'source_type' => null, 'source_id' => null, 'client_id' => null, 'staff_id' => null, 'asset_id' => null,
+            'client_id' => null, 'staff_id' => null, 'asset_id' => null,
             'occurred_at' => '2026-10-05 12:00:00', 'event_category' => HsEvent::CATEGORY_INCIDENT,
             'idempotency_key' => (string) Str::uuid(), ...$fields]);
     }

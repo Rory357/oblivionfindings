@@ -165,7 +165,7 @@ class HsRecordCandidateContextPrivacyTest extends WorkplaceInjurySourceTestCase
     }
     private function ordinary(array $changes = []): HsEvent
     {
-        return HsEvent::factory()->createQuietly(['site_id' => $this->site->id, 'source_type' => null, 'source_id' => null,
+        return HsEvent::factory()->createQuietly(['site_id' => $this->site->id,
             'event_category' => HsEvent::CATEGORY_INCIDENT, 'staff_id' => null, 'client_id' => null, 'asset_id' => null,
             'status' => HsEvent::STATUS_OPEN, 'created_by' => $this->factual->id, ...$changes]);
     }

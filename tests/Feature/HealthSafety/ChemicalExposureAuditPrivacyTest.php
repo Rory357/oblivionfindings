@@ -255,7 +255,7 @@ final class ChemicalExposureAuditPrivacyTest extends TestCase
     public function test_historical_child_parent_binding_cannot_be_hidden_by_reparenting_to_ordinary_event(): void
     {
         $private = $this->event($this->source);
-        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id, 'source_type' => null, 'source_id' => null]));
+        $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id]));
         $child = HsInvestigation::withoutEvents(fn () => HsInvestigation::factory()->create(['hs_event_id' => $ordinary->id]));
         $row = $this->audit(HsInvestigation::class, $child->id, 'hsinvestigation.update', ['before' => ['hs_event_id' => $private->id], 'after' => ['hs_event_id' => $ordinary->id]]);
         $this->assertSame([], $this->visible($this->safety, AuditLog::whereKey($row->id)));

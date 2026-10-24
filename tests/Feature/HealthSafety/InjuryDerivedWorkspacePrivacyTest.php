@@ -455,7 +455,7 @@ class InjuryDerivedWorkspacePrivacyTest extends InjuryWorkspaceReadTestCase
 
     private function ordinary(array $changes = []): HsEvent
     {
-        return HsEvent::factory()->createQuietly(['site_id' => $this->site->id, 'source_type' => null, 'source_id' => null,
+        return HsEvent::factory()->createQuietly(['site_id' => $this->site->id,
             'event_category' => HsEvent::CATEGORY_INCIDENT, 'staff_id' => null, 'client_id' => null, 'asset_id' => null,
             'status' => HsEvent::STATUS_OPEN, 'occurred_at' => now()->subDay(), 'reported_at' => now()->subDay(),
             'created_by' => $this->viewer->id, 'idempotency_key' => (string) Str::uuid(), ...$changes]);
