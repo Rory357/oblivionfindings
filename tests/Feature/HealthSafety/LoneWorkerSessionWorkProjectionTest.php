@@ -55,6 +55,7 @@ class LoneWorkerSessionWorkProjectionTest extends TestCase
         $tasks->shouldReceive('itemsFor')->andReturn([]);
         $tasks->shouldReceive('filterItems')->andReturn([]);
         $tasks->shouldReceive('navigationBadgeFor')->andReturn(['view' => true, 'badge' => 0, 'degraded' => false]);
+        $tasks->shouldReceive('navigationBadgeInContext')->andReturn(['view' => true, 'badge' => 0, 'degraded' => false]);
         $tasks->shouldReceive('findItemFor')->andReturnUsing(function ($viewer, $source, $id) {
             if ($source !== 'corrective_action' || in_array((int) $id, $this->hiddenActions, true)) {
                 return null;
