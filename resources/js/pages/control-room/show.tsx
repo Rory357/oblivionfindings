@@ -162,6 +162,15 @@ export default function ControlRoomAlertShow(
     );
     const finished = ['resolved', 'closed', 'dismissed'].includes(a.status);
     const openTasks = d.tasks.filter((task) => isOpenTask(task.status)).length;
+    const tabCount: Partial<Record<RecordTab, number>> = {
+        tasks: openTasks,
+        evidence: d.evidence_packs.length,
+        activity: d.discussions.length,
+        linked:
+            (d.linked_incident ? 1 : 0) +
+            (d.linked_hs_event ? 1 : 0) +
+            (d.linked_it_work ? 1 : 0),
+    };
     const run = d.playbook_run;
     const runPercent = run?.total_steps
         ? Math.round((run.completed_steps / run.total_steps) * 100)
@@ -314,10 +323,8 @@ export default function ControlRoomAlertShow(
                         key: t.key,
                         label: t.label,
                         icon: t.icon,
-                        count:
-                            t.key === 'tasks' && openTasks > 0
-                                ? openTasks
-                                : undefined,
+                        // Counts only where there is something to open.
+                        count: tabCount[t.key] || undefined,
                     }))}
                 />
             }

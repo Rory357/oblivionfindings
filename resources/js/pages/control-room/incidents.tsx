@@ -22,6 +22,8 @@ import {
 import { raisedWords, useNow } from '@/components/control-room/live-response/response-clock';
 import { TargetLens } from '@/components/control-room/live-response/target-lens';
 import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
+import { useListKeys } from '@/components/control-room/live-response/use-list-keys';
+import { ListKeysHint } from '@/components/control-room/live-response/response-worklist';
 import {
     PageHeaderFilterSelect,
     PageHeaderMeterBig,
@@ -220,6 +222,16 @@ export default function SafetyHandovers({
     const rows = useMemo(() => journeys.data.map(asRow), [journeys.data]);
     const actions = useAlertActions(detail);
     const selection = useAlertSelection({ rows, detail, runAction: actions.run });
+    useListKeys({
+        ids: rows.map((row) => row.id),
+        selectedId: selection.selectedId,
+        onSelect: (id) => selection.select(id),
+        onOpen: (id) => router.visit(`/control-room/alerts/${id}`),
+        onAcknowledge: (id) => {
+            if (!rows.find((row) => row.id === id)?.actions.can_acknowledge) return false;
+            selection.select(id, 'acknowledge');
+        },
+    });
     const now = useNow();
     const lens = filters.lens ?? 'attention';
 
@@ -228,7 +240,7 @@ export default function SafetyHandovers({
             if (!document.hidden)
                 router.reload({
                     async: true,
-                    only: ['journeys', 'lenses', 'stats', 'detail'],
+                    only: ['journeys', 'lenses', 'stats', 'detail', 'tabCounts'],
                     preserveScroll: true,
                 });
         }, 30_000);
@@ -347,6 +359,11 @@ export default function SafetyHandovers({
                             ))}
                         </ol>
                     )}
+                    {journeys.data.length > 1 ? (
+                        <div className="hidden border-t border-border px-5 py-2.5 lg:block">
+                            <ListKeysHint />
+                        </div>
+                    ) : null}
                     {journeys.meta.last_page > 1 ? (
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
                             <p className="text-caption">
@@ -472,6 +489,7 @@ function JourneyRow({
             {({ rowProps, overflowButton }) => (
                 <li
                     onContextMenu={rowProps.onContextMenu}
+                    data-alert-row={journey.alert.id}
                     data-selected={selected ? 'true' : undefined}
                     className={cn(
                         'relative flex items-start gap-3 py-3.5 pr-3 pl-5 transition-colors',

@@ -12,6 +12,7 @@ import {
 } from '@/components/control-room/live-response/live-response-filters';
 import { ResponseWorklist } from '@/components/control-room/live-response/response-worklist';
 import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
+import { useListKeys } from '@/components/control-room/live-response/use-list-keys';
 import { LiveMark } from '@/components/control-room/live-response/target-lens';
 import {
     PageHeaderFilterSelect,
@@ -92,6 +93,16 @@ export default function Escalations({
         detail,
         runAction: actions.run,
     });
+    useListKeys({
+        ids: worklist.data.map((row) => row.id),
+        selectedId: selection.selectedId,
+        onSelect: (id) => selection.select(id),
+        onOpen: (id) => router.visit(`/control-room/alerts/${id}`),
+        onAcknowledge: (id) => {
+            if (!worklist.data.find((row) => row.id === id)?.actions.can_acknowledge) return false;
+            selection.select(id, 'acknowledge');
+        },
+    });
 
     useEffect(() => {
         const visible = new Set(worklist.data.map((row) => row.id));
@@ -103,7 +114,7 @@ export default function Escalations({
             if (document.hidden) return;
             router.reload({
                 async: true,
-                only: ['queues', 'worklist', 'summary', 'serverTime', 'detail'],
+                only: ['queues', 'worklist', 'summary', 'serverTime', 'detail', 'tabCounts'],
                 preserveScroll: true,
             });
         }, 30_000);
@@ -244,6 +255,7 @@ export default function Escalations({
                 }
             >
                 <ResponseWorklist
+                    keyHint
                     title="Escalated"
                     description="Missed targets first, then the highest queue and the most urgent."
                     worklist={{

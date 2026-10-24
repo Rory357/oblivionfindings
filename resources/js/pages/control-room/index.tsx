@@ -26,6 +26,7 @@ import { longDuration } from '@/components/control-room/live-response/response-c
 import { ResponseWorklist } from '@/components/control-room/live-response/response-worklist';
 import { LiveMark } from '@/components/control-room/live-response/target-lens';
 import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
+import { useListKeys } from '@/components/control-room/live-response/use-list-keys';
 import {
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -71,6 +72,7 @@ const LIVE_PROPS = [
     'handover',
     'activity',
     'freshness',
+    'tabCounts',
     'detail',
 ] as const;
 
@@ -146,6 +148,16 @@ export function ControlRoomDashboardView({
         rows: worklist.data,
         detail,
         runAction: actions.run,
+    });
+    useListKeys({
+        ids: worklist.data.map((row) => row.id),
+        selectedId: selection.selectedId,
+        onSelect: (id) => selection.select(id),
+        onOpen: (id) => router.visit(`/control-room/alerts/${id}`),
+        onAcknowledge: (id) => {
+            if (!worklist.data.find((row) => row.id === id)?.actions.can_acknowledge) return false;
+            selection.select(id, 'acknowledge');
+        },
     });
 
     const apply = (next: Partial<DeskFilters>) =>
@@ -324,6 +336,7 @@ export function ControlRoomDashboardView({
                 }
             >
                 <ResponseWorklist
+                    keyHint
                     title={top ? 'Up next' : 'Needs action'}
                     description={
                         top

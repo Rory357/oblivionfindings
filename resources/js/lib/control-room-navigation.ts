@@ -11,12 +11,14 @@ import {
     LayoutDashboard,
     ListChecks,
     ListTodo,
+    MailWarning,
     Map,
     MessageSquare,
     Radio,
     RadioTower,
     Send,
     Settings,
+    ShieldCheck,
     SlidersHorizontal,
     Target,
     Wrench,
@@ -133,6 +135,12 @@ function views(can: Can, key: ControlRoomDestinationKey): ControlRoomView[] {
                         icon: Radio,
                         allowed: read(can),
                     },
+                    {
+                        key: '/control-room/coverage',
+                        label: 'Coverage',
+                        icon: ShieldCheck,
+                        allowed: read(can),
+                    },
                 ];
             case 'communications':
                 return [
@@ -146,6 +154,12 @@ function views(can: Can, key: ControlRoomDestinationKey): ControlRoomView[] {
                         key: '/control-room/messaging',
                         label: 'Conversations',
                         icon: MessageSquare,
+                        allowed: read(can),
+                    },
+                    {
+                        key: '/control-room/delivery-problems',
+                        label: 'Delivery problems',
+                        icon: MailWarning,
                         allowed: read(can),
                     },
                 ];
@@ -272,8 +286,13 @@ export function controlRoomDestinationForPath(
     const path = pathOf(url);
     if (path !== '/control-room' && !path.startsWith('/control-room/'))
         return undefined;
-    if (/^\/control-room\/(map|devices)(\/|$)/.test(path)) return 'monitoring';
-    if (/^\/control-room\/(broadcast|messaging)(\/|$)/.test(path))
+    if (/^\/control-room\/(map|devices|coverage)(\/|$)/.test(path))
+        return 'monitoring';
+    if (
+        /^\/control-room\/(broadcast|messaging|delivery-problems)(\/|$)/.test(
+            path,
+        )
+    )
         return 'communications';
     if (/^\/control-room\/shifts(\/|$)/.test(path)) return 'duty';
     if (

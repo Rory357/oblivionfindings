@@ -70,6 +70,7 @@ export function ResponseWorklist({
     emptyIcon = Inbox,
     toolbar,
     selection,
+    keyHint = false,
 }: {
     title: string;
     description: string;
@@ -87,6 +88,8 @@ export function ResponseWorklist({
         selected: ReadonlySet<number>;
         onChange: (next: Set<number>) => void;
     };
+    /** Show the keyboard reminder (the page wires useListKeys). */
+    keyHint?: boolean;
 }) {
     const headingId = useId();
     const rows = worklist.data;
@@ -178,6 +181,12 @@ export function ResponseWorklist({
                 </ol>
             )}
 
+            {keyHint && rows.length > 1 ? (
+                <div className="hidden border-t border-border px-5 py-2.5 lg:block">
+                    <ListKeysHint />
+                </div>
+            ) : null}
+
             {worklist.meta.last_page > 1 ? (
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
                     <p className="text-caption">
@@ -195,6 +204,20 @@ export function ResponseWorklist({
                 </div>
             ) : null}
         </Card>
+    );
+}
+
+/** ↑ ↓ move · A acknowledge · Enter open — shown where the list has the keys. */
+export function ListKeysHint() {
+    const key = 'rounded-[5px] border border-border bg-muted px-1.5 py-px font-sans text-[11px] font-semibold text-foreground';
+    return (
+        <span className="text-caption inline-flex flex-wrap items-center gap-1.5" aria-hidden="true">
+            Keys:
+            <kbd className={key}>↑</kbd>
+            <kbd className={key}>↓</kbd> move
+            <kbd className={key}>A</kbd> acknowledge
+            <kbd className={key}>Enter</kbd> open
+        </span>
     );
 }
 
@@ -232,6 +255,7 @@ function WorklistRow({
     return (
         <li
             onContextMenu={rowProps.onContextMenu}
+            data-alert-row={row.id}
             data-selected={selected ? 'true' : undefined}
             className={cn(
                 'relative flex items-start gap-3 py-3.5 pr-3 pl-5 transition-colors',

@@ -119,6 +119,8 @@ class ControlRoomIncidentController extends Controller
         ])->values();
 
         return Inertia::render('control-room/incidents', [
+            // Live counts on the Live response tabs (same rules as each tab).
+            'tabCounts' => fn () => app(\App\Services\ControlRoom\LiveResponseTabCounts::class)->for($user),
             'journeys' => $this->paginatorPayload($journeys),
             'filters' => $filters,
             'lenses' => $lenses,

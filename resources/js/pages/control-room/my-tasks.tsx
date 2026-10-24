@@ -6,6 +6,7 @@ import { ControlRoomPage } from '@/components/control-room/control-room-page';
 import { AlertPreview } from '@/components/control-room/live-response/alert-preview';
 import { ResponseWorklist } from '@/components/control-room/live-response/response-worklist';
 import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
+import { useListKeys } from '@/components/control-room/live-response/use-list-keys';
 import {
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -93,13 +94,23 @@ export default function MyTasks({
         detail,
         runAction: actions.run,
     });
+    useListKeys({
+        ids: my_alerts.map((row) => row.id),
+        selectedId: selection.selectedId,
+        onSelect: (id) => selection.select(id),
+        onOpen: (id) => router.visit(`/control-room/alerts/${id}`),
+        onAcknowledge: (id) => {
+            if (!my_alerts.find((row) => row.id === id)?.actions.can_acknowledge) return false;
+            selection.select(id, 'acknowledge');
+        },
+    });
 
     useEffect(() => {
         const poll = window.setInterval(() => {
             if (document.hidden) return;
             router.reload({
                 async: true,
-                only: ['my_alerts', 'my_followups', 'my_shift', 'stats', 'detail'],
+                only: ['my_alerts', 'my_followups', 'my_shift', 'stats', 'detail', 'tabCounts'],
             });
         }, 30_000);
         return () => window.clearInterval(poll);
@@ -185,6 +196,7 @@ export default function MyTasks({
                 <div className="flex min-w-0 flex-col gap-5">
                     <div id="my-alerts" className="scroll-mt-5">
                         <ResponseWorklist
+                            keyHint
                             title="Alerts you are on"
                             description="Most urgent first."
                             worklist={{

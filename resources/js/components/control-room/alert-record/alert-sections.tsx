@@ -868,55 +868,46 @@ export function OverviewSection({
                 </ReviewCard>
             ) : null}
 
-            <ReviewCard icon={RadioTower} title="About this alert">
-                <FilledRow label="Type" value={titleCase(a.alert_type)} />
-                <FilledRow label="Came from" value={titleCase(a.source)} />
-                <FilledRow
-                    label="Escalation"
-                    value={a.escalation_level > 0 ? `Level ${a.escalation_level}` : undefined}
-                />
-                <FilledRow
-                    label="Raised"
-                    value={a.triggered_at ? formatDateTime(a.triggered_at) : undefined}
-                />
-            </ReviewCard>
-
-            {place.person || place.asset || place.location ? (
-                <ReviewCard icon={User} title="Who and where">
+            {/* One Details box (24 Oct: fewer boxes): what it is, who and
+                where, and the working details staff can edit. */}
+            <ReviewCard
+                icon={ClipboardList}
+                title="Details"
+                onEdit={d.can.manage ? onEditMeta : undefined}
+                span
+            >
+                <div className="grid gap-x-6 sm:grid-cols-2">
+                    <FilledRow label="Type" value={titleCase(a.alert_type)} />
+                    <FilledRow label="Came from" value={titleCase(a.source)} />
+                    <FilledRow
+                        label="Raised"
+                        value={a.triggered_at ? formatDateTime(a.triggered_at) : undefined}
+                    />
+                    <FilledRow
+                        label="Escalation"
+                        value={a.escalation_level > 0 ? `Level ${a.escalation_level}` : undefined}
+                    />
                     <FilledRow label="Person" value={place.person} />
                     <FilledRow label="Device or vehicle" value={place.asset} />
                     <FilledRow label="Location" value={place.location} />
-                    {d.location ? (
-                        <div className="pt-1.5">
-                            <a
-                                href={`https://www.google.com/maps?q=${d.location.lat},${d.location.lng}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                            >
-                                <MapPin className="h-3.5 w-3.5" /> Open in Google
-                                Maps
-                            </a>
-                        </div>
-                    ) : null}
-                </ReviewCard>
-            ) : null}
-
-            {working.priority || working.category || working.due || working.resolution ? (
-                <ReviewCard
-                    icon={ClipboardList}
-                    title="Working details"
-                    onEdit={d.can.manage ? onEditMeta : undefined}
-                    span
-                >
-                    <div className="grid gap-x-6 sm:grid-cols-2">
-                        <FilledRow label="Priority" value={working.priority} />
-                        <FilledRow label="Category" value={working.category} />
-                        <FilledRow label="Due" value={working.due} />
-                        <FilledRow label="Resolution code" value={working.resolution} />
+                    <FilledRow label="Priority" value={working.priority} />
+                    <FilledRow label="Category" value={working.category} />
+                    <FilledRow label="Due" value={working.due} />
+                    <FilledRow label="Resolution code" value={working.resolution} />
+                </div>
+                {d.location ? (
+                    <div className="pt-1.5">
+                        <a
+                            href={`https://www.google.com/maps?q=${d.location.lat},${d.location.lng}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                            <MapPin className="h-3.5 w-3.5" /> Open in Google Maps
+                        </a>
                     </div>
-                </ReviewCard>
-            ) : null}
+                ) : null}
+            </ReviewCard>
 
             {fleet ? (
                 <ReviewCard icon={Truck} title="Fleet context" span>

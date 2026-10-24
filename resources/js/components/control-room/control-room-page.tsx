@@ -14,10 +14,34 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
+type TabCounts = {
+    needs_action?: number;
+    mine?: number;
+    escalated?: number;
+    snoozed?: number;
+};
+
 type PageProps = {
     [key: string]: unknown;
     auth?: { can?: ControlRoomNavCapabilities };
+    /** Live response pages send these (LiveResponseTabCounts). */
+    tabCounts?: TabCounts | null;
 };
+
+/** The server's tab counts, keyed by the Live response view each belongs to. */
+function liveResponseRailCounts(
+    counts: TabCounts | null | undefined,
+    needsActionKey: string | undefined,
+): Partial<Record<string, number>> | undefined {
+    if (!counts) return undefined;
+    const out: Partial<Record<string, number>> = {
+        '/control-room/my-tasks': counts.mine,
+        '/control-room/escalations': counts.escalated,
+        '/control-room/alerts?lens=snoozed': counts.snoozed,
+    };
+    if (needsActionKey) out[needsActionKey] = counts.needs_action;
+    return out;
+}
 
 /**
  * The view tabs of the current Control Room destination, on the bottom edge
@@ -129,6 +153,11 @@ export function ControlRoomPage({
     const breadcrumbs = breadcrumbOverride ?? trail;
 
     const { title, icon, ...rest } = header;
+    const counts =
+        railCounts ??
+        (hub?.destination.key === 'response'
+            ? liveResponseRailCounts(page.props.tabCounts, hub.destination.views[0]?.key)
+            : undefined);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -145,7 +174,7 @@ export function ControlRoomPage({
                             rail
                         ) : hub && hub.destination.views.length > 1 ? (
                             <ControlRoomHubRail
-                                counts={railCounts}
+                                counts={counts}
                                 alerts={railAlerts}
                             />
                         ) : undefined

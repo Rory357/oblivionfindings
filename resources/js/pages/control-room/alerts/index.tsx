@@ -15,6 +15,7 @@ import {
 } from '@/components/control-room/live-response/live-response-filters';
 import { ResponseWorklist } from '@/components/control-room/live-response/response-worklist';
 import { useAlertSelection } from '@/components/control-room/live-response/use-alert-selection';
+import { useListKeys } from '@/components/control-room/live-response/use-list-keys';
 import { NewAlertWizard } from '@/components/control-room/new-alert-wizard';
 import {
     PageHeaderFilterSelect,
@@ -202,11 +203,21 @@ export default function AlertsIndex({
     );
     const actions = useAlertActions(detail);
     const selection = useAlertSelection({ rows, detail, runAction: actions.run });
+    useListKeys({
+        ids: rows.map((row) => row.id),
+        selectedId: selection.selectedId,
+        onSelect: (id) => selection.select(id),
+        onOpen: (id) => router.visit(`/control-room/alerts/${id}`),
+        onAcknowledge: (id) => {
+            if (!rows.find((row) => row.id === id)?.actions.can_acknowledge) return false;
+            selection.select(id, 'acknowledge');
+        },
+    });
 
     useEffect(() => {
         const poll = window.setInterval(() => {
             if (!document.hidden)
-                router.reload({ async: true, only: ['alerts', 'stats', 'detail'], preserveScroll: true });
+                router.reload({ async: true, only: ['alerts', 'stats', 'detail', 'tabCounts'], preserveScroll: true });
         }, 30_000);
         return () => window.clearInterval(poll);
     }, []);
@@ -353,6 +364,7 @@ export default function AlertsIndex({
                 }
             >
                 <ResponseWorklist
+                    keyHint
                     title={view === 'waiting' ? 'Snoozed' : view === 'history' ? 'Done' : 'Needs action'}
                     description={
                         view === 'history'

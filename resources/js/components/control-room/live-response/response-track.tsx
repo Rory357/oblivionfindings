@@ -22,13 +22,18 @@ function when(iso: string, now: number): string {
     return sameDay(new Date(iso), new Date(now)) ? formatTime(iso) : formatDateTime(iso);
 }
 
-function stepFor(target: AlertTarget, label: string, now: number): Step {
+function stepFor(
+    target: AlertTarget,
+    label: string,
+    now: number,
+    by?: string | null,
+): Step {
     if (target.doneAt)
         return {
             key: target.key,
             label,
             state: 'done',
-            note: when(target.doneAt, now),
+            note: by ? `${when(target.doneAt, now)} · ${by}` : when(target.doneAt, now),
             title: formatDateTime(target.doneAt),
         };
     if (target.state === 'missed' && target.deadline)
@@ -71,12 +76,16 @@ export function ResponseTrack({
             key: 'raised',
             label: 'Raised',
             state: 'done',
-            note: raisedAt ? when(raisedAt, now) : 'Time not recorded',
+            note: raisedAt
+                ? detail.alert.created_by?.name
+                    ? `${when(raisedAt, now)} · ${detail.alert.created_by.name}`
+                    : when(raisedAt, now)
+                : 'Time not recorded',
             title: raisedAt ? formatDateTime(raisedAt) : undefined,
         },
-        stepFor(ack, 'Acknowledged', now),
+        stepFor(ack, 'Acknowledged', now, detail.alert.acknowledged_by?.name),
         stepFor(respond, 'Responding', now),
-        stepFor(resolve, 'Resolved', now),
+        stepFor(resolve, 'Resolved', now, detail.alert.resolved_by?.name),
     ];
     const current = steps.findIndex((step) => step.state !== 'done');
 

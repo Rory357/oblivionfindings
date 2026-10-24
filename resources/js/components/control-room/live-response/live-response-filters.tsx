@@ -1,7 +1,11 @@
 import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
-import { PageHeaderFilterSelect, PageHeaderSearch } from '@/components/page';
+import {
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderSearch,
+} from '@/components/page';
 import { router } from '@inertiajs/react';
-import { Building2, Gauge, Inbox, Radio, UserRound } from 'lucide-react';
+import { Building2, Gauge, Inbox, Radio, UserRound, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export type LiveResponseFilterValues = {
@@ -97,6 +101,11 @@ export function LiveResponseFilters({
     const set = (key: keyof LiveResponseFilterValues) => (value: string) =>
         onChange({ ...values, [key]: value === 'all' ? '' : value });
 
+    // How many filters (search included) are narrowing the list right now.
+    const active = (
+        ['q', 'severity', 'source', 'assigned_to', 'site_id', 'queue_id'] as const
+    ).filter((key) => values[key] !== undefined && values[key] !== null && values[key] !== '');
+
     return (
         <>
             {show.severity ? (
@@ -175,6 +184,19 @@ export function LiveResponseFilters({
                         })),
                     ]}
                 />
+            ) : null}
+            {active.length > 0 ? (
+                <PageHeaderFilterButton
+                    icon={X}
+                    onClick={() =>
+                        onChange(
+                            Object.fromEntries(active.map((key) => [key, ''])) as LiveResponseFilterValues,
+                        )
+                    }
+                    aria-label={`Clear ${active.length} ${active.length === 1 ? 'filter' : 'filters'}`}
+                >
+                    Clear {active.length === 1 ? 'filter' : `${active.length} filters`}
+                </PageHeaderFilterButton>
             ) : null}
         </>
     );
