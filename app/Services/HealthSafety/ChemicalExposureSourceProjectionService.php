@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use LogicException;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use App\Support\HealthSafety\QueryPaging;
 
 /** Private copied-source boundary. Integration is held until the prospective writer proof is composed. */
 final class ChemicalExposureSourceProjectionService
@@ -173,7 +174,7 @@ final class ChemicalExposureSourceProjectionService
 
     private function candidates(Builder $sourceCandidates, CurrentAuthorizationReads $reads, array $sites): Builder
     {
-        return $reads->query((clone $sourceCandidates)->setEagerLoads([])->reorder()->limit(null)->offset(0))
+        return $reads->query((clone $sourceCandidates)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...)))
             ->whereIn('hs_events.source_type', $this->sourceTypes())->where('hs_events.event_category', HsEvent::CATEGORY_EXPOSURE)
             ->whereIn('hs_events.site_id', $sites)->whereNotNull('hs_events.source_id')->whereNull('hs_events.asset_id')->whereNull('hs_events.deleted_at')
             ->select($this->eventColumns());

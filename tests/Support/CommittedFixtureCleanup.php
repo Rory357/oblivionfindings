@@ -16,22 +16,33 @@ use RuntimeException;
  * capture() reads the committed baseline through a separate session, so rows
  * the test has not committed yet (setUp fixtures included) are never baseline.
  * restore() deletes rows above each auto-increment high-water mark and
- * key-only rows (pivots, natural and UUID keys) absent from the baseline. It
- * never re-inserts, since generated columns and append-only guards reject
- * that; if any table checksum still differs, the next test rebuilds.
+ * key-only rows (pivots, natural and UUID keys) absent from the baseline.
+ *
+ * Deleting new rows cannot undo changes to baseline rows (a seeder's sync()
+ * detaching a migration's role grant, an observer touching a role). So capture()
+ * also snapshots every small table (up to SNAPSHOT_ROW_LIMIT rows, generated
+ * columns left out), and restore() rewrites a table from its snapshot when its
+ * checksum still differs. A table that refuses the rewrite (an append-only
+ * guard, say) is left alone; if any checksum still differs, the next test
+ * rebuilds, exactly as before.
  */
 final class CommittedFixtureCleanup
 {
+    /** Tables up to this size are snapshotted at capture so changed baseline rows can be put back. */
+    private const SNAPSHOT_ROW_LIMIT = 5000;
+
     /**
      * @param  array<string, array{string, int}>  $highWaterMarks  table => [auto-increment column, max value]
      * @param  array<string, array{list<string>, array<string, true>}>  $keyedRows  table => [key columns, baseline keys]
      * @param  array<string, string|null>  $checksums  table => CHECKSUM TABLE value
+     * @param  array<string, array{list<string>, list<list<mixed>>}>  $snapshots  table => [insertable columns, baseline rows]
      */
     private function __construct(
         private readonly string $database,
         private readonly array $highWaterMarks,
         private readonly array $keyedRows,
         private readonly array $checksums,
+        private readonly array $snapshots = [],
     ) {}
 
     public static function capture(): self
@@ -45,7 +56,11 @@ final class CommittedFixtureCleanup
         );
         // Reads here never need the test's locks; fail fast rather than wait on them.
         $pdo->exec('SET SESSION lock_wait_timeout = 10');
+        // Snapshots are read and written back in UTC so TIMESTAMP values round-trip exactly.
+        $pdo->exec("SET SESSION time_zone = '+00:00'");
         $database = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
+        $generated = self::columnsByTable($pdo, "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND EXTRA LIKE '%GENERATED%'");
         $incrementing = self::columnsByTable($pdo, "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE() AND EXTRA LIKE '%auto_increment%'");
         $primaryKeys = self::columnsByTable($pdo, "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE
@@ -57,7 +72,17 @@ final class CommittedFixtureCleanup
 
         $highWaterMarks = [];
         $keyedRows = [];
+        $snapshots = [];
         foreach ($tables as $table) {
+            $insertable = array_values(array_diff($allColumns[$table] ?? [], $generated[$table] ?? []));
+            if ($insertable !== []) {
+                $rows = $pdo->query('SELECT '.implode(', ', array_map(self::quote(...), $insertable)).' FROM '.self::quote($table)
+                    .' LIMIT '.(self::SNAPSHOT_ROW_LIMIT + 1))->fetchAll(PDO::FETCH_NUM);
+                if (count($rows) <= self::SNAPSHOT_ROW_LIMIT) {
+                    $snapshots[$table] = [$insertable, $rows];
+                }
+            }
+
             if (isset($incrementing[$table])) {
                 $column = $incrementing[$table][0];
                 $max = $pdo->query('SELECT MAX('.self::quote($column).') FROM '.self::quote($table))->fetchColumn();
@@ -71,7 +96,7 @@ final class CommittedFixtureCleanup
             $keyedRows[$table] = [$columns, array_fill_keys(array_keys(self::keys($pdo, $table, $columns)), true)];
         }
 
-        return new self($database, $highWaterMarks, $keyedRows, self::checksums($pdo, $tables));
+        return new self($database, $highWaterMarks, $keyedRows, self::checksums($pdo, $tables), $snapshots);
     }
 
     /** Call once RefreshDatabase has closed its transaction, e.g. from beforeApplicationDestroyed(). */
@@ -107,7 +132,57 @@ final class CommittedFixtureCleanup
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
         }
 
-        RefreshDatabaseState::$migrated = self::checksums($pdo, array_keys($this->checksums)) === $this->checksums;
+        $current = self::checksums($pdo, array_keys($this->checksums));
+        $changed = array_keys(array_filter($current, fn (?string $checksum, string $table): bool => $checksum !== ($this->checksums[$table] ?? null), ARRAY_FILTER_USE_BOTH));
+        if ($changed !== []) {
+            $this->rewriteFromSnapshots($pdo, $changed);
+            $current = self::checksums($pdo, array_keys($this->checksums));
+        }
+
+        RefreshDatabaseState::$migrated = $current === $this->checksums;
+    }
+
+    /**
+     * Put changed small tables back to their baseline rows. Each table is rewritten in its own
+     * transaction; one that refuses (a delete guard, a type that doesn't round-trip) is rolled
+     * back and left for the rebuild.
+     *
+     * @param  list<string>  $tables
+     */
+    private function rewriteFromSnapshots(PDO $pdo, array $tables): void
+    {
+        $session = $pdo->query('SELECT @@SESSION.time_zone, @@SESSION.sql_mode')->fetch(PDO::FETCH_NUM);
+        $pdo->exec("SET SESSION time_zone = '+00:00'");
+        // Baseline ids of 0 (the default organisation, for example) must stay 0.
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_AUTO_VALUE_ON_ZERO')");
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        try {
+            foreach ($tables as $table) {
+                if (! isset($this->snapshots[$table])) {
+                    continue;
+                }
+                [$columns, $rows] = $this->snapshots[$table];
+                try {
+                    $pdo->beginTransaction();
+                    $pdo->exec('DELETE FROM '.self::quote($table));
+                    $perRow = '('.implode(', ', array_fill(0, count($columns), '?')).')';
+                    $columnList = implode(', ', array_map(self::quote(...), $columns));
+                    foreach (array_chunk($rows, max(1, intdiv(60000, count($columns)))) as $chunk) {
+                        $pdo->prepare('INSERT INTO '.self::quote($table).' ('.$columnList.') VALUES '
+                            .implode(', ', array_fill(0, count($chunk), $perRow)))->execute(array_merge(...$chunk));
+                    }
+                    $pdo->commit();
+                } catch (\Throwable) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                }
+            }
+        } finally {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+            $restore = $pdo->prepare('SET SESSION time_zone = ?, SESSION sql_mode = ?');
+            $restore->execute([$session[0], $session[1]]);
+        }
     }
 
     /**

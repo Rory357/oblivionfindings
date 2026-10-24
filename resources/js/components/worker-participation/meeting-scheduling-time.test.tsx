@@ -50,10 +50,13 @@ beforeEach(() => {
     transport.put.mockClear();
     transport.post.mockClear();
 });
-afterEach(() => {
+afterEach(async () => {
     cleanup();
     vi.unstubAllEnvs();
     vi.useRealTimers();
+    // A closed dialog returns focus on Radix's next tick (overlay-focus-return). Let that run now,
+    // against an empty page, so it can't land on the next test's wizard header and close its picker.
+    await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
 function show(instant: string, status = 'scheduled', edit = true) {
@@ -265,6 +268,8 @@ describe('Actual meeting schedule editor', () => {
             await screen.findByRole('button', { name: /^Thu 15 October 2026/ }),
         );
         fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
+        // The closed date picker returns focus on Radix's next tick; let it land before opening the time picker.
+        await new Promise((resolve) => setTimeout(resolve, 0));
         await changeTime('12', '30', 'PM');
         expect(
             screen.getByRole('button', {

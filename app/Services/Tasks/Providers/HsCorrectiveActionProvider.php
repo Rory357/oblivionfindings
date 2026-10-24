@@ -24,6 +24,7 @@ use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use App\Support\HealthSafety\QueryPaging;
 
 class HsCorrectiveActionProvider implements ContextualHealthSafetyTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
@@ -164,7 +165,7 @@ class HsCorrectiveActionProvider implements ContextualHealthSafetyTaskProvider, 
             $query,
             function ($scoped, User $actor) use ($context) {
                 // Candidate discovery is independent; the final relation retains its outer-row correlation.
-                $childIds = (clone $scoped)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+                $childIds = (clone $scoped)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
                     ->select($scoped->qualifyColumn('hs_event_id'));
                 if ($context === null) {
                     throw new LogicException('H&S task source discovery requires its active prepared callback.');

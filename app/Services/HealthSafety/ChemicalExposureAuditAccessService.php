@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use App\Support\HealthSafety\QueryPaging;
 
 /** Exposure audit discovery is identity-only; audit bodies remain behind current source proof. */
 final class ChemicalExposureAuditAccessService
@@ -134,7 +135,7 @@ final class ChemicalExposureAuditAccessService
     /** Candidate bounds never replace the complete SQL private-identity denial. */
     private function identityQuery(Builder $candidate): Builder
     {
-        $query = (clone $candidate)->setEagerLoads([])->reorder()->limit(null)->offset(0);
+        $query = (clone $candidate)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...));
         $query->where(fn (Builder $private) => $this->privateIdentity($private));
         $query->select(['audit_logs.id', 'audit_logs.action', 'audit_logs.auditable_type',
             'audit_logs.auditable_id', 'audit_logs.user_id', 'audit_logs.client_id']);

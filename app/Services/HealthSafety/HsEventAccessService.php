@@ -11,6 +11,7 @@ use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use App\Support\HealthSafety\QueryPaging;
 
 /** The same read boundary for a direct H&S event and its linked projections.
  * Source scopes are consumed and materialized inside the caller transaction.
@@ -86,7 +87,7 @@ final class HsEventAccessService
         $ids = [];
         // A correlated relation scope supplies independent candidates; final correlation remains intact.
         // Discover only requested rows, but prove every matching source before final pagination.
-        $candidates = (clone ($sourceCandidates ?? $query))->setEagerLoads([])->reorder()->limit(null)->offset(0)
+        $candidates = (clone ($sourceCandidates ?? $query))->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
             ->whereIn('hs_events.source_type', $types)
             ->select(['hs_events.id', 'hs_events.source_id', 'hs_events.client_id', 'hs_events.site_id', 'hs_events.staff_id', 'hs_events.event_category']);
         $candidates = ($context ? $context->query($candidates) : $candidates)->get();
@@ -150,7 +151,7 @@ final class HsEventAccessService
         }
         $ids = [];
         if ($viewer !== null) {
-            $candidates = (clone ($sourceCandidates ?? $query))->setEagerLoads([])->reorder()->limit(null)->offset(0);
+            $candidates = (clone ($sourceCandidates ?? $query))->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...));
             try {
                 $ids = HealthSafetyReadContext::within($viewer, InjuryAccessService::PERMISSIONS,
                     fn (HealthSafetyReadContext $reads): array => app(InjurySourceProjectionService::class)
@@ -184,7 +185,7 @@ final class HsEventAccessService
         $related = $source->incidentRelated(HsEvent::withTrashed());
         if ($context === null || $viewer === null) { return $related->select('hs_events.id'); }
         $context->assertViewer($viewer);
-        $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_events.id');
+        $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
         $allowed = $context->applyIncidentEventScope(HsEvent::query()->whereIn('hs_events.id', clone $candidateIds), $sourceCandidates);
         // Retained SQL, not a plucked whitelist: late original-parent/authority changes still deny children.
         $context->reconsumeIncidentPredicate($related, $allowed);
@@ -218,7 +219,7 @@ final class HsEventAccessService
         if ($sourceCandidates !== null) {
             // The caller supplies an independently executable query; keep its
             // exact identity, Site and source filters before treatment proof.
-            $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_events.id');
+            $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
             $events->whereIn('hs_events.id', $candidateIds);
         }
 
@@ -269,7 +270,7 @@ final class HsEventAccessService
     /** Standalone wrappers discover only event identities bound to their already filtered children. */
     private function childSourceCandidates(Builder $query, string $eventColumn): Builder
     {
-        $children = (clone $query)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+        $children = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
             ->whereNotNull($eventColumn)->select($eventColumn);
 
         return HsEvent::withTrashed()->whereIn('hs_events.id', $children);
@@ -278,9 +279,9 @@ final class HsEventAccessService
     /** Both retained event bindings are authoritative; unrelated morph IDs are not event IDs. */
     private function riskSourceCandidates(Builder $query, array $types): Builder
     {
-        $legacy = (clone $query)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+        $legacy = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
             ->whereNotNull($query->qualifyColumn('hs_event_id'))->select($query->qualifyColumn('hs_event_id'));
-        $modern = (clone $query)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+        $modern = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
             ->whereIn($query->qualifyColumn('assessable_type'), $types)
             ->whereNotNull($query->qualifyColumn('assessable_id'))->select($query->qualifyColumn('assessable_id'));
 
@@ -292,7 +293,7 @@ final class HsEventAccessService
     {
         $types = array_unique([FirstAidRecord::class, (new FirstAidRecord)->getMorphClass(), RestraintEvent::class, (new RestraintEvent)->getMorphClass(),
             WorkplaceInjury::class, (new WorkplaceInjury)->getMorphClass()]);
-        $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_events.id');
+        $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
         $allowed = $this->applyFirstAidSourceScope(HsEvent::query()->whereIn('hs_events.id', clone $candidateIds), $viewer, $context, $sourceCandidates)
             ->whereIn('hs_events.source_type', $types)->pluck('hs_events.id')->all();
 

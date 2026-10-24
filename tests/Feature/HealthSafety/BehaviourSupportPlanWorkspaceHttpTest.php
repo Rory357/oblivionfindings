@@ -318,7 +318,7 @@ final class BehaviourSupportPlanWorkspaceHttpTest extends BehaviourSupportPlanTe
         Storage::fake('private');
         $plan = $this->makePlan();
         Storage::disk('private')->put('client_documents/choice.pdf', 'Actual bytes');
-        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'Authorised evidence choice', 'storage_disk' => 'private', 'storage_path' => 'client_documents/choice.pdf']);
+        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'Authorised evidence choice', 'storage_disk' => 'private', 'storage_path' => 'client_documents/choice.pdf', 'original_name' => 'choice.pdf']);
         $this->actingAs($this->planSpecialist)->getJson($this->url($plan).'/approval')->assertOk()->assertJsonPath('detail.approval_options.evidence', []);
         $this->grant($this->planSpecialist, 'clients.update');
         $json = $this->getJson($this->url($plan).'/approval')->assertOk()->assertJsonPath('detail.approval_options.evidence.0.reference', ['type' => 'client_document', 'id' => $document->id])->assertJsonPath('detail.approval_options.evidence.0.selectable', true)->json('detail.approval_options');

@@ -12,6 +12,7 @@ use Illuminate\Database\Query\Expression;
 use Illuminate\Database\Grammar;
 use Illuminate\Support\Facades\DB;
 use LogicException;
+use App\Support\HealthSafety\QueryPaging;
 
 /** Original incident/HSE association, intersected with existing source authority before copied bodies. */
 final class IncidentHsEventSourceReadService
@@ -56,7 +57,7 @@ final class IncidentHsEventSourceReadService
     public function applyEventScopeInReads(Builder $events, User $current, CurrentAuthorizationReads $reads, ?Builder $candidates = null): Builder
     {
         $reads->assertActive();
-        $candidates = (clone ($candidates ?? $events))->setEagerLoads([])->reorder()->limit(null)->offset(0);
+        $candidates = (clone ($candidates ?? $events))->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...));
         $this->assertEvents($candidates);
         $identities = $reads->query($this->incidentRelated($candidates))->get(self::EVENT_META);
         $sourceIds = $identities->pluck('source_id')->filter()->all();
@@ -131,7 +132,7 @@ final class IncidentHsEventSourceReadService
         if (! $incidents->getModel() instanceof ClientIncident || $incidents->getQuery()->from !== 'client_incidents') {
             throw new LogicException('Incident source scope requires the canonical incident table.');
         }
-        $discover = app(IncidentAccessService::class)->apply((clone $incidents)->setEagerLoads([])->reorder()->limit(null)->offset(0), $current, $reads);
+        $discover = app(IncidentAccessService::class)->apply((clone $incidents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...)), $current, $reads);
         $roots = $reads->query($discover->select(array_values(array_unique(self::ROOT_META))))->get();
         $bindings = [];
         foreach ($roots as $root) { $bindings[] = $this->originalRootParent($root, $current, $reads); }

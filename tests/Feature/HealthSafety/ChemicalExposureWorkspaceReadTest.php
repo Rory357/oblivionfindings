@@ -29,7 +29,7 @@ final class ChemicalExposureWorkspaceReadTest extends ChemicalExposureCommandTes
         foreach (['incidents.viewAny', 'clients.viewAny'] as $key) { $this->allow($this->manager, $key); }
         $client = Client::factory()->create(['site_id' => $this->site->id]);
         return ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create(['client_id' => $client->id,
-            'site_id' => $this->site->id, 'reported_by' => $this->manager->id, 'assigned_to' => $this->manager->id,
+            'site_id' => $this->site->id, 'reported_by' => $this->manager->id, 'investigation_assigned_to' => $this->manager->id,
             'shift_id' => null, 'service_context_id' => null, 'respite_stay_id' => null, 'is_hr_confidential' => false]));
     }
     public function test_actual_capture_detail_preserves_original_fields_and_source_revision_without_raw_version_or_paths(): void

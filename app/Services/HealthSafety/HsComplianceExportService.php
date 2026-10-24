@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
+use App\Support\HealthSafety\QueryPaging;
 
 /**
  * Structured compliance exports for WorkSafe, auditors, and governance.
@@ -510,7 +511,7 @@ class HsComplianceExportService
                 continue;
             }
             $original = $eagerLoads[$name];
-            $proof = (clone $parents)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+            $proof = (clone $parents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
                 ->select($parents->getModel()->qualifyColumn($column));
             $parents->with([$name => function ($relation) use ($original, $proof): void {
                 $original($relation);
@@ -520,7 +521,7 @@ class HsComplianceExportService
         }
         if (isset($eagerLoads['hsEvent.site'])) {
             $original = $eagerLoads['hsEvent.site'];
-            $proof = (clone $parents)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+            $proof = (clone $parents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
                 ->select($parents->getModel()->qualifyColumn('hs_event_id'));
             $sites = HsEvent::query()->whereIn('hs_events.id', $proof)->select('hs_events.site_id');
             $parents->with(['hsEvent.site' => function ($relation) use ($original, $sites, $proof): void {

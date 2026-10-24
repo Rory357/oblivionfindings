@@ -20,6 +20,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use App\Support\HealthSafety\QueryPaging;
 
 /**
  * Central query service for H&S dashboard and reporting data.
@@ -768,7 +769,7 @@ class HsDashboardService
                 continue;
             }
             $original = $eagerLoads[$name];
-            $proof = (clone $parents)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+            $proof = (clone $parents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
                 ->select($parents->getModel()->qualifyColumn($column));
             $parents->with([$name => function ($relation) use ($original, $proof): void {
                 $original($relation);
@@ -778,7 +779,7 @@ class HsDashboardService
         }
         if (isset($eagerLoads['hsEvent.site'])) {
             $original = $eagerLoads['hsEvent.site'];
-            $proof = (clone $parents)->setEagerLoads([])->reorder()->limit(null)->offset(0)
+            $proof = (clone $parents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
                 ->select($parents->getModel()->qualifyColumn('hs_event_id'));
             $sites = HsEvent::query()->whereIn('hs_events.id', $proof)->select('hs_events.site_id');
             $parents->with(['hsEvent.site' => function ($relation) use ($original, $sites, $proof): void {
@@ -795,7 +796,7 @@ class HsDashboardService
     private function protectIncidentEagerLoads(Builder $events, ?User $viewer, ?HealthSafetyReadContext $context): Builder
     {
         $original = $events->getEagerLoads()['clientIncident'];
-        $eventProof = (clone $events)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_events.id');
+        $eventProof = (clone $events)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
         $incidents = ClientIncident::query()->whereIn('client_incidents.hs_event_id', $eventProof);
         $incidents = $viewer === null || $context === null ? $incidents->whereRaw('1 = 0') : $context->applyIncidentSourceScope($incidents);
         $events->with(['clientIncident' => function ($relation) use ($original, $incidents, $eventProof): void {

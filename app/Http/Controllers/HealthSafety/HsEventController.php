@@ -53,6 +53,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use App\Support\HealthSafety\QueryPaging;
 
 class HsEventController extends Controller
 {
@@ -347,7 +348,7 @@ class HsEventController extends Controller
             // An action due date is not the parent review's occurrence date.
             $actionRequest = Request::create('/', 'GET', $request->input('action_context'));
             $actionRequest->setUserResolver(fn () => $request->user());
-            $parentCandidates = (clone $query)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_events.id');
+            $parentCandidates = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
             $actionCandidates = HsCorrectiveAction::query()->whereIn('hs_event_id', $parentCandidates);
             $this->applyActionRefinements($actionCandidates, $actionRequest);
             $query->whereHas('correctiveActions', function (Builder $actions) use ($actionRequest, $actionCandidates): void {
@@ -1551,7 +1552,7 @@ class HsEventController extends Controller
         if ($sourceActions !== null) {
             $this->applyActionSourceFilters($candidateActions, $request);
         }
-        $candidateActions->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_corrective_actions.hs_event_id');
+        $candidateActions->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_corrective_actions.hs_event_id');
         $sourceCandidates = HsEvent::query()->whereIn('id', $candidateActions);
         $this->siteAccess->applyHsEventScope($sourceCandidates, $request->user(), $this->hsEventBypassPermissions());
         $query->whereHas('hsEvent', function (Builder $eventQuery) use ($request, $sourceCandidates) {

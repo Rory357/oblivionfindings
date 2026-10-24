@@ -25,6 +25,7 @@ use App\Services\UserSiteAccessService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use App\Support\HealthSafety\QueryPaging;
 
 /**
  * Single source of truth for serialising a risk assessment to the React layer —
@@ -47,7 +48,7 @@ class RiskAssessmentPresenter
                 }
             }
             if ($originalParent !== null) {
-                $query->whereIn('hs_risk_assessments.id', (clone $originalParent)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_risk_assessments.id'));
+                $query->whereIn('hs_risk_assessments.id', (clone $originalParent)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_risk_assessments.id'));
                 $context->reconsumeIncidentPredicate($query, $originalParent);
             }
             $ra = self::guardEagerQuery($query, $viewer, $context)->firstOrFail();
@@ -414,7 +415,7 @@ class RiskAssessmentPresenter
             $authority = app(HsRiskAssessmentService::class)->authorityQueryInContext($current, $context);
             $query->whereExists((clone $authority)->selectRaw('1')->toBase());
             app(HsEventAccessService::class)->applyFirstAidRiskSourceScope($query, $current, $context);
-            $parent = (clone $query)->setEagerLoads([])->reorder()->limit(null)->offset(0);
+            $parent = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...));
             $loads = $query->getEagerLoads();
             foreach (['hsEvent' => 'hs_event_id', 'assessedBy' => 'assessed_by_user_id', 'approvedBy' => 'approved_by_user_id', 'creator' => 'created_by'] as $name => $column) {
                 if (! isset($loads[$name])) { continue; }
@@ -459,12 +460,12 @@ class RiskAssessmentPresenter
 
     public static function guardChildQuery(Builder $child, string $parentColumn, Builder $original, HealthSafetyReadContext $context): Builder
     {
-        $child->whereIn($parentColumn, (clone $original)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select('hs_risk_assessments.id'));
+        $child->whereIn($parentColumn, (clone $original)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_risk_assessments.id'));
         $context->reconsumeIncidentPredicate($child, $original);
         foreach (['user' => 'user_id', 'uploader' => 'uploaded_by'] as $relationName => $column) {
             $loads = $child->getEagerLoads();
             if (! isset($loads[$relationName])) { continue; }
-            $load = $loads[$relationName]; $proof = (clone $child)->setEagerLoads([])->reorder()->limit(null)->offset(0)->select($child->getModel()->qualifyColumn($column));
+            $load = $loads[$relationName]; $proof = (clone $child)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select($child->getModel()->qualifyColumn($column));
             $child->with([$relationName => function ($relation) use ($load, $proof, $original, $context): void {
                 $load($relation); $relation->whereIn('users.id', clone $proof); $context->reconsumeIncidentPredicate($relation->getQuery(), $original); self::track($relation->getQuery(), $context);
             }]);

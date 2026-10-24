@@ -17,6 +17,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use App\Support\HealthSafety\QueryPaging;
 
 /** Fresh locked evidence belongs to exactly one materializing read callback. */
 final class HealthSafetyReadContext
@@ -97,7 +98,8 @@ final class HealthSafetyReadContext
             }
             return $query;
         };
-        $roles = $current->roles->modelKeys();
+        // The prepared roles may arrive as a plain collection; read the keys either way.
+        $roles = $current->roles->map(fn ($role) => $role->getKey())->values()->all();
         $definitions = $reads->query(DB::table('permissions')->whereIn('key', $keys))->get(['id', 'key'])->map(fn ($row) => (array) $row)->all();
         $permissionIds = array_column($definitions, 'id');
         $profile = func_num_args() >= 4 ? $originalProfile : $current->getRelation('hrEmployeeProfile')?->getRawOriginal();
@@ -351,7 +353,7 @@ final class HealthSafetyReadContext
     {
         $this->assertActive();
         $types = array_values(array_unique([WorkplaceInjury::class, (new WorkplaceInjury)->getMorphClass()]));
-        $candidates = (clone ($sourceCandidates ?? $query))->setEagerLoads([])->reorder()->limit(null)->offset(0);
+        $candidates = (clone ($sourceCandidates ?? $query))->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...));
         $ids = [];
         try {
             $ids = $this->consumeSourceViewer(InjuryAccessService::PERMISSIONS,

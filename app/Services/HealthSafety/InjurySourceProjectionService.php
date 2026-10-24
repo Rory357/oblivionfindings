@@ -16,6 +16,7 @@ use Illuminate\Database\Grammar;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use App\Support\HealthSafety\QueryPaging;
 
 /** Purpose-fixed factual injury projections. No private recovery data or authority escapes. */
 final class InjurySourceProjectionService
@@ -41,7 +42,7 @@ final class InjurySourceProjectionService
                 }
                 $query = (clone $candidates)->setEagerLoads([])->whereIn('site_id', $sites);
                 $query = $this->metricAuthority($query, $context, $current, $reads, $sites);
-                $discovery = (clone $query)->reorder()->limit(null)->offset(0)->select(InjuryAccessService::FACTUAL_COLUMNS);
+                $discovery = (clone $query)->reorder()->when(true, QueryPaging::clear(...))->select(InjuryAccessService::FACTUAL_COLUMNS);
                 $discovery = $materialisation->protect($this->metricLifetime($discovery, $reads));
                 $roots = $discovery->get();
                 $parents = ($this->metricParents ??= new \WeakMap)[$context] ?? [];

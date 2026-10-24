@@ -102,7 +102,8 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
 
 - **Control Room fixes on main** (`d6b01d2c8`, PR #26): auto-start procedures need at least one alert type and severity; staff records open only within the viewer's Sites.
   - Kept safer: HR's `hr.employees.viewAllSites` is **not** a bypass for `/staff` records (only `sites.viewAll`); staff with no HR profile (legacy only) open only for `sites.viewAll`.
-  - Follow-up being built: the `/staff` list and the credentials/assignments pages get the same Site rule.
+  - Follow-up on main (`1f3a1e855`, PR #27): the `/staff` list and the credentials/assignments pages follow the same Site rule.
+  - **Decision for Stephan:** `/staff/{user}/assignments` still lists, and accepts, clients from every Site. Scoping that to the viewer's Sites is a client-privacy change left for him.
 - **Exposure delivery panel**: Codex's panel called endpoints that were never built (a 404 hid the private record). It now reads the real `delivery-attempts` endpoint, read-only, "Destination not checked". Backend gap: destination proof, inspect and retry.
 - **Tests that fail the same way on main** (not touched by this build): client-profile family-chat test, device-group auto-rule tests. The incident journey status test also failed on main ("Target missed" vs "SLA breached"); fixed here.
 - **Test speed**: committing/concurrency tests force a full test-database rebuild (~446 migrations past the committed schema dump). Test runs use a local full dump swapped in only while Pest runs; nothing about it is committed.

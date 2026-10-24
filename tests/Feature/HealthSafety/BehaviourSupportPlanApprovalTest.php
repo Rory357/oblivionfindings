@@ -108,7 +108,7 @@ final class BehaviourSupportPlanApprovalTest extends BehaviourSupportPlanTestCas
         Storage::fake('private');
         $this->documentGrant($this->planSpecialist);
         Storage::disk('private')->put('clients/approval.pdf', 'Actual retained document bytes');
-        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'External approval decision', 'storage_disk' => 'private', 'storage_path' => 'clients/approval.pdf']);
+        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'External approval decision', 'storage_disk' => 'private', 'storage_path' => 'clients/approval.pdf', 'original_name' => 'approval.pdf']);
         $plan = $this->makePlan();
         $payload = $this->approvalPayload($plan, ['origin' => 'external_specialist', 'external_name' => 'Named external decision maker', 'external_role' => 'Recorded professional role', 'external_organisation' => 'Recorded provider', 'external_reference' => 'Decision ABC-42', 'external_decision_date' => '2026-10-10', 'evidence_references' => [['type' => 'client_document', 'id' => $document->id]]]);
         $receipt = $this->approvals()->decide($plan, $this->planSpecialist, $payload);
@@ -126,7 +126,7 @@ final class BehaviourSupportPlanApprovalTest extends BehaviourSupportPlanTestCas
         Storage::fake('private');
         $plan = $this->makePlan();
         $this->documentGrant($this->planSpecialist);
-        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'Unavailable document', 'storage_disk' => 'public', 'storage_path' => 'legacy.pdf']);
+        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'Unavailable document', 'storage_disk' => 'public', 'storage_path' => 'legacy.pdf', 'original_name' => 'legacy.pdf']);
         $payload = $this->approvalPayload($plan, ['origin' => 'external_specialist', 'external_name' => 'Actual specialist', 'external_role' => 'Recorded role', 'external_organisation' => 'Provider', 'external_reference' => 'D-1', 'external_decision_date' => '2026-10-10', 'evidence_references' => [['type' => 'client_document', 'id' => $document->id]]]);
         $this->validation(fn () => $this->approvals()->decide($plan, $this->planSpecialist, $payload), 'evidence_references');
         $this->assertSame(0, BehaviourSupportPlanApproval::count());
@@ -271,7 +271,7 @@ final class BehaviourSupportPlanApprovalTest extends BehaviourSupportPlanTestCas
     {
         Storage::fake('private');
         Storage::disk('private')->put('clients/read-boundary.pdf', 'Actual private bytes');
-        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'Read boundary evidence', 'storage_disk' => 'private', 'storage_path' => 'clients/read-boundary.pdf']);
+        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'Read boundary evidence', 'storage_disk' => 'private', 'storage_path' => 'clients/read-boundary.pdf', 'original_name' => 'read-boundary.pdf']);
         $plan = $this->makePlan();
         $payload = $this->approvalPayload($plan, ['evidence_references' => [['type' => 'client_document', 'id' => $document->id]]]);
         $this->denied(fn () => $this->approvals()->decide($plan, $this->planSpecialist, $payload));
@@ -294,7 +294,7 @@ final class BehaviourSupportPlanApprovalTest extends BehaviourSupportPlanTestCas
     {
         Storage::fake('private');
         Storage::disk('private')->put('clients/hr-boundary.pdf', 'Actual private bytes');
-        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'Read evidence', 'storage_disk' => 'private', 'storage_path' => 'clients/hr-boundary.pdf']);
+        $document = ClientDocument::create(['client_id' => $this->client->id, 'title' => 'Read evidence', 'storage_disk' => 'private', 'storage_path' => 'clients/hr-boundary.pdf', 'original_name' => 'hr-boundary.pdf']);
         $plan = $this->makePlan();
         $this->documentGrant($this->planSpecialist);
         $this->planSpecialist->load('hrEmployeeProfile');

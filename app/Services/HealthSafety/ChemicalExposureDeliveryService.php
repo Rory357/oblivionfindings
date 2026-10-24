@@ -96,7 +96,12 @@ final class ChemicalExposureDeliveryService
     /** Called by an after-commit observer; it never guesses a callable destination or marks a source delivered. */
     public function sourceCommitted(SubstanceExposureRecord $source): void
     {
-        if (DB::transactionLevel() !== 0) { throw new LogicException('Exposure commit observation requires the physical root commit.'); }
+        // Only after the outermost application transaction has committed. Laravel's transaction manager knows which
+        // transactions after-commit work belongs to (in tests it leaves out the wrapping RefreshDatabase transaction;
+        // in production it is empty exactly when the root commit has happened).
+        if (app('db.transactions')->callbackApplicableTransactions()->isNotEmpty()) {
+            throw new LogicException('Exposure commit observation requires the physical root commit.');
+        }
         // Prospective commands stage the outbox before commit. Genuine legacy writes have no verified version and are not auto-certified.
         // Destination execution is an explicit current-authorised consumer operation, mounted by the module integration owner.
     }
