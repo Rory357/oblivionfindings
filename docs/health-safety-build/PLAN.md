@@ -127,3 +127,11 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
   - Respite restraint pieces: Codex's respite restraint recording action and workspace restraint lists only work with Codex's respite frontend; main's respite form and main's newer respite privacy test contradict them. Restraint recording from respite keeps main's working path. Porting Codex's respite restraint frontend + backend together is Stephan's call (2 `RespiteRestraintReadTest` cases).
   - `SafeguardingCurrentReadHttpTest` (4): Codex's own docblock calls it an unapplied, unrun extraction; the register never mounts `SafeguardingConcernReadScope`, even in his snapshot.
   - `HazardWorklistHeaderTest` (4): the held `sites.viewAny` decision above.
+- **Incident journey for alert-linked incidents**: the ported governance read passes its current-authorization reads to the Control Room alert scopes; main's copy ignored them, so every alert-linked incident showed "Journey needs review"/"blocked". The scopes now take the optional reads (Codex's change, backward compatible); checked on demo data ("Operational response active" → "Continue Control Room response").
+- **Helper A decisions left for Stephan** (tests left failing, not loosened):
+  - H&S officer client picker on the incident report (`health_safety_officer` has no client-read permission; passing would show client names without it or change RBAC).
+  - H&S tasks for HR-confidential incidents (would loosen "incident-linked events need incident read access").
+  - `HealthSafetyTaskContextTest` "exact task lookup" forbids any SQL naming `permission_user`; the query it catches is a deny-only equality check. Narrowing the assertion is a test-rule decision.
+  - `HsRiskIncidentSourceCompositionTest` "client final page": Codex marked the wrapper as not built.
+- **Behaviour change (Codex's, kept)**: an incident outside the viewer's scope now returns 404 (not found) instead of main's 403; missing permission is still 403.
+- **Known gap, same as live main**: Codex rewrote `ControlRoomNotificationService` (sanitised status codes, proof before copied incident text in notifications). It stays main's version (Control Room is out of this build's scope), so two `IncidentJourneyServiceTest` cases fail; notifications behave exactly as they do on live main today.
