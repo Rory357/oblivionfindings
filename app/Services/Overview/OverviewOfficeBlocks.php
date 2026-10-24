@@ -336,9 +336,10 @@ final class OverviewOfficeBlocks
         // The health and safety dashboard's Site rule, limited to the selected sites.
         $scope = array_values(array_intersect($siteIds, $this->sites->accessibleSiteIds($user, ['healthSafety.viewAllSites'])));
         $hs = app(HsDashboardService::class);
-        $actions = collect($hs->overdueCorrectiveActions($scope, 100));
+        // H&S source reads need the viewer (no viewer, no readable source; Codex's H&S reads).
+        $actions = collect($hs->overdueCorrectiveActions($scope, 100, $user));
         $expiring = collect($hs->expiringFeed($scope, 30, 20, $user));
-        $sinceInjury = app(HsKpiService::class)->daysSinceLostTimeInjury($scope);
+        $sinceInjury = app(HsKpiService::class)->daysSinceLostTimeInjury($scope, $user);
         $lapsed = $expiring->where('days_until', '<', 0)->count();
         $rows = $actions->take(4)->map(fn ($action) => [
             'label' => $action['title'], 'date' => $action['due_date'], 'status' => 'Overdue', 'tone' => 'warning', 'href' => '/health-safety',
