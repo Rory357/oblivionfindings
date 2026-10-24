@@ -38,7 +38,7 @@ final class ChemicalPublicWorkspaceControllerTest extends ChemicalCommandTestCas
         $response->assertHeader('Referrer-Policy', 'no-referrer');
         return $receipt;
     }
-    private function file(): UploadedFile { return UploadedFile::fake()->create('recorded-sds.pdf', 4, 'application/pdf'); }
+    private function file(): UploadedFile { return UploadedFile::fake()->createWithContent('recorded-sds.pdf', "%PDF-1.4\n".str_repeat("recorded sheet\n", 280)."%%EOF\n"); }
     private function privateHeaders($response): void
     {
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));

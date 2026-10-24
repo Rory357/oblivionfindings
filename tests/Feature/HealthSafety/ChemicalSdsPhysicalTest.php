@@ -20,7 +20,7 @@ final class ChemicalSdsPhysicalTest extends ChemicalCommandTestCase
     protected bool $physicalCommits = true;
 
     protected function setUp(): void { parent::setUp(); Storage::fake('private'); }
-    private function file(string $name = 'recorded-sds.pdf'): UploadedFile { return UploadedFile::fake()->create($name, 4, 'application/pdf'); }
+    private function file(string $name = 'recorded-sds.pdf'): UploadedFile { return UploadedFile::fake()->createWithContent($name, "%PDF-1.4\n".str_repeat("recorded sheet\n", 280)."%%EOF\n"); }
     private function upload($root, array $facts = [], ?string $key = null): array
     {
         return $this->service()->uploadSds($root, $this->manager, $this->file(),

@@ -44,7 +44,9 @@ final class ChemicalExposureRecoveryConcurrencyTest extends ChemicalExposureReco
     private function race(array $jobs, string $mode): array
     {
         $this->assertSame(0, DB::transactionLevel()); $this->assertSame('mysql', DB::connection()->getDriverName());
-        $this->assertStringStartsWith('oblivion_hs_', DB::connection()->getDatabaseName());
+        // Child processes write to this database: only ever a disposable test database (this repo's per-process
+        // test database or Codex's oblivion_hs_ ones), never a real one.
+        $this->assertMatchesRegularExpression('/^(oblivion_hs_|oblivion_findings_codex_test_\d+$)/', DB::connection()->getDatabaseName());
         $prefix = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-chemical-recovery-race-'.Str::uuid(); $go = $prefix.'-go'; $processes = []; $signals = [];
         try {
             foreach ($jobs as $index => [$actor, $source, $values]) {

@@ -104,7 +104,10 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     {
         [$root, $row] = $this->pending(); $this->workspace()->retry($this->manager, $root->id, $row->id);
         $event = HsEvent::findOrFail($row->fresh()->hs_event_id);
-        $event->forceFill(['status' => HsEvent::STATUS_CLOSED, 'worksafe_notifiable' => true])->saveQuietly();
+        // Fixture only: the closure guard trigger admits this one close, as HsEventClosureService does.
+        \Illuminate\Support\Facades\DB::statement('SET @hs_canonical_close_event_id = '.(int) $event->id);
+        try { $event->forceFill(['status' => HsEvent::STATUS_CLOSED, 'worksafe_notifiable' => true])->saveQuietly(); }
+        finally { \Illuminate\Support\Facades\DB::statement('SET @hs_canonical_close_event_id = NULL'); }
         $this->workspace()->detail($this->manager, $root->id, $row->id); $this->workspace()->retry($this->manager, $root->id, $row->id);
         $this->assertSame(HsEvent::STATUS_CLOSED, $event->fresh()->status); $this->assertTrue($event->fresh()->worksafe_notifiable);
     }

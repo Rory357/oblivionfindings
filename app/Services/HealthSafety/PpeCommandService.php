@@ -1488,7 +1488,9 @@ final class PpeCommandService
             || ! is_array($origin) || ($origin['attachment_type'] ?? null) !== $row->attachment_type
             || ($origin['attachment_id'] ?? null) !== $row->attachment_id || ($origin['parent_type'] ?? null) !== $row->parent_type
             || ($origin['parent_id'] ?? null) !== $row->parent_id || ($origin['disk'] ?? null) !== 'public'
-            || ($origin['path'] ?? null) !== $row->origin_path || ($origin['observed_bytes'] ?? null) !== $bytes
+            // Byte facts are compared by canonical digest: stored JSON returns with MySQL's key order.
+            || ($origin['path'] ?? null) !== $row->origin_path || ! isset($origin['observed_bytes'])
+            || PpeCommandValues::digest($origin['observed_bytes']) !== PpeCommandValues::digest($bytes)
             || ($origin['original_attribution_state'] ?? null) !== 'legacy_unknown'
             || ($origin['original_metadata']['id'] ?? null) !== $row->attachment_id
             || ($origin['original_metadata'][$this->parentForeignKey($row->parent_type)] ?? null) !== $row->parent_id
@@ -1498,7 +1500,8 @@ final class PpeCommandService
             || ($after['id'] ?? null) !== $row->attachment_id || ($after['disk'] ?? null) !== 'private'
             || ($after['path'] ?? null) !== $row->destination_path
             || ($after[$this->parentForeignKey($row->parent_type)] ?? null) !== $row->parent_id
-            || ($version->content['facts']['file_evidence'] ?? null) !== $bytes
+            || ! isset($version->content['facts']['file_evidence'])
+            || PpeCommandValues::digest($version->content['facts']['file_evidence']) !== PpeCommandValues::digest($bytes)
             || $version->site_id !== $row->site_id) {
             throw new LogicException('PPE public-origin cleanup is not bound to its exact transfer acceptance.');
         }

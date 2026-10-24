@@ -37,7 +37,9 @@ final class ChemicalExposureFollowupDestinationService
                 $descriptor = $this->commands->withCurrentViewer($receiver, function ($recipientCurrent, $recipientReads, $recipientSites) use ($deliveryId) {
                     return $this->admitAttempt($deliveryId, $recipientCurrent, $recipientReads, $recipientSites);
                 });
-                if ($descriptor['membership'] !== $membership || $descriptor['recipient_id'] !== $recipient) {
+                // Canonical digest, not array identity: the stored JSON comes back with MySQL's key order.
+                if (ChemicalCommandValues::digest($descriptor['membership']) !== ChemicalCommandValues::digest($membership)
+                    || $descriptor['recipient_id'] !== $recipient) {
                     throw new LogicException('Private follow-up destination membership changed.');
                 }
                 $id = $descriptor['notification_id'];

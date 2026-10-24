@@ -25,7 +25,7 @@ final class ChemicalRegisterSourceProofTest extends ChemicalCommandTestCase
     private function read(): ChemicalRegisterReadService { return app(ChemicalRegisterReadService::class); }
     private function upload(HazardousSubstance $root, array $facts = []): SafetyDataSheet
     {
-        $receipt = $this->service()->uploadSds($root, $this->manager, UploadedFile::fake()->create('Printed source.pdf', 4, 'application/pdf'),
+        $receipt = $this->service()->uploadSds($root, $this->manager, UploadedFile::fake()->createWithContent('Printed source.pdf', "%PDF-1.4\n".str_repeat("printed sheet\n", 280)."%%EOF\n"),
             $this->command($root, ['version' => 'Printed 1', 'issue_date' => '2026-10-01', 'review_date' => '2027-10-01', ...$facts]));
         return SafetyDataSheet::findOrFail($receipt['source_id']);
     }

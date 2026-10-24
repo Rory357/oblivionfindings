@@ -142,7 +142,7 @@ final class ChemicalExposureHsReportedFactsPolicyTest extends ChemicalExposureCo
         $root = $this->exposure(['medical_treatment' => 'medical']); $old = $this->attempt($root); $this->deliver($old);
         $event = $this->event($old);
         app(HsEventService::class)->recordWorksafeDecision($event, false, 'Explicit independent operational review retained.', $this->manager);
-        $event->refresh()->updateQuietly(['severity' => 'critical', 'investigation_required' => true,
+        $this->closedFixture($event->refresh(), ['severity' => 'critical', 'investigation_required' => true,
             'owner_user_id' => $this->manager->id, 'status' => HsEvent::STATUS_CLOSED, 'closed_at' => now(), 'closed_by' => $this->manager->id,
             'handover_status' => HsEvent::HANDOVER_ACCEPTED, 'accepted_by_user_id' => $this->manager->id, 'accepted_at' => now()]);
         $before = $this->workflow($event->fresh());
@@ -156,7 +156,7 @@ final class ChemicalExposureHsReportedFactsPolicyTest extends ChemicalExposureCo
     public function test_reported_high_escalation_retains_exact_event_time_marker_lineage_and_independent_closed_status(): void
     {
         $root = $this->exposure(['medical_treatment' => 'none']); $old = $this->attempt($root); $this->deliver($old);
-        $event = $this->event($old); $event->updateQuietly(['status' => HsEvent::STATUS_CLOSED, 'closed_at' => now(), 'closed_by' => $this->manager->id,
+        $event = $this->event($old); $this->closedFixture($event, ['status' => HsEvent::STATUS_CLOSED, 'closed_at' => now(), 'closed_by' => $this->manager->id,
             'owner_user_id' => $this->manager->id]); $before = $this->workflow($event->fresh());
         $this->exposureService()->correct($root, $this->manager, $this->privateCommand($root,
             ['reason' => 'Actual reported attention, category remains unknown', 'medical_treatment' => null, 'medical_attention_sought' => true]));
@@ -343,6 +343,13 @@ final class ChemicalExposureHsReportedFactsPolicyTest extends ChemicalExposureCo
         $root = $this->exposure(['medical_treatment' => 'medical']); $attempt = $this->attempt($root); $this->deliver($attempt);
         $event = $this->event($attempt); $event->updateQuietly(['severity' => 'low', 'investigation_required' => false]);
         return [$root, $attempt, $event->fresh()];
+    }
+    /** Fixture only: the closure guard trigger admits this one close, as HsEventClosureService does. */
+    private function closedFixture(HsEvent $event, array $attributes): void
+    {
+        \Illuminate\Support\Facades\DB::statement('SET @hs_canonical_close_event_id = '.(int) $event->id);
+        try { $event->forceFill($attributes)->saveQuietly(); }
+        finally { \Illuminate\Support\Facades\DB::statement('SET @hs_canonical_close_event_id = NULL'); }
     }
     private function workflow(HsEvent $event): array
     {

@@ -58,8 +58,9 @@ final class ChemicalCommandService
             'reason' => ['required', 'string', 'max:2000']]);
         $this->reason($values);
         return $this->catalogueCommand($substance, $actor, 'change_status', $values,
+            // payload() leaves out the command reason; the recorded status reason is the validated reason itself.
             fn ($root, $payload) => $root->fill(['status' => $payload['status'],
-                'status_reason' => $payload['status'] === 'active' ? null : $payload['reason']]));
+                'status_reason' => $payload['status'] === 'active' ? null : $values['reason']]));
     }
 
     public function createStorage(HazardousSubstance|int $substance, User $actor, array $input): array

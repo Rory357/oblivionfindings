@@ -27,7 +27,10 @@ final class ChemicalExposureDownloadService
         if ($spool === false) { fclose($input); throw new LogicException('Private evidence could not be prepared.'); }
         try {
             $copied = stream_copy_to_stream($input, $spool);
-            if ($copied === false || ! feof($input) || ! rewind($spool)) { throw new LogicException('Private evidence could not be fully copied.'); }
+            // A plain-file copy can stop at the known size without a read reaching EOF, so feof() alone stays false.
+            // One more read must return nothing and reach EOF: no bytes were left behind.
+            $trailing = $copied === false ? false : fread($input, 1);
+            if ($copied === false || $trailing !== '' || ! feof($input) || ! rewind($spool)) { throw new LogicException('Private evidence could not be fully copied.'); }
             $hash = hash_init('sha256'); $hashed = hash_update_stream($hash, $spool);
             abort_unless($copied === $proof['size'] && $hashed === $proof['size'] && hash_equals($proof['sha256'], hash_final($hash)), 404);
             if (! rewind($spool)) { throw new LogicException('Verified private evidence could not be replayed.'); }
