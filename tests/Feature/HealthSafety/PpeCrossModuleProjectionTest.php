@@ -240,7 +240,9 @@ final class PpeCrossModuleProjectionTest extends PpeReadTestCase
         $this->assertSame($props['kpis']['ppe_expiring'], $partial['kpis']['ppe_expiring']);
         $this->assertSame($props['ppe_kpi_state'], $partial['ppe_kpi_state']);
         $this->assertSame($props['worklists']['ppe_expiring_state'], $partial['worklists']['ppe_expiring_state']);
-        $this->assertArrayNotHasKey('sites', $partial);
+        // The controller refreshes the Site list with every partial response (Codex: identity alone can't prove Site
+        // access), so it comes back with the same readable Sites, never another viewer's.
+        $this->assertSame($props['sites'], $partial['sites']);
     }
 
     public function test_http_private_ppe_measures_are_null_when_current_staff_evidence_is_withdrawn(): void
