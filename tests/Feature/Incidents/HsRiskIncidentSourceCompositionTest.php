@@ -114,7 +114,8 @@ final class HsRiskIncidentSourceCompositionTest extends IncidentIndependenceTest
     {
         $event = $this->event($this->incident(['client_id' => $this->client->id]));
         $foreign = Site::factory()->create(['is_active' => true]);
-        $foreignEvent = HsEvent::factory()->createQuietly(['site_id' => $foreign->id, 'source_type' => null, 'source_id' => null, 'created_by' => $this->manager->id]);
+        // Standalone foreign event: hs_events.source_type/source_id are NOT NULL, so it keeps the factory's own HsEvent source.
+        $foreignEvent = HsEvent::factory()->createQuietly(['site_id' => $foreign->id, 'created_by' => $this->manager->id]);
         $risk = $this->risk($event, 'modern');
         DB::table('hs_risk_assessments')->where('id', $risk->id)->update(['hs_event_id' => $foreignEvent->id]);
         $this->allow($this->manager, 'healthSafety.viewAllSites');

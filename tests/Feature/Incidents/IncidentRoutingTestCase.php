@@ -75,9 +75,11 @@ abstract class IncidentRoutingTestCase extends TestCase
 
     protected function incident(array $values = []): ClientIncident
     {
+        // occurred_at is pinned to the frozen clock: the factory's Faker date uses the real clock, so period
+        // windows around the frozen "now" would otherwise include or exclude the fixture at random.
         return ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
             'site_id' => $this->site->id, 'client_id' => Client::factory()->create(['site_id' => $this->site->id])->id,
-            'reported_by' => $this->reporter->id, 'status' => 'submitted', 'submitted_at' => now(), 'type' => 'injury',
+            'reported_by' => $this->reporter->id, 'status' => 'submitted', 'submitted_at' => now(), 'occurred_at' => now(), 'type' => 'injury',
             'incident_owner_user_id' => null, 'owner_revision' => 0, 'description' => 'Private synthetic incident narrative', ...$values,
         ]));
     }

@@ -122,7 +122,8 @@ final class IncidentIndependenceIntakeTest extends IncidentIndependenceTestCase
         $this->assertSame([['id' => (int) $this->lead->id, 'name' => $this->lead->name]], $first['candidates']);
         $this->allow($this->reporter, 'clients.viewAny', false); $queries = []; DB::listen(function ($q) use (&$queries): void { $queries[] = $q->sql; });
         $this->denial(fn () => app(Intake::class)->captureCandidates($this->reporter, $this->context()));
-        $this->assertDoesNotMatchRegularExpression('/select\s+[^;]*["`]name["`]/i', implode(';', $queries));
+        // No query may PROJECT a name before the denial. A role-name filter in a WHERE (roles.name in (...)) selects nobody's name.
+        $this->assertDoesNotMatchRegularExpression('/select\s+(?:(?!\bfrom\b)[^;])*["`]name["`]/i', implode(';', $queries));
     }
     public function test_foreign_or_inactive_named_person_is_not_accepted(): void
     {

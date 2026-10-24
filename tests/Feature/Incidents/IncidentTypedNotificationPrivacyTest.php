@@ -57,7 +57,7 @@ final class IncidentTypedNotificationPrivacyTest extends IncidentIndependenceTes
 
     private function declare(ClientIncident $root, User $involved, int $policyRevision = 0): array
     {
-        return $this->accept($this->command(['report_request_uuid' => $root->report_request_uuid,
+        return $this->acceptForExisting($root, $this->command(['report_request_uuid' => $root->report_request_uuid,
             'expected_policy_revision' => $policyRevision, 'independent_handling' => ['requested' => true,
                 'reason_code' => 'other_staff_involved', 'identification' => 'named', 'involved_user_ids' => [(int) $involved->id]]]));
     }
@@ -294,8 +294,11 @@ final class IncidentTypedNotificationPrivacyTest extends IncidentIndependenceTes
     public function test_late_change_body_rewrite_is_not_a_new_accepted_fingerprint_baseline(): void
     {
         [$root, $change, $delivery] = $this->owned();
+        // Rewrite between the change body read and the audit body read. Every independence-scoped source query
+        // embeds `audit_logs as independence_audit`, so the audit table name alone would fire before the change read.
         $this->mutateAtBody('audit_logs', fn () => DB::table('incident_owner_changes')->where('id', $change->id)->update(['owner_name' => $this->lead->name.' ']),
-            fn () => $this->refusal(fn () => app(IncidentOwnerNotifications::class)->deliver($delivery->id)));
+            fn () => $this->refusal(fn () => app(IncidentOwnerNotifications::class)->deliver($delivery->id)),
+            'AS notification_fp from '.DB::connection()->getQueryGrammar()->wrapTable('audit_logs'));
         $this->noNotice($delivery->id);
     }
 

@@ -164,7 +164,10 @@ final class IncidentSavedCopyService
             $value === null ? $query->whereNull($column) : $query->where($column, $value);
         }
         if ($savedText !== null) { $query->whereRaw('BINARY `snapshot_text` = ?', [$savedText]); }
-        $query->whereIn('incident_id', (clone $source)->reorder()->select('client_incidents.id'))
+        // whereIn() would compile the source to SQL text right here, running its date/lifetime guard once at proof
+        // time. EXISTS keeps the source builder, so that guard is re-evaluated by every SQL that embeds this predicate.
+        $query->whereExists((clone $source)->reorder()->select('client_incidents.id')
+                ->whereColumn('client_incidents.id', 'incident_saved_copies.incident_id')->toBase())
             ->whereRaw($this->metadataFingerprint().' = ?', [$identity->metadata_fp])
             ->whereExists(fn ($guard) => $guard->selectRaw('1')->from('audit_logs as copy_audit')->where('copy_audit.id', $audit->id)
                 ->whereRaw(IncidentIndependenceBindingSql::fingerprint('audit', 'copy_audit').' = ?', [$audit->proof_fp]))

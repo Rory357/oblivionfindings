@@ -82,9 +82,10 @@ final class IncidentResponseSourceAdmissionTest extends IncidentIndependenceTest
         $this->assertTrue($refused, 'The source must be refused, not accepted and rolled back after disclosure.');
     }
 
-    private function acceptedSource(): ClientIncident
+    private function acceptedSource(int $policyRevision = 0): ClientIncident
     {
-        $receipt = $this->accept($this->command());
+        // The intake refuses a declaration made against a policy revision other than the current one.
+        $receipt = $this->accept($this->command(['expected_policy_revision' => $policyRevision]));
         $root = ClientIncident::findOrFail($receipt['incident_id']);
         ClientIncident::withoutEvents(fn () => $root->forceFill(['severity' => 'low', 'immediate_action_taken' => 'The person is safe.'])->saveOrFail());
         return $root;
@@ -106,9 +107,13 @@ final class IncidentResponseSourceAdmissionTest extends IncidentIndependenceTest
     public function test_supplied_current_reads_are_reused_and_expired_reads_are_errors(): void
     {
         $root = $this->root(); $escaped = null;
-        DB::transaction(fn () => CurrentAuthorizationReads::within(function ($reads) use ($root, &$escaped): void {
-            $escaped = $reads; $this->assertTrue(app(Response::class)->canEscalate($this->manager, $root, $reads));
-        }));
+        // A plain closure: an arrow fn would capture $escaped by value, so the handle would never escape.
+        DB::transaction(function () use ($root, &$escaped): void {
+            CurrentAuthorizationReads::within(function ($reads) use ($root, &$escaped): void {
+                $escaped = $reads; $this->assertTrue(app(Response::class)->canEscalate($this->manager, $root, $reads));
+            });
+        });
+        $this->assertInstanceOf(CurrentAuthorizationReads::class, $escaped);
         $this->expectException(LogicException::class);
         app(Response::class)->canEscalate($this->manager, $root, $escaped);
     }
@@ -130,7 +135,7 @@ final class IncidentResponseSourceAdmissionTest extends IncidentIndependenceTest
     {
         app(Policy::class)->save($this->manager, ['mode' => 'assignment_only', 'expected_policy_revision' => 0,
             'request_uuid' => (string) Str::uuid(), 'reason' => 'Explicit assignment-only handling policy review.']);
-        $root = $this->acceptedSource();
+        $root = $this->acceptedSource(1);
         $this->assertTrue(app(Response::class)->canEscalate($this->lead, $root));
         $first = $this->send($root, $this->lead); $second = $this->send($root, $this->lead, 'critical');
         $this->assertSame($first->id, $second->id);

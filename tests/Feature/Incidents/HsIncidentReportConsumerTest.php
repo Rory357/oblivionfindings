@@ -48,8 +48,10 @@ final class HsIncidentReportConsumerTest extends IncidentIndependenceTestCase
         $this->bundle($blocked, 'restricted-source');
         $healthy = $this->incident(['client_id' => $this->client->id, 'description' => 'Readable source description']);
         $this->bundle($healthy, 'readable-source');
-        $ordinary = HsEvent::factory()->createQuietly(['source_type' => null, 'source_id' => null,
-            'site_id' => $this->site->id, 'client_id' => $this->client->id, 'staff_id' => $this->manager->id,
+        // Standalone H&S event: hs_events.source_type/source_id are NOT NULL, so it keeps the factory's own
+        // non-incident source (HsEvent) rather than nulls; no protected incident source is attached.
+        $ordinary = HsEvent::factory()->createQuietly([
+            'occurred_at' => now(), 'reported_at' => now(), 'site_id' => $this->site->id, 'client_id' => $this->client->id, 'staff_id' => $this->manager->id,
             'event_category' => HsEvent::CATEGORY_HAZARD, 'status' => HsEvent::STATUS_OPEN,
             'worksafe_notifiable' => true, 'worksafe_status' => HsEvent::WORKSAFE_PENDING,
             'created_by' => $this->manager->id, 'idempotency_key' => (string) Str::uuid()]);
@@ -463,6 +465,8 @@ final class HsIncidentReportConsumerTest extends IncidentIndependenceTestCase
         $category = $root->type === 'near_miss' ? HsEvent::CATEGORY_NEAR_MISS : HsEvent::CATEGORY_INCIDENT;
         $event = HsEvent::factory()->createQuietly(['source_type' => ClientIncident::class, 'source_id' => $root->id,
             'event_category' => $category, 'idempotency_key' => HsEvent::buildIdempotencyKey(ClientIncident::class, $root->id, $category),
+            // The factory's Faker dates use the real clock, which can land after the frozen test "now".
+            'occurred_at' => now(), 'reported_at' => now(),
             'site_id' => $root->site_id, 'client_id' => $root->client_id, 'control_room_alert_id' => null,
             'status' => HsEvent::STATUS_OPEN, 'worksafe_notifiable' => true, 'worksafe_status' => HsEvent::WORKSAFE_PENDING,
             'closure_summary' => $marker, 'created_by' => $this->manager->id]);

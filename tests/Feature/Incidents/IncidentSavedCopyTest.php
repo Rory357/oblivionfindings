@@ -442,7 +442,7 @@ final class IncidentSavedCopyTest extends IncidentIndependenceTestCase
         DB::table('control_room_alerts')->where('id', $fixture['alert_id'])->update(['client_id' => $this->client->id, 'notes' => $copy['copy']['text'],
             'context' => json_encode(['saved_incident_copy' => $this->origin($copy)])]);
         $freshRoot = $root->fresh();
-        $this->accept($this->command(['report_request_uuid' => $freshRoot->report_request_uuid]));
+        $this->acceptForExisting($freshRoot, $this->command(['report_request_uuid' => $freshRoot->report_request_uuid]));
         $calls = 0;
         $this->unavailableMaterialisation($this->liveCopy($fixture, $this->lead, function () use (&$calls): array { $calls++; return []; }));
         $this->assertSame(0, $calls);
