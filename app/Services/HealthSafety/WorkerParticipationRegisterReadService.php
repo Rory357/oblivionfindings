@@ -228,10 +228,12 @@ final class WorkerParticipationRegisterReadService
             } else {
                 $data['committee'] = $relations['committee'][$row->hs_committee_id] ?? null;
                 $data['creator'] = $relations['creator'][$row->created_by] ?? null;
-                $attendees = $this->attendeeQuery([(int) $row->id], $context, $site)->get(['users.id', 'users.name',
+                // addSelect, not get($columns): the related users query already selects users.id/users.name,
+                // and get() ignores its columns whenever a select is set, so the pivot facts came back null.
+                $attendees = $this->attendeeQuery([(int) $row->id], $context, $site)->addSelect([
                     'hs_meeting_attendees.meeting_id as pivot_meeting_id', 'hs_meeting_attendees.user_id as pivot_user_id',
                     'hs_meeting_attendees.response as pivot_response', 'hs_meeting_attendees.attended as pivot_attended',
-                    'hs_meeting_attendees.created_at as pivot_created_at', 'hs_meeting_attendees.updated_at as pivot_updated_at']);
+                    'hs_meeting_attendees.created_at as pivot_created_at', 'hs_meeting_attendees.updated_at as pivot_updated_at'])->get();
                 $data['attendee_users'] = $attendees->map(function ($attendee) use ($row): array {
                     $named = $attendee->toArray();
                     foreach (array_keys($named) as $column) { if (str_starts_with($column, 'pivot_')) { unset($named[$column]); } }
