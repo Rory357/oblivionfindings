@@ -112,12 +112,20 @@ final class WorkerParticipationInvitationReadTest extends RestraintEventCommandT
     public function test_current_approved_internal_staff_is_required_before_body(string $state): void
     {
         if ($state === 'unapproved') { $this->actor->update(['approved_at' => null]); }
-        elseif ($state === 'external') { $this->actor->update(['external_clinical_account' => true]); }
+        // external_clinical_account is not mass assignable; update() would silently skip it.
+        elseif ($state === 'external') { $this->actor->forceFill(['external_clinical_account' => true])->save(); }
         elseif ($state === 'client') { $this->actor->update(['role' => 'client']); }
         else { $this->actor->hrEmployeeProfile->update(match ($state) {
             'inactive' => ['is_active' => false], 'ended' => ['end_date' => '2026-10-01'], default => ['start_date' => '2026-12-01'],
         }); }
-        $this->withoutPrivateHydration(fn () => $this->getJson($this->url())->assertNotFound());
+        // Main's global web middleware refuses two states before the route runs: an unapproved account is
+        // signed out to the login page (EnsureAccountStillApproved), and an external clinical account may open
+        // only the clinical portal (EnsureExternalClinicalIsolation, 403). Both still read no private body.
+        $this->withoutPrivateHydration(fn () => match ($state) {
+            'unapproved' => $this->getJson($this->url())->assertRedirect(route('login')),
+            'external' => $this->getJson($this->url())->assertForbidden(),
+            default => $this->getJson($this->url())->assertNotFound(),
+        });
     }
 
     public function test_wide_hs_reader_still_requires_own_pivot_and_flags_nullable_ownership(): void
@@ -194,7 +202,13 @@ final class WorkerParticipationInvitationReadTest extends RestraintEventCommandT
         finally { $armed = false; }
     }
 
-    private function permission(string $key, bool $allowed): void { $this->actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', $key)->sole()->id => ['allowed' => $allowed]]); }
+    private function permission(string $key, bool $allowed): void
+    {
+        $this->actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', $key)->sole()->id => ['allowed' => $allowed]]);
+        // actingAs() reuses this one User across requests; earlier requests leave its permission relations
+        // loaded, and canDo() then answers from that stale copy. A real request always loads a fresh user.
+        $this->actor->unsetRelations();
+    }
     private function url(): string { return '/my-day/safety/meetings/'.$this->meeting->id; }
 
     private function withoutPrivateHydration(callable $operation): void

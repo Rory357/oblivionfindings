@@ -260,12 +260,13 @@ class WorkerParticipationCalendarSourceReadTest extends RestraintEventCommandTes
 
     public function test_actual_native_user_ics_token_uses_its_source_viewer_and_reports_positive_then_restricted_status(): void
     {
-        $this->actor->update(['calendar_feed_token' => 'participation-native-user-token']);
-        $response = $this->get('/calendar/feed/participation-native-user-token.ics');
+        // The feed route accepts only [A-Za-z0-9]+ tokens, and calendar_feed_token is not mass assignable.
+        $this->actor->forceFill(['calendar_feed_token' => 'participationNativeUserToken'])->save();
+        $response = $this->get('/calendar/feed/participationNativeUserToken.ics');
         $response->assertOk()->assertHeader('X-Calendar-Participation-Source', 'available');
         $this->assertStringContainsString('Approved committee', $response->getContent());
         $this->revoke($this->actor, 'hazards.view');
-        $response = $this->get('/calendar/feed/participation-native-user-token.ics');
+        $response = $this->get('/calendar/feed/participationNativeUserToken.ics');
         $response->assertOk()->assertHeader('X-Calendar-Participation-Source', 'restricted');
         $this->assertStringNotContainsString('Approved committee', $response->getContent());
         $this->assertStringContainsString('Existing manual event', $response->getContent());
@@ -274,10 +275,11 @@ class WorkerParticipationCalendarSourceReadTest extends RestraintEventCommandTes
     public function test_actual_resource_ics_never_reads_participation_sources_and_keeps_other_provider_bytes(): void
     {
         CalendarSyncMapping::create(['site_id' => $this->site->id, 'provider' => 'google', 'external_calendar_id' => 'synthetic-resource',
-            'sync_direction' => 'one_way', 'sources' => ['participation', 'event', 'meal'], 'ical_feed_token' => 'participation-native-resource-token', 'is_active' => true]);
+            'sync_direction' => 'one_way', 'sources' => ['participation', 'event', 'meal'], 'ical_feed_token' => 'participationNativeResourceToken', 'is_active' => true]);
         $state = $this->sourceSql();
         try {
-            $response = $this->get('/calendar/site/'.$this->site->id.'/feed/participation-native-resource-token.ics');
+            // The house feed route accepts only [A-Za-z0-9]+ tokens.
+            $response = $this->get('/calendar/site/'.$this->site->id.'/feed/participationNativeResourceToken.ics');
             $response->assertOk()->assertHeader('X-Calendar-Participation-Source', 'restricted'); $this->assertSame([], $state->sql);
             foreach (['BEGIN:VCALENDAR', 'Existing manual event', 'Existing meal fact', 'END:VCALENDAR'] as $fact) { $this->assertStringContainsString($fact, $response->getContent()); }
             $this->assertStringNotContainsString('Approved committee', $response->getContent());

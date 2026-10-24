@@ -146,18 +146,21 @@ final class HsWorkerParticipationMetricFocusTest extends IncidentRoutingTestCase
             ->assertJsonPath('props.rows.data.0.elected_at', '2026-10-01')->assertJsonPath('props.rows.data.0.work_group', 'Night')
             ->assertJsonPath('props.rows.data.0.user.name', $rep->user->name)->assertJsonPath('props.rows.data.0.site.name', $this->site->name)
             ->assertJsonPath('props.rows.data.0.created_by', $this->manager->id);
-        $this->assertSame($rep->toArray()['elected_at'], $response->json('props.detail.data.elected_at'));
+        // Detail dates use the same civil-date contract as the rows (the register's dateValues), not the
+        // model's midnight-instant serialisation; HsWorkerParticipationRegisterSourceReadTest pins the same.
+        $this->assertSame('2026-10-01', $response->json('props.detail.data.elected_at'));
         $consultation = $this->consultation(['consultation_date' => '2026-09-27', 'outcome' => 'Recorded outcome']);
         $response = $this->page(['tab' => 'consultations', 'period' => 'all', 'consultation' => $consultation->id])->assertOk()
             ->assertJsonPath('props.rows.data.0.consultation_date', '2026-09-27')->assertJsonPath('props.rows.data.0.site.name', $this->site->name)
             ->assertJsonPath('props.rows.data.0.outcome', 'Recorded outcome')->assertJsonPath('props.rows.data.0.created_by', $this->manager->id);
-        $this->assertSame($consultation->toArray()['consultation_date'], $response->json('props.detail.data.consultation_date'));
+        $this->assertSame('2026-09-27', $response->json('props.detail.data.consultation_date'));
     }
 
     public function test_default_quarter_keeps_first_day_and_all_future_scheduling_without_redefining_bounded_hero_quarter(): void
     {
-        $this->meeting(['scheduled_at' => '2026-09-30 23:59:59']);
-        $first = $this->meeting(['scheduled_at' => '2026-10-01 00:00:00']);
+        // The quarter is the worker (Pacific/Auckland) quarter: it opens at 2026-10-01 00:00 NZDT = 2026-09-30 11:00 UTC.
+        $this->meeting(['scheduled_at' => '2026-09-30 10:59:59']);
+        $first = $this->meeting(['scheduled_at' => '2026-09-30 11:00:00']);
         $current = $this->meeting(['scheduled_at' => '2026-10-12 03:00:00']);
         $future = $this->meeting(['scheduled_at' => '2027-01-01 00:00:00']);
         $response = $this->page(['tab' => 'meetings', 'site_id' => $this->site->id])->assertOk()
@@ -209,7 +212,8 @@ final class HsWorkerParticipationMetricFocusTest extends IncidentRoutingTestCase
 
     private function consultation(array $values = []): HsConsultation
     {
-        return HsConsultation::create(['title' => 'Recorded consultation', 'site_id' => $this->site->id,
+        // hs_consultations.description is NOT NULL with no default.
+        return HsConsultation::create(['title' => 'Recorded consultation', 'description' => 'Recorded consultation detail', 'site_id' => $this->site->id,
             'consultation_type' => 'procedure_change', 'consultation_date' => '2026-10-11', 'status' => 'open',
             'initiated_by' => $this->manager->id, 'created_by' => $this->manager->id, ...$values]);
     }

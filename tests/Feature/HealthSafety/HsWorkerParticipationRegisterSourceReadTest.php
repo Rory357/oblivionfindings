@@ -255,7 +255,8 @@ final class HsWorkerParticipationRegisterSourceReadTest extends TestCase
         $this->assertEqualsCanonicalizing([$first->id, $last->id, $next->id, $this->own['meetings']->id], array_column($response->json('props.rows.data'), 'id'));
         $this->assertNotContains($before->id, array_column($response->json('props.rows.data'), 'id'));
         $this->own['consultations']->update(['consultation_date' => '2026-10-01']);
-        HsConsultation::create(['title' => 'Prior calendar quarter', 'consultation_type' => 'procedure_change', 'site_id' => $this->site->id,
+        // hs_consultations.description is NOT NULL with no default.
+        HsConsultation::create(['title' => 'Prior calendar quarter', 'description' => 'Recorded', 'consultation_type' => 'procedure_change', 'site_id' => $this->site->id,
             'consultation_date' => '2026-09-30', 'status' => 'open', 'initiated_by' => $this->actor->id, 'created_by' => $this->actor->id]);
         $this->page(['tab' => 'consultations', 'period' => 'quarter'])->assertOk()->assertJsonPath('props.rows.total', 1)
             ->assertJsonPath('props.rows.data.0.consultation_date', '2026-10-01');

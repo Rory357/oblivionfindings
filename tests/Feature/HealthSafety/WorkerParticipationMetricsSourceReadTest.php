@@ -240,6 +240,10 @@ final class WorkerParticipationMetricsSourceReadTest extends TestCase
     {
         $this->atAggregate('hs_committees', 'count(', fn () => $this->records($this->site),
             function (): void { $result = $this->metrics->overview($this->actor, $this->site->id); $this->assertSame('unavailable', $result['source_access']); $this->assertNull($result['committees']); });
+        // The simulated concurrent write ran on this connection inside the refused read's transaction, so that
+        // read's rollback undid it. A real concurrent writer commits independently: replay it, then read fresh.
+        $this->assertSame(1, $this->metrics->overview($this->actor, $this->site->id)['committees']);
+        $this->records($this->site);
         $this->assertSame(2, $this->metrics->overview($this->actor, $this->site->id)['committees']);
     }
 
@@ -247,6 +251,8 @@ final class WorkerParticipationMetricsSourceReadTest extends TestCase
     {
         $this->atAggregate('hs_consultations', ' as m', fn () => $this->grant('hazards.view', false),
             function (): void { $this->assertSame('unavailable', $this->monthly($this->site->id)['source_access']); });
+        // The refused read's rollback undid the withdrawal simulated on this connection; replay it as a committed write.
+        $this->grant('hazards.view', false);
         $this->assertSame('restricted', $this->monthly($this->site->id)['source_access']);
         $this->grant('hazards.view', true); $this->assertSame('readable', $this->monthly($this->site->id)['source_access']);
     }

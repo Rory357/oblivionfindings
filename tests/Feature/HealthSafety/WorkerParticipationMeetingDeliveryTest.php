@@ -348,7 +348,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
         $foreignCommittee = HsCommittee::create(['name' => 'Foreign private source', 'site_id' => $foreignSite->id, 'status' => 'active',
             'meeting_frequency' => 'monthly', 'established_at' => '2025-01-01', 'members' => []]);
         $foreign = $foreignCommittee->meetings()->create(['scheduled_at' => '2026-01-15 00:00:00', 'status' => 'scheduled', 'minutes' => 'Private foreign minutes']);
-        $this->manager->permissionOverrides()->attach(Permission::where('name', 'healthSafety.viewAllSites')->sole()->id, ['allowed' => false]);
+        $this->manager->permissionOverrides()->attach(Permission::where('key', 'healthSafety.viewAllSites')->sole()->id, ['allowed' => false]);
         $hydrations = 0; $armed = true;
         HsCommitteeMeeting::retrieved(function ($row) use (&$hydrations, &$armed, $foreign): void {
             if ($armed && $row->id === $foreign->id && array_key_exists('minutes', $row->getAttributes())) { $hydrations++; }
