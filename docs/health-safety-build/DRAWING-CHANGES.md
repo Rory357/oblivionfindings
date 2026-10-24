@@ -101,3 +101,4 @@ the viewer can be brought up to date later. Newest last.
 | 20, 20b | Each "Open" in the time-first lists has a full screen-reader name ("Open corrective action: Repair the rail") | Several identical "Open" links had no context |
 | 1–4 (owner) | A closed incident with no recorded owner reads "Owner not recorded" with a plain "?" avatar | Matches the owner wording elsewhere; initials of "Not recorded" were meaningless |
 | 24e | While a refused save is held in the evidence-window editor, "Check current access" shows under the editor | Without it the person had no way on |
+| 129g | "Current delivery checks" reads the real `delivery-attempts` endpoint as a read-only list (up to the 25 newest attempts; each shows "Destination not checked"); there is no inspect or retry button | Codex's panel called `/deliveries`, `/deliveries/{id}` and `/retry`, which have no route; the 404 hid the whole private record. Backend gap: destination proof, inspect and retry |

@@ -54,9 +54,11 @@ function authority(d: ExposureWorkspaceDetail | undefined, action: Action, sourc
             ? 'can_reassign' in row && row.can_reassign && 'completed_at' in row && row.completed_at === null : 'can_remove' in row && row.can_remove && row.attribution_state === 'recorded');
 }
 /** Inline saved-record commands. The capture page may place this bounded form inside the shared capture shell. */
-export function ExposureCommandForm({ action, actorId, detail: suppliedDetail, capture, sourceId, retainedChild, active, onCancel, onDone, onWithdraw }: {
+export function ExposureCommandForm({ action, actorId, detail: suppliedDetail, capture, sourceId, retainedChild, active, onCancel, onDone, onWithdraw, onStep }: {
     action: Action; actorId: number; detail?: ExposureWorkspaceDetail; capture?: ExposureCapture; sourceId?: number;
     retainedChild?: ExposureFollowup | ExposureEvidence; active: boolean; onCancel: () => void; onDone: () => void; onWithdraw?: () => void;
+    /** The capture page's header stage line follows the wizard (pg-hsn-130): the current step, and `saved` once confirmed. */
+    onStep?: (step: number, saved: boolean) => void;
 }) {
     const [values, setValues] = useState<ExposureFormValues>(() => exposureInitialValues(action, suppliedDetail?.record));
     const originalValues = useRef(values);
@@ -97,6 +99,7 @@ export function ExposureCommandForm({ action, actorId, detail: suppliedDetail, c
     const editingLocked = command.busy || command.uncertain || command.withdrawn || choices.withdrawn || !!command.receipt || !admitted || !permitted;
     useEffect(() => { if (command.withdrawn) onWithdraw?.(); }, [command.withdrawn, onWithdraw]);
     useEffect(() => { if (command.rejected) setStep(0); }, [command.rejected]);
+    useEffect(() => { onStep?.(step, !!command.receipt); }, [step, command.receipt, onStep]);
     const set = (key: string, value: string | File | null) => { setValues((current) => ({ ...current, [key]: value })); setLocalErrors((current) => ({ ...current, [key]: '' })); };
     const fields = specs(action); const errors = { ...localErrors, ...command.errors };
     const prepare = () => {
@@ -282,6 +285,7 @@ export function ExposureCommandForm({ action, actorId, detail: suppliedDetail, c
             {action !== 'capture' && <div className="mt-5 flex flex-wrap gap-3"><Button type="button" variant="outline" className="frontline-tap" onClick={onCancel}>Cancel</Button>{controls}</div>}
         </form>
         {reviewFailure && <p role="status" className="text-subtle text-status-warning">{reviewFailure}</p>}
+        {/* eslint-disable-next-line no-restricted-syntax -- the review panel sits inside the form's own layout (the form stays as it is). */}
         {fresh?.detail.record && <div className="space-y-4 rounded-lg border border-border bg-card p-4"><h3 className="text-section-title">Current facts for review</h3>
             <p className="text-subtle">{fresh.detail.record.worker.name} · {fresh.detail.record.site.name} · Revision {fresh.detail.command_context?.expected_version}</p>
             <dl className="grid gap-3 sm:grid-cols-2">{Object.entries(fresh.detail.record).filter(([key]) => ['exposed_at', 'exposure_type', 'exposure_duration', 'circumstances', 'symptoms', 'first_aid_given', 'medical_attention_sought', 'medical_treatment', 'medical_outcome', 'incident_reported'].includes(key)).map(([key, value]) =>

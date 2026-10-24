@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- Test doubles use raw buttons as simple controls. */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -49,17 +50,17 @@ it('retains a mounted draft through record sections and returns to the same exac
 it('withholds saved source facts and command fields after repair while preserving the in-memory draft for valid recovery', () => {
     const d = record(); const { rerender } = render(<PpeShow {...d} />);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Retained unsaved change' } });
-    const damaged = { kind: 'inventory', detail: { id: 9, source_integrity: 'repair_required', command_context: null, read_scope: 'source_repair_required', can: { manage: false } } } as PpeRepairRecord;
+    const damaged = { kind: 'inventory', detail: { id: 9, source_integrity: 'repair_required', command_context: null, read_scope: 'source_repair_required', can: { manage: false } } } as unknown as PpeRepairRecord;
     rerender(<PpeShow {...damaged} />);
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Save test command' })).toBeDisabled();
     expect(screen.queryByText(/Saved equipment brand/)).not.toBeInTheDocument(); expect(screen.getByRole('status')).toHaveTextContent('Source history needs review');
     rerender(<PpeShow {...d} />); expect(screen.getByRole('textbox')).toHaveValue('Retained unsaved change');
 });
 it('never mounts a never-authorised command from a URL hint or invents a readable damaged record', () => {
-    const d = record(); render(<PpeShow {...d} detail={{ ...d.detail, can: { manage: false } } as typeof d.detail} />);
+    const d = record(); render(<PpeShow {...({ ...d, detail: { ...d.detail, can: { manage: false } } } as PpeRecord)} />);
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('unavailable');
     cleanup();
-    const damaged = { kind: 'inventory', detail: { id: 9, source_integrity: 'repair_required', command_context: null, can: {} } } as PpeRepairRecord;
+    const damaged = { kind: 'inventory', detail: { id: 9, source_integrity: 'repair_required', command_context: null, can: {} } } as unknown as PpeRepairRecord;
     render(<PpeShow {...damaged} />); expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('source needs review');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 });

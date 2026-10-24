@@ -14,7 +14,7 @@ import { compactMenu, EntityContextMenu, useEntityContextMenu, type MenuItem } f
 import { FactRows, Log, Note, PeopleCards, PlaceCards, QuietLine, RingCard, RowList, SideColumn, Story, type CheckItem, type PersonCardItem, type SgTone } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDateOnly, formatDateTimeLong, formatTime, toDateInput } from '@/lib/datetime';
+import { formatDateOnly, formatTime, toDateInput } from '@/lib/datetime';
 import { ppeHref, type PpeCommand, type PpePageKey, type PpeSection } from '@/lib/health-safety/ppe-navigation';
 import { Link, router } from '@inertiajs/react';
 import { CalendarDays, CircleCheck, Clock, Download, Eye, FileText, MapPin, MoveRight, Paperclip, ShieldCheck, Tag, Trash2, UserRound } from 'lucide-react';
@@ -24,20 +24,24 @@ import type { PpeAllocation, PpeInspection, PpeItem, PpePage, PpeRecord } from '
 import { catIcon, catLabel, condLabel, formatBytes, statusLabel, type PpeAttachment } from './ppe-shared';
 
 export const ppeDay = (value?: string | null) => formatDateOnly(value, 'Not recorded');
-export const ppeTime = (value?: string | null) => formatDateTimeLong(value, 'Not recorded');
 /** "2 Sep 2026" for a timestamp, on the NZ calendar. */
 const dayOf = (value?: string | null) => (value ? formatDateOnly(toDateInput(value), 'Not recorded') : 'Not recorded');
+/** "2 Sep 2026, 9:15 am" — the register's short date with its time. */
+export const ppeTime = (value?: string | null) => (value && toDateInput(value) ? `${dayOf(value)}, ${formatTime(value)}` : 'Not recorded');
 const sentence = (value: string) => { const text = value.replaceAll('_', ' '); return text.charAt(0).toUpperCase() + text.slice(1); };
 export const PPE_RESULT_LABELS: Record<string, string> = { pass: 'Pass', fail: 'Fail', needs_repair: 'Needs repair', condemned: 'Condemned' };
 export const ppeResultLabel = (result: string) => PPE_RESULT_LABELS[result] ?? sentence(result);
 const resultTone = (result: string): SgTone => (result === 'pass' ? 'success' : result === 'condemned' ? 'critical' : 'warning');
+const LAST_INSPECTION: Record<string, string> = { pass: 'Last inspection passed', fail: 'Last inspection failed' };
+/** History rows read by what the change did: issues blue, returns quiet, holds amber, condemn and disposal red. */
+const historyTone = (command: string): SgTone => (command === 'allocate' ? 'info' : command === 'return' ? 'none' : command === 'hold' ? 'warning' : ['condemn', 'dispose'].includes(command) ? 'critical' : 'success');
 /** The register says "Issued" for equipment out with a worker. */
 export const ppeServiceLabel = (status: string | null | undefined) => (status === 'allocated' ? 'Issued' : statusLabel(status));
 export const PPE_FREQUENCY_WORDS: Record<string, string> = { daily: 'daily', weekly: 'weekly', monthly: 'monthly', quarterly: 'quarterly', annually: 'yearly' };
 
 type Props = { record: PpeRecord; section: PpeSection; sourceHref: string; open: (command: PpeCommand, attachment?: number) => void; page: (key: PpePageKey, page: number) => void };
 function Pages({ meta, name, change }: { meta?: PpePage; name: string; change: (page: number) => void }) {
-    if (!meta) return null;
+    if (!meta || meta.last_page <= 1) return null;
     return <nav aria-label={`${name} pages`} className="flex flex-wrap items-center gap-3"><Button type="button" size="sm" variant="outline" disabled={meta.current_page <= 1} onClick={() => change(meta.current_page - 1)}>Previous</Button><span className="text-caption">Page {meta.current_page} of {meta.last_page} · {meta.total} records</span><Button type="button" size="sm" variant="outline" disabled={meta.current_page >= meta.last_page} onClick={() => change(meta.current_page + 1)}>Next</Button></nav>;
 }
 /** A block-head action for a command, only when the record allows it. */
@@ -62,12 +66,12 @@ function EquipmentOverview({ record, sourceHref }: Props & { record: { kind: 'in
     const checks: CheckItem[] = [
         { label: d.condition ? `Condition ${condLabel(d.condition).toLowerCase()}` : 'Condition not recorded', state: conditionTone(d.condition) },
         latest
-            ? { label: `Last inspection: ${ppeResultLabel(latest.result).toLowerCase()}`, state: resultTone(latest.result), note: `${dayOf(latest.inspected_at)} · ${latest.inspector?.name ?? 'Inspector not confirmed'}` }
+            ? { label: LAST_INSPECTION[latest.result] ?? `Last inspection: ${ppeResultLabel(latest.result).toLowerCase()}`, state: resultTone(latest.result), note: `${dayOf(latest.inspected_at)} · ${latest.inspector?.name ?? 'Inspector not confirmed'}` }
             : d.last_inspected_at ? { label: 'Last inspection', state: 'none', note: ppeDay(d.last_inspected_at) } : { label: 'No inspection recorded', state: 'none' },
         {
             label: frequency ? `${sentence(PPE_FREQUENCY_WORDS[frequency] ?? frequency)} inspection` : 'Next inspection',
-            state: d.currency.inspection_state === 'overdue' ? 'critical' : d.currency.inspection_state === 'scheduled' ? 'success' : 'none',
-            note: d.currency.inspection_state === 'overdue' ? 'Overdue' : d.next_inspection_due ? `Due ${ppeDay(d.next_inspection_due)}` : 'Not scheduled',
+            state: d.currency?.inspection_state === 'overdue' ? 'critical' : d.currency?.inspection_state === 'scheduled' ? 'success' : 'none',
+            note: d.currency?.inspection_state === 'overdue' ? 'Overdue' : d.next_inspection_due ? `Due ${ppeDay(d.next_inspection_due)}` : 'Not scheduled',
         },
     ];
     return <>
@@ -266,7 +270,7 @@ function History({ record, page }: Props) {
     return <>
         {d.command_history_integrity === 'repair_required' && <Integrity>Some command history cannot be confirmed and is withheld. Its saved rows remain included in the page count.</Integrity>}
         {rows.length
-            ? <Log title="History" sub={HISTORY_NOTE} limit={rows.length} items={rows.map((entry) => ({ key: entry.id, time: dayOf(entry.recorded_at), tone: 'success' as SgTone,
+            ? <Log title="History" sub={HISTORY_NOTE} limit={rows.length} items={rows.map((entry) => ({ key: entry.id, time: dayOf(entry.recorded_at), tone: historyTone(entry.command),
                 title: `Version ${entry.version} · ${sentence(entry.command)}`, sub: `${entry.recorded_at ? formatTime(entry.recorded_at) : 'Time not recorded'} · ${entry.actor?.name ?? 'Recorder not confirmed'}` }))} />
             : <QuietLine title="History" sub={HISTORY_NOTE} text="No attributed command history is available on this page." />}
         <Pages name="Command history" meta={d.pages?.history} change={(next) => page('history_page', next)} />

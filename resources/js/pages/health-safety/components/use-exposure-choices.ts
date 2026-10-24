@@ -18,7 +18,10 @@ export function useExposureChoices({ actorId, rootId, sourceRevision, substanceI
     const [afterId, setAfterId] = useState(0); const [incidentPage, setIncidentPage] = useState(1); const [nonce, setNonce] = useState(0);
     const key = JSON.stringify([actorId, rootId, sourceRevision, substanceId, siteId, search, incidentSearch, afterId, incidentPage, nonce]);
     const [result, setResult] = useState<{ key: string; value: ExposureCapture | ExposureCommandChoices | null; error: string | null; withdrawn: boolean } | null>(null);
-    const [pendingKey, setPendingKey] = useState<string | null>(null); const onDenied = useRef(onWithdraw); onDenied.current = onWithdraw;
+    const [pendingKey, setPendingKey] = useState<string | null>(null);
+    // The latest withdraw callback, read only when a response arrives (refs are not read or written during render).
+    const onDenied = useRef(onWithdraw);
+    useEffect(() => { onDenied.current = onWithdraw; }, [onWithdraw]);
     useEffect(() => {
         if (!enabled || !siteId || (!rootId && !substanceId)) { setResult(null); setPendingKey(null); return; }
         const controller = new AbortController(); setPendingKey(key);

@@ -16,7 +16,8 @@ const props = (record: PpeRecord, section: 'overview' | 'evidence' | 'allocation
 
 it('does not invent Other as the category of an unknown saved reference', () => {
     render(<PpeRecordPanel {...props(inventory(), 'overview')} />);
-    expect(screen.getByText('Category').nextElementSibling).toHaveTextContent('Not recorded');
+    // The category is a story chip (drawing pg-hsn-121); an unknown saved category reads "not recorded", never Other.
+    expect(screen.getByText('Category not recorded')).toBeInTheDocument();
     expect(screen.queryByText('Other')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Kauri' })).toHaveAttribute('href', '/sites/4?tab=ppe&return_to=%2Fhealth-safety%2Fppe%2Finventory%2F9');
 });
@@ -60,7 +61,10 @@ it('shows unavailable historical evidence without a public URL and opens only it
     expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Preview evidence' })).not.toBeInTheDocument();
     expect(screen.getAllByText(/does not confirm available bytes/)).toHaveLength(2);
-    fireEvent.click(screen.getByRole('button', { name: 'Move evidence to private storage' }));
+    // The transfer lives in the row's menu (kebab and right-click, drawing pg-hsn-121d).
+    fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 60, clientY: 80 });
+    expect(screen.queryByRole('menuitem', { name: /Preview|Download/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move evidence to private storage' }));
     expect(p.open).toHaveBeenCalledWith('relocate_evidence', 8);
     expect(screen.getByText('The retained file path cannot be confirmed.')).toBeInTheDocument();
 });
@@ -70,9 +74,12 @@ it('uses the private verified evidence endpoints and keeps its original metadata
         created_at: '2026-10-10T01:00:00Z', uploaded_by: { name: 'Original uploader' },
         notes: 'Observed evidence', download_url: '/health-safety/ppe/inventory/9/attachments/8/download', url: '/health-safety/ppe/inventory/9/attachments/8/download?preview=1' }] };
     render(<PpeRecordPanel {...props({ ...record, detail: d } as unknown as PpeRecord, 'evidence')} />);
-    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', d.attachments[0].download_url);
+    // The file name downloads the verified original; preview and download also sit in the row's menu.
+    expect(screen.getByRole('link', { name: 'Verified inspection.pdf' })).toHaveAttribute('href', d.attachments[0].download_url);
     expect(screen.getByText(/Original uploader/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview evidence' }));
+    fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 60, clientY: 80 });
+    expect(screen.getByRole('menuitem', { name: 'Download' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Preview evidence' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Verified inspection.pdf');
 });
 it('separates unconfirmed command history from the earlier reconstructed facts', () => {

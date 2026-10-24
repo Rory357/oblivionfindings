@@ -7,7 +7,7 @@ const io = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock('axios', () => ({ default: { get: io.get, post: io.post, isAxiosError: (error: unknown) => !!error && typeof error === 'object' && 'response' in error } }));
 vi.mock('@inertiajs/react', () => ({ Head: () => null, Link: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> }));
 vi.mock('@/layouts/app-layout', () => ({ default: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
-vi.mock('@/components/page', () => ({ PageHeader: () => null, PageHeaderGlassButton: () => null, PageHeaderRail: () => null,
+vi.mock('@/components/page', () => ({ PageHeader: () => null, PageHeaderGlassButton: () => null, PageHeaderPrimaryButton: () => null, PageHeaderRail: () => null,
     PageLayout: ({ children }: { children: ReactNode }) => <>{children}</> }));
 const removal = (state = 'pending') => ({ id: 9, state, removed_from_record: true, recorded_at: '2026-10-12T03:00:00Z', can_retry: state !== 'complete' });
 const queue = (attempts: unknown[], next_cursor: number | null = null) => ({ data: { attempts, next_cursor } });
@@ -17,8 +17,9 @@ afterEach(cleanup);
 it('withdraws a loaded queue after current access is revoked instead of leaving old attempts actionable', async () => {
     io.get.mockResolvedValueOnce(queue([removal()])).mockRejectedValueOnce({ response: { status: 403 } });
     render(<PpeRecoveryQueue kind="removals" />);
-    expect(await screen.findByText('File attempt 9')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Check current attempts' }));
+    // A loaded queue is re-read from the header's Check again or the row's menu (drawing pg-hsn-124).
+    fireEvent.contextMenu(await screen.findByText('File attempt 9'), { clientX: 120, clientY: 150 });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Check current attempts' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('unavailable with current access');
     expect(screen.queryByText('File attempt 9')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry file cleanup' })).not.toBeInTheDocument();

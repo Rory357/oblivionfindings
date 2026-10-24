@@ -80,6 +80,7 @@ export function usePpeCatalogueCommand<T extends FormDataType<T>>(initial: T, co
             setFailure('The change is not confirmed. Check current work before sending again. Your entries are retained.');
         } finally { if (request.current === controller) { request.current = null; if (mounted.current) setSaving(false); } }
     };
-    return { form, change, busy, saving, checking, receipt, failure, unresolved, stale, allowed, currentType, options: checked?.options ?? null,
+    // `guard` (the retained idempotency key and reviewed revision) is read-only for callers; only this hook changes it.
+    return { form, change, guard, busy, saving, checking, receipt, failure, unresolved, stale, allowed, currentType, options: checked?.options ?? null,
         checkCurrent, useCurrent, checkFailed, reviewAvailable: !!checked && allowed && !unresolved, save };
 }

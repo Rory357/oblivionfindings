@@ -38,26 +38,30 @@ function index(): ChemicalIndexProps {
 afterEach(() => { cleanup(); vi.resetAllMocks(); io.url = '/health-safety/substances/9?section=overview'; });
 it('opens permanent chemical records with exact filtered Back and source-backed Site meter destinations', () => {
     render(<ChemicalRegister {...index()} />);
-    const href = screen.getAllByRole('link', { name: 'Recorded chemical' })[0].getAttribute('href')!;
+    // The whole row opens the record (drawing pg-hsn-125); its kebab and right-click carry the same action.
+    fireEvent.click(screen.getByText('Recorded chemical'));
+    const href = io.get.mock.calls[0][0] as string;
+    expect(new URL(href, 'https://example.invalid').pathname).toBe('/health-safety/substances/9');
     const back = new URL(href, 'https://example.invalid').searchParams.get('return_to')!;
     expect(new URL(back, 'https://example.invalid').searchParams.get('site_id')).toBe('3');
     expect(new URL(back, 'https://example.invalid').searchParams.get('q')).toBe('cleaning');
-    const current = new URL(screen.getByRole('link', { name: 'View recorded current sheets' }).getAttribute('href')!, 'https://example.invalid');
+    const current = new URL(screen.getByRole('link', { name: 'View current safety data sheets' }).getAttribute('href')!, 'https://example.invalid');
     expect(current.searchParams.get('tab')).toBe('active'); expect(current.searchParams.get('sds_state')).toBe('current'); expect(current.searchParams.get('site_id')).toBe('3');
-    expect(current.searchParams.has('q')).toBe(false); expect(screen.queryByRole('button', { name: 'Board exports' })).not.toBeInTheDocument();
+    expect(current.searchParams.has('q')).toBe(false); expect(screen.queryByRole('button', { name: 'Reports' })).not.toBeInTheDocument();
 });
 it('withholds repair identities and keeps unknown header measures separate from zero or exposure counts', () => {
     const props = index(); props.source_integrity = 'repair_required'; props.rows.data[0] = { ...props.rows.data[0], source_integrity: 'repair_required', name: 'STALE-CHEMICAL-NAME', common_name: 'STALE-COMMON-NAME', storage_count: null };
     props.hero.live.active = null; props.hero.live.controlled = null; props.hero.live.sds_current = null; props.hero.attention.sds_expiring = null; props.hero.attention.sds_missing = null;
     render(<ChemicalRegister {...props} />);
     expect(screen.queryByText('STALE-CHEMICAL-NAME')).not.toBeInTheDocument(); expect(screen.queryByText('STALE-COMMON-NAME')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Unconfirmed').length).toBeGreaterThanOrEqual(5); expect(screen.getByText(/not counted here/)).toBeInTheDocument();
+    // The one header number (current sheets) and the row's storage count stay unconfirmed, never zero.
+    expect(screen.getAllByText('Unconfirmed').length).toBeGreaterThanOrEqual(2); expect(screen.getByText(/not counted here/)).toBeInTheDocument();
 });
 it('uses in-page record sections and refuses unproved child action bookmarks', () => {
     io.url = '/health-safety/substances/9?section=sds&action=edit_sds&sds=999';
     render(<ChemicalShow detail={detail()} return_to="/my-day" chemical_confirmation={null} chemical_href={null} />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('unavailable');
-    fireEvent.click(screen.getByRole('button', { name: 'View storage locations' }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Storage/ }));
     expect(io.replace).toHaveBeenCalledWith(expect.objectContaining({ preserveState: true, preserveScroll: true }));
     expect(io.replace.mock.calls[0][0].url).toContain('section=storage'); expect(io.get).not.toHaveBeenCalled();
 });
@@ -77,7 +81,7 @@ it('requires explicit current-facts review after a definite version rejection an
     const d = detail();
     io.request.mockRejectedValueOnce({ response: { status: 422, data: { errors: { expected_version: ['The record has changed.'] } } } });
     render(<ChemicalCommandForm action="edit" actorId={7} detail={d} active onCancel={vi.fn()} onDone={vi.fn()} />);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Chemical name' }), { target: { value: 'Retained entered name' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /^Chemical name/ }), { target: { value: 'Retained entered name' } });
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save reviewed details' }));
@@ -100,7 +104,7 @@ it('keeps current-facts review unavailable while the original write remains unce
     io.request.mockRejectedValueOnce(new Error('Write response lost'));
     const props = { action: 'edit' as const, actorId: 7, detail: d, active: true, onCancel: vi.fn(), onDone: vi.fn() };
     const { rerender } = render(<ChemicalCommandForm {...props} />);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Chemical name' }), { target: { value: 'Retained original entries' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /^Chemical name/ }), { target: { value: 'Retained original entries' } });
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save reviewed details' }));

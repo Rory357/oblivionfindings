@@ -8,11 +8,13 @@ export const positiveExposureIdentity = (value: string | null): number | null =>
     value && /^[1-9]\d*$/.test(value) && value.length <= 10 && Number(value) <= 2147483647 ? Number(value) : null;
 export function parseExposureNavigation(value: string | null | undefined): URL | null {
     if (!value || new TextEncoder().encode(value).length > 1500 || !value.startsWith('/') || value.startsWith('//')
+        // eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
         || /[\\#\u0000-\u0020\u007f]/.test(value) || /%(?![0-9a-f]{2})/i.test(value)) return null;
     try {
         const target = new URL(value, origin);
         if (target.origin !== origin || target.pathname !== value.split('?')[0]) return null;
-        for (const [key, item] of target.searchParams) if (/[\[\]]/.test(key) || /[\\\u0000-\u001f\u007f]/.test(key + item)) return null;
+        // eslint-disable-next-line no-control-regex -- refuses control characters in a query key or value on purpose (return-link safety).
+        for (const [key, item] of target.searchParams) if (/[[\]]/.test(key) || /[\\\u0000-\u001f\u007f]/.test(key + item)) return null;
         return target;
     } catch { return null; }
 }

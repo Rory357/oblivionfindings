@@ -17,6 +17,7 @@ import { EntityContextMenu, useEntityContextMenu, type MenuItem } from '@/compon
 import { EntityTable, type EntityTableColumn } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { formatDateOnly, formatTime, toDateInput } from '@/lib/datetime';
 import { ppeHref, type PpeSection } from '@/lib/health-safety/ppe-navigation';
@@ -41,7 +42,7 @@ export function PpeRows<T extends { id: number }>({ rows, total, title, caption,
     const context = useEntityContextMenu<T>();
     const open = (row: T) => router.get(href(row));
     return <div className="space-y-5"><ListCaption title={title} caption={caption ?? `${rows.length} of ${total} shown`} />
-        {rows.length === 0 ? <div className="rounded-xl border border-border bg-card p-5"><h2 className="text-section-title">No records match these filters</h2><p className="text-subtle mt-2">Change the filters to find another record.</p></div> : <>
+        {rows.length === 0 ? <Card><CardContent className="p-5"><h2 className="text-section-title">No records match these filters</h2><p className="text-subtle mt-2">Change the filters to find another record.</p></CardContent></Card> : <>
             <ul className={view === 'cards' ? 'grid gap-5 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-5 md:hidden'} aria-label={title}>{rows.map((row) => <li key={row.id}><EntityCard icon={Icon} meridian={meridian(row)} name={name(row)} subline={subline(row)}
                 href={href(row)} linkLabel={`Open ${name(row)}`} onOpen={() => open(row)} actions={actions(row)} onContextMenu={(event) => context.open(event, row)}
                 chips={chips(row)} alerts={alerts(row)} footer={footer(row)} className="[&_a]:inline-flex [&_a]:min-h-[44px] [&_a]:items-center [&_a]:focus-visible:ring-2 [&_a]:focus-visible:ring-ring" /></li>)}</ul>
@@ -127,13 +128,14 @@ export function PpeAllocationTable({ rows, total, returnTo, footer }: { rows: Al
         ...(!damaged(row) ? [{ label: 'Fit and training facts', icon: ClipboardCheck, onClick: () => router.get(href(row, 'fit-training')) },
             { label: 'Evidence', icon: FileText, onClick: () => router.get(href(row, 'evidence')) }, { label: 'History', icon: History, onClick: () => router.get(href(row, 'history')) }] : [])];
     const fact = (row: AllocationDisplayRow, value: () => ReactNode) => damaged(row) ? withheld : value();
+    // A respirator issued without a fit test on record is the one that needs someone: it reads as an amber badge.
+    const training = (row: AllocationDisplayRow) => (row.training_completed ? 'Training done' : 'No training on record');
     const fitTraining = (row: AllocationDisplayRow) => {
         if (row.ppe_type?.category === 'respiratory' && !row.fit_test_completed) {
             return <span className="inline-flex flex-wrap items-center gap-1.5"><StatusBadge variant="warning">No fit test on record</StatusBadge>
-                <span className="text-caption text-muted-foreground">{row.training_completed ? 'Training recorded' : 'No training on record'}</span></span>;
+                <span className="text-caption">{training(row)}</span></span>;
         }
-        if (!row.fit_test_completed && !row.training_completed) return 'No fit test or training on record';
-        return `${row.fit_test_completed ? 'Fit test recorded' : 'No fit test on record'} · ${row.training_completed ? 'Training recorded' : 'No training on record'}`;
+        return `${row.fit_test_completed ? 'Fit test done' : 'No fit test on record'} · ${training(row)}`;
     };
     const columns: RecordTableColumn<AllocationDisplayRow>[] = [
         { key: 'item', label: 'Item', className: 'min-w-[14rem]', cell: (row) => <div className="grid gap-1">

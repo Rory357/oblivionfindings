@@ -78,9 +78,11 @@ export function chemicalFormPayload(action: ChemicalAction | 'create', values: V
     if (action === 'add_sds') result.file = values.file;
     return result;
 }
-export function ChemicalCommandForm({ action, actorId, detail: providedDetail, storage: providedStorage, sheet: providedSheet, capture: supplied, sourceAvailable = true, active, onCancel, onDone, onWithdraw }: {
+export function ChemicalCommandForm({ action, actorId, detail: providedDetail, storage: providedStorage, sheet: providedSheet, capture: supplied, sourceAvailable = true, active, onCancel, onDone, onWithdraw, onStep }: {
     action: ChemicalAction | 'create'; actorId: number; detail?: ChemicalDetail; storage?: ChemicalStorageLocation; sheet?: ChemicalSdsRecord;
     capture?: ChemicalCapture; sourceAvailable?: boolean; active: boolean; onCancel: () => void; onDone: () => void; onWithdraw?: () => void;
+    /** The host page's header stage line follows the wizard (pg-hsn-127): the current step, and `saved` once confirmed. */
+    onStep?: (step: number, saved: boolean) => void;
 }) {
     const [capture, setCapture] = useState<ChemicalCapture | null>(supplied ?? null);
     const [reviewedRecord, setReviewedRecord] = useState<{ detail: ChemicalDetail; storage?: ChemicalStorageLocation; sheet?: ChemicalSdsRecord; observedVersion: number | null; observedStorageVersion?: number | null } | null>(null);
@@ -167,6 +169,7 @@ export function ChemicalCommandForm({ action, actorId, detail: providedDetail, s
         setVersions(next); setFresh(null); setReviewFailure('Current revision reviewed. Your retained entries have not been replaced. Recheck them before submitting.');
     };
     useEffect(() => { if (command.withdrawn) onWithdraw?.(); }, [command.withdrawn, onWithdraw]);
+    useEffect(() => { onStep?.(step, !!command.receipt); }, [step, command.receipt, onStep]);
     const steps = catalogue ? [{ key: 'reference', label: 'Reference', blurb: 'Identity and classification', icon: FlaskConical },
         { key: 'controls', label: 'Safe use', blurb: 'Recorded precautions and responses', icon: Shield }, { key: 'review', label: 'Review', blurb: 'Check before saving', icon: ClipboardCheck }] :
         [{ key: 'facts', label: 'Details', blurb: 'Record this change', icon: FileText }, { key: 'review', label: 'Review', blurb: 'Check before saving', icon: ClipboardCheck }];

@@ -10,9 +10,11 @@ const origin = 'https://chemical-navigation.invalid';
 const positive = (value: string | null) => value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
 const single = (query: URLSearchParams, key: string) => query.getAll(key).length === 1 ? query.get(key) : null;
 function parsed(value: string | null | undefined): URL | null {
+    // eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
     if (!value || new TextEncoder().encode(value).length > 1500 || !value.startsWith('/') || value.startsWith('//') || /[\\#\u0000-\u0020\u007f]/.test(value)) return null;
     try {
         const target = new URL(value, origin);
+        // eslint-disable-next-line no-control-regex -- refuses decoded control characters in a return link on purpose (link safety).
         if (target.origin !== origin || target.pathname !== value.split('?')[0] || /[\\\u0000-\u001f\u007f]/.test(decodeURIComponent(value))) return null;
         return target;
     } catch { return null; }
