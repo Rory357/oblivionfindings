@@ -62,6 +62,20 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $viewer->permissionOverrides()->syncWithoutDetaching([Permission::where('key', $key)->sole()->id => ['allowed' => true]]);
     }
 
+    /**
+     * Fixture only: the closure guard trigger admits this one close, as HsEventClosureService does.
+     * A query update, so the caller's loaded model keeps its stale pre-close state.
+     */
+    private function closedFixture(HsEvent $event, array $attributes): void
+    {
+        DB::statement('SET @hs_canonical_close_event_id = '.(int) $event->id);
+        try {
+            HsEvent::whereKey($event->id)->update($attributes);
+        } finally {
+            DB::statement('SET @hs_canonical_close_event_id = NULL');
+        }
+    }
+
     public function test_visibility_reconstructs_current_facts_and_people_instead_of_caller_loaded_relations(): void
     {
         $source = $this->event();
@@ -209,7 +223,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
             DB::disableQueryLog();
         }
         // A retained denied-source reference is uncertain, never a completed journey.
-        HsEvent::whereKey($event->id)->update(['status' => HsEvent::STATUS_CLOSED]);
+        $this->closedFixture($event, ['status' => HsEvent::STATUS_CLOSED]);
         $this->assertSame('Journey needs review', $presenter->present($journey, $viewer)['journey_state']);
     }
 
@@ -257,7 +271,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $journeys = \Mockery::mock(app(IncidentJourneyService::class))->makePartial();
         $journeys->shouldReceive('governanceRecordsForAlert')->andReturn(['incident' => null, 'hs_event' => $event]);
         $this->instance(IncidentJourneyService::class, $journeys);
-        HsEvent::whereKey($event->id)->update(['status' => HsEvent::STATUS_CLOSED, 'handover_status' => HsEvent::HANDOVER_ACCEPTED]);
+        $this->closedFixture($event, ['status' => HsEvent::STATUS_CLOSED, 'handover_status' => HsEvent::HANDOVER_ACCEPTED]);
         $service = app(AlertWorkspaceService::class);
         $dto = $service->build($viewer, $alert->id);
         $this->assertSame(HsEvent::STATUS_CLOSED, $dto['linked_hs_event']['status']);
@@ -455,7 +469,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $journeys = \Mockery::mock(app(IncidentJourneyService::class))->makePartial();
         $journeys->shouldReceive('journeyForIncident')->andReturn(new IncidentJourney($incident, null, $event));
         $this->instance(IncidentJourneyService::class, $journeys);
-        HsEvent::whereKey($event->id)->update(['status' => HsEvent::STATUS_CLOSED,
+        $this->closedFixture($event, ['status' => HsEvent::STATUS_CLOSED,
             'handover_status' => HsEvent::HANDOVER_ACCEPTED, 'acceptance_notes' => 'Current accepted governance']);
         $response = $this->actingAs($viewer)->get('/incidents/'.$incident->id)->assertOk();
         $response->assertInertia(fn (Assert $page) => $page->where('detail.hs_event.status', HsEvent::STATUS_CLOSED)
@@ -503,9 +517,10 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
                 if ($revocation === 'source') {
                     $response->assertOk();
                 }
-                if ($response->status() === 403) {
-                    // Independent incident authority can also deny the whole page.
-                    $response->assertForbidden();
+                if (in_array($response->status(), [403, 404], true)) {
+                    // Independent incident authority can also deny the whole page; an incident
+                    // outside the viewer's current Site scope is concealed as 404 (kept Codex rule).
+                    $this->assertNotSame('source', $revocation);
                 } else {
                     $response->assertOk()->assertInertia(fn (Assert $page) => $page->where('detail.hs_event', null)
                         ->where('detail.journey_state', 'Journey needs review')
@@ -644,8 +659,10 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $this->withoutMiddleware(HandleInertiaRequests::class);
         $viewer = $this->staff(['hazards.view', 'hazards.manage', 'clients.viewAny', 'incidents.viewAny',
             'healthSafety.events.close', 'healthSafety.closureExceptions.request', 'healthSafety.closureExceptions.approve']);
+        // Handover acceptance needs an actually submitted incident; the factory state sets status only.
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
             'site_id' => $this->site->id, 'client_id' => $this->client->id, 'reported_by' => $viewer->id,
+            'submitted_at' => now()->subHour(),
         ]));
         $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->forClientIncident($incident)->create([
             'site_id' => $this->site->id, 'client_id' => $this->client->id,

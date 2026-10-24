@@ -61,7 +61,7 @@ class RestraintRegisterTest extends RestraintEventCommandTestCase
         return ClientIncident::factory()->create([
             'client_id' => $client->id,
             'site_id' => $client->site_id,
-            'status' => 'open',
+            'status' => 'submitted',
             'is_hr_confidential' => false,
         ]);
     }

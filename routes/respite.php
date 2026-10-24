@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\HealthSafety\RestraintEventWorkspaceController;
 use App\Http\Controllers\Respite\ClientRespiteAllocationController;
 use App\Http\Controllers\Respite\RespiteBookingController;
 use App\Http\Controllers\Respite\RespiteBookingRequestController;
@@ -85,7 +84,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/respite/stays/{stay}/bed-hold', [RespiteStayController::class, 'recordBedHold'])->name('respite.stays.bed-hold');
         Route::post('/respite/stays/{stay}/discharge', [RespiteStayController::class, 'discharge'])->name('respite.stays.discharge');
         Route::post('/respite/stays/{stay}/medication-reconciliation', [RespiteStayController::class, 'storeMedicationReconciliation'])->name('respite.stays.medication-reconciliation.store');
-        Route::get('/respite/stays/{stay}/restraints/report', [RestraintEventWorkspaceController::class, 'reportStay'])->name('respite.stays.restraints.report');
         Route::post('/respite/stays/{stay}/restraints', [RespiteStayController::class, 'recordRestraint'])->name('respite.stays.restraints.store');
         Route::post('/respite/stays/{stay}/incidents', [RespiteStayController::class, 'recordIncident'])->name('respite.stays.incidents.store');
         Route::post('/respite/stays/{stay}/complaints', [RespiteStayController::class, 'recordComplaint'])->name('respite.stays.complaints.store');

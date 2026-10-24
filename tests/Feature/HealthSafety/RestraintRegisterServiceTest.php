@@ -153,8 +153,8 @@ final class RestraintRegisterServiceTest extends RestraintEventCommandTestCase
     {
         $event = $this->event();
         $other = Client::factory()->create(['site_id' => $this->site->id]);
-        $ownIncident = ClientIncident::factory()->create(['client_id' => $this->client->id, 'site_id' => $this->site->id, 'status' => 'open', 'is_hr_confidential' => false]);
-        ClientIncident::factory()->create(['client_id' => $other->id, 'site_id' => $this->site->id, 'status' => 'open']);
+        $ownIncident = ClientIncident::factory()->create(['client_id' => $this->client->id, 'site_id' => $this->site->id, 'status' => 'submitted', 'is_hr_confidential' => false]);
+        ClientIncident::factory()->create(['client_id' => $other->id, 'site_id' => $this->site->id, 'status' => 'submitted']);
         $ownPlan = $this->legacyPlan();
         BehaviourSupportPlan::factory()->create(['client_id' => $other->id, 'title' => 'Unrelated source']);
         $result = $this->register()->pickers($this->actor, ['client_id' => $other->id], $event);

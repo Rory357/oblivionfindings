@@ -63,7 +63,7 @@ class RestraintEventAccessTest extends RestraintEventCommandTestCase
         $row = $this->event();
         $projection = app(RestraintSourceProjectionService::class);
         $external = $this->staff(['restraints.view', 'clients.viewAny']);
-        $external->update(['external_clinical_account' => true]);
+        $external->forceFill(['external_clinical_account' => true])->save(); // Not mass-assignable on User.
         $this->denied(fn () => $projection->event($row, $external));
         $portal = $this->staff(['restraints.view', 'clients.viewAny']);
         $portal->update(['role' => 'client']);

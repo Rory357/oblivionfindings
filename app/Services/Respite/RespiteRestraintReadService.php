@@ -24,7 +24,8 @@ final class RespiteRestraintReadService
             $fresh = $this->currentStay($current, $reads, $sites, $stay);
             $can = $this->capabilities($current, $reads, $sites, $fresh);
 
-            return ['can' => $can, 'summary' => $can['view'] ? $this->register->summary($current, $fresh->client) : null, 'report_href' => $can['capture'] ? $this->reportHref($fresh) : null];
+            // No stay report link: Codex's stay report page is unrouted until the decision 7 follow-up.
+            return ['can' => $can, 'summary' => $can['view'] ? $this->register->summary($current, $fresh->client) : null, 'report_href' => null];
         }), $this->emptyStay());
     }
 
@@ -68,7 +69,7 @@ final class RespiteRestraintReadService
                     }
                     $reviewTotal += $unreviewed;
                     $missingTotal += $missing;
-                    $byStay[(int) $fresh->id] = ['can' => $can, 'report_href' => $can['capture'] ? $this->reportHref($fresh) : null, 'unreviewed' => $unreviewed];
+                    $byStay[(int) $fresh->id] = ['can' => $can, 'report_href' => null, 'unreviewed' => $unreviewed];
                     if (! $can['capture'] || ! in_array($fresh->status, ['active', 'extended'], true)) {
                         continue;
                     }
@@ -113,11 +114,6 @@ final class RespiteRestraintReadService
         $proof = fn ($operation) => $this->allowed(fn () => $this->access->assertClient($stay->client, $current, $reads, $sites, $operation));
 
         return ['capture' => $current->canDo('respite.stays.manage') && $proof('respite_capture'), 'view' => $current->canDo('restraints.view') && $proof('view'), 'review' => ($current->canDo('restraints.review') || $current->canDo('restraints.manage')) && $proof('workspace')];
-    }
-
-    private function reportHref(RespiteStay $stay): string
-    {
-        return '/respite/stays/'.$stay->id.'/restraints/report?'.http_build_query(['return_to' => '/respite/stays/'.$stay->id], '', '&', PHP_QUERY_RFC3986);
     }
 
     private function emptyStay(): array

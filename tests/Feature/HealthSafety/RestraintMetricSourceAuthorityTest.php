@@ -171,7 +171,8 @@ final class RestraintMetricSourceAuthorityTest extends RestraintEventCommandTest
         $this->grant('clients.viewAny', false); $this->grant('clients.viewAssigned', true);
         $result = $this->atMetricSql('event_group', fn () => DB::table('client_user')->where('client_id', $this->client->id)->where('user_id', $this->actor->id)->delete(), fn () => $this->breakdowns());
         $this->assertNull($result['by_type']);
-        $this->client->supportWorkers()->attach($this->actor->id);
+        // The read's own transaction may roll the injected removal back; restore idempotently.
+        $this->client->supportWorkers()->syncWithoutDetaching([$this->actor->id]);
         $this->assertSame([['label' => 'physical', 'count' => 1]], $this->breakdowns()['by_type']);
     }
 
@@ -266,10 +267,14 @@ final class RestraintMetricSourceAuthorityTest extends RestraintEventCommandTest
     {
         $graph = $this->stayGraph(false);
         $otherBooking = RespiteBooking::factory()->create(['client_id' => $this->client->id, 'location_id' => $this->site->id]);
-        $armed = true; $fired = false;
-        DB::connection()->beforeExecuting(function (string $sql) use (&$armed, &$fired, $graph, $otherBooking): void {
-            // Between assertStay's first booking and the shared resolver's first stay.
-            if ($armed && ! $fired && str_starts_with(strtolower(ltrim($sql)), 'select')
+        $armed = true; $fired = false; $bookingRead = false;
+        DB::connection()->beforeExecuting(function (string $sql) use (&$armed, &$fired, &$bookingRead, $graph, $otherBooking): void {
+            // Between assertStay's first booking and the shared resolver's first stay. assertStay's own
+            // stay select also carries the original-source EXISTS guard, so wait for its booking read first.
+            if ($armed && ! $fired && preg_match('/^\s*select\s+[^()]*?\bfrom\s+`respite_bookings`/i', $sql) === 1) {
+                $bookingRead = true; // a top-level booking read, not a booking guard inside another select
+            }
+            if ($armed && ! $fired && $bookingRead && str_starts_with(strtolower(ltrim($sql)), 'select')
                 && str_contains($sql, 'from '.chr(96).'respite_stays'.chr(96)) && str_contains($sql, 'exists')) {
                 $fired = true;
                 DB::table('respite_stays')->where('id', $graph['stay']->id)->update(['booking_id' => $otherBooking->id]);

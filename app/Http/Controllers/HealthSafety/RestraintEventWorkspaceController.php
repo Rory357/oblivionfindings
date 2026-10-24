@@ -4,7 +4,6 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
 use App\Models\BehaviourSupportPlan;
-use App\Models\RespiteStay;
 use App\Models\RestraintCommandReceipt;
 use App\Models\RestraintEvent;
 use App\Models\RestraintEventAttachment;
@@ -14,7 +13,6 @@ use App\Services\HealthSafety\RestraintEvidenceService;
 use App\Services\HealthSafety\RestraintRegisterService;
 use App\Services\HealthSafety\RestraintService;
 use App\Services\HealthSafety\RestraintSourceProjectionService;
-use App\Services\Respite\RespiteRestraintReadService;
 use App\Support\HealthSafety\RestraintReturn;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -38,21 +36,11 @@ class RestraintEventWorkspaceController extends Controller
     public function report(Request $request): Response|JsonResponse
     {
         abort_if($request->has('stay_id') || $request->has('respite_stay_id'), 422);
-        // The generic entry retains restraint capture authority; Respite has a separate canonical-stay route.
+        // The generic entry retains restraint capture authority. A respite stay records through main's
+        // respite form for this merge (decision 7); Codex's stay report page returns with that follow-up.
         $this->access->withCurrentViewer($request->user(), fn ($current) => $this->access->assertOperation($current, 'capture'));
 
         return $this->reportPage($request);
-    }
-
-    public function reportStay(Request $request, RespiteStay $stay): Response|JsonResponse
-    {
-        $context = app(RespiteRestraintReadService::class)->reportContext($request->user(), $stay);
-        foreach (['client_id', 'site_id', 'respite_stay_id'] as $key) {
-            abort_if($request->filled($key) && $this->positive($request->input($key)) !== $context[$key], 404);
-        }
-        abort_if($request->has('stay_id'), 422);
-
-        return $this->reportPage($request, $context);
     }
 
     private function reportPage(Request $request, ?array $context = null): Response|JsonResponse
@@ -132,7 +120,8 @@ class RestraintEventWorkspaceController extends Controller
         $props = [
             'detail' => $detail,
             'workspace' => $review ? 'review' : 'view',
-            'pickers' => ($detail['can']['review'] || $detail['can']['capture']) ? $this->register->pickers($request->user(), [], $event) : [],
+            // Event pickers serve review commands only (and need review authority); a capture grant adds evidence without them.
+            'pickers' => $detail['can']['review'] ? $this->register->pickers($request->user(), [], $event) : [],
             'return_to' => RestraintReturn::sanitize($request->input('return_to')),
             'restraint_confirmation' => $this->confirmation($request, (int) $event->id),
         ];

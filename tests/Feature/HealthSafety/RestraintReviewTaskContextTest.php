@@ -111,7 +111,9 @@ class RestraintReviewTaskContextTest extends RestraintEventCommandTestCase
         $sourceQueries = array_filter($queries, fn ($query) => str_contains($query['query'], 'from `restraint_events`'));
         $this->assertNotEmpty($sourceQueries);
         foreach ($sourceQueries as $query) {
-            $this->assertStringNotContainsString('select *', strtolower($query['query']));
+            // The restraint source select names its columns. The Client Site scope is an
+            // EXISTS (select * from clients ...) guard, which returns no columns of either table.
+            $this->assertDoesNotMatchRegularExpression('/^\s*select\s+(?:`?restraint_events`?\.)?\*\s+from\s+`restraint_events`/i', $query['query']);
             $this->assertStringNotContainsString('trigger_description', $query['query']);
             $this->assertStringNotContainsString('restraint_description', $query['query']);
         }

@@ -230,23 +230,31 @@ final class RestraintStaySupportingSourceReadTest extends RestraintEventCommandT
     public function test_direct_expired_frame_refuses_before_actual_support_query(): void
     {
         $graph = $this->graph(); $frame = $receiver = $receiverReads = null;
-        $this->within(fn ($context) => app(RestraintAccessService::class)->withReadContext($context,
-            function ($current, $reads) use ($context, $graph, &$frame, &$receiver, &$receiverReads): array {
-                $frame = $this->actualFrame($graph['event'], $context, $current, $reads);
-                $receiver = $current; $receiverReads = $reads;
-                return [];
-            }));
+        // A closure (not an arrow fn) so the escaped frame reaches this scope by reference.
+        $this->within(function ($context) use ($graph, &$frame, &$receiver, &$receiverReads) {
+            return app(RestraintAccessService::class)->withReadContext($context,
+                function ($current, $reads) use ($context, $graph, &$frame, &$receiver, &$receiverReads): array {
+                    $frame = $this->actualFrame($graph['event'], $context, $current, $reads);
+                    $receiver = $current; $receiverReads = $reads;
+                    return [];
+                });
+        });
+        $this->assertInstanceOf(Closure::class, $frame);
         $this->logicRefusal(fn () => $frame(RespiteStay::query()->whereKey($graph['stay']->id), $receiver, $receiverReads)->get());
     }
 
     public function test_old_frame_inside_fresh_same_actor_context_refuses_before_support_sql(): void
     {
         $graph = $this->graph(); $frame = null;
-        $this->within(fn ($context) => app(RestraintAccessService::class)->withReadContext($context,
-            function ($current, $reads) use ($context, $graph, &$frame): array {
-                $frame = $this->actualFrame($graph['event'], $context, $current, $reads);
-                return [];
-            }));
+        // A closure (not an arrow fn) so the escaped frame reaches this scope by reference.
+        $this->within(function ($context) use ($graph, &$frame) {
+            return app(RestraintAccessService::class)->withReadContext($context,
+                function ($current, $reads) use ($context, $graph, &$frame): array {
+                    $frame = $this->actualFrame($graph['event'], $context, $current, $reads);
+                    return [];
+                });
+        });
+        $this->assertInstanceOf(Closure::class, $frame);
         $this->logicRefusal(fn () => $this->within(fn ($fresh) => app(RestraintAccessService::class)->withReadContext($fresh,
             fn ($current, $reads) => app(RespiteStayScope::class)->resolveAuthorizedHealthSafetyStayMetadata(
                 $this->requestFor($current), $graph['stay']->id, $reads, $frame))));

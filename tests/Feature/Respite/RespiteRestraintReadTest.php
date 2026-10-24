@@ -52,12 +52,13 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         return ['can' => ['capture' => false, 'view' => false, 'review' => false], 'summary' => null, 'report_href' => null];
     }
 
-    public function test_capture_only_stay_page_has_dedicated_report_link_without_private_summary(): void
+    public function test_capture_only_stay_page_has_no_report_link_or_private_summary(): void
     {
         $stay = $this->stay();
         $this->recorded($stay);
         $viewer = $this->staff(['clients.viewAny', 'respite.viewAny', 'respite.stays.manage']);
-        $response = $this->actingAs($viewer)->get(route('respite.stays.show', $stay))->assertOk()->assertInertia(fn (Assert $page) => $page->component('respite/stays/show')->where('stay.id', $stay->id)->where('restraints.can', ['capture' => true, 'view' => false, 'review' => false])->where('restraints.summary', null)->where('restraints.report_href', '/respite/stays/'.$stay->id.'/restraints/report?return_to=%2Frespite%2Fstays%2F'.$stay->id));
+        // Decision 7: capture is main's respite form on this page; Codex's stay report page is unrouted until the follow-up.
+        $response = $this->actingAs($viewer)->get(route('respite.stays.show', $stay))->assertOk()->assertInertia(fn (Assert $page) => $page->component('respite/stays/show')->where('stay.id', $stay->id)->where('restraints.can', ['capture' => true, 'view' => false, 'review' => false])->where('restraints.summary', null)->where('restraints.report_href', null));
         $this->assertStringNotContainsString('Sensitive factual source', $response->getContent());
         $this->assertStringNotContainsString('plan_authorization_snapshot', $response->getContent());
         $this->assertStringNotContainsString('restraint_events', $response->getContent());
@@ -118,16 +119,16 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         $this->assertSame('/respite/stays/'.$stay->id.'/restraints', $data['store_href']);
     }
 
-    public function test_capture_only_dedicated_report_uses_actual_legacy_post_and_does_not_open_generic_report(): void
+    public function test_capture_only_coordinator_posts_main_form_and_does_not_open_generic_or_stay_report(): void
     {
         $stay = $this->stay();
         $viewer = $this->staff(['clients.viewAny', 'respite.viewAny', 'respite.stays.manage']);
-        $report = $this->actingAs($viewer)->getJson(route('respite.stays.restraints.report', $stay))->assertOk();
-        $report->assertJsonPath('capture_context.client_id', $this->client->id)->assertJsonPath('capture_context.site_id', $this->site->id)->assertJsonPath('capture_context.respite_stay_id', $stay->id)->assertJsonPath('capture_context.store_href', '/respite/stays/'.$stay->id.'/restraints')->assertJsonPath('can.create_plan', false);
-        $this->getJson(route('health-safety.restraints.report'))->assertForbidden();
         // Stephan (25 Oct): main's respite restraint form and action stay for this merge, so the stay's store
-        // endpoint takes main's form payload. Codex's keyed receipt arrives with the dedicated page (follow-up).
-        $this->post($report->json('capture_context.store_href'), [
+        // endpoint takes main's form payload. Codex's dedicated stay report page (and keyed receipt) is
+        // unrouted until the follow-up.
+        $this->actingAs($viewer)->getJson('/respite/stays/'.$stay->id.'/restraints/report')->assertNotFound();
+        $this->getJson(route('health-safety.restraints.report'))->assertForbidden();
+        $this->post(route('respite.stays.restraints.store', $stay), [
             'started_at' => now()->subHour()->toDateTimeString(), 'restraint_type' => 'physical_hold', 'severity' => 'medium',
             'trigger_description' => 'Escalating distress', 'de_escalation_attempted' => 'Calm voice and space offered',
             'restraint_description' => 'Brief guided hold', 'within_support_plan' => false,
@@ -136,18 +137,26 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         $this->assertSame($stay->id, RestraintEvent::sole()->stay_id);
     }
 
-    public function test_stay_report_rejects_query_tuple_spoof_and_foreign_stay_without_fallback_pickers(): void
+    public function test_foreign_stay_has_no_restraint_capabilities_or_capture_context(): void
     {
-        $stay = $this->stay();
-        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $foreignSite = Site::factory()->create(['is_active' => true]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
         $foreignStay = $this->stay($foreignClient, $foreignSite);
-        $this->actingAs($this->actor)->getJson(route('respite.stays.restraints.report', [$stay, 'client_id' => $otherClient->id]))->assertNotFound();
-        $this->getJson(route('respite.stays.restraints.report', [$stay, 'site_id' => $foreignSite->id]))->assertNotFound();
-        $this->getJson(route('respite.stays.restraints.report', [$stay, 'respite_stay_id' => $foreignStay->id]))->assertNotFound();
-        $this->getJson(route('respite.stays.restraints.report', $foreignStay))->assertNotFound();
         $this->assertSame($this->noCapabilities(), $this->reads()->forStay($this->actor, $foreignStay));
+        $this->refusedContext($foreignStay);
+    }
+
+    /** The strict capture context refuses (403/404, or a concealed stay) rather than falling back. */
+    private function refusedContext(RespiteStay $stay): void
+    {
+        try {
+            $this->reads()->reportContext($this->actor, $stay);
+            $this->fail('The stay capture context must be refused.');
+        } catch (ModelNotFoundException) {
+            $this->addToAssertionCount(1);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+            $this->assertContains($error->getStatusCode(), [403, 404]);
+        }
     }
 
     public function test_warm_actor_permissions_are_fresh_for_stay_links_summary_and_report(): void
@@ -231,7 +240,7 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         $stay = $this->stay();
         $this->site->update(['archived_at' => now()]);
         $this->assertSame($this->noCapabilities(), $this->reads()->forStay($this->actor, $stay));
-        $this->actingAs($this->actor)->getJson(route('respite.stays.restraints.report', $stay))->assertForbidden();
+        $this->refusedContext($stay);
     }
 
     public function test_current_client_read_permission_revocation_conceals_cached_source_reference(): void

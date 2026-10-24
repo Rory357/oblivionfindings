@@ -46,7 +46,8 @@ class RestraintDeliveryTest extends RestraintEventCommandTestCase
         $this->assertSame('authority_changed', $intent->fresh()->failure_code);
         $second = $this->eventWithFreshActor();
         $delivery = RestraintSourceDelivery::where('restraint_event_id', $second->id)->where('purpose', 'source_review')->sole();
-        $second->updateQuietly(['site_id' => $this->site->id + 1000]);
+        // site_id is a real foreign key, so the changed tuple moves to another existing Site.
+        $second->updateQuietly(['site_id' => \App\Models\Site::factory()->create(['is_active' => true])->id]);
         app(RestraintSourceDeliveryService::class)->deliver($delivery->id);
         $this->assertSame('source_changed', $delivery->fresh()->failure_code);
     }

@@ -6,7 +6,6 @@ use App\Events\Respite\RespiteEvent;
 use App\Models\BehaviourSupportPlan;
 use App\Models\BehaviourSupportPlanApproval;
 use App\Models\BehaviourSupportPlanVersion;
-use App\Models\Client;
 use App\Models\RespiteBooking;
 use App\Models\RespiteStay;
 use App\Models\RestraintCommandReceipt;
@@ -41,7 +40,8 @@ final class RestraintReportRecoveryHttpTest extends RestraintEventCommandTestCas
         $this->assertSame(1, RestraintCommandReceipt::where('source_type', 'event')->count());
         $row = RestraintEvent::sole();
         $this->assertNull($row->behaviour_support_plan_version_id);
-        $this->assertSame('approval_unknown', $row->plan_authorization_state);
+        // This Client has no plan at all, so the recorded state is 'missing' (never an approval).
+        $this->assertSame('missing', $row->plan_authorization_state);
         $this->assertSame(0, BehaviourSupportPlanApproval::count());
     }
 
@@ -217,30 +217,27 @@ final class RestraintReportRecoveryHttpTest extends RestraintEventCommandTestCas
         $this->get(route('health-safety.restraints.report'))->assertOk()->assertInertia(fn (Assert $page) => $page->component('health-safety/restraints/events/report')->where('restraint_confirmation', null));
     }
 
-    public function test_respite_report_is_canonical_and_only_its_existing_stay_post_can_capture(): void
+    /*
+     * Decision 7 (Stephan, 25 Oct): a respite stay records through main's respite form for this merge,
+     * and Codex's stay report page (`/respite/stays/{stay}/restraints/report`) is unrouted until that
+     * follow-up, because its receipt recovery cannot find a submission of main's form.
+     */
+    public function test_respite_only_actor_records_through_main_form_and_has_no_shared_capture_or_stay_report(): void
     {
         Event::fake([RespiteEvent::class]);
         $stay = $this->stay();
         $actor = $this->staff(['respite.viewAny', 'respite.stays.manage', 'clients.viewAny']);
-        $query = ['respite_stay_id' => $stay->id, 'client_id' => $this->client->id, 'site_id' => $this->site->id];
-        $this->actingAs($actor)->getJson(route('respite.stays.restraints.report', ['stay' => $stay->id, ...$query]))->assertOk()
-            ->assertJsonPath('can.capture', true)->assertJsonPath('can.create_plan', false)
-            ->assertJsonPath('capture_context.client_id', $this->client->id)->assertJsonPath('capture_context.site_id', $this->site->id)
-            ->assertJsonPath('capture_context.respite_stay_id', $stay->id)->assertJsonPath('capture_context.store_href', '/respite/stays/'.$stay->id.'/restraints')
-            ->assertJsonPath('pickers.clients.0.id', $this->client->id)->assertJsonCount(1, 'pickers.clients')
-            ->assertJsonPath('pickers.sites.0.id', $this->site->id)->assertJsonCount(1, 'pickers.sites');
+        $this->actingAs($actor)->getJson('/respite/stays/'.$stay->id.'/restraints/report')->assertNotFound();
         $input = $this->capture();
         $this->postJson(route('health-safety.restraints.events.store'), $input)->assertForbidden();
         $this->postJson(route('health-safety.restraints.plans.store'), $this->planInput())->assertForbidden();
+        $this->getJson($this->report($input['idempotency_key']))->assertForbidden();
         $this->post(route('respite.stays.restraints.store', $stay), $input)->assertRedirect()->assertSessionHasNoErrors();
-        $this->getJson(route('respite.stays.restraints.report', ['stay' => $stay->id, ...$query, 'receipt_key' => $input['idempotency_key']]))->assertOk()
-            ->assertJsonPath('restraint_confirmation.capture_entry', 'respite')->assertJsonPath('restraint_confirmation.version', 1)
-            ->assertJsonPath('restraint_href', null)->assertJsonPath('plan_href', null);
         $row = RestraintEvent::sole();
         $this->assertSame($stay->id, $row->stay_id);
-        $this->assertSame($this->client->id, $row->recorded_client_id);
-        $this->assertSame($this->site->id, $row->recorded_site_id);
-        $this->assertSame($stay->id, $row->recorded_stay_id);
+        $this->assertSame($this->client->id, $row->client_id);
+        $this->assertSame($this->site->id, $row->site_id);
+        $this->assertDatabaseCount('restraint_command_receipts', 0);
         $this->getJson(route('health-safety.restraints.index'))->assertForbidden();
     }
 
@@ -250,28 +247,12 @@ final class RestraintReportRecoveryHttpTest extends RestraintEventCommandTestCas
         $actor = $this->staff(['restraints.create', 'respite.viewAny', 'respite.stays.manage', 'clients.viewAny']);
         $input = $this->capture(['stay_id' => $stay->id, 'site_id' => $this->site->id]);
         $saved = $this->service()->create($actor, $input);
-        $actor->load('permissionOverrides');
         $this->revoke($actor, 'restraints.create');
-        $this->actingAs($actor)->getJson(route('respite.stays.restraints.report', ['stay' => $stay->id, 'receipt_key' => $saved['idempotency_key']]))->assertOk()
-            ->assertJsonPath('can.capture', true)->assertJsonPath('can.create_plan', false)->assertJsonPath('restraint_confirmation', null);
+        // The generic report is the only recovery entry now; the respite grant does not reopen it.
+        $this->actingAs($actor->fresh())->getJson($this->report($saved['idempotency_key']))->assertForbidden();
         $this->postJson(route('health-safety.restraints.events.store'), $input)->assertForbidden();
         $this->assertDatabaseCount('restraint_events', 1);
         $this->assertDatabaseCount('restraint_command_receipts', 1);
-    }
-
-    public function test_respite_report_rejects_foreign_client_site_and_malformed_source_tuple(): void
-    {
-        $stay = $this->stay();
-        $actor = $this->staff(['respite.viewAny', 'respite.stays.manage', 'clients.viewAny']);
-        $otherClient = Client::factory()->for($this->site)->create();
-        $otherSite = Site::factory()->create(['is_active' => true]);
-        $this->actingAs($actor);
-        foreach ([['client_id' => $otherClient->id], ['site_id' => $otherSite->id], ['respite_stay_id' => [$stay->id]], ['respite_stay_id' => 0]] as $query) {
-            $this->getJson(route('respite.stays.restraints.report', ['stay' => $stay->id, ...$query]))->assertNotFound();
-        }
-        $this->getJson(route('respite.stays.restraints.report', ['stay' => $stay->id, 'stay_id' => $stay->id + 100000]))->assertUnprocessable();
-        $this->assertDatabaseCount('restraint_events', 0);
-        $this->assertDatabaseCount('restraint_command_receipts', 0);
     }
 
     #[DataProvider('sources')]
@@ -280,38 +261,21 @@ final class RestraintReportRecoveryHttpTest extends RestraintEventCommandTestCas
         $actor = $this->staff(['restraints.create', 'clients.viewAny']);
         $saved = $this->firstCreate($kind, $actor);
         $ledger = RestraintCommandReceipt::where('idempotency_key', $saved['idempotency_key'])->sole();
-        DB::table('restraint_command_receipts')->where('id', $ledger->id)->update(['audit_log_id' => null]);
+        // audit_log_id is NOT NULL with a restrict-on-delete key (Codex's schema too), so a lost
+        // audit identity is simulated by a receipt that points at an unrelated audit row.
+        $unrelated = DB::table('audit_logs')->insertGetId(['action' => 'unrelated.audit', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('restraint_command_receipts')->where('id', $ledger->id)->update(['audit_log_id' => $unrelated]);
         $this->actingAs($actor)->getJson($this->report($saved['idempotency_key']))->assertOk()
             ->assertJsonPath('restraint_confirmation', null)->assertJsonPath('behaviour_support_plan_confirmation', null);
         $this->assertDatabaseCount('restraint_command_receipts', 1);
     }
 
-    public function test_explicit_stay_report_never_proves_a_receipt_from_another_same_client_stay(): void
+    public function test_stay_bound_plan_create_records_its_exact_canonical_stay_without_approval(): void
     {
         $stay = $this->stay();
-        $other = $this->stay();
-        $actor = $this->staff(['respite.viewAny', 'respite.stays.manage', 'clients.viewAny']);
-        $saved = $this->service()->createForStay($actor, $other, $this->capture());
-        $this->actingAs($actor)->getJson(route('respite.stays.restraints.report', ['stay' => $stay->id, 'receipt_key' => $saved['idempotency_key']]))->assertOk()
-            ->assertJsonPath('capture_context.respite_stay_id', $stay->id)->assertJsonPath('restraint_confirmation', null)->assertJsonPath('restraint_href', null);
-        $this->withSession(['restraint_confirmation' => $saved])->getJson(route('respite.stays.restraints.report', $stay))->assertOk()
-            ->assertJsonPath('restraint_confirmation', null)->assertJsonPath('restraint_href', null);
-        $this->getJson(route('respite.stays.restraints.report', ['stay' => $other->id, 'receipt_key' => $saved['idempotency_key']]))->assertOk()
-            ->assertJsonPath('restraint_confirmation.event_id', $saved['event_id']);
-        $this->assertDatabaseCount('restraint_events', 1);
-    }
-
-    public function test_stay_bound_plan_create_recovers_only_inside_its_exact_canonical_context(): void
-    {
-        $stay = $this->stay();
-        $other = $this->stay();
         $actor = $this->staff(['restraints.create', 'respite.viewAny', 'respite.stays.manage', 'clients.viewAny']);
         $input = [...$this->planInput(), 'site_id' => $this->site->id, 'stay_id' => $stay->id];
-        $saved = app(BehaviourSupportPlanService::class)->create($actor, $input);
-        $this->actingAs($actor)->getJson(route('respite.stays.restraints.report', ['stay' => $stay->id, 'kind' => 'plan', 'receipt_key' => $saved['idempotency_key']]))->assertOk()
-            ->assertJsonPath('can.create_plan', true)->assertJsonPath('behaviour_support_plan_confirmation.plan_id', $saved['plan_id'])->assertJsonPath('plan_href', null);
-        $this->getJson(route('respite.stays.restraints.report', ['stay' => $other->id, 'kind' => 'plan', 'receipt_key' => $saved['idempotency_key']]))->assertOk()
-            ->assertJsonPath('behaviour_support_plan_confirmation', null)->assertJsonPath('plan_href', null);
+        app(BehaviourSupportPlanService::class)->create($actor, $input);
         $plan = BehaviourSupportPlan::sole();
         $this->assertSame($stay->id, $plan->source_stay_id);
         $this->assertSame($this->client->id, $plan->client_id);
@@ -340,8 +304,8 @@ final class RestraintReportRecoveryHttpTest extends RestraintEventCommandTestCas
         foreach (['stay_id', 'respite_stay_id'] as $key) {
             $this->getJson(route('health-safety.restraints.report', [$key => $stay->id]))->assertUnprocessable();
         }
-        $this->getJson(route('respite.stays.restraints.report', ['stay' => $stay->id, 'client_id' => $this->client->id, 'site_id' => $this->site->id, 'respite_stay_id' => $stay->id]))->assertOk()
-            ->assertJsonPath('capture_context.respite_stay_id', $stay->id);
+        // Codex's stay report page is unrouted for this merge (decision 7 follow-up).
+        $this->getJson('/respite/stays/'.$stay->id.'/restraints/report?respite_stay_id='.$stay->id)->assertNotFound();
         $this->assertDatabaseCount('restraint_events', 0);
         $this->assertDatabaseCount('restraint_command_receipts', 0);
     }

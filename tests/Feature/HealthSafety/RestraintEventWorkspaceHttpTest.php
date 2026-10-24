@@ -83,7 +83,10 @@ class RestraintEventWorkspaceHttpTest extends RestraintEventCommandTestCase
             $this->assertNull($this->service()->confirmationForViewer($this->actor, $accepted));
             DB::table('audit_logs')->where('id', $audit->id)->update($original);
         }
-        DB::table('restraint_command_receipts')->where('id', $receipt->id)->update(['audit_log_id' => null]);
+        // audit_log_id is NOT NULL with a restrict-on-delete key (Codex's schema too), so a lost
+        // audit identity is simulated by a receipt that points at an unrelated audit row.
+        $unrelated = DB::table('audit_logs')->insertGetId(['action' => 'unrelated.audit', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('restraint_command_receipts')->where('id', $receipt->id)->update(['audit_log_id' => $unrelated]);
         $this->assertNull($this->service()->confirmationForViewer($this->actor, $accepted));
         DB::table('restraint_command_receipts')->where('id', $receipt->id)->update(['audit_log_id' => $audit->id]);
         $this->assertSame($accepted['event_id'], $this->service()->confirmationForViewer($this->actor, $accepted)['event_id']);
@@ -192,42 +195,54 @@ class RestraintEventWorkspaceHttpTest extends RestraintEventCommandTestCase
         return RespiteStay::create(['booking_id' => $booking->id, 'client_id' => $this->client->id, 'status' => 'active', 'actual_start' => now()->subDay()]);
     }
 
-    public function test_respite_capture_uses_uuid_offset_commands_and_emits_existing_downstream_event_once_not_on_replay(): void
+    /**
+     * Decision 7 (Stephan, 25 Oct): main's respite restraint form stays for this merge. It
+     * takes main's payload, keeps no command receipt and is not idempotent; Codex's keyed
+     * "record a restraint for this stay" recorder is a logged follow-up.
+     */
+    public function test_respite_form_records_the_stays_restraint_once_per_submission_and_needs_the_stay_grant(): void
     {
         Event::fake([RespiteEvent::class]);
         $stay = $this->stay();
         $coordinator = $this->staff(['respite.stays.manage', 'respite.viewAny', 'clients.viewAny']);
-        $input = Arr::except($this->capture(), 'client_id');
+        $input = Arr::except($this->capture(), ['client_id', 'idempotency_key']);
         $this->actingAs($coordinator)->from('/respite/stays/'.$stay->id)->post(route('respite.stays.restraints.store', $stay), $input)
-            ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('restraint_confirmation', fn ($receipt) => $receipt['capture_entry'] === 'respite' && $receipt['accepted'] === true && ! array_key_exists('restraint_description', $receipt));
+            ->assertRedirect('/respite/stays/'.$stay->id)->assertSessionHasNoErrors();
         $row = RestraintEvent::sole();
         $this->assertSame($stay->id, $row->stay_id);
-        $this->assertSame($this->client->id, $row->recorded_client_id);
-        $this->assertSame($this->site->id, $row->recorded_site_id);
-        $this->assertSame($stay->id, $row->recorded_stay_id);
-        $this->post(route('respite.stays.restraints.store', $stay), $input)->assertRedirect()->assertSessionHasNoErrors()
-            ->assertSessionHas('restraint_confirmation', fn ($receipt) => $receipt['replayed'] === true);
+        $this->assertSame($this->client->id, $row->client_id);
+        $this->assertSame($this->site->id, $row->site_id);
+        $this->assertSame('Sensitive factual source', $row->restraint_description);
         Event::assertDispatchedTimes(RespiteEvent::class, 1);
-        $this->assertDatabaseCount('restraint_command_receipts', 1);
-        $this->post(route('respite.stays.restraints.store', $stay), [...$input, 'idempotency_key' => (string) Str::uuid(), 'started_at' => '2026-10-10T12:00:00'])
-            ->assertSessionHasErrors('started_at');
+        $this->assertDatabaseCount('restraint_command_receipts', 0);
+        foreach (['trigger_description', 'de_escalation_attempted', 'restraint_description'] as $field) {
+            $this->post(route('respite.stays.restraints.store', $stay), [...$input, $field => ''])->assertSessionHasErrors($field);
+        }
+        $this->assertDatabaseCount('restraint_events', 1);
         $this->revoke($coordinator, 'respite.stays.manage');
-        $this->post(route('respite.stays.restraints.store', $stay), $input)->assertForbidden();
+        // The route permission is read from the user loaded for each request.
+        $this->actingAs($coordinator->fresh())->post(route('respite.stays.restraints.store', $stay), $input)->assertForbidden();
+        $this->assertDatabaseCount('restraint_events', 1);
         Event::assertDispatchedTimes(RespiteEvent::class, 1);
     }
 
-    public function test_respite_capture_cannot_silently_override_submitted_client_stay_or_foreign_approved_source_context(): void
+    public function test_respite_form_records_only_the_stays_own_client_and_refuses_a_coordinator_without_that_site(): void
     {
         Event::fake([RespiteEvent::class]);
         $stay = $this->stay();
         $coordinator = $this->staff(['respite.stays.manage', 'respite.viewAny', 'clients.viewAny']);
         $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
-        $this->actingAs($coordinator)->postJson(route('respite.stays.restraints.store', $stay), $this->capture(['client_id' => $otherClient->id]))->assertNotFound();
-        $this->postJson(route('respite.stays.restraints.store', $stay), $this->capture(['stay_id' => $stay->id + 1000]))->assertNotFound();
+        // Main's form never reads a Client, Site or stay from the payload: a forged one cannot move the record.
+        $this->actingAs($coordinator)->post(route('respite.stays.restraints.store', $stay),
+            $this->capture(['client_id' => $otherClient->id, 'stay_id' => $stay->id + 1000]))->assertRedirect()->assertSessionHasNoErrors();
+        $row = RestraintEvent::sole();
+        $this->assertSame($this->client->id, $row->client_id);
+        $this->assertSame($stay->id, $row->stay_id);
+        $this->assertSame($this->site->id, $row->site_id);
         $foreign = $this->staff(['respite.stays.manage', 'respite.viewAny', 'clients.viewAny'], Site::factory()->create(['is_active' => true]));
-        $this->actingAs($foreign)->postJson(route('respite.stays.restraints.store', $stay), $this->capture())->assertNotFound();
-        $this->assertDatabaseCount('restraint_events', 0);
+        $this->actingAs($foreign)->post(route('respite.stays.restraints.store', $stay), $this->capture())->assertNotFound();
+        $this->assertDatabaseCount('restraint_events', 1);
         $this->assertDatabaseCount('restraint_command_receipts', 0);
-        Event::assertNotDispatched(RespiteEvent::class);
+        Event::assertDispatchedTimes(RespiteEvent::class, 1);
     }
 }

@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\RestraintDebrief;
 use App\Models\RestraintMonitoringObservation;
 use App\Models\Site;
+use App\Support\JsonEvidence;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Str;
 use LogicException;
@@ -85,12 +86,14 @@ class RestraintMonitoringDebriefTest extends RestraintEventCommandTestCase
             'facts' => ['condition' => 'Retained legacy condition'], 'evidence_ids' => [], 'command_key' => (string) Str::uuid()]);
         $accepted = $this->service()->correctObservation($row, $this->actor, $this->command($row, ['observation_id' => $original->id, 'observed_by' => null, 'observed_at' => now()->subMinutes(9)->toIso8601String(), 'condition' => 'Corrected legacy condition', 'reason' => 'Actual transcription correction']));
         $corrected = RestraintMonitoringObservation::findOrFail($accepted['observation_id']);
+        // MySQL json columns reorder object keys; compare the retained snapshot's data, not its key order.
+        $retained = fn (?array $value) => $value === null ? null : JsonEvidence::canonicalise($value);
         $this->assertNull($corrected->actual_actor_id);
-        $this->assertSame($snapshot, $corrected->actual_actor_snapshot);
+        $this->assertSame($retained($snapshot), $retained($corrected->actual_actor_snapshot));
         $this->assertNull($corrected->facts['observed_by']);
         $this->assertSame($this->actor->id, $corrected->recorder_id);
         $this->assertSame($original->id, $corrected->supersedes_id);
-        $this->assertSame($snapshot, $original->fresh()->actual_actor_snapshot);
+        $this->assertSame($retained($snapshot), $retained($original->fresh()->actual_actor_snapshot));
         $this->assertSame('Retained legacy condition', $original->fresh()->facts['condition']);
     }
 
