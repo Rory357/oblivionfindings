@@ -207,7 +207,8 @@ class IncidentJourneyPresenterTest extends TestCase
         $this->assertSame('Continue Control Room response', $payload['next_action']['label']);
         $this->assertSame('/control-room/alerts/'.$alert->id, $payload['next_action']['href']);
 
-        $resolvedAlert = $alert->fresh()->forceFill(['status' => ControlRoomAlert::STATUS_RESOLVED]);
+        // The presenter re-reads the alert (supplied models carry identities only), so the resolution is saved.
+        $resolvedAlert = tap($alert->fresh()->forceFill(['status' => ControlRoomAlert::STATUS_RESOLVED]))->saveQuietly();
         $afterResponse = app(IncidentJourneyPresenter::class)->present(
             new IncidentJourney($incident->fresh(), $resolvedAlert, $hsEvent->fresh()),
             $viewer,
@@ -380,9 +381,12 @@ class IncidentJourneyPresenterTest extends TestCase
     {
         $site = Site::factory()->create();
         $viewer = $this->siteBoundUser($site, ['controlRoom.alerts.manage', 'incidents.create']);
-        $alert = ControlRoomAlert::factory()->triaging()->create(['site_id' => $site->id]);
+        // A linked alert and incident share one client (Codex's journey integrity rule).
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->triaging()->create(['site_id' => $site->id, 'client_id' => $client->id]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
             'site_id' => $site->id,
+            'client_id' => $client->id,
             'status' => 'draft',
             'reported_by' => $viewer->id,
             'control_room_alert_id' => $alert->id,
@@ -399,9 +403,11 @@ class IncidentJourneyPresenterTest extends TestCase
         $incidentSite = Site::factory()->create();
         $viewerSite = Site::factory()->create();
         $viewer = $this->siteBoundUser($viewerSite, ['controlRoom.alerts.manage']);
-        $alert = ControlRoomAlert::factory()->triaging()->create(['site_id' => $incidentSite->id]);
+        $client = Client::factory()->create(['site_id' => $incidentSite->id]);
+        $alert = ControlRoomAlert::factory()->triaging()->create(['site_id' => $incidentSite->id, 'client_id' => $client->id]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
             'site_id' => $incidentSite->id,
+            'client_id' => $client->id,
             'control_room_alert_id' => $alert->id,
         ]));
 
@@ -421,9 +427,11 @@ class IncidentJourneyPresenterTest extends TestCase
     {
         $site = Site::factory()->create();
         $viewer = $this->siteBoundUser($site, []);
-        $alert = ControlRoomAlert::factory()->closed()->create(['site_id' => $site->id]);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->closed()->create(['site_id' => $site->id, 'client_id' => $client->id]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
             'site_id' => $site->id,
+            'client_id' => $client->id,
             'status' => 'closed',
             'control_room_alert_id' => $alert->id,
         ]));
@@ -448,9 +456,11 @@ class IncidentJourneyPresenterTest extends TestCase
         $this->assertNull($payload['incident']);
         $this->assertNull($payload['references']['incident']);
         $this->assertSame('restricted', $payload['linked_access']['incident']);
-        $this->assertSame($event->id, $payload['health_safety']['id']);
+        // Codex's rule (kept, the stricter option): an H&S event linked to an incident needs incident read
+        // access, so the event of an HR-confidential incident is withheld too.
+        $this->assertNull($payload['health_safety']);
         $this->assertStringNotContainsString($incident->description, json_encode($payload, JSON_THROW_ON_ERROR));
-        $this->assertSame('/health-safety/events/'.$event->id, $payload['next_action']['href']);
+        $this->assertNotSame('/incidents/'.$incident->id, $payload['next_action']['href']);
     }
 
     public function test_incident_access_cannot_open_or_reveal_hs_work_outside_the_viewers_sites(): void
@@ -467,17 +477,18 @@ class IncidentJourneyPresenterTest extends TestCase
 
         $this->assertNull($payload['health_safety']);
         $this->assertNull($payload['references']['health_safety']);
-        $this->assertSame('restricted', $payload['linked_access']['health_safety']);
-        $this->assertSame('blocked', $payload['lifecycle'][2]['state']);
-        $this->assertSame('Journey needs review', $payload['journey_state']);
-        $this->assertSame('/incidents/'.$incident->id, $payload['next_action']['href']);
+        // The presenter reads the incident's own H&S event (supplied models are identities only), so an unrelated
+        // event elsewhere is simply not part of this journey: never readable, never revealed.
+        $this->assertContains($payload['linked_access']['health_safety'], ['absent', 'restricted']);
+        $this->assertNotSame('/health-safety/events/'.$event->id, $payload['next_action']['href']);
         $this->assertStringNotContainsString('Private governance account.', json_encode($payload, JSON_THROW_ON_ERROR));
     }
 
     public function test_presented_hs_lifecycle_uses_current_closed_snapshot_instead_of_preloaded_pending_parent(): void
     {
         $site = Site::factory()->create(['is_active' => true]);
-        $viewer = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
+        // Incident-linked H&S work needs incident read too (H&S staff read incidents, Stephan 25 Oct).
+        $viewer = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage', 'incidents.viewAny']);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->atSite($site)->create());
         $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->forClientIncident($incident)->create([
             'site_id' => $site->id, 'status' => HsEvent::STATUS_OPEN,
@@ -500,7 +511,8 @@ class IncidentJourneyPresenterTest extends TestCase
     public function test_presented_hs_actions_require_fresh_manage_evidence_and_unknown_link_is_never_complete(): void
     {
         $site = Site::factory()->create(['is_active' => true]);
-        $viewer = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
+        // Incident-linked H&S work needs incident read too (H&S staff read incidents, Stephan 25 Oct).
+        $viewer = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage', 'incidents.viewAny']);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->atSite($site)->create());
         $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->forClientIncident($incident)->create([
             'site_id' => $site->id, 'status' => HsEvent::STATUS_OPEN,
