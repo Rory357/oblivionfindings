@@ -54,7 +54,9 @@ final class ChemicalSourceMigrationTest extends ChemicalCommandTestCase
         $storage = SubstanceStorageLocation::factory()->create(['hazardous_substance_id' => $root->id, 'site_id' => $this->site->id]);
         $reversed = [];
         try {
-            foreach (['2026_10_12_200300_create_chemical_exposure_hs_projections.php' => 'chemical_exposure_hs_projections',
+            // Every later chemical migration with foreign keys into the public source tables is reversed first.
+            foreach (['2026_10_12_200500_create_chemical_exposure_recovery.php' => 'chemical_exposure_recovery_cases',
+                '2026_10_12_200300_create_chemical_exposure_hs_projections.php' => 'chemical_exposure_hs_projections',
                 '2026_10_12_200200_create_chemical_exposure_source_history.php' => 'chemical_exposure_source_versions'] as $file => $table) {
                 if (Schema::hasTable($table)) {
                     $dependent = require database_path('migrations/'.$file);
