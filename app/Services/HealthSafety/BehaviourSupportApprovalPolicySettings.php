@@ -351,16 +351,24 @@ final class BehaviourSupportApprovalPolicySettings
 
     private function transaction(callable $operation): mixed
     {
-        try {
-            return DB::transaction($operation);
-        } catch (\Illuminate\Database\DeadlockException) {
-            // Inside a transaction Laravel raises a deadlock (1213) as DeadlockException, not QueryException.
-            throw ValidationException::withMessages(['expected_policy_revision' => 'The approval policy or its authority changed concurrently. Your entries were not saved; review current settings before trying again.']);
-        } catch (QueryException $error) {
-            if (in_array((int) ($error->errorInfo[1] ?? 0), [1062, 1205, 1213, 3572], true)) {
+        // An identical command that lost a race (a deadlock, or its key saved meanwhile) is retried once from a fresh
+        // snapshot when this is the outermost transaction, so it replays the saved result. A different command, or a
+        // second loss, still gets the "changed concurrently" refusal and saves nothing.
+        $retry = DB::transactionLevel() === 0;
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return DB::transaction($operation);
+            } catch (\Illuminate\Database\DeadlockException|QueryException $error) {
+                // Inside a transaction Laravel raises a deadlock (1213) as DeadlockException, not QueryException.
+                $code = $error instanceof QueryException ? (int) ($error->errorInfo[1] ?? 0) : 1213;
+                if (! in_array($code, [1062, 1205, 1213, 3572], true)) {
+                    throw $error;
+                }
+                if ($retry && $attempt === 1) {
+                    continue;
+                }
                 throw ValidationException::withMessages(['expected_policy_revision' => 'The approval policy or its authority changed concurrently. Your entries were not saved; review current settings before trying again.']);
             }
-            throw $error;
         }
     }
 
