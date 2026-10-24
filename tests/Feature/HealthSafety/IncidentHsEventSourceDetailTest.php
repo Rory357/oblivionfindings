@@ -165,10 +165,12 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
     public function test_competing_direct_incident_link_and_wrong_original_client_are_quarantined_without_body(): void
     {
         $fixture = $this->source(); $other = $this->incident();
-        DB::table('client_incidents')->where('id', $other->id)->update(['hs_event_id' => $fixture['event']->id]);
-        $state = $this->observeBodies($fixture, fn () => $this->detail($fixture)->assertNotFound());
-        $this->assertSame(0, $state->event); $this->assertSame(0, $state->incident);
-        DB::table('client_incidents')->where('id', $other->id)->update(['hs_event_id' => null]);
+        // A competing direct link can't be stored: client_incidents.hs_event_id is unique.
+        try {
+            DB::transaction(fn () => DB::table('client_incidents')->where('id', $other->id)->update(['hs_event_id' => $fixture['event']->id]));
+            $this->fail('A second incident must not be able to claim the same H&S event.');
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {}
+        $this->detail($fixture)->assertOk();
         DB::table('client_incidents')->where('id', $fixture['incident']->id)->update(['client_id' => $other->client_id]);
         $this->detail($fixture)->assertNotFound();
         DB::table('client_incidents')->where('id', $fixture['incident']->id)->update(['client_id' => $fixture['incident']->client_id]);
@@ -216,7 +218,9 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
     public static function lateSourceChanges(): array
     {
         return ['read grant' => ['grant'], 'HR source privacy' => ['privacy'], 'original client' => ['client'],
-            'relabeled source' => ['source'], 'competing link' => ['competing'], 'independence declaration' => ['independence']];
+            // No 'competing link' case: client_incidents.hs_event_id is unique (main and Codex's schema), so a second
+            // incident can't claim the event; test_competing_direct_incident_link… checks the database refuses it.
+            'relabeled source' => ['source'], 'independence declaration' => ['independence']];
     }
 
     #[DataProvider('lateSourceChanges')]
@@ -229,7 +233,6 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
                 'privacy' => DB::table('client_incidents')->where('id', $fixture['incident']->id)->update(['is_hr_confidential' => true]),
                 'client' => DB::table('client_incidents')->where('id', $fixture['incident']->id)->update(['client_id' => $other->client_id]),
                 'source' => DB::table('hs_events')->where('id', $fixture['event']->id)->update(['source_type' => HsEvent::class]),
-                'competing' => DB::table('client_incidents')->where('id', $other->id)->update(['hs_event_id' => $fixture['event']->id]),
                 'independence' => DB::table('incident_independent_handling_declarations')->where('incident_id', $fixture['incident']->id)->update(['handling' => json_encode(['requested' => false])]),
             };
         });
@@ -387,7 +390,8 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
     {
         $fixture = $this->source();
         DB::table('users')->where('id', $this->manager->id)->update(['external_clinical_account' => true]);
-        $state = $this->observeBodies($fixture, fn () => $this->detail($fixture)->assertForbidden());
+        // An external account has no H&S Sites, so the event isn't found (404, the out-of-scope answer); no body is read.
+        $state = $this->observeBodies($fixture, fn () => $this->detail($fixture)->assertNotFound());
         $this->assertSame([0, 0, 0, 0], [$state->event, $state->incident, $state->attachment, $state->followup]);
     }
 
