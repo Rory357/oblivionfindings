@@ -53,7 +53,8 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'fleet.viewAny'], 'H&S Viewer');
+        // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'fleet.viewAny', 'incidents.viewAny'], 'H&S Viewer');
 
         $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
@@ -349,7 +350,8 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view'], 'Dashboard Viewer');
+        // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'incidents.viewAny', 'restraints.view'], 'Dashboard Viewer');
         $foreignWorker = $this->siteBoundUser($foreignSite, [], 'Foreign Worker');
 
         HsRiskAssessment::factory()->active()->forSite($visibleSite->id)->create([
@@ -469,7 +471,8 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view']);
+        // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'incidents.viewAny']);
         $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
         ClientIncident::factory()->create([
@@ -570,8 +573,9 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $primarySite = Site::factory()->create(['name' => 'Primary Site']);
         $secondarySite = Site::factory()->create(['name' => 'Secondary Site']);
         $remoteSite = Site::factory()->create(['name' => 'Remote Site']);
+        // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
         $viewer = $this->userWithPermissions(
-            ['hazards.view', 'healthSafety.viewAllSites', 'fleet.viewAny', 'fleet.manage'],
+            ['hazards.view', 'healthSafety.viewAllSites', 'fleet.viewAny', 'fleet.manage', 'incidents.viewAny'],
             'Application H&S lead',
         );
         HrEmployeeProfile::factory()->create([
