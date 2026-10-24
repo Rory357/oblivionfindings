@@ -159,7 +159,8 @@ final class ChemicalExposureEvidenceTest extends ChemicalExposureCommandTestCase
         [$dto, $queries] = $this->capturedQueries(fn () => $this->evidenceService()->retryStagingCleanup($this->manager, $stage->id));
         $this->assertSame('cleanup_pending', $dto['state']); Storage::disk('private')->assertExists($stage->path);
         $hr = array_filter($queries, fn ($q) => str_contains($q['query'], 'from `hr_documents`'));
-        $this->assertNotEmpty($hr); foreach ($hr as $q) { $this->assertStringNotContainsString('select *', strtolower($q['query'])); }
+        // An EXISTS probe's "select *" returns no columns; any real wide select of HR documents still fails.
+        $this->assertNotEmpty($hr); foreach ($hr as $q) { $this->assertStringNotContainsString('select *', (string) preg_replace('/exists\s*\(\s*select \*/', 'exists (select 1', strtolower($q['query']))); }
         $this->assertNotNull($doc->id);
         $another = $this->failed($root); $item = \App\Models\PpeInventory::factory()->create(['site_id' => $this->site->id]);
         \App\Models\PpeAttachment::create(['ppe_inventory_id' => $item->id, 'uploaded_by' => $this->manager->id,
