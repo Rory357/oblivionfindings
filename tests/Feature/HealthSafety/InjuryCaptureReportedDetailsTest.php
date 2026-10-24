@@ -32,8 +32,8 @@ class InjuryCaptureReportedDetailsTest extends WorkplaceInjurySourceTestCase
         $this->assertSame('New provided treatment', $row->immediate_treatment);
         $this->assertSame('gp_visit', $row->medical_treatment_type);
         $this->assertSame('NEW-PROVIDED-CLAIM', $row->acc_claim_number);
-        $this->denied(fn () => app(InjuryWorkspaceService::class)->detail($this->capturer, $row->id));
-        $this->denied(fn () => $this->source()->update($row, $this->capturer, $this->command($row, ['notes' => 'Forbidden enduring edit'])));
+        $this->denial(fn () => app(InjuryWorkspaceService::class)->detail($this->capturer, $row->id));
+        $this->denial(fn () => $this->source()->update($row, $this->capturer, $this->command($row, ['notes' => 'Forbidden enduring edit'])));
         $recovered = $this->source()->confirmationForKey($this->capturer, strtoupper($payload['idempotency_key']));
         $this->assertTrue($recovered['accepted']);
         $this->assertStringNotContainsString('New provided', json_encode($recovered));
@@ -46,17 +46,17 @@ class InjuryCaptureReportedDetailsTest extends WorkplaceInjurySourceTestCase
         $service = app(InjuryWorkspaceService::class);
         $this->assertTrue($service->captureOptions($this->capturer, $this->site->id)['can']['record_reported_details']);
         $this->revoke($this->capturer, 'hazards.create');
-        $this->denied(fn () => $this->source()->create($this->capturer, $this->createPayload()));
+        $this->denial(fn () => $this->source()->create($this->capturer, $this->createPayload()));
         $this->capturer->permissionOverrides()->syncWithoutDetaching([
             Permission::where('key', 'hazards.create')->sole()->id => ['allowed' => true],
         ]);
         $this->assertTrue($service->captureOptions($this->capturer, $this->site->id)['can']['record_reported_details']);
         $other = Site::factory()->create(['is_active' => true]);
         $this->capturer->hrEmployeeProfile()->update(['primary_site_id' => $other->id, 'secondary_site_ids' => []]);
-        $this->denied(fn () => $this->source()->create($this->capturer, $this->createPayload()));
+        $this->denial(fn () => $this->source()->create($this->capturer, $this->createPayload()));
         $this->capturer->hrEmployeeProfile()->update(['primary_site_id' => $this->site->id]);
         $this->worker->hrEmployeeProfile()->update(['is_active' => false]);
-        $this->denied(fn () => $this->source()->create($this->capturer, $this->createPayload()));
+        $this->denial(fn () => $this->source()->create($this->capturer, $this->createPayload()));
         $this->assertDatabaseCount('workplace_injuries', 0);
         $this->assertDatabaseCount('workplace_injury_command_receipts', 0);
     }
@@ -64,7 +64,7 @@ class InjuryCaptureReportedDetailsTest extends WorkplaceInjurySourceTestCase
     public function test_capture_capability_does_not_relax_existing_medical_edit_or_accept_a_self_asserted_transport_grant(): void
     {
         $row = $this->injury();
-        $this->denied(fn () => $this->source()->update($row, $this->factual, $this->command($row, ['notes' => 'Forbidden private edit'])));
+        $this->denial(fn () => $this->source()->update($row, $this->factual, $this->command($row, ['notes' => 'Forbidden private edit'])));
         $receipt = $this->source()->update($row, $this->manager, $this->command($row, ['notes' => 'Authorised current medical edit']));
         $this->assertTrue($receipt['accepted']);
         $this->assertSame('Authorised current medical edit', $row->fresh()->notes);
