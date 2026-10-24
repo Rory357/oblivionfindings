@@ -519,7 +519,7 @@ final class InjuryAccessService
             // Exact subject identity across all retained parents; a forged legacy node/reparent cannot hide typed ownership.
             $governed = $reads->query(WorkplaceInjurySourceVersion::query())->where('source_type', $type)->where('source_id', $source->id)
                 ->where(fn ($proof) => $proof->where('source_schema_version', '<>', 0)->orWhere('aggregate_revision', '<>', 0)
-                    ->orWhereNotNull('factual_content')->orWhereNotNull('factual_digest'))->exists();
+                    ->orWhereNotNull('factual_content')->orWhereNotNull('factual_digest'))->select('id')->exists();
             if ((int) ($source->source_revision ?? 0) !== 0 || $governed) {
                 throw new LogicException('A governed injury source cannot be downgraded to unknown legacy attribution.');
             }
@@ -621,7 +621,7 @@ final class InjuryAccessService
             // Identity-only prior provenance is retained even if a forged legacy node changes the apparent parent.
             $governed = $reads->query(WorkplaceInjurySourceVersion::query())->where('source_type', 'attachment')->where('source_id', $row->id)
                 ->where(fn ($proof) => $proof->where('source_schema_version', '<>', 0)->orWhere('aggregate_revision', '<>', 0)
-                    ->orWhereNotNull('factual_content')->orWhereNotNull('factual_digest'))->exists();
+                    ->orWhereNotNull('factual_content')->orWhereNotNull('factual_digest'))->select('id')->exists();
             if ((int) $row->source_revision !== 0 || $governed) {
                 return ['attribution_state' => 'repair_required', 'available' => false,
                     'source_version_id' => $version ? (int) $version->id : null,

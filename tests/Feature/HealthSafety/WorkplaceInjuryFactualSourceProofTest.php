@@ -10,11 +10,19 @@ use App\Models\WorkplaceInjurySourceVersion;
 use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\HealthSafety\InjuryAccessService;
 use App\Services\HealthSafety\RestraintCommandValues;
+use App\Support\JsonEvidence;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
 final class WorkplaceInjuryFactualSourceProofTest extends WorkplaceInjurySourceTestCase
 {
+    /** MySQL json columns return object keys in their own order; values and types stay strict. */
+    private function assertSameFacts(array $expected, mixed $actual): void
+    {
+        $this->assertIsArray($actual);
+        $this->assertSame(JsonEvidence::canonicalise($expected), JsonEvidence::canonicalise($actual));
+    }
+
     private function proof(WorkplaceInjury $injury, $viewer = null): array
     {
         return $this->access()->withCurrentViewer($viewer ?? $this->factual, fn ($current, $reads, $sites) =>
@@ -30,7 +38,7 @@ final class WorkplaceInjuryFactualSourceProofTest extends WorkplaceInjurySourceT
     {
         $injury = $this->injury();
         $version = $this->currentVersion($injury);
-        $this->assertSame(InjuryAccessService::factualSnapshot($injury->fresh()), $version->factual_content);
+        $this->assertSameFacts(InjuryAccessService::factualSnapshot($injury->fresh()), $version->factual_content);
         $this->assertSame(RestraintCommandValues::digest($version->factual_content), $version->factual_digest);
         $this->assertSame(['attribution_state' => 'recorded', 'source_version_id' => $version->id,
             'source_revision' => 1], $this->proof($injury));
@@ -49,7 +57,7 @@ final class WorkplaceInjuryFactualSourceProofTest extends WorkplaceInjurySourceT
         $receipt = $this->recovery()->recordCapacity($injury, $this->manager, $this->capacityPayload($injury));
         $version = $this->currentVersion($injury);
         $this->assertSame('capacity_assessment', $version->source_type);
-        $this->assertSame(InjuryAccessService::factualSnapshot($injury->fresh()), $version->factual_content);
+        $this->assertSameFacts(InjuryAccessService::factualSnapshot($injury->fresh()), $version->factual_content);
         $this->assertSame(['attribution_state' => 'recorded', 'source_version_id' => $receipt['source_version_id'],
             'source_revision' => 2], $this->proof($injury));
         foreach (['capacity_assessment', 'assessment_summary', 'restrictions', 'Attributed external issuer', 'Private'] as $excluded) {
@@ -236,6 +244,6 @@ final class WorkplaceInjuryFactualSourceProofTest extends WorkplaceInjurySourceT
         $poisoned = $injury->fresh();
         $poisoned->coordinator_snapshot = ['id' => $this->factual->id, 'name' => $this->factual->name,
             'private_note' => 'Forbidden arbitrary identity snapshot'];
-        $this->assertSame($factual, InjuryAccessService::factualSnapshot($poisoned));
+        $this->assertSameFacts($factual, InjuryAccessService::factualSnapshot($poisoned));
     }
 }

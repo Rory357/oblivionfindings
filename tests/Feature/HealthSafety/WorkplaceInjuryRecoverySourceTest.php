@@ -48,7 +48,8 @@ final class WorkplaceInjuryRecoverySourceTest extends WorkplaceInjurySourceTestC
     {
         $injury = $this->injury();
         $formerAssessor = $this->staff();
-        $legacy = WorkCapacityAssessment::factory()->create(['workplace_injury_id' => $injury->id, 'user_id' => $formerAssessor->id]);
+        // The legacy provenance markers are database defaults, so read the stored row.
+        $legacy = WorkCapacityAssessment::factory()->create(['workplace_injury_id' => $injury->id, 'user_id' => $formerAssessor->id])->refresh();
         $this->assertSame(0, $legacy->source_schema_version);
         $this->assertSame('legacy_unknown', $legacy->attribution_state);
         $this->assertNull($legacy->worker_id);
