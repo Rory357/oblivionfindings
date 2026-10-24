@@ -167,7 +167,10 @@ class ProcedureReviewRequestTaskProviderTest extends TestCase
         $response->assertOk()->assertJsonPath('canAssign', false)->assertJsonPath('canSplit', false)->assertJsonPath('timeline', []);
         $href = $response->json('item.link');
         parse_str(parse_url($href, PHP_URL_QUERY), $query);
-        $this->assertSame('/tasks?q=procedure&assigned=me', $query['return_to']);
+        // Main's /tasks return sanitiser keeps the given parameter order; the parameters themselves must match.
+        $this->assertSame('/tasks', parse_url($query['return_to'], PHP_URL_PATH));
+        parse_str((string) parse_url($query['return_to'], PHP_URL_QUERY), $returnQuery);
+        $this->assertEqualsCanonicalizing(['q' => 'procedure', 'assigned' => 'me'], $returnQuery);
         $this->assertSame((string) $review->id, $query['request']);
         $this->get($href)->assertOk();
         $this->post('/tasks/procedure_review_request/'.$review->id.'/assign', ['assignee_id' => $this->worker()->id])->assertStatus(400);
