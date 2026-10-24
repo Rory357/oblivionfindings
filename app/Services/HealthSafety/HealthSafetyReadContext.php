@@ -178,6 +178,8 @@ final class HealthSafetyReadContext
             $permissionKeys = array_values(array_unique($permissionKeys));
             $current = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($viewer, $permissionKeys);
             $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
+            // An invalid configured zone makes every H&S date unavailable; never a silently substituted calendar day.
+            try { new \DateTimeZone($timezone); } catch (\Exception $invalid) { throw new LogicException('The configured H&S worker timezone is invalid.', 0, $invalid); }
             $preparedSourceDate = [$timezone, now($timezone)->toDateString()];
             $currentStaff = $current->approved_at !== null && ! $current->isExternalClinicianAccount()
                 && $reads->query(app(HrCurrentStaffService::class)->currentUsersQuery())->whereKey($current->id)->exists();
