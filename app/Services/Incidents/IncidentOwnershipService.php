@@ -187,7 +187,8 @@ final class IncidentOwnershipService
         $reads->assertActive();
         if (! $protectedParents->getModel() instanceof ClientIncident) { throw new LogicException('Incident owner summary requires a canonical incident parent query.'); }
         $current = $this->authorization->lockForUserWithoutWaiting($viewer, IncidentOwnerEligibility::PERMISSIONS);
-        $qualified = app(IncidentAccessService::class)->apply((clone $protectedParents)->whereKey($incident->id), $current, $reads);
+        $one = IncidentIndependenceIntakeService::narrowedToIncident($protectedParents, (int) $incident->id, $reads) ?? (clone $protectedParents)->whereKey($incident->id);
+        $qualified = app(IncidentAccessService::class)->apply($one, $current, $reads);
         $source = $reads->query(clone $qualified)->first(IncidentRoutingService::SOURCE_COLUMNS);
         if ($source === null) { return null; }
         $protectedFacts = app(IncidentTypedNotificationReadService::class)->identity(clone $qualified, $source, IncidentRoutingService::SOURCE_COLUMNS);

@@ -47,7 +47,7 @@ final class IncidentTaskReadService
 
     public function isStillIncident(ClientIncident $incident, Builder $parents, CurrentAuthorizationReads $reads): bool
     {
-        $query = (clone $parents)->whereKey($incident->id);
+        $query = IncidentIndependenceIntakeService::narrowedToIncident($parents, (int) $incident->id, $reads) ?? (clone $parents)->whereKey($incident->id);
         $this->exactSnapshot($query, $incident, ['client_id', 'site_id', 'shift_id', 'reported_by', 'submitted_at', 'type', 'is_hr_confidential',
             'status', 'incident_owner_user_id', 'owner_revision', 'reference_number', 'title', 'description', 'severity', 'source',
             'occurred_at', 'created_at', 'hs_event_id', 'control_room_alert_id', 'investigation_assigned_to',
@@ -57,8 +57,11 @@ final class IncidentTaskReadService
 
     public function isStillFollowup(IncidentFollowup $followup, Builder $parents, CurrentAuthorizationReads $reads): bool
     {
+        // With the snapshot pinning client_incident_id to P, "IN (parents)" and "IN (parents narrowed to P)" are the same test.
+        $parentId = array_key_exists('client_incident_id', $followup->getAttributes()) ? $followup->getRawOriginal('client_incident_id') : null;
+        $parent = $parentId === null ? null : IncidentIndependenceIntakeService::narrowedToIncident($parents, (int) $parentId, $reads);
         $query = IncidentFollowup::query()->whereKey($followup->id)
-            ->whereIn('client_incident_id', (clone $parents)->reorder()->select('client_incidents.id'));
+            ->whereIn('client_incident_id', ($parent ?? clone $parents)->reorder()->select('client_incidents.id'));
         $this->exactSnapshot($query, $followup, ['client_incident_id', 'assigned_to_user_id', 'due_at', 'completed_at', 'notes', 'created_by', 'created_at']);
         return $reads->query($query)->exists();
     }

@@ -74,23 +74,39 @@ final class IncidentHsEventSourceReadService
         $relatedIds = $identities->pluck('id')->all();
         $bindings = [];
         foreach ($identities as $event) {
-            $parent = $this->incidentQueryForEventInReads($event, $current, $reads);
+            // Parents without the viewer-wide authority facts: those are the same in every block and are added once below.
+            $parent = $this->eventParent($event, $current, $reads, false);
             $bindings[] = ['event' => $event, 'parent' => $parent];
         }
-        $events->where(function (Builder $scope) use ($bindings, $relatedIds): void {
+        $events->where(function (Builder $scope) use ($bindings, $relatedIds, $current, $reads): void {
             $scope->where(fn (Builder $ordinary) => $this->withoutIncidentSources($ordinary)->whereNotIn('hs_events.id', $relatedIds));
-            foreach ($bindings as $binding) {
-                $scope->orWhere(function (Builder $exact) use ($binding): void {
-                    $this->exact($exact, $binding['event']->getAttributes(), 'hs_events');
-                    $exact->whereExists((clone $binding['parent'])->reorder()->selectRaw('1')->toBase());
+            if ($bindings === []) { return; }
+            // (X1 AND A) OR (X2 AND A) ... is A AND (X1 OR X2 ...). A only compares the viewer's own uncorrelated rows,
+            // so this is the same test with A compiled once rather than once per linked event. Without a snapshot no
+            // parent reached authority (each is "1 = 0"), so every linked block is false either way.
+            $scope->orWhere(function (Builder $linked) use ($bindings, $current, $reads): void {
+                if ($this->hasAuthoritySnapshot($current, $reads)) { $this->authorityCommon($linked, $current, $reads); }
+                $linked->where(function (Builder $any) use ($bindings): void {
+                    foreach ($bindings as $binding) {
+                        $any->orWhere(function (Builder $exact) use ($binding): void {
+                            $this->exact($exact, $binding['event']->getAttributes(), 'hs_events');
+                            $exact->whereExists((clone $binding['parent'])->reorder()->selectRaw('1')->toBase());
+                        });
+                    }
                 });
-            }
+            });
         });
         return $this->protect($events, $reads);
     }
 
     /** Active, protected parent Builder. Metadata models only locate the literal original; they are not read receipts. */
     public function incidentQueryForEventInReads(HsEvent $original, User $current, CurrentAuthorizationReads $reads): Builder
+    {
+        return $this->eventParent($original, $current, $reads, true);
+    }
+
+    /** $common false leaves out the viewer-wide authority facts; only the list scopes, which add them once, use that. */
+    private function eventParent(HsEvent $original, User $current, CurrentAuthorizationReads $reads, bool $common): Builder
     {
         $reads->assertActive();
         $empty = fn (): Builder => $this->protect(ClientIncident::query()->whereRaw('1 = 0'), $reads);
@@ -100,8 +116,9 @@ final class IncidentHsEventSourceReadService
         // Existing Journey read contract allows leading slash legacy spelling, never case/trailing-byte rewrites.
         if (! is_string($type) || ltrim($type, '\\') !== ClientIncident::class || ! $original->source_id) { return $empty(); }
         $eventParents = $this->eventParents[$reads] ?? [];
-        if (isset($eventParents[$current->id][$original->id])) {
-            return $eventParents[$current->id][$original->id]['meta'] === $meta ? clone $eventParents[$current->id][$original->id]['query'] : $empty();
+        $key = $common ? (string) $current->id : $current->id.'/site-client';
+        if (isset($eventParents[$key][$original->id])) {
+            return $eventParents[$key][$original->id]['meta'] === $meta ? clone $eventParents[$key][$original->id]['query'] : $empty();
         }
         $roots = ($this->discovery[$reads] ?? [])[$original->id] ?? $reads->query(ClientIncident::query()->where(fn (Builder $root) => $root
             ->whereKey($original->source_id)->orWhere('hs_event_id', $original->id)))->get(array_values(array_unique(self::ROOT_META)));
@@ -109,7 +126,7 @@ final class IncidentHsEventSourceReadService
         $root = $roots->sole();
         if (($root->hs_event_id !== null && (int) $root->hs_event_id !== (int) $original->id)
             || ! app(IncidentJourneyService::class)->hsEventIsCanonicalForIncident($root, $original)) { return $empty(); }
-        $query = $this->originalRootParent($root, $current, $reads);
+        $query = $this->originalRootParent($root, $current, $reads, $common);
         $event = HsEvent::query()->whereKey($original->id);
         $this->exact($event, $meta, 'hs_events');
         $event->whereNotExists(DB::table('client_incidents as hs_other_incident')->selectRaw('1')
@@ -118,9 +135,18 @@ final class IncidentHsEventSourceReadService
             ->where('hs_other_source.id', '!=', $original->id)->where('hs_other_source.source_id', $root->id)
             ->whereRaw('LOWER(TRIM(LEADING ? FROM TRIM(REPLACE(REPLACE(REPLACE(`hs_other_source`.`source_type`, CHAR(9), ?), CHAR(10), ?), CHAR(13), ?)))) = LOWER(?)', ['\\', '', '', '', ClientIncident::class]));
         $query->whereExists($event->selectRaw('1')->toBase());
-        $query = $this->authorityUnchanged($query, $current, $reads, $original->site_id, $original->client_id);
+        // originalRootParent() already holds the authority conditions for the root's Site and Client. The same
+        // viewer, Site and Client give the same conditions, so they are added again only when the event's differ.
+        $siteId = $original->site_id === null ? null : (int) $original->site_id;
+        $clientId = $original->client_id === null ? null : (int) $original->client_id;
+        $rootSiteId = $root->site_id === null ? null : (int) $root->site_id;
+        $rootClientId = $root->client_id === null ? null : (int) $root->client_id;
+        if ($siteId !== $rootSiteId || $clientId !== $rootClientId) {
+            $query = $common ? $this->authorityUnchanged($query, $current, $reads, $siteId, $clientId)
+                : $this->authorityScoped($query, $current, $reads, $siteId, $clientId);
+        }
         $query = $this->protect($query, $reads);
-        $eventParents[$current->id][$original->id] = ['meta' => $meta, 'query' => clone $query];
+        $eventParents[$key][$original->id] = ['meta' => $meta, 'query' => clone $query];
         $this->eventParents[$reads] = $eventParents;
         return $query;
     }
@@ -135,26 +161,35 @@ final class IncidentHsEventSourceReadService
         $discover = app(IncidentAccessService::class)->apply((clone $incidents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...)), $current, $reads);
         $roots = $reads->query($discover->select(array_values(array_unique(self::ROOT_META))))->get();
         $bindings = [];
-        foreach ($roots as $root) { $bindings[] = $this->originalRootParent($root, $current, $reads); }
+        foreach ($roots as $root) { $bindings[] = $this->originalRootParent($root, $current, $reads, false); }
         if ($bindings === []) { return $this->protect($incidents->whereRaw('1 = 0'), $reads); }
-        $incidents->where(function (Builder $allowed) use ($bindings): void {
-            foreach ($bindings as $guard) {
-                $allowed->orWhereIn('client_incidents.id', (clone $guard)->reorder()->select('client_incidents.id'));
-            }
+        // Every guard carried the same viewer-wide authority facts A (uncorrelated), so
+        // "id IN (G1 AND A) OR id IN (G2 AND A) ..." is "A AND (id IN G1 OR id IN G2 ...)", with A compiled once.
+        $incidents->where(function (Builder $allowed) use ($bindings, $current, $reads): void {
+            $this->authorityCommon($allowed, $current, $reads);
+            $allowed->where(function (Builder $any) use ($bindings): void {
+                foreach ($bindings as $guard) {
+                    $any->orWhereIn('client_incidents.id', (clone $guard)->reorder()->select('client_incidents.id'));
+                }
+            });
         });
         return $this->protect($incidents, $reads);
     }
 
-    /** Reuse the earliest original source proof within this exact reads/actor lifetime; never recapture a changed root as acceptance. */
-    private function originalRootParent(ClientIncident $root, User $current, CurrentAuthorizationReads $reads): Builder
+    /** Reuse the earliest original source proof within this exact reads/actor lifetime; never recapture a changed root as acceptance.
+     * $common false leaves out the viewer-wide authority facts, for list scopes that add them once around all parents. */
+    private function originalRootParent(ClientIncident $root, User $current, CurrentAuthorizationReads $reads, bool $common = true): Builder
     {
         $parents = $this->rootParents[$reads] ?? [];
-        if (isset($parents[$current->id][$root->id])) { return clone $parents[$current->id][$root->id]; }
+        $key = $common ? (string) $current->id : $current->id.'/site-client';
+        if (isset($parents[$key][$root->id])) { return clone $parents[$key][$root->id]; }
         $query = app(IncidentAccessService::class)->apply(ClientIncident::query()->whereKey($root->id), $current, $reads);
         $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read');
         $this->exact($query, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
-        $query = $this->protect($this->authorityUnchanged($query, $current, $reads, $root->site_id, $root->client_id), $reads);
-        $parents[$current->id][$root->id] = clone $query;
+        $query = $common ? $this->authorityUnchanged($query, $current, $reads, $root->site_id, $root->client_id)
+            : $this->authorityScoped($query, $current, $reads, $root->site_id, $root->client_id);
+        $query = $this->protect($query, $reads);
+        $parents[$key][$root->id] = clone $query;
         $this->rootParents[$reads] = $parents;
         return $query;
     }
@@ -222,6 +257,48 @@ final class IncidentHsEventSourceReadService
     /** Equality only, after canonical Access/Intake admission. Reuses original evidence; it never evaluates/confers permission. */
     private function authorityUnchanged(Builder $source, User $current, CurrentAuthorizationReads $reads, ?int $siteId, ?int $clientId): Builder
     {
+        return $this->authorityScoped($this->authorityCommon($source, $current, $reads), $current, $reads, $siteId, $clientId);
+    }
+
+    private function hasAuthoritySnapshot(User $current, CurrentAuthorizationReads $reads): bool
+    {
+        return isset(($this->evidence[$reads] ?? [])[$current->id]);
+    }
+
+    /** The viewer's own role, permission, override and HR profile rows: the same for every Site and Client. */
+    private function authorityCommon(Builder $source, User $current, CurrentAuthorizationReads $reads): Builder
+    {
+        $snapshot = $this->authoritySnapshot($current, $reads);
+        $roleIds = array_column($snapshot['roles'], 'id');
+        $permissionIds = array_values(array_unique([...array_column($snapshot['definitions'], 'id'), ...array_keys($snapshot['used_definitions'])]));
+        foreach ($snapshot['used_definitions'] as $definition) {
+            $source->whereExists($this->exact(DB::table('permissions')->where('id', $definition['id']), $definition)->selectRaw('1'));
+        }
+        foreach ([
+            [DB::table('users')->where('id', $current->id), $snapshot['users'], ['id']],
+            [DB::table('permissions')->whereIn('key', self::PERMISSIONS), $snapshot['definitions'], ['id']],
+            [DB::table('role_user')->where('user_id', $current->id), $snapshot['memberships'], ['role_id', 'user_id']],
+            [DB::table('roles')->whereIn('id', $roleIds), $snapshot['roles'], ['id']],
+            [DB::table('role_permission')->whereIn('role_id', $roleIds)->whereIn('permission_id', $permissionIds), $snapshot['grants'], ['role_id', 'permission_id']],
+            [DB::table('permission_user')->where('user_id', $current->id)->whereIn('permission_id', $permissionIds), $snapshot['overrides'], ['permission_id', 'user_id']],
+            [DB::table('hr_employee_profiles')->where('user_id', $current->id)->whereNull('deleted_at'), $snapshot['profiles'], ['id']],
+        ] as [$selector, $rows, $identity]) { $this->expectedSet($source, $selector, $rows, $identity); }
+        return $source;
+    }
+
+    /** The bounded Site and Client rows for one source. */
+    private function authorityScoped(Builder $source, User $current, CurrentAuthorizationReads $reads, ?int $siteId, ?int $clientId): Builder
+    {
+        $snapshot = $this->authoritySnapshot($current, $reads);
+        foreach ([
+            [DB::table('sites')->where('id', $siteId), array_values(array_filter($snapshot['sites'], fn ($row) => (int) $row['id'] === $siteId)), ['id']],
+            [DB::table('client_user')->where('user_id', $current->id)->where('client_id', $clientId), array_values(array_filter($snapshot['clients'], fn ($row) => (int) $row['client_id'] === $clientId)), ['id']],
+        ] as [$selector, $rows, $identity]) { $this->expectedSet($source, $selector, $rows, $identity); }
+        return $source;
+    }
+
+    private function authoritySnapshot(User $current, CurrentAuthorizationReads $reads): array
+    {
         $actors = $this->evidence[$reads] ?? [];
         if (! isset($actors[$current->id])) {
             if (! $current->relationLoaded('roles') || ! $current->relationLoaded('permissionOverrides')
@@ -255,24 +332,7 @@ final class IncidentHsEventSourceReadService
             $actors[$current->id] = $snapshot;
             $this->evidence[$reads] = $actors;
         }
-        $snapshot = $actors[$current->id];
-        $roleIds = array_column($snapshot['roles'], 'id');
-        $permissionIds = array_values(array_unique([...array_column($snapshot['definitions'], 'id'), ...array_keys($snapshot['used_definitions'])]));
-        foreach ($snapshot['used_definitions'] as $definition) {
-            $source->whereExists($this->exact(DB::table('permissions')->where('id', $definition['id']), $definition)->selectRaw('1'));
-        }
-        foreach ([
-            [DB::table('users')->where('id', $current->id), $snapshot['users'], ['id']],
-            [DB::table('permissions')->whereIn('key', self::PERMISSIONS), $snapshot['definitions'], ['id']],
-            [DB::table('role_user')->where('user_id', $current->id), $snapshot['memberships'], ['role_id', 'user_id']],
-            [DB::table('roles')->whereIn('id', $roleIds), $snapshot['roles'], ['id']],
-            [DB::table('role_permission')->whereIn('role_id', $roleIds)->whereIn('permission_id', $permissionIds), $snapshot['grants'], ['role_id', 'permission_id']],
-            [DB::table('permission_user')->where('user_id', $current->id)->whereIn('permission_id', $permissionIds), $snapshot['overrides'], ['permission_id', 'user_id']],
-            [DB::table('hr_employee_profiles')->where('user_id', $current->id)->whereNull('deleted_at'), $snapshot['profiles'], ['id']],
-            [DB::table('sites')->where('id', $siteId), array_values(array_filter($snapshot['sites'], fn ($row) => (int) $row['id'] === $siteId)), ['id']],
-            [DB::table('client_user')->where('user_id', $current->id)->where('client_id', $clientId), array_values(array_filter($snapshot['clients'], fn ($row) => (int) $row['client_id'] === $clientId)), ['id']],
-        ] as [$selector, $rows, $identity]) { $this->expectedSet($source, $selector, $rows, $identity); }
-        return $source;
+        return $actors[$current->id];
     }
 
     private function expectedSet(Builder $guard, QueryBuilder $selector, array $rows, array $identity): void

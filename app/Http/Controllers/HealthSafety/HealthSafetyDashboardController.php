@@ -75,6 +75,21 @@ class HealthSafetyDashboardController extends Controller
         return Inertia::render('health-safety/dashboard', $props);
     }
 
+    /** The Site comparison needs current staff with approved Sites. Without them the comparison is withheld (empty),
+     * like the PPE numbers above, instead of denying the whole overview. A refused Site choice (404) still refuses. */
+    private function siteLeagueOrEmpty(?Carbon $from, ?Carbon $to, int|array|null $siteScope, ?User $user, HealthSafetyReadContext $context): array
+    {
+        try {
+            return $this->dashboardService->siteLeague($from, $to, $siteScope, $user, $context);
+        } catch (HttpExceptionInterface $denial) {
+            if ($denial->getStatusCode() !== 403) {
+                throw $denial;
+            }
+
+            return [];
+        }
+    }
+
     private function overviewProps(Request $request, HealthSafetyReadContext $context, HealthSafetyReadMaterialisationProof $proof): array
     {
         $user = $context->consumeSourceViewer([], fn (User $current): User => $current);
@@ -263,7 +278,7 @@ class HealthSafetyDashboardController extends Controller
                 ->limit(6)
                 ->get()
                 ->map(fn ($r) => ['label' => $r->type, 'count' => (int) $r->count])->all(),
-            'site_league' => $this->dashboardService->siteLeague($from, $to, $siteScope, $user, $context),
+            'site_league' => $this->siteLeagueOrEmpty($from, $to, $siteScope, $user, $context),
 
             // Leading tab — open-hazards list (row 3) + worker-participation KPI (row 1).
             // Participation operands use canonical current source admission and nullable availability.

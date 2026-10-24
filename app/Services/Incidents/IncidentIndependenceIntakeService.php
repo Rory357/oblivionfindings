@@ -213,7 +213,48 @@ final class IncidentIndependenceIntakeService
             }
         }
         if ($admitted === []) { return $reads->query($query->whereRaw('1 = 0')); }
-        return $reads->query($query->where(function (Builder $allowed) use ($admitted): void {
+        $base = clone $query;
+        $scoped = $reads->query($this->whereAdmitted($query, $admitted));
+        self::$admittedScopes ??= new \WeakMap;
+        self::$admittedScopes[$scoped] = ['base' => $base, 'admitted' => array_column($admitted, null, 'id'), 'reads' => $reads,
+            'service' => $this, 'shape' => self::scopeShape($scoped)];
+        return $scoped;
+    }
+
+    /** @var \WeakMap<Builder, array{base: Builder, admitted: array<int, array>, reads: CurrentAuthorizationReads, service: self, shape: array}>|null */
+    private static ?\WeakMap $admittedScopes = null;
+
+    /** A scoped query from applySourceScopeInReads() restricted to one incident, as a drop-in for
+     * `(clone $scoped)->whereKey($incidentId)`. Every admitted block already requires `client_incidents.id = <its id>`,
+     * so `id = X AND (block_1 OR … OR block_n)` is exactly `id = X AND block_X`: same rows, same proof facts and
+     * fingerprints from the original read, nothing re-read as a new baseline. Re-checking one row then sends one
+     * block instead of one per readable incident. Null when the query was not scoped here, belongs to another read
+     * lifetime, or has gained clauses since it was scoped; callers then keep the full clone. */
+    public static function narrowedToIncident(Builder $scoped, int $incidentId, CurrentAuthorizationReads $reads): ?Builder
+    {
+        $entry = self::$admittedScopes[$scoped] ?? null;
+        if ($entry === null || $entry['reads'] !== $reads || $entry['shape'] !== self::scopeShape($scoped)) { return null; }
+        $reads->assertActive();
+        $narrowed = (clone $entry['base'])->whereKey($incidentId);
+        $binding = $entry['admitted'][$incidentId] ?? null;
+        if ($binding === null) { return $reads->query($narrowed->whereRaw('1 = 0')); }
+        return $reads->query($entry['service']->whereAdmitted($narrowed, [$binding]));
+    }
+
+    /** Clause counts, scopes and the last clause's identity: any later change to the scoped query voids narrowing. */
+    private static function scopeShape(Builder $query): array
+    {
+        $base = $query->getQuery();
+        $last = $base->wheres === [] ? null : $base->wheres[array_key_last($base->wheres)];
+        return [$base->from, count($base->wheres), count($base->joins ?? []), count($base->havings ?? []), count($base->groups ?? []),
+            count($base->unions ?? []), array_map('count', $base->bindings), $last['query'] ?? $last,
+            (fn () => array_keys($this->scopes))->call($query), $query->removedScopes()];
+    }
+
+    /** One OR block per admitted incident: the exact root, its proof guards and its closed evidence graph. */
+    private function whereAdmitted(Builder $query, array $admitted): Builder
+    {
+        return $query->where(function (Builder $allowed) use ($admitted): void {
             foreach ($admitted as $binding) {
                 $allowed->orWhere(function (Builder $exact) use ($binding): void {
                     $exact->where('client_incidents.id', $binding['id'])
@@ -241,7 +282,7 @@ final class IncidentIndependenceIntakeService
                     }
                 });
             }
-        }));
+        });
     }
 
     /** Exact closed graph facts remain private to this invocation; SQL uses the same fixed-column fingerprints. */
