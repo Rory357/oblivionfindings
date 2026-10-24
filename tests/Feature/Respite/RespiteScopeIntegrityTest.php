@@ -274,14 +274,18 @@ class RespiteScopeIntegrityTest extends TestCase
             ]))
             ->assertNotFound();
 
-        $this->actingAs($this->coordinator)
-            ->post(route('health-safety.restraints.events.store'), $this->canonicalRestraintPayload([
-                'client_id' => $resident->id,
-                'site_id' => $this->site->id,
-                'stay_id' => $stay->id,
-                'behaviour_support_plan_id' => $foreignPlan->id,
-            ]))
-            ->assertNotFound();
+        // The canonical plan resolver refuses any plan that is not this resident's
+        // with one 403, so a foreign plan cannot be told apart from a missing one.
+        foreach ([$foreignPlan->id, (int) BehaviourSupportPlan::withTrashed()->max('id') + 1] as $planId) {
+            $this->actingAs($this->coordinator)
+                ->post(route('health-safety.restraints.events.store'), $this->canonicalRestraintPayload([
+                    'client_id' => $resident->id,
+                    'site_id' => $this->site->id,
+                    'stay_id' => $stay->id,
+                    'behaviour_support_plan_id' => $planId,
+                ]))
+                ->assertForbidden();
+        }
 
         $this->actingAs($this->coordinator)
             ->post(route('health-safety.restraints.events.store'), $this->canonicalRestraintPayload([
