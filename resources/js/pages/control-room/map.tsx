@@ -646,6 +646,11 @@ export default function ControlRoomMap({
     const restricted = stats.location_restricted;
     const now = useNow(30_000);
     const oldCount = devices.filter((device) => positionAge(device.last_seen_at, now).old).length;
+    // An "online" tracker whose last position is over a day old is not reporting.
+    const staleOnline = devices.filter(
+        (device) => device.status === 'online' && positionAge(device.last_seen_at, now).old,
+    ).length;
+    const reporting = Math.max(0, stats.online - staleOnline);
 
     return (
         <ControlRoomPage
@@ -692,14 +697,18 @@ export default function ControlRoomMap({
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
                             label="Reporting"
-                            tone={stats.online > 0 ? 'success' : 'brand'}
+                            tone={reporting > 0 ? 'success' : 'brand'}
                             href={`${BASE_PATH}${queryString({ ...siteQuery, status: 'online' })}`}
                             preserveState
                             preserveScroll
                             ariaLabel="Show trackers that are reporting"
                         >
-                            <PageHeaderMeterBig>{stats.online}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>trackers online</PageHeaderMeterCaption>
+                            <PageHeaderMeterBig>{reporting}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {staleOnline > 0
+                                    ? `seen in the last ${OLD_POSITION_HOURS} hours · ${staleOnline} old`
+                                    : `seen in the last ${OLD_POSITION_HOURS} hours`}
+                            </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
                             label="Offline"

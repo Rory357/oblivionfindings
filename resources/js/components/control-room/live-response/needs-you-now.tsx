@@ -121,7 +121,16 @@ export function NeedsYouNowCard({
                             Take it
                         </Button>
                     ) : null}
-                    <Button asChild size="lg" variant="outline">
+                    <Button
+                        asChild
+                        size="lg"
+                        // With no step to take here, opening it is the next step.
+                        variant={
+                            row.actions.can_acknowledge || (row.actions.can_claim && !row.assignee)
+                                ? 'outline'
+                                : 'default'
+                        }
+                    >
                         <Link href={row.href}>
                             Open
                             <ArrowUpRight aria-hidden="true" />
