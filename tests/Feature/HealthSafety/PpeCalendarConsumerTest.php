@@ -180,7 +180,7 @@ final class PpeCalendarConsumerTest extends PpeReadTestCase
     }
     public function test_personal_subscription_token_uses_its_owner_source_authority_not_current_request_actor(): void
     {
-        $this->dated(); $this->viewer->update(['calendar_feed_token' => 'ppepersonalsource123']); $this->actingAs($this->worker);
+        $this->dated(); $this->viewer->forceFill(['calendar_feed_token' => 'ppepersonalsource123'])->save(); $this->actingAs($this->worker); // the token isn't mass-assignable
         $url = '/calendar/feed/ppepersonalsource123.ics';
         $response = $this->get($url)->assertOk(); $this->assertStringContainsString('OWN-ITEM', $response->getContent());
         $this->assertStringNotContainsString('FOREIGN-PRIVATE', $response->getContent());
