@@ -180,3 +180,18 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
 - **Worker-calendar timezone**: an empty worker timezone falls back to the app timezone, then UTC, across the H&S and incident read paths.
 - **Overview client-name tests count only the H&S read** (`HsDashboardClientOptionsSourceReadTest`): Codex's collector counted every client name loaded in the request, so main's sidebar loads failed it: the portal user's own client list, and the task and meds badges for support workers. The collector now keeps loads from the shared sidebar props apart. Anything loaded by the option owner or the Overview controller still fails the test. No app code changed.
   - **Follow-up for Stephan (main behaviour, unchanged here):** the sidebar's portal client list doesn't apply Codex's portal rule that someone with an HR profile (even archived) isn't treated as a portal member. A former staff member who is also a family contact still sees their linked client's name in the sidebar.
+- **Incident-linked H&S events were hidden and locked (fixed 25 Oct, `0e355ce90`)**: Codex's source scope refuses every incident-linked event unless the read runs inside the H&S read context. The two registers and every event command ran without it, so on demo data the admin saw 6 of 52 events and 1 of 6 actions. Close, closure exceptions, handover, WorkSafe, investigation, corrective-action and evidence commands all answered 404. Codex's controller is the same, and his tests for these paths were never run.
+  - Both registers now read inside one context, with a short retry if the read's no-wait locks meet a save in progress.
+  - Commands check the event through the event page's read and hold the event row for update first, so a double submit waits instead of deadlocking.
+  - Corrective-action owners must be able to read the event, through the same read.
+  - Rules unchanged: incident read and current staff are still required. Covered by `HsIncidentLinkedEventCommandsTest`.
+- **Decision for Stephan (asked 25 Oct ~11:00): team leads and incident-linked H&S events.** On the .com, 22 team leads have `hazards.manage` but no incident read. Under Codex's rule they lose every incident-linked H&S event; on main they see them, with the incident link shown only to incident readers. Codex's tests expect main's behaviour. The options:
+  - (A) a grant migration giving `team_lead` incident read, like decision 8;
+  - (B) build the restricted view, where the event is visible and actionable without the incident link or narrative (recommended);
+  - (C) keep Codex's rule.
+
+  Under A or C, handover owners should also be limited to people who can read the event. `HsHandoverAcceptanceTest` waits on this answer.
+- **Follow-up (performance)**:
+  - The sidebar task badge recomputes in about 6 s cold for the demo admin (7,700 queries; it's cached for 60 s).
+  - The H&S incident scope adds one SQL block per incident-linked event (about 4.7 KB each; the demo register query is about 218 KB). That's fine at demo scale but grows with the number of linked events.
+- **PPE and chemical file checks** (`32936eb6b`): MySQL's json column hands back `{size, digest}`, so every fresh PPE upload was marked "repair needed" and its download answered 404. Byte proofs now compare by key, still strict on values and types.
