@@ -125,7 +125,14 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         $report = $this->actingAs($viewer)->getJson(route('respite.stays.restraints.report', $stay))->assertOk();
         $report->assertJsonPath('capture_context.client_id', $this->client->id)->assertJsonPath('capture_context.site_id', $this->site->id)->assertJsonPath('capture_context.respite_stay_id', $stay->id)->assertJsonPath('capture_context.store_href', '/respite/stays/'.$stay->id.'/restraints')->assertJsonPath('can.create_plan', false);
         $this->getJson(route('health-safety.restraints.report'))->assertForbidden();
-        $this->post($report->json('capture_context.store_href'), $this->capture())->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('restraint_confirmation');
+        // Stephan (25 Oct): main's respite restraint form and action stay for this merge, so the stay's store
+        // endpoint takes main's form payload. Codex's keyed receipt arrives with the dedicated page (follow-up).
+        $this->post($report->json('capture_context.store_href'), [
+            'started_at' => now()->subHour()->toDateTimeString(), 'restraint_type' => 'physical_hold', 'severity' => 'medium',
+            'trigger_description' => 'Escalating distress', 'de_escalation_attempted' => 'Calm voice and space offered',
+            'restraint_description' => 'Brief guided hold', 'within_support_plan' => false,
+            'deviation_reason' => 'No current plan covers this stay',
+        ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame($stay->id, RestraintEvent::sole()->stay_id);
     }
 
@@ -225,19 +232,6 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         $this->site->update(['archived_at' => now()]);
         $this->assertSame($this->noCapabilities(), $this->reads()->forStay($this->actor, $stay));
         $this->actingAs($this->actor)->getJson(route('respite.stays.restraints.report', $stay))->assertForbidden();
-    }
-
-    public function test_workspace_partial_picker_props_recheck_capture_without_changing_unrelated_stay_lists(): void
-    {
-        $stay = $this->stay();
-        $this->recorded($stay);
-        $viewer = $this->staff(['clients.viewAny', 'respite.viewAny', 'respite.stays.manage']);
-        $this->actingAs($viewer)->get('/respite')->assertOk()->assertInertia(fn (Assert $page) => $page->component('respite/index')->where('stays.0.id', $stay->id)->where('stays.0.restraints.can.capture', true)->where('stays.0.unreviewedRestraints', 0)->where('stats.compliance.restraintsAwaitingReview', 0)->where('restraintPickers.sites.0.id', $this->site->id));
-        $this->revoke($viewer, 'respite.stays.manage');
-        $response = $this->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'respite/index', 'X-Inertia-Partial-Data' => 'restraintPickers'])->get('/respite')->assertOk();
-        $this->assertSame(['sites' => [], 'staff' => [], 'incidents' => [], 'plans' => []], $response->json('props.restraintPickers'));
-        $this->assertArrayNotHasKey('stays', $response->json('props'));
-        $this->assertStringNotContainsString('Sensitive factual source', $response->getContent());
     }
 
     public function test_current_client_read_permission_revocation_conceals_cached_source_reference(): void

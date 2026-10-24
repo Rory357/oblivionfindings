@@ -20,12 +20,17 @@ class HazardWorklistHeaderTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function reader(Site $site): User
+    /** Hazard reader at one Site; $houseAccess adds sites.viewAny, which the Site hazards list and export also require. */
+    private function reader(Site $site, bool $houseAccess = false): User
     {
         $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => []]);
         $permission = Permission::firstOrCreate(['key' => 'hazards.view'], ['description' => 'Read hazards', 'module' => 'Test', 'group' => 'test']);
         $user->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+        if ($houseAccess) {
+            $house = Permission::firstOrCreate(['key' => 'sites.viewAny'], ['description' => 'View sites', 'module' => 'Test', 'group' => 'test']);
+            $user->permissionOverrides()->attach($house->id, ['allowed' => true]);
+        }
 
         return $user;
     }
@@ -46,7 +51,7 @@ class HazardWorklistHeaderTest extends TestCase
     {
         $this->travelTo(CarbonImmutable::parse('2026-10-08 00:30:00', 'Pacific/Auckland')->utc());
         $site = Site::factory()->create(['type' => 'house']);
-        $reader = $this->reader($site);
+        $reader = $this->reader($site, true);
         $this->hazard($site, $reader, 'HZ-TODAY', ['assigned_to_user_id' => $reader->id]);
         $this->hazard($site, $reader, 'HZ-OVERDUE', ['status' => 'in_progress', 'due_date' => '2026-10-07']);
         $this->hazard($site, $reader, 'HZ-MITIGATED', ['status' => 'mitigated']);
@@ -75,7 +80,7 @@ class HazardWorklistHeaderTest extends TestCase
     public function test_dashboard_open_work_destination_and_exports_include_open_and_in_progress_at_the_selected_site(): void
     {
         $site = Site::factory()->create(['type' => 'house']);
-        $reader = $this->reader($site);
+        $reader = $this->reader($site, true);
         $this->hazard($site, $reader, 'HZ-ACTIVE-OPEN');
         $this->hazard($site, $reader, 'HZ-ACTIVE-WORKING', ['status' => 'in_progress']);
         $this->hazard($site, $reader, 'HZ-INACTIVE-MITIGATED', ['status' => 'mitigated']);
@@ -99,7 +104,7 @@ class HazardWorklistHeaderTest extends TestCase
     {
         $this->travelTo(CarbonImmutable::parse('2026-10-08 00:30:00', 'Pacific/Auckland')->utc());
         $site = Site::factory()->create(['type' => 'house']);
-        $reader = $this->reader($site);
+        $reader = $this->reader($site, true);
         $before = $this->hazard($site, $reader, 'HZ-BEFORE', ['created_at' => '2026-10-07 10:59:59']);
         $first = $this->hazard($site, $reader, 'HZ-FIRST', ['created_at' => '2026-10-07 11:00:00']);
         $last = $this->hazard($site, $reader, 'HZ-LAST', ['created_at' => '2026-10-08 10:59:59']);
@@ -187,14 +192,25 @@ class HazardWorklistHeaderTest extends TestCase
         $hazard->forceFill(['document_paths' => [['path' => $path, 'name' => 'receipt.txt']]])->saveQuietly();
         $this->actingAs($reader)->get('/hazards/'.$hazard->id)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('detail.id', $hazard->id)->where('detail.can.manage', false)->where('detail.can.assign', false)->where('detail.can.close', false)->where('detail.can.create', false));
-        $this->get("/sites/{$site->id}/hazards")->assertOk();
+        // House check (Stephan, 25 Oct): hazards.view alone does not open the Site hazards list or its export.
+        $this->get("/sites/{$site->id}/hazards")->assertForbidden();
+        $this->get("/sites/{$site->id}/hazards/export")->assertForbidden();
         $this->get("/hazards/{$hazard->id}")->assertOk();
         $this->get("/hazards/{$hazard->id}/media/document/0")->assertOk();
         $this->get("/sites/{$site->id}")->assertForbidden();
         $this->post("/hazards/{$hazard->id}/status", ['status' => 'in_progress'])->assertForbidden();
         $this->get("/compliance/hazards?site_id={$foreign->id}")->assertForbidden();
         $this->get("/sites/{$site->id}/hazards/export?site_id={$foreign->id}")->assertForbidden();
-        foreach (["/hazards/{$hidden->id}", "/hazards/{$hidden->id}/media/document/0", "/sites/{$foreign->id}/hazards", "/sites/{$foreign->id}/hazards/export"] as $url) {
+        foreach (["/hazards/{$hidden->id}", "/hazards/{$hidden->id}/media/document/0"] as $url) {
+            $this->get($url)->assertNotFound()->assertDontSee('HZ-HIDDEN');
+        }
+        foreach (["/sites/{$foreign->id}/hazards", "/sites/{$foreign->id}/hazards/export"] as $url) {
+            $this->get($url)->assertForbidden()->assertDontSee('HZ-HIDDEN');
+        }
+        // With the house check passed, the Site list opens at the reader's own Site and still hides another Site.
+        $house = $this->reader($site, true);
+        $this->actingAs($house)->get("/sites/{$site->id}/hazards")->assertOk();
+        foreach (["/sites/{$foreign->id}/hazards", "/sites/{$foreign->id}/hazards/export"] as $url) {
             $this->get($url)->assertNotFound()->assertDontSee('HZ-HIDDEN');
         }
         $this->assertSame('open', $hazard->fresh()->status);

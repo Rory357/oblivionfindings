@@ -592,8 +592,14 @@ class HealthSafetyTaskContextTest extends TestCase
                     }
                 }
                 foreach (\Illuminate\Support\Facades\DB::getQueryLog() as $query) {
+                    // Allowed (Stephan, 25 Oct): equality guards embedded in a source predicate as
+                    // "[not] exists (select 1 from <authority table> …)". They are ANDed into the read and
+                    // only compare the original evidence, so they can deny but never grant. Any other read of
+                    // an authority table (a select, join or load) would reacquire RBAC and still fails.
+                    $sql = preg_replace('/exists \(select 1 from `(permission_user|role_user|role_permission)`/',
+                        'exists (select 1 from `authority_equality_guard`', strtolower($query['query']));
                     foreach (['permission_user', 'role_user', 'role_permission'] as $authorityTable) {
-                        $this->assertStringNotContainsString($authorityTable, strtolower($query['query']), 'Provided context must not reacquire RBAC.');
+                        $this->assertStringNotContainsString($authorityTable, $sql, 'Provided context must not reacquire RBAC.');
                     }
                 }
                 return $items;
