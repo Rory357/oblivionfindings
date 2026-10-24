@@ -58,20 +58,30 @@ final class ChemicalExposureEvidenceStorage
         }
         $expected = array_intersect_key($facts, ['sha256' => true, 'size' => true]);
         $existing = $this->bytes($stage->path);
-        if ($existing !== null && $existing !== $expected) { throw new LogicException('Different bytes occupy this unique reserved evidence path.'); }
+        if ($existing !== null && ! self::sameBytes($existing, $expected)) { throw new LogicException('Different bytes occupy this unique reserved evidence path.'); }
         if ($existing === null) {
             $stored = Storage::disk('private')->putFileAs(dirname($stage->path), $file, basename($stage->path));
-            if ($stored !== $stage->path || $this->bytes($stage->path) !== $expected) {
+            if ($stored !== $stage->path || ! self::sameBytes($this->bytes($stage->path), $expected)) {
                 throw new LogicException('Exposure staged bytes were not durably confirmed.');
             }
         }
+    }
+
+    /** Same bytes: {sha256: string, size: int} with equal values, whatever order the keys arrive in (MySQL json reorders them). */
+    private static function sameBytes(mixed $actual, mixed $expected): bool
+    {
+        $shape = fn (mixed $bytes): bool => is_array($bytes) && count($bytes) === 2
+            && is_string($bytes['sha256'] ?? null) && is_int($bytes['size'] ?? null);
+
+        return $shape($actual) && $shape($expected)
+            && hash_equals($expected['sha256'], $actual['sha256']) && $actual['size'] === $expected['size'];
     }
 
     public function discard(string $path, array $expected): void
     {
         $actual = $this->bytes($path);
         if ($actual === null) { return; }
-        if ($actual !== $expected || ! Storage::disk('private')->delete($path) || Storage::disk('private')->exists($path)) {
+        if (! self::sameBytes($actual, $expected) || ! Storage::disk('private')->delete($path) || Storage::disk('private')->exists($path)) {
             throw new LogicException('Exposure physical cleanup remains pending.');
         }
     }

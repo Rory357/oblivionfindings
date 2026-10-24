@@ -792,7 +792,7 @@ final class PpeCommandService
                 || $row->site_id !== (int) $root->site_id || ($row->root_id !== null && $row->root_id !== (int) $root->id)
                 || $row->command !== $result['command'] || $row->idempotency_key !== $result['idempotency_key']
                 || ! hash_equals($row->fingerprint, $fingerprint) || count($matches) !== 1
-                || $this->storage->bytes($row->path) !== ['digest' => $row->file_digest, 'size' => $row->file_size]) {
+                || ! PpeCommandValues::sameBytes($this->storage->bytes($row->path), ['digest' => $row->file_digest, 'size' => $row->file_size])) {
                 throw new LogicException('PPE staged evidence does not match exact durable acceptance.');
             }
             $row->forceFill(['receipt_id' => $receipt->id, 'state' => 'accepted']);
@@ -848,7 +848,7 @@ final class PpeCommandService
                 || ($origin['parent_type'] ?? null) !== $row->source_type || ($origin['parent_id'] ?? null) !== $row->source_id
                 || ($origin['disk'] ?? null) !== 'public' || ($origin['original_attribution_state'] ?? null) !== 'legacy_unknown'
                 || PpeCommandValues::digest($row->intent['_legacy_origin'] ?? null) !== PpeCommandValues::digest($origin)
-                || ($origin['observed_bytes'] ?? null) !== ['digest' => $row->file_digest, 'size' => $row->file_size]) {
+                || ! PpeCommandValues::sameBytes($origin['observed_bytes'] ?? null, ['digest' => $row->file_digest, 'size' => $row->file_size])) {
                 throw new LogicException('PPE transfer staging origin requires repair.');
             }
             $attachmentId = $origin['attachment_id'];
@@ -873,7 +873,7 @@ final class PpeCommandService
             if ($receipt->idempotency_key !== $row->idempotency_key || ! hash_equals($receipt->fingerprint, $row->fingerprint)
                 || $receipt->root_type !== 'inventory' || ($row->root_id !== null && $receipt->root_id !== $row->root_id)
                 || (int) $acceptedRoot->site_id !== $row->site_id || ($direct ? count($documents) !== 0 : count($documents) !== 1)
-                || $proof !== ['digest' => $row->file_digest, 'size' => $row->file_size]
+                || ! PpeCommandValues::sameBytes($proof, ['digest' => $row->file_digest, 'size' => $row->file_size])
                 || ($row->command === 'relocate_attachment' && PpeCommandValues::digest($version->content['facts']['legacy_origin'] ?? null) !== PpeCommandValues::digest($row->legacy_origin))) {
                 throw new LogicException('PPE staging acceptance identity requires repair.');
             }
@@ -944,7 +944,7 @@ final class PpeCommandService
                 if (! $this->storage->retainedStagingReference($row)) {
                     $bytes = $this->storage->bytes($row->path);
                     if ($bytes === null) { $state = 'cleaned'; }
-                    elseif ($bytes === ['digest' => $row->file_digest, 'size' => $row->file_size]) {
+                    elseif (PpeCommandValues::sameBytes($bytes, ['digest' => $row->file_digest, 'size' => $row->file_size])) {
                         $this->storage->discard($row->path);
                         $state = 'cleaned';
                     }
@@ -1093,7 +1093,7 @@ final class PpeCommandService
             if ($actual === null) {
                 return ['attribution_state' => 'unavailable', 'available' => false, 'byte_proof' => null];
             }
-            return $actual === $expected ? ['attribution_state' => 'recorded', 'available' => true, 'byte_proof' => $actual]
+            return PpeCommandValues::sameBytes($actual, $expected) ? ['attribution_state' => 'recorded', 'available' => true, 'byte_proof' => $actual]
                 : ['attribution_state' => 'repair_required', 'available' => false, 'byte_proof' => null];
         } catch (LogicException) {
             return ['attribution_state' => 'repair_required', 'available' => false, 'byte_proof' => null];
@@ -1571,7 +1571,7 @@ final class PpeCommandService
                 try {
                     $expected = ['digest' => $row->file_digest, 'size' => $row->file_size];
                     // Never erase the public fallback when the accepted private bytes are absent or changed.
-                    if ($this->storage->bytes($row->destination_path) === $expected) {
+                    if (PpeCommandValues::sameBytes($this->storage->bytes($row->destination_path), $expected)) {
                         $state = $this->storage->purgeLegacyOrigin($row->parent_type, $row->origin_path, $expected);
                     }
                 } catch (Throwable $failure) { report($failure); }

@@ -40,7 +40,7 @@ final class PpeEvidenceStorage
             throw new LogicException('The reserved PPE path already contains bytes; inspect that attempt before retrying.');
         }
         $path = $disk->putFileAs(dirname($attempt->path), $file, basename($attempt->path));
-        if ($path !== $attempt->path || $this->bytes($attempt->path) !== ['digest' => $identity['digest'], 'size' => $identity['size']]) {
+        if ($path !== $attempt->path || ! PpeCommandValues::sameBytes($this->bytes($attempt->path), ['digest' => $identity['digest'], 'size' => $identity['size']])) {
             throw new LogicException('The private evidence bytes were not durably confirmed.');
         }
         return ['disk' => 'private', 'path' => $attempt->path, ...$identity];
@@ -125,7 +125,7 @@ final class PpeEvidenceStorage
         if (DB::transactionLevel() < 1) { throw new LogicException('Public PPE cleanup requires locked delivery authority.'); }
         $actual = $this->legacyPublicBytes($parentType, $path);
         if ($actual === null) { return 'complete'; }
-        if ($actual !== $expected || $this->publicPathReferenced($path)) { return 'unknown'; }
+        if (! PpeCommandValues::sameBytes($actual, $expected) || $this->publicPathReferenced($path)) { return 'unknown'; }
         $disk = Storage::disk('public');
         return $disk->delete($path) && ! $disk->exists($path) ? 'complete' : 'pending';
     }

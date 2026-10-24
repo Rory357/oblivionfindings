@@ -62,6 +62,19 @@ final class PpeCommandValues
         return $value;
     }
 
+    /**
+     * Same file bytes: both are {digest: string, size: int} with equal values. Key order is ignored because MySQL's
+     * json column hands keys back in its own order; values and types still compare strictly.
+     */
+    public static function sameBytes(mixed $actual, mixed $expected): bool
+    {
+        $shape = fn (mixed $bytes): bool => is_array($bytes) && count($bytes) === 2
+            && is_string($bytes['digest'] ?? null) && is_int($bytes['size'] ?? null);
+
+        return $shape($actual) && $shape($expected)
+            && hash_equals($expected['digest'], $actual['digest']) && $actual['size'] === $expected['size'];
+    }
+
     public static function digest(mixed $value): string
     {
         return hash('sha256', json_encode(self::canonical($value), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION));
