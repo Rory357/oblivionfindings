@@ -131,7 +131,11 @@ class HandleInertiaRequests extends Middleware
         if ($user) {
             $can = $this->getUserPermissions($user);
             if (isset($can['job_board'])) {
-                $can['job_board']['open_count'] = $this->jobBoardOpenCount($user);
+                // Only people who see the "Available shifts" item get its badge count (same test as the sidebar),
+                // so everyone else's pages don't query open shifts or their clients.
+                $seesJobBoard = ($can['job_board']['viewAny'] ?? false) || ($can['job_board']['claim'] ?? false)
+                    || ($can['shifts']['viewAny'] ?? false) || ($can['shifts']['viewAssigned'] ?? false);
+                $can['job_board']['open_count'] = $seesJobBoard ? $this->jobBoardOpenCount($user) : 0;
             }
 
             // Overdue-meds badge for the sidebar "Meds today" item. Only
