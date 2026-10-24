@@ -10,7 +10,7 @@ use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\TaskItem;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
-/** Unregistered. Source commands alone complete work; no generic model/audit/assignment adapter. */
+/** Registered in TaskAggregator::defaultProviders(). Source commands alone complete work; no generic model/audit/assignment adapter. */
 final class ChemicalExposureFollowupProvider implements ContextualHealthSafetyTaskProvider, SiteScopedTaskProvider
 {
     public function sourceKey(): string { return 'chemical_exposure_followup'; }

@@ -208,7 +208,8 @@ class HealthSafetyTaskContextTest extends TestCase
 
     public function test_navigation_retains_finding_end_of_day_at_the_new_zealand_daylight_saving_boundary(): void
     {
-        $this->travelTo(Carbon::parse('2026-09-27T23:59:58+13:00'));
+        // Same NZ instants, frozen in UTC (the default timezone) so stored datetimes are read correctly.
+        $this->travelTo(Carbon::parse('2026-09-27T23:59:58+13:00')->utc());
         $drill = EmergencyDrill::factory()->create(['site_id' => $this->sourceSite->id, 'conducted_by' => $this->worker->id, 'status' => 'in_progress']);
         $finding = EmergencyDrillFinding::factory()->create(['emergency_drill_id' => $drill->id,
             'assigned_to' => $this->worker->id, 'due_date' => '2026-09-27', 'status' => 'open']);
@@ -221,7 +222,7 @@ class HealthSafetyTaskContextTest extends TestCase
         $this->assertSame('2026-09-27T23:59:59+13:00', $items[0]->dueAt);
         $this->assertFalse($items[0]->isOverdue());
         $this->assertSame($provider->authorizedTasks($this->worker)[0]->dueAt, $items[0]->dueAt);
-        $this->travelTo(Carbon::parse('2026-09-28T00:00:00+13:00'));
+        $this->travelTo(Carbon::parse('2026-09-28T00:00:00+13:00')->utc());
         $this->assertTrue($navigation()[0]->isOverdue());
         $drill->update(['status' => 'cancelled']);
         $this->assertSame([], $navigation());
@@ -661,12 +662,12 @@ class HealthSafetyTaskContextTest extends TestCase
         $identityColumns = ['hs_event' => 'hs_events.id', 'hs_investigation' => 'hs_investigations.id', 'corrective_action' => 'hs_corrective_actions.id'];
         foreach ($providers as $provider) {
             foreach ($rows as $index => $ids) {
-                IlluminateSupportFacadesDB::enableQueryLog();
-                IlluminateSupportFacadesDB::flushQueryLog();
+                \Illuminate\Support\Facades\DB::enableQueryLog();
+                \Illuminate\Support\Facades\DB::flushQueryLog();
                 try {
                     $items = $provider->authorizedTasks($this->worker, ['id' => $ids[$provider->sourceKey()]]);
                     $this->assertCount($index === 0 ? 1 : 0, $items, $provider::class);
-                    $proofs = array_filter(IlluminateSupportFacadesDB::getQueryLog(),
+                    $proofs = array_filter(\Illuminate\Support\Facades\DB::getQueryLog(),
                         fn ($query) => str_contains(strtolower($query['query']), 'first_aid_records')
                             && str_contains(strtolower($query['query']), 'exists'));
                     $this->assertNotEmpty($proofs, 'Actual canonical treatment proof must execute.');
@@ -679,8 +680,8 @@ class HealthSafetyTaskContextTest extends TestCase
                         $this->assertStringNotContainsString('injury_illness_description', $sql);
                     }
                 } finally {
-                    IlluminateSupportFacadesDB::disableQueryLog();
-                    IlluminateSupportFacadesDB::flushQueryLog();
+                    \Illuminate\Support\Facades\DB::disableQueryLog();
+                    \Illuminate\Support\Facades\DB::flushQueryLog();
                 }
             }
         }
@@ -706,11 +707,11 @@ class HealthSafetyTaskContextTest extends TestCase
             foreach ($providers as $provider) {
                 $this->assertCount(1, $provider->authorizedTasksInContext($this->worker, ['id' => $rows[0][$provider->sourceKey()]], $context));
                 $this->assertSame([], $provider->authorizedTasksInContext($this->worker, ['id' => $rows[1][$provider->sourceKey()]], $context));
-                IlluminateSupportFacadesDB::enableQueryLog();
-                IlluminateSupportFacadesDB::flushQueryLog();
+                \Illuminate\Support\Facades\DB::enableQueryLog();
+                \Illuminate\Support\Facades\DB::flushQueryLog();
                 try {
                     $found = $provider->authorizedTasksInContext($this->worker, ['q' => 'CandidateScope'], $context);
-                    $proofs = array_filter(IlluminateSupportFacadesDB::getQueryLog(),
+                    $proofs = array_filter(\Illuminate\Support\Facades\DB::getQueryLog(),
                         fn ($query) => str_contains(strtolower($query['query']), 'first_aid_records')
                             && str_contains(strtolower($query['query']), 'exists'));
                     $this->assertNotEmpty($proofs);
@@ -726,8 +727,8 @@ class HealthSafetyTaskContextTest extends TestCase
                     $this->assertSame([$provider->sourceKey().'-'.$rows[0][$provider->sourceKey()]], array_column($found, 'id'));
                     array_push($all, ...$found);
                 } finally {
-                    IlluminateSupportFacadesDB::disableQueryLog();
-                    IlluminateSupportFacadesDB::flushQueryLog();
+                    \Illuminate\Support\Facades\DB::disableQueryLog();
+                    \Illuminate\Support\Facades\DB::flushQueryLog();
                 }
             }
             return $all;
@@ -751,10 +752,11 @@ class HealthSafetyTaskContextTest extends TestCase
         $events = $rows = [];
         foreach ([$own, $other] as $index => $record) {
             $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->create([
-                'source_type' => AppModelsFirstAidRecord::class, 'source_id' => $record->id,
+                'source_type' => \App\Models\FirstAidRecord::class, 'source_id' => $record->id,
                 'event_category' => HsEvent::CATEGORY_INJURY, 'site_id' => $record->site_id,
                 'client_id' => null, 'asset_id' => null, 'staff_id' => $record->treated_person_id,
-                'reference_number' => 'HS-CandidateScope-'.$index.'-'.$record->id,
+                // hs_events.reference_number is varchar(20); the search term stays in the reference.
+                'reference_number' => 'HS-CandidateScope-'.$index,
                 'created_by' => $this->manager->id, 'owner_user_id' => $this->worker->id,
                 'status' => HsEvent::STATUS_OPEN,
             ]));

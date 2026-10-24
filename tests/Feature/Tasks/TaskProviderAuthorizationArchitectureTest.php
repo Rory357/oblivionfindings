@@ -5,6 +5,8 @@ use App\Http\Controllers\AllTasksController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Notifications\AppEventNotification;
+use App\Services\HealthSafety\ChemicalExposureFollowupDestinationService;
+use App\Services\HealthSafety\InjurySourceProjectionService;
 use App\Services\Medication\Downtime\DowntimeService;
 use App\Services\Medication\Reviews\MedicationReviewReader;
 use App\Services\NotificationService;
@@ -13,10 +15,13 @@ use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\Providers\ActionItemProvider;
 use App\Services\Tasks\Providers\CdLossReportProvider;
+use App\Services\Tasks\Providers\ChemicalExposureFollowupProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use App\Services\Tasks\Providers\ControlRoomAlertProvider;
 use App\Services\Tasks\Providers\DataBreachProvider;
 use App\Services\Tasks\Providers\DataSubjectRequestProvider;
+use App\Services\Tasks\Providers\EmergencyDrillFindingProvider;
+use App\Services\Tasks\Providers\EmergencyDrillProvider;
 use App\Services\Tasks\Providers\FirstAidFollowupProvider;
 use App\Services\Tasks\Providers\FleetFinanceReviewProvider;
 use App\Services\Tasks\Providers\FleetIncidentProvider;
@@ -43,6 +48,7 @@ use App\Services\Tasks\Providers\MedicationPrescriberRequestProvider;
 use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
 use App\Services\Tasks\Providers\MedicationReviewProvider;
 use App\Services\Tasks\Providers\MedicationRoundProvider;
+use App\Services\Tasks\Providers\ProcedureReviewRequestProvider;
 use App\Services\Tasks\Providers\ReferralTaskProvider;
 use App\Services\Tasks\Providers\RespiteTaskProvider;
 use App\Services\Tasks\Providers\RestraintReviewProvider;
@@ -61,7 +67,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(42);
+    expect($providers)->toHaveCount(46);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -71,6 +77,9 @@ it('registers every task source behind exactly one authorization boundary', func
         HsInvestigationProvider::class => 'hs_investigation',
         HsCorrectiveActionProvider::class => 'corrective_action',
         SiteHazardProvider::class => 'hazard',
+        ProcedureReviewRequestProvider::class => 'procedure_review_request',
+        EmergencyDrillProvider::class => 'emergency_drill',
+        EmergencyDrillFindingProvider::class => 'emergency_drill_finding',
         WorkplaceInjuryProvider::class => 'injury',
         SafeguardingConcernProvider::class => 'safeguarding',
         SafeguardingActionPlanProvider::class => 'safeguarding_action',
@@ -107,6 +116,7 @@ it('registers every task source behind exactly one authorization boundary', func
         ReferralTaskProvider::class => 'referrals',
         FirstAidFollowupProvider::class => 'first_aid_followup',
         RestraintReviewProvider::class => 'restraint_review',
+        ChemicalExposureFollowupProvider::class => 'chemical_exposure_followup',
     ]);
 
     // Owning-domain adapters retain the same Site/person boundary; their
@@ -116,6 +126,24 @@ it('registers every task source behind exactly one authorization boundary', func
         MedicationReviewChangeProvider::class => [MedicationReviewReader::class, '->clientIds($user)', "whereColumn('medication_reviews.client_id', 'medication_review_items.client_id')"],
         MedicationPaperGiverConfirmationProvider::class => [DowntimeService::class, '->pendingConfirmations($user)'],
         MedicationPaperWitnessConfirmationProvider::class => [DowntimeService::class, '->pendingConfirmations($user)'],
+    ];
+
+    // These approved source-owned adapters retain fresh actor/Site/source reads;
+    // the original providers continue to satisfy their existing shared boundary.
+    $currentSourceAdapters = [
+        ProcedureReviewRequestProvider::class => [
+            'SafeWorkProcedureAccessService::class', '$access->assertSource($row, $current, $reads, $sites, false, $context)',
+            '$access->isApprovedVersion($version)', '$access->audienceAllows($version->content_snapshot ?? [], $current, $sites)',
+            '$access->workingAllowed($record, $current, $sites)', '$access->allSitesAllowed($record->applicable_sites ?? [], $sites, $current)',
+        ],
+        EmergencyDrillProvider::class => [
+            'EmergencyDrillAccessService::class', '$access->scopeForSites(EmergencyDrill::query(), $sites)',
+            '->where(\'conducted_by\', $current->id)',
+        ],
+        EmergencyDrillFindingProvider::class => [
+            'EmergencyDrillAccessService::class', '->whereHas(\'emergencyDrill\', fn ($q) => $access->scopeForSites($q, $sites))',
+            '->where(\'assigned_to\', $current->id)',
+        ],
     ];
 
     foreach ($providers as $provider) {
@@ -132,6 +160,52 @@ it('registers every task source behind exactly one authorization boundary', func
         $source = $path === false ? '' : file_get_contents($path);
 
         expect($source)->not->toContain('public function tasks(');
+        if ($provider instanceof WorkplaceInjuryProvider) {
+            expect($siteScoped)->toBeTrue();
+            expect($source)
+                ->toContain(InjurySourceProjectionService::class)
+                ->toContain('->taskRows($user, $filters, $context)')
+                ->toContain('restricted: true')
+                ->not->toContain('WorkplaceInjury::query(')
+                ->not->toContain('->siteScoped(')
+                ->not->toContain(TaskProviderAuthorization::class)
+                ->not->toMatch('/->(?:get|paginate|cursor|lazy|chunk)\s*\(/');
+            // TaskItems are created after the scalar-only source callback has returned.
+            expect(strpos($source, '->taskRows($user, $filters, $context)'))->toBeLessThan(strpos($source, 'new TaskItem('));
+
+            continue;
+        }
+
+        if ($provider instanceof ChemicalExposureFollowupProvider) {
+            // Source-owned private follow-ups: the H&S destination service reads assigned rows under
+            // its own fresh actor/Site/source authority and returns scalars only.
+            expect($siteScoped)->toBeTrue();
+            expect($source)
+                ->toContain(ChemicalExposureFollowupDestinationService::class)
+                ->toContain('->taskRows($viewer, $filters, $context, $navigation)')
+                ->toContain('restricted: true')
+                ->not->toContain('ChemicalExposureFollowup::query(')
+                ->not->toContain('->siteScoped(')
+                ->not->toContain(TaskProviderAuthorization::class)
+                ->not->toMatch('/->(?:get|paginate|cursor|lazy|chunk)\s*\(/');
+
+            continue;
+        }
+
+        if (isset($currentSourceAdapters[$provider::class])) {
+            expect($siteScoped)->toBeTrue();
+            expect($source)
+                ->toContain('->withCurrentViewer(')
+                ->toContain('CurrentAuthorizationReads $reads')
+                ->toContain('if (! $this->canView($current))')
+                ->toContain('$reads->query(');
+            foreach ($currentSourceAdapters[$provider::class] as $requiredScope) {
+                expect($source)->toContain($requiredScope);
+            }
+
+            continue;
+        }
+
         if (isset($domainAdapters[$provider::class])) {
             expect($source)->toContain('if (! $this->canView($user))');
             foreach ($domainAdapters[$provider::class] as $requiredScope) {
