@@ -37,6 +37,9 @@ class HsRiskAssessmentWorkspaceTest extends TestCase
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->firstOrFail());
         $this->site = Site::factory()->create(['type' => 'house']);
+        // H&S data needs current staff (Stephan, 25 Oct): the admin works at the Site.
+        \App\Domain\Hr\Models\HrEmployeeProfile::factory()->create(['user_id' => $this->admin->id, 'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [], 'start_date' => '2020-01-01', 'end_date' => null, 'is_active' => true]);
     }
 
     public function test_show_content_negotiates_permanent_page_and_preserves_json_detail(): void

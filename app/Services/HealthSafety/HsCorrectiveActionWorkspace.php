@@ -27,7 +27,8 @@ final class HsCorrectiveActionWorkspace
         $permissions = array_values(array_unique([...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
             ...InjuryAccessService::PERMISSIONS, ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS]));
         return HealthSafetyReadContext::within($viewer, $permissions, fn ($context) =>
-            $context->consumeSourceViewer($permissions, function ($viewer) use ($record, $context) {
+            // H&S data needs current staff and an approved Site (Stephan, 25 Oct), as on the event page.
+            $context->consumeViewer($permissions, function ($viewer) use ($record, $context) {
                 abort_unless($viewer->canDo('hazards.view'), 403);
                 $sourceCandidates = $context->applyEventSiteScope(HsEvent::query()->whereIn('id', HsCorrectiveAction::query()
                     ->whereKey($record->id)->select('hs_event_id')), UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
