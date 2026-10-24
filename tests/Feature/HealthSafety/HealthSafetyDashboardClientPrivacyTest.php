@@ -84,8 +84,8 @@ class HealthSafetyDashboardClientPrivacyTest extends TestCase
         $this->viewer->assignedClients()->attach($client->id);
         $this->assertSame([$client->id], array_column($this->dashboard()['clients'], 'id'));
         User::query()->whereKey($this->viewer->id)->update(['approved_at' => null]);
-        // An account that is no longer approved is signed out by main's approval check before any H&S read.
-        $this->actingAs($this->viewer)->get('/health-safety')->assertRedirect();
+        // An account that is no longer approved is refused: the H&S read finds it unapproved before any client read.
+        $this->actingAs($this->viewer)->get('/health-safety')->assertForbidden();
     }
 
     public function test_current_hr_and_approved_site_revocation_suppress_picker_without_requiring_first_aid_module_authority(): void
@@ -103,6 +103,8 @@ class HealthSafetyDashboardClientPrivacyTest extends TestCase
         $this->grant('healthSafety.viewAllSites', true);
         $this->grant('clients.viewAny', true);
         $this->grant('clinical.accessAllSites', true);
+        // A new request loads the user afresh; reuse the same object's grants only after reloading them.
+        $this->viewer = $this->viewer->fresh();
         $this->assertSame([$client->id], array_column($this->dashboard()['clients'], 'id'));
         $this->site->update(['is_active' => false]);
         $this->assertSame([], $this->dashboard()['clients']);

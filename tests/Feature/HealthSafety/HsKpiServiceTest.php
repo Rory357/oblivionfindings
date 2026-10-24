@@ -46,7 +46,8 @@ class HsKpiServiceTest extends TestCase
         $this->viewer = User::factory()->create(['approved_at' => now()]);
         HrEmployeeProfile::factory()->create(['user_id' => $this->viewer->id, 'primary_site_id' => Site::factory()->create()->id,
             'secondary_site_ids' => [], 'is_active' => true, 'start_date' => '2020-01-01', 'end_date' => null]);
-        foreach (['hazards.view', 'healthSafety.viewAllSites', 'incidents.viewAny'] as $key) {
+        // TRIFR and the near-miss ratio count recordability from medical treatment, which needs wellbeing read (kept rule).
+        foreach (['hazards.view', 'healthSafety.viewAllSites', 'incidents.viewAny', 'hr.wellbeing.view'] as $key) {
             $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'test', 'module' => 'Test']);
             $this->viewer->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
         }
