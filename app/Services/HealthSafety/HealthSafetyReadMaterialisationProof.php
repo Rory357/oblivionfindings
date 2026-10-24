@@ -54,9 +54,9 @@ final class HealthSafetyReadMaterialisationProof
             // Aggregate/get clones have their actual final columns here. A subquery
             // compiled without execution creates no receipt.
             $original = clone $actual;
-            $actual->afterQuery(function ($rows) use ($original) {
+            $actual->afterQuery(function ($rows) use ($original, $actual) {
                 if (! $this->verifying) {
-                    $this->receipts[] = ['query' => $original, 'facts' => $this->facts($rows)];
+                    $this->receipts[] = ['query' => $original, 'facts' => $this->facts($rows), 'pluck' => $this->pluckArguments($actual)];
                 }
                 return $rows;
             });
@@ -73,14 +73,32 @@ final class HealthSafetyReadMaterialisationProof
                 foreach ($this->receipts as $receipt) {
                     // Preserve original expressions, bindings and read locks. Never
                     // replay detached SQL or recapture a fresh source admission.
-                    $query = clone $receipt['query'];
-                    $rows = $reads->query($query)->get();
+                    $query = $reads->query(clone $receipt['query']);
+                    // Replay the same terminal read: pluck() emitted values, not rows.
+                    $rows = $receipt['pluck'] === null ? $query->get() : $query->pluck(...$receipt['pluck']);
                     abort_unless($this->facts($rows) === $receipt['facts'], 404, 'Source evidence changed during report materialisation.');
                 }
             });
         } finally {
             $this->verifying = false;
         }
+    }
+
+    /**
+     * pluck() hands after-query callbacks the plucked values rather than rows, so
+     * the final barrier must pluck the same column and key. Any other read is a get().
+     *
+     * @return array{0: mixed, 1: mixed}|null
+     */
+    private function pluckArguments(QueryBuilder $actual): ?array
+    {
+        foreach (debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 8) as $frame) {
+            if (($frame['function'] ?? null) === 'pluck' && ($frame['object'] ?? null) === $actual) {
+                return [$frame['args'][0] ?? null, $frame['args'][1] ?? null];
+            }
+        }
+
+        return null;
     }
 
     private function facts(mixed $rows): array
