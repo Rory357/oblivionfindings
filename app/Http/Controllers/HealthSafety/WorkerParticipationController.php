@@ -351,10 +351,16 @@ class WorkerParticipationController extends Controller
         $request->validate(['document' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx']]);
 
         $path = $request->file('document')->store("health-safety/meetings/{$meeting->id}", 'private');
-        $meeting->update([
-            'minutes_document_path' => $path,
-            'minutes_document_name' => $request->file('document')->getClientOriginalName(),
-        ]);
+        try {
+            $meeting->update([
+                'minutes_document_path' => $path,
+                'minutes_document_name' => $request->file('document')->getClientOriginalName(),
+            ]);
+        } catch (\Throwable $error) {
+            // The record still points at its earlier minutes: remove only the file this request stored.
+            if (is_string($path) && $path !== '') { \Illuminate\Support\Facades\Storage::disk('private')->delete($path); }
+            throw $error;
+        }
 
         return back()->with('success', 'Meeting minutes uploaded successfully.');
     }
