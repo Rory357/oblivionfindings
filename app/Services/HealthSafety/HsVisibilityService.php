@@ -2,6 +2,7 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Models\ControlRoomAlert;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\User;
@@ -22,6 +23,29 @@ class HsVisibilityService
     private const PROJECTION_PERMISSIONS = ['compliance.view'];
 
     public function __construct(private readonly HsEventAccessService $access) {}
+
+    /**
+     * The H&S event linked to a Control Room alert, for the alert record's panel.
+     *
+     * Read through forEvent(), so a viewer who cannot read the event gets only its
+     * workflow state: no reference, names, WorkSafe details or link.
+     */
+    public function forControlRoomAlert(ControlRoomAlert $alert, ?User $viewer = null): ?array
+    {
+        if ($viewer === null) {
+            return null;
+        }
+        $hsEvent = HsEvent::query()->where('control_room_alert_id', $alert->id)->first(['id']);
+        if (! $hsEvent) {
+            return null;
+        }
+        $summary = $this->forEvent($hsEvent, $viewer) + ['reference_number' => null, 'href' => null];
+        if (! $viewer->canDo('hazards.view')) {
+            $summary['href'] = null;
+        }
+
+        return $summary;
+    }
 
     /**
      * Shape an already resolved canonical event for another module.

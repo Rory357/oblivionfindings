@@ -174,7 +174,7 @@ class HealthSafetyReadContextTest extends TestCase
     {
         $first = $this->event(FirstAidRecord::factory()->create(['site_id' => $this->sourceSite->id, 'first_aider_id' => $this->firstAider->id]));
         $second = $this->event(FirstAidRecord::factory()->create(['site_id' => $this->sourceSite->id, 'first_aider_id' => $this->firstAider->id]));
-        $ordinary = HsEvent::factory()->create(['site_id' => $this->sourceSite->id, 'source_type' => null, 'source_id' => null]);
+        $ordinary = HsEvent::factory()->create(['site_id' => $this->sourceSite->id]);
         HealthSafetyReadContext::within($this->manager, $this->keys(), function ($context) use ($first, $second, $ordinary): array {
             $access = app(HsEventAccessService::class);
             $final = HsEvent::whereKey([$first->id, $second->id, $ordinary->id]);
@@ -298,7 +298,7 @@ class HealthSafetyReadContextTest extends TestCase
         $first = $this->event($record);
         $second = $this->event(FirstAidRecord::factory()->create(['site_id' => $this->sourceSite->id, 'first_aider_id' => $this->firstAider->id]));
         $record->deleteQuietly();
-        $ordinary = HsEvent::factory()->create(['site_id' => $this->sourceSite->id, 'source_type' => null, 'source_id' => null]);
+        $ordinary = HsEvent::factory()->create(['site_id' => $this->sourceSite->id]);
         $actual = DB::transaction(fn () => app(HsEventAccessService::class)->applyFirstAidSourceScope(
             HsEvent::whereKey([$first->id, $second->id, $ordinary->id]), $this->manager, null, HsEvent::whereKey($first->id),
         )->pluck('id')->all());
