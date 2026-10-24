@@ -685,7 +685,11 @@ class HealthSafetyTaskContextTest extends TestCase
                 }
             }
         }
-        $events[0]->updateQuietly(['status' => HsEvent::STATUS_CLOSED]);
+        // The hs_events close-path trigger admits only the canonical closure path; mark this fixture close as such
+        // (same pattern as the chemical exposure suites), rather than bypassing the trigger.
+        \Illuminate\Support\Facades\DB::statement('SET @hs_canonical_close_event_id = '.(int) $events[0]->id);
+        try { $events[0]->updateQuietly(['status' => HsEvent::STATUS_CLOSED]); }
+        finally { \Illuminate\Support\Facades\DB::statement('SET @hs_canonical_close_event_id = NULL'); }
         HsInvestigation::findOrFail($rows[0]['hs_investigation'])->updateQuietly(['status' => HsInvestigation::STATUS_COMPLETED]);
         HsCorrectiveAction::findOrFail($rows[0]['corrective_action'])->updateQuietly(['status' => HsCorrectiveAction::STATUS_CLOSED]);
         foreach ($providers as $provider) {
