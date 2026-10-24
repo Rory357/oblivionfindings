@@ -22,6 +22,9 @@ use Inertia\Inertia;
 
 class StaffController extends Controller
 {
+    /** People with this see staff records at every Site. */
+    private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -65,10 +68,12 @@ class StaffController extends Controller
         // Portal users should never appear in the staff module.
         abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
 
-        // Staff can view themselves; managers/admins can view any staff.
+        // Staff can view themselves; managers/admins can view staff in their
+        // own Sites (every Site with sites.viewAll).
         if ($auth->id !== $user->id) {
             abort_unless($auth->canDo('staff.viewAny'), 403);
         }
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $user->load(['roles:id,name,label']);
         $staffProfile = $this->staffProfileMap([$user->id])[$user->id] ?? null;
@@ -231,6 +236,7 @@ class StaffController extends Controller
 
         // Portal users should never appear in the staff module.
         abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $user->load(['roles:id,name,label']);
         $staffProfile = $this->staffProfileMap([$user->id])[$user->id] ?? null;
@@ -250,6 +256,7 @@ class StaffController extends Controller
 
         // Portal users should never be editable from the staff module.
         abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -300,6 +307,7 @@ class StaffController extends Controller
                     || in_array($lockedUser->role, ['client', 'next_of_kin'], true),
                 404,
             );
+            $this->abortUnlessStaffInViewerSites($lockedActor, $lockedUser);
             $lockedUser->update([
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -339,6 +347,35 @@ class StaffController extends Controller
         ]);
 
         return redirect()->route('staff.show', $user)->with('success', 'Staff updated.');
+    }
+
+    /**
+     * A staff record is open to its owner, to people with sites.viewAll, and
+     * otherwise only to viewers who share a Site with it: the staff member's
+     * HR profile (current or former) has its primary or a secondary Site
+     * among the viewer's Sites. Anyone else gets not found, so a record in
+     * another Site isn't confirmed to exist.
+     */
+    private function abortUnlessStaffInViewerSites(User $viewer, User $staff): void
+    {
+        if ((int) $viewer->id === (int) $staff->id) {
+            return;
+        }
+
+        $siteAccess = app(UserSiteAccessService::class);
+        if ($siteAccess->canBypass($viewer, self::SITE_BYPASS_PERMISSIONS)) {
+            return;
+        }
+
+        $inViewerSites = $siteAccess
+            ->applyHistoricalStaffSiteScope(
+                User::query()->whereKey($staff->id),
+                $viewer,
+                self::SITE_BYPASS_PERMISSIONS,
+            )
+            ->exists();
+
+        abort_unless($inViewerSites, 404);
     }
 
     private function serializeStaffUser(User $user, ?array $staffProfile = null, int $assignedClientsCount = 0): array
