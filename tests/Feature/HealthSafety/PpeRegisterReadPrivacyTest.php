@@ -79,13 +79,14 @@ class PpeRegisterReadPrivacyTest extends PpeReadTestCase
 
     public function test_nz_day_thresholds_include_today_without_expiring_at_start_of_day(): void
     {
-        $this->travelTo(\Carbon\Carbon::parse('2026-10-12T23:30:00+13:00'));
+        // Same NZ instants, frozen in UTC (main's TestCase refuses a frozen clock outside the default timezone).
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-12T23:30:00+13:00')->utc());
         $this->item->update(['expiry_date' => '2026-10-12', 'next_inspection_due' => '2026-10-12']);
         $dto = app(PpeRegisterService::class)->index($this->viewer, ['tab' => 'inv_inspection']);
         $this->assertSame(1, $dto['inventory']['total']);
         $this->assertSame(0, $dto['hero']['compliance']['inspections_overdue']);
         $this->assertSame('in_date', $dto['inventory']['data'][0]['currency']['expiry_state']);
-        $this->travelTo(\Carbon\Carbon::parse('2026-10-13T00:01:00+13:00'));
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-13T00:01:00+13:00')->utc());
         $dto = app(PpeRegisterService::class)->index($this->viewer);
         $this->assertSame(1, $dto['hero']['compliance']['inspections_overdue']);
         $this->assertSame('expired', $dto['inventory']['data'][0]['currency']['expiry_state']);
