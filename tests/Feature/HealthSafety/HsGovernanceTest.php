@@ -86,7 +86,7 @@ class HsGovernanceTest extends TestCase
         $this->assertEquals('critical', $summary['overall_status']);
     }
 
-    public function test_overall_status_good_when_clean(): void
+    public function test_overall_status_is_unknown_not_good_when_clean(): void
     {
         $summary = $this->governanceService->getBoardSummary(viewer: $this->applicationViewer);
 
