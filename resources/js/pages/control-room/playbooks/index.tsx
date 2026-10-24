@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/table';
 import { formatRelative } from '@/lib/datetime';
 import { Link, router } from '@inertiajs/react';
-import { BookOpen, Eye, Layers, Plus, Power, ToggleRight } from 'lucide-react';
+import { BookOpen, Eye, Layers, Plus, Power, ToggleRight, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 // --- Types ---
@@ -45,6 +45,8 @@ interface PlaybookSummary {
     version: number;
     is_active: boolean;
     auto_attach: boolean;
+    /** "Start on its own" is on but no alert type or severity is chosen, so it never starts on its own. */
+    auto_start_missing_triggers: boolean;
     requires_approval: boolean;
     sla_acknowledge_minutes: number | null;
     sla_response_minutes: number | null;
@@ -63,6 +65,7 @@ interface Props {
     };
     categories: Record<string, string>;
     stepTypes: Record<string, string>;
+    alertTypes: string[];
     can: {
         manage: boolean;
     };
@@ -71,6 +74,9 @@ interface Props {
 type StatusFilter = 'all' | '1' | '0';
 
 const BASE = '/control-room/playbooks';
+
+/** The procedure page, opened on its edit wizard at "Starting and targets". */
+const chooseTriggersHref = (id: number) => `${BASE}/${id}?edit=starting`;
 
 const STATUS_OPTIONS = [
     { value: 'all', label: 'Available and off' },
@@ -94,6 +100,7 @@ export default function PlaybooksIndex({
     filters,
     categories,
     stepTypes,
+    alertTypes,
     can,
 }: Props) {
     const [status, setStatus] = useState<StatusFilter>(() =>
@@ -150,6 +157,16 @@ export default function PlaybooksIndex({
             icon: Eye,
             onSelect: () => router.visit(`${BASE}/${pb.id}`),
         },
+        ...(can.manage && pb.auto_start_missing_triggers
+            ? [
+                  {
+                      key: 'triggers',
+                      label: 'Choose which alerts start it',
+                      icon: Zap,
+                      onSelect: () => router.visit(chooseTriggersHref(pb.id)),
+                  },
+              ]
+            : []),
         ...(can.manage
             ? [
                   pb.is_active
@@ -345,6 +362,7 @@ export default function PlaybooksIndex({
                     onClose={() => setWizardOpen(false)}
                     categories={categories}
                     stepTypes={stepTypes}
+                    alertTypes={alertTypes}
                 />
             ) : null}
         </ControlRoomPage>
@@ -397,7 +415,29 @@ function ProcedureRow({
                     <TableCell className="text-subtle whitespace-nowrap">{category}</TableCell>
                     <TableCell className="text-right tabular-nums">{pb.steps_count}</TableCell>
                     <TableCell className="whitespace-nowrap">
-                        {pb.auto_attach ? 'On its own' : 'From an alert'}
+                        {pb.auto_start_missing_triggers ? (
+                            <>
+                                <StatusBadge variant="warning" size="sm">
+                                    Won&apos;t start on its own
+                                </StatusBadge>
+                                {canManage ? (
+                                    <Link
+                                        href={chooseTriggersHref(pb.id)}
+                                        className="text-caption block font-medium text-primary hover:underline"
+                                    >
+                                        Choose which alerts start it
+                                    </Link>
+                                ) : (
+                                    <span className="text-caption block">
+                                        No alerts are chosen to start it
+                                    </span>
+                                )}
+                            </>
+                        ) : pb.auto_attach ? (
+                            'On its own'
+                        ) : (
+                            'From an alert'
+                        )}
                         {pb.requires_approval ? (
                             <span className="text-caption block">Needs sign-off</span>
                         ) : null}

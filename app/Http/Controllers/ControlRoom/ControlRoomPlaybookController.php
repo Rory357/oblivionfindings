@@ -7,11 +7,13 @@ use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\PlaybookStep;
+use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -20,6 +22,18 @@ class ControlRoomPlaybookController extends Controller
     use AuthorizesControlRoomAlertAccess;
 
     private const TRANSACTION_ATTEMPTS = 3;
+
+    /** How many distinct alert types already raised are offered as choices. */
+    private const OCCURRING_ALERT_TYPE_LIMIT = 300;
+
+    /**
+     * A procedure that starts on its own needs at least one alert type and one
+     * severity: an empty list never matches an alert (Playbook::findForAlert).
+     */
+    private const TRIGGER_MESSAGES = [
+        'trigger_alert_types.required' => 'Choose at least one alert type that starts this procedure on its own.',
+        'trigger_severities.required' => 'Choose at least one severity that starts this procedure on its own.',
+    ];
 
     /**
      * List playbooks with category/active filters.
@@ -52,6 +66,7 @@ class ControlRoomPlaybookController extends Controller
             'version' => $pb->version,
             'is_active' => $pb->is_active,
             'auto_attach' => $pb->auto_attach,
+            'auto_start_missing_triggers' => $pb->autoStartMissingTriggers(),
             'requires_approval' => $pb->requires_approval,
             'sla_acknowledge_minutes' => $pb->sla_acknowledge_minutes,
             'sla_response_minutes' => $pb->sla_response_minutes,
@@ -67,6 +82,7 @@ class ControlRoomPlaybookController extends Controller
             'filters' => $filters,
             'categories' => Playbook::categories(),
             'stepTypes' => PlaybookStep::types(),
+            'alertTypes' => $this->alertTypeOptions(),
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
             ],
@@ -128,6 +144,7 @@ class ControlRoomPlaybookController extends Controller
                 'version' => $playbook->version,
                 'is_active' => $playbook->is_active,
                 'auto_attach' => $playbook->auto_attach,
+                'auto_start_missing_triggers' => $playbook->autoStartMissingTriggers(),
                 'trigger_alert_types' => $playbook->trigger_alert_types ?? [],
                 'trigger_severities' => $playbook->trigger_severities ?? [],
                 'sla_acknowledge_minutes' => $playbook->sla_acknowledge_minutes,
@@ -165,6 +182,7 @@ class ControlRoomPlaybookController extends Controller
             'recentRuns' => $recentRuns,
             'categories' => Playbook::categories(),
             'stepTypes' => PlaybookStep::types(),
+            'alertTypes' => $this->alertTypeOptions(),
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
             ],
@@ -185,9 +203,9 @@ class ControlRoomPlaybookController extends Controller
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['required', 'string', 'in:emergency,safety,compliance,maintenance,investigation'],
             'auto_attach' => ['boolean'],
-            'trigger_alert_types' => ['nullable', 'array'],
+            'trigger_alert_types' => [Rule::requiredIf($request->boolean('auto_attach')), 'nullable', 'array'],
             'trigger_alert_types.*' => ['string', 'max:100'],
-            'trigger_severities' => ['nullable', 'array'],
+            'trigger_severities' => [Rule::requiredIf($request->boolean('auto_attach')), 'nullable', 'array'],
             'trigger_severities.*' => ['string', 'in:low,medium,high,critical'],
             'sla_acknowledge_minutes' => ['nullable', 'integer', 'min:1'],
             'sla_response_minutes' => ['nullable', 'integer', 'min:1'],
@@ -206,7 +224,7 @@ class ControlRoomPlaybookController extends Controller
             'steps.*.decision_options' => ['nullable', 'array'],
             'steps.*.notify_config' => ['nullable', 'array'],
             'steps.*.evidence_config' => ['nullable', 'array'],
-        ]);
+        ], self::TRIGGER_MESSAGES);
 
         $playbook = DB::transaction(function () use ($data, $user) {
             $playbook = Playbook::create([
@@ -273,9 +291,9 @@ class ControlRoomPlaybookController extends Controller
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['required', 'string', 'in:emergency,safety,compliance,maintenance,investigation'],
             'auto_attach' => ['boolean'],
-            'trigger_alert_types' => ['nullable', 'array'],
+            'trigger_alert_types' => [Rule::requiredIf($request->boolean('auto_attach')), 'nullable', 'array'],
             'trigger_alert_types.*' => ['string', 'max:100'],
-            'trigger_severities' => ['nullable', 'array'],
+            'trigger_severities' => [Rule::requiredIf($request->boolean('auto_attach')), 'nullable', 'array'],
             'trigger_severities.*' => ['string', 'in:low,medium,high,critical'],
             'sla_acknowledge_minutes' => ['nullable', 'integer', 'min:1'],
             'sla_response_minutes' => ['nullable', 'integer', 'min:1'],
@@ -295,7 +313,7 @@ class ControlRoomPlaybookController extends Controller
             'steps.*.decision_options' => ['nullable', 'array'],
             'steps.*.notify_config' => ['nullable', 'array'],
             'steps.*.evidence_config' => ['nullable', 'array'],
-        ]);
+        ], self::TRIGGER_MESSAGES);
 
         DB::transaction(function () use ($data, $playbook, $user) {
             $playbook->update([
@@ -362,6 +380,42 @@ class ControlRoomPlaybookController extends Controller
         ]);
 
         return back()->with('success', 'Procedure saved as version '.$playbook->fresh()->version.'.');
+    }
+
+    /**
+     * The alert types a procedure can be set to start on: every active signal
+     * type (alerts raised from a signal carry SignalType.name as alert_type),
+     * the types alerts have actually been raised with, and any type a
+     * procedure already starts on, so a save never drops it.
+     *
+     * @return list<string>
+     */
+    private function alertTypeOptions(): array
+    {
+        $signalTypes = SignalType::query()->active()->pluck('name');
+
+        $occurring = ControlRoomAlert::query()
+            ->whereNotNull('alert_type')
+            ->where('alert_type', '!=', '')
+            ->distinct()
+            ->orderBy('alert_type')
+            ->limit(self::OCCURRING_ALERT_TYPE_LIMIT)
+            ->pluck('alert_type');
+
+        $saved = Playbook::query()
+            ->whereNotNull('trigger_alert_types')
+            ->pluck('trigger_alert_types')
+            ->filter(fn ($types) => is_array($types))
+            ->flatten(1);
+
+        return $signalTypes
+            ->concat($occurring)
+            ->concat($saved)
+            ->filter(fn ($type) => is_string($type) && trim($type) !== '')
+            ->unique()
+            ->sort(fn (string $a, string $b) => strcmp(mb_strtolower($a), mb_strtolower($b)) ?: strcmp($a, $b))
+            ->values()
+            ->all();
     }
 
     /**

@@ -107,6 +107,18 @@ class Playbook extends Model
             ->first();
     }
 
+    /**
+     * "Start on its own" is switched on but no alert type or no severity is
+     * chosen, so findForAlert() never matches it and it only starts by hand.
+     * NULL (an older "every alert" setting) still matches and is not flagged;
+     * an empty list matches nothing.
+     */
+    public function autoStartMissingTriggers(): bool
+    {
+        return (bool) $this->auto_attach
+            && ($this->trigger_alert_types === [] || $this->trigger_severities === []);
+    }
+
     // Playbook categories
     public const CATEGORY_EMERGENCY = 'emergency';
     public const CATEGORY_SAFETY = 'safety';

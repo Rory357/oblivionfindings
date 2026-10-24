@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import PlaybookShow from './show';
@@ -9,7 +9,12 @@ const inertia = vi.hoisted(() => ({
     post: vi.fn(),
     reload: vi.fn(),
     breadcrumbs: [] as Array<{ title: string; href?: string }>,
-    wizard: null as null | { playbook?: Record<string, unknown> | null },
+    wizard: null as null | {
+        playbook?: Record<string, unknown> | null;
+        alertTypes?: string[];
+        openAt?: string;
+        onClose?: () => void;
+    },
 }));
 
 vi.mock('@inertiajs/react', () => ({
@@ -41,7 +46,7 @@ vi.mock('@/layouts/app-layout', () => ({
 
 // The wizard has its own behaviour; here we check it opens prefilled.
 vi.mock('@/components/control-room/playbook-wizard', () => ({
-    PlaybookWizard: (props: { playbook?: Record<string, unknown> | null }) => {
+    PlaybookWizard: (props: NonNullable<typeof inertia.wizard>) => {
         inertia.wizard = props;
         return <div role="dialog" aria-label="Edit response procedure" />;
     },
@@ -63,6 +68,7 @@ const playbook = {
     version: 3,
     is_active: true,
     auto_attach: true,
+    auto_start_missing_triggers: false,
     trigger_alert_types: ['geofence_breach'],
     trigger_severities: ['high'],
     sla_acknowledge_minutes: 5,
@@ -127,7 +133,18 @@ const props = {
     ],
     categories: { safety: 'Safety' },
     stepTypes: { task: 'Task', evidence: 'Collect evidence' },
+    alertTypes: ['fall_detected', 'geofence_breach'],
     can: { manage: true },
+} satisfies ComponentProps<typeof PlaybookShow>;
+
+/** Saved with "Start on its own" on but no alert types chosen. */
+const flaggedProps = {
+    ...props,
+    playbook: {
+        ...playbook,
+        auto_start_missing_triggers: true,
+        trigger_alert_types: [],
+    },
 } satisfies ComponentProps<typeof PlaybookShow>;
 
 describe('A response procedure record', () => {
@@ -199,6 +216,59 @@ describe('A response procedure record', () => {
             trigger_severities: ['high'],
             escalation_after_minutes: 20,
         });
+        expect(inertia.wizard?.alertTypes).toEqual(['fall_detected', 'geofence_breach']);
+        expect(inertia.wizard?.openAt).toBe('basics');
+    });
+
+    it('a working procedure is not flagged', () => {
+        render(<PlaybookShow {...props} />);
+
+        expect(screen.queryByText("Won't start on its own")).not.toBeInTheDocument();
+        expect(screen.getByText(/Starts on its own for matching alerts/)).toBeInTheDocument();
+    });
+
+    it('flags a procedure that is set to start on its own with no alerts chosen, with a way to fix it', () => {
+        render(<PlaybookShow {...flaggedProps} />);
+
+        const panel = screen
+            .getByRole('heading', { name: 'When it starts' })
+            .closest('[data-slot="card"]') as HTMLElement;
+        expect(within(panel).getByText("Won't start on its own")).toBeInTheDocument();
+        expect(within(panel).getByText(/only starts when someone starts it from the alert/)).toBeInTheDocument();
+        expect(within(panel).queryByText('Yes, for matching new alerts')).not.toBeInTheDocument();
+        expect(screen.getByText(/Won't start on its own until alerts are chosen/)).toBeInTheDocument();
+
+        fireEvent.click(within(panel).getByRole('button', { name: 'Choose which alerts start it' }));
+        expect(screen.getByRole('dialog', { name: 'Edit response procedure' })).toBeInTheDocument();
+        expect(inertia.wizard?.openAt).toBe('automation');
+    });
+
+    it('people who can only view see the flag without the way to fix it', () => {
+        render(<PlaybookShow {...flaggedProps} can={{ manage: false }} />);
+
+        expect(screen.getByText("Won't start on its own")).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Choose which alerts start it' }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('a link from the list opens the editor on "Starting and targets", and closing it forgets the link', () => {
+        window.history.replaceState(null, '', '/control-room/playbooks/7?edit=starting');
+        render(<PlaybookShow {...flaggedProps} />);
+
+        expect(screen.getByRole('dialog', { name: 'Edit response procedure' })).toBeInTheDocument();
+        expect(inertia.wizard?.openAt).toBe('automation');
+
+        act(() => inertia.wizard?.onClose?.());
+        expect(screen.queryByRole('dialog', { name: 'Edit response procedure' })).not.toBeInTheDocument();
+        expect(window.location.search).toBe('');
+    });
+
+    it('the same link opens nothing for people who can only view', () => {
+        window.history.replaceState(null, '', '/control-room/playbooks/7?edit=starting');
+        render(<PlaybookShow {...flaggedProps} can={{ manage: false }} />);
+
+        expect(screen.queryByRole('dialog', { name: 'Edit response procedure' })).not.toBeInTheDocument();
     });
 
     it('turning it off asks first in red', () => {
