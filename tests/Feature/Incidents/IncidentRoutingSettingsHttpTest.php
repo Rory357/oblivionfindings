@@ -191,7 +191,9 @@ final class IncidentRoutingSettingsHttpTest extends IncidentRoutingTestCase
         $this->actingAs($this->manager)->put(self::URL, $input)->assertRedirect(route('health-safety.settings.index'))
             ->assertSessionHas('health_safety_routing_request_uuid', $input['request_uuid']);
         $receipt = HealthSafetySettingChange::where('command_key', $input['request_uuid'])->sole()->accepted_result;
-        $this->getJson('/health-safety/settings')->assertOk()->assertJsonPath('health_safety_routing_receipt', $receipt)
+        // $receipt is read back from a MySQL JSON column (keys reordered); the page shows the accepted order. Values stay exact.
+        $this->getJson('/health-safety/settings')->assertOk()
+            ->assertJsonPath('health_safety_routing_receipt', fn ($shown) => is_array($shown) && \App\Support\JsonEvidence::matches($receipt, $shown))
             ->assertJsonPath('routing_viewer_id', $this->manager->id);
         // The redirect flashes only the UUID, and the visit above consumed that flash; the Inertia page
         // reconstructs the same receipt from the same stored UUID.

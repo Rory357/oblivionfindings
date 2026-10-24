@@ -348,7 +348,8 @@ final class IncidentResponseSourceAdmissionTest extends IncidentIndependenceTest
 
     public function test_audit_failure_preserves_source_and_does_not_accept_response_or_severity_links(): void
     {
-        $root = $this->root(); $before = $root->getRawOriginal(); $dispatcher = Model::getEventDispatcher(); Model::setEventDispatcher(clone $dispatcher);
+        // Snapshot the stored row (fresh), not create()'s partial attribute set, so every column is compared.
+        $root = $this->root(); $before = $root->fresh()->getRawOriginal(); $dispatcher = Model::getEventDispatcher(); Model::setEventDispatcher(clone $dispatcher);
         AuditLog::creating(function (AuditLog $row): void { if ($row->action === 'controlRoom.alert.createFromIncident') { throw new \RuntimeException('Synthetic mandatory response audit refusal.'); } });
         try {
             try { $this->send($root); $this->fail('No audit acceptance must roll back.'); }
@@ -360,7 +361,8 @@ final class IncidentResponseSourceAdmissionTest extends IncidentIndependenceTest
 
     public function test_final_owned_check_refuses_late_audit_observer_source_change_without_claiming_prebody_closure(): void
     {
-        $root = $this->root(); $before = $root->getRawOriginal(); $dispatcher = Model::getEventDispatcher(); Model::setEventDispatcher(clone $dispatcher);
+        // Snapshot the stored row (fresh), not create()'s partial attribute set, so every column is compared.
+        $root = $this->root(); $before = $root->fresh()->getRawOriginal(); $dispatcher = Model::getEventDispatcher(); Model::setEventDispatcher(clone $dispatcher);
         AuditLog::created(function (AuditLog $row) use ($root): void {
             if ($row->action === 'controlRoom.alert.createFromIncident') { DB::table('client_incidents')->where('id', $root->id)->update(['reported_by' => $this->cover->id]); }
         });
