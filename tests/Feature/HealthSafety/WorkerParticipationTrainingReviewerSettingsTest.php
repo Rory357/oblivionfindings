@@ -16,6 +16,8 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
     protected function setUp(): void
     {
         parent::setUp();
+        // Governance keys come from their own seeder, not RbacSeeder.
+        $this->seed(\Database\Seeders\GovernancePermissionsSeeder::class);
         $this->actor = $this->staff(['governance.settings.view', 'governance.settings.manage', 'hazards.view']);
         $this->reviewerId = (int) $this->staff(['hazards.view', 'governance.compliance.manage', 'governance.compliance.view'])->id;
     }

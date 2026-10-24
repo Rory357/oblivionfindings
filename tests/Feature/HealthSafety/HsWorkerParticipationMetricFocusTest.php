@@ -197,7 +197,7 @@ final class HsWorkerParticipationMetricFocusTest extends IncidentRoutingTestCase
     private function committee(Site $site, array $values = []): HsCommittee
     {
         return HsCommittee::create(['name' => 'Recorded committee', 'site_id' => $site->id, 'status' => 'active',
-            'meeting_frequency' => 'monthly', 'created_by' => $this->manager->id, ...$values]);
+            'meeting_frequency' => 'monthly', 'created_by' => $this->manager->id, ...$values, 'established_at' => '2026-01-01']);
     }
 
     private function meeting(array $values = []): HsCommitteeMeeting

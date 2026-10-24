@@ -7,9 +7,9 @@ then `docs/health-safety-build/PLAN.md`.
 ## Where things are
 
 - **Code:** this worktree, branch `claude/hs-workspace-build` —
-  `C:\Users\steph\Herd\oblivionfindings\.claude\worktrees\objective-mendel-a6cccd`. It holds Codex's H&S
+  `C:/Users/steph/Herd/oblivionfindings/.claude/worktrees/objective-mendel-a6cccd`. It holds Codex's H&S
   rebuild (pages, controllers, presenters) plus the new shared parts below. Edit only under this path.
-- **Drawings:** the design kit `C:\Users\steph\Herd\oblivionfindings-design-kit` (read-only for you).
+- **Drawings:** the design kit `C:/Users/steph/Herd/oblivionfindings-design-kit` (read-only for you).
   - See a drawing: `node preview/hsx/prev.mjs <tag> pg-hsn-2 pg-hsn-2b …` → `preview/hsx/prev-<tag>-<n>-l.png`
     (add `MODE=d` for dark). Read the PNGs. Use a tag of your own (your group name) so you don't overwrite others.
   - The drawing as data (header, every block, its words): `node preview/hsx/dump.mjs pg-hsn-2 …` — this is the
@@ -26,7 +26,7 @@ then `docs/health-safety-build/PLAN.md`.
     `KnowList`, `Story`, `Flow`, `RiskMap`, `DutyClock`, `Queue`, `StageDots`, `Choices`, `Routes`,
     `EvidenceWindows`. Their props mirror the drawing blocks (kit tone names map: ok→success, warn→warning,
     crit→critical, na→none). A worked example of almost every part, built from drawing pg-hsn-2:
-    `C:\Users\steph\AppData\Local\Temp\claude\C--Users-steph-Herd-oblivionfindings--claude-worktrees-objective-mendel-a6cccd\dd00b656-07db-4781-930c-f8bd2ee955e0\scratchpad\sg-harness\entry.tsx`.
+    `<scratchpad>/sg-harness/entry.tsx`.
   - Status → always `<StatusBadge>`. Tables → `components/ui/table.tsx` / the list contracts in DESIGN.md.
   - If a drawing needs a part that doesn't exist, build it inside your page group's own folder only if it is
     specific to that page; anything reusable → describe it in your report instead of adding it to shared files.
@@ -59,7 +59,7 @@ lead runs them for all groups. Use these instead:
 
 - **Render a page with made-up props** (esbuild + Tailwind + headless Chrome, a few seconds):
   ```
-  cd "C:\Users\steph\AppData\Local\Temp\claude\C--Users-steph-Herd-oblivionfindings--claude-worktrees-objective-mendel-a6cccd\dd00b656-07db-4781-930c-f8bd2ee955e0\scratchpad\page-harness"
+  cd "<scratchpad>/page-harness"
   node build.mjs incidents/show fixtures/incident-show.tsx out/<group>-incident-show --shot=shots/<group>-incident-show.png --height=2200
   node build.mjs incidents/show fixtures/incident-show.tsx out/<group>-incident-show --dark --shot=shots/<group>-incident-show-d.png
   ```
@@ -68,7 +68,7 @@ lead runs them for all groups. Use these instead:
   Vitest fixtures and the drawing's demo data (Hemi Walker, Aurora House, Wed 21 Oct 2026 …). `auth.can` answers
   yes to everything unless the fixture sets `__shared.auth.can`. Render each drawn state and compare it with the
   drawing PNG side by side at 1440 px wide. Errors show in red at the top of the screenshot.
-- **Missing imports/exports:** `node "C:\Users\steph\AppData\Local\Temp\claude\C--Users-steph-Herd-oblivionfindings--claude-worktrees-objective-mendel-a6cccd\dd00b656-07db-4781-930c-f8bd2ee955e0\scratchpad\ts-missing.cjs"` from the worktree root.
+- **Missing imports/exports:** `node "<scratchpad>/ts-missing.cjs"` from the worktree root.
 - **Tests:** update your pages' existing Vitest files where they assert the old structure (keep every behaviour
   and guard assertion; change only what the redesign moved). You can't run them; the lead will.
 

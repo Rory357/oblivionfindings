@@ -211,8 +211,10 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
                 $includeSearchContext,
                 $user,
             ) {
+                // The journey context now reads under the signed-in viewer's own access.
                 $journey = IncidentJourneyTaskContext::make(
                     $alert->clientIncident,
+                    $user,
                     $alert,
                     includeSearchContext: $includeSearchContext,
                 );

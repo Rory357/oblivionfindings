@@ -20,6 +20,8 @@ final class WorkerParticipationTrainingReviewTest extends RestraintEventCommandT
     protected function setUp(): void
     {
         parent::setUp();
+        // Governance keys come from their own seeder, not RbacSeeder.
+        $this->seed(\Database\Seeders\GovernancePermissionsSeeder::class);
         $this->actor = $this->staff(['hazards.view', 'governance.compliance.view', 'governance.compliance.manage']);
         $this->actingAs($this->actor);
         GovernanceSetting::set(WorkerParticipationTrainingReviewerResolver::KEY,

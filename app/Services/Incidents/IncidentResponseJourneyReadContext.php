@@ -158,7 +158,7 @@ final class IncidentResponseJourneyReadContext
         $query = HsEvent::query()->where(function (Builder $rows) use ($key): void {
             $rows->where(fn ($source) => $source->where('source_type', ClientIncident::class)->where('source_id', $this->original['id']))
                 ->orWhere('idempotency_key', $key);
-            if ($this->hsId !== null) { $rows->orWhereKey($this->hsId); }
+            if ($this->hsId !== null) { $rows->orWhere($rows->getModel()->getQualifiedKeyName(), $this->hsId); }
         });
         $rows = $this->payloadQuery($query)->orderBy('id')->limit(2)->get(self::HS_METADATA);
         if ($rows->count() > 1) { throw new \DomainException('Incident journey conflict: multiple H&S events claim the incident source tuple.'); }

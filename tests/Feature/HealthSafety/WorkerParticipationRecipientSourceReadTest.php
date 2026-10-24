@@ -28,7 +28,7 @@ final class WorkerParticipationRecipientSourceReadTest extends RestraintEventCom
         parent::setUp();
         config(['app.timezone' => 'UTC', 'app.worker_timezone' => 'Pacific/Auckland']);
         $this->actor = $this->staff([]);
-        $this->committee = HsCommittee::create(['site_id' => $this->site->id, 'name' => 'Own source', 'status' => 'active']);
+        $this->committee = HsCommittee::create(['site_id' => $this->site->id, 'name' => 'Own source', 'status' => 'active', 'established_at' => '2026-01-01']);
         $this->meeting = $this->committee->meetings()->create(['scheduled_at' => '2026-10-14 01:00:00', 'location' => 'Original location', 'status' => 'scheduled', 'minutes' => 'Private minutes']);
         $this->meeting->attendeeUsers()->attach($this->actor->id, ['response' => 'invited', 'attended' => false]);
         $this->actingAs($this->actor);

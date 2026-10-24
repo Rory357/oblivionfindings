@@ -26,6 +26,46 @@ final class TaskSearch
     }
 
     /**
+     * Narrow candidates by the record's own searchable fields even when it has
+     * no incident link. Providers still apply source authority, then the
+     * aggregator matches only their permission-shaped search material.
+     *
+     * @param  list<string>  $columns
+     * @param  array<string, list<string>>  $relations
+     * @param  array<string, string>  $displayStates
+     */
+    public static function applyRecordPredicate(Builder $query, array $filters, array $columns, array $relations = [], array $displayStates = []): Builder
+    {
+        $needle = trim((string) ($filters['q'] ?? ''));
+        if ($needle === '') {
+            return $query;
+        }
+        $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $needle).'%';
+        $statuses = self::matchingStatuses($needle, $displayStates);
+
+        return $query->where(function (Builder $match) use ($columns, $relations, $like, $statuses): void {
+            foreach ($columns as $column) {
+                $match->orWhereLike($column, $like);
+            }
+            if ($statuses !== []) {
+                $match->orWhereIn('status', $statuses);
+            }
+            foreach ($relations as $relation => $fields) {
+                $match->orWhereHas($relation, function (Builder $related) use ($fields, $like): void {
+                    $related->where(function (Builder $values) use ($fields, $like): void {
+                        foreach ($fields as $field) {
+                            $values->orWhereLike($field, $like);
+                        }
+                        if (in_array('first_name', $fields, true) && in_array('last_name', $fields, true)) {
+                            $values->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$like]);
+                        }
+                    });
+                });
+            }
+        });
+    }
+
+    /**
      * @return string[]
      */
     public static function incidentJourneySources(?array $selectedSources): array
