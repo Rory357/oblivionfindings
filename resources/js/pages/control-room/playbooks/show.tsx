@@ -21,6 +21,7 @@ import {
     PageHeaderRail,
     PageHeaderStatusChip,
 } from '@/components/page';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
@@ -83,6 +84,8 @@ interface PlaybookDetail {
     version: number;
     is_active: boolean;
     auto_attach: boolean;
+    /** "Start on its own" is on but no alert type or severity is chosen, so it never starts on its own. */
+    auto_start_missing_triggers: boolean;
     trigger_alert_types: string[];
     trigger_severities: string[];
     sla_acknowledge_minutes: number | null;
@@ -127,12 +130,16 @@ interface Props {
     recentRuns: RunEntry[];
     categories: Record<string, string>;
     stepTypes: Record<string, string>;
+    alertTypes: string[];
     can: {
         manage: boolean;
     };
 }
 
 type RecordTab = 'steps' | 'evidence' | 'runs';
+
+/** ?edit=starting (from the procedures list) opens the edit wizard on "Starting and targets". */
+const EDIT_STARTING = 'starting';
 
 const TABS: ReadonlyArray<{ key: RecordTab; label: string; icon: LucideIcon }> = [
     { key: 'steps', label: 'Steps', icon: ListChecks },
@@ -164,6 +171,19 @@ function initialTab(): RecordTab {
     if (typeof window === 'undefined') return 'steps';
     const tab = new URLSearchParams(window.location.search).get('tab');
     return TABS.some((t) => t.key === tab) ? (tab as RecordTab) : 'steps';
+}
+
+function editStartingRequested(): boolean {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('edit') === EDIT_STARTING;
+}
+
+/** Drop ?edit= once the wizard closes, so a refresh doesn't reopen it. */
+function forgetEditRequest() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('edit')) return;
+    url.searchParams.delete('edit');
+    window.history.replaceState(window.history.state, '', url.toString());
 }
 
 /** Keep the open tab in the address so a refresh or a shared link returns to it. */
@@ -235,10 +255,20 @@ export default function PlaybookShow({
     recentRuns,
     categories,
     stepTypes,
+    alertTypes,
     can,
 }: Props) {
-    const [wizardOpen, setWizardOpen] = useState(false);
+    // Which step the edit wizard opens on; null = closed.
+    const [wizardAt, setWizardAt] = useState<'basics' | 'automation' | null>(() =>
+        can.manage && editStartingRequested() ? 'automation' : null,
+    );
+    const openWizard = (at: 'basics' | 'automation' = 'basics') => setWizardAt(at);
+    const closeWizard = () => {
+        setWizardAt(null);
+        forgetEditRequest();
+    };
     const [turningOff, setTurningOff] = useState(false);
+    const missingTriggers = playbook.auto_start_missing_triggers;
     const [tab, setTab] = useState<RecordTab>(initialTab);
     const selectTab = (next: RecordTab) => {
         setTab(next);
@@ -341,7 +371,7 @@ export default function PlaybookShow({
             >
                 {playbook.is_active ? 'Turn off' : 'Turn on'}
             </PageHeaderGlassButton>
-            <PageHeaderPrimaryButton icon={Pencil} onClick={() => setWizardOpen(true)}>
+            <PageHeaderPrimaryButton icon={Pencil} onClick={() => openWizard()}>
                 Edit procedure
             </PageHeaderPrimaryButton>
         </>
@@ -350,13 +380,36 @@ export default function PlaybookShow({
     const side = (
         <div className="flex min-w-0 flex-col gap-5">
             <Panel title="When it starts">
+                {missingTriggers ? (
+                    <div className="grid justify-items-start gap-1.5">
+                        <StatusBadge variant="warning" size="sm">
+                            Won&apos;t start on its own
+                        </StatusBadge>
+                        <p className="text-subtle">
+                            “Start on its own” is on, but no alert type or
+                            severity is chosen, so it only starts when someone
+                            starts it from the alert.
+                        </p>
+                        {can.manage ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openWizard('automation')}
+                            >
+                                Choose which alerts start it
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
                 <Facts
                     rows={[
                         [
                             'Starts on its own',
-                            playbook.auto_attach
-                                ? 'Yes, for matching new alerts'
-                                : 'No — start it from the alert',
+                            missingTriggers
+                                ? null
+                                : playbook.auto_attach
+                                  ? 'Yes, for matching new alerts'
+                                  : 'No — start it from the alert',
                         ],
                         [
                             'Alert types',
@@ -469,9 +522,11 @@ export default function PlaybookShow({
                 subline: [
                     category,
                     playbook.is_active
-                        ? playbook.auto_attach
-                            ? 'Starts on its own for matching alerts'
-                            : 'Start it from the alert that needs a response'
+                        ? missingTriggers
+                            ? "Won't start on its own until alerts are chosen"
+                            : playbook.auto_attach
+                              ? 'Starts on its own for matching alerts'
+                              : 'Start it from the alert that needs a response'
                         : "Turned off — it can't be started",
                 ].join(' · '),
                 actions,
@@ -576,12 +631,14 @@ export default function PlaybookShow({
 
             {/* Guided procedure editor — basics → steps → starting and targets → review.
                 Mounted only while open so every run starts fresh. */}
-            {wizardOpen ? (
+            {wizardAt ? (
                 <PlaybookWizard
                     open
-                    onClose={() => setWizardOpen(false)}
+                    onClose={closeWizard}
                     categories={categories}
                     stepTypes={stepTypes}
+                    alertTypes={alertTypes}
+                    openAt={wizardAt}
                     playbook={{
                         id: playbook.id,
                         name: playbook.name,

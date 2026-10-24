@@ -51,6 +51,7 @@ afterEach(() => {
 const base = {
     code: null,
     version: 1,
+    auto_start_missing_triggers: false,
     requires_approval: false,
     sla_acknowledge_minutes: null,
     sla_response_minutes: null,
@@ -92,10 +93,21 @@ const props = {
             is_active: false,
             auto_attach: false,
         },
+        {
+            ...base,
+            id: 4,
+            name: 'Missed check-in',
+            description: null,
+            category: 'safety',
+            is_active: true,
+            auto_attach: true,
+            auto_start_missing_triggers: true,
+        },
     ],
     filters: {},
     categories: { emergency: 'Emergency', safety: 'Safety' },
     stepTypes: { task: 'Task' },
+    alertTypes: ['fall_detected'],
     can: { manage: true },
 } satisfies ComponentProps<typeof PlaybooksIndex>;
 
@@ -170,6 +182,39 @@ describe('Settings › Procedures', () => {
         fireEvent.contextMenu(row('Fire alarm'));
         expect(screen.getByRole('menuitem', { name: 'Open procedure' })).toBeInTheDocument();
         expect(screen.getByRole('menuitem', { name: 'Turn off' })).toBeInTheDocument();
+    });
+
+    it('flags a procedure that is set to start on its own but has no alerts chosen', () => {
+        render(<PlaybooksIndex {...props} />);
+
+        const flagged = row('Missed check-in');
+        expect(within(flagged).getByText("Won't start on its own")).toBeInTheDocument();
+        expect(within(flagged).queryByText('On its own')).not.toBeInTheDocument();
+        expect(
+            within(flagged).getByRole('link', { name: 'Choose which alerts start it' }),
+        ).toHaveAttribute('href', '/control-room/playbooks/4?edit=starting');
+        expect(within(row('Personal SOS alert')).getByText('On its own')).toBeInTheDocument();
+        expect(within(row('Personal SOS alert')).queryByText("Won't start on its own")).not.toBeInTheDocument();
+
+        fireEvent.contextMenu(flagged);
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Choose which alerts start it' }));
+        expect(inertia.visit).toHaveBeenCalledWith('/control-room/playbooks/4?edit=starting');
+    });
+
+    it('only editors get the way in to choose alerts for a flagged procedure', () => {
+        render(<PlaybooksIndex {...props} can={{ manage: false }} />);
+
+        const flagged = row('Missed check-in');
+        expect(within(flagged).getByText("Won't start on its own")).toBeInTheDocument();
+        expect(within(flagged).getByText('No alerts are chosen to start it')).toBeInTheDocument();
+        expect(
+            within(flagged).queryByRole('link', { name: 'Choose which alerts start it' }),
+        ).not.toBeInTheDocument();
+
+        fireEvent.contextMenu(flagged);
+        expect(
+            screen.queryByRole('menuitem', { name: 'Choose which alerts start it' }),
+        ).not.toBeInTheDocument();
     });
 
     it('stays readable for people who can only view', () => {
