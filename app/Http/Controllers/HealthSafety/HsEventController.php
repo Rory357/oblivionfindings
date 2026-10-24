@@ -953,13 +953,16 @@ class HsEventController extends Controller
             'created_at' => $attachment->created_at?->toIso8601String(),
             'download_url' => "/health-safety/events/{$hsEvent->id}/incident-attachments/{$attachment->id}/download",
         ])->values() ?? collect();
+        // A linked alert this viewer can't open is shown as restricted, from the id already on the record; the alert
+        // itself isn't loaded.
+        $linkedAlertId = $sourceIncident?->control_room_alert_id ?? $hsEvent->control_room_alert_id;
         $linkedOperationalEvidence = $alert
             ? $this->linkedEvidence->present(
                 $alert,
                 $currentUser,
                 fn (EvidenceItem $item): string => "/health-safety/events/{$hsEvent->id}/control-room-evidence/{$item->id}/download",
             )
-            : null;
+            : ($linkedAlertId !== null ? LinkedOperationalEvidencePresenter::restricted() : null);
         $canOpenAlert = data_get($linkedOperationalEvidence, 'access') === 'readable';
         if ($canOpenAlert) {
             // Operational source authority is independent of the H&S parent.
@@ -1148,7 +1151,7 @@ class HsEventController extends Controller
                 // An incident-sourced event whose incident this viewer can't read is "restricted", not "absent".
                 'incident' => $sourceIncident !== null ? ($canOpenIncident ? 'readable' : 'restricted')
                     : (ltrim((string) $hsEvent->getRawOriginal('source_type'), '\\') === ClientIncident::class ? 'restricted' : 'absent'),
-                'control_room' => $alert === null ? 'absent' : ($canOpenAlert ? 'readable' : 'restricted'),
+                'control_room' => $alert === null ? ($linkedAlertId !== null ? 'restricted' : 'absent') : ($canOpenAlert ? 'readable' : 'restricted'),
             ],
             'incident_followups' => $incidentFollowups,
             'journey_state' => $this->journeyPresenter->journeyState(

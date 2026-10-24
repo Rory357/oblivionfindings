@@ -38,6 +38,21 @@ final class LinkedOperationalEvidencePresenter
      * @param  callable(EvidenceItem): (?string)  $downloadUrl
      * @return array<string, mixed>
      */
+    /** A linked alert this viewer can't open: its existence only, never its content. */
+    public static function restricted(): array
+    {
+        return [
+            'label' => 'Linked Control Room evidence',
+            'read_only' => true,
+            'access' => 'restricted',
+            'source' => null,
+            'notes' => [],
+            'tasks' => [],
+            'evidence_packs' => [],
+            'communications' => [],
+        ];
+    }
+
     public function present(
         ControlRoomAlert $sourceAlert,
         User $viewer,
@@ -47,16 +62,7 @@ final class LinkedOperationalEvidencePresenter
     ): array {
         if ($context !== null) { return $this->presentInContext($sourceAlert, $viewer, $downloadUrl, $context, $consumeCopiedNote); }
         if (! $this->access->canView($sourceAlert, $viewer)) {
-            return [
-                'label' => 'Linked Control Room evidence',
-                'read_only' => true,
-                'access' => 'restricted',
-                'source' => null,
-                'notes' => [],
-                'tasks' => [],
-                'evidence_packs' => [],
-                'communications' => [],
-            ];
+            return self::restricted();
         }
 
         $alert = ControlRoomAlert::query()
