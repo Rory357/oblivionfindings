@@ -77,7 +77,7 @@ New status key? Add it to `status-colors.ts` once; it's used on 50+ pages.
 | Frontline/staff mobile pages | `layouts/staff-page-shell.tsx` (+ `staff-bottom-nav`, `.staff-shell-content`, `.frontline-sticky-footer`, `.frontline-header-inset` safe-area helpers from `app.css`) |
 | Auth screens | `layouts/auth/auth-journey-layout.tsx` (the Journey half-and-half; see Recurring patterns) |
 | Settings pages | `layouts/settings/layout.tsx` |
-| Marketing pages | `layouts/marketing-layout.tsx` |
+| Public website (the client's own site) | `layouts/marketing-layout.tsx` (`PublicSiteLayout`) with `components/public-site/` and `resources/css/journey-site.css` — see Recurring patterns |
 
 **The global shell chrome (approved 2026-09-05).** The top bar +
 sidebar follow `design_styles/APP_SHELL_STYLE_GUIDE.md` — the "Event
@@ -161,12 +161,43 @@ meter row).
   Settings › Branding recolours them. Identity follows branding: no custom
   branding shows the Journey mark and "oblivion care"; an uploaded logo shows
   that logo (its "logo for dark backgrounds" version on ink); a custom name
-  alone shows the name without our mark, with "Powered by oblivion care". The
-  islands artwork stays for every client. Staff sign-in asks for the email
-  first and sends organisation domains to their provider. Family sign-in
-  offers the emailed sign-in link first. The journey animation plays once,
-  only while a sign-in is sent. Mockups: the "Sign-in redesign" canvas
-  (claude.ai/artifact/TKAEX7134Dgt5zp7ehDuHn), boards marked "chosen".
+  alone shows the name without our mark, with "Powered by oblivion care".
+  **With client branding the brand half is the client's (Stephan, 21 Oct
+  2026, mockup v2):** their website and sign-in photo from Settings ›
+  Branding under two ink scrims (≥ 72 % behind the top band, ≥ 90 % behind
+  the welcome block), or a plain brand-colour panel when there is no photo.
+  The islands artwork and its journey animation are only Oblivion's own
+  default, with no client branding at all. Over a photo the family headline
+  is "Kia ora, whānau. / Good to see you." Both sign-in pages have "Back to
+  website" at the top (at the top of the form on phones). Staff sign-in asks
+  for the email first ("Your work email") and sends organisation domains to
+  their provider. Family sign-in offers the emailed sign-in link first. The
+  journey animation plays once, only while a sign-in is sent. Mockups: the
+  "Sign-in redesign" canvas (claude.ai/artifact/TKAEX7134Dgt5zp7ehDuHn),
+  boards marked "chosen"; `docs/referrals/mockup-v2/` for the photo half.
+
+- **The public website is the client's own site (approved by Stephan
+  23 Oct 2026, mockup v2 in `docs/referrals/mockup-v2/`).** It speaks as the
+  provider ("we"), never as Oblivion Care. Every public page — home, Our
+  support, Funding help, About us, Careers, Contact us, Make a referral,
+  secure upload and the footer pages — uses `PublicSiteLayout`
+  (`layouts/marketing-layout.tsx`): one ink band holding the site header and
+  the page intro (`PageIntro`), and one footer. Header: Our support · Funding
+  help · About us · Careers · Contact us, then Sign in and the primary "Make
+  a referral"; the full nav from 1280 px, a menu with the horizon line below
+  that. The footer carries one small "Powered by oblivion care" line when the
+  site has client branding. Build pages from `components/public-site/`
+  (`SitePhoto`, `Lens`, `RadioTiles` tile pickers, `Pathway`, `PlanPathway`,
+  `SafeContactBand`, `EmergencyNote`) and the `.journey-site-*` classes in
+  `resources/css/journey-site.css`. The provider's name comes from
+  `usePublicSite()` (Settings › Branding, then Settings › Referrals) and is
+  null rather than "Oblivion Care". Photos: the home hero and sign-in use the
+  Settings › Branding photo; a client without one gets a plain brand-colour
+  panel (`.journey-site-panel`). Our demo photos and the fictional provider's
+  facts (`content.ts` `demo`) show only on a demo server
+  (`config('demo.site')`, shared as `demoSite`). Public tap targets are 44 px
+  (`.frontline-tap` or `min-h-[44px]`), and Make a referral is tile pickers
+  on the page, then the 1100 px `WizardShell`.
 
 - **Calendars — always the Site Calendar style** (approved 2026-09-13).
   `resources/js/pages/sites/calendar/SiteCalendar.tsx` and `_parts.tsx`
@@ -194,6 +225,26 @@ meter row).
 - **Simple dialogs** (single-section forms, confirmations, detail viewers) —
   follow `design_styles/POPUP_STYLE_GUIDE.md` exactly (shell/body split,
   `_dialogs.tsx` co-location, width tokens, tile pickers).
+- **The pop-up kit — `components/popup/` (approved by Stephan 2026-10-23;
+  Control Room is the first module on it).** One shared frame so every
+  pop-up looks and behaves the same: `PopupForm` (480 / 720 / 900),
+  `PopupConfirm` (480: plain, destructive, warning, alert), `PopupViewer`,
+  `PopupSelectionBar`, and the one `DiscardDraftConfirm` ("Discard this
+  draft?" · Keep editing · Discard draft) that Esc, ✕ and Cancel all ask
+  when typing would be lost. Wizards stay on `WizardShell` (1100). Every
+  pop-up has the same top: a round icon **lens** (`.popup-lens`, never a
+  rounded square), the title, one line, ✕; a 2px **horizon** line on its top
+  edge (`.popup-horizon`); the record it came from as a plain context line;
+  a grey footer band with Cancel first and the main button last, named for
+  what it does. Red only when data is destroyed or a safety check is
+  loosened. Consequential actions keep a review step (Control Room: resolve,
+  report incident, confirm sensor report). A lost response shows "Result not
+  confirmed" with a way to check, never an invitation to submit twice.
+  Feature code passes icon, title, fields and the action — never widths,
+  paddings, colours or footers. Source drawings: the "Oblivion color scheme
+  and design system" session's `docs/design-refresh-2026-10-19/POPUP-SYSTEM.md`
+  (its Slate colours are not in `app.css` yet; the kit uses today's tokens).
+  Other modules move onto the kit one at a time.
 - **Premium attachment uploads** (approved by Stephan 2026-09-20) — invoice,
   evidence, photo and document fields reuse `FileDropzone` + `StagedFileCard`
   from `components/ui/file-dropzone.tsx`. Keep browse and keyboard access
@@ -396,7 +447,20 @@ before.
   photo background, plain token cards or the shell's ring wordmark. Brand-facing
   screens use the Oblivion Care Journey identity through
   `auth-journey-layout.tsx` (Recurring patterns). Don't add a giant stacked
-  wordmark (rejected as Option D) or looping decorative motion.
+  wordmark (rejected as Option D) or looping decorative motion. The one photo
+  allowed is the client's own website and sign-in photo, which the layout
+  draws in its brand half under the approved scrims (Stephan, 21 Oct 2026).
+- **Oblivion identity on a client's site** (corrected 20–23 Oct 2026, client
+  demo website) — "Oblivion Care" as a fallback provider name, an
+  `@oblivioncare.co.nz` placeholder, our demo photos, or the NZ islands art on
+  a site or sign-in page that carries a client's branding. The public website
+  and the sign-in pages are the client's: the name comes from Settings ›
+  Branding or Settings › Referrals and reads neutrally when unset; a client
+  without a photo gets a plain brand-colour panel; the islands are only
+  Oblivion's own default; "Powered by oblivion care" is the one mention.
+  ESLint (`design/no-oblivion-fallback`) blocks an "Oblivion Care" string in
+  the public site and sign-in layout files (the screen-reader text of the
+  Powered by line is JSX text, which it allows).
 - **Raw palette classes / inline hex** — bypasses rebranding; ESLint blocks it.
 - **Hardcoded hues inside CSS utilities** — ESLint only sees classNames, so
   hex hiding in `app.css` rules or `style={{}}` props escapes it. Known
@@ -636,6 +700,33 @@ before.
   transforms on `default`/`outline` buttons (via `className` or raw
   elements) instead of the soft-depth treatment owned by
   `components/ui/button.tsx` (see `design_styles/BUTTON_STYLE_GUIDE.md`).
+- **One module dropping the header band** (corrected 2026-10-23, Control
+  Room) — redesign drawings replaced the purple Event Horizon header with a
+  plain white title, a search row and underline tabs for one module only.
+  Stephan chose the standard header for Control Room: consistency across
+  modules wins. Fix a header that looks wrong by keeping it compact (title,
+  ≤ 4 linked numbers, filters and view tabs inside it), not by giving one
+  module its own header. Control Room pages use `ControlRoomPage`
+  (`components/control-room/control-room-page.tsx`), which wraps the shared
+  `PageHeader` and the destination's view tabs.
+- **A live board that reads like a generic admin list** (corrected
+  2026-10-24, Control Room Live response: "looks so generic … hard to
+  understand"). A list of reference numbers, device names, small pills and
+  bare dates, with the same words repeated on every row, a "no target"
+  block per target and empty "—" fields, does not tell an operator who
+  needs help or how long is left. Live work leads with the **person and
+  the house**, says **what happened** in one sentence, shows **who is on
+  it** (or "No one on it yet"), and shows **time as age or countdown**
+  ("raised 3 min ago", "due in 4 min", "missed by 12 min") — never a bare
+  time without its date. Use Control Room's marks
+  (`components/control-room/live-response/`): the **countdown lens**
+  (`TargetLens`, `.cr-lens` — the pop-up kit's round lens with a ring that
+  empties toward the target; grey "waiting" when there is no target), the
+  **urgency bar** (`UrgencyBar`, fixed safety colours), the **Live mark**
+  (`LiveMark`) in the header subline, and the **"Needs you now"** card
+  for an urgent top alert (only when it is urgent). Reference numbers stay
+  small and last. Hide empty fields; say a thing once; plain tab names
+  (Needs action · Mine · Escalated · Snoozed · Incident reports · Done).
 - **Page tops that bypass the Event Horizon header** — a page opening
   with a plain heading, a one-off banner, a legacy `PageHero`, or a
   search/filter bar sitting BELOW the header, instead of the fixed
@@ -660,6 +751,13 @@ before.
   the sidebar entry staying lit across the hub). Don't orphan a module
   that has no other entry (Roadmap became a Strategy hub tab), and never
   use hidden nav as the security boundary.
+  Reinforced 2026-10-12 for **Workforce**: six destinations — Rostering,
+  Available shifts, Attendance, Timesheets, Handovers, Settings. The Shifts
+  list, Conflict queue, Qualifications and Availability open from
+  Rostering's header (the Rostering entry stays lit on them); Shift notes
+  is a tab in the Handovers header. Their routes, permissions and command
+  search entries stay; someone who can't open Rostering (or the Shift notes
+  tab) keeps a direct entry instead (`buildWorkforceSubPanelGroups`).
 - **Auditor and developer language in member-facing copy** (corrected
   2026-09-14, Governance: "for a normal person it is difficult to
   understand") — reference codes used as names (`RES-2026-004` as a title
@@ -822,6 +920,11 @@ before.
   ancestor. Check any tap target by measuring the rendered px
   (`getBoundingClientRect`, or `elementFromPoint` 21 px from the centre
   for `.frontline-hit`), not by its class name or a "44px" comment.
+  The same 14 px root put the dialog ✕ (`right-4` = 14 px) so its 44 px
+  area ended exactly on the dialog edge, and every scrolling dialog showed
+  a 1 px sideways scrollbar (fixed app-wide 2026-10-24, Stephan: the ✕ now
+  sits at 16 px). Keep a `.frontline-hit` control's area at least 2 px
+  inside a scrolling container's edge.
   Guardrail: `design/no-rem-tap-floor` rejects `min-h-11` / `min-w-11` in
   the medication screens (`pages/emar`, `components/emar`, `pages/meds`;
   EA-210, 2026-10-10).

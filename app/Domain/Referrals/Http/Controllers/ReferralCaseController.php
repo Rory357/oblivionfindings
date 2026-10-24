@@ -113,7 +113,8 @@ final class ReferralCaseController extends Controller
 
         return [
             'view' => $filters['view'],
-            'referrals' => $filters['view'] === 'referrals' && $filters['layout'] !== 'pipeline' ? $workspace->referralPage($actor, $filters) : $empty,
+            // General enquiries list through the same rows, in their own queue.
+            'referrals' => in_array($filters['view'], ['referrals', 'enquiries'], true) && $filters['layout'] !== 'pipeline' ? $workspace->referralPage($actor, $filters) : $empty,
             'pipeline' => $filters['view'] === 'referrals' && $filters['layout'] === 'pipeline' ? $workspace->pipeline($actor, $filters, $this->stages()) : [],
             'funding' => $filters['view'] === 'funding' ? $workspace->fundingPage($actor, $filters) : $empty,
             'followUps' => $followUps['page'] ?? $empty,

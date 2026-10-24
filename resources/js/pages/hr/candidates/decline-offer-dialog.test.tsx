@@ -85,6 +85,10 @@ const candidate = {
             cover_letter: null,
             screening_answers: null,
             cv_original_name: null,
+            experience_summary: null,
+            years_of_experience: null,
+            right_to_work_status: null,
+            driver_licence_class: null,
             offer: {
                 id: 77,
                 position_title: 'Support worker',

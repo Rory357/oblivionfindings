@@ -44,7 +44,8 @@ function row(): AlertWorklistRow {
 }
 
 const dependencies = () => ({
-    openWorkspace: vi.fn(),
+    select: vi.fn(),
+    openAction: vi.fn(),
     post: vi.fn(),
     visit: vi.fn(),
     copy: vi.fn(),
@@ -56,10 +57,10 @@ describe('buildControlRoomAlertRowActions', () => {
             buildControlRoomAlertRowActions(row(), dependencies()).map(
                 (action) => action.key,
             ),
-        ).toEqual(['open', 'copy-reference']);
+        ).toEqual(['preview', 'open', 'copy-reference']);
     });
 
-    it('uses the canonical workspace for lifecycle actions and routes safe direct actions', () => {
+    it('runs one-step actions straight away and opens a pop-up for the rest', () => {
         const record = row();
         record.actions = {
             ...record.actions,
@@ -74,12 +75,20 @@ describe('buildControlRoomAlertRowActions', () => {
         };
         const effects = dependencies();
         const actions = buildControlRoomAlertRowActions(record, effects);
+        const run = (key: string) =>
+            actions.find((action) => action.key === key)?.onSelect();
 
-        actions.find((action) => action.key === 'claim')?.onSelect();
-        actions.find((action) => action.key === 'acknowledge')?.onSelect();
-        actions.find((action) => action.key === 'snooze')?.onSelect();
-        actions.find((action) => action.key === 'open-incident')?.onSelect();
+        run('preview');
+        run('open');
+        run('claim');
+        run('acknowledge');
+        run('snooze');
+        run('escalate');
+        run('incident');
+        run('open-incident');
 
+        expect(effects.select).toHaveBeenCalledWith(17);
+        expect(effects.visit).toHaveBeenNthCalledWith(1, '/control-room/alerts/17');
         expect(effects.post).toHaveBeenNthCalledWith(
             1,
             '/control-room/alerts/17/assign-to-me',
@@ -88,7 +97,10 @@ describe('buildControlRoomAlertRowActions', () => {
             2,
             '/control-room/alerts/17/acknowledge',
         );
-        expect(effects.openWorkspace).toHaveBeenCalledWith(17);
-        expect(effects.visit).toHaveBeenCalledWith('/incidents/4');
+        expect(effects.openAction).toHaveBeenNthCalledWith(1, 17, 'snooze');
+        expect(effects.openAction).toHaveBeenNthCalledWith(2, 17, 'escalate');
+        expect(effects.openAction).toHaveBeenNthCalledWith(3, 17, 'report_incident');
+        expect(effects.visit).toHaveBeenNthCalledWith(2, '/incidents/4');
+        expect(actions.find((a) => a.key === 'incident')?.label).toBe('Report incident…');
     });
 });

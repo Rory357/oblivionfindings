@@ -115,7 +115,8 @@ Route::get('/terms', [PublicProviderController::class, 'show'])->defaults('provi
 Route::get('/accessibility', [PublicProviderController::class, 'show'])->defaults('provider_page', 'accessibility')->name('provider.accessibility');
 Route::redirect('/smart-monitoring', '/services', 301)->name('smart-monitoring');
 Route::get('/contact', [PublicProviderController::class, 'show'])->defaults('provider_page', 'contact')->name('contact');
-Route::post('/contact', [PublicProviderController::class, 'retiredContact'])->middleware('throttle:10,1');
+// Contact us → a general enquiry in referral intake (an old cached form without a token is still retired).
+Route::post('/contact', [App\Domain\Referrals\Http\Controllers\PublicContactController::class, 'store'])->middleware('throttle:6,1')->name('contact.store');
 // Career Portal — public surface lives on the requisition-backed Careers
 // controller. The legacy posting-backed job-detail page has been retired; only
 // the candidate application-status tracker (`applicationStatus`) remains on the
@@ -125,6 +126,7 @@ Route::get('/careers', [CareerPortalController::class, 'index'])->name('careers.
 Route::get('/careers/application/{token}', [App\Http\Controllers\CareerPortalController::class, 'applicationStatus'])->middleware('throttle:30,1')->name('careers.application.status');
 Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer'])->middleware('throttle:30,1')->name('careers.offer.show');
 Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondToOffer'])->middleware('throttle:10,1')->name('careers.offer.respond');
+Route::get('/careers/jobs/{job:slug}', [CareerPortalController::class, 'show'])->name('careers.job');
 Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');
 Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'submitApplication'])->name('careers.apply.store');
 // Public token-guarded reference questionnaire — must precede the /careers/{slug} catch-all.

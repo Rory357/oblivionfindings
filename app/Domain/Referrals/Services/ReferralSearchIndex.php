@@ -65,16 +65,21 @@ final class ReferralSearchIndex
         $search = trim($search);
         $hashes = $this->queryHashes($search);
         $reference = preg_match('/^[0-9A-Za-z]{2,26}$/', $search) === 1 ? strtoupper($search) : null;
-        if ($hashes === [] && $reference === null) {
+        // A general enquiry's ENQ- number, exactly ("ENQ-1001", "enq 1001" or "ENQ1001").
+        $enquiry = preg_match('/^enq[\s-]?(\d{1,9})$/i', $search, $number) === 1 ? (int) $number[1] : null;
+        if ($hashes === [] && $reference === null && $enquiry === null) {
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where(function (Builder $match) use ($hashes, $reference): void {
+        return $query->where(function (Builder $match) use ($hashes, $reference, $enquiry): void {
             if ($hashes !== []) {
                 $match->whereIn('care_referrals.id', $this->matching($hashes));
             }
             if ($reference !== null) {
                 $match->orWhere('care_referrals.reference', 'like', $reference.'%');
+            }
+            if ($enquiry !== null) {
+                $match->orWhere('care_referrals.enquiry_number', $enquiry);
             }
         });
     }

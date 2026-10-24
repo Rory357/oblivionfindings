@@ -28,6 +28,7 @@ use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Operations\OpsMessageVisibilityService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
+use App\Support\Branding\BrandHeroPhoto;
 use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Closure;
@@ -173,6 +174,8 @@ class HandleInertiaRequests extends Middleware
                             'branding.name',
                             'branding.logo_path',
                             'branding.logo_dark_path',
+                            BrandHeroPhoto::PATH_SETTING,
+                            BrandHeroPhoto::ALT_SETTING,
                         ]);
                 })
                 ->get(['key', 'value'])
@@ -194,6 +197,9 @@ class HandleInertiaRequests extends Middleware
         // The organisation's logo for dark backgrounds (sign-in brand half, dark mode).
         $logoDarkPath = $settings->get('branding.logo_dark_path')?->value;
         $logoDarkUrl = $logoDarkPath ? Storage::disk('public')->url($logoDarkPath) : null;
+        // The website and sign-in photo (public home hero, both sign-in pages).
+        $heroUrl = BrandHeroPhoto::url($settings->get(BrandHeroPhoto::PATH_SETTING)?->value);
+        $heroAlt = $settings->get(BrandHeroPhoto::ALT_SETTING)?->value;
 
         $hasOpsMessagingTables = SchemaCache::hasTable('ops_messages')
             && SchemaCache::hasTable('ops_conversation_participants');
@@ -292,7 +298,12 @@ class HandleInertiaRequests extends Middleware
                 'name' => is_string($brandingName) && trim($brandingName) !== '' ? $brandingName : config('app.name'),
                 'logoUrl' => $logoUrl,
                 'logoDarkUrl' => $logoDarkUrl,
+                'heroUrl' => $heroUrl,
+                'heroAlt' => is_string($heroAlt) ? $heroAlt : null,
             ],
+            // The client demo website server (config/demo.php): the public pages may show the
+            // fictional provider's photos and facts. A client's own site never does.
+            'demoSite' => (bool) config('demo.site'),
             // Per-user appearance preferences so the React app can hydrate
             // from server state instead of only trusting localStorage. Null
             // values mean "fall back to brand/org defaults". The `appearance`

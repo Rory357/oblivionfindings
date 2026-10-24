@@ -112,10 +112,10 @@ export function Donut({
                 </g>
                 <foreignObject x={0} y={0} width={size} height={size}>
                     <div className="flex h-full w-full flex-col items-center justify-center text-center leading-none">
-                        <div className="text-[26px] font-extrabold tracking-tight text-muted-foreground tabular-nums">
+                        <div className="text-3xl font-extrabold tracking-tight text-muted-foreground tabular-nums">
                             {centerValue}
                         </div>
-                        <div className="mt-1 text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
+                        <div className="mt-1 text-xs font-semibold tracking-wider text-muted-foreground/80 uppercase">
                             {centerLabel}
                         </div>
                     </div>

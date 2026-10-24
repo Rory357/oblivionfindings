@@ -48,6 +48,7 @@ type Props = {
     catalogue: Catalogue;
     can: { create: boolean; manage: boolean; view_medications?: boolean };
     currentUser: { id: number; name: string };
+    handoverCommandProtocol?: 1 | null;
 };
 
 export default function HandoversIndex(props: Props) {
@@ -64,7 +65,9 @@ function HandoversBody({
     summary: counts,
     evidence,
     handoverPagination,
+    handoverCommandProtocol = null,
 }: Props) {
+    const [checkedHandoverCommands] = useState(() => handoverCommandProtocol === 1);
     const weekStartDate = useMemo(
         () => new Date(`${weekStart}T00:00:00`),
         [weekStart],
@@ -74,6 +77,7 @@ function HandoversBody({
     const { draft: filters } = query;
     const [view, setView] = useState<ViewMode>('cards');
     const [wizardOpen, setWizardOpen] = useState(false);
+    const [submitOnly, setSubmitOnly] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [detailId, setDetailId] = useState<number | null>(() => {
         const requested =
@@ -140,12 +144,14 @@ function HandoversBody({
     };
 
     const openNew = () => {
+        setSubmitOnly(false);
         setEditingId(null);
         setPendingClientId(null);
         setWizardOpen(true);
     };
 
-    const openEdit = (h: Handover) => {
+    const openEdit = (h: Handover, submit = false) => {
+        setSubmitOnly(submit);
         setDetailId(null);
         setEditingId(h.id);
         setWizardOpen(true);
@@ -157,16 +163,13 @@ function HandoversBody({
         setPendingClientId(null);
     };
 
-    const submitHandover = (h: Handover) =>
-        router.patch(
-            `/operations/handovers/${h.id}/submit`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () =>
-                    toast.success('Draft submitted to incoming worker'),
-            },
-        );
+    const submitHandover = (h: Handover) => {
+        if (checkedHandoverCommands) { openEdit(h, true); return; }
+        router.patch(`/operations/handovers/${h.id}/submit`, {}, {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Draft submitted to incoming worker'),
+        });
+    };
 
     const acknowledgeHandover = (h: Handover) =>
         router.patch(
@@ -192,10 +195,11 @@ function HandoversBody({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/handovers' },
                 { title: 'Handovers', href: '/operations/handovers' },
             ]}
         >
-            <Head title="Shift Handovers" />
+            <Head title="Handovers" />
             <PageShell>
                 <HandoversHero
                     weekStart={weekStartDate}
@@ -310,18 +314,21 @@ function HandoversBody({
                 }
             />
 
-            {wizardOpen ? (
-                <HandoverWizard
+            <HandoverWizard
+                    checkedCommands={checkedHandoverCommands}
+                    timeZone={evidence.timezone}
+                    submitOnly={submitOnly}
                     open={wizardOpen}
                     onOpenChange={(open) => (open ? null : closeWizard())}
                     editing={editingHandover}
+                    editingUnavailable={editingId !== null && editingHandover === null}
                     catalogue={catalogue}
                     currentUser={currentUser}
                     preselectClientId={pendingClientId}
                     onAddClient={() => setAddClientOpen(true)}
+                    addClientActive={addClientOpen}
                     onSubmitted={(week) => goWeek(week)}
-                />
-            ) : null}
+            />
 
             <AddClientDialog
                 isOpen={addClientOpen}

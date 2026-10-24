@@ -6,7 +6,8 @@ export default function TemplateWorkspace() {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Workforce', href: '/operations/rostering/templates' },
+                { title: 'Workforce', href: '/operations/rostering' },
+                { title: 'Rostering', href: '/operations/rostering' },
                 { title: 'Templates', href: '/operations/rostering/templates' },
             ]}
         >

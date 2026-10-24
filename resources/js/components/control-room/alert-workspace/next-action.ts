@@ -41,17 +41,17 @@ export function nextAlertAction(input: AlertNextActionInput): AlertNextAction {
             label: 'Confirm detection',
             href: null,
             statusText:
-                'Confirm or dismiss the sensor detection before creating a formal record.',
+                'Confirm or dismiss what the sensor picked up before reporting anything.',
         };
     }
 
     if (!input.incident && input.can.createIncident) {
         return {
             key: 'create_incident',
-            label: 'Create incident and hand over',
+            label: 'Report incident',
             href: null,
             statusText:
-                'Creates one official incident and opens its H&S handover.',
+                'Reporting it hands the follow-up to Health & Safety.',
         };
     }
 
@@ -64,7 +64,7 @@ export function nextAlertAction(input: AlertNextActionInput): AlertNextAction {
             key: 'continue_health_safety',
             label: 'Continue in H&S',
             href: input.healthSafety.href,
-            statusText: 'H&S has accepted ownership of the governance work.',
+            statusText: 'Health & Safety has taken on the follow-up.',
         };
     }
 
@@ -75,8 +75,8 @@ export function nextAlertAction(input: AlertNextActionInput): AlertNextAction {
             href: input.incident.href,
             statusText:
                 input.healthSafety?.handoverStatus === 'awaiting_acceptance'
-                    ? 'Waiting for H&S acceptance'
-                    : 'The incident is the official record of what happened.',
+                    ? 'Waiting for Health & Safety to take it on.'
+                    : 'The incident report is the record of what happened.',
         };
     }
 
@@ -86,7 +86,7 @@ export function nextAlertAction(input: AlertNextActionInput): AlertNextAction {
         href: null,
         statusText:
             input.alertStatus === 'resolved' || input.alertStatus === 'closed'
-                ? 'No further operational action is available.'
-                : 'Continue the operational response in Control Room.',
+                ? 'Nothing more to do here.'
+                : 'Carry on the response here in Control Room.',
     };
 }

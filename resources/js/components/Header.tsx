@@ -1,126 +1,144 @@
 import { BrandLockup } from '@/components/brand/brand-lockup';
-import { enquiryUrl } from '@/components/public-provider';
+import {
+    navKeyForUrl,
+    siteLinks,
+    usePublicSite,
+    type SiteNavKey,
+} from '@/components/public-site/site';
 import { Button } from '@/components/ui/button';
-import { useAppearance } from '@/hooks/use-appearance';
 import { Link, usePage } from '@inertiajs/react';
-import { Menu, Moon, Sun, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowRight, LogIn, Menu, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
-export default function Header({ name = 'Oblivion Care' }: { name?: string }) {
-    const [open, setOpen] = useState(false);
-    const { url } = usePage();
-    const { appearance, updateAppearance } = useAppearance();
-    useEffect(() => setOpen(false), [url]);
-    const dark =
-        appearance === 'dark' ||
-        (appearance === 'system' &&
-            typeof window !== 'undefined' &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches);
-    const links = [
-        { href: '/services', label: 'Our support' },
-        { href: '/funding', label: 'Funding help' },
-        { href: '/about', label: 'About us' },
-        { href: '/contact', label: 'Contact' },
-    ];
-    const navigation = links.map((item) => (
-        <Link
-            key={item.href}
-            href={item.href}
-            aria-current={url.split('?')[0] === item.href ? 'page' : undefined}
-            onClick={() => setOpen(false)}
-            className="frontline-tap text-subtle flex items-center rounded-lg px-3 py-2 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
-        >
-            {item.label}
-        </Link>
-    ));
+const nav: { key: SiteNavKey; label: string; href: string }[] = [
+    { key: 'support', label: 'Our support', href: siteLinks.support },
+    { key: 'funding', label: 'Funding help', href: siteLinks.funding },
+    { key: 'about', label: 'About us', href: siteLinks.about },
+    { key: 'careers', label: 'Careers', href: siteLinks.careers },
+    { key: 'contact', label: 'Contact us', href: siteLinks.contact },
+];
+
+/** The brand slot as the home link (Settings › Branding) — never a hard-coded logo. */
+export function SiteLockup() {
+    const { name } = usePublicSite();
     return (
-        <header className="relative flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
-            {/* The brand slot (Settings › Branding): Journey lockup, a client logo or a client name — never a hard-coded mark. */}
-            <Link
-                href="/"
-                aria-label={`${name} home`}
-                className="frontline-tap flex min-w-0 items-center rounded-lg focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <BrandLockup surface={dark ? 'dark' : 'light'} />
-            </Link>
+        <Link
+            href={siteLinks.home}
+            className="flex min-h-[44px] min-w-0 items-center rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label={name ? `${name} home` : 'Home'}
+        >
+            <BrandLockup surface="dark" name={name} />
+        </Link>
+    );
+}
+
+/**
+ * The public website header (mockup v2): on the ink band, the brand slot,
+ * Our support · Funding help · About us · Careers · Contact us, then
+ * "Sign in" and the primary "Make a referral". The full nav shows from
+ * 1280 px (xl); below that a menu button opens the nav under a horizon line.
+ */
+export default function Header({ current }: { current?: SiteNavKey | null }) {
+    const [open, setOpen] = useState(false);
+    const toggle = useRef<HTMLButtonElement>(null);
+    const { url } = usePage();
+    const active = current ?? navKeyForUrl(url);
+    useEffect(() => setOpen(false), [url]);
+    const close = () => setOpen(false);
+    const ariaCurrent = (key: SiteNavKey) =>
+        active === key ? ('page' as const) : undefined;
+
+    return (
+        <header className="journey-site-container flex min-h-[76px] items-center justify-between gap-4 py-3">
+            <SiteLockup />
             <nav
-                aria-label="Main navigation"
-                className="hidden items-center gap-1 lg:flex"
+                aria-label="Main"
+                className="hidden items-center gap-0.5 xl:flex"
             >
-                {navigation}
+                {nav.map((item) => (
+                    <Link
+                        key={item.key}
+                        href={item.href}
+                        className="journey-site-navlink"
+                        aria-current={ariaCurrent(item.key)}
+                    >
+                        {item.label}
+                    </Link>
+                ))}
             </nav>
-            <div className="flex items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="frontline-tap"
-                    aria-label={
-                        dark ? 'Use light appearance' : 'Use dark appearance'
-                    }
-                    onClick={() => updateAppearance(dark ? 'light' : 'dark')}
-                >
-                    {dark ? (
-                        <Sun className="size-4" />
-                    ) : (
-                        <Moon className="size-4" />
-                    )}
-                </Button>
+            <div className="hidden items-center gap-2 xl:flex">
                 <Link
-                    href="/login"
-                    className="text-subtle hidden items-center rounded-lg px-3 py-2 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring lg:flex"
+                    href={siteLinks.signIn}
+                    className="journey-site-navlink gap-2"
                 >
-                    Staff and family sign in
+                    <LogIn className="size-4" aria-hidden />
+                    Sign in
                 </Link>
-                <Button asChild className="hidden sm:inline-flex">
-                    <Link href={enquiryUrl()}>Explore support</Link>
-                </Button>
-                <Button
-                    variant="outline"
-                    size="icon"
-                    className="frontline-tap lg:hidden"
-                    aria-expanded={open}
-                    aria-controls="public-mobile-menu"
-                    aria-label={open ? 'Close navigation' : 'Open navigation'}
-                    onClick={() => setOpen(!open)}
-                >
-                    {open ? (
-                        <X className="size-4" />
-                    ) : (
-                        <Menu className="size-4" />
-                    )}
+                <Button asChild className="frontline-tap">
+                    <Link
+                        href={siteLinks.referral}
+                        aria-current={ariaCurrent('referral')}
+                    >
+                        Make a referral
+                        <ArrowRight className="size-4" aria-hidden />
+                    </Link>
                 </Button>
             </div>
+            <Button
+                ref={toggle}
+                variant="outline"
+                size="icon"
+                className="size-[44px] xl:hidden"
+                aria-expanded={open}
+                aria-controls="site-menu"
+                aria-label={open ? 'Close menu' : 'Open menu'}
+                onClick={() => setOpen((value) => !value)}
+            >
+                {open ? (
+                    <X className="size-5" aria-hidden />
+                ) : (
+                    <Menu className="size-5" aria-hidden />
+                )}
+            </Button>
             {open && (
-                <nav
-                    id="public-mobile-menu"
-                    aria-label="Mobile navigation"
-                    className="w-full space-y-1 rounded-xl border border-border bg-card p-3 lg:hidden"
+                <div
+                    id="site-menu"
+                    className="journey-site-horizon absolute inset-x-0 top-[76px] z-50 bg-journey-ink px-5 pt-1 pb-6 shadow-lg xl:hidden"
                     onKeyDown={(event) => {
                         if (event.key === 'Escape') {
-                            setOpen(false);
-                            document
-                                .querySelector<HTMLButtonElement>(
-                                    '[aria-controls="public-mobile-menu"]',
-                                )
-                                ?.focus();
+                            close();
+                            toggle.current?.focus();
                         }
                     }}
                 >
-                    {navigation}
-                    <Link
-                        href={enquiryUrl()}
-                        onClick={() => setOpen(false)}
-                        className="frontline-tap flex items-center rounded-lg px-3 py-2 font-medium text-primary focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        Explore support
-                    </Link>
-                    <Link
-                        href="/login"
-                        className="frontline-tap text-subtle flex items-center rounded-lg px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        Staff and family sign in
-                    </Link>
-                </nav>
+                    <nav aria-label="Main" className="flex flex-col py-2">
+                        {nav.map((item) => (
+                            <Link
+                                key={item.key}
+                                href={item.href}
+                                className="journey-site-navlink"
+                                aria-current={ariaCurrent(item.key)}
+                                onClick={close}
+                            >
+                                {item.label}
+                            </Link>
+                        ))}
+                        <Link
+                            href={siteLinks.signIn}
+                            className="journey-site-navlink gap-2"
+                            onClick={close}
+                        >
+                            <LogIn className="size-4" aria-hidden />
+                            Sign in
+                        </Link>
+                    </nav>
+                    <Button asChild className="frontline-tap w-full">
+                        <Link href={siteLinks.referral} onClick={close}>
+                            Make a referral
+                            <ArrowRight className="size-4" aria-hidden />
+                        </Link>
+                    </Button>
+                </div>
             )}
         </header>
     );

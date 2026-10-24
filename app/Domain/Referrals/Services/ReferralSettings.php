@@ -54,6 +54,9 @@ final class ReferralSettings
     /** Always available: duplicate review and the documented fallback close, and every referral's default priority. */
     public const PROTECTED_CHOICES = ['hold' => [], 'close' => ['duplicate', 'other'], 'priority' => ['standard']];
 
+    /** Public Contact us details (office address, contact email, opening hours); older versions read as blank. */
+    public const PUBLIC_CONTACT_DEFAULTS = ['office_address' => '', 'contact_email' => '', 'opening_hours' => ''];
+
     public static function defaults(): array
     {
         return [
@@ -65,6 +68,8 @@ final class ReferralSettings
                 'notice_version' => 'draft',
                 'notice' => '',
                 'acknowledgement_enabled' => false,
+                // Optional details for the public Contact us page; blank ones are simply not shown.
+                ...self::PUBLIC_CONTACT_DEFAULTS,
             ],
             'services' => [['id' => 'supported_living', 'label' => 'Supported living', 'enabled' => true]],
             'intake' => ['team' => 'Central intake', 'first_contact_business_days' => 2, 'hold_review_business_days' => 5],
@@ -156,6 +161,9 @@ final class ReferralSettings
     /** Fills settings that older publications did not store, so every version reads the same way. */
     public static function presentable(array $configuration): array
     {
+        foreach (self::PUBLIC_CONTACT_DEFAULTS as $key => $blank) {
+            $configuration['public'][$key] ??= $blank;
+        }
         $configuration['choices'] = array_combine(self::CHOICE_LISTS, array_map(
             fn (string $list) => array_map(fn (array $item) => ['id' => $item['id'], 'label' => $item['label'], 'enabled' => $item['enabled']], self::choices($configuration, $list)),
             self::CHOICE_LISTS,
@@ -362,7 +370,11 @@ final class ReferralSettings
         $pathways = is_array($configuration['pathways'] ?? null) ? array_filter($configuration['pathways'], 'is_array') : [];
         $data = Validator::make(['configuration' => $configuration], [
             'configuration' => ['required', 'array:'.implode(',', $keys)],
-            'configuration.public' => 'required|array:enabled,provider_name,contact_phone,response_hours,notice_version,notice,acknowledgement_enabled',
+            'configuration.public' => 'required|array:enabled,provider_name,contact_phone,response_hours,notice_version,notice,acknowledgement_enabled,office_address,contact_email,opening_hours',
+            // Shown on the public Contact us page only when filled in.
+            'configuration.public.office_address' => 'sometimes|nullable|string|max:300',
+            'configuration.public.contact_email' => 'sometimes|nullable|email:rfc|max:254',
+            'configuration.public.opening_hours' => 'sometimes|nullable|string|max:200',
             'configuration.public.enabled' => 'required|boolean',
             'configuration.public.provider_name' => 'required|string|max:120',
             'configuration.public.contact_phone' => 'present|nullable|string|max:80',

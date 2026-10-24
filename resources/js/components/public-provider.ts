@@ -6,6 +6,11 @@ export type PublicProvider = {
     notice: string;
     notice_version: string;
     services: { id: string; label: string }[];
+    /** Contact us page details (Lane CU, Settings › Referrals › Intake).
+     *  Blank when not set; the website hides a row that isn't set. */
+    email?: string | null;
+    address?: string | null;
+    opening_hours?: string | null;
 };
 
 export function enquiryUrl(purpose = 'support', service?: string) {

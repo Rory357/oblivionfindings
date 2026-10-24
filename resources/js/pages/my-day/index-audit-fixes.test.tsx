@@ -21,8 +21,10 @@ vi.mock('@inertiajs/react', () => ({
         post: mocks.routerPost,
         visit: mocks.routerVisit,
         patch: mocks.routerPatch,
+        on: vi.fn(() => () => {}),
+        reload: vi.fn(),
     },
-    usePage: () => ({ props: mocks.props }),
+    usePage: () => ({ props: mocks.props, url: '/my-day' }),
 }));
 
 vi.mock('sonner', () => ({
@@ -82,7 +84,8 @@ vi.mock('./components/day-work-list', () => ({
     DayWorkList: () => <section data-testid="day-work" />,
 }));
 
-vi.mock('./components/digest-panel', () => ({
+vi.mock('./components/digest-panel', async (importOriginal) => ({
+    ...await importOriginal<typeof import('./components/digest-panel')>(),
     DigestPanel: () => <section data-testid="digest" />,
 }));
 
@@ -177,6 +180,40 @@ describe('My Day audit wiring', () => {
         mocks.routerPatch.mockClear();
         mocks.toastError.mockClear();
         mocks.props = baseProps();
+    });
+
+    it('keeps a My Day return when reporting for the active shift', () => {
+        render(<MyDay />);
+        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
+        expect(mocks.routerVisit).toHaveBeenCalledWith(
+            '/incidents/create?shift_id=44&return_to=%2Fmy-day',
+        );
+    });
+
+    it('keeps a My Day return without inventing a shift when none is active', () => {
+        mocks.props = { ...baseProps(), active_shift: null };
+        render(<MyDay />);
+        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
+        expect(mocks.routerVisit).toHaveBeenCalledWith(
+            '/incidents/create?return_to=%2Fmy-day',
+        );
+    });
+
+    it('discovers Team updates on Today without revealing an unverified broadcast preview', () => {
+        mocks.props.notifications = [{
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            title: 'Private staff broadcast',
+            at: 'Today',
+            broadcast: { schema_version: 1, notification_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                recipient_viewer_id: 1, reader_read_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                href: '/notifications?notification=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        }];
+        render(<MyDay />);
+        expect(screen.getByRole('region', { name: 'Team updates' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'View all updates' })).toHaveAttribute('href', '/notifications');
+        expect(screen.queryByText('Private staff broadcast')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Check staff messages' })).toBeInTheDocument();
+        expect(screen.getByTestId('day-work')).toBeInTheDocument();
     });
 
     it('keeps an ordinary due task in the work list without a duplicate warning banner', () => {

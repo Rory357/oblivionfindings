@@ -108,17 +108,19 @@ class ControlRoomIncidentController extends Controller
         $sites = $sitesQuery->get(['id', 'name']);
 
         $lenses = collect([
-            ['key' => 'attention', 'label' => 'Needs attention', 'help' => 'Operational or governance work is still open.'],
-            ['key' => 'needs_incident', 'label' => 'Needs incident', 'help' => 'Create the formal incident record and H&S handover.'],
-            ['key' => 'awaiting_health_safety', 'label' => 'Awaiting H&S', 'help' => 'H&S has not accepted ownership yet.'],
-            ['key' => 'accepted_in_progress', 'label' => 'Accepted / in progress', 'help' => 'H&S owns the governance work while operations continue.'],
-            ['key' => 'operational_complete_governance_open', 'label' => 'Operations done / H&S open', 'help' => 'The alert is complete but governance work remains.'],
+            ['key' => 'attention', 'label' => 'Needs attention', 'help' => 'The response or the H&S follow-up is still open.'],
+            ['key' => 'needs_incident', 'label' => 'Needs an incident report', 'help' => 'Report the incident so H&S can take over its follow-up.'],
+            ['key' => 'awaiting_health_safety', 'label' => 'Waiting for H&S', 'help' => 'H&S has not accepted the follow-up yet.'],
+            ['key' => 'accepted_in_progress', 'label' => 'H&S in progress', 'help' => 'H&S owns the follow-up while the response continues.'],
+            ['key' => 'operational_complete_governance_open', 'label' => 'Response done, H&S open', 'help' => 'The response is finished; the H&S follow-up is still open.'],
             ['key' => 'complete', 'label' => 'Complete', 'help' => 'Operational and H&S work are both closed.'],
         ])->map(fn (array $lens) => $lens + [
             'count' => (int) $lensCounts->get($lens['key'], 0),
         ])->values();
 
         return Inertia::render('control-room/incidents', [
+            // Live counts on the Live response tabs (same rules as each tab).
+            'tabCounts' => fn () => app(\App\Services\ControlRoom\LiveResponseTabCounts::class)->for($user),
             'journeys' => $this->paginatorPayload($journeys),
             'filters' => $filters,
             'lenses' => $lenses,
@@ -258,7 +260,7 @@ class ControlRoomIncidentController extends Controller
         $nextAction = match ($stage) {
             'needs_incident' => [
                 'key' => 'create_incident',
-                'label' => 'Create incident and hand over',
+                'label' => 'Report incident',
                 'href' => '/control-room/alerts/'.$alert->id,
             ],
             'awaiting_health_safety' => [
@@ -283,7 +285,9 @@ class ControlRoomIncidentController extends Controller
             ],
         };
 
-        return $worklist + [
+        // array_merge, not +: the journey's own next step must replace the
+        // generic "Continue response" the worklist row carries.
+        return array_merge($worklist, [
             'alert' => [
                 'id' => $alert->id,
                 'reference_number' => $alert->reference_number ?: null,
@@ -314,7 +318,7 @@ class ControlRoomIncidentController extends Controller
             ] : null,
             'stage' => $stage,
             'next_action' => $nextAction,
-        ];
+        ]);
     }
 
     /** @return array<string, mixed> */

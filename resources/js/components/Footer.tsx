@@ -1,79 +1,98 @@
-import {
-    BrandLockup,
-    JourneyWordmark,
-    useCustomBrandName,
-} from '@/components/brand/brand-lockup';
-import {
-    enquiryUrl,
-    phoneUrl,
-    type PublicProvider,
-} from '@/components/public-provider';
-import { useAppearance } from '@/hooks/use-appearance';
+import { JourneyWordmark } from '@/components/brand/brand-lockup';
+import { SiteLockup } from '@/components/Header';
+import { enquiryUrl, phoneUrl } from '@/components/public-provider';
+import { demo, regionList } from '@/components/public-site/content';
+import { siteLinks, usePublicSite } from '@/components/public-site/site';
 import { Link } from '@inertiajs/react';
-import { Phone } from 'lucide-react';
 
-export default function Footer({ provider }: { provider?: PublicProvider }) {
-    const customName = useCustomBrandName();
-    const { appearance } = useAppearance();
-    const dark =
-        appearance === 'dark' ||
-        (appearance === 'system' &&
-            typeof window !== 'undefined' &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches);
-    const groups = [
-        {
-            title: 'Getting support',
-            links: [
-                { href: '/services', label: 'Our support' },
-                { href: '/funding', label: 'Funding assistance' },
-                { href: enquiryUrl('referral'), label: 'Make a referral' },
-            ],
-        },
-        {
-            title: 'Stay connected',
-            links: [
-                { href: '/contact', label: 'Contact us' },
-                { href: '/careers', label: 'Careers' },
-                { href: '/login', label: 'Staff and family sign in' },
-            ],
-        },
-        {
-            title: 'Your information',
-            links: [
-                { href: '/privacy-policy', label: 'Privacy' },
-                { href: '/terms', label: 'Website terms' },
-                { href: '/accessibility', label: 'Accessibility' },
-            ],
-        },
-    ];
+const columns: { title: string; links: { label: string; href: string }[] }[] = [
+    {
+        title: 'Our support',
+        links: [
+            { label: 'Support at home', href: `${siteLinks.support}#home` },
+            {
+                label: 'In the community',
+                href: `${siteLinks.support}#community`,
+            },
+            {
+                label: 'Short breaks (respite)',
+                href: `${siteLinks.support}#respite`,
+            },
+            { label: 'Funding help', href: siteLinks.funding },
+        ],
+    },
+    {
+        title: 'Get in touch',
+        links: [
+            { label: 'Make a referral', href: siteLinks.referral },
+            { label: 'Request a callback', href: enquiryUrl('callback') },
+            { label: 'Contact us', href: siteLinks.contact },
+        ],
+    },
+    {
+        title: 'About',
+        links: [
+            { label: 'About us', href: siteLinks.about },
+            { label: 'Careers', href: siteLinks.careers },
+            { label: 'Staff sign in', href: siteLinks.signIn },
+            { label: 'Family portal', href: siteLinks.familySignIn },
+        ],
+    },
+];
+
+/**
+ * The public website footer (mockup v2): the brand slot, where the provider
+ * works and how to call, three link groups, then © the provider, one small
+ * "Powered by oblivion care" line when the site carries a client's brand, and
+ * the Privacy / Terms / Accessibility pages.
+ */
+export default function Footer() {
+    const { name, hasClientBrand, demo: isDemo, provider } = usePublicSite();
+    const phone = provider.phone?.trim();
+    const hours = provider.response_hours?.trim();
+
     return (
-        <footer className="mt-16 border-t border-border pt-8">
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                    <BrandLockup surface={dark ? 'dark' : 'light'} />
-                    <p className="text-subtle mt-3">
-                        Start with a conversation about your goals, your choices
-                        and the support that matters to you.
+        <footer className="journey-site-footer">
+            <div className="journey-site-container grid gap-10 py-12 md:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
+                <div className="space-y-4">
+                    <span className="block text-journey-paper">
+                        <SiteLockup />
+                    </span>
+                    <p className="max-w-xs text-sm">
+                        {isDemo
+                            ? `Supported living across ${regionList(demo.regions)}.`
+                            : 'Supported living, shaped around you.'}
                     </p>
-                    {provider?.phone && (
-                        <a
-                            href={phoneUrl(provider.phone)}
-                            className="frontline-tap text-subtle mt-3 inline-flex items-center gap-2 rounded focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                            <Phone className="size-4" />
-                            {provider.phone}
-                        </a>
+                    {(phone || hours) && (
+                        <p className="text-sm">
+                            {phone && (
+                                <a
+                                    href={phoneUrl(phone)}
+                                    className="inline-flex min-h-[44px] items-center font-semibold"
+                                >
+                                    {phone}
+                                </a>
+                            )}
+                            {phone && hours && <br />}
+                            {hours}
+                        </p>
                     )}
                 </div>
-                {groups.map((group) => (
-                    <nav key={group.title} aria-label={group.title}>
-                        <h2 className="font-medium">{group.title}</h2>
-                        <ul className="mt-2">
-                            {group.links.map((link) => (
-                                <li key={link.href}>
+                {columns.map((column) => (
+                    <nav
+                        key={column.title}
+                        aria-label={column.title}
+                        className="space-y-3 text-sm"
+                    >
+                        <p className="font-semibold text-journey-paper">
+                            {column.title}
+                        </p>
+                        <ul>
+                            {column.links.map((link) => (
+                                <li key={link.label}>
                                     <Link
                                         href={link.href}
-                                        className="frontline-tap text-subtle inline-flex items-center rounded py-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="inline-flex min-h-[44px] items-center"
                                     >
                                         {link.label}
                                     </Link>
@@ -83,20 +102,41 @@ export default function Footer({ provider }: { provider?: PublicProvider }) {
                     </nav>
                 ))}
             </div>
-            <p className="text-caption mt-8 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border py-6 text-muted-foreground">
-                <span>
-                    © {new Date().getFullYear()}{' '}
-                    {customName ?? provider?.name ?? 'Oblivion Care'}. Support
-                    availability and funding are confirmed individually.
-                </span>
-                {customName && (
-                    <span className="flex items-center gap-1.5">
-                        Powered by
-                        <JourneyWordmark className="text-[13px] text-current" />
-                        <span className="sr-only">Oblivion Care</span>
+            <div className="journey-site-container flex flex-wrap items-center justify-between gap-3 border-t border-journey-paper/10 py-5 text-sm">
+                <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span>
+                        © {new Date().getFullYear()}
+                        {name ? ` ${name}` : ''}
                     </span>
-                )}
-            </p>
+                    {hasClientBrand && (
+                        <span className="flex items-center gap-1.5">
+                            Powered by
+                            <JourneyWordmark className="text-[13px] text-current" />
+                            <span className="sr-only">Oblivion Care</span>
+                        </span>
+                    )}
+                </span>
+                <span className="flex flex-wrap gap-x-5">
+                    <Link
+                        href={siteLinks.privacy}
+                        className="inline-flex min-h-[44px] items-center"
+                    >
+                        Privacy
+                    </Link>
+                    <Link
+                        href={siteLinks.terms}
+                        className="inline-flex min-h-[44px] items-center"
+                    >
+                        Terms
+                    </Link>
+                    <Link
+                        href={siteLinks.accessibility}
+                        className="inline-flex min-h-[44px] items-center"
+                    >
+                        Accessibility
+                    </Link>
+                </span>
+            </div>
         </footer>
     );
 }

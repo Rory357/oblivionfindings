@@ -20,7 +20,27 @@ vi.mock('@/layouts/app-layout', () => ({
 vi.mock('@/components/page-shell', () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
-vi.mock('@/components/page', () => ({ PageHero: () => null }));
+vi.mock('@/components/page', () => ({
+    PageLayout: ({
+        hero,
+        children,
+    }: {
+        hero?: ReactNode;
+        children?: ReactNode;
+    }) => (
+        <>
+            {hero}
+            {children}
+        </>
+    ),
+    PageHeaderGlassButton: () => null,
+    PageHeaderMeterBlock: () => null,
+    PageHeaderMeterDonut: () => null,
+    PageHeaderPrimaryButton: () => null,
+}));
+vi.mock('@/components/workforce/workforce-page-header', () => ({
+    WorkforcePageHeader: () => null,
+}));
 vi.mock('@/components/operations/shift-medication-card', () => ({
     default: () => <div>Shift medication content</div>,
 }));

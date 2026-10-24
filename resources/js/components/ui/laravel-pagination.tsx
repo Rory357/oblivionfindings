@@ -23,6 +23,8 @@ interface SharedPaginationProps {
      */
     onPage?: (page: number) => void;
     ariaLabel?: string;
+    /** Disables every page button, e.g. while the owning list is loading. */
+    disabled?: boolean;
 }
 
 type LaravelPaginationProps = SharedPaginationProps & (
@@ -77,6 +79,7 @@ export function LaravelPagination({
     navigation,
     cursor,
     ariaLabel = 'Pagination',
+    disabled = false,
 }: LaravelPaginationProps) {
     if (cursor) {
         if (cursor.previousHref === null && cursor.nextHref === null) return null;
@@ -140,6 +143,7 @@ export function LaravelPagination({
     return (
         <nav
             aria-label={ariaLabel}
+            aria-busy={disabled || undefined}
             className={cn(
                 'flex items-center justify-center gap-2.5',
                 className,
@@ -154,7 +158,7 @@ export function LaravelPagination({
                             key={i}
                             variant="outline"
                             size="sm"
-                            disabled={link.disabled}
+                            disabled={disabled || link.disabled}
                             onClick={link.visit}
                             aria-label="Previous page"
                             className="frontline-hit min-w-[36px]"
@@ -170,7 +174,7 @@ export function LaravelPagination({
                             key={i}
                             variant="outline"
                             size="sm"
-                            disabled={link.disabled}
+                            disabled={disabled || link.disabled}
                             onClick={link.visit}
                             aria-label="Next page"
                             className="frontline-hit min-w-[36px]"
@@ -185,7 +189,7 @@ export function LaravelPagination({
                         key={i}
                         variant={link.active ? 'default' : 'outline'}
                         size="sm"
-                        disabled={link.disabled}
+                        disabled={disabled || link.disabled}
                         onClick={link.visit}
                         aria-current={link.active ? 'page' : undefined}
                         className="frontline-hit min-w-[36px]"

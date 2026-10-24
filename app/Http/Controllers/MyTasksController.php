@@ -24,6 +24,8 @@ use App\Models\Site;
 use App\Models\SiteChecklistRun;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\ControlRoom\BroadcastRecipientReadContext;
+use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\GuidedRoundService;
 use App\Services\HandoverWorkerNotes;
 use App\Services\MarScheduleService;
@@ -48,6 +50,7 @@ use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class MyTasksController extends Controller
@@ -75,10 +78,19 @@ class MyTasksController extends Controller
         private readonly MarLinkService $marLinks,
     ) {}
 
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request): HttpResponse
     {
         abort_unless($request->user(), 403);
 
+        return app(BroadcastRecipientReadService::class)->respond(
+            $request->user(),
+            $request,
+            fn (BroadcastRecipientReadContext $broadcastContext): Response => $this->myDayResponse($request, $broadcastContext),
+        );
+    }
+
+    private function myDayResponse(Request $request, BroadcastRecipientReadContext $broadcastContext): Response
+    {
         $user = $request->user();
         $userId = $user->id;
         $canOpenEmar = $user->canDo('medications.view');
@@ -133,7 +145,7 @@ class MyTasksController extends Controller
 
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
         $tasks = $this->getCrTasks($user);
-        $notifications = $this->getDigestNotifications($user);
+        $notifications = $this->getDigestNotifications($user, $broadcastContext);
         $pendingClaimsCount = $this->getPendingClaimsCount($user);
 
         // 8. Stats
@@ -148,9 +160,7 @@ class MyTasksController extends Controller
             'timesheets_pending' => collect($timesheets)->count(),
             'incidents_open' => count($incidents),
             'cr_alerts' => collect($tasks)->where('type', 'alert')->count(),
-            'notifications_unread' => $this->boardPackAccess
-                ->visibleNotificationQuery($user, unreadOnly: true)
-                ->count(),
+            'notifications_unread' => $this->getUnreadNotificationCount($user, $broadcastContext),
         ];
 
         // 11. Frontline clock state (PR 4)
@@ -203,9 +213,10 @@ class MyTasksController extends Controller
             'timesheets' => $timesheets,
             'incidents' => $incidents,
             'tasks' => $tasks,
-            'notifications' => $notifications,
+            'notifications' => Inertia::always($notifications),
+            'broadcast_updates_reader' => Inertia::always($broadcastContext->envelope()),
             'pending_claims_count' => $pendingClaimsCount,
-            'stats' => $stats,
+            'stats' => Inertia::always($stats),
             'clock' => $clock,
             'active_round' => $activeRound,
             // Worker-facing Lone Worker Safety check-in card. Null unless the
@@ -1493,7 +1504,7 @@ class MyTasksController extends Controller
                         'severity' => $incident->severity,
                         'status' => $incident->status,
                         'occurred_at' => $incident->occurred_at?->toIso8601String(),
-                        'url' => '/incidents/'.$incident->id,
+                        'url' => '/incidents/'.$incident->id.'?return_to=%2Fmy-day',
                         'requires_followup' => (bool) $incident->requires_followup,
                     ];
                 })
@@ -1691,7 +1702,7 @@ class MyTasksController extends Controller
                         'description' => $description,
                         'priority' => $incident?->severity ?? 'medium',
                         'status' => 'pending',
-                        'source_url' => '/incidents/'.($followup->client_incident_id),
+                        'source_url' => '/incidents/'.($followup->client_incident_id).'?return_to=%2Fmy-day',
                         'due_at' => $followup->due_at?->toIso8601String(),
                         'created_at' => $followup->created_at->toIso8601String(),
                         'meta' => [
@@ -1746,35 +1757,64 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getDigestNotifications(User $user): array
+    private function getUnreadNotificationCount(User $user, BroadcastRecipientReadContext $broadcastContext): int
     {
-        try {
-            $workerNow = Carbon::now($this->workerTimezone());
+        $count = 0;
+        $this->boardPackAccess
+            ->visibleNotificationQuery($user, true, null, $broadcastContext)
+            ->reorder()
+            ->chunkById(200, function (Collection $notifications) use ($broadcastContext, &$count): void {
+                foreach ($notifications as $notification) {
+                    // Counted typed rows also reveal their existence, including rows beyond the five previews.
+                    // Register each with the same final proof, then discard the projected message body.
+                    $broadcastContext->project($notification);
+                    $count++;
+                }
+            }, 'notifications.id', 'id');
 
-            return $this->boardPackAccess
-                ->visibleNotificationQuery($user, unreadOnly: true)
-                ->latest()
-                ->limit(5)
-                ->get(['id', 'type', 'data', 'created_at'])
-                ->map(function ($notification) use ($workerNow) {
-                    $data = is_array($notification->data) ? $notification->data : [];
-                    $createdAt = $this->digestNotificationCreatedAt($notification);
+        return $count;
+    }
 
-                    return [
-                        'id' => (string) $notification->id,
-                        'title' => $this->digestNotificationTitle($data, (string) $notification->type),
-                        'at' => $this->digestNotificationAge($createdAt, $workerNow),
-                        'tone' => $this->digestNotificationTone($data),
+    private function getDigestNotifications(User $user, BroadcastRecipientReadContext $broadcastContext): array
+    {
+        $workerNow = Carbon::now($this->workerTimezone());
+
+        return $this->boardPackAccess
+            ->visibleNotificationQuery($user, true, null, $broadcastContext)
+            ->latest()
+            ->limit(5)
+            ->get()
+            ->map(function ($notification) use ($workerNow, $broadcastContext) {
+                $broadcast = $broadcastContext->project($notification);
+                $data = $broadcast === null
+                    ? (is_array($notification->data) ? $notification->data : [])
+                    : $broadcast['data'];
+                $createdAt = $broadcast === null
+                    ? $this->digestNotificationCreatedAt($notification)
+                    : Carbon::parse($broadcast['created_at'])->timezone($this->workerTimezone());
+
+                $item = [
+                    'id' => $broadcast === null ? (string) $notification->id : $broadcast['id'],
+                    'title' => $broadcast === null
+                        ? $this->digestNotificationTitle($data, (string) $notification->type)
+                        : Str::limit(trim($data['body']), 90),
+                    'at' => $this->digestNotificationAge($createdAt, $workerNow),
+                    'tone' => $this->digestNotificationTone($data),
+                ];
+                if ($broadcast !== null) {
+                    $item['broadcast'] = [
+                        'schema_version' => $data['schema_version'],
+                        'notification_id' => $broadcast['id'],
+                        'recipient_viewer_id' => $data['recipient_viewer_id'],
+                        'reader_read_id' => $data['reader_read_id'],
+                        'href' => $data['url'],
                     ];
-                })
-                ->values()
-                ->all();
-        } catch (\Throwable $e) {
-            report($e);
-            $this->unavailableSections[] = 'Updates';
+                }
 
-            return [];
-        }
+                return $item;
+            })
+            ->values()
+            ->all();
     }
 
     private function digestNotificationTitle(array $data, string $type): string

@@ -230,6 +230,10 @@ class CandidateController extends Controller
                         'location' => null,
                     ] : null,
                     'cover_letter' => $application->cover_letter,
+                    'experience_summary' => $application->experience_summary,
+                    'years_of_experience' => $application->years_of_experience,
+                    'right_to_work_status' => $application->right_to_work_status,
+                    'driver_licence_class' => $application->driver_licence_class,
                     'screening_answers' => $application->screening_answers,
                     'cv_original_name' => $application->cv_original_name,
                     'interview_kit' => $application->interviewKit ? [

@@ -1,71 +1,65 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { plainLabel } from '@/components/control-room/alert-record/alert-labels';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { formatRelative } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
+    CategoryBars,
+    NOT_MEASURED,
+    ReportPanel,
+    SEVERITY_LABEL,
+    SEVERITY_ORDER,
+    TrendChart,
+    measured,
+    showSection,
+    trendLabel,
+    type ChartRow,
+} from '@/components/control-room/reports/report-parts';
 import {
-    Activity,
-    AlertTriangle,
-    CheckCircle,
-    Clock,
-    ShieldCheck,
-    TrendingUp,
-    Users,
-    Wifi,
-    WifiOff,
-    Zap,
-} from 'lucide-react';
-import { useEffect, useRef } from 'react';
+    PageHeaderFilterSelect,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+} from '@/components/page';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
-    Area,
-    AreaChart,
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { formatDateTime, formatRelative, formatTime } from '@/lib/datetime';
+import { Link, router } from '@inertiajs/react';
+import { ArrowUpRight, CalendarRange, Clock, Radio, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface Props {
     period: string;
-    kpis: {
-        avg_acknowledge_minutes: number;
-        avg_resolution_hours: number;
+    kpis?: {
+        avg_acknowledge_minutes: number | null;
+        avg_resolution_hours: number | null;
         sla_compliance_pct: number | null;
-        open_alerts: number;
-        alerts_today: number;
-    };
-    volume_trend: { label: string; count: number }[];
-    top_sources: { name: string; count: number }[];
-    top_alert_types: { name: string; count: number }[];
-    severity_distribution: Record<string, number>;
-    operator_performance: {
+        open_alerts: number | null;
+        alerts_today: number | null;
+    } | null;
+    volume_trend?: { label: string; count: number }[];
+    top_sources?: { name: string; count: number }[];
+    top_alert_types?: { name: string; count: number }[];
+    severity_distribution?: Record<string, number>;
+    operator_performance?: {
         name: string;
         alerts_handled: number;
-        avg_response_minutes: number;
+        avg_response_minutes: number | null;
     }[];
-    shift_comparison: {
+    shift_comparison?: {
         name: string;
         duration_hours: number;
         alerts_created: number;
         alerts_resolved: number;
         alerts_escalated: number;
     }[];
-    signal_sources: {
+    signal_sources?: {
         name: string;
         status: string;
         last_heartbeat_at: string | null;
@@ -74,31 +68,39 @@ interface Props {
     }[];
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
-    critical: '#ef4444',
-    high: '#f97316',
-    medium: '#eab308',
-    low: '#3b82f6',
-};
+const BASE = '/control-room/stats';
 
-const CHART_COLORS = [
-    '#6366f1',
-    '#8b5cf6',
-    '#a855f7',
-    '#d946ef',
-    '#ec4899',
-    '#f43f5e',
-    '#fb923c',
-    '#facc15',
-    '#4ade80',
-    '#22d3ee',
+const PERIODS = [
+    { value: '24h', label: 'Last 24 hours' },
+    { value: '7d', label: 'Last 7 days' },
+    { value: '30d', label: 'Last 30 days' },
 ];
 
-const breadcrumbs = [
-    { title: 'Control Room', href: '/control-room' },
-    { title: 'Live Statistics', href: '#' },
+/** Props the 30-second refresh reloads. */
+const LIVE_PROPS = [
+    'kpis',
+    'volume_trend',
+    'top_sources',
+    'top_alert_types',
+    'severity_distribution',
+    'operator_performance',
+    'shift_comparison',
+    'signal_sources',
 ];
 
+function countRows(rows: { name: string; count: number }[] | undefined): ChartRow[] {
+    return (rows ?? []).map((row) => ({
+        key: row.name,
+        label: plainLabel(row.name) || 'Not recorded',
+        value: Number(row.count) || 0,
+    }));
+}
+
+/**
+ * Reports › Trends — how alert volume, response speed and workload change
+ * over a period, refreshed every 30 seconds. Every figure the server did not
+ * record reads "Not measured", never 0.
+ */
 export default function ControlRoomStats({
     period,
     kpis,
@@ -106,684 +108,367 @@ export default function ControlRoomStats({
     top_sources,
     top_alert_types,
     severity_distribution,
-    operator_performance,
-    shift_comparison,
-    signal_sources,
+    operator_performance = [],
+    shift_comparison = [],
+    signal_sources = [],
 }: Props) {
-    // Auto-refresh every 30 seconds
-    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [updatedAt, setUpdatedAt] = useState(() => new Date());
+    const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
-        timerRef.current = setInterval(() => {
+        const poll = window.setInterval(() => {
+            if (document.hidden) return;
+            setRefreshing(true);
             router.reload({
-                only: [
-                    'kpis',
-                    'volume_trend',
-                    'top_sources',
-                    'top_alert_types',
-                    'severity_distribution',
-                    'operator_performance',
-                    'shift_comparison',
-                    'signal_sources',
-                ],
+                only: LIVE_PROPS,
+                preserveScroll: true,
+                onSuccess: () => setUpdatedAt(new Date()),
+                onFinish: () => setRefreshing(false),
             });
         }, 30_000);
-        return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
-        };
+        return () => window.clearInterval(poll);
     }, []);
 
-    const handlePeriodChange = (newPeriod: string) => {
-        router.get(
-            '/control-room/stats',
-            { period: newPeriod },
-            { preserveState: true },
-        );
-    };
+    const choosePeriod = (value: string) =>
+        router.get(BASE, { period: value }, { preserveState: true, preserveScroll: true });
 
-    // Prepare severity pie data
-    const severityPieData = Object.entries(severity_distribution).map(
-        ([name, value]) => ({
-            name: name.charAt(0).toUpperCase() + name.slice(1),
-            value,
-            color: SEVERITY_COLORS[name] ?? '#94a3b8',
-        }),
+    const periodName = PERIODS.find((p) => p.value === period)?.label ?? 'Last 7 days';
+    const hourly = period === '24h';
+
+    const openAlerts = measured(kpis?.open_alerts);
+    const alertsToday = measured(kpis?.alerts_today);
+    const compliance = measured(kpis?.sla_compliance_pct);
+    const avgAcknowledge = measured(kpis?.avg_acknowledge_minutes, { zeroIsMissing: true });
+    const avgResolution = measured(kpis?.avg_resolution_hours, { zeroIsMissing: true });
+
+    const trendRows: ChartRow[] = (volume_trend ?? []).map((point, index) => ({
+        key: `${index}-${point.label}`,
+        label: trendLabel(point.label),
+        value: Number(point.count) || 0,
+    }));
+    const severityRows: ChartRow[] = SEVERITY_ORDER.map((key) => ({
+        key,
+        label: SEVERITY_LABEL[key],
+        value: Number(severity_distribution?.[key]) || 0,
+    }));
+    const busiest = Math.max(1, ...operator_performance.map((op) => op.alerts_handled));
+    // A column that would read "Not measured" on every row is left out.
+    const ackKnown = operator_performance.some(
+        (op) => measured(op.avg_response_minutes, { zeroIsMissing: true }) !== null,
     );
-
-    // Max for operator bar visualization
-    const maxOperatorAlerts = Math.max(
-        ...operator_performance.map((o) => o.alerts_handled),
-        1,
-    );
-
-    const periodLabel =
-        period === '24h'
-            ? 'Last 24 Hours'
-            : period === '7d'
-              ? 'Last 7 Days'
-              : 'Last 30 Days';
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Live Statistics - Control Room" />
-            <PageShell>
-                <CommandCentrePage
-                    variant="compact"
-                    current="/control-room/stats"
-                    icon={TrendingUp}
-                    title="Operational analytics"
-                    description="Review Control Room workload, SLA performance, trends, and service health away from the live desk."
-                    status="Analytics workspace"
-                    freshness={periodLabel}
-                    actions={
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5 text-xs text-primary-foreground/80">
-                                <span className="relative flex h-2 w-2">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                </span>
-                                Auto-refreshing
-                            </div>
-                            <Select
-                                value={period}
-                                onValueChange={handlePeriodChange}
-                            >
-                                <SelectTrigger className="w-[160px] border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="24h">
-                                        Last 24 Hours
-                                    </SelectItem>
-                                    <SelectItem value="7d">
-                                        Last 7 Days
-                                    </SelectItem>
-                                    <SelectItem value="30d">
-                                        Last 30 Days
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+        <ControlRoomPage
+            header={{
+                subline: (
+                    <>
+                        How alert volume, response speed and workload change over time ·{' '}
+                        <span aria-live="polite">
+                            {refreshing ? 'Refreshing…' : `Updated ${formatTime(updatedAt)}`}
+                        </span>
+                    </>
+                ),
+                meters: (
+                    <>
+                        <PageHeaderMeterBlock
+                            label="Open alerts"
+                            tone={openAlerts ? 'warning' : 'brand'}
+                            href="/control-room"
+                            ariaLabel="Show the alerts that need action"
+                        >
+                            <PageHeaderMeterBig>{openAlerts ?? NOT_MEASURED}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>need action now</PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Alerts today"
+                            onClick={() => showSection('volume-trend')}
+                            ariaLabel="Show alert volume over time"
+                        >
+                            <PageHeaderMeterBig>{alertsToday ?? NOT_MEASURED}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>since midnight</PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Targets met"
+                            tone={compliance !== null && compliance < 90 ? 'warning' : 'brand'}
+                            href="/control-room/sla/breaches"
+                            ariaLabel="Show missed response targets"
+                        >
+                            <PageHeaderMeterBig>
+                                {compliance === null ? NOT_MEASURED : `${compliance}%`}
+                            </PageHeaderMeterBig>
+                            {compliance !== null ? <PageHeaderMeterBar percent={compliance} /> : null}
+                            <PageHeaderMeterCaption>
+                                {compliance === null
+                                    ? 'no response targets finished yet'
+                                    : `response targets met · ${periodName.toLowerCase()}`}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Average acknowledge"
+                            onClick={() => showSection('operators')}
+                            ariaLabel="Show response speed by operator"
+                        >
+                            <PageHeaderMeterBig>
+                                {avgAcknowledge === null ? NOT_MEASURED : `${avgAcknowledge} min`}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {avgResolution === null
+                                    ? 'resolution time not measured'
+                                    : `resolved in ${avgResolution} h on average`}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    </>
+                ),
+                filters: (
+                    <PageHeaderFilterSelect
+                        icon={CalendarRange}
+                        label="Last 7 days"
+                        allValue="7d"
+                        value={period}
+                        options={PERIODS}
+                        onChange={choosePeriod}
+                    />
+                ),
+            }}
+        >
+            <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+                <ReportPanel
+                    id="volume-trend"
+                    title="Alert volume"
+                    description={hourly ? 'Alerts per hour over the last 24 hours.' : `Alerts per day · ${periodName.toLowerCase()}.`}
+                >
+                    <TrendChart
+                        rows={trendRows}
+                        kind="line"
+                        labelHeading={hourly ? 'Hour' : 'Day'}
+                        emptyTitle="No alerts in this period"
+                        emptyDescription="Try a longer period."
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="open-by-severity"
+                    title="Open alerts by severity"
+                    description="Alerts that still need action, right now."
+                >
+                    <CategoryBars
+                        rows={severityRows}
+                        labelHeading="Severity"
+                        showShare
+                        emptyTitle="No open alerts"
+                        emptyDescription="Everything raised has been dealt with."
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="top-sources"
+                    title="Top sources"
+                    description={`Where alerts came from · ${periodName.toLowerCase()}.`}
+                >
+                    <CategoryBars
+                        rows={countRows(top_sources)}
+                        labelHeading="Source"
+                        emptyTitle="No alerts in this period"
+                    />
+                </ReportPanel>
+                <ReportPanel
+                    id="top-types"
+                    title="Top alert types"
+                    description={`The most common kinds of alert · ${periodName.toLowerCase()}.`}
+                >
+                    <CategoryBars
+                        rows={countRows(top_alert_types)}
+                        labelHeading="Alert type"
+                        emptyTitle="No alerts in this period"
+                    />
+                </ReportPanel>
+
+                <ReportPanel
+                    id="operators"
+                    title="Operator workload"
+                    description={
+                        ackKnown
+                            ? `Alerts assigned to each person, and how long they took to acknowledge after assignment · ${periodName.toLowerCase()}.`
+                            : `Alerts assigned to each person · ${periodName.toLowerCase()}.`
+                    }
+                    className="lg:col-span-2"
+                >
+                    {operator_performance.length ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Operator</TableHead>
+                                    <TableHead className="text-right">Alerts handled</TableHead>
+                                    {ackKnown ? (
+                                        <TableHead className="text-right">
+                                            Average time to acknowledge
+                                        </TableHead>
+                                    ) : null}
+                                    <TableHead className="hidden w-[30%] sm:table-cell">
+                                        <span className="sr-only">Share of the busiest operator</span>
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {operator_performance.map((op, index) => {
+                                    const avg = measured(op.avg_response_minutes, {
+                                        zeroIsMissing: true,
+                                    });
+                                    return (
+                                        <TableRow key={`${op.name}-${index}`}>
+                                            <TableHead scope="row" className="font-medium text-foreground">
+                                                {op.name}
+                                            </TableHead>
+                                            <TableCell className="text-right tabular-nums">
+                                                {op.alerts_handled}
+                                            </TableCell>
+                                            {ackKnown ? (
+                                                <TableCell className="text-right tabular-nums">
+                                                    {avg === null ? (
+                                                        <span className="text-muted-foreground">
+                                                            {NOT_MEASURED}
+                                                        </span>
+                                                    ) : (
+                                                        `${avg} min`
+                                                    )}
+                                                </TableCell>
+                                            ) : null}
+                                            <TableCell className="hidden sm:table-cell">
+                                                <span
+                                                    aria-hidden="true"
+                                                    className="block h-2 overflow-hidden rounded-full bg-muted"
+                                                >
+                                                    <span
+                                                        className="block h-full rounded-full bg-chart-1"
+                                                        style={{
+                                                            width: `${(op.alerts_handled / busiest) * 100}%`,
+                                                        }}
+                                                    />
+                                                </span>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <EmptyState
+                            variant="compact"
+                            icon={Users}
+                            title="No assigned alerts in this period"
+                            description="Workload shows once alerts are assigned to people."
+                        />
+                    )}
+                </ReportPanel>
+
+                <ReportPanel
+                    id="recent-duties"
+                    title="Recent duties"
+                    description="The last five finished duties side by side."
+                    action={
+                        <Link
+                            href="/control-room/shifts"
+                            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                        >
+                            Duty handover
+                            <ArrowUpRight aria-hidden="true" className="size-4" />
+                        </Link>
                     }
                 >
-                    {/* KPI Cards */}
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-status-info-bg p-2">
-                                        <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground">
-                                            Avg Acknowledge
-                                        </p>
-                                        <p className="text-2xl font-bold">
-                                            {kpis.avg_acknowledge_minutes}m
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-primary/10 p-2 dark:bg-primary/30">
-                                        <CheckCircle className="h-5 w-5 text-primary dark:text-primary" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground">
-                                            Avg Resolution
-                                        </p>
-                                        <p className="text-2xl font-bold">
-                                            {kpis.avg_resolution_hours}h
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-status-success-bg p-2">
-                                        <ShieldCheck className="h-5 w-5 text-status-success dark:text-status-success" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground">
-                                            SLA Compliance
-                                        </p>
-                                        <p className="text-2xl font-bold">
-                                            {kpis.sla_compliance_pct === null
-                                                ? 'Not assessed'
-                                                : `${kpis.sla_compliance_pct}%`}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-status-warning-bg p-2">
-                                        <AlertTriangle className="h-5 w-5 text-status-warning dark:text-status-warning" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground">
-                                            Open Alerts
-                                        </p>
-                                        <p className="text-2xl font-bold">
-                                            {kpis.open_alerts}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-primary/10 p-2 dark:bg-primary/30">
-                                        <Zap className="h-5 w-5 text-primary dark:text-primary" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground">
-                                            Alerts Today
-                                        </p>
-                                        <p className="text-2xl font-bold">
-                                            {kpis.alerts_today}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                    {shift_comparison.length ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Duty</TableHead>
+                                    <TableHead className="text-right">Length</TableHead>
+                                    <TableHead className="text-right">Created</TableHead>
+                                    <TableHead className="text-right">Resolved</TableHead>
+                                    <TableHead className="text-right">Escalated</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {shift_comparison.map((duty, index) => (
+                                    <TableRow key={`${duty.name}-${index}`}>
+                                        <TableHead scope="row" className="font-medium whitespace-normal text-foreground">
+                                            {duty.name}
+                                        </TableHead>
+                                        <TableCell className="text-right tabular-nums">
+                                            {duty.duration_hours} h
+                                        </TableCell>
+                                        <TableCell className="text-right tabular-nums">
+                                            {duty.alerts_created}
+                                        </TableCell>
+                                        <TableCell className="text-right tabular-nums">
+                                            {duty.alerts_resolved}
+                                        </TableCell>
+                                        <TableCell className="text-right tabular-nums">
+                                            {duty.alerts_escalated}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <EmptyState
+                            variant="compact"
+                            icon={Clock}
+                            title="No finished duties to compare"
+                            description="Duty counts cover every site, so they show only for people who can see all sites."
+                        />
+                    )}
+                </ReportPanel>
 
-                    {/* Charts Grid */}
-                    <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-                        {/* Alert Volume Trend */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Alert Volume Trend
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="h-[280px]">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <AreaChart data={volume_trend}>
-                                            <defs>
-                                                <linearGradient
-                                                    id="volumeGradient"
-                                                    x1="0"
-                                                    y1="0"
-                                                    x2="0"
-                                                    y2="1"
-                                                >
-                                                    <stop
-                                                        offset="5%"
-                                                        stopColor="#6366f1"
-                                                        stopOpacity={0.3}
-                                                    />
-                                                    <stop
-                                                        offset="95%"
-                                                        stopColor="#6366f1"
-                                                        stopOpacity={0}
-                                                    />
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid
-                                                strokeDasharray="3 3"
-                                                className="stroke-muted"
-                                            />
-                                            <XAxis
-                                                dataKey="label"
-                                                tick={{ fontSize: 11 }}
-                                                interval="preserveStartEnd"
-                                                className="text-muted-foreground"
-                                            />
-                                            <YAxis
-                                                tick={{ fontSize: 11 }}
-                                                allowDecimals={false}
-                                                className="text-muted-foreground"
-                                            />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    backgroundColor:
-                                                        'hsl(var(--card))',
-                                                    border: '1px solid hsl(var(--border))',
-                                                    borderRadius: '8px',
-                                                    fontSize: '12px',
-                                                }}
-                                            />
-                                            <Area
-                                                type="monotone"
-                                                dataKey="count"
-                                                stroke="#6366f1"
-                                                strokeWidth={2}
-                                                fill="url(#volumeGradient)"
-                                                name="Alerts"
-                                            />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Severity Distribution */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Severity Distribution (Unresolved)
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="h-[280px]">
-                                    {severityPieData.length === 0 ? (
-                                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                                            No unresolved alerts
-                                        </div>
-                                    ) : (
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
+                <ReportPanel
+                    id="signal-sources"
+                    title="Signal sources"
+                    description="Whether each connected source has checked in during the last 10 minutes."
+                    action={
+                        <Link
+                            href="/control-room/devices"
+                            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                        >
+                            Signals
+                            <ArrowUpRight aria-hidden="true" className="size-4" />
+                        </Link>
+                    }
+                >
+                    {signal_sources.length ? (
+                        <ul className="divide-y divide-border">
+                            {signal_sources.map((source, index) => (
+                                <li
+                                    key={`${source.name}-${index}`}
+                                    className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5 first:pt-0 last:pb-0"
+                                >
+                                    <span className="min-w-0">
+                                        <span className="block font-medium">{source.name}</span>
+                                        <span
+                                            className="text-caption block"
+                                            title={
+                                                source.last_heartbeat_at
+                                                    ? formatDateTime(source.last_heartbeat_at)
+                                                    : undefined
+                                            }
                                         >
-                                            <PieChart>
-                                                <Pie
-                                                    data={severityPieData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={60}
-                                                    outerRadius={100}
-                                                    paddingAngle={3}
-                                                    dataKey="value"
-                                                    nameKey="name"
-                                                    label={({ name, value }) =>
-                                                        `${name}: ${value}`
-                                                    }
-                                                >
-                                                    {severityPieData.map(
-                                                        (entry, index) => (
-                                                            <Cell
-                                                                key={index}
-                                                                fill={
-                                                                    entry.color
-                                                                }
-                                                            />
-                                                        ),
-                                                    )}
-                                                </Pie>
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        backgroundColor:
-                                                            'hsl(var(--card))',
-                                                        border: '1px solid hsl(var(--border))',
-                                                        borderRadius: '8px',
-                                                        fontSize: '12px',
-                                                    }}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Top Sources */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Top Sources ({periodLabel})
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="h-[280px]">
-                                    {top_sources.length === 0 ? (
-                                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                                            No data for this period
-                                        </div>
-                                    ) : (
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <BarChart
-                                                data={top_sources}
-                                                layout="vertical"
-                                                margin={{ left: 80 }}
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    className="stroke-muted"
-                                                />
-                                                <XAxis
-                                                    type="number"
-                                                    tick={{ fontSize: 11 }}
-                                                    allowDecimals={false}
-                                                />
-                                                <YAxis
-                                                    type="category"
-                                                    dataKey="name"
-                                                    tick={{ fontSize: 11 }}
-                                                    width={75}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        backgroundColor:
-                                                            'hsl(var(--card))',
-                                                        border: '1px solid hsl(var(--border))',
-                                                        borderRadius: '8px',
-                                                        fontSize: '12px',
-                                                    }}
-                                                />
-                                                <Bar
-                                                    dataKey="count"
-                                                    fill="#8b5cf6"
-                                                    radius={[0, 4, 4, 0]}
-                                                    name="Alerts"
-                                                />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Top Alert Types */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Top Alert Types ({periodLabel})
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="h-[280px]">
-                                    {top_alert_types.length === 0 ? (
-                                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                                            No data for this period
-                                        </div>
-                                    ) : (
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <BarChart
-                                                data={top_alert_types}
-                                                layout="vertical"
-                                                margin={{ left: 80 }}
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    className="stroke-muted"
-                                                />
-                                                <XAxis
-                                                    type="number"
-                                                    tick={{ fontSize: 11 }}
-                                                    allowDecimals={false}
-                                                />
-                                                <YAxis
-                                                    type="category"
-                                                    dataKey="name"
-                                                    tick={{ fontSize: 11 }}
-                                                    width={75}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        backgroundColor:
-                                                            'hsl(var(--card))',
-                                                        border: '1px solid hsl(var(--border))',
-                                                        borderRadius: '8px',
-                                                        fontSize: '12px',
-                                                    }}
-                                                />
-                                                <Bar
-                                                    dataKey="count"
-                                                    fill="#f97316"
-                                                    radius={[0, 4, 4, 0]}
-                                                    name="Alerts"
-                                                />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Operator Performance */}
-                    <div className="mt-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <Users className="h-4 w-4" />
-                                    Operator Performance ({periodLabel})
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {operator_performance.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No operator data for this period.
-                                    </p>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pr-4 pb-3 font-medium">
-                                                        Operator
-                                                    </th>
-                                                    <th className="pr-4 pb-3 text-right font-medium">
-                                                        Alerts Handled
-                                                    </th>
-                                                    <th className="pr-4 pb-3 text-right font-medium">
-                                                        Avg Response
-                                                    </th>
-                                                    <th className="hidden pb-3 font-medium sm:table-cell">
-                                                        Volume
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {operator_performance.map(
-                                                    (op, i) => (
-                                                        <tr
-                                                            key={i}
-                                                            className="border-b last:border-0"
-                                                        >
-                                                            <td className="py-3 pr-4 font-medium">
-                                                                {op.name}
-                                                            </td>
-                                                            <td className="py-3 pr-4 text-right">
-                                                                {
-                                                                    op.alerts_handled
-                                                                }
-                                                            </td>
-                                                            <td className="py-3 pr-4 text-right">
-                                                                {op.avg_response_minutes >
-                                                                0
-                                                                    ? `${op.avg_response_minutes}m`
-                                                                    : '-'}
-                                                            </td>
-                                                            <td className="hidden py-3 sm:table-cell">
-                                                                <div className="h-2 w-full max-w-[200px] rounded-full bg-muted">
-                                                                    <div
-                                                                        className="h-2 rounded-full bg-primary"
-                                                                        style={{
-                                                                            width: `${(op.alerts_handled / maxOperatorAlerts) * 100}%`,
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Shift Comparison */}
-                    <div className="mt-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <Activity className="h-4 w-4" />
-                                    Shift Comparison (Last 5 Completed)
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {shift_comparison.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No completed shifts found.
-                                    </p>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pr-4 pb-3 font-medium">
-                                                        Shift
-                                                    </th>
-                                                    <th className="pr-4 pb-3 text-right font-medium">
-                                                        Duration
-                                                    </th>
-                                                    <th className="pr-4 pb-3 text-right font-medium">
-                                                        Created
-                                                    </th>
-                                                    <th className="pr-4 pb-3 text-right font-medium">
-                                                        Resolved
-                                                    </th>
-                                                    <th className="pb-3 text-right font-medium">
-                                                        Escalated
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {shift_comparison.map(
-                                                    (s, i) => (
-                                                        <tr
-                                                            key={i}
-                                                            className="border-b last:border-0"
-                                                        >
-                                                            <td className="py-3 pr-4 font-medium">
-                                                                {s.name}
-                                                            </td>
-                                                            <td className="py-3 pr-4 text-right">
-                                                                {
-                                                                    s.duration_hours
-                                                                }
-                                                                h
-                                                            </td>
-                                                            <td className="py-3 pr-4 text-right">
-                                                                {
-                                                                    s.alerts_created
-                                                                }
-                                                            </td>
-                                                            <td className="py-3 pr-4 text-right text-status-success dark:text-status-success">
-                                                                {
-                                                                    s.alerts_resolved
-                                                                }
-                                                            </td>
-                                                            <td className="py-3 text-right">
-                                                                {s.alerts_escalated >
-                                                                0 ? (
-                                                                    <span className="text-status-warning dark:text-status-warning">
-                                                                        {
-                                                                            s.alerts_escalated
-                                                                        }
-                                                                    </span>
-                                                                ) : (
-                                                                    <span>
-                                                                        {
-                                                                            s.alerts_escalated
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Signal Source Health */}
-                    <div className="mt-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <Wifi className="h-4 w-4" />
-                                    Signal Source Health
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {signal_sources.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No signal sources configured.
-                                    </p>
-                                ) : (
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                        {signal_sources.map((ss, i) => (
-                                            <div
-                                                key={i}
-                                                className={`rounded-lg border p-4 ${
-                                                    !ss.is_healthy
-                                                        ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
-                                                        : 'border-border'
-                                                }`}
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <span
-                                                            className={`inline-block h-2.5 w-2.5 rounded-full ${
-                                                                ss.is_healthy
-                                                                    ? 'bg-status-success'
-                                                                    : 'bg-status-critical'
-                                                            }`}
-                                                        />
-                                                        <span className="text-sm font-medium">
-                                                            {ss.name}
-                                                        </span>
-                                                    </div>
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className="text-xs"
-                                                    >
-                                                        {ss.signal_count_24h} /
-                                                        24h
-                                                    </Badge>
-                                                </div>
-                                                <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                                                    {ss.is_healthy ? (
-                                                        <Wifi className="h-3 w-3" />
-                                                    ) : (
-                                                        <WifiOff className="h-3 w-3 text-status-critical" />
-                                                    )}
-                                                    <span>
-                                                        {ss.last_heartbeat_at
-                                                            ? formatRelative(
-                                                                  ss.last_heartbeat_at,
-                                                              )
-                                                            : 'No heartbeat'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                </CommandCentrePage>
-            </PageShell>
-        </AppLayout>
+                                            {source.last_heartbeat_at
+                                                ? `Last check-in ${formatRelative(source.last_heartbeat_at)}`
+                                                : 'Has never checked in'}{' '}
+                                            · {source.signal_count_24h} signals in 24 hours
+                                        </span>
+                                    </span>
+                                    <StatusBadge variant={source.is_healthy ? 'success' : 'critical'}>
+                                        {source.is_healthy ? 'Checking in' : 'Not checking in'}
+                                    </StatusBadge>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <EmptyState
+                            variant="compact"
+                            icon={Radio}
+                            title="No signal sources set up"
+                            description="Sources are added under Settings › Sources."
+                        />
+                    )}
+                </ReportPanel>
+            </div>
+        </ControlRoomPage>
     );
 }

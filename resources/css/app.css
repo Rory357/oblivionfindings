@@ -4,6 +4,7 @@
 @import './maintenance-date-time.css';
 @import './journey-auth.css';
 @import './signature-blocks.css';
+@import './journey-site.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -1857,4 +1858,217 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 /* Fleet overview: mute only raster basemap tiles; markers retain status tones. */
 .grayscale-map .leaflet-tile-pane {
     filter: grayscale(1);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * The pop-up kit (components/popup/, DESIGN.md "Pop-up kit"; approved by
+ * Stephan 23 Oct 2026 — Control Room first). Two brand marks, both derived
+ * from --primary so Settings › Branding retints them:
+ *   .popup-lens     the round icon lens in a pop-up header (never a rounded
+ *                   square). Critical/warning lenses use the fixed status
+ *                   pairs — safety tones never follow the brand.
+ *   .popup-horizon  the 2px horizon line on the top edge of anything that
+ *                   floats (dialog, confirm, selection bar).
+ * ────────────────────────────────────────────────────────────────────────── */
+.popup-lens {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: var(--primary);
+    background:
+        radial-gradient(
+            110% 110% at 50% 118%,
+            color-mix(in oklch, var(--primary) 22%, transparent) 0%,
+            transparent 62%
+        ),
+        color-mix(in oklch, var(--primary-fill) 9%, var(--card));
+    box-shadow:
+        inset 0 0 0 1.5px color-mix(in oklch, currentColor 36%, transparent),
+        0 0 0 5px color-mix(in oklch, currentColor 7%, transparent);
+}
+.popup-lens--sm {
+    width: 30px;
+    height: 30px;
+    box-shadow: inset 0 0 0 1.5px var(--border);
+    background: transparent;
+    color: var(--muted-foreground);
+}
+.popup-lens--critical {
+    color: var(--status-critical);
+    background: var(--status-critical-bg);
+}
+.popup-lens--warning {
+    color: var(--status-warning);
+    background: var(--status-warning-bg);
+}
+/* No `position` here: this rule is outside Tailwind's layers, so it would
+   beat the dialog's `fixed` and drop the pop-up to the foot of the page.
+   Every frame that uses it is already fixed, sticky or `relative`. */
+.popup-horizon::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            20%,
+        var(--primary) 50%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            80%,
+        transparent 100%
+    );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Control Room's own marks (Stephan, 24 Oct 2026: "light board + Oblivion
+ * details"; components/control-room/live-response/target-lens.tsx).
+ *   .cr-lens  the countdown lens — the pop-up kit's round lens with a ring
+ *             that empties as a response target gets closer. Brand while
+ *             there's time; the fixed warning / critical pairs when it's
+ *             close or missed (safety tones never follow the brand); grey
+ *             when there's no target and it shows how long it has waited.
+ *   .cr-live  the "Live · updated 9:46 am" mark on the header band.
+ * ────────────────────────────────────────────────────────────────────────── */
+.cr-lens {
+    --cr-lens-tone: var(--primary);
+    --cr-lens-left: 100%;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: var(--cr-lens-tone);
+    background:
+        radial-gradient(
+            closest-side,
+            color-mix(in oklch, var(--cr-lens-tone) 7%, var(--card)) calc(100% - 4px),
+            transparent calc(100% - 3.5px)
+        ),
+        conic-gradient(
+            var(--cr-lens-tone) var(--cr-lens-left),
+            color-mix(in oklch, var(--cr-lens-tone) 16%, transparent) 0
+        );
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--cr-lens-tone) 7%, transparent);
+    font-variant-numeric: tabular-nums;
+}
+.cr-lens-value {
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.01em;
+}
+.cr-lens-unit {
+    margin-top: 2px;
+    font-size: 9.5px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--muted-foreground);
+}
+.cr-lens--lg {
+    width: 68px;
+    height: 68px;
+    box-shadow: 0 0 0 6px color-mix(in oklch, var(--cr-lens-tone) 8%, transparent);
+}
+.cr-lens--lg .cr-lens-value {
+    font-size: 18px;
+}
+.cr-lens--warning {
+    --cr-lens-tone: var(--status-warning);
+}
+.cr-lens--critical {
+    --cr-lens-tone: var(--status-critical);
+}
+.cr-lens--neutral {
+    --cr-lens-tone: var(--muted-foreground);
+}
+.cr-lens--late {
+    background:
+        radial-gradient(
+            closest-side,
+            var(--status-critical-bg) calc(100% - 4px),
+            transparent calc(100% - 3.5px)
+        ),
+        var(--status-critical);
+}
+
+.cr-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.cr-live-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: oklch(from var(--live) 0.86 calc(c * 1.4) h);
+}
+.cr-live--stale .cr-live-dot {
+    background: oklch(from var(--status-warning) 0.86 c h);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .cr-live:not(.cr-live--stale) .cr-live-dot::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: 50%;
+        border: 1.5px solid oklch(from var(--live) 0.86 calc(c * 1.4) h);
+        animation: cr-live-pulse 2.4s ease-out infinite;
+    }
+    .cr-lens--late {
+        animation: cr-lens-late 2.4s ease-in-out infinite;
+    }
+}
+@keyframes cr-live-pulse {
+    0% {
+        opacity: 0.7;
+        transform: scale(0.8);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(2.2);
+    }
+}
+@keyframes cr-lens-late {
+    0%,
+    100% {
+        box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-critical) 10%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 7px color-mix(in oklch, var(--status-critical) 18%, transparent);
+    }
+}
+/* A row that arrived since the list first drew glows once (the critical
+   notice above the list says it in words). */
+@media (prefers-reduced-motion: no-preference) {
+    .cr-row-new {
+        animation: cr-row-new 4s ease-out 1;
+    }
+}
+@keyframes cr-row-new {
+    0%,
+    30% {
+        background-color: color-mix(in oklch, var(--live) 16%, transparent);
+    }
+    100% {
+        background-color: transparent;
+    }
 }

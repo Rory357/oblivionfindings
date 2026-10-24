@@ -1,10 +1,29 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
+import {
+    plainLabel,
+    severityBadge,
+} from '@/components/control-room/alert-record/alert-labels';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
+import {
+    ControlRoomRowActions,
+    type ControlRoomRowAction,
+} from '@/components/control-room/control-room-row-actions';
 import { PlaybookWizard } from '@/components/control-room/playbook-wizard';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    TurnOffProcedureConfirm,
+    turnOnProcedure,
+} from '@/components/control-room/procedure-turn-off-confirm';
+import {
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderStatusChip,
+} from '@/components/page';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import {
     Table,
     TableBody,
@@ -13,24 +32,31 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
-import { Head, Link, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
-    CheckCircle,
-    Clock,
-    ExternalLink,
-    Layers,
-    Lock,
+    formatDateTime,
+    formatDurationMinutes,
+    formatRelative,
+} from '@/lib/datetime';
+import { Link, router } from '@inertiajs/react';
+import {
+    BookOpen,
+    Eye,
+    FileText,
+    FileWarning,
+    History,
+    Image,
+    ListChecks,
+    MessageSquareQuote,
+    Package,
+    Paperclip,
+    PenLine,
     Pencil,
     Power,
-    Search as SearchIcon,
-    Shield,
-    Star,
-    Wrench,
+    StickyNote,
+    Video,
+    type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 // --- Types ---
 
@@ -44,8 +70,8 @@ interface PlaybookStep {
     is_blocking: boolean;
     time_limit_minutes: number | null;
     decision_options: string[] | null;
-    notify_config: Record<string, any> | null;
-    evidence_config: Record<string, any> | null;
+    notify_config: Record<string, unknown> | null;
+    evidence_config: Record<string, unknown> | null;
 }
 
 interface PlaybookDetail {
@@ -96,16 +122,6 @@ interface RunEntry {
     completed_by: { id: number; name: string } | null;
 }
 
-interface StepEditForm {
-    id: number | null;
-    title: string;
-    type: string;
-    instructions: string;
-    is_required: boolean;
-    is_blocking: boolean;
-    time_limit_minutes: string;
-}
-
 interface Props {
     playbook: PlaybookDetail;
     recentRuns: RunEntry[];
@@ -116,74 +132,104 @@ interface Props {
     };
 }
 
+type RecordTab = 'steps' | 'evidence' | 'runs';
+
+const TABS: ReadonlyArray<{ key: RecordTab; label: string; icon: LucideIcon }> = [
+    { key: 'steps', label: 'Steps', icon: ListChecks },
+    { key: 'evidence', label: 'Required evidence', icon: Package },
+    { key: 'runs', label: 'Run history', icon: History },
+];
+
+const RUN_STATUS: Record<string, { label: string; tone: StatusVariant }> = {
+    pending: { label: 'Not started', tone: 'neutral' },
+    in_progress: { label: 'In progress', tone: 'info' },
+    completed: { label: 'Done', tone: 'success' },
+    failed: { label: 'Failed', tone: 'critical' },
+    cancelled: { label: 'Cancelled', tone: 'neutral' },
+};
+
+const EVIDENCE_ICON: Record<string, LucideIcon> = {
+    photo: Image,
+    video: Video,
+    document: FileText,
+    signature: PenLine,
+    witness_statement: MessageSquareQuote,
+    incident_report: FileWarning,
+    note: StickyNote,
+};
+
 // --- Helpers ---
 
-const categoryConfig: Record<
-    string,
-    { color: string; icon: typeof AlertTriangle }
-> = {
-    emergency: {
-        color: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-        icon: AlertTriangle,
-    },
-    safety: {
-        color: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-        icon: Shield,
-    },
-    compliance: {
-        color: 'bg-status-info-bg text-status-info border-status-info/30',
-        icon: CheckCircle,
-    },
-    maintenance: {
-        color: 'bg-muted text-foreground border-border',
-        icon: Wrench,
-    },
-    investigation: {
-        color: 'bg-primary/10 text-primary border-primary',
-        icon: SearchIcon,
-    },
-};
-
-const stepTypeColors: Record<string, string> = {
-    task: 'bg-status-info-bg text-status-info',
-    decision: 'bg-primary/10 text-primary',
-    notification: 'bg-status-warning-bg text-status-warning',
-    escalation: 'bg-status-critical-bg text-status-critical',
-    evidence: 'bg-status-success-bg text-status-success',
-    approval: 'bg-status-warning-bg text-status-warning',
-};
-
-const runStatusColors: Record<string, string> = {
-    pending: 'bg-muted text-foreground',
-    in_progress: 'bg-status-info-bg text-status-info',
-    completed: 'bg-status-success-bg text-status-success',
-    failed: 'bg-status-critical-bg text-status-critical',
-    cancelled: 'bg-muted text-muted-foreground',
-};
-
-const severityColors: Record<string, string> = {
-    critical: 'bg-status-critical text-white',
-    high: 'bg-status-warning text-white',
-    medium: 'bg-status-warning text-black',
-    low: 'bg-status-success text-white',
-};
-
-function formatDuration(
-    startIso: string | null,
-    endIso: string | null,
-): string {
-    if (!startIso || !endIso) return '-';
-    const start = new Date(startIso).getTime();
-    const end = new Date(endIso).getTime();
-    const diffMs = end - start;
-    const mins = Math.floor(diffMs / 60000);
-    const hrs = Math.floor(mins / 60);
-    if (hrs > 0) return `${hrs}h ${mins % 60}m`;
-    return `${mins}m`;
+function initialTab(): RecordTab {
+    if (typeof window === 'undefined') return 'steps';
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    return TABS.some((t) => t.key === tab) ? (tab as RecordTab) : 'steps';
 }
 
-// --- Component ---
+/** Keep the open tab in the address so a refresh or a shared link returns to it. */
+function rememberTab(tab: RecordTab) {
+    const url = new URL(window.location.href);
+    if (tab === 'steps') url.searchParams.delete('tab');
+    else url.searchParams.set('tab', tab);
+    window.history.replaceState(window.history.state, '', url.toString());
+}
 
+function runStatus(status: string) {
+    return RUN_STATUS[status] ?? { label: plainLabel(status), tone: 'neutral' as const };
+}
+
+function runMinutes(run: RunEntry): number | null {
+    if (!run.started_at || !run.completed_at) return null;
+    const ms = new Date(run.completed_at).getTime() - new Date(run.started_at).getTime();
+    return Number.isFinite(ms) && ms >= 0 ? Math.floor(ms / 60000) : null;
+}
+
+function Panel({
+    id,
+    title,
+    caption,
+    children,
+}: {
+    id?: string;
+    title: string;
+    caption?: string;
+    children: ReactNode;
+}) {
+    return (
+        <Card id={id} tabIndex={id ? -1 : undefined} className="min-w-0 gap-4 px-5 py-5 outline-none">
+            <div className="min-w-0">
+                <h2 className="text-section-title">{title}</h2>
+                {caption ? <p className="text-subtle mt-0.5">{caption}</p> : null}
+            </div>
+            {children}
+        </Card>
+    );
+}
+
+/** Label / value rows; rows without a value are left out. */
+function Facts({ rows }: { rows: Array<[string, ReactNode | null | undefined | false]> }) {
+    const shown = rows.filter(([, value]) => value !== null && value !== undefined && value !== false && value !== '');
+    if (!shown.length) return null;
+    return (
+        <dl className="grid gap-3">
+            {shown.map(([label, value]) => (
+                <div key={label} className="grid gap-0.5">
+                    <dt className="text-caption">{label}</dt>
+                    <dd className="text-sm text-foreground">{value}</dd>
+                </div>
+            ))}
+        </dl>
+    );
+}
+
+// --- Page ---
+
+/**
+ * One response procedure (code name: playbook) — its steps, the evidence it
+ * asks for and when it was last run, with when it starts and its time
+ * targets alongside. Anyone who can see Control Room can read it; editors
+ * edit it in the procedure wizard and turn it on or off.
+ */
 export default function PlaybookShow({
     playbook,
     recentRuns,
@@ -192,492 +238,343 @@ export default function PlaybookShow({
     can,
 }: Props) {
     const [wizardOpen, setWizardOpen] = useState(false);
-
-    const catConfig =
-        categoryConfig[playbook.category] ?? categoryConfig.maintenance;
-    const CatIcon = catConfig.icon;
-
-    const toggleActive = () => {
-        router.post(
-            `/control-room/playbooks/${playbook.id}/toggle-active`,
-            {},
-            { preserveScroll: true },
-        );
+    const [turningOff, setTurningOff] = useState(false);
+    const [tab, setTab] = useState<RecordTab>(initialTab);
+    const selectTab = (next: RecordTab) => {
+        setTab(next);
+        rememberTab(next);
     };
 
+    const category = categories[playbook.category] ?? plainLabel(playbook.category);
+    const required = playbook.steps.filter((step) => step.is_required).length;
+    const evidenceSteps = playbook.steps.filter((step) => step.type === 'evidence');
+    const lastRun = recentRuns[0] ?? null;
+
+    const targets: Array<[string, number]> = (
+        [
+            ['Acknowledge within', playbook.sla_acknowledge_minutes],
+            ['Respond within', playbook.sla_response_minutes],
+            ['Resolve within', playbook.sla_resolution_minutes],
+        ] as Array<[string, number | null]>
+    ).filter((row): row is [string, number] => Boolean(row[1]));
+    const hasTargets = targets.length > 0 || Boolean(playbook.escalation_after_minutes);
+
+    const showTargets = () => {
+        if (tab === 'runs') selectTab('steps');
+        window.requestAnimationFrame(() => {
+            const card = document.getElementById('procedure-targets');
+            card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            card?.focus({ preventScroll: true });
+        });
+    };
+
+    const meters = (
+        <>
+            <PageHeaderMeterBlock
+                label="Steps"
+                onClick={() => selectTab('steps')}
+                pressed={tab === 'steps'}
+                ariaLabel="Show the response steps"
+            >
+                <PageHeaderMeterBig>{playbook.steps.length}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {required === playbook.steps.length
+                        ? 'all required'
+                        : `${required} required`}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Required evidence"
+                onClick={() => selectTab('evidence')}
+                pressed={tab === 'evidence'}
+                ariaLabel="Show the evidence this procedure asks for"
+            >
+                <PageHeaderMeterBig>{playbook.required_evidence.length}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {playbook.required_evidence.length
+                        ? playbook.required_evidence.map(plainLabel).join(', ')
+                        : 'nothing to collect'}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Last started"
+                onClick={() => selectTab('runs')}
+                pressed={tab === 'runs'}
+                ariaLabel="Show the run history"
+            >
+                <PageHeaderMeterBig>
+                    {lastRun?.started_at ? formatRelative(lastRun.started_at) : 'Not yet'}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {lastRun ? runStatus(lastRun.status).label : 'not run on an alert yet'}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            {targets.length ? (
+                <PageHeaderMeterBlock
+                    label={targets[0][0]}
+                    onClick={showTargets}
+                    ariaLabel="Show this procedure's time targets"
+                >
+                    <PageHeaderMeterBig>{formatDurationMinutes(targets[0][1])}</PageHeaderMeterBig>
+                    <PageHeaderMeterCaption>
+                        {targets.length > 1
+                            ? targets
+                                  .slice(1)
+                                  .map(([label, minutes]) =>
+                                      `${label.replace(/ within$/, '').toLowerCase()} ${formatDurationMinutes(minutes)}`,
+                                  )
+                                  .join(' · ')
+                            : 'time target'}
+                    </PageHeaderMeterCaption>
+                </PageHeaderMeterBlock>
+            ) : null}
+        </>
+    );
+
+    const actions = can.manage ? (
+        <>
+            <PageHeaderGlassButton
+                icon={Power}
+                onClick={() =>
+                    playbook.is_active ? setTurningOff(true) : turnOnProcedure(playbook)
+                }
+            >
+                {playbook.is_active ? 'Turn off' : 'Turn on'}
+            </PageHeaderGlassButton>
+            <PageHeaderPrimaryButton icon={Pencil} onClick={() => setWizardOpen(true)}>
+                Edit procedure
+            </PageHeaderPrimaryButton>
+        </>
+    ) : undefined;
+
+    const side = (
+        <div className="flex min-w-0 flex-col gap-5">
+            <Panel title="When it starts">
+                <Facts
+                    rows={[
+                        [
+                            'Starts on its own',
+                            playbook.auto_attach
+                                ? 'Yes, for matching new alerts'
+                                : 'No — start it from the alert',
+                        ],
+                        [
+                            'Alert types',
+                            playbook.trigger_alert_types.length
+                                ? playbook.trigger_alert_types.map(plainLabel).join(', ')
+                                : null,
+                        ],
+                        [
+                            'Severities',
+                            playbook.trigger_severities.length ? (
+                                <span className="flex flex-wrap gap-1">
+                                    {playbook.trigger_severities.map((value) => (
+                                        <StatusBadge
+                                            key={value}
+                                            variant={severityBadge(value).tone}
+                                            size="sm"
+                                        >
+                                            {plainLabel(value)}
+                                        </StatusBadge>
+                                    ))}
+                                </span>
+                            ) : null,
+                        ],
+                        [
+                            'Sign-off',
+                            playbook.requires_approval
+                                ? "A manager signs off before it's finished"
+                                : null,
+                        ],
+                        [
+                            'Who signs off',
+                            playbook.approval_roles.length
+                                ? playbook.approval_roles.map(plainLabel).join(', ')
+                                : null,
+                        ],
+                        [
+                            'Escalates to',
+                            playbook.escalation_targets.length
+                                ? playbook.escalation_targets.map(plainLabel).join(', ')
+                                : null,
+                        ],
+                    ]}
+                />
+            </Panel>
+            {hasTargets ? (
+                <Panel id="procedure-targets" title="Time targets">
+                    <Facts
+                        rows={[
+                            ...targets.map(
+                                ([label, minutes]) =>
+                                    [label, formatDurationMinutes(minutes)] as [string, ReactNode],
+                            ),
+                            [
+                                'Escalate after',
+                                playbook.escalation_after_minutes
+                                    ? formatDurationMinutes(playbook.escalation_after_minutes)
+                                    : null,
+                            ],
+                        ]}
+                    />
+                </Panel>
+            ) : null}
+            {tab !== 'evidence' && playbook.required_evidence.length ? (
+                <Panel title="Required evidence">
+                    <EvidenceList items={playbook.required_evidence} compact />
+                </Panel>
+            ) : null}
+            <Panel title="About this procedure">
+                <Facts
+                    rows={[
+                        ['Category', category],
+                        ['Version', `Version ${playbook.version}`],
+                        [
+                            'Added',
+                            playbook.created_at
+                                ? [playbook.created_by?.name, formatDateTime(playbook.created_at)]
+                                      .filter(Boolean)
+                                      .join(' · ')
+                                : playbook.created_by?.name,
+                        ],
+                        [
+                            'Last changed',
+                            playbook.updated_at && playbook.updated_at !== playbook.created_at
+                                ? [playbook.updated_by?.name, formatDateTime(playbook.updated_at)]
+                                      .filter(Boolean)
+                                      .join(' · ')
+                                : null,
+                        ],
+                    ]}
+                />
+            </Panel>
+        </div>
+    );
+
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'Playbooks', href: '/control-room/playbooks' },
-                {
-                    title: playbook.name,
-                    href: `/control-room/playbooks/${playbook.id}`,
-                },
-            ]}
+        <ControlRoomPage
+            headTitle={playbook.name}
+            recordCrumb={{ title: playbook.name }}
+            header={{
+                variant: 'profile',
+                backHref: '/control-room/playbooks',
+                icon: BookOpen,
+                title: playbook.name,
+                wrapTitle: true,
+                titleChip: (
+                    <PageHeaderStatusChip variant={playbook.is_active ? 'success' : 'neutral'}>
+                        {playbook.is_active ? 'Available' : 'Off'} · Version {playbook.version}
+                    </PageHeaderStatusChip>
+                ),
+                subline: [
+                    category,
+                    playbook.is_active
+                        ? playbook.auto_attach
+                            ? 'Starts on its own for matching alerts'
+                            : 'Start it from the alert that needs a response'
+                        : "Turned off — it can't be started",
+                ].join(' · '),
+                actions,
+                meters,
+            }}
+            rail={
+                <PageHeaderRail
+                    ariaLabel="Procedure record"
+                    showFind={false}
+                    value={tab}
+                    onSelect={selectTab}
+                    items={TABS.map((t) => ({
+                        key: t.key,
+                        label: t.label,
+                        icon: t.icon,
+                        count:
+                            t.key === 'steps'
+                                ? playbook.steps.length
+                                : t.key === 'evidence'
+                                  ? playbook.required_evidence.length || undefined
+                                  : recentRuns.length || undefined,
+                    }))}
+                />
+            }
         >
-            <Head title={`${playbook.name} - Playbooks`} />
-
-            <div className="flex flex-col gap-6 p-6">
-                <PageShell>
-                    {/* Header */}
-                    <CommandCentrePage
-                        variant="compact"
-                        current="/control-room/playbooks"
-                        icon={CatIcon}
-                        title={playbook.name}
-                        description={
-                            playbook.description ??
-                            'Review this response procedure and its ordered steps.'
-                        }
-                        status={`${categories[playbook.category] ?? playbook.category} · v${playbook.version} · ${playbook.is_active ? 'active' : 'inactive'}`}
-                        actions={
-                            can.manage ? (
-                                <div className="flex items-center gap-2">
-                                    <ConfirmChip
-                                        label={
-                                            playbook.is_active
-                                                ? 'Deactivate'
-                                                : 'Activate'
-                                        }
-                                        icon={Power}
-                                        destructive={playbook.is_active}
-                                        onConfirm={toggleActive}
-                                        title={
-                                            playbook.is_active
-                                                ? 'Stop this playbook auto-attaching to new alerts'
-                                                : 'Make this playbook available'
-                                        }
-                                    />
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setWizardOpen(true)}
-                                    >
-                                        <Pencil className="mr-1 h-3 w-3" />
-                                        Edit
-                                    </Button>
-                                </div>
-                            ) : undefined
-                        }
+            {tab === 'steps' ? (
+                <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                    <Panel
+                        title="Response steps"
+                        caption={playbook.description ?? 'What the operator does, in order.'}
                     >
-                        {
-                            /* ==================== VIEW MODE ==================== */
-                            <div className="space-y-6">
-                                {/* Info Cards Row */}
-                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                    {/* Trigger Conditions */}
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                                Trigger Conditions
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                <div>
-                                                    <span className="text-xs font-medium text-muted-foreground">
-                                                        Alert Types
-                                                    </span>
-                                                    <div className="mt-1 flex flex-wrap gap-1">
-                                                        {playbook
-                                                            .trigger_alert_types
-                                                            .length > 0 ? (
-                                                            playbook.trigger_alert_types.map(
-                                                                (t) => (
-                                                                    <Badge
-                                                                        key={t}
-                                                                        variant="outline"
-                                                                        className="text-xs"
-                                                                    >
-                                                                        {t}
-                                                                    </Badge>
-                                                                ),
-                                                            )
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Any
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <span className="text-xs font-medium text-muted-foreground">
-                                                        Severities
-                                                    </span>
-                                                    <div className="mt-1 flex flex-wrap gap-1">
-                                                        {playbook
-                                                            .trigger_severities
-                                                            .length > 0 ? (
-                                                            playbook.trigger_severities.map(
-                                                                (s) => (
-                                                                    <Badge
-                                                                        key={s}
-                                                                        className={`text-xs ${severityColors[s] ?? ''}`}
-                                                                    >
-                                                                        {s}
-                                                                    </Badge>
-                                                                ),
-                                                            )
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Any
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 pt-1">
-                                                    {playbook.auto_attach && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="bg-status-success-bg text-xs text-status-success"
-                                                        >
-                                                            Auto-attach
-                                                        </Badge>
-                                                    )}
-                                                    {playbook.requires_approval && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="bg-status-warning-bg text-xs text-status-warning"
-                                                        >
-                                                            Requires Approval
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                        {playbook.steps.length === 0 ? (
+                            <EmptyState
+                                icon={ListChecks}
+                                title="No steps yet"
+                                description="Edit the procedure to add the steps an operator follows."
+                                variant="compact"
+                            />
+                        ) : (
+                            <ol className="grid gap-3">
+                                {playbook.steps.map((step) => (
+                                    <StepItem
+                                        key={step.id}
+                                        step={step}
+                                        typeLabel={stepTypes[step.type] ?? plainLabel(step.type)}
+                                    />
+                                ))}
+                            </ol>
+                        )}
+                    </Panel>
+                    {side}
+                </div>
+            ) : null}
 
-                                    {/* SLA Targets */}
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                                SLA Targets
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm">
-                                                        Acknowledge
-                                                    </span>
-                                                    <span className="font-mono text-sm font-medium">
-                                                        {playbook.sla_acknowledge_minutes
-                                                            ? `${playbook.sla_acknowledge_minutes} min`
-                                                            : '-'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm">
-                                                        Response
-                                                    </span>
-                                                    <span className="font-mono text-sm font-medium">
-                                                        {playbook.sla_response_minutes
-                                                            ? `${playbook.sla_response_minutes} min`
-                                                            : '-'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm">
-                                                        Resolution
-                                                    </span>
-                                                    <span className="font-mono text-sm font-medium">
-                                                        {playbook.sla_resolution_minutes
-                                                            ? `${playbook.sla_resolution_minutes} min`
-                                                            : '-'}
-                                                    </span>
-                                                </div>
-                                                {playbook.escalation_after_minutes && (
-                                                    <div className="flex items-center justify-between border-t pt-2">
-                                                        <span className="text-sm text-muted-foreground">
-                                                            Escalate after
-                                                        </span>
-                                                        <span className="font-mono text-sm font-medium text-status-critical">
-                                                            {
-                                                                playbook.escalation_after_minutes
-                                                            }{' '}
-                                                            min
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+            {tab === 'evidence' ? (
+                <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                    <div className="flex min-w-0 flex-col gap-5">
+                        <Panel
+                            title="Required evidence"
+                            caption="What the operator must collect when they run this procedure."
+                        >
+                            {playbook.required_evidence.length ? (
+                                <EvidenceList items={playbook.required_evidence} />
+                            ) : (
+                                <EmptyState
+                                    icon={Package}
+                                    title="No evidence is asked for"
+                                    description="Operators can still add evidence to the alert as they go."
+                                    variant="compact"
+                                />
+                            )}
+                        </Panel>
+                        {evidenceSteps.length ? (
+                            <Panel
+                                title="Steps that collect evidence"
+                                caption="The operator is asked for it at these steps."
+                            >
+                                <ol className="grid gap-3">
+                                    {evidenceSteps.map((step) => (
+                                        <StepItem
+                                            key={step.id}
+                                            step={step}
+                                            typeLabel={stepTypes[step.type] ?? plainLabel(step.type)}
+                                        />
+                                    ))}
+                                </ol>
+                            </Panel>
+                        ) : null}
+                    </div>
+                    {side}
+                </div>
+            ) : null}
 
-                                    {/* Required Evidence */}
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                                Required Evidence
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {playbook.required_evidence.length >
-                                            0 ? (
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {playbook.required_evidence.map(
-                                                        (type) => (
-                                                            <Badge
-                                                                key={type}
-                                                                variant="outline"
-                                                                className="text-xs"
-                                                            >
-                                                                {type.replace(
-                                                                    /_/g,
-                                                                    ' ',
-                                                                )}
-                                                            </Badge>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm text-muted-foreground">
-                                                    No evidence requirements
-                                                    specified.
-                                                </p>
-                                            )}
-                                            {playbook.created_by && (
-                                                <p className="mt-4 text-xs text-muted-foreground">
-                                                    Created by{' '}
-                                                    {playbook.created_by.name}
-                                                    {playbook.created_at &&
-                                                        ` on ${formatDateTime(playbook.created_at)}`}
-                                                </p>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                </div>
+            {tab === 'runs' ? <RunHistory runs={recentRuns} /> : null}
 
-                                {/* Steps */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <Layers className="h-4 w-4" />
-                                            Steps ({playbook.steps.length})
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {playbook.steps.length === 0 ? (
-                                            <p className="py-4 text-center text-sm text-muted-foreground">
-                                                No steps defined.
-                                            </p>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {playbook.steps.map((step) => (
-                                                    <div
-                                                        key={step.id}
-                                                        className="flex items-start gap-3 rounded-lg border p-3"
-                                                    >
-                                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                                                            {step.order}
-                                                        </div>
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-medium">
-                                                                    {step.title}
-                                                                </span>
-                                                                <Badge
-                                                                    className={`text-xs ${stepTypeColors[step.type] ?? 'bg-muted text-foreground'}`}
-                                                                >
-                                                                    {stepTypes[
-                                                                        step
-                                                                            .type
-                                                                    ] ??
-                                                                        step.type}
-                                                                </Badge>
-                                                                {step.is_required && (
-                                                                    <span
-                                                                        className="flex items-center gap-0.5 text-xs text-status-warning"
-                                                                        title="Required"
-                                                                    >
-                                                                        <Star className="h-3 w-3" />
-                                                                        Required
-                                                                    </span>
-                                                                )}
-                                                                {step.is_blocking && (
-                                                                    <span
-                                                                        className="flex items-center gap-0.5 text-xs text-status-critical"
-                                                                        title="Blocking"
-                                                                    >
-                                                                        <Lock className="h-3 w-3" />
-                                                                        Blocking
-                                                                    </span>
-                                                                )}
-                                                                {step.time_limit_minutes && (
-                                                                    <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                                                                        <Clock className="h-3 w-3" />
-                                                                        {
-                                                                            step.time_limit_minutes
-                                                                        }
-                                                                        m
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {step.instructions && (
-                                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                                    {
-                                                                        step.instructions
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
+            {turningOff ? (
+                <TurnOffProcedureConfirm
+                    procedure={playbook}
+                    onClose={() => setTurningOff(false)}
+                />
+            ) : null}
 
-                                {/* Run History */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">
-                                            Run History
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {recentRuns.length === 0 ? (
-                                            <p className="py-4 text-center text-sm text-muted-foreground">
-                                                No runs yet. This playbook has
-                                                not been executed.
-                                            </p>
-                                        ) : (
-                                            <div className="overflow-x-auto">
-                                                <Table>
-                                                    <TableHeader>
-                                                        <TableRow>
-                                                            <TableHead>
-                                                                Alert
-                                                            </TableHead>
-                                                            <TableHead>
-                                                                Status
-                                                            </TableHead>
-                                                            <TableHead>
-                                                                Progress
-                                                            </TableHead>
-                                                            <TableHead>
-                                                                Started
-                                                            </TableHead>
-                                                            <TableHead>
-                                                                Completed
-                                                            </TableHead>
-                                                            <TableHead>
-                                                                Duration
-                                                            </TableHead>
-                                                            <TableHead>
-                                                                Started By
-                                                            </TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {recentRuns.map(
-                                                            (run) => (
-                                                                <TableRow
-                                                                    key={run.id}
-                                                                >
-                                                                    <TableCell>
-                                                                        {run.alert ? (
-                                                                            <Link
-                                                                                href={`/control-room/alerts/${run.alert_id}`}
-                                                                                className="flex items-center gap-1 text-sm hover:underline"
-                                                                            >
-                                                                                <span className="font-medium">
-                                                                                    #
-                                                                                    {
-                                                                                        run.alert_id
-                                                                                    }
-                                                                                </span>
-                                                                                <Badge
-                                                                                    className={`text-[10px] ${severityColors[run.alert.severity] ?? ''}`}
-                                                                                >
-                                                                                    {
-                                                                                        run
-                                                                                            .alert
-                                                                                            .severity
-                                                                                    }
-                                                                                </Badge>
-                                                                                <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                                                                            </Link>
-                                                                        ) : (
-                                                                            <span className="text-sm text-muted-foreground">
-                                                                                #
-                                                                                {
-                                                                                    run.alert_id
-                                                                                }
-                                                                            </span>
-                                                                        )}
-                                                                    </TableCell>
-                                                                    <TableCell>
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className={`text-xs ${runStatusColors[run.status] ?? ''}`}
-                                                                        >
-                                                                            {run.status.replace(
-                                                                                /_/g,
-                                                                                ' ',
-                                                                            )}
-                                                                        </Badge>
-                                                                    </TableCell>
-                                                                    <TableCell>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
-                                                                                <div
-                                                                                    className="h-full rounded-full bg-primary transition-all"
-                                                                                    style={{
-                                                                                        width: `${run.progress}%`,
-                                                                                    }}
-                                                                                />
-                                                                            </div>
-                                                                            <span className="text-xs text-muted-foreground">
-                                                                                {
-                                                                                    run.completed_steps
-                                                                                }
-
-                                                                                /
-                                                                                {
-                                                                                    run.total_steps
-                                                                                }
-                                                                            </span>
-                                                                        </div>
-                                                                    </TableCell>
-                                                                    <TableCell className="text-sm">
-                                                                        {formatDateTime(
-                                                                            run.started_at,
-                                                                        )}
-                                                                    </TableCell>
-                                                                    <TableCell className="text-sm">
-                                                                        {formatDateTime(
-                                                                            run.completed_at,
-                                                                        )}
-                                                                    </TableCell>
-                                                                    <TableCell className="font-mono text-sm">
-                                                                        {formatDuration(
-                                                                            run.started_at,
-                                                                            run.completed_at,
-                                                                        )}
-                                                                    </TableCell>
-                                                                    <TableCell className="text-sm">
-                                                                        {run
-                                                                            .started_by
-                                                                            ?.name ??
-                                                                            '-'}
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            ),
-                                                        )}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        }
-                    </CommandCentrePage>
-                </PageShell>
-            </div>
-
-            {/* Guided playbook editor — basics → steps → automation → review.
+            {/* Guided procedure editor — basics → steps → starting and targets → review.
                 Mounted only while open so every run starts fresh. */}
             {wizardOpen ? (
                 <PlaybookWizard
@@ -699,6 +596,9 @@ export default function PlaybookShow({
                         sla_resolution_minutes:
                             playbook.sla_resolution_minutes?.toString() ?? '',
                         required_evidence: playbook.required_evidence ?? [],
+                        trigger_alert_types: playbook.trigger_alert_types,
+                        trigger_severities: playbook.trigger_severities,
+                        escalation_after_minutes: playbook.escalation_after_minutes,
                         steps: playbook.steps.map((s) => ({
                             id: s.id,
                             title: s.title,
@@ -712,6 +612,204 @@ export default function PlaybookShow({
                     }}
                 />
             ) : null}
-        </AppLayout>
+        </ControlRoomPage>
+    );
+}
+
+// --- Parts ---
+
+function StepItem({ step, typeLabel }: { step: PlaybookStep; typeLabel: string }) {
+    return (
+        <li className="flex items-start gap-3 rounded-[12px] border border-border p-3.5">
+            <span
+                aria-hidden="true"
+                className="popup-lens popup-lens--sm shrink-0 text-xs font-semibold tabular-nums"
+            >
+                {step.order}
+            </span>
+            <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-semibold text-foreground">
+                        <span className="sr-only">Step {step.order}: </span>
+                        {step.title}
+                    </span>
+                    {step.is_required ? (
+                        <StatusBadge variant="neutral" size="sm">
+                            Required
+                        </StatusBadge>
+                    ) : null}
+                    {step.is_blocking ? (
+                        <StatusBadge variant="warning" size="sm">
+                            Must finish first
+                        </StatusBadge>
+                    ) : null}
+                </p>
+                <p className="text-caption mt-0.5">
+                    {[
+                        typeLabel,
+                        step.time_limit_minutes
+                            ? `within ${formatDurationMinutes(step.time_limit_minutes)}`
+                            : null,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                </p>
+                {step.instructions ? (
+                    <p className="text-subtle mt-1.5 whitespace-pre-line">{step.instructions}</p>
+                ) : null}
+                {step.decision_options?.length ? (
+                    <p className="text-subtle mt-1.5">
+                        Choices: {step.decision_options.join(' · ')}
+                    </p>
+                ) : null}
+            </div>
+        </li>
+    );
+}
+
+function EvidenceList({ items, compact = false }: { items: string[]; compact?: boolean }) {
+    return (
+        <ul className={compact ? 'grid gap-2' : 'grid gap-2.5 sm:grid-cols-2'}>
+            {items.map((item) => {
+                const Icon = EVIDENCE_ICON[item] ?? Paperclip;
+                return (
+                    <li
+                        key={item}
+                        className={
+                            compact
+                                ? 'flex items-center gap-2 text-sm text-foreground'
+                                : 'flex items-center gap-3 rounded-[12px] border border-border px-3.5 py-3 text-sm font-medium text-foreground'
+                        }
+                    >
+                        <span className="popup-lens popup-lens--sm shrink-0" aria-hidden="true">
+                            <Icon className="size-[15px]" />
+                        </span>
+                        {plainLabel(item)}
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
+
+function RunHistory({ runs }: { runs: RunEntry[] }) {
+    return (
+        <Card className="min-w-0 gap-0 overflow-hidden py-0">
+            <div className="border-b border-border px-5 py-4">
+                <h2 className="text-section-title">Run history</h2>
+                <p className="text-subtle mt-0.5">
+                    The most recent times this procedure was run on an alert, newest first.
+                </p>
+            </div>
+            {runs.length === 0 ? (
+                <div className="px-5 py-10">
+                    <EmptyState
+                        icon={History}
+                        title="Not run yet"
+                        description="Runs appear here once the procedure is started on an alert."
+                    />
+                </div>
+            ) : (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="pl-5">Alert</TableHead>
+                            <TableHead>Severity</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Progress</TableHead>
+                            <TableHead>Started</TableHead>
+                            <TableHead>Finished</TableHead>
+                            <TableHead>Took</TableHead>
+                            <TableHead>Started by</TableHead>
+                            <TableHead className="w-12 pr-3">
+                                <span className="sr-only">Actions</span>
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {runs.map((run) => (
+                            <RunRow key={run.id} run={run} />
+                        ))}
+                    </TableBody>
+                </Table>
+            )}
+        </Card>
+    );
+}
+
+function RunRow({ run }: { run: RunEntry }) {
+    const href = `/control-room/alerts/${run.alert_id}`;
+    const status = runStatus(run.status);
+    const minutes = runMinutes(run);
+    const items: ControlRoomRowAction[] = run.alert
+        ? [{ key: 'open', label: 'Open alert', icon: Eye, onSelect: () => router.visit(href) }]
+        : [];
+
+    return (
+        <ControlRoomRowActions label={`Actions for alert ${run.alert_id}`} items={items}>
+            {({ rowProps, overflowButton }) => (
+                <TableRow
+                    {...rowProps}
+                    className={
+                        run.alert
+                            ? 'cursor-pointer outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset'
+                            : undefined
+                    }
+                    onClick={
+                        run.alert
+                            ? (event) => {
+                                  // The alert link and the kebab handle their own clicks.
+                                  if ((event.target as HTMLElement).closest('a,button')) return;
+                                  router.visit(href);
+                              }
+                            : undefined
+                    }
+                >
+                    <TableCell className="pl-5">
+                        {run.alert ? (
+                            <>
+                                <span className="block font-medium text-foreground">
+                                    {plainLabel(run.alert.alert_type) || 'Alert'}
+                                </span>
+                                <Link
+                                    href={href}
+                                    className="text-caption font-medium text-primary hover:underline"
+                                >
+                                    Alert {run.alert_id}
+                                </Link>
+                            </>
+                        ) : (
+                            <span className="text-subtle">Alert {run.alert_id}</span>
+                        )}
+                    </TableCell>
+                    <TableCell>
+                        {run.alert ? (
+                            <StatusBadge variant={severityBadge(run.alert.severity).tone} size="sm">
+                                {plainLabel(run.alert.severity)}
+                            </StatusBadge>
+                        ) : null}
+                    </TableCell>
+                    <TableCell>
+                        <StatusBadge variant={status.tone} size="sm">
+                            {status.label}
+                        </StatusBadge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">
+                        {run.completed_steps} of {run.total_steps} steps
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {run.started_at ? formatDateTime(run.started_at) : null}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {run.completed_at ? formatDateTime(run.completed_at) : null}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">
+                        {minutes !== null ? formatDurationMinutes(minutes) : null}
+                    </TableCell>
+                    <TableCell>{run.started_by?.name ?? null}</TableCell>
+                    <TableCell className="pr-3 text-right">{overflowButton}</TableCell>
+                </TableRow>
+            )}
+        </ControlRoomRowActions>
     );
 }

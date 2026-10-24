@@ -22,12 +22,8 @@ export function ConflictToasts({ toasts }: { toasts: QueueToast[] }) {
                         <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
                     </span>
                     <div className="min-w-0">
-                        <p className="text-[13px] font-semibold">
-                            {toast.title}
-                        </p>
-                        <p className="text-[11.5px] text-white/60">
-                            {toast.sub}
-                        </p>
+                        <p className="text-sm font-semibold">{toast.title}</p>
+                        <p className="text-sm text-white/60">{toast.sub}</p>
                     </div>
                 </div>
             ))}

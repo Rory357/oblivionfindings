@@ -7,6 +7,8 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -14,6 +16,27 @@ use PHPUnit\Framework\TestCase;
 
 class FleetNavigationPermissionProjectionTest extends TestCase
 {
+    private ?Container $previousContainer = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The projection reads config('chat.shared_experience'). Without an application boot
+        // there is no config store, so give the bare container one with shared Chat off.
+        $this->previousContainer = Container::getInstance();
+        $container = new Container;
+        $container->instance('config', new Repository(['chat' => ['shared_experience' => false]]));
+        Container::setInstance($container);
+    }
+
+    protected function tearDown(): void
+    {
+        Container::setInstance($this->previousContainer);
+
+        parent::tearDown();
+    }
+
     /** @return array<string, array{list<string>, bool}> */
     public static function permissionCases(): array
     {

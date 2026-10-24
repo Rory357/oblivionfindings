@@ -40,6 +40,10 @@ export type ReferralConfiguration = {
         notice_version: string;
         notice: string | null;
         acknowledgement_enabled: boolean;
+        /** Public Contact us page details; blank ones aren't shown. Older versions are filled with blanks by the server. */
+        office_address?: string | null;
+        contact_email?: string | null;
+        opening_hours?: string | null;
     };
     services: {
         id: string;
