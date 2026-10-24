@@ -336,10 +336,22 @@ class HsRecommendationDispositionTest extends TestCase
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThan(
-            100,
-            $queryCount,
-            "Event detail used {$queryCount} queries for a large site-scoped owner set.",
+        // The H&S read has a fixed cost per page (authority evidence, source scopes, the in-page task badge), so the
+        // check is that a large owner set adds no per-person queries: 100 more Site staff must not change the count.
+        User::factory()->count(100)->create(['approved_at' => now()])
+            ->each(fn (User $user) => HrEmployeeProfile::factory()->create([
+                'user_id' => $user->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [],
+            ]));
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->actingAs($officer)->get("/health-safety/events/{$event->id}")->assertOk();
+        $largerCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(
+            $queryCount + 2,
+            $largerCount,
+            "Event detail went from {$queryCount} to {$largerCount} queries when 100 more Site staff were added.",
         );
 
         $response
