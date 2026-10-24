@@ -76,7 +76,10 @@ final class IncidentHsEventSourceReadService
         $bindings = [];
         foreach ($identities as $event) {
             // Parents without the viewer-wide authority facts: those are the same in every block and are added once below.
-            $parent = $this->eventParent($event, $current, $reads, false);
+            // Restricted parents (Stephan, 25 Oct, "event yes, incident no"): an incident-linked H&S event is visible to
+            // H&S viewers at its Site without incident read. The incident's HR-confidential, Site and independence
+            // rules and its exact original facts still apply; its content stays behind incidentQueryForEventInReads().
+            $parent = $this->eventParent($event, $current, $reads, false, true);
             $bindings[] = ['event' => $event, 'parent' => $parent];
         }
         $events->where(function (Builder $scope) use ($bindings, $relatedIds, $current, $reads): void {
@@ -107,7 +110,7 @@ final class IncidentHsEventSourceReadService
     }
 
     /** $common false leaves out the viewer-wide authority facts; only the list scopes, which add them once, use that. */
-    private function eventParent(HsEvent $original, User $current, CurrentAuthorizationReads $reads, bool $common): Builder
+    private function eventParent(HsEvent $original, User $current, CurrentAuthorizationReads $reads, bool $common, bool $restricted = false): Builder
     {
         $reads->assertActive();
         $empty = fn (): Builder => $this->protect(ClientIncident::query()->whereRaw('1 = 0'), $reads);
@@ -119,7 +122,7 @@ final class IncidentHsEventSourceReadService
         // Existing Journey read contract allows leading slash legacy spelling, never case/trailing-byte rewrites.
         if (! is_string($type) || ltrim($type, '\\') !== ClientIncident::class || ! $original->source_id) { return $empty(); }
         $eventParents = $this->eventParents[$reads] ?? [];
-        $key = $common ? (string) $current->id : $current->id.'/site-client';
+        $key = ($common ? (string) $current->id : $current->id.'/site-client').($restricted ? '/restricted' : '');
         // Both variants pin the earliest event facts seen in this lifetime; a changed event is never a new original.
         $pinned = $eventParents[$current->id.'/meta'][$original->id] ?? null;
         if ($pinned !== null && $pinned !== $meta) { return $empty(); }
@@ -132,8 +135,8 @@ final class IncidentHsEventSourceReadService
         $root = $roots->sole();
         if (($root->hs_event_id !== null && (int) $root->hs_event_id !== (int) $original->id)
             || ! app(IncidentJourneyService::class)->hsEventIsCanonicalForIncident($root, $original)) { return $empty(); }
-        $query = $this->originalRootParent($root, $current, $reads, $common);
-        $base = $this->rootBase($root, $current, $reads);
+        $query = $this->originalRootParent($root, $current, $reads, $common, $restricted);
+        $base = $this->rootBase($root, $current, $reads, $restricted);
         $event = HsEvent::query()->whereKey($original->id);
         $this->exact($event, $meta, 'hs_events');
         $event->whereNotExists(DB::table('client_incidents as hs_other_incident')->selectRaw('1')
@@ -184,12 +187,12 @@ final class IncidentHsEventSourceReadService
 
     /** Reuse the earliest original source proof within this exact reads/actor lifetime; never recapture a changed root as acceptance.
      * $common false leaves out the viewer-wide authority facts, for list scopes that add them once around all parents. */
-    private function originalRootParent(ClientIncident $root, User $current, CurrentAuthorizationReads $reads, bool $common = true): Builder
+    private function originalRootParent(ClientIncident $root, User $current, CurrentAuthorizationReads $reads, bool $common = true, bool $restricted = false): Builder
     {
-        $key = $common ? (string) $current->id : $current->id.'/site-client';
+        $key = ($common ? (string) $current->id : $current->id.'/site-client').($restricted ? '/restricted' : '');
         if (isset(($this->rootParents[$reads] ?? [])[$key][$root->id])) { return clone $this->rootParents[$reads][$key][$root->id]; }
         // Both variants derive from the same earliest root base, so neither recaptures a changed root.
-        $base = $this->rootBase($root, $current, $reads);
+        $base = $this->rootBase($root, $current, $reads, $restricted);
         $query = clone $base['query'];
         $query = $common ? $this->authorityUnchanged($query, $current, $reads, $base['site_id'], $base['client_id'])
             : $this->authorityScoped($query, $current, $reads, $base['site_id'], $base['client_id']);
@@ -201,11 +204,16 @@ final class IncidentHsEventSourceReadService
     }
 
     /** Canonical access, independence and the exact original root facts, captured once per reads/actor/root. */
-    private function rootBase(ClientIncident $root, User $current, CurrentAuthorizationReads $reads): array
+    private function rootBase(ClientIncident $root, User $current, CurrentAuthorizationReads $reads, bool $restricted = false): array
     {
-        $baseKey = $current->id.'/base';
+        $baseKey = $current->id.'/base'.($restricted ? '/restricted' : '');
         if (isset(($this->rootParents[$reads] ?? [])[$baseKey][$root->id])) { return $this->rootParents[$reads][$baseKey][$root->id]; }
-        $query = app(IncidentAccessService::class)->apply(ClientIncident::query()->whereKey($root->id), $current, $reads);
+        $access = app(IncidentAccessService::class);
+        // Restricted (H&S event visibility only): the incident's HR-confidential and Site rules without the incident
+        // read permission. The full variant is the canonical incident read, which incident content needs.
+        $query = $restricted
+            ? $reads->query($access->applySiteScope(ClientIncident::query()->whereKey($root->id), $current, $reads))
+            : $access->apply(ClientIncident::query()->whereKey($root->id), $current, $reads);
         $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read');
         $this->exact($query, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
         $base = ['query' => $query, 'site_id' => $root->site_id === null ? null : (int) $root->site_id,

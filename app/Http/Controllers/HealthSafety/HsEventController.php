@@ -527,7 +527,7 @@ class HsEventController extends Controller
             ->whereKey($ownerId)
             ->first();
 
-        if (! $owner || ! $owner->canDo('hazards.manage')) {
+        if (! $owner || ! $this->canOwnEvent($owner, $hsEvent, $request->user())) {
             throw ValidationException::withMessages([
                 'owner_user_id' => empty($data['owner_user_id'])
                     ? 'Choose an approved H&S owner for this site before accepting.'
@@ -854,7 +854,7 @@ class HsEventController extends Controller
                 ->with(['permissionOverrides', 'roles.permissions'])
                 ->orderBy('name')
                 ->get(['id', 'name'])
-                ->filter(fn (User $user): bool => $user->canDo('hazards.manage'))
+                ->filter(fn (User $user): bool => $this->canOwnEvent($user, $hsEvent, $currentUser))
                 ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
                 ->values()
                 ->all();
@@ -1145,7 +1145,9 @@ class HsEventController extends Controller
             ] : null,
             'linked_operational_evidence' => $linkedOperationalEvidence,
             'linked_access' => [
-                'incident' => $sourceIncident === null ? 'absent' : ($canOpenIncident ? 'readable' : 'restricted'),
+                // An incident-sourced event whose incident this viewer can't read is "restricted", not "absent".
+                'incident' => $sourceIncident !== null ? ($canOpenIncident ? 'readable' : 'restricted')
+                    : (ltrim((string) $hsEvent->getRawOriginal('source_type'), '\\') === ClientIncident::class ? 'restricted' : 'absent'),
                 'control_room' => $alert === null ? 'absent' : ($canOpenAlert ? 'readable' : 'restricted'),
             ],
             'incident_followups' => $incidentFollowups,
@@ -1222,9 +1224,14 @@ class HsEventController extends Controller
                 'verify_corrective_actions' => $canManage && $canAccessActionEvidence,
             ],
         ];
-        if ($context !== null && $incidentSource['parent'] !== null
-            && ltrim((string) $hsEvent->getRawOriginal('source_type'), '\\') === ClientIncident::class) {
-            abort_unless($context->query(clone $incidentSource['parent'])->exists(), 404);
+        if ($context !== null && ltrim((string) $hsEvent->getRawOriginal('source_type'), '\\') === ClientIncident::class) {
+            if ($sourceIncident !== null && $incidentSource['parent'] !== null) {
+                // Incident content was included: the incident must still be readable as the page is published.
+                abort_unless($context->query(clone $incidentSource['parent'])->exists(), 404);
+            } else {
+                // Restricted view (Stephan, 25 Oct): no incident content was read, but the event must still be visible.
+                abort_unless($context->applyIncidentEventScope(HsEvent::query()->whereKey($hsEvent->id))->exists(), 404);
+            }
         }
         if ($sourceIncident !== null && $context !== null) {
             $context->consumeSourceViewer(\App\Services\Incidents\IncidentHsEventSourceReadService::PERMISSIONS,
@@ -1729,6 +1736,26 @@ class HsEventController extends Controller
         }
 
         return $event->controlRoomAlert()->first();
+    }
+
+    /**
+     * A handover owner must be able to open the event (Stephan, 25 Oct): H&S view and manage, and for an event from a
+     * private source (incident, treatment, restraint, injury) the same source read as the event page. The person
+     * already reading or acting on it passes; ordinary H&S events need no extra read.
+     */
+    private function canOwnEvent(User $person, HsEvent $event, User $viewer): bool
+    {
+        if (! $person->canDo('hazards.manage') || ! $person->canDo('hazards.view')) {
+            return false;
+        }
+        if ((int) $person->id === (int) $viewer->id) {
+            return true;
+        }
+        $source = ltrim((string) $event->getRawOriginal('source_type'), '\\');
+        $private = in_array($source, [ClientIncident::class, \App\Models\FirstAidRecord::class, RestraintEvent::class, WorkplaceInjury::class], true)
+            || ClientIncident::query()->where('hs_event_id', $event->id)->exists();
+
+        return ! $private || app(HsEventAccessService::class)->canReadEvent($person, $event);
     }
 
     private function handoverOwnerQuery(HsEvent $event, User $viewer): Builder

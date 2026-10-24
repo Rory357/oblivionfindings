@@ -102,12 +102,25 @@ final class HealthSafetyOfficerIncidentReadTest extends IncidentIndependenceTest
         $this->assertSame([(int) $own->id, (int) $elsewhere->id], $this->readable($officer, [$own, $elsewhere, $confidential]));
     }
 
-    public function test_without_incident_read_the_officer_sees_no_incident_linked_work(): void
+    public function test_without_incident_read_the_officer_still_sees_the_event_but_not_the_incident(): void
     {
+        // Stephan, 25 Oct ("event yes, incident no"): the H&S event shows at the officer's Site; the incident itself,
+        // and an HR-confidential incident's event, stay behind their own rules.
         $officer = $this->officer($this->site);
         $this->allow($officer, 'incidents.viewAny', false);
         $own = $this->linkedEvent($this->site);
+        $confidential = $this->linkedEvent($this->site, ['is_hr_confidential' => true]);
 
-        $this->assertSame([], $this->readable($officer, [$own]));
+        $this->assertSame([(int) $own->id], $this->readable($officer, [$own, $confidential]));
+        $this->assertFalse($this->incidentReadable($officer, $own));
+        $this->allow($officer, 'incidents.viewAny', true);
+        $this->assertTrue($this->incidentReadable($officer->fresh(), $own));
+    }
+
+    private function incidentReadable(User $viewer, HsEvent $event): bool
+    {
+        return HealthSafetyReadContext::within($viewer, array_unique([
+            ...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS, ...InjuryAccessService::PERMISSIONS,
+        ]), fn ($context): bool => $context->query($context->incidentQueryForEvent($event))->exists());
     }
 }

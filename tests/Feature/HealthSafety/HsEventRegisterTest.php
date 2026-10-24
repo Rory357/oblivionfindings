@@ -459,14 +459,18 @@ class HsEventRegisterTest extends TestCase
                 ->where('detail.source.url', "/incidents/{$event->source_id}")
             );
 
-        // Incident-linked H&S work needs incident read: without it the event isn't shown at all.
+        // Without incident read the event still shows, with no incident link (Stephan, 25 Oct: event yes, incident no).
         $withoutIncidentRead = $this->hsOfficer($site);
         $withoutIncidentRead->permissionOverrides()->syncWithoutDetaching([
             Permission::query()->where('key', 'incidents.viewAny')->sole()->id => ['allowed' => false],
         ]);
         $this->actingAs($withoutIncidentRead)
             ->get('/health-safety/events?event='.$event->id)
-            ->assertNotFound();
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.source', null)
+                ->where('detail.linked_access.incident', 'restricted')
+            );
 
         $admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
