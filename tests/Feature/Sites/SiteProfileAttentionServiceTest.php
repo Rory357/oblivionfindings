@@ -45,7 +45,7 @@ class SiteProfileAttentionServiceTest extends TestCase
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $this->site = Site::factory()->create(['type' => 'house']);
         // PPE attention comes through the PPE source read, which needs current staff (Stephan, 25 Oct): the admin works here.
-        AppDomainHrModelsHrEmployeeProfile::factory()->create(['user_id' => $this->admin->id, 'primary_site_id' => $this->site->id,
+        \App\Domain\Hr\Models\HrEmployeeProfile::factory()->create(['user_id' => $this->admin->id, 'primary_site_id' => $this->site->id,
             'secondary_site_ids' => [], 'start_date' => '2020-01-01', 'end_date' => null, 'is_active' => true]);
     }
 
