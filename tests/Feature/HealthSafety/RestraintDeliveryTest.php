@@ -35,6 +35,22 @@ class RestraintDeliveryTest extends RestraintEventCommandTestCase
         $this->assertNotNull($intent->fresh()->delivered_at);
     }
 
+    /** Replaces main's HsEventBackboneTest observer cases: a restraint reaches H&S as high with an injury, medium without. */
+    public function test_delivered_hs_event_is_a_restraint_event_high_with_injury_and_medium_without(): void
+    {
+        $plain = $this->event();
+        $injured = $this->event(['injury_occurred' => true, 'injury_details' => 'Grazed forearm, first aid given.']);
+        $service = app(RestraintSourceDeliveryService::class);
+        foreach ([[$plain, 'medium'], [$injured, 'high']] as [$row, $severity]) {
+            $intent = RestraintSourceDelivery::where('restraint_event_id', $row->id)->where('purpose', 'source_review')->sole();
+            $service->deliver($intent->id);
+            $this->assertSame('delivered', $intent->fresh()->status);
+            $hs = HsEvent::where('source_type', RestraintEvent::class)->where('source_id', $row->id)->sole();
+            $this->assertSame($severity, $hs->severity);
+            $this->assertSame(HsEvent::CATEGORY_RESTRAINT, $hs->event_category);
+        }
+    }
+
     public function test_revoked_initiator_or_changed_tuple_cannot_receive_a_source_delivery_success(): void
     {
         $row = $this->event();
