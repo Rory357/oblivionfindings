@@ -121,5 +121,18 @@ abstract class IncidentRecordingCommandTestCase extends IncidentIndependenceTest
         return compact('incident', 'camera', 'recorder', 'source', 'attachments', 'window');
     }
 
+    /**
+     * Reassign a fixture Device to a staff member (private provenance). A Device has at most one active
+     * assignment (device_assignments_one_active_device_uq), so its current Site assignment is released at the
+     * same instant, as DeviceAssignmentService::assign() does.
+     */
+    protected function assignToStaff(Device $device, \App\Models\User $staff): DeviceAssignment
+    {
+        $at = now()->subHour();
+        DeviceAssignment::query()->where('device_id', $device->id)->active()
+            ->update(['released_at' => $at, 'released_by_user_id' => $this->manager->id]);
 
+        return DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => 'staff', 'assignable_id' => $staff->id,
+            'custody_site_id' => $this->site->id, 'assignment_type' => 'permanent', 'assigned_at' => $at, 'assigned_by_user_id' => $this->manager->id]);
+    }
 }

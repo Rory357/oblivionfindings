@@ -173,6 +173,10 @@ final class IncidentRecordingReferenceReadTest extends IncidentIndependenceTestC
     public function test_new_private_provenance_cannot_hide_behind_visible_site_assignment(): void
     {
         $f = $this->fixture();
+        // One active assignment per Device (device_assignments_one_active_device_uq): reassignment releases the Site
+        // assignment at the same instant, as DeviceAssignmentService::assign() does.
+        DeviceAssignment::query()->where('device_id', $f['camera']->id)->active()
+            ->update(['released_at' => now()->subHour(), 'released_by_user_id' => $this->manager->id]);
         DeviceAssignment::create(['device_id' => $f['camera']->id, 'assignable_type' => 'staff', 'assignable_id' => $this->lead->id,
             'custody_site_id' => $this->site->id, 'assignment_type' => 'permanent', 'assigned_at' => now()->subHour(), 'assigned_by_user_id' => $this->manager->id]);
         $row = $this->read($f['incident'])['references']['items'][0];

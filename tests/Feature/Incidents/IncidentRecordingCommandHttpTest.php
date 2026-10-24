@@ -27,12 +27,13 @@ final class IncidentRecordingCommandHttpTest extends IncidentRecordingCommandTes
         ClientIncident::withoutEvents(fn () => $incident->update(['status' => 'closed']));
         $replay = $this->postJson($url, $body); $this->privateJson($replay, 200); $this->assertSame($original, $replay->json());
         $recover = '/incidents/'.$incident->id.'/evidence-window-commands/'.$body['idempotency_key'].'?expected_actor_id='.$this->manager->id;
-        $receipt = $this->getJson($recover); $this->privateJson($receipt, 200); $this->assertSame($original, $receipt->json());
+        // Recovery refuses any request body; getJson() would send "[]", so these GETs carry none (the boundary sets JSON Accept).
+        $receipt = $this->get($recover); $this->privateJson($receipt, 200); $this->assertSame($original, $receipt->json());
         $conflict = $this->postJson($url, [...$body, 'reason' => 'A changed payload must never become a replay.']);
         $this->privateJson($conflict, 409); $conflict->assertExactJson(['code' => 'context_changed']);
         $this->assertSame(1, IncidentEvidenceWindowCommandReceipt::where('incident_id', $incident->id)->count());
         $this->allow($this->manager, 'securityDevices.viewAny', false);
-        $this->privateJson($this->getJson($recover), 404);
+        $this->privateJson($this->get($recover), 404);
     }
 
     public function test_attachment_http_new_replay_and_actor_private_recovery(): void
@@ -43,7 +44,8 @@ final class IncidentRecordingCommandHttpTest extends IncidentRecordingCommandTes
         $existing = CctvRecordingReference::where('uuid', $f['attachments'][0]->reference_uuid)->firstOrFail();
         $uuid = (string) Str::uuid(); $metadata = $existing->metadata;
         $metadata['reference_uuid'] = $uuid; $metadata['reader_href'] = '/security-devices/cctv/recording-references/'.$uuid;
-        $copy = $existing->replicate(); $copy->uuid = $uuid; $copy->request_key = (string) Str::uuid();
+        // replicate() drops created_at, which this timestamp-less model stores explicitly (NOT NULL, matching metadata).
+        $copy = $existing->replicate(); $copy->created_at = $existing->created_at; $copy->uuid = $uuid; $copy->request_key = (string) Str::uuid();
         $copy->metadata = $metadata; $copy->metadata_hash = CctvContract::hash($metadata); $copy->saveOrFail();
         $body = ['expected_actor_id' => $this->manager->id, 'idempotency_key' => (string) Str::uuid(),
             'expected_incident_evidence_version' => 2, 'evidence_window_revision' => 1, 'reference_uuid' => $uuid,
@@ -52,12 +54,12 @@ final class IncidentRecordingCommandHttpTest extends IncidentRecordingCommandTes
         $first = $this->postJson($url, $body); $this->privateJson($first, 201);
         $replay = $this->postJson($url, $body); $this->privateJson($replay, 200); $this->assertSame($first->json(), $replay->json());
         $recover = '/incidents/'.$f['incident']->id.'/recording-attachment-commands/'.$body['idempotency_key'].'?expected_actor_id=';
-        $this->privateJson($this->getJson($recover.$this->reporter->id), 403);
-        $receipt = $this->getJson($recover.$this->manager->id); $this->privateJson($receipt, 200);
+        $this->privateJson($this->get($recover.$this->reporter->id), 403);
+        $receipt = $this->get($recover.$this->manager->id); $this->privateJson($receipt, 200);
         $this->assertSame($first->json(), $receipt->json());
         $this->assertSame(2, IncidentRecordingAttachment::where('incident_id', $f['incident']->id)->count());
         $this->allow($this->manager, CctvRecordingReferences::VIEW, false);
-        $this->privateJson($this->getJson($recover.$this->manager->id), 404);
+        $this->privateJson($this->get($recover.$this->manager->id), 404);
     }
 
     public function test_raw_json_and_query_rejection_cannot_create_a_receipt_or_flash_private_input(): void

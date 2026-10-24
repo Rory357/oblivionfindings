@@ -69,8 +69,7 @@ final class IncidentRecordingPreviewReadServiceTest extends IncidentRecordingCom
     {
         $f = $this->fixture();
         foreach (['incidents.update', 'incidents.evidence.window.record', 'incidents.evidence.attach'] as $permission) { $this->allow($this->manager, $permission); }
-        DeviceAssignment::create(['device_id' => $f['camera']->id, 'assignable_type' => 'staff', 'assignable_id' => $this->lead->id,
-            'custody_site_id' => $this->site->id, 'assignment_type' => 'permanent', 'assigned_at' => now()->subHour(), 'assigned_by_user_id' => $this->manager->id]);
+        $this->assignToStaff($f['camera'], $this->lead);
         $this->assertSame([], $this->preview($f)['sources']['items']);
         ClientIncident::withoutEvents(fn () => $f['incident']->update(['status' => 'closed']));
         $dto = $this->preview($f); $this->assertFalse($dto['permissions']['can_record']);
@@ -101,8 +100,7 @@ final class IncidentRecordingPreviewReadServiceTest extends IncidentRecordingCom
         CctvSource::retrieved(function () use (&$armed): void { $armed = true; });
         User::retrieved(function () use ($f, &$armed, &$revoked): void {
             if (!$armed || $revoked) { return; } $revoked = true;
-            DeviceAssignment::create(['device_id' => $f['camera']->id, 'assignable_type' => 'staff', 'assignable_id' => $this->lead->id,
-                'custody_site_id' => $this->site->id, 'assignment_type' => 'permanent', 'assigned_at' => now()->subHour(), 'assigned_by_user_id' => $this->manager->id]);
+            $this->assignToStaff($f['camera'], $this->lead);
         });
         try { $this->denial(fn () => $this->preview($f), 404); $this->assertTrue($revoked); }
         finally { Model::setEventDispatcher($events); }
@@ -168,8 +166,7 @@ final class IncidentRecordingPreviewReadServiceTest extends IncidentRecordingCom
             if (!$armed || $mutated || !str_contains($query->sql, 'client_incidents')) { return; }
             $mutated = true;
             if ($mutation === 'private_assignment') {
-                DeviceAssignment::create(['device_id' => $f['camera']->id, 'assignable_type' => 'staff', 'assignable_id' => $this->lead->id,
-                    'custody_site_id' => $this->site->id, 'assignment_type' => 'permanent', 'assigned_at' => now()->subHour(), 'assigned_by_user_id' => $this->manager->id]);
+                $this->assignToStaff($f['camera'], $this->lead);
             } else { $f['source']->update(['verified_at' => now()->addSecond()]); }
         });
         try {
