@@ -271,63 +271,17 @@ class HsEventBackboneTest extends TestCase
     // RestraintEvent → HsEvent wiring
     // ──────────────────────────────────────────────────────
 
-    public function test_restraint_with_injury_creates_high_hs_event(): void
-    {
-        $event = RestraintEvent::factory()->withInjury()->create();
-
-        $this->assertDatabaseHas('hs_events', [
-            'source_type' => RestraintEvent::class,
-            'source_id' => $event->id,
-            'event_category' => 'restraint',
-            'severity' => 'high',
-        ]);
-    }
-
-    public function test_restraint_without_injury_creates_medium_hs_event(): void
-    {
-        $event = RestraintEvent::factory()->withinSupportPlan()->create();
-
-        $this->assertDatabaseHas('hs_events', [
-            'source_type' => RestraintEvent::class,
-            'source_id' => $event->id,
-            'severity' => 'medium',
-        ]);
-    }
+    // Retired: a RestraintEvent created directly (factory) no longer projects an H&S event without an authorised
+    // current actor. Recording goes through RestraintService and its delivery, where the same rule (injury → high,
+    // otherwise medium) is covered by RestraintDeliveryTest.
 
     // ──────────────────────────────────────────────────────
     // Step 7 orphan-category wiring
     // ──────────────────────────────────────────────────────
 
-    public function test_substance_exposure_record_creates_exposure_hs_event(): void
-    {
-        $site = Site::factory()->create();
-        $worker = User::factory()->create();
-        $creator = User::factory()->create();
-        $substance = HazardousSubstance::factory()->create(['created_by' => $creator->id]);
-
-        $record = SubstanceExposureRecord::create([
-            'hazardous_substance_id' => $substance->id,
-            'user_id' => $worker->id,
-            'site_id' => $site->id,
-            'exposed_at' => now()->subHour(),
-            'exposure_type' => 'inhalation',
-            'circumstances' => 'Cleaner vapour exposure during storage-room spill response.',
-            'medical_attention_sought' => true,
-            'incident_reported' => false,
-            'created_by' => $creator->id,
-        ]);
-
-        $this->assertDatabaseHas('hs_events', [
-            'source_type' => SubstanceExposureRecord::class,
-            'source_id' => $record->id,
-            'event_category' => HsEvent::CATEGORY_EXPOSURE,
-            'severity' => HsEvent::SEVERITY_HIGH,
-            'site_id' => $site->id,
-            'staff_id' => $worker->id,
-            'created_by' => $creator->id,
-            'investigation_required' => true,
-        ]);
-    }
+    // Retired: exposure records are written by the chemical exposure commands, and their H&S event (exposure, high
+    // with medical attention, investigation required, the worker's Site) is covered by
+    // ChemicalExposureHsEventDeliveryTest::test_actual_accepted_source_has_separate_pending_delivery_then_one_exact_destination.
 
     public function test_failed_site_inspection_record_creates_inspection_failure_hs_event(): void
     {
