@@ -229,7 +229,8 @@ it('redacts monitorable Shift GPS until the safety session is activated', functi
             'site_id' => $site->id,
             'client_id' => $client->id,
             'shift_id' => $shift->id,
-            'expected_end_at' => now()->addHours(2)->toDateTimeString(),
+            // The start command takes an exact instant with its offset, as the drawn start form sends.
+            'expected_end_at' => now()->addHours(2)->toIso8601String(),
         ])
         ->assertRedirect()
         ->assertSessionHasNoErrors();
