@@ -25,6 +25,7 @@ use Inertia\Testing\AssertableInertia;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Incidents\IncidentIndependenceTestCase;
+use Tests\Support\SharedSidebarFrames;
 
 /** Complete native source/detail suite UNRUN. It does not certify bulk readers, CR transport, copied byte provenance or query budget. */
 final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
@@ -82,12 +83,13 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
             ClientIncidentAttachment::class => ['attachment', 'original_name'], IncidentFollowup::class => ['followup', 'notes']] as $class => [$key, $field]) {
             $id = $fixture[$key]->id;
             $class::retrieved(function ($row) use ($state, $key, $field, $id): void {
-                if ((int) $row->id === (int) $id && array_key_exists($field, $row->getAttributes())) { $state->{$key}++; }
+                // Main's shared sidebar (task badge) loads rows on every page before the page's read; it isn't counted.
+                if ((int) $row->id === (int) $id && array_key_exists($field, $row->getAttributes()) && ! SharedSidebarFrames::active()) { $state->{$key}++; }
             });
         }
         if ($mutate !== null) {
             DB::connection()->beforeExecuting(function ($sql) use ($state, $mutateTable, $mutate): void {
-                if (! $state->armed || ! preg_match('/^select (.*?) from `([^`]+)` /s', $sql, $match) || $match[2] !== $mutateTable) { return; }
+                if (! $state->armed || SharedSidebarFrames::active() || ! preg_match('/^select (.*?) from `([^`]+)` /s', $sql, $match) || $match[2] !== $mutateTable) { return; }
                 if (in_array($mutateTable, ['hs_events', 'client_incidents'], true) && ! str_contains($match[1], '*')) { return; }
                 $state->armed = false; $state->fired = true; $mutate();
             });
