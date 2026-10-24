@@ -187,8 +187,20 @@ final class HsCorrectiveActionOwnershipService
     /** Ordinary sources retain their existing eligibility and notification policy. */
     private function derivedSourceReadable(User $viewer, HsEvent $event): bool
     {
-        // Through the event page's H&S source read, so an incident-linked event's owner must be able to read the incident.
-        return app(HsEventAccessService::class)->canReadEvent($viewer, $event);
+        $incidentLinked = app(\App\Services\Incidents\IncidentHsEventSourceReadService::class)
+            ->incidentRelated(HsEvent::query()->whereKey($event->id))->exists();
+        if ($incidentLinked) {
+            // Incident-linked events are refused outside the H&S read, so check through the event page's read: the
+            // owner must be able to read the incident.
+            return app(HsEventAccessService::class)->canReadEvent($viewer, $event);
+        }
+
+        return DB::transaction(function () use ($viewer, $event): bool {
+            $query = HsEvent::query()->whereKey($event->id)->lock('for share nowait');
+            app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $viewer);
+
+            return $query->exists();
+        });
     }
 
     public function present(User $viewer, HsCorrectiveAction $action, bool $participant): array
