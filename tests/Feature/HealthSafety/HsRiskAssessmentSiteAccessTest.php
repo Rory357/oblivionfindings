@@ -74,7 +74,8 @@ class HsRiskAssessmentSiteAccessTest extends TestCase
 
         $this->actingAs($viewer)
             ->get('/health-safety/risk-assessments?hs_event_id='.$otherEvent->id)
-            ->assertForbidden();
+            // An event outside the viewer's H&S read isn't found (404, as in FirstAidDerivedReportsPrivacyTest).
+            ->assertNotFound();
 
         foreach ([$foreignRisk, $standalone, $mismatched] as $hidden) {
             $this->actingAs($viewer)
@@ -196,7 +197,8 @@ class HsRiskAssessmentSiteAccessTest extends TestCase
             ->assertOk();
         $this->actingAs($manager)
             ->get("/health-safety/risk-assessments/{$foreign->id}/attachments/{$foreignAttachment->id}/download")
-            ->assertForbidden();
+            // A file on another Site's risk isn't found (404); nothing is streamed.
+            ->assertNotFound();
         $this->actingAs($manager)
             ->get("/health-safety/risk-assessments/{$local->id}/attachments/{$foreignAttachment->id}/download")
             ->assertNotFound();
