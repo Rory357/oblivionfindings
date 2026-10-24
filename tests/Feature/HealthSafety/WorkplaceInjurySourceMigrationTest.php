@@ -40,12 +40,13 @@ final class WorkplaceInjurySourceMigrationTest extends WorkplaceInjurySourceTest
 
     public function test_additive_migration_never_backfills_ambiguous_legacy_assessor_carrier(): void
     {
+        // The legacy provenance markers are database defaults, so read the stored rows.
         $injury = WorkplaceInjury::withoutEvents(fn () => WorkplaceInjury::factory()->create([
-            'user_id' => $this->worker->id, 'site_id' => $this->site->id]));
+            'user_id' => $this->worker->id, 'site_id' => $this->site->id]))->refresh();
         $assessment = WorkCapacityAssessment::withoutEvents(fn () => WorkCapacityAssessment::factory()->create([
-            'workplace_injury_id' => $injury->id, 'user_id' => $this->manager->id]));
+            'workplace_injury_id' => $injury->id, 'user_id' => $this->manager->id]))->refresh();
         $plan = ReturnToWorkPlan::withoutEvents(fn () => ReturnToWorkPlan::factory()->create([
-            'workplace_injury_id' => $injury->id, 'worker_id' => $this->worker->id]));
+            'workplace_injury_id' => $injury->id, 'worker_id' => $this->worker->id]))->refresh();
         $this->assertSame(0, $injury->source_schema_version);
         $this->assertSame(0, $assessment->source_revision);
         $this->assertSame('legacy_unknown', $assessment->attribution_state);

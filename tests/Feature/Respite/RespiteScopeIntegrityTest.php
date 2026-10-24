@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use LogicException;
 use RuntimeException;
 use Tests\TestCase;
@@ -266,7 +267,7 @@ class RespiteScopeIntegrityTest extends TestCase
         $foreignPlan = $this->currentPlan($foreignResident);
 
         $this->actingAs($this->coordinator)
-            ->post(route('health-safety.restraints.events.store'), $this->restraintPayload([
+            ->post(route('health-safety.restraints.events.store'), $this->canonicalRestraintPayload([
                 'client_id' => $otherResident->id,
                 'site_id' => $this->site->id,
                 'stay_id' => $stay->id,
@@ -274,7 +275,7 @@ class RespiteScopeIntegrityTest extends TestCase
             ->assertNotFound();
 
         $this->actingAs($this->coordinator)
-            ->post(route('health-safety.restraints.events.store'), $this->restraintPayload([
+            ->post(route('health-safety.restraints.events.store'), $this->canonicalRestraintPayload([
                 'client_id' => $resident->id,
                 'site_id' => $this->site->id,
                 'stay_id' => $stay->id,
@@ -283,7 +284,7 @@ class RespiteScopeIntegrityTest extends TestCase
             ->assertNotFound();
 
         $this->actingAs($this->coordinator)
-            ->post(route('health-safety.restraints.events.store'), $this->restraintPayload([
+            ->post(route('health-safety.restraints.events.store'), $this->canonicalRestraintPayload([
                 'client_id' => $resident->id,
                 'site_id' => $this->site->id,
                 'stay_id' => $foreignStay->id,
@@ -1025,5 +1026,16 @@ class RespiteScopeIntegrityTest extends TestCase
             'within_support_plan' => true,
             ...$overrides,
         ];
+    }
+
+    /** The H&S restraint register takes a source command: a key and offset-bearing instants. */
+    private function canonicalRestraintPayload(array $overrides = []): array
+    {
+        return $this->restraintPayload([
+            'idempotency_key' => (string) Str::uuid(),
+            'started_at' => now()->subHour()->timezone('Pacific/Auckland')->toIso8601String(),
+            'ended_at' => now()->subMinutes(45)->timezone('Pacific/Auckland')->toIso8601String(),
+            ...$overrides,
+        ]);
     }
 }
