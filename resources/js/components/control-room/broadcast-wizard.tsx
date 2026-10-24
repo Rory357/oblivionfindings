@@ -78,6 +78,31 @@ export function channelList(channels: string[]): string {
 }
 
 /**
+ * Why a send wasn't delivered or was skipped, in plain words. Keys come from
+ * the server (ControlRoomBroadcastController::reasonKey); "other" shows the
+ * recorded message as it is.
+ */
+export const BROADCAST_REASON_LABELS: Record<string, string> = {
+    no_phone: 'No mobile number on their record',
+    no_email: 'No email address on their record',
+    no_device: 'No phone set up for push notifications',
+    sms_not_set_up: "SMS isn't set up",
+    push_not_set_up: "Push notifications aren't set up",
+    turned_off: 'They turned this channel off for broadcasts',
+    not_eligible: 'No longer in the audience',
+};
+
+export function broadcastReasonWords(
+    reason: string | null | undefined,
+    detail: string | null | undefined,
+): string | null {
+    if (reason && reason !== 'other' && BROADCAST_REASON_LABELS[reason]) {
+        return BROADCAST_REASON_LABELS[reason];
+    }
+    return detail?.trim() || null;
+}
+
+/**
  * A broadcast's delivery as recorded. "Delivered" means the channel confirmed
  * it — never that it was read or acknowledged, which are separate outcomes.
  */
@@ -295,7 +320,7 @@ export function BroadcastWizard({
                     submitted ? (
                         <WizardSuccessPane
                             title="Broadcast is being sent"
-                            blurb={`Going to ${estimatedRecipients} ${estimatedRecipients === 1 ? 'person' : 'people'} by ${channelNames}. It's now in the broadcast list, with what was delivered to each person.`}
+                            blurb={`Going to ${estimatedRecipients} ${estimatedRecipients === 1 ? 'person' : 'people'} by ${channelNames}. It's now in the broadcast list, with what was delivered to each person and who has read it in the app.`}
                             actions={
                                 <>
                                     <Button variant="outline" onClick={reset}>

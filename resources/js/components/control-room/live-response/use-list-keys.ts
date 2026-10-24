@@ -3,7 +3,8 @@ import { useEffect, useRef } from 'react';
 /** Typing, a pop-up or an open menu owns the keyboard; the list keeps out. */
 function keyboardIsBusy(event: KeyboardEvent): boolean {
     if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return true;
-    const target = event.target as HTMLElement | null;
+    // Keys sent to the window itself have no element to check.
+    const target = event.target instanceof Element ? event.target : null;
     if (
         target?.closest(
             'input, textarea, select, [contenteditable="true"], [role="combobox"], [role="listbox"]',
@@ -39,7 +40,10 @@ export function useListKeys({
     onAcknowledge?: (id: number) => boolean | void;
 }) {
     const latest = useRef({ ids, selectedId, onSelect, onOpen, onAcknowledge });
-    latest.current = { ids, selectedId, onSelect, onOpen, onAcknowledge };
+    // Keep the newest list and handlers for the one window listener below.
+    useEffect(() => {
+        latest.current = { ids, selectedId, onSelect, onOpen, onAcknowledge };
+    });
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {

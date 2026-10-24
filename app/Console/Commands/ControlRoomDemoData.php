@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\Notifications\DeliverBroadcastCommunicationJob;
 use App\Models\Client;
 use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\BroadcastIntent;
 use App\Models\ControlRoom\Communication;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoom\SignalSource;
@@ -12,6 +14,8 @@ use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use App\Models\User;
+use App\Notifications\ControlRoom\BroadcastRecipientNotice;
+use App\Services\ControlRoom\BroadcastRecipientLedger;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -68,10 +72,28 @@ final class ControlRoomDemoData extends Command
             $alertIds = ControlRoomAlert::query()->where('reference_number', 'like', self::REF_PREFIX.'%')->pluck('id');
 
             $count += AlertSla::query()->whereIn('alert_id', $alertIds)->delete();
+
+            // Example broadcasts: their inbox copies and their ledger entries.
+            $demoMessages = Communication::query()
+                ->where('template_used', self::MESSAGE_TAG)
+                ->get(['id', 'broadcast_group_id', 'broadcast_outcome']);
+            $noticeIds = $demoMessages
+                ->map(fn (Communication $row) => is_array($row->broadcast_outcome)
+                    ? ($row->broadcast_outcome['recipient_notification_id'] ?? null)
+                    : null)
+                ->filter()
+                ->values();
+            $count += DB::table('notifications')
+                ->where('type', BroadcastRecipientNotice::class)
+                ->whereIn('id', $noticeIds)
+                ->delete();
+            $groupIds = $demoMessages->pluck('broadcast_group_id')->filter()->unique()->values();
+
             $count += Communication::query()
                 ->where('template_used', self::MESSAGE_TAG)
                 ->orWhereIn('alert_id', $alertIds)
                 ->delete();
+            $count += BroadcastIntent::query()->whereIn('id', $groupIds)->delete();
             $count += ControlRoomAlert::query()->whereIn('id', $alertIds)->delete();
             $count += Device::withTrashed()->where('device_uid', 'like', self::CODE_PREFIX.'%')->forceDelete();
             $count += TriageQueue::query()->where('code', 'like', self::CODE_PREFIX.'%')->delete();
@@ -274,45 +296,89 @@ final class ControlRoomDemoData extends Command
         $device('Front door contact', 'door', 'Aurora House', $now->copy()->subMinutes(4), 2);
         $device('Hemi’s SOS pendant', 'tracker', 'Aurora House', $now->copy()->subMinutes(1), 1);
         $device('Kitchen smoke detector', 'alarm_panel', 'Tōtara House', $now->copy()->subMinutes(18), 2);
-        $device('Hallway motion sensor', 'sensor', 'Tōtara House', $now->copy()->subHours(3), 2);
+        // Over 24 hours with nothing: Coverage reads it as Quiet.
+        $device('Hallway motion sensor', 'sensor', 'Tōtara House', $now->copy()->subHours(30), 2);
         $device('Community van tracker', 'tracker', 'Kōwhai Lodge', $now->copy()->subMinutes(6), 1);
         $device('Back gate contact', 'door', 'Kōwhai Lodge', null, 2);
 
-        // Broadcasts (one urgent message to many staff) with delivery outcomes.
-        $recipients = $staff->take(5);
-        $broadcast = function (string $content, Carbon $sentAt, array $outcomes) use (&$count, $recipients, $owner): void {
+        // Broadcasts (one urgent message to many staff), sent through the real
+        // path: the intent ledger and the real in-app delivery, so each in-app
+        // recipient gets a proper inbox copy. Texts are only marked
+        // delivered/failed here — nothing is actually sent.
+        $actor = $staff->first() ? User::query()->find($staff->first()->id) : null;
+        $broadcast = function (string $content, Carbon $sentAt, array $smsOutcomes, int $readers) use (&$count, $staff, $actor): void {
+            if (! $actor) {
+                return;
+            }
             $group = (string) Str::uuid();
-            foreach ($recipients->values() as $index => $recipient) {
+            $targets = User::query()
+                ->whereIn('id', $staff->take(5)->pluck('id'))
+                ->orderBy('id')
+                ->get(['id', 'name', 'email', 'cellphone', 'work_phone']);
+            foreach ($targets as $index => $target) {
                 foreach (['in_app', 'sms'] as $channel) {
-                    $status = $outcomes[$channel][$index % count($outcomes[$channel])];
                     Communication::create([
                         'broadcast_group_id' => $group,
                         'channel' => $channel,
                         'direction' => 'outbound',
                         'purpose' => 'broadcast',
-                        'target_user_id' => $recipient->id,
+                        'target_user_id' => $target->id,
                         'target_phone' => $channel === 'sms' ? '+64 21 000 0'.str_pad((string) $index, 3, '0', STR_PAD_LEFT) : null,
                         'content' => $content,
                         'template_used' => self::MESSAGE_TAG,
-                        'status' => $status,
-                        'status_detail' => $status === 'failed' ? 'Number not reachable' : null,
+                        'status' => 'pending',
+                        'force_delivery' => false,
                         'sent_at' => $sentAt,
-                        'delivered_at' => $status === 'delivered' ? $sentAt->copy()->addSeconds(20 + $index) : null,
-                        'initiated_by_user_id' => $owner(0),
+                        'initiated_by_user_id' => $actor->id,
                     ]);
                     $count++;
                 }
+            }
+            app(BroadcastRecipientLedger::class)->record($actor, $group, [
+                'content' => $content,
+                'channels' => ['in_app', 'sms'],
+                'target_roles' => [],
+                'send_to_all' => true,
+                'template' => null,
+                'force_delivery' => false,
+            ], $targets, $sentAt);
+            $count++;
+
+            $rows = Communication::query()->where('broadcast_group_id', $group)->orderBy('id')->get();
+            foreach ($rows->where('channel', 'in_app')->values() as $index => $row) {
+                DeliverBroadcastCommunicationJob::dispatchSync((int) $row->id);
+                $row->refresh();
+                if ($row->status !== 'delivered') {
+                    continue;
+                }
+                $row->forceFill(['delivered_at' => $sentAt->copy()->addSeconds(15 + $index)])->save();
+                $noticeId = is_array($row->broadcast_outcome) ? ($row->broadcast_outcome['recipient_notification_id'] ?? null) : null;
+                if ($noticeId && $index < $readers) {
+                    DB::table('notifications')->where('id', $noticeId)->update([
+                        'read_at' => $sentAt->copy()->addMinutes(2 + $index * 3),
+                    ]);
+                }
+            }
+            foreach ($rows->where('channel', 'sms')->values() as $index => $row) {
+                $status = $smsOutcomes[$index % count($smsOutcomes)];
+                $row->forceFill([
+                    'status' => $status,
+                    'status_detail' => $status === 'failed' ? 'Number not reachable' : null,
+                    'delivered_at' => $status === 'delivered' ? $sentAt->copy()->addSeconds(30 + $index) : null,
+                ])->save();
             }
         };
         $broadcast(
             'Power cut at Aurora House. Generator is on — check medication fridges and call in when done.',
             $now->copy()->subMinutes(40),
-            ['in_app' => ['delivered'], 'sms' => ['delivered', 'delivered', 'failed', 'delivered', 'sent']],
+            ['delivered', 'delivered', 'failed', 'delivered', 'sent'],
+            3,
         );
         $broadcast(
             'Heavy rain warning for Raglan this afternoon. Outings to the coast are cancelled.',
             $now->copy()->subHours(6),
-            ['in_app' => ['delivered'], 'sms' => ['delivered']],
+            ['delivered'],
+            5,
         );
 
         // A response conversation about the safe-zone alert.

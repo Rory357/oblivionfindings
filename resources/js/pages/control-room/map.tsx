@@ -9,6 +9,7 @@ import {
     type ControlRoomRowAction,
 } from '@/components/control-room/control-room-row-actions';
 import { applyLiveResponseFilters } from '@/components/control-room/live-response/live-response-filters';
+import { longDuration, useNow } from '@/components/control-room/live-response/response-clock';
 import {
     PageHeaderFilterCheck,
     PageHeaderFilterSelect,
@@ -142,6 +143,36 @@ function isRecentlySeen(lastSeen: string | null, minutes: number = 5): boolean {
     return diff < minutes * 60 * 1000;
 }
 
+/** A position older than this is "old": shown faded, never as live. */
+export const OLD_POSITION_HOURS = 24;
+
+/**
+ * How old a reported position is, in words ("last seen 3 days ago"). A
+ * position with no time can't be shown as current either, so it counts as old.
+ */
+export function positionAge(
+    lastSeen: string | null,
+    now: number = Date.now(),
+): { old: boolean; words: string } {
+    const ms = lastSeen ? now - new Date(lastSeen).getTime() : NaN;
+    if (!Number.isFinite(ms)) return { old: true, words: 'time not recorded' };
+    return {
+        old: ms > OLD_POSITION_HOURS * 60 * 60 * 1000,
+        words: ms < 60_000 ? 'last seen just now' : `last seen ${longDuration(ms)} ago`,
+    };
+}
+
+/**
+ * The one sentence said under an old position, in the list and the popup
+ * (the "Old position" badge sits beside it, so the words don't repeat it).
+ */
+export function oldPositionWords(lastSeen: string | null, now: number = Date.now()): string {
+    const age = positionAge(lastSeen, now);
+    return age.words === 'time not recorded'
+        ? 'The time of this position wasn’t recorded, so it may not be where it is now.'
+        : `${age.words.charAt(0).toUpperCase()}${age.words.slice(1)}, so it may not be where it is now.`;
+}
+
 export function escapeMapHtml(value: unknown): string {
     return String(value ?? '').replace(/[&<>"']/g, (character) => {
         const entities: Record<string, string> = {
@@ -156,12 +187,21 @@ export function escapeMapHtml(value: unknown): string {
     });
 }
 
-export function mapDeviceActivityLabel(device: {
-    status: string;
-    last_seen_at: string | null;
-}): string {
+/**
+ * The tracker's state in words. A tracker that is online but whose position
+ * is old reads "Old position", never "Reporting": an old position must not
+ * look live.
+ */
+export function mapDeviceActivityLabel(
+    device: {
+        status: string;
+        last_seen_at: string | null;
+    },
+    now: number = Date.now(),
+): string {
     if (device.status === 'offline') return 'Offline';
     if (device.status === 'unknown') return 'Status unknown';
+    if (positionAge(device.last_seen_at, now).old) return 'Old position';
 
     return isRecentlySeen(device.last_seen_at, 5)
         ? 'Recently updated'
@@ -171,6 +211,7 @@ export function mapDeviceActivityLabel(device: {
 const ACTIVITY_TONE: Record<string, StatusVariant> = {
     Offline: 'critical',
     'Status unknown': 'neutral',
+    'Old position': 'warning',
     'Recently updated': 'info',
     Reporting: 'success',
 };
@@ -178,20 +219,29 @@ const ACTIVITY_TONE: Record<string, StatusVariant> = {
 /**
  * One colour per marker meaning, all from tokens so Settings › Branding and
  * dark mode follow (MAP_GEOFENCING_STYLE_GUIDE.md: greyscale tiles, coloured
- * overlays). Offline wins over the tracker type, as the legend says.
+ * overlays). Offline wins over the tracker type, as the legend says. An old
+ * fleet position is never green or blue (those mean it is reporting), and
+ * every old position is drawn faded with a dashed outline.
  */
-function deviceTone(device: MapDevice): { css: string; dot: string } {
+function deviceTone(device: MapDevice): { css: string; dot: string; edge: string } {
     if (device.status === 'offline')
-        return { css: 'var(--status-critical)', dot: 'bg-status-critical' };
+        return { css: 'var(--status-critical)', dot: 'bg-status-critical', edge: 'border-status-critical' };
     if (device.type === 'personal_tracker')
-        return { css: 'var(--category-hr)', dot: 'bg-category-hr' };
+        return { css: 'var(--category-hr)', dot: 'bg-category-hr', edge: 'border-category-hr' };
     if (device.type === 'asset_tracker')
-        return { css: 'var(--category-fleet)', dot: 'bg-category-fleet' };
-    if (device.status === 'unknown')
-        return { css: 'var(--muted-foreground)', dot: 'bg-muted-foreground' };
+        return { css: 'var(--category-fleet)', dot: 'bg-category-fleet', edge: 'border-category-fleet' };
+    if (device.status === 'unknown' || positionAge(device.last_seen_at).old)
+        return { css: 'var(--muted-foreground)', dot: 'bg-muted-foreground', edge: 'border-muted-foreground' };
     if (isRecentlySeen(device.last_seen_at, 5))
-        return { css: 'var(--status-info)', dot: 'bg-status-info' };
-    return { css: 'var(--status-success)', dot: 'bg-status-success' };
+        return { css: 'var(--status-info)', dot: 'bg-status-info', edge: 'border-status-info' };
+    return { css: 'var(--status-success)', dot: 'bg-status-success', edge: 'border-status-success' };
+}
+
+/** The marker's inline style: solid when current, faded + dashed when old. */
+export function deviceMarkerStyle(tone: { css: string }, old: boolean): string {
+    return old
+        ? `width:22px;height:22px;border-radius:50%;background:color-mix(in oklab, ${tone.css} 35%, var(--card));border:2.5px dashed ${tone.css};opacity:0.75`
+        : `width:22px;height:22px;border-radius:50%;background:${tone.css};border:2.5px solid var(--card);${MARKER_SHADOW}`;
 }
 
 const LEGEND: ReadonlyArray<{ label: string; swatch: string }> = [
@@ -199,6 +249,10 @@ const LEGEND: ReadonlyArray<{ label: string; swatch: string }> = [
     { label: 'Fleet tracker — recently updated', swatch: 'rounded-full bg-status-info' },
     { label: 'Fleet tracker — status unknown', swatch: 'rounded-full bg-muted-foreground' },
     { label: 'Tracker — offline', swatch: 'rounded-full bg-status-critical' },
+    {
+        label: `Old position — over ${OLD_POSITION_HOURS} hours, faded`,
+        swatch: 'rounded-full border-2 border-dashed border-muted-foreground bg-muted opacity-75',
+    },
     { label: 'Personal safety tracker', swatch: 'rounded-full bg-category-hr' },
     { label: 'Asset tracker', swatch: 'rounded-full bg-category-fleet' },
     { label: 'Site', swatch: 'rounded-full bg-category-sites' },
@@ -450,13 +504,15 @@ export default function ControlRoomMap({
 
             // ── Tracker markers ──────────────────────────────────────────────
 
+            const now = Date.now();
             devices.forEach((device) => {
                 const tone = deviceTone(device);
-                const label = mapDeviceActivityLabel(device);
+                const label = mapDeviceActivityLabel(device, now);
+                const age = positionAge(device.last_seen_at, now);
 
                 const deviceIcon = L.divIcon({
                     className: '',
-                    html: `<div style="width:22px;height:22px;border-radius:50%;background:${tone.css};border:2.5px solid var(--card);${MARKER_SHADOW}"></div>`,
+                    html: `<div data-old-position="${age.old ? 'true' : 'false'}" style="${deviceMarkerStyle(tone, age.old)}"></div>`,
                     iconSize: [22, 22],
                     iconAnchor: [11, 11],
                     popupAnchor: [0, -14],
@@ -468,10 +524,14 @@ export default function ControlRoomMap({
                     `<div class="min-w-[190px] text-sm">` +
                     `<strong class="font-semibold">${escapeMapHtml(device.context_label || deviceName)}</strong>` +
                     (site ? popupLine(site) : '') +
-                    popupLine(`${label} · ${device.type_label}`) +
-                    (device.last_seen_at
-                        ? popupLine(`Last reported ${formatRelative(device.last_seen_at)}`)
-                        : '') +
+                    popupLine(
+                        [label, age.old && label !== 'Old position' ? 'Old position' : null, device.type_label]
+                            .filter(Boolean)
+                            .join(' · '),
+                    ) +
+                    (age.old
+                        ? `<span class="block font-semibold text-status-warning">${escapeMapHtml(oldPositionWords(device.last_seen_at, now))}</span>`
+                        : popupLine(age.words.charAt(0).toUpperCase() + age.words.slice(1))) +
                     (device.battery_level !== null
                         ? popupLine(`Battery ${device.battery_level}%`)
                         : '') +
@@ -486,7 +546,9 @@ export default function ControlRoomMap({
 
                 const marker = L.marker([device.latitude, device.longitude], {
                     icon: deviceIcon,
-                    title: device.name || device.device_uid || 'Tracker',
+                    title: `${device.name || device.device_uid || 'Tracker'}${age.old ? ' (old position)' : ''}`,
+                    // An old position sits under the current ones.
+                    zIndexOffset: age.old ? -100 : 0,
                 })
                     .bindPopup(popupContent, { className: POPUP_CLASS })
                     .on('click', () => setSelectedId(device.id))
@@ -501,6 +563,8 @@ export default function ControlRoomMap({
             alerts
                 .filter((a) => a.latitude !== null && a.longitude !== null)
                 .forEach((alert) => {
+                    const tracker = devices.find((device) => device.id === alert.device_id);
+                    const trackerAge = tracker ? positionAge(tracker.last_seen_at, now) : null;
                     const alertIcon = L.divIcon({
                         className: '',
                         html:
@@ -520,6 +584,9 @@ export default function ControlRoomMap({
                             `${severityBadge(alert.severity).label} · ${statusBadge(alert.status).label}`,
                         ) +
                         popupLine(`Raised ${formatRelative(alert.triggered_at)}`) +
+                        (trackerAge?.old
+                            ? `<span class="block font-semibold text-status-warning">${escapeMapHtml(`Old tracker position. ${oldPositionWords(tracker!.last_seen_at, now)}`)}</span>`
+                            : '') +
                         popupLink(alert.detail_url, 'Open alert') +
                         `</div>`;
 
@@ -577,6 +644,8 @@ export default function ControlRoomMap({
     const siteQuery = { site_id: filters.site_id };
     const updated = `Updated ${formatTime(lastRefreshed)}`;
     const restricted = stats.location_restricted;
+    const now = useNow(30_000);
+    const oldCount = devices.filter((device) => positionAge(device.last_seen_at, now).old).length;
 
     return (
         <ControlRoomPage
@@ -712,6 +781,9 @@ export default function ControlRoomMap({
                     {restricted > 0
                         ? ` ${restricted} ${restricted === 1 ? 'tracker has' : 'trackers have'} no position shown here because their location rules don't allow it.`
                         : ''}
+                    {oldCount > 0
+                        ? ` ${oldCount} ${oldCount === 1 ? 'position is' : 'positions are'} over ${OLD_POSITION_HOURS} hours old and ${oldCount === 1 ? 'is' : 'are'} drawn faded on the map.`
+                        : ''}
                 </p>
             </PopupCallout>
 
@@ -745,6 +817,7 @@ export default function ControlRoomMap({
                                     site={siteName(device.site_id)}
                                     alert={alertFor(device)}
                                     selected={device.id === selectedId}
+                                    now={now}
                                     onFocus={() => focusDevice(device)}
                                 />
                             ))}
@@ -793,15 +866,19 @@ function PositionRow({
     site,
     alert,
     selected,
+    now,
     onFocus,
 }: {
     device: MapDevice;
     site: string | null;
     alert: MapAlert | null;
     selected: boolean;
+    now: number;
     onFocus: () => void;
 }) {
-    const label = mapDeviceActivityLabel(device);
+    const label = mapDeviceActivityLabel(device, now);
+    const age = positionAge(device.last_seen_at, now);
+    const tone = deviceTone(device);
     const deviceName = device.name || device.device_uid || 'Tracker';
     // Who or what it is about first; the tracker itself goes small.
     const name = device.context_label || deviceName;
@@ -836,7 +913,10 @@ function PositionRow({
                 >
                     <span
                         aria-hidden="true"
-                        className={cn('mt-1.5 size-2.5 shrink-0 rounded-full', deviceTone(device).dot)}
+                        className={cn(
+                            'mt-1.5 size-2.5 shrink-0 rounded-full',
+                            age.old ? cn('border-2 border-dashed opacity-75', tone.edge) : tone.dot,
+                        )}
                     />
                     <Button
                         unstyled
@@ -847,12 +927,12 @@ function PositionRow({
                     >
                         <span className="flex items-start justify-between gap-3">
                             <span className="min-w-0 font-semibold text-foreground">{name}</span>
-                            {device.last_seen_at ? (
+                            {device.last_seen_at && !age.old ? (
                                 <span
-                                    className="text-caption shrink-0 tabular-nums"
+                                    className="text-caption shrink-0"
                                     title={formatDateTime(device.last_seen_at)}
                                 >
-                                    {formatRelative(device.last_seen_at)}
+                                    {age.words}
                                 </span>
                             ) : null}
                         </span>
@@ -861,6 +941,11 @@ function PositionRow({
                             <StatusBadge variant={ACTIVITY_TONE[label] ?? 'neutral'} size="sm">
                                 {label}
                             </StatusBadge>
+                            {age.old && label !== 'Old position' ? (
+                                <StatusBadge variant="warning" size="sm">
+                                    Old position
+                                </StatusBadge>
+                            ) : null}
                             {alert ? (
                                 <StatusBadge variant="critical" size="sm">
                                     Active alert
@@ -872,6 +957,14 @@ function PositionRow({
                                 </StatusBadge>
                             ) : null}
                         </span>
+                        {age.old ? (
+                            <span
+                                className="mt-1 block text-sm text-status-warning-foreground"
+                                title={device.last_seen_at ? formatDateTime(device.last_seen_at) : undefined}
+                            >
+                                {oldPositionWords(device.last_seen_at, now)}
+                            </span>
+                        ) : null}
                         <span className="text-caption mt-1 block">
                             {[device.context_label ? deviceName : null, device.type_label]
                                 .filter(Boolean)

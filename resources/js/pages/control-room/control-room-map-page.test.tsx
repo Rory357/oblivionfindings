@@ -94,6 +94,10 @@ afterEach(() => {
     leaflet.markers.length = 0;
 });
 
+function minutesAgo(minutes: number): string {
+    return new Date(Date.now() - minutes * 60_000).toISOString();
+}
+
 function props(
     overrides: Partial<ComponentProps<typeof ControlRoomMap>> = {},
 ): ComponentProps<typeof ControlRoomMap> {
@@ -110,7 +114,8 @@ function props(
                 latitude: -36.85,
                 longitude: 174.76,
                 battery_level: 15,
-                last_seen_at: '2026-10-24T08:00:00Z',
+                // Relative to the real clock so the fixture never goes old.
+                last_seen_at: minutesAgo(10),
                 position_source: 'canonical_device',
                 context_label: 'Hemi Walker',
                 manufacturer: null,
@@ -201,6 +206,64 @@ describe('Monitoring › Map', () => {
 
         fireEvent.click(row);
         expect(leaflet.instance.setView).toHaveBeenCalledWith([-36.85, 174.76], 16);
+        expect(within(row).getByText('last seen 10 min ago')).toBeInTheDocument();
+        expect(within(row).queryByText('Old position')).not.toBeInTheDocument();
+    });
+
+    it('marks a position over 24 hours old in words, with a badge, and draws it faded', async () => {
+        const base = props().devices[0];
+        render(
+            <ControlRoomMap
+                {...props({
+                    devices: [
+                        { ...base, last_seen_at: minutesAgo(3 * 24 * 60 + 5) },
+                        {
+                            ...base,
+                            id: 5,
+                            device_uid: 'HIACE-1',
+                            name: 'Hiace tracker',
+                            type: 'vehicle_tracker',
+                            type_label: 'Fleet tracker',
+                            context_label: 'Hiace ZX1234',
+                            battery_level: null,
+                            last_seen_at: minutesAgo(2),
+                        },
+                    ],
+                })}
+            />,
+        );
+
+        await waitFor(() => expect(leaflet.marker).toHaveBeenCalled());
+
+        const old = screen.getByRole('button', { name: /^Hemi Walker/ });
+        expect(within(old).getByText('Old position')).toBeInTheDocument();
+        // Online but old: never "Reporting", and the age is said once, in words.
+        expect(within(old).queryByText('Reporting')).not.toBeInTheDocument();
+        expect(
+            within(old).getByText('Last seen 3 days ago, so it may not be where it is now.'),
+        ).toBeInTheDocument();
+        expect(within(old).queryByText('last seen 3 days ago')).not.toBeInTheDocument();
+
+        const current = screen.getByRole('button', { name: /^Hiace ZX1234/ });
+        expect(within(current).queryByText('Old position')).not.toBeInTheDocument();
+        expect(within(current).getByText('Recently updated')).toBeInTheDocument();
+
+        expect(screen.getByText(/1 position is over 24 hours old/)).toBeInTheDocument();
+        expect(
+            within(screen.getByRole('list', { name: 'Map legend' })).getByText(
+                'Old position — over 24 hours, faded',
+            ),
+        ).toBeInTheDocument();
+
+        const icons = leaflet.divIcon.mock.calls.map(
+            (call) => (call as unknown as [{ html: string }])[0].html,
+        );
+        expect(icons.some((html) => html.includes('data-old-position="true"') && html.includes('dashed'))).toBe(true);
+        expect(icons.some((html) => html.includes('data-old-position="false"'))).toBe(true);
+        const popups = leaflet.markers.map((marker) => marker.popup).join('\n');
+        expect(popups).toContain('Last seen 3 days ago, so it may not be where it is now.');
+        // The alert raised from that tracker says its position is old too.
+        expect(popups).toContain('Old tracker position.');
     });
 
     it('escapes every value in the popups and uses plain words', async () => {

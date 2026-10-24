@@ -41,6 +41,9 @@ interface BroadcastGroup {
     total_recipients: number;
     delivered_count: number;
     failed_count: number;
+    /** People who marked the in-app copy read, of those sent it in-app with tracking. */
+    read_count: number;
+    read_of: number;
     initiated_by: BroadcastInitiator | null;
 }
 
@@ -75,8 +78,9 @@ const BASE_PATH = '/control-room/broadcast';
 
 /**
  * Communications › Broadcasts — urgent messages sent to staff, newest first,
- * with what each channel confirmed. "New broadcast" opens the four-step
- * wizard with its review step.
+ * with what each channel confirmed and how many have read it in the app.
+ * "New broadcast" opens the four-step wizard with its review step.
+ * Acknowledgement isn't recorded for broadcasts, so there is no column for it.
  */
 export default function ControlRoomBroadcast({
     broadcasts,
@@ -113,8 +117,8 @@ export default function ControlRoomBroadcast({
                     <div className="min-w-0">
                         <h2 className="text-section-title">Broadcasts</h2>
                         <p className="text-subtle mt-0.5">
-                            Delivered means the channel confirmed it. It doesn&apos;t
-                            mean the person has read it.
+                            Delivered means the channel confirmed it. Read means the
+                            person opened it, or marked it read, in the app.
                         </p>
                     </div>
                     <StatusBadge variant="neutral" className="tabular-nums">
@@ -139,9 +143,8 @@ export default function ControlRoomBroadcast({
                                 <TableHead className="pl-5">Message</TableHead>
                                 <TableHead>Audience</TableHead>
                                 <TableHead>Sent</TableHead>
-                                <TableHead className="text-right">Delivered</TableHead>
-                                <TableHead className="text-right">Not delivered</TableHead>
                                 <TableHead>Delivery</TableHead>
+                                <TableHead>Read</TableHead>
                                 <TableHead className="w-12 pr-5">
                                     <span className="sr-only">Actions</span>
                                 </TableHead>
@@ -267,26 +270,48 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastGroup }) {
                             </>
                         ) : null}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                        {broadcast.delivered_count} of {total}
+                    <TableCell className="whitespace-normal">
+                        <span className="grid gap-0.5">
+                            <StatusBadge
+                                variant={state.tone}
+                                size="sm"
+                                className="justify-self-start"
+                            >
+                                {state.label}
+                            </StatusBadge>
+                            <span className="text-caption tabular-nums">
+                                {broadcast.delivered_count} of {total} delivered
+                                {broadcast.failed_count > 0 ? (
+                                    <span className="font-semibold text-status-critical">
+                                        {' '}
+                                        · {broadcast.failed_count} not delivered
+                                    </span>
+                                ) : null}
+                            </span>
+                        </span>
                     </TableCell>
-                    <TableCell
-                        className={
-                            broadcast.failed_count > 0
-                                ? 'text-right font-semibold text-status-critical tabular-nums'
-                                : 'text-right text-muted-foreground tabular-nums'
-                        }
-                    >
-                        {broadcast.failed_count}
-                    </TableCell>
-                    <TableCell>
-                        <StatusBadge variant={state.tone} size="sm">
-                            {state.label}
-                        </StatusBadge>
+                    <TableCell className="whitespace-nowrap">
+                        <ReadCell broadcast={broadcast} />
                     </TableCell>
                     <TableCell className="pr-5 text-right">{overflowButton}</TableCell>
                 </TableRow>
             )}
         </ControlRoomRowActions>
+    );
+}
+
+/** "11 of 18" people read the in-app copy; older broadcasts kept no read record. */
+function ReadCell({ broadcast }: { broadcast: BroadcastGroup }) {
+    if (broadcast.read_of > 0) {
+        return (
+            <span className="tabular-nums">
+                {broadcast.read_count} of {broadcast.read_of}
+            </span>
+        );
+    }
+    return (
+        <span className="text-caption">
+            {broadcast.channels.includes('in_app') ? 'Not recorded' : 'Not sent in-app'}
+        </span>
     );
 }

@@ -3,6 +3,7 @@ import {
     ControlRoomRowActions,
     type ControlRoomRowAction,
 } from '@/components/control-room/control-room-row-actions';
+import type { RuleGroup } from '@/components/control-room/settings/settings-filters';
 import {
     OPTION_GROUPS,
     type ConfigOption,
@@ -13,6 +14,7 @@ import {
     type SignalSourceOption,
     type TriageQueueData,
 } from '@/components/control-room/settings/types';
+import { longDuration } from '@/components/control-room/live-response/response-clock';
 import { PopupCallout } from '@/components/popup';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,11 +29,13 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { formatDateTime } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
     Activity,
     CalendarX,
+    Filter,
     Inbox,
     ListChecks,
     Pencil,
@@ -55,6 +59,7 @@ function SettingsCard({
     title,
     caption,
     count,
+    total,
     action,
     children,
 }: {
@@ -62,6 +67,8 @@ function SettingsCard({
     title: string;
     caption: string;
     count?: number;
+    /** When the header filters narrow the list: "Showing 4 of 53". */
+    total?: number;
     action?: ReactNode;
     children: ReactNode;
 }) {
@@ -80,7 +87,9 @@ function SettingsCard({
                 <div className="flex items-center gap-2">
                     {count !== undefined ? (
                         <StatusBadge variant="neutral" className="tabular-nums">
-                            {count}
+                            {total !== undefined && total !== count
+                                ? `Showing ${count} of ${total}`
+                                : count}
                         </StatusBadge>
                     ) : null}
                     {action}
@@ -139,20 +148,45 @@ function RowMenu({
     );
 }
 
+/** The one message when header filters leave a list empty, with a way back. */
+function NoMatches({ what, onClear }: { what: string; onClear: () => void }) {
+    return (
+        <div className="px-5 py-10">
+            <EmptyState
+                icon={Filter}
+                title={`No ${what} match these filters`}
+                description="Change the search or filters to see the others."
+                action={
+                    <Button type="button" variant="outline" onClick={onClear}>
+                        Clear filters
+                    </Button>
+                }
+            />
+        </div>
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Routing                                                            */
 /* ------------------------------------------------------------------ */
 
+const ROUTING_COLUMNS = 7;
+
 export function RoutingView({
-    rules,
+    groups,
+    total,
     onEdit,
     onDelete,
     onTurnOff,
+    onClearFilters,
 }: {
-    rules: SignalRuleData[];
+    /** The rules left by the header search and filters, under their area headings. */
+    groups: RuleGroup[];
+    total: number;
     onEdit: (rule: SignalRuleData) => void;
     onDelete: (rule: SignalRuleData) => void;
     onTurnOff: (rule: SignalRuleData) => void;
+    onClearFilters: () => void;
 }) {
     const turnOn = (rule: SignalRuleData) =>
         router.put(
@@ -160,14 +194,16 @@ export function RoutingView({
             { ...rule, conditions: (rule.conditions ?? null) as never, is_active: true },
             { preserveScroll: true },
         );
+    const shown = groups.reduce((sum, group) => sum + group.rules.length, 0);
     return (
         <SettingsCard
             icon={RadioTower}
             title="Routing rules"
             caption="How each kind of signal becomes an alert: its severity, level and procedure."
-            count={rules.length}
+            count={shown}
+            total={total}
         >
-            {rules.length === 0 ? (
+            {total === 0 ? (
                 <div className="px-5 py-10">
                     <EmptyState
                         icon={RadioTower}
@@ -175,6 +211,8 @@ export function RoutingView({
                         description="Without a rule, signals use their own severity and the first matching queue."
                     />
                 </div>
+            ) : shown === 0 ? (
+                <NoMatches what="rules" onClear={onClearFilters} />
             ) : (
                 <Table>
                     <TableHeader>
@@ -190,73 +228,91 @@ export function RoutingView({
                             </TableHead>
                         </TableRow>
                     </TableHeader>
-                    <TableBody>
-                        {rules.map((rule) => {
-                            // Severities outside the four levels (e.g. info) read as plain words.
-                            const severity = rule.output_severity
-                                ? SEVERITY_KEYS.has(rule.output_severity)
-                                    ? severityBadge(rule.output_severity)
-                                    : { label: plainLabel(rule.output_severity), tone: 'neutral' as const }
-                                : null;
-                            return (
-                                <RowMenu
-                                    key={rule.id}
-                                    label={`Actions for ${rule.name}`}
-                                    items={[
-                                        { key: 'edit', label: 'Edit rule', icon: Pencil, onSelect: () => onEdit(rule) },
-                                        rule.is_active
-                                            ? { key: 'off', label: 'Turn off', icon: Power, onSelect: () => onTurnOff(rule) }
-                                            : { key: 'on', label: 'Turn on', icon: Power, onSelect: () => turnOn(rule) },
-                                        { key: 'delete', label: 'Delete rule', icon: Trash2, tone: 'critical', onSelect: () => onDelete(rule) },
-                                    ]}
+                    {groups.map((group) => (
+                        <TableBody key={group.area} data-area={group.area}>
+                            <TableRow className="border-t bg-muted/30 hover:bg-muted/30">
+                                <TableHead
+                                    scope="rowgroup"
+                                    colSpan={ROUTING_COLUMNS}
+                                    className="h-9 pl-5"
                                 >
-                                    {({ onContextMenu, menu }) => (
-                                        <TableRow
-                                            onContextMenu={onContextMenu}
-                                            onClick={() => onEdit(rule)}
-                                            className="cursor-pointer"
-                                        >
-                                            <TableCell className="pl-5">
-                                                <p className="font-semibold text-foreground">{rule.name}</p>
-                                                <p className="text-caption">
-                                                    {rule.signal_type_name ?? 'Any signal type'} ·{' '}
-                                                    {rule.signal_source_name ?? 'any source'}
-                                                </p>
-                                            </TableCell>
-                                            <TableCell>
-                                                {severity ? (
-                                                    <StatusBadge variant={severity.tone} size="sm">
-                                                        {severity.label}
-                                                    </StatusBadge>
-                                                ) : (
-                                                    <span className="text-subtle">Keeps the signal&apos;s</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-subtle">
-                                                {rule.playbook_name ?? 'None'}
-                                            </TableCell>
-                                            <TableCell className="text-subtle tabular-nums">
-                                                {rule.deduplicate
-                                                    ? `${rule.dedup_window_minutes ?? 30} min`
-                                                    : 'Off'}
-                                            </TableCell>
-                                            <TableCell className="text-right tabular-nums">{rule.priority}</TableCell>
-                                            <TableCell onClick={(e) => e.stopPropagation()}>
-                                                <OnOff
-                                                    label={`Routing rule ${rule.name} on`}
-                                                    checked={rule.is_active}
-                                                    onChange={(on) => (on ? turnOn(rule) : onTurnOff(rule))}
-                                                />
-                                            </TableCell>
-                                            <TableCell className="pr-3" onClick={(e) => e.stopPropagation()}>
-                                                {menu}
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </RowMenu>
-                            );
-                        })}
-                    </TableBody>
+                                    <span className="inline-flex items-center gap-2">
+                                        <span className="text-sm font-semibold text-foreground">
+                                            {group.label}
+                                        </span>
+                                        <StatusBadge variant="neutral" size="sm" className="tabular-nums">
+                                            {group.rules.length} {group.rules.length === 1 ? 'rule' : 'rules'}
+                                        </StatusBadge>
+                                    </span>
+                                </TableHead>
+                            </TableRow>
+                            {group.rules.map((rule) => {
+                                // Severities outside the four levels (e.g. info) read as plain words.
+                                const severity = rule.output_severity
+                                    ? SEVERITY_KEYS.has(rule.output_severity)
+                                        ? severityBadge(rule.output_severity)
+                                        : { label: plainLabel(rule.output_severity), tone: 'neutral' as const }
+                                    : null;
+                                return (
+                                    <RowMenu
+                                        key={rule.id}
+                                        label={`Actions for ${rule.name}`}
+                                        items={[
+                                            { key: 'edit', label: 'Edit rule', icon: Pencil, onSelect: () => onEdit(rule) },
+                                            rule.is_active
+                                                ? { key: 'off', label: 'Turn off', icon: Power, onSelect: () => onTurnOff(rule) }
+                                                : { key: 'on', label: 'Turn on', icon: Power, onSelect: () => turnOn(rule) },
+                                            { key: 'delete', label: 'Delete rule', icon: Trash2, tone: 'critical', onSelect: () => onDelete(rule) },
+                                        ]}
+                                    >
+                                        {({ onContextMenu, menu }) => (
+                                            <TableRow
+                                                onContextMenu={onContextMenu}
+                                                onClick={() => onEdit(rule)}
+                                                className="cursor-pointer"
+                                            >
+                                                <TableCell className="pl-5">
+                                                    <p className="font-semibold text-foreground">{rule.name}</p>
+                                                    <p className="text-caption">
+                                                        {rule.signal_type_name ?? 'Any signal type'} ·{' '}
+                                                        {rule.signal_source_name ?? 'any source'}
+                                                    </p>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {severity ? (
+                                                        <StatusBadge variant={severity.tone} size="sm">
+                                                            {severity.label}
+                                                        </StatusBadge>
+                                                    ) : (
+                                                        <span className="text-subtle">Keeps the signal&apos;s</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-subtle">
+                                                    {rule.playbook_name ?? 'None'}
+                                                </TableCell>
+                                                <TableCell className="text-subtle tabular-nums">
+                                                    {rule.deduplicate
+                                                        ? `${rule.dedup_window_minutes ?? 30} min`
+                                                        : 'Off'}
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">{rule.priority}</TableCell>
+                                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                                    <OnOff
+                                                        label={`Routing rule ${rule.name} on`}
+                                                        checked={rule.is_active}
+                                                        onChange={(on) => (on ? turnOn(rule) : onTurnOff(rule))}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="pr-3" onClick={(e) => e.stopPropagation()}>
+                                                    {menu}
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </RowMenu>
+                                );
+                            })}
+                        </TableBody>
+                    ))}
                 </Table>
             )}
         </SettingsCard>
@@ -273,12 +329,17 @@ function anyOf(values: string[], all: string) {
 
 export function QueuesView({
     queues,
+    total,
     onEdit,
     onTurnOff,
+    onClearFilters,
 }: {
+    /** The queues left by the header filters. */
     queues: TriageQueueData[];
+    total: number;
     onEdit: (queue: TriageQueueData) => void;
     onTurnOff: (queue: TriageQueueData) => void;
+    onClearFilters: () => void;
 }) {
     const turnOn = (queue: TriageQueueData) =>
         router.put(
@@ -292,11 +353,14 @@ export function QueuesView({
             title="Queues"
             caption="Where new alerts wait for a team, and where they move on to if no one picks them up."
             count={queues.length}
+            total={total}
         >
-            {queues.length === 0 ? (
+            {total === 0 ? (
                 <div className="px-5 py-10">
                     <EmptyState icon={Inbox} title="No queues yet" description="Add a queue to give new alerts to a team." />
                 </div>
+            ) : queues.length === 0 ? (
+                <NoMatches what="queues" onClear={onClearFilters} />
             ) : (
                 <Table>
                     <TableHeader>
@@ -382,28 +446,48 @@ const SOURCE_STATUS: Record<SignalSourceOption['status'], { label: string; tone:
     maintenance: { label: 'In maintenance', tone: 'warning' },
 };
 
+/** "5 min ago", "75 days ago" — an age, never a bare date (24 Oct rule). */
+function ago(at: string | null, fallback: string): string {
+    if (!at) return fallback;
+    const ms = Date.now() - new Date(at).getTime();
+    if (!Number.isFinite(ms)) return fallback;
+    return ms < 60_000 ? 'just now' : `${longDuration(ms)} ago`;
+}
+
 /** How fresh a source's heartbeat is: under 5 min fine, under 10 late, else silent. */
 function heartbeat(at: string | null): { label: string; tone: StatusVariant } {
     if (!at) return { label: 'Never heard from', tone: 'critical' };
     const minutes = (Date.now() - new Date(at).getTime()) / 60000;
-    const when = formatRelative(at);
+    const when = ago(at, 'never');
     if (minutes < 5) return { label: `Heard ${when}`, tone: 'success' };
     if (minutes < 10) return { label: `Late — heard ${when}`, tone: 'warning' };
     return { label: `Silent — last heard ${when}`, tone: 'critical' };
 }
 
-export function SourcesView({ sources }: { sources: SignalSourceOption[] }) {
+export function SourcesView({
+    sources,
+    total,
+    onClearFilters,
+}: {
+    /** The sources left by the header filter. */
+    sources: SignalSourceOption[];
+    total: number;
+    onClearFilters: () => void;
+}) {
     return (
         <SettingsCard
             icon={Radio}
             title="Signal sources"
             caption="The systems that send signals, so you can check each one is still reporting."
             count={sources.length}
+            total={total}
         >
-            {sources.length === 0 ? (
+            {total === 0 ? (
                 <div className="px-5 py-10">
                     <EmptyState icon={Radio} title="No signal sources" description="Connect a source in Security & Devices." />
                 </div>
+            ) : sources.length === 0 ? (
+                <NoMatches what="sources" onClear={onClearFilters} />
             ) : (
                 <ul className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
                     {sources.map((source) => {
@@ -432,7 +516,7 @@ export function SourcesView({ sources }: { sources: SignalSourceOption[] }) {
                                     <span className="font-semibold text-foreground tabular-nums">
                                         {source.signal_count_24h.toLocaleString('en-NZ')}
                                     </span>{' '}
-                                    signals in 24 hours · last signal {formatRelative(source.last_signal_at, Date.now(), 'never')}
+                                    signals in 24 hours · last signal {ago(source.last_signal_at, 'never')}
                                 </p>
                                 {source.capabilities.length ? (
                                     <p className="text-caption">
@@ -461,27 +545,35 @@ const WINDOW_STATUS: Record<MaintenanceWindowData['status'], { label: string; to
 
 export function MaintenanceView({
     windows,
+    total,
     sites,
     onEdit,
     onCancel,
+    onClearFilters,
 }: {
+    /** The windows left by the header filter. */
     windows: MaintenanceWindowData[];
+    total: number;
     sites: Array<{ id: number; name: string }>;
     onEdit: (window: MaintenanceWindowData) => void;
     onCancel: (window: MaintenanceWindowData) => void;
+    onClearFilters: () => void;
 }) {
     const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name ?? null;
     return (
         <SettingsCard
             icon={Wrench}
             title="Maintenance windows"
-            caption="Planned work when a source or house is expected to go quiet or false-alarm, so it doesn't raise alerts."
+            caption="Planned work when a source or house is expected to go quiet or false-alarm, so it doesn't raise alerts. Finished and cancelled windows show for 7 days."
             count={windows.length}
+            total={total}
         >
-            {windows.length === 0 ? (
+            {total === 0 ? (
                 <div className="px-5 py-10">
                     <EmptyState icon={Wrench} title="No maintenance planned" description="Schedule a window before planned work so it doesn't raise alerts." />
                 </div>
+            ) : windows.length === 0 ? (
+                <NoMatches what="maintenance windows" onClear={onClearFilters} />
             ) : (
                 <Table>
                     <TableHeader>
@@ -561,10 +653,15 @@ const DELIVERY_STATUS: Record<SignalOutboxRow['status'], { label: string; tone: 
 
 export function DeliveryView({
     rows,
+    total,
     onRetry,
+    onClearFilters,
 }: {
+    /** The deliveries left by the header filter. */
     rows: SignalOutboxRow[];
+    total: number;
     onRetry: (row: SignalOutboxRow) => void;
+    onClearFilters: () => void;
 }) {
     return (
         <SettingsCard
@@ -572,11 +669,14 @@ export function DeliveryView({
             title="Signals that didn't arrive"
             caption="Signals that couldn't be turned into alerts. Check what went wrong before trying again."
             count={rows.length}
+            total={total}
         >
-            {rows.length === 0 ? (
+            {total === 0 ? (
                 <div className="px-5 py-10">
                     <EmptyState icon={Activity} title="Every signal got through" description="Failed deliveries show here so you can try them again." />
                 </div>
+            ) : rows.length === 0 ? (
+                <NoMatches what="deliveries" onClear={onClearFilters} />
             ) : (
                 <>
                     <div className="px-5 pt-4">
@@ -620,7 +720,7 @@ export function DeliveryView({
                                         </TableCell>
                                         <TableCell className="text-right tabular-nums">{row.attempts}</TableCell>
                                         <TableCell title={formatDateTime(row.last_attempt_at)}>
-                                            {formatRelative(row.last_attempt_at, Date.now(), 'Not tried yet')}
+                                            {ago(row.last_attempt_at, 'Not tried yet')}
                                         </TableCell>
                                         <TableCell className="max-w-[18rem]">
                                             <p className="text-subtle truncate" title={row.last_error ?? undefined}>
@@ -658,23 +758,33 @@ export function DeliveryView({
 
 export function OptionsView({
     options,
+    allOptions,
+    only = 'all',
     onAdd,
     onDelete,
 }: {
+    /** The options left by the header's on/off filter. */
     options: Record<string, ConfigOption[]>;
+    allOptions: Record<string, ConfigOption[]>;
+    /** The header's list filter: one list, or all three side by side. */
+    only?: OptionGroup | 'all';
     onAdd: (group: OptionGroup, title: string) => void;
     onDelete: (option: ConfigOption, title: string) => void;
 }) {
+    const groups = OPTION_GROUPS.filter((group) => only === 'all' || group.key === only);
     return (
-        <div className="grid min-w-0 gap-5 xl:grid-cols-3">
-            {OPTION_GROUPS.map((group) => {
+        <div className={cn('grid min-w-0 gap-5', groups.length > 1 && 'xl:grid-cols-3')}>
+            {groups.map((group) => {
                 const items = options?.[group.key] ?? [];
+                const all = allOptions?.[group.key] ?? [];
                 return (
                     <SettingsCard
                         key={group.key}
                         icon={group.key === 'task_category' ? ListChecks : SlidersHorizontal}
                         title={group.title}
                         caption={group.caption}
+                        count={items.length}
+                        total={all.length}
                         action={
                             <Button
                                 type="button"
@@ -689,7 +799,9 @@ export function OptionsView({
                         }
                     >
                         {items.length === 0 ? (
-                            <p className="text-subtle px-5 py-6">None yet.</p>
+                            <p className="text-subtle px-5 py-6">
+                                {all.length === 0 ? 'None yet.' : 'None match the on/off filter.'}
+                            </p>
                         ) : (
                             <ul className="divide-y divide-border">
                                 {items.map((option) => (
