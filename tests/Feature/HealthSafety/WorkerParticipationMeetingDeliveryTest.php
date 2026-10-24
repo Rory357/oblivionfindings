@@ -69,11 +69,21 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     private function stage(string $reason = 'scheduled', bool $workforce = false): array
     {
-        return DB::transaction(function () use ($reason, $workforce): array {
+        return $this->asManagerRequest(fn (): array => DB::transaction(function () use ($reason, $workforce): array {
             $event = $this->delivery->recordCurrentEpoch($this->meeting, $this->manager, $reason);
             $ids = $this->delivery->stageToAudience($this->manager, $event['event_id'], [(int) $this->attendee->id], $workforce);
             return [...$event, 'ids' => $ids];
-        });
+        }));
+    }
+
+    /** Manager staging runs inside the manager's own web request in the app; outside HTTP, request()->user() is empty. */
+    private function asManagerRequest(callable $operation): mixed
+    {
+        $previous = $this->app['request'];
+        $request = \Illuminate\Http\Request::create('/health-safety/worker-participation');
+        $request->setUserResolver(fn ($guard = null) => auth()->guard($guard)->user());
+        $this->app->instance('request', $request);
+        try { return $operation(); } finally { $this->app->instance('request', $previous); }
     }
 
     private function attendeeId(array $event): string
@@ -109,11 +119,11 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
     {
         $first = $this->stage();
         $this->meeting->attendeeUsers()->attach($this->worker->id);
-        $second = DB::transaction(function (): array {
+        $second = $this->asManagerRequest(fn (): array => DB::transaction(function (): array {
             $event = $this->delivery->recordCurrentEpoch($this->meeting, $this->manager, 'attendees_added');
             $event['ids'] = $this->delivery->stageToAudience($this->manager, $event['event_id'], [(int) $this->worker->id]);
             return $event;
-        });
+        }));
         $this->assertSame($first['source_epoch_id'], $second['source_epoch_id']);
         $this->assertCount(1, $second['ids']);
         $this->delivery->deliverDatabase($this->attendeeId($first));

@@ -68,10 +68,17 @@ final class WorkerParticipationMeetingMailDeliveryTest extends TestCase
         $meeting->attendeeUsers()->attach($this->recipient->id);
         $this->actingAs($this->manager); Queue::fake(); Notification::fake();
         $this->delivery = app(WorkerParticipationMeetingDeliveryService::class);
-        $this->id = DB::transaction(function () use ($meeting): string {
-            $event = $this->delivery->recordCurrentEpoch($meeting, $this->manager, 'scheduled');
-            return $this->delivery->stageToAudience($this->manager, $event['event_id'], [(int) $this->recipient->id])[0];
-        });
+        // Manager staging runs inside the manager's own web request in the app; outside HTTP, request()->user() is empty.
+        $previous = $this->app['request'];
+        $request = \Illuminate\Http\Request::create('/health-safety/worker-participation');
+        $request->setUserResolver(fn ($guard = null) => auth()->guard($guard)->user());
+        $this->app->instance('request', $request);
+        try {
+            $this->id = DB::transaction(function () use ($meeting): string {
+                $event = $this->delivery->recordCurrentEpoch($meeting, $this->manager, 'scheduled');
+                return $this->delivery->stageToAudience($this->manager, $event['event_id'], [(int) $this->recipient->id])[0];
+            });
+        } finally { $this->app->instance('request', $previous); }
         $this->assertSame(0, DB::transactionLevel());
     }
 

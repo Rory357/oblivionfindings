@@ -13,7 +13,7 @@ if (ini_get('memory_limit') !== '512M' || count($argv) !== 6) {
 }
 [$script, $database, $encodedPayload, $readyPath, $attemptPath, $releasePath] = $argv;
 if (getenv('APP_ENV') !== 'testing' || getenv('DB_CONNECTION') !== 'mysql'
-    || getenv('DB_DATABASE') !== $database || ! preg_match('/^oblivion_hs_goal_test_[0-9]+$/D', $database)) {
+    || getenv('DB_DATABASE') !== $database || ! preg_match('/^(oblivion_hs_goal_test_[0-9]+|oblivion_findings_codex_test_[0-9]+)$/D', $database)) {
     throw new RuntimeException('Restraint workers require the exact dedicated H&S native test schema.');
 }
 foreach ([$readyPath, $attemptPath, $releasePath] as $path) {
