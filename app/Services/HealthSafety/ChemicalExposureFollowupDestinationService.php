@@ -65,7 +65,8 @@ final class ChemicalExposureFollowupDestinationService
                 }
                 // Do not let a save listener/interleaving replace the original source under a genuine inbox row.
                 $fresh = $this->admitAttempt($deliveryId, $current, $reads, $sites);
-                if ($fresh !== $descriptor || $fresh['membership'] !== $membership) {
+                if ($fresh !== $descriptor
+                    || ChemicalCommandValues::digest($fresh['membership']) !== ChemicalCommandValues::digest($membership)) {
                     throw new LogicException('Private follow-up source changed during inbox persistence.');
                 }
                 $recipientFresh = $this->commands->withCurrentViewer($receiver,
