@@ -117,6 +117,9 @@ final class IncidentHsEventSourceReadService
         if (! is_string($type) || ltrim($type, '\\') !== ClientIncident::class || ! $original->source_id) { return $empty(); }
         $eventParents = $this->eventParents[$reads] ?? [];
         $key = $common ? (string) $current->id : $current->id.'/site-client';
+        // Both variants pin the earliest event facts seen in this lifetime; a changed event is never a new original.
+        $pinned = $eventParents[$current->id.'/meta'][$original->id] ?? null;
+        if ($pinned !== null && $pinned !== $meta) { return $empty(); }
         if (isset($eventParents[$key][$original->id])) {
             return $eventParents[$key][$original->id]['meta'] === $meta ? clone $eventParents[$key][$original->id]['query'] : $empty();
         }
@@ -127,6 +130,7 @@ final class IncidentHsEventSourceReadService
         if (($root->hs_event_id !== null && (int) $root->hs_event_id !== (int) $original->id)
             || ! app(IncidentJourneyService::class)->hsEventIsCanonicalForIncident($root, $original)) { return $empty(); }
         $query = $this->originalRootParent($root, $current, $reads, $common);
+        $base = $this->rootBase($root, $current, $reads);
         $event = HsEvent::query()->whereKey($original->id);
         $this->exact($event, $meta, 'hs_events');
         $event->whereNotExists(DB::table('client_incidents as hs_other_incident')->selectRaw('1')
@@ -135,18 +139,17 @@ final class IncidentHsEventSourceReadService
             ->where('hs_other_source.id', '!=', $original->id)->where('hs_other_source.source_id', $root->id)
             ->whereRaw('LOWER(TRIM(LEADING ? FROM TRIM(REPLACE(REPLACE(REPLACE(`hs_other_source`.`source_type`, CHAR(9), ?), CHAR(10), ?), CHAR(13), ?)))) = LOWER(?)', ['\\', '', '', '', ClientIncident::class]));
         $query->whereExists($event->selectRaw('1')->toBase());
-        // originalRootParent() already holds the authority conditions for the root's Site and Client. The same
-        // viewer, Site and Client give the same conditions, so they are added again only when the event's differ.
+        // originalRootParent() already holds the authority conditions for the original root's Site and Client.
+        // The same viewer, Site and Client give the same conditions, so they are added again only when the event's differ.
         $siteId = $original->site_id === null ? null : (int) $original->site_id;
         $clientId = $original->client_id === null ? null : (int) $original->client_id;
-        $rootSiteId = $root->site_id === null ? null : (int) $root->site_id;
-        $rootClientId = $root->client_id === null ? null : (int) $root->client_id;
-        if ($siteId !== $rootSiteId || $clientId !== $rootClientId) {
+        if ($siteId !== $base['site_id'] || $clientId !== $base['client_id']) {
             $query = $common ? $this->authorityUnchanged($query, $current, $reads, $siteId, $clientId)
                 : $this->authorityScoped($query, $current, $reads, $siteId, $clientId);
         }
         $query = $this->protect($query, $reads);
         $eventParents[$key][$original->id] = ['meta' => $meta, 'query' => clone $query];
+        $eventParents[$current->id.'/meta'][$original->id] = $meta;
         $this->eventParents[$reads] = $eventParents;
         return $query;
     }
@@ -180,18 +183,34 @@ final class IncidentHsEventSourceReadService
      * $common false leaves out the viewer-wide authority facts, for list scopes that add them once around all parents. */
     private function originalRootParent(ClientIncident $root, User $current, CurrentAuthorizationReads $reads, bool $common = true): Builder
     {
-        $parents = $this->rootParents[$reads] ?? [];
         $key = $common ? (string) $current->id : $current->id.'/site-client';
-        if (isset($parents[$key][$root->id])) { return clone $parents[$key][$root->id]; }
-        $query = app(IncidentAccessService::class)->apply(ClientIncident::query()->whereKey($root->id), $current, $reads);
-        $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read');
-        $this->exact($query, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
-        $query = $common ? $this->authorityUnchanged($query, $current, $reads, $root->site_id, $root->client_id)
-            : $this->authorityScoped($query, $current, $reads, $root->site_id, $root->client_id);
+        if (isset(($this->rootParents[$reads] ?? [])[$key][$root->id])) { return clone $this->rootParents[$reads][$key][$root->id]; }
+        // Both variants derive from the same earliest root base, so neither recaptures a changed root.
+        $base = $this->rootBase($root, $current, $reads);
+        $query = clone $base['query'];
+        $query = $common ? $this->authorityUnchanged($query, $current, $reads, $base['site_id'], $base['client_id'])
+            : $this->authorityScoped($query, $current, $reads, $base['site_id'], $base['client_id']);
         $query = $this->protect($query, $reads);
+        $parents = $this->rootParents[$reads] ?? [];
         $parents[$key][$root->id] = clone $query;
         $this->rootParents[$reads] = $parents;
         return $query;
+    }
+
+    /** Canonical access, independence and the exact original root facts, captured once per reads/actor/root. */
+    private function rootBase(ClientIncident $root, User $current, CurrentAuthorizationReads $reads): array
+    {
+        $baseKey = $current->id.'/base';
+        if (isset(($this->rootParents[$reads] ?? [])[$baseKey][$root->id])) { return $this->rootParents[$reads][$baseKey][$root->id]; }
+        $query = app(IncidentAccessService::class)->apply(ClientIncident::query()->whereKey($root->id), $current, $reads);
+        $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read');
+        $this->exact($query, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
+        $base = ['query' => $query, 'site_id' => $root->site_id === null ? null : (int) $root->site_id,
+            'client_id' => $root->client_id === null ? null : (int) $root->client_id];
+        $parents = $this->rootParents[$reads] ?? [];
+        $parents[$baseKey][$root->id] = $base;
+        $this->rootParents[$reads] = $parents;
+        return $base;
     }
 
     /** Every child SELECT embeds the SAME original parent/HSE/independence/authority predicate. */
