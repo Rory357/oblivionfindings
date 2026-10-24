@@ -392,7 +392,7 @@ class StaffRecordSiteScopeTest extends TestCase
     {
         $colleague = $this->staffAt($this->ownSite);
         $elsewhere = $this->staffAt($this->otherSite);
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->ownSite->id]);
         $elsewhere->assignedClients()->attach($client->id);
 
         $this->actingAs($this->manager)->get("/staff/{$colleague->id}/assignments")->assertOk();
@@ -416,5 +416,69 @@ class StaffRecordSiteScopeTest extends TestCase
         $this->actingAs($this->allSitesManager())
             ->get("/staff/{$elsewhere->id}/assignments")
             ->assertOk();
+    }
+
+    // ── Clients offered on the assignments page (Stephan, 25 Oct 2026) ──
+
+    public function test_assignments_page_lists_only_clients_at_the_viewers_sites(): void
+    {
+        $colleague = $this->staffAt($this->ownSite);
+        $own = Client::factory()->create(['site_id' => $this->ownSite->id]);
+        $other = Client::factory()->create(['site_id' => $this->otherSite->id]);
+        $siteless = Client::factory()->create(['site_id' => null]);
+        $colleague->assignedClients()->attach([$own->id, $other->id]);
+
+        $response = $this->actingAs($this->manager)->get("/staff/{$colleague->id}/assignments")->assertOk();
+        $listed = collect($response->inertiaProps('clients'))->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $this->assertContains($own->id, $listed);
+        $this->assertNotContains($other->id, $listed);
+        $this->assertNotContains($siteless->id, $listed);
+        $this->assertSame([$own->id], collect($response->inertiaProps('assignedIds'))->map(fn ($id) => (int) $id)->all());
+    }
+
+    public function test_assignments_refuse_a_client_at_another_site(): void
+    {
+        $colleague = $this->staffAt($this->ownSite);
+        $other = Client::factory()->create(['site_id' => $this->otherSite->id]);
+
+        $this->actingAs($this->manager)
+            ->put("/staff/{$colleague->id}/assignments", ['client_ids' => [$other->id]])
+            ->assertSessionHasErrors('client_ids');
+        $this->assertFalse($colleague->assignedClients()->whereKey($other->id)->exists());
+    }
+
+    public function test_saving_keeps_assignments_at_sites_the_viewer_cannot_see(): void
+    {
+        $colleague = $this->staffAt($this->ownSite);
+        $own = Client::factory()->create(['site_id' => $this->ownSite->id]);
+        $other = Client::factory()->create(['site_id' => $this->otherSite->id]);
+        $colleague->assignedClients()->attach([$own->id, $other->id]);
+
+        $this->actingAs($this->manager)
+            ->put("/staff/{$colleague->id}/assignments", ['client_ids' => []])
+            ->assertRedirect();
+
+        $this->assertFalse($colleague->assignedClients()->whereKey($own->id)->exists());
+        $this->assertTrue($colleague->assignedClients()->whereKey($other->id)->exists());
+    }
+
+    public function test_sites_view_all_lists_and_assigns_clients_at_every_site(): void
+    {
+        $colleague = $this->staffAt($this->otherSite);
+        $other = Client::factory()->create(['site_id' => $this->otherSite->id]);
+        $siteless = Client::factory()->create(['site_id' => null]);
+        $viewer = $this->allSitesManager();
+
+        $listed = collect($this->actingAs($viewer)->get("/staff/{$colleague->id}/assignments")->assertOk()->inertiaProps('clients'))
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $this->assertContains($other->id, $listed);
+        $this->assertContains($siteless->id, $listed);
+
+        $this->actingAs($viewer)
+            ->put("/staff/{$colleague->id}/assignments", ['client_ids' => [$other->id, $siteless->id]])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+        $this->assertEqualsCanonicalizing([$other->id, $siteless->id], $colleague->assignedClients()->pluck('clients.id')->map(fn ($id) => (int) $id)->all());
     }
 }
