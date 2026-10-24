@@ -344,7 +344,9 @@ class HazardWorkspaceConnectionsTest extends TestCase
         $local = $this->hazard();
         $foreign = $this->hazard(['site_id' => Site::factory()->create(['type' => 'house'])->id,
             'description' => 'PRIVATE-FOREIGN-HAZARD-KEY-PREP']);
-        $this->actingAs($viewer)->get('/hazards/'.$foreign->id)->assertForbidden()
+        // A hazard outside the reader's Sites is indistinguishable from a missing one
+        // (the same 404 as SafetySiteAccessTest and HazardWorklistHeaderTest).
+        $this->actingAs($viewer)->get('/hazards/'.$foreign->id)->assertNotFound()
             ->assertDontSee('PRIVATE-FOREIGN-HAZARD-KEY-PREP');
         $response = $this->get('/hazards/'.$local->id)->assertOk();
         $connections = data_get($response->viewData('page'), 'props.detail.connections');

@@ -108,18 +108,20 @@ class SafeguardingConcernControllerTest extends TestCase
     {
         $site = Site::factory()->create();
         $open = [];
+        // withoutEvents() skips the model's creating hook, so the NOT NULL unique
+        // reference_number it normally generates is supplied here.
         foreach (['reported', 'investigating', 'action_plan', 'monitoring'] as $status) {
             $open[] = SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
-                'site_id' => $site->id, 'status' => $status,
+                'site_id' => $site->id, 'status' => $status, 'reference_number' => 'SG-TEST-OPEN-'.$status,
             ]))->id;
         }
         foreach (['closed', 'no_action_required'] as $status) {
             SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
-                'site_id' => $site->id, 'status' => $status,
+                'site_id' => $site->id, 'status' => $status, 'reference_number' => 'SG-TEST-DONE-'.$status,
             ]));
         }
         SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
-            'site_id' => Site::factory()->create()->id, 'status' => 'reported',
+            'site_id' => Site::factory()->create()->id, 'status' => 'reported', 'reference_number' => 'SG-TEST-FOREIGN',
         ]));
         $this->actingAs($this->admin)->get('/safeguarding?tab=open&site_id='.$site->id)->assertOk()
             ->assertInertia(fn ($page) => $page->where('tab', 'open')->where('filters.site_id', $site->id)
