@@ -451,6 +451,9 @@ class SafeWorkProcedureService
     {
         try {
             return DB::transaction($operation);
+        } catch (\Illuminate\Database\DeadlockException) {
+            // Inside a transaction Laravel raises a deadlock (1213) as DeadlockException, not QueryException.
+            throw ValidationException::withMessages(['expected_version' => 'Another change is in progress. Review the current procedure and retry.']);
         } catch (QueryException $error) {
             if ((int) ($error->errorInfo[1] ?? 0) === 1062 && (str_contains($error->getMessage(), 'procedure_review_command_key_unique') || str_contains($error->getMessage(), 'procedure_review_requests_idempotency_key_unique'))) {
                 throw ValidationException::withMessages(['idempotency_key' => 'This command key was already confirmed for different details. Review the current request.']);

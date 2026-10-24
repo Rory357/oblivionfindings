@@ -435,6 +435,9 @@ class HsRiskAssessmentService
     {
         try {
             return DB::transaction($operation);
+        } catch (\Illuminate\Database\DeadlockException) {
+                // Inside a transaction Laravel raises a deadlock (1213) as DeadlockException, not QueryException.
+                throw ValidationException::withMessages(['assessment' => 'This assessment or its access is changing. Reload it before trying again.']);
         } catch (QueryException $error) {
             if (in_array((int) ($error->errorInfo[1] ?? 0), [1205, 1213, 3572], true)) {
                 throw ValidationException::withMessages(['assessment' => 'This assessment or its access is changing. Reload it before trying again.']);

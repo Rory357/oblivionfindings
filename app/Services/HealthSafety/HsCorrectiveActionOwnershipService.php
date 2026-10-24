@@ -170,6 +170,9 @@ final class HsCorrectiveActionOwnershipService
                     return $change;
                 });
             }, 3);
+        } catch (\Illuminate\Database\DeadlockException) {
+                // Inside a transaction Laravel raises a deadlock (1213) as DeadlockException, not QueryException.
+                throw ValidationException::withMessages(['expected_revision' => 'Access or ownership is being updated. Your entries have been kept; review the action and try again.']);
         } catch (QueryException $error) {
             if (in_array((int) ($error->errorInfo[1] ?? 0), [1205, 1213, 3572], true)) {
                 throw ValidationException::withMessages(['expected_revision' => 'Access or ownership is being updated. Your entries have been kept; review the action and try again.']);

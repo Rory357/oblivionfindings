@@ -542,6 +542,9 @@ final class BehaviourSupportPlanService
     {
         try {
             return DB::transaction($operation);
+        } catch (\Illuminate\Database\DeadlockException) {
+            // Inside a transaction Laravel raises a deadlock (1213) as DeadlockException, not QueryException.
+            $this->invalid('expected_version', 'The plan or its authority changed concurrently. Your draft was not saved.');
         } catch (QueryException $error) {
             if (in_array((int) ($error->errorInfo[1] ?? 0), [1062, 1205, 1213, 3572], true)) {
                 $this->invalid('expected_version', 'The plan or its authority changed concurrently. Your draft was not saved.');

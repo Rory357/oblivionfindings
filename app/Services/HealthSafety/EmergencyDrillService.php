@@ -462,6 +462,9 @@ class EmergencyDrillService
     {
         try {
             return DB::transaction($operation, 3);
+        } catch (\Illuminate\Database\DeadlockException) {
+                // Inside a transaction Laravel raises a deadlock (1213) as DeadlockException, not QueryException.
+                throw ValidationException::withMessages(['expected_version' => 'This drill or its authority changed concurrently. Review the current record before retrying.']);
         } catch (QueryException $exception) {
             if (in_array((int) ($exception->errorInfo[1] ?? 0), [1062, 1205, 1213, 3572], true)) {
                 throw ValidationException::withMessages(['expected_version' => 'This drill or its authority changed concurrently. Review the current record before retrying.']);
