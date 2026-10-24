@@ -3,6 +3,8 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Controllers\HealthSafety\HealthSafetyDashboardController;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -379,10 +381,21 @@ final class HsDashboardClientOptionsSourceReadTest extends RestraintEventCommand
     private function isNameSql(string $sql): bool { return str_starts_with(strtolower($sql), 'select `id`, `first_name`, `last_name`, `site_id` from `clients`'); }
     private function names(): object
     {
-        $state = (object) ['armed' => true, 'ids' => [], 'sql' => [], 'replaySql' => [], 'dispatcher' => Model::getEventDispatcher()];
+        $state = (object) ['armed' => true, 'ids' => [], 'sidebarIds' => [], 'sql' => [], 'replaySql' => [], 'dispatcher' => Model::getEventDispatcher()];
         Model::setEventDispatcher(clone $state->dispatcher);
         Client::retrieved(function ($client) use ($state): void {
-            if ($state->armed && array_key_exists('first_name', $client->getAttributes())) { $state->ids[] = (int) $client->id; }
+            if (! $state->armed || ! array_key_exists('first_name', $client->getAttributes())) { return; }
+            // Main's shared sidebar props (the portal's own client list, task and meds badges) load the signed-in
+            // user's own clients on every page. They are not the H&S option read under test, so they are kept
+            // apart; anything loaded by the option owner or the Overview controller still counts. (The whole request
+            // runs inside the middleware's handle(), so only its share/badge frames mark a sidebar load.)
+            $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+            $classes = array_column($frames, 'class');
+            $sidebar = array_filter($frames, fn (array $frame): bool => ($frame['class'] ?? null) === HandleInertiaRequests::class
+                    && ($frame['function'] ?? null) !== 'handle') !== []
+                && ! in_array(DashboardClientOptionsReadService::class, $classes, true)
+                && ! in_array(HealthSafetyDashboardController::class, $classes, true);
+            if ($sidebar) { $state->sidebarIds[] = (int) $client->id; } else { $state->ids[] = (int) $client->id; }
         });
         DB::connection()->beforeExecuting(function (string $sql) use ($state): void {
             if ($state->armed && $this->isNameSql($sql)) {
