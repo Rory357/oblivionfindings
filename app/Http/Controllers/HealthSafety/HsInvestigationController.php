@@ -273,18 +273,11 @@ class HsInvestigationController extends Controller
         abort_unless($investigation->hs_event_id === $event->id, 404);
     }
 
+    /** Read through the event page's H&S source read (incident-linked events need incident read); it stays locked until commit. */
     private function resolveAccessibleEvent(Request $request, HsEvent $event): HsEvent
     {
-        $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope(
-            $query,
-            $request->user(),
-            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
-        );
-
-        app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $request->user());
-
-        return $query->findOrFail($event->id);
+        return app(HsEventAccessService::class)->readableEventForCommand($request->user(), (int) $event->id,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
     }
 
     /** @param list<int> $staffIds */

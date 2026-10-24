@@ -29,15 +29,9 @@ class HsWorksafeDecisionController extends Controller
         RecordHsWorksafeDecisionRequest $request,
         int $hsEvent,
     ): RedirectResponse {
-        $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope(
-            $query,
-            $request->user(),
-            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
-        );
-        app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $request->user());
-
-        $event = $query->findOrFail($hsEvent);
+        // The event page's H&S source read (incident-linked events need incident read); it stays locked until commit.
+        $event = app(HsEventAccessService::class)->readableEventForCommand($request->user(), $hsEvent,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
         $data = $request->validated();
 
         try {

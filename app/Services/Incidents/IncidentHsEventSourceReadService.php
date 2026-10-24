@@ -59,7 +59,8 @@ final class IncidentHsEventSourceReadService
         $reads->assertActive();
         $candidates = (clone ($candidates ?? $events))->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...));
         $this->assertEvents($candidates);
-        $identities = $reads->query($this->incidentRelated($candidates))->get(self::EVENT_META);
+        // Exactly the identity columns, whatever the caller selected (a register adds count columns that aren't on the table).
+        $identities = $reads->query($this->incidentRelated($candidates->select(array_map(fn (string $column): string => 'hs_events.'.$column, self::EVENT_META))))->get();
         $sourceIds = $identities->pluck('source_id')->filter()->all();
         $eventIds = $identities->pluck('id')->all();
         if ($eventIds !== []) {

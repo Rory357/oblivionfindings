@@ -20,6 +20,81 @@ final class HsEventAccessService
 {
     public function __construct(private readonly UserSiteAccessService $sites) {}
 
+    /** What an event read prepares: each H&S source's own read permissions (the event page prepares the same). */
+    public static function eventReadPermissionKeys(): array
+    {
+        return array_values(array_unique([...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
+            ...InjuryAccessService::PERMISSIONS, ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS]));
+    }
+
+    /**
+     * One H&S event through the same source read as the event page, so incident-linked events need incident read and
+     * First Aid, restraint and injury events keep their own source rules. Without a read context those events are always
+     * refused, so every command on an event goes through here. The command runs while the read holds and gets the event
+     * (and the context); whatever it returns (a response, a flag) is handed back. Unknown or unreadable events are 404.
+     *
+     * @param  \Closure(HsEvent, HealthSafetyReadContext): mixed  $command
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function withReadableEvent(User $viewer, int $eventId, \Closure $command,
+        array $bypassPermissions = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, array $permissionKeys = [], bool $forUpdate = false): mixed
+    {
+        $result = null;
+        if ($forUpdate) {
+            // A command writes the event: hold it for update first, so a repeated submit waits for the first instead of
+            // both taking the read's shared lock and deadlocking when they write. Locks only; nothing is read out.
+            if (\Illuminate\Support\Facades\DB::transactionLevel() < 1) { throw new \LogicException('An H&S event command must run inside a transaction.'); }
+            HsEvent::withTrashed()->whereKey($eventId)->lockForUpdate()->value('id');
+        }
+        HealthSafetyReadContext::within($viewer, array_values(array_unique([...self::eventReadPermissionKeys(), ...$permissionKeys])),
+            function (HealthSafetyReadContext $context) use ($viewer, $eventId, $command, $bypassPermissions, &$result): array {
+                $query = HsEvent::query()->whereKey($eventId);
+                $context->assertViewer($viewer);
+                $context->applyEventSiteScope($query, $bypassPermissions);
+                $this->applyFirstAidSourceScope($query, $viewer, $context);
+                // Only the command's own outcome leaves the read; the event model stays inside it.
+                $result = $command($query->firstOrFail(), $context);
+
+                return [];
+            });
+
+        return $result;
+    }
+
+    /**
+     * The event for a command that must be readable first (investigations, corrective actions, WorkSafe decisions).
+     * It is checked through the event read above (404 when unknown or unreadable) and then loaded fresh. The read's
+     * shared locks stay held until the caller's transaction commits, so the check still holds while the command writes.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function readableEventForCommand(User $viewer, int $eventId,
+        array $bypassPermissions = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, bool $forUpdate = true): HsEvent
+    {
+        if (\Illuminate\Support\Facades\DB::transactionLevel() < 1) {
+            throw new \LogicException('An H&S event command must run inside its transaction so the read stays locked.');
+        }
+        $this->withReadableEvent($viewer, $eventId, fn (): bool => true, $bypassPermissions, [], $forUpdate);
+
+        return HsEvent::query()->whereKey($eventId)->firstOrFail();
+    }
+
+    /** Whether this person may currently read the event (owner eligibility, notification recipients). Never throws a refusal. */
+    public function canReadEvent(User $person, HsEvent $event, array $bypassPermissions = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS): bool
+    {
+        try {
+            return $this->withReadableEvent($person, (int) $event->id, fn (): bool => true, $bypassPermissions) === true;
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return false;
+        } catch (HttpException $refused) {
+            if (! in_array($refused->getStatusCode(), [403, 404], true)) {
+                throw $refused;
+            }
+
+            return false;
+        }
+    }
+
     public function applyReadableScope(Builder $query, User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
     {
         if ($context !== null) {

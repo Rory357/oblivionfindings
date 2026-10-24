@@ -78,10 +78,11 @@ class HsEventController extends Controller
      */
     public function index(Request $request): Response
     {
-        return DB::transaction(fn () => $this->indexWithinSourceAuthority($request));
+        return Inertia::render('health-safety/events/index', $this->registerRead($request,
+            fn (HealthSafetyReadContext $context): array => $this->indexWithinSourceAuthority($request, $context)));
     }
 
-    private function indexWithinSourceAuthority(Request $request): Response
+    private function indexWithinSourceAuthority(Request $request, HealthSafetyReadContext $context): array
     {
         $this->validateRegisterPeriod($request);
         $request->validate([
@@ -119,8 +120,8 @@ class HsEventController extends Controller
             ->orderByDesc('reported_at');
 
         $this->applyTab($query, $tab);
-        $this->applyEventRefinements($query, $request);
-        $this->applyScope($query, $request);
+        $this->applyEventRefinements($query, $request, $context);
+        $this->applyScope($query, $request, $context);
 
         $paginator = $query->paginate(25)->withQueryString();
 
@@ -174,7 +175,7 @@ class HsEventController extends Controller
         });
 
         // Counts use the same active refinements as their linked worklists.
-        $statusCounts = $this->scopedBase($request)
+        $statusCounts = $this->scopedBase($request, $context)
             ->selectRaw('status, count(*) as c')
             ->groupBy('status')
             ->pluck('c', 'status');
@@ -188,13 +189,13 @@ class HsEventController extends Controller
             'corrective_actions' => $count(HsEvent::STATUS_CORRECTIVE_ACTION),
             'monitoring' => $count(HsEvent::STATUS_MONITORING),
             'closed' => $count(HsEvent::STATUS_CLOSED),
-            'handover' => (int) $this->scopedBase($request)
+            'handover' => (int) $this->scopedBase($request, $context)
                 ->where('handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE)
                 ->count(),
-            'worksafe' => (int) $this->scopedBase($request)->where('worksafe_notifiable', true)->count(),
+            'worksafe' => (int) $this->scopedBase($request, $context)->where('worksafe_notifiable', true)->count(),
         ];
         foreach (['investigation_due', 'awaiting_verification', 'worksafe_pending'] as $attentionTab) {
-            $attentionQuery = $this->scopedBase($request);
+            $attentionQuery = $this->scopedBase($request, $context);
             $this->applyTab($attentionQuery, $attentionTab);
             $tabCounts[$attentionTab] = $attentionQuery->count();
         }
@@ -218,21 +219,18 @@ class HsEventController extends Controller
         // â”€â”€ Detail-over-list (?event=) â”€â”€
         $detail = null;
         if ($request->filled('event')) {
-            $detail = HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), function (HealthSafetyReadContext $context) use ($request): ?array {
-                $target = $this->resolveAccessibleEvent($request, $request->integer('event'), $context);
-                $detailQuery = HsEvent::query()->whereKey($target->id);
-                $this->applyScope($detailQuery, $request, $context);
-                $target = $context->query($detailQuery)->first();
-
-                return $target ? $context->consumeViewer($this->detailReadPermissionKeys(),
-                    fn (User $current): array => $this->buildEventDetail($target, $current, $context)) : null;
-            });
+            $target = $this->resolveAccessibleEvent($request, $request->integer('event'), $context);
+            $detailQuery = HsEvent::query()->whereKey($target->id);
+            $this->applyScope($detailQuery, $request, $context);
+            $target = $context->query($detailQuery)->first();
+            $detail = $target ? $context->consumeViewer($this->detailReadPermissionKeys(),
+                fn (User $current): array => $this->buildEventDetail($target, $current, $context)) : null;
         }
 
-        $siteIds = $this->scopedBase($request)->whereNotNull('site_id')->distinct()->pluck('site_id');
+        $siteIds = $this->scopedBase($request, $context)->whereNotNull('site_id')->distinct()->pluck('site_id');
 
-        return Inertia::render('health-safety/events/index', [
-            'events' => $events,
+        return [
+            'events' => $events->toArray(),
             'tab' => $tab,
             'tabCounts' => $tabCounts,
             'hero' => $hero,
@@ -251,10 +249,10 @@ class HsEventController extends Controller
             'actionReturnUrl' => $request->filled('action_context')
                 ? '/health-safety/corrective-actions?'.http_build_query($request->input('action_context'), '', '&', PHP_QUERY_RFC3986)
                 : null,
-            'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']),
+            'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name'])->toArray(),
             'detail' => $detail,
             'can' => ['manage' => (bool) ($request->user()?->canDo('hazards.manage') ?? false)],
-        ]);
+        ];
     }
 
     /** Canonical Site authority and the selected New Zealand occurrence period. */
@@ -290,11 +288,11 @@ class HsEventController extends Controller
     }
 
     /** A fresh, scope-applied base query for the hero/tab aggregates. */
-    private function scopedBase(Request $request): Builder
+    private function scopedBase(Request $request, ?HealthSafetyReadContext $context = null): Builder
     {
         $query = HsEvent::query();
-        $this->applyEventRefinements($query, $request);
-        $this->applyScope($query, $request);
+        $this->applyEventRefinements($query, $request, $context);
+        $this->applyScope($query, $request, $context);
 
         return $query;
     }
@@ -327,7 +325,7 @@ class HsEventController extends Controller
         ]);
     }
 
-    private function applyEventRefinements(Builder $query, Request $request): void
+    private function applyEventRefinements(Builder $query, Request $request, ?HealthSafetyReadContext $context = null): void
     {
         if ($request->filled('severity')) {
             $query->where('severity', $request->input('severity'));
@@ -351,9 +349,9 @@ class HsEventController extends Controller
             $parentCandidates = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
             $actionCandidates = HsCorrectiveAction::query()->whereIn('hs_event_id', $parentCandidates);
             $this->applyActionRefinements($actionCandidates, $actionRequest);
-            $query->whereHas('correctiveActions', function (Builder $actions) use ($actionRequest, $actionCandidates): void {
+            $query->whereHas('correctiveActions', function (Builder $actions) use ($actionRequest, $actionCandidates, $context): void {
                 $this->applyActionRefinements($actions, $actionRequest);
-                $this->applyActionScope($actions, $actionRequest, $actionCandidates);
+                $this->applyActionScope($actions, $actionRequest, $actionCandidates, $context);
             });
         }
     }
@@ -409,12 +407,11 @@ class HsEventController extends Controller
     /** Close through the one canonical H&S readiness/exception aggregate. */
     public function close(Request $request, int $hsEvent)
     {
-        return DB::transaction(fn () => $this->closeWithinSourceAuthority($request, $hsEvent));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->closeWithinSourceAuthority($request, $event)));
     }
 
-    private function closeWithinSourceAuthority(Request $request, int $hsEvent)
+    private function closeWithinSourceAuthority(Request $request, HsEvent $hsEvent)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
         $data = $request->validate([
             'closure_summary' => ['required', 'string', 'max:2000'],
@@ -437,12 +434,11 @@ class HsEventController extends Controller
 
     public function requestClosureException(Request $request, int $hsEvent)
     {
-        return DB::transaction(fn () => $this->requestClosureExceptionWithinSourceAuthority($request, $hsEvent));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->requestClosureExceptionWithinSourceAuthority($request, $event)));
     }
 
-    private function requestClosureExceptionWithinSourceAuthority(Request $request, int $hsEvent)
+    private function requestClosureExceptionWithinSourceAuthority(Request $request, HsEvent $hsEvent)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $data = $request->validate([
             'category' => ['required', 'string', 'in:'.implode(',', array_keys(HsClosureException::CATEGORY_SCOPES))],
             'reason' => ['required', 'string', 'min:20', 'max:2000'],
@@ -464,12 +460,11 @@ class HsEventController extends Controller
 
     public function decideClosureException(Request $request, int $hsEvent, int $exception)
     {
-        return DB::transaction(fn () => $this->decideClosureExceptionWithinSourceAuthority($request, $hsEvent, $exception));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->decideClosureExceptionWithinSourceAuthority($request, $event, $exception)));
     }
 
-    private function decideClosureExceptionWithinSourceAuthority(Request $request, int $hsEvent, int $exception)
+    private function decideClosureExceptionWithinSourceAuthority(Request $request, HsEvent $hsEvent, int $exception)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $exception = $hsEvent->closureExceptions()->findOrFail($exception);
         $data = $request->validate([
             'decision' => ['required', 'string', 'in:approved,rejected'],
@@ -493,12 +488,11 @@ class HsEventController extends Controller
 
     public function revokeClosureException(Request $request, int $hsEvent, int $exception)
     {
-        return DB::transaction(fn () => $this->revokeClosureExceptionWithinSourceAuthority($request, $hsEvent, $exception));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->revokeClosureExceptionWithinSourceAuthority($request, $event, $exception)));
     }
 
-    private function revokeClosureExceptionWithinSourceAuthority(Request $request, int $hsEvent, int $exception)
+    private function revokeClosureExceptionWithinSourceAuthority(Request $request, HsEvent $hsEvent, int $exception)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $exception = $hsEvent->closureExceptions()->findOrFail($exception);
         $data = $request->validate([
             'reason' => ['required', 'string', 'min:10', 'max:2000'],
@@ -518,12 +512,11 @@ class HsEventController extends Controller
      */
     public function acceptHandover(Request $request, int $hsEvent)
     {
-        return DB::transaction(fn () => $this->acceptHandoverWithinSourceAuthority($request, $hsEvent));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->acceptHandoverWithinSourceAuthority($request, $event)));
     }
 
-    private function acceptHandoverWithinSourceAuthority(Request $request, int $hsEvent)
+    private function acceptHandoverWithinSourceAuthority(Request $request, HsEvent $hsEvent)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $data = $request->validate([
             'owner_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'acceptance_notes' => ['nullable', 'string', 'max:2000'],
@@ -562,12 +555,11 @@ class HsEventController extends Controller
      */
     public function worksafeNotify(Request $request, int $hsEvent)
     {
-        return DB::transaction(fn () => $this->worksafeNotifyWithinSourceAuthority($request, $hsEvent));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->worksafeNotifyWithinSourceAuthority($request, $event)));
     }
 
-    private function worksafeNotifyWithinSourceAuthority(Request $request, int $hsEvent)
+    private function worksafeNotifyWithinSourceAuthority(Request $request, HsEvent $hsEvent)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
         $data = $request->validate([
             'notified_at' => ['required', 'date'],
@@ -597,12 +589,11 @@ class HsEventController extends Controller
      */
     public function worksafeAcknowledge(Request $request, int $hsEvent)
     {
-        return DB::transaction(fn () => $this->worksafeAcknowledgeWithinSourceAuthority($request, $hsEvent));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->worksafeAcknowledgeWithinSourceAuthority($request, $event)));
     }
 
-    private function worksafeAcknowledgeWithinSourceAuthority(Request $request, int $hsEvent)
+    private function worksafeAcknowledgeWithinSourceAuthority(Request $request, HsEvent $hsEvent)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
         $data = $request->validate([
             'acknowledged_at' => ['required', 'date'],
@@ -619,12 +610,11 @@ class HsEventController extends Controller
 
     public function worksafeSitePreservation(Request $request, int $hsEvent)
     {
-        return DB::transaction(fn () => $this->worksafeSitePreservationWithinSourceAuthority($request, $hsEvent));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->worksafeSitePreservationWithinSourceAuthority($request, $event)));
     }
 
-    private function worksafeSitePreservationWithinSourceAuthority(Request $request, int $hsEvent)
+    private function worksafeSitePreservationWithinSourceAuthority(Request $request, HsEvent $hsEvent)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $data = $request->validate([
             'required' => ['required', 'boolean'],
             'evidence_reference' => ['required', 'string', 'min:5', 'max:500'],
@@ -646,12 +636,11 @@ class HsEventController extends Controller
 
     public function worksafeSitePreservationRelease(Request $request, int $hsEvent)
     {
-        return DB::transaction(fn () => $this->worksafeSitePreservationReleaseWithinSourceAuthority($request, $hsEvent));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->worksafeSitePreservationReleaseWithinSourceAuthority($request, $event)));
     }
 
-    private function worksafeSitePreservationReleaseWithinSourceAuthority(Request $request, int $hsEvent)
+    private function worksafeSitePreservationReleaseWithinSourceAuthority(Request $request, HsEvent $hsEvent)
     {
-        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
         $data = $request->validate([
             'released_at' => ['required', 'date'],
             'evidence_reference' => ['required', 'string', 'min:5', 'max:500'],
@@ -1294,15 +1283,14 @@ class HsEventController extends Controller
         int $hsEvent,
         ClientIncidentAttachment $attachment,
     ): StreamedResponse {
-        return DB::transaction(fn () => $this->downloadIncidentAttachmentWithinSourceAuthority($request, $hsEvent, $attachment));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->downloadIncidentAttachmentWithinSourceAuthority($request, $event, $attachment), false));
     }
 
     private function downloadIncidentAttachmentWithinSourceAuthority(
         Request $request,
-        int $hsEvent,
+        HsEvent $event,
         ClientIncidentAttachment $attachment,
     ): StreamedResponse {
-        $event = $this->resolveAccessibleEvent($request, $hsEvent);
         $incidentId = $event->source_type === ClientIncident::class
             ? (int) $event->source_id
             : (int) ($event->clientIncident()->value('id') ?? 0);
@@ -1323,15 +1311,14 @@ class HsEventController extends Controller
         int $hsEvent,
         EvidenceItem $item,
     ): StreamedResponse {
-        return DB::transaction(fn () => $this->downloadControlRoomEvidenceWithinSourceAuthority($request, $hsEvent, $item));
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->downloadControlRoomEvidenceWithinSourceAuthority($request, $event, $item), false));
     }
 
     private function downloadControlRoomEvidenceWithinSourceAuthority(
         Request $request,
-        int $hsEvent,
+        HsEvent $event,
         EvidenceItem $item,
     ): StreamedResponse {
-        $event = $this->resolveAccessibleEvent($request, $hsEvent);
         $sourceIncident = $event->source_type === ClientIncident::class
             ? ClientIncident::query()->find($event->source_id)
             : $event->clientIncident()->first();
@@ -1358,10 +1345,11 @@ class HsEventController extends Controller
      */
     public function correctiveActions(Request $request): Response
     {
-        return DB::transaction(fn () => $this->correctiveActionsWithinSourceAuthority($request));
+        return Inertia::render('health-safety/corrective-actions/index', $this->registerRead($request,
+            fn (HealthSafetyReadContext $context): array => $this->correctiveActionsWithinSourceAuthority($request, $context)));
     }
 
-    private function correctiveActionsWithinSourceAuthority(Request $request): Response
+    private function correctiveActionsWithinSourceAuthority(Request $request, HealthSafetyReadContext $context): array
     {
         $this->validateRegisterPeriod($request);
         $tab = (string) $request->input('tab', $this->legacyActionTab($request));
@@ -1384,18 +1372,14 @@ class HsEventController extends Controller
 
         $this->applyActionTab($query, $tab);
         $this->applyActionRefinements($query, $request);
-        $this->applyActionScope($query, $request);
+        $this->applyActionScope($query, $request, null, $context);
 
         $actions = $query->paginate(25)->withQueryString();
         $pageActions = $actions->getCollection();
         $strictEventIds = HsEvent::query()
             ->whereKey($pageActions->pluck('hs_event_id')->filter()->unique()->all());
-        $this->siteAccess->applyHsEventScope(
-            $strictEventIds,
-            $request->user(),
-            [],
-        );
-        app(HsEventAccessService::class)->applyFirstAidSourceScope($strictEventIds, $request->user());
+        $context->applyEventSiteScope($strictEventIds, []);
+        app(HsEventAccessService::class)->applyFirstAidSourceScope($strictEventIds, $request->user(), $context);
         $strictEventIds = $strictEventIds->pluck('id')->map(fn ($id) => (int) $id);
         $evidenceLoadState = HsCorrectiveActionPresenter::EVIDENCE_LOADED;
         try {
@@ -1433,7 +1417,7 @@ class HsEventController extends Controller
             ] : null,
         ]);
 
-        $base = $this->actionScopedBase($request);
+        $base = $this->actionScopedBase($request, $context);
         $countStatus = fn (string $status): int => (int) (clone $base)->where('status', $status)->count();
         $openCount = $countStatus(HsCorrectiveAction::STATUS_OPEN);
         $inProgressCount = $countStatus(HsCorrectiveAction::STATUS_IN_PROGRESS);
@@ -1476,15 +1460,12 @@ class HsEventController extends Controller
 
         $detail = null;
         if ($request->filled('event')) {
-            $detail = HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), function (HealthSafetyReadContext $context) use ($request): array {
-                $target = $this->resolveAccessibleEvent($request, $request->integer('event'), $context);
-
-                return $context->consumeViewer($this->detailReadPermissionKeys(),
-                    fn (User $current): array => $this->buildEventDetail($target, $current, $context));
-            });
+            $target = $this->resolveAccessibleEvent($request, $request->integer('event'), $context);
+            $detail = $context->consumeViewer($this->detailReadPermissionKeys(),
+                fn (User $current): array => $this->buildEventDetail($target, $current, $context));
         }
 
-        $siteIds = $this->actionScopedBase($request)->whereHas('hsEvent', fn (Builder $q) => $q->whereNotNull('site_id'))
+        $siteIds = $this->actionScopedBase($request, $context)->whereHas('hsEvent', fn (Builder $q) => $q->whereNotNull('site_id'))
             ->with('hsEvent:id,site_id')
             ->get()
             ->pluck('hsEvent.site_id')
@@ -1492,8 +1473,8 @@ class HsEventController extends Controller
             ->unique()
             ->values();
 
-        return Inertia::render('health-safety/corrective-actions/index', [
-            'actions' => $actions,
+        return [
+            'actions' => $actions->toArray(),
             'tab' => $tab,
             'tabCounts' => $tabCounts,
             'hero' => $hero,
@@ -1514,7 +1495,7 @@ class HsEventController extends Controller
                 'from' => $request->input('from'),
                 'to' => $request->input('to'),
             ],
-            'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']),
+            'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name'])->toArray(),
             'detail' => $detail,
             'can' => [
                 'manage' => $canManage,
@@ -1522,7 +1503,7 @@ class HsEventController extends Controller
                 // (NOT hazards.manage) per the corrective-actions handover.
                 'viewReports' => (bool) ($request->user()?->canDo('governance.view') ?? false),
             ],
-        ]);
+        ];
     }
 
     private function legacyActionTab(Request $request): string
@@ -1545,7 +1526,7 @@ class HsEventController extends Controller
         };
     }
 
-    private function applyActionScope(Builder $query, Request $request, ?Builder $sourceActions = null): void
+    private function applyActionScope(Builder $query, Request $request, ?Builder $sourceActions = null, ?HealthSafetyReadContext $context = null): void
     {
         $this->applyActionSourceFilters($query, $request);
         $candidateActions = clone ($sourceActions ?? $query);
@@ -1555,13 +1536,18 @@ class HsEventController extends Controller
         $candidateActions->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_corrective_actions.hs_event_id');
         $sourceCandidates = HsEvent::query()->whereIn('id', $candidateActions);
         $this->siteAccess->applyHsEventScope($sourceCandidates, $request->user(), $this->hsEventBypassPermissions());
-        $query->whereHas('hsEvent', function (Builder $eventQuery) use ($request, $sourceCandidates) {
-            $this->siteAccess->applyHsEventScope(
-                $eventQuery,
-                $request->user(),
-                $this->hsEventBypassPermissions(),
-            );
-            app(HsEventAccessService::class)->applyFirstAidSourceScope($eventQuery, $request->user(), null, $sourceCandidates);
+        $query->whereHas('hsEvent', function (Builder $eventQuery) use ($request, $sourceCandidates, $context) {
+            if ($context !== null) {
+                $context->applyEventSiteScope($eventQuery, $this->hsEventBypassPermissions());
+            } else {
+                $this->siteAccess->applyHsEventScope(
+                    $eventQuery,
+                    $request->user(),
+                    $this->hsEventBypassPermissions(),
+                );
+            }
+            // Without the read context, actions on incident-linked events are refused.
+            app(HsEventAccessService::class)->applyFirstAidSourceScope($eventQuery, $request->user(), $context, $sourceCandidates);
         });
     }
 
@@ -1584,11 +1570,11 @@ class HsEventController extends Controller
         }
     }
 
-    private function actionScopedBase(Request $request): Builder
+    private function actionScopedBase(Request $request, ?HealthSafetyReadContext $context = null): Builder
     {
         $query = HsCorrectiveAction::query();
         $this->applyActionRefinements($query, $request);
-        $this->applyActionScope($query, $request);
+        $this->applyActionScope($query, $request, null, $context);
 
         return $query;
     }
@@ -1626,6 +1612,40 @@ class HsEventController extends Controller
                     ->orWhere('title', 'like', "%{$term}%")
                     ->orWhereHas('hsEvent', fn (Builder $event) => $event->where('reference_number', 'like', "%{$term}%"));
             });
+        }
+    }
+
+    /**
+     * Event commands read the event as the event page does (incident-linked events need incident read) and run while
+     * that read holds. Without the read, incident-linked events are always refused.
+     *
+     * @param  \Closure(HsEvent, HealthSafetyReadContext): mixed  $command
+     */
+    private function onAccessibleEvent(Request $request, int $eventId, \Closure $command, bool $forUpdate = true): mixed
+    {
+        return app(HsEventAccessService::class)->withReadableEvent($request->user(), $eventId, $command,
+            $this->hsEventBypassPermissions(), $this->detailReadPermissionKeys(), $forUpdate);
+    }
+
+    /**
+     * A register page read through the H&S source read, so incident-linked events show to viewers who can read the
+     * incident. The read takes no-wait shared locks, which can meet a save in progress, so it is retried briefly.
+     *
+     * @param  \Closure(HealthSafetyReadContext): array  $read
+     */
+    private function registerRead(Request $request, \Closure $read): array
+    {
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), $read);
+            } catch (\Illuminate\Database\QueryException|\Illuminate\Database\DeadlockException $error) {
+                $code = (int) ($error->errorInfo[1] ?? 0);
+                if ($attempt >= 3 || DB::transactionLevel() > 0
+                    || ! ($error instanceof \Illuminate\Database\DeadlockException || in_array($code, [1205, 1213, 3572], true))) {
+                    throw $error;
+                }
+                usleep(100_000 * $attempt);
+            }
         }
     }
 

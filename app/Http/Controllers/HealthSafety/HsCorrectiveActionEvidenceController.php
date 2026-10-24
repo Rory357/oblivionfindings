@@ -183,16 +183,9 @@ class HsCorrectiveActionEvidenceController extends Controller
         Request $request,
         HsEvent $event,
     ): HsEvent {
-        $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope(
-            $query,
-            $request->user(),
-            [],
-        );
-
-        app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $request->user());
-
-        return $query->findOrFail($event->id);
+        // The event page's H&S source read (incident-linked events need incident read); it stays locked until commit.
+        // Evidence changes the action, not the event, so the event isn't held for update.
+        return app(HsEventAccessService::class)->readableEventForCommand($request->user(), (int) $event->id, [], false);
     }
 
     private function lockAction(
