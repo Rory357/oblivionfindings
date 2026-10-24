@@ -46,6 +46,33 @@ class SiteCalendarAggregator
 
     private array $participationAccess = ['status' => 'not_requested', 'reason' => null];
 
+    /** PPE dates through the PPE source read: the viewer's PPE access and current Sites. No access means no PPE items. */
+    private function ppeForViewer(array $siteIds, Carbon $start, Carbon $end, mixed $viewer): array
+    {
+        if (! $viewer instanceof \App\Models\User) {
+            return [];
+        }
+        try {
+            return app(\App\Services\HealthSafety\PpeSiteReadService::class)
+                ->obligationsForViewer(array_values(array_map('intval', $siteIds)), $start, $end, $viewer);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $denied) {
+            if (! in_array($denied->getStatusCode(), [403, 404], true)) {
+                throw $denied;
+            }
+
+            return [];
+        }
+    }
+
+    /** A calendar item from its array form (the PPE read adds integrity facts the item doesn't carry). */
+    private static function calendarItem(array $row): CalendarItem
+    {
+        static $params = null;
+        $params ??= array_map(fn (\ReflectionParameter $p) => $p->getName(), (new \ReflectionMethod(CalendarItem::class, '__construct'))->getParameters());
+
+        return new CalendarItem(...array_intersect_key($row, array_flip($params)));
+    }
+
     /** How the last range read admitted worker-participation obligations (they need a canonical viewer read). */
     public function participationSourceAccess(): array
     {
@@ -129,9 +156,12 @@ class SiteCalendarAggregator
                 continue;
             }
 
-            // Participation and drill obligations are read for the explicit viewer (their own source access).
-            $viewer = array_key_exists('viewer', $filters) ? $filters['viewer'] : request()->user();
-            if ($provider instanceof WorkerParticipationObligationProvider) {
+            // Participation, drill and PPE obligations are read for the explicit viewer (their own source access);
+            // without one, the signed-in user (request()->user() is empty outside a web request).
+            $viewer = array_key_exists('viewer', $filters) ? $filters['viewer'] : (request()->user() ?? auth()->user());
+            if ($provider instanceof PpeObligationProvider) {
+                $obligations = array_map(fn (array $row): CalendarItem => self::calendarItem($row), $this->ppeForViewer($siteIds, $start, $end, $viewer));
+            } elseif ($provider instanceof WorkerParticipationObligationProvider) {
                 $read = $provider->readForViewer($siteIds, $start, $end, $viewer,
                     $filters['health_safety_context'] ?? null, $filters['participation_access'] ?? null);
                 $this->participationAccess = $read['source_access'];
