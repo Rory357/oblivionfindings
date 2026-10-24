@@ -990,7 +990,8 @@ class RbacSeeder extends Seeder
             'calendar.view', 'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign', 'hazards.close',
             'healthSafety.viewAllSites', 'healthSafety.events.close', 'healthSafety.events.closeAny',
             'healthSafety.closureExceptions.request',
-            'incidents.create',
+            // Stephan 25 Oct 2026: H&S officers read incidents (Site and privacy rules still apply).
+            'incidents.create', 'incidents.viewAny',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',
