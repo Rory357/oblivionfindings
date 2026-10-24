@@ -6,8 +6,9 @@ use App\Services\Incidents\IncidentEvidenceWindowPolicyValues as Policy;
 use App\Services\Incidents\IncidentRecordingReconstructionValues as Values;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
+/** Boots the app: invalid policies throw ValidationException, which needs the validator binding. */
 final class IncidentEvidenceWindowPolicyValuesTest extends TestCase
 {
     public function test_site_override_is_exact_and_does_not_expand_source_permissions(): void

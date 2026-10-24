@@ -5,6 +5,7 @@ namespace App\Services\HealthSafety;
 use App\Models\Client;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Support\HealthSafety\QueryPaging;
 use App\Models\HsRiskAssessment;
 use App\Models\Site;
 use App\Models\User;
@@ -67,10 +68,10 @@ final class RiskAssessmentWorkspaceConnectionsService
                 $eventBinding = $canonical->hs_event_id !== null ? 'hs_event_id' : 'assessable_id';
                 $eventCandidates = HsEvent::query()->whereKey($eventId);
                 $eventQuery = $this->events->applyReadableScope(clone $eventCandidates, $viewer, $context, $eventCandidates)
-                    ->whereIn('hs_events.id', (clone $canonicalQuery)->setEagerLoads([])->select('hs_risk_assessments.'.$eventBinding));
+                    ->whereIn('hs_events.id', (clone $canonicalQuery)->setEagerLoads([])->when(true, QueryPaging::clear(...))->select('hs_risk_assessments.'.$eventBinding));
                 $context->reconsumeIncidentPredicate($eventQuery, $canonicalQuery);
                 $eventQuery->with(['owner' => function ($relation) use ($eventQuery, $context): void {
-                    $relation->select(['id', 'name'])->whereIn('users.id', (clone $eventQuery)->setEagerLoads([])->select('hs_events.owner_user_id'));
+                    $relation->select(['id', 'name'])->whereIn('users.id', (clone $eventQuery)->setEagerLoads([])->when(true, QueryPaging::clear(...))->select('hs_events.owner_user_id'));
                     $context->reconsumeIncidentPredicate($relation->getQuery(), $eventQuery);
                     HealthSafetyReadMaterialisationProof::current($context)?->protect($relation->getQuery());
                 }]);
@@ -87,7 +88,7 @@ final class RiskAssessmentWorkspaceConnectionsService
                     $result['tasks'][] = [...$this->taskSummary($task, (int) $event->id, null, $recordHref),
                         'id' => $task->id, 'source' => $task->source];
                 }
-                $actionQuery = HsCorrectiveAction::query()->where('hs_event_id', $event->id)->whereIn('hs_event_id', (clone $eventQuery)->setEagerLoads([])->select('hs_events.id'))->orderByDesc('id');
+                $actionQuery = HsCorrectiveAction::query()->where('hs_event_id', $event->id)->whereIn('hs_event_id', (clone $eventQuery)->setEagerLoads([])->when(true, QueryPaging::clear(...))->select('hs_events.id'))->orderByDesc('id');
                 $context->reconsumeIncidentPredicate($actionQuery, $eventQuery);
                 $actions = (HealthSafetyReadMaterialisationProof::current($context)?->protect($actionQuery) ?? $actionQuery)->get(['id', 'due_date']);
                 foreach ($actions as $action) {

@@ -444,8 +444,18 @@ final class IncidentRegisterReadService
     {
         $current = [];
         foreach ($relations as $relation) {
+            // "name:col,col" is only parsed by Laravel for plain strings, not keys with a callback,
+            // so split it here and select the columns inside the callback.
+            [$name, $columns] = array_pad(explode(':', $relation, 2), 2, null);
             // Eager callbacks receive a Relation, not invariably an Eloquent Builder.
-            $current[$relation] = function ($relationQuery) use ($reads): void {
+            $current[$name] = function ($relationQuery) use ($reads, $columns): void {
+                if ($columns !== null) {
+                    $relationQuery->select(array_map(
+                        fn (string $column) => $relationQuery instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany
+                            ? $relationQuery->getRelated()->qualifyColumn($column) : $column,
+                        explode(',', $columns),
+                    ));
+                }
                 $query = $relationQuery instanceof \Illuminate\Database\Eloquent\Relations\Relation ? $relationQuery->getQuery() : $relationQuery;
                 $reads->query($query);
             };

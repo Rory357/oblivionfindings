@@ -193,10 +193,16 @@ class HsCorrectiveAction extends Model
         return $query->whereNotIn('status', [self::STATUS_VERIFIED, self::STATUS_CLOSED]);
     }
 
+    /** The worker calendar; an empty setting falls back to the application timezone. */
+    private static function workerTimezone(): string
+    {
+        return (string) (config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone', 'UTC'));
+    }
+
     public function scopeOverdue($query)
     {
         return $query->whereNotNull('due_date')
-            ->where('due_date', '<', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+            ->where('due_date', '<', now(self::workerTimezone())->toDateString())
             ->whereNotIn('status', [self::STATUS_VERIFIED, self::STATUS_CLOSED]);
     }
 
@@ -245,7 +251,7 @@ class HsCorrectiveAction extends Model
     public function isOverdue(): bool
     {
         return $this->due_date
-            && $this->due_date->toDateString() < now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString()
+            && $this->due_date->toDateString() < now(self::workerTimezone())->toDateString()
             && $this->isOpen();
     }
 

@@ -263,7 +263,7 @@ class IncidentJourneyPresenter
         $type = bin2hex(ClientIncident::class);
         return "CASE WHEN client_incidents.site_id IS NOT NULL THEN client_incidents.site_id "
             ."WHEN EXISTS(SELECT 1 FROM hs_events e WHERE e.id = client_incidents.hs_event_id AND e.deleted_at IS NULL "
-            ."AND e.source_type = CONVERT(UNHEX('$type') USING utf8mb4) AND e.source_id = client_incidents.id AND e.site_id IS NOT NULL FOR SHARE NOWAIT) "
+            ."AND BINARY e.source_type = BINARY CONVERT(UNHEX('$type') USING utf8mb4) AND e.source_id = client_incidents.id AND e.site_id IS NOT NULL FOR SHARE NOWAIT) "
             ."THEN (SELECT e.site_id FROM hs_events e WHERE e.id = client_incidents.hs_event_id AND e.deleted_at IS NULL LIMIT 1 FOR SHARE NOWAIT) "
             ."WHEN client_incidents.shift_id IS NOT NULL THEN (SELECT s.site_id FROM shifts s WHERE s.id = client_incidents.shift_id AND s.client_id = client_incidents.client_id LIMIT 1 FOR SHARE NOWAIT) "
             ."ELSE (SELECT c.site_id FROM clients c WHERE c.id = client_incidents.client_id AND c.deleted_at IS NULL LIMIT 1 FOR SHARE NOWAIT) END";
