@@ -446,8 +446,10 @@ class HsRecommendationDispositionTest extends TestCase
         $user = User::factory()->create(['role' => 'health_safety_officer', 'approved_at' => now()]);
         $role = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
         $user->roles()->attach($role);
+        // H&S reads need at least one approved Site; an all-Sites officer still works at a real one.
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
+            'primary_site_id' => Site::factory()->create()->id,
             'secondary_site_ids' => [],
         ]);
 
