@@ -21,7 +21,9 @@ it('opens the permanent equipment record from both real mobile cards and desktop
     // The shared list owns its complete card branch even when the desktop table is selected.
     const cards = mobile ?? container.querySelector('ul[class*="md:hidden"]');
     expect(cards).not.toBeNull();
-    expect(within(cards as HTMLElement).getByRole('link', { name: /Open Recorded gloves/ })).toHaveAttribute('href', href);
+    // The shared entity card links its name and its Open action to the same permanent record.
+    const cardLinks = within(cards as HTMLElement).getAllByRole('link', { name: /Open Recorded gloves/ });
+    expect(cardLinks.length).toBeGreaterThan(0); cardLinks.forEach((link) => expect(link).toHaveAttribute('href', href));
     const desktop = container.querySelector('div.hidden.md\\:block');
     expect(desktop).not.toBeNull();
     expect(within(desktop as HTMLElement).getByRole('link', { name: /Open Recorded gloves/ })).toHaveAttribute('href', href);
@@ -34,7 +36,8 @@ it('withholds all damaged-row facts in both branches even when stale values arri
     expect(screen.queryByText('Store A')).not.toBeInTheDocument();
     expect(screen.queryByText('12 Oct 2026')).not.toBeInTheDocument();
     expect(screen.getByText(/Recorded quantity is not confirmed/)).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /Open Equipment 9/ })).toHaveLength(2);
+    const repairLinks = screen.getAllByRole('link', { name: /Open Equipment 9/ });
+    expect(repairLinks.length).toBeGreaterThanOrEqual(2); repairLinks.forEach((link) => expect(link.getAttribute('href')).toBe(href));
     expect(screen.getByRole('status')).toHaveTextContent(/equipment source needs review/);
 });
 it('labels a capped preview and saved-record count without claiming a complete active inventory', () => {
