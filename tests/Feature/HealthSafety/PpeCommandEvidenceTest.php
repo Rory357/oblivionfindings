@@ -298,7 +298,9 @@ final class PpeCommandEvidenceTest extends PpeCommandTestCase
         $item = $this->item(); $file = PpeAttachment::findOrFail($this->upload($item)['source_id']);
         $event = \App\Models\HsEvent::factory()->create(['site_id' => $this->site->id]);
         $pointer = \App\Models\HsAttachment::create(['attachable_type' => $event->getMorphClass(), 'attachable_id' => $event->id,
-            'uploaded_by' => $this->worker->id, 'disk' => null, 'path' => $file->path, 'original_name' => 'OTHER-MODULE-PRIVATE-NAME']);
+            // hs_attachments.disk is NOT NULL (default 'private') in main's and Codex's schema, so the legacy pointer
+            // carries the default disk; it still names the same file and must block the purge.
+            'uploaded_by' => $this->worker->id, 'disk' => 'private', 'path' => $file->path, 'original_name' => 'OTHER-MODULE-PRIVATE-NAME']);
         $hydrated = 0; \App\Models\HsAttachment::retrieved(function () use (&$hydrated) { $hydrated++; });
         DB::flushQueryLog(); DB::enableQueryLog();
         try {
@@ -309,7 +311,8 @@ final class PpeCommandEvidenceTest extends PpeCommandTestCase
         $this->assertSame('unknown', $cleanup->state); $this->assertSame(0, $hydrated);
         $references = array_filter($queries, fn ($query) => str_contains($query['query'], '`hs_attachments`'));
         $this->assertNotEmpty($references);
-        foreach ($references as $query) { $this->assertStringNotContainsString('original_name', $query['query']); $this->assertStringNotContainsString('select *', strtolower($query['query'])); }
+        // An EXISTS probe's "select *" returns no columns; any real wide select of the pointer still fails.
+        foreach ($references as $query) { $this->assertStringNotContainsString('original_name', $query['query']); $this->assertStringNotContainsString('select *', (string) preg_replace('/exists\s*\(\s*select \*/', 'exists (select 1', strtolower($query['query']))); }
         $dto = $this->service()->cleanupForViewer($this->manager, $cleanup->id);
         $this->assertStringNotContainsString('OTHER-MODULE-PRIVATE-NAME', json_encode($dto));
         Storage::disk('private')->assertExists($file->path); $this->assertNotNull($pointer->fresh());

@@ -110,7 +110,7 @@ final class HsDashboardClientOptionsSourceReadTest extends RestraintEventCommand
         $this->sourceHttp($this->actor)->assertOk()->assertJsonPath('clients.0.id', $this->client->id);
         // The Site comparison keeps its current-staff rule: it is withheld (empty) while the rest of the overview
         // opens, as main's overview tests expect (HealthSafetyDashboardController::siteLeagueOrEmpty).
-        $this->overview()->assertOk()->assertJsonPath('props.kpis.site_league', []);
+        $this->overview()->assertOk()->assertJsonPath('props.site_league', []);
     }
 
     public function test_approved_portal_membership_preserves_own_subject_without_staff_or_full_client_permission(): void
