@@ -65,7 +65,8 @@ final class IncidentRoutingSettingsHttpTest extends IncidentRoutingTestCase
         $this->putJson(self::URL, $this->payload())->assertForbidden();
         $actor->hrEmployeeProfile()->update(['is_active' => true]);
         $this->getJson(self::URL)->assertOk();
-        $external = $this->staff([IncidentRoutingSettings::PERMISSION]); $external->update(['external_clinical_account' => true]);
+        // external_clinical_account is not mass assignable; update() would silently leave an internal account.
+        $external = $this->staff([IncidentRoutingSettings::PERMISSION]); $external->forceFill(['external_clinical_account' => true])->save();
         $this->actingAs($external)->getJson(self::URL)->assertForbidden();
     }
 
@@ -192,7 +193,10 @@ final class IncidentRoutingSettingsHttpTest extends IncidentRoutingTestCase
         $receipt = HealthSafetySettingChange::where('command_key', $input['request_uuid'])->sole()->accepted_result;
         $this->getJson('/health-safety/settings')->assertOk()->assertJsonPath('health_safety_routing_receipt', $receipt)
             ->assertJsonPath('routing_viewer_id', $this->manager->id);
-        $this->get('/health-safety/settings')->assertOk()->assertInertia(fn (Assert $page) => $page->component('health-safety/settings')
+        // The redirect flashes only the UUID, and the visit above consumed that flash; the Inertia page
+        // reconstructs the same receipt from the same stored UUID.
+        $this->withSession(['health_safety_routing_request_uuid' => $input['request_uuid']])
+            ->get('/health-safety/settings')->assertOk()->assertInertia(fn (Assert $page) => $page->component('health-safety/settings')
             ->where('health_safety_routing_receipt', $receipt)->where('routing_viewer_id', $this->manager->id));
     }
 
@@ -337,7 +341,8 @@ final class IncidentRoutingSettingsHttpTest extends IncidentRoutingTestCase
             ->assertJsonPath('routing_history.data.0.revision', 1);
         $this->getJson('/health-safety/settings?routing_page=2')->assertOk()->assertJsonCount(1, 'routing_history.data')
             ->assertJsonPath('policy.policy_revision', $policyReceipt['policy_revision']);
-        $this->assertSame(1, HealthSafetySettingChange::where('setting_key', BehaviourSupportApprovalPolicySettings::KEY)->count());
+        // BSP history is its materialised application default (revision 0) plus the one save; routing adds nothing.
+        $this->assertSame([0, 1], HealthSafetySettingChange::where('setting_key', BehaviourSupportApprovalPolicySettings::KEY)->orderBy('revision')->pluck('revision')->all());
     }
 
     public function test_inertia_save_redirect_and_partial_receipt_use_actual_actor_uuid_without_command_body(): void

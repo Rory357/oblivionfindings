@@ -91,7 +91,8 @@ final class IncidentEvidenceWindowPolicySettingsTest extends IncidentRoutingTest
         $this->assertSame('invalid',app(Policy::class)->editor($this->manager)['policy']['configuration_state']);
         $receipt=app(Policy::class)->save($this->manager,$this->command());
         $row=HealthSafetySettingChange::findOrFail($receipt['setting_change_id']);
-        $this->assertSame($raw,$row->before_value); $this->assertSame(Values::digest($raw),$row->before_digest);
+        // The JSON column reorders object keys; the retained raw content and its digest stay exact.
+        $this->assertSame(\App\Support\JsonEvidence::canonicalise($raw),\App\Support\JsonEvidence::canonicalise($row->before_value)); $this->assertSame(Values::digest($raw),$row->before_digest);
         $this->assertSame(1,$row->revision); $this->assertSame('configured',app(Policy::class)->editor($this->manager)['policy']['configuration_state']);
     }
 
@@ -102,8 +103,9 @@ final class IncidentEvidenceWindowPolicySettingsTest extends IncidentRoutingTest
         $this->denial(fn()=>app(Policy::class)->save($this->manager,$payload),404);
         $payload['policy']['rules'][0]['site_id']=(int)$this->site->id;
         $this->site->update(['is_active'=>false]);
-        try { app(Policy::class)->save($this->manager,$payload); $this->fail('Inactive Site must not be newly selected.'); }
-        catch (\Illuminate\Database\Eloquent\ModelNotFoundException) { $this->assertSame(0,HealthSafetySettingChange::where('setting_key',Policy::KEY)->count()); }
+        // Inactive Sites are outside the actor's current selectable Sites, so the refusal is the same generic 404.
+        $this->denial(fn()=>app(Policy::class)->save($this->manager,$payload),404);
+        $this->assertSame(0,HealthSafetySettingChange::where('setting_key',Policy::KEY)->count());
         $this->site->update(['is_active'=>true]);
         $receipt=app(Policy::class)->save($this->manager,$payload);
         $this->site->update(['is_active'=>false]);

@@ -28,6 +28,8 @@ final class IncidentRoutingSettings
     public function withLockedConfiguration(callable $operation, ?User $manager = null, ?callable $beforeRead = null): mixed
     {
         return DB::transaction(function () use ($operation, $manager, $beforeRead): mixed {
+            // A denied manager neither materialises nor reads the routing mutex; authority is re-read under the lock below.
+            if ($manager) { CurrentAuthorizationReads::within(fn ($reads) => $this->current($manager, $reads)); }
             AppSetting::query()->insertOrIgnore(['key' => self::REVISION_KEY, 'value' => json_encode(0), 'created_at' => now(), 'updated_at' => now()]);
             $mutex = AppSetting::query()->where('key', self::REVISION_KEY)->lockForUpdate()->firstOrFail();
             if ($manager) { CurrentAuthorizationReads::within(fn ($reads) => $this->current($manager, $reads)); }
@@ -113,7 +115,7 @@ final class IncidentRoutingSettings
                     IncidentRoutingValues::error('request_uuid', 'This command identity already belongs to different saved work.');
                 }
                 $this->assertHistory($existing);
-                return $existing->accepted_result;
+                return self::receipt($existing->accepted_result);
             }
             if ($before['revision'] === null || $before['revision'] !== $values['expected_revision'] || $before['revision'] >= 2147483646) {
                 IncidentRoutingValues::error('expected_revision', 'The routing configuration changed or needs repair. Review current settings; your entries are retained.');
@@ -192,8 +194,18 @@ final class IncidentRoutingSettings
                 return null;
             }
             $this->assertHistory($row);
-            return $row->accepted_result;
+            return self::receipt($row->accepted_result);
         }));
+    }
+
+    /**
+     * A replayed receipt keeps the key order of the originally accepted one. MySQL JSON columns
+     * reorder object keys, and assertHistory() has already proved these exact keys and values.
+     */
+    private static function receipt(array $stored): array
+    {
+        $order = ['accepted', 'request_uuid', 'setting_key', 'revision', 'configuration_digest', 'action', 'actor_id'];
+        return array_replace(array_intersect_key(array_flip($order), $stored), $stored);
     }
 
     public function assertHistory(HealthSafetySettingChange $row, ?\Illuminate\Database\Eloquent\Builder $protectedSource = null, ?CurrentAuthorizationReads $reads = null): void

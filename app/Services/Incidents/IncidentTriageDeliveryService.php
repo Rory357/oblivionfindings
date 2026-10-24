@@ -92,9 +92,7 @@ final class IncidentTriageDeliveryService
                 $guard = $leaf->protect($source, $rows, $reads)
                     ->whereExists(fn ($query) => $query->selectRaw('1')->from('incident_triage_deliveries')->where('id', $identity->id)
                         ->where('decision_id', $identity->decision_id)->where('recipient_user_id', $identity->recipient_user_id)
-                        ->whereRaw('BINARY `recipient_role` = BINARY ?', [$identity->recipient_role])->where('due_at', $identity->getRawOriginal('due_at')))
-                    ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('incident_routing_decisions')
-                        ->where('intent_id', $intent->id)->where('attempt', '>', $decision->attempt));
+                        ->whereRaw('BINARY `recipient_role` = BINARY ?', [$identity->recipient_role])->where('due_at', $identity->getRawOriginal('due_at')));
                 if ($mutex !== null) { $guard->whereExists(fn ($query) => $query->selectRaw('1')->from('app_settings')->where('id', $mutex->id)->where('key', $mutex->key)); }
                 $guard->whereNotExists(fn ($query) => $query->selectRaw('1')->from('audit_logs')->where('action', 'incidents.routing.evaluated')
                     ->where('auditable_type', $intent->getMorphClass())->where('auditable_id', $intent->id)->where('meta->attempt', $decision->attempt)->where('id', '!=', $audit->id));
@@ -104,9 +102,14 @@ final class IncidentTriageDeliveryService
                         ->where('auditable_id', $mutex->id)->where('meta->request_uuid', $setting->command_key)->where('id', '!=', $setting->audit_id));
                 }
                 if (! $eligible) {
+                    // A later accepted decision is itself a reason this recipient is superseded, so the skip proof binds the
+                    // same source and evidence without requiring that no later attempt exists. No notice is sent on this path.
                     if (! (clone $guard)->exists()) { throw new LogicException('Incident triage notification source changed before acceptance.'); }
                     return $this->unavailable($delivery, 'skipped', 'current_authority_unavailable');
                 }
+                // Only the current decision may notify: no later attempt may exist at any guarded read below.
+                $guard->whereNotExists(fn ($query) => $query->selectRaw('1')->from('incident_routing_decisions')
+                    ->where('intent_id', $intent->id)->where('attempt', '>', $decision->attempt));
                 $this->assertCurrent($recipient, $root, $guard, $reads, $manager);
                 if ($delivery->due_at->isFuture()) { return ['id' => $delivery->id, 'state' => 'pending', 'confirmed' => false]; }
                 $payload = ['kind' => 'incident_ownership', 'event_key' => 'incidents.owner.needs_owner',

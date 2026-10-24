@@ -81,9 +81,12 @@ final class IncidentRegisterOwnerFilterTest extends IncidentRoutingTestCase
         DB::enableQueryLog(); DB::flushQueryLog();
         try { $dto = $this->read(['owner' => 'needs_owner']); $queries = DB::getQueryLog(); }
         finally { DB::disableQueryLog(); }
-        $scan = array_filter($queries, fn ($row) => str_starts_with(str_replace(chr(96), '', $row['query']),
-            'select client_incidents.id, client_incidents.client_id, client_incidents.site_id'));
-        $this->assertCount(1, $scan); $this->assertSame(1, $dto['tabCounts']['all']);
+        // The owner scan (routing source columns) and the independent-handling identity scan (intake root columns)
+        // share their first columns; each must run exactly once for the whole register, not per tab or hero.
+        $scan = fn (string $prefix) => array_filter($queries, fn ($row) => str_starts_with(str_replace(chr(96), '', $row['query']), $prefix));
+        $this->assertCount(1, $scan('select client_incidents.id, client_incidents.client_id, client_incidents.site_id, client_incidents.shift_id, client_incidents.reported_by, client_incidents.submitted_at'));
+        $this->assertCount(1, $scan('select client_incidents.id, client_incidents.client_id, client_incidents.site_id, client_incidents.shift_id, client_incidents.reported_by, client_incidents.report_request_uuid'));
+        $this->assertSame(1, $dto['tabCounts']['all']);
     }
 
     public function test_inactive_revoked_and_damaged_owner_become_replacement_work_and_restore(): void

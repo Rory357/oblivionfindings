@@ -61,9 +61,11 @@ final class IncidentRoutingSettingsTest extends IncidentRoutingTestCase
     {
         $config = $this->config(); $config['routes'][0]['site_id'] = Site::factory()->create()->id;
         $this->denial(fn () => $this->settings($config), 404);
+        // external_clinical_account is not mass assignable and the User model refuses external-to-internal changes,
+        // so the fixture row is set and restored directly to keep the later inactive-profile check meaningful.
         foreach (['approved_at' => null, 'external_clinical_account' => true] as $key => $value) {
-            $this->lead->update([$key => $value]); $this->validation(fn () => $this->settings(), 'configuration.routes.0.lead_user_id');
-            $this->lead->update([$key => $key === 'approved_at' ? now() : false]);
+            DB::table('users')->where('id', $this->lead->id)->update([$key => $value]); $this->validation(fn () => $this->settings(), 'configuration.routes.0.lead_user_id');
+            DB::table('users')->where('id', $this->lead->id)->update([$key => $key === 'approved_at' ? now() : false]);
         }
         $this->lead->hrEmployeeProfile()->update(['is_active' => false]);
         $this->validation(fn () => $this->settings(), 'configuration.routes.0.lead_user_id');

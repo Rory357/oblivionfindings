@@ -60,8 +60,9 @@ final class IncidentRoutingCommandTest extends IncidentRoutingTestCase
     public function test_soft_deleted_safeguarding_concern_keeps_specialist_rule_and_alleged_perpetrator_exclusion(): void
     {
         $this->allow($this->lead, 'incidents.owner.holdRestricted'); $config = $this->config(); $config['routes'][0]['scope'] = 'restricted'; $this->settings($config);
+        // withoutEvents() also skips the model's creating hook, so supply its required reference.
         $root = $this->incident(); $concern = SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
-            'related_incident_id' => $root->id, 'site_id' => $this->site->id, 'alleged_perpetrator_type' => User::class, 'alleged_perpetrator_id' => $this->lead->id,
+            'reference_number' => SafeguardingConcern::generateReferenceNumber(), 'related_incident_id' => $root->id, 'site_id' => $this->site->id, 'alleged_perpetrator_type' => User::class, 'alleged_perpetrator_id' => $this->lead->id,
         ])); $concern->delete();
         $this->assertSame('needs_owner', $this->routed($root)['state']); $this->assertNull($root->fresh()->incident_owner_user_id);
     }
