@@ -27,6 +27,8 @@ final class WorkerParticipationRecipientSourceReadTest extends RestraintEventCom
     {
         parent::setUp();
         config(['app.timezone' => 'UTC', 'app.worker_timezone' => 'Pacific/Auckland']);
+        // The base class's restraint actor is current staff at this Site; it is not part of this suite's workforce.
+        $this->actor->hrEmployeeProfile()->update(['is_active' => false]);
         $this->actor = $this->staff([]);
         $this->committee = HsCommittee::create(['site_id' => $this->site->id, 'name' => 'Own source', 'status' => 'active', 'established_at' => '2026-01-01']);
         $this->meeting = $this->committee->meetings()->create(['scheduled_at' => '2026-10-14 01:00:00', 'location' => 'Original location', 'status' => 'scheduled', 'minutes' => 'Private minutes']);
@@ -52,12 +54,13 @@ final class WorkerParticipationRecipientSourceReadTest extends RestraintEventCom
     public function test_contextual_origin_expires_but_same_request_standalone_reuses_original_actor_evidence(): void
     {
         $old = null;
+        // Plain closures: an arrow fn would capture $old by value, so the origin would never reach this scope.
         HealthSafetyReadContext::within($this->actor, WorkerParticipationRecipientSourceService::PERMISSIONS,
-            fn ($context) => HealthSafetyReadMaterialisationProof::within($context, function () use ($context, &$old): array {
+            function ($context) use (&$old) { return HealthSafetyReadMaterialisationProof::within($context, function () use ($context, &$old): array {
                 $old = $this->sources->captureOrigin($this->actor, $this->meeting->id, 'attendee', null, $context);
                 $this->assertSame(1, $old->applySourcePredicate(HsCommitteeMeeting::query())->count());
                 return [];
-            }));
+            }); });
         $this->logic(fn () => $old->assertOriginal());
         $fresh = $this->sources->captureOrigin($this->actor, $this->meeting->id, 'attendee');
         $this->assertSame(1, $fresh->applySourcePredicate(HsCommitteeMeeting::query())->count());
@@ -87,11 +90,11 @@ final class WorkerParticipationRecipientSourceReadTest extends RestraintEventCom
     {
         $old = null; $predicate = null;
         HealthSafetyReadContext::within($this->actor, WorkerParticipationRecipientSourceService::PERMISSIONS,
-            fn ($context) => HealthSafetyReadMaterialisationProof::within($context, function () use ($context, &$old, &$predicate): array {
+            function ($context) use (&$old, &$predicate) { return HealthSafetyReadMaterialisationProof::within($context, function () use ($context, &$old, &$predicate): array {
                 $old = $this->sources->captureOrigin($this->actor, $this->meeting->id, 'attendee', null, $context);
                 $predicate = $old->applySourcePredicate(DB::table('hs_committee_meetings'))->selectRaw('1');
                 return [];
-            }));
+            }); });
         $other = $this->staff([]); $this->actingAs($other);
         $sqlCount = 0; $armed = true;
         DB::connection()->beforeExecuting(function ($sql) use (&$sqlCount, &$armed): void { if ($armed && str_starts_with(strtolower(ltrim($sql)), 'select') && str_contains($sql, 'hs_committee_meetings')) { $sqlCount++; } });
@@ -261,7 +264,8 @@ final class WorkerParticipationRecipientSourceReadTest extends RestraintEventCom
         }
         $this->assertFalse($this->actor->fresh()->canDo('hazards.view'));
         $this->assertSame([['recipient_id' => $recipient->id, 'audience' => 'attendee']], DB::transaction(fn () => $this->sources->candidateRecipients($this->meeting, false)));
-        $this->actor->update(['external_clinical_account' => true]);
+        // external_clinical_account is not mass assignable; update() would silently skip it.
+        $this->actor->forceFill(['external_clinical_account' => true])->save();
         $this->refused(fn () => DB::transaction(fn () => $this->sources->candidateRecipients($this->meeting)), 403);
     }
 
@@ -281,13 +285,14 @@ final class WorkerParticipationRecipientSourceReadTest extends RestraintEventCom
                 default => DB::table('permission_user')->where('user_id', $this->actor->id)->where('permission_id', Permission::where('key', 'hazards.manage')->sole()->id)->update(['allowed' => false]),
             };
         });
+        // Built outside the arrow fn below: an arrow fn would capture $armed by value and never arm the listener.
+        $callback = function ($current, $reads, $context, $proof, $descriptor, $source) use (&$armed): array {
+            $armed = true;
+            $this->withoutLocationHydration(fn () => (clone $source)->get(['id', 'location']));
+            return [];
+        };
         try {
-            $this->refused(fn () => $this->sources->withManagerSource($this->actor, $this->meeting->id,
-                function ($current, $reads, $context, $proof, $descriptor, $source) use (&$armed): array {
-                    $armed = true;
-                    $this->withoutLocationHydration(fn () => (clone $source)->get(['id', 'location']));
-                    return [];
-                }));
+            $this->refused(fn () => $this->sources->withManagerSource($this->actor, $this->meeting->id, $callback));
             $this->assertTrue($fired);
         } finally { $armed = false; }
     }
@@ -325,12 +330,13 @@ final class WorkerParticipationRecipientSourceReadTest extends RestraintEventCom
                 default => DB::table('hs_committee_meetings')->where('id', $this->meeting->id)->update(['location' => 'Changed before nested location body']),
             };
         });
+        // Built outside the arrow fns below: an arrow fn would capture $armed by value and never arm the listener.
+        $callback = function ($current, $reads, $context, $proof, $descriptor) use (&$armed): array {
+            $armed = true;
+            return $this->sources->candidateRecipients($this->meeting, true, $context, $descriptor);
+        };
         try {
-            $this->refused(fn () => DB::transaction(fn () => $this->sources->withManagerSource($this->actor, $this->meeting->id,
-                function ($current, $reads, $context, $proof, $descriptor) use (&$armed): array {
-                    $armed = true;
-                    return $this->sources->candidateRecipients($this->meeting, true, $context, $descriptor);
-                })));
+            $this->refused(fn () => DB::transaction(fn () => $this->sources->withManagerSource($this->actor, $this->meeting->id, $callback)));
             $this->assertTrue($fired); $this->assertSame(0, $hydrated);
         } finally { $armed = false; Model::setEventDispatcher($dispatcher); }
         // Failed source command rolls back only its injected change; original healthy discovery remains functional.

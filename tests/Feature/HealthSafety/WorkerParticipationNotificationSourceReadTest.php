@@ -3,6 +3,7 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Governance\Models\BoardPack;
+use App\Domain\Governance\Models\DashboardSnapshot;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
 use App\Domain\Governance\Services\BoardPackAccessService;
@@ -415,6 +416,8 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
     #[DataProvider('ordinaryFamilyEligibility')]
     public function test_production_board_pack_and_own_medication_notifications_preserve_existing_rules(bool $currentStaff): void
     {
+        // Board pack permissions come from their own seeder, not RbacSeeder.
+        $this->seed(\Database\Seeders\GovernancePermissionsSeeder::class);
         foreach (['medications.view', 'medications.controlled.view', 'medications.audit.view'] as $key) {
             $this->actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', $key)->sole()->id => ['allowed' => false]]);
         }
@@ -423,7 +426,12 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
         }
         $meeting = GovernanceMeeting::create(['meeting_type' => 'full_board', 'title' => 'Board meeting',
             'scheduled_at' => now()->addWeek(), 'duration_minutes' => 60, 'status' => 'scheduled', 'quorum_required' => 50, 'created_by' => $this->actor->id]);
-        $pack = BoardPack::create(['governance_meeting_id' => $meeting->id, 'revision_number' => 1, 'build_status' => 'published', 'generated_by' => $this->actor->id]);
+        // board_packs requires its dashboard snapshot and generated_at on this schema.
+        $snapshot = DashboardSnapshot::create(['snapshot_data' => ['widgets' => []], 'period_type' => 'month', 'period_start' => now()->startOfMonth()->toDateString(),
+            'period_end' => now()->toDateString(), 'checksum' => DashboardSnapshot::generateChecksum(['widgets' => []]), 'captured_at' => now(),
+            'captured_by' => $this->actor->id, 'data_freshness' => []]);
+        $pack = BoardPack::create(['governance_meeting_id' => $meeting->id, 'dashboard_snapshot_id' => $snapshot->id, 'revision_number' => 1,
+            'build_status' => 'published', 'generated_at' => now(), 'generated_by' => $this->actor->id]);
         $packId = $this->otherNotice(BoardPackPublishedNotification::class, ['pack_id' => $pack->id, 'title' => 'Board papers']);
         $hiddenPack = $this->otherNotice(BoardPackPublishedNotification::class, ['pack_id' => 99999999, 'title' => 'Unavailable board papers']);
         $medicine = MedicationAlert::create(['type' => MedicationAlertCatalogue::RENEWALS, 'dedupe_key' => (string) Str::uuid(),
