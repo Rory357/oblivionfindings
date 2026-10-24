@@ -112,6 +112,8 @@ final class IncidentHsEventSourceReadService
         $empty = fn (): Builder => $this->protect(ClientIncident::query()->whereRaw('1 = 0'), $reads);
         $meta = array_intersect_key($original->getRawOriginal(), array_flip(self::EVENT_META));
         if (count($meta) !== count(self::EVENT_META) || ! $original->id) { return $empty(); }
+        // Callers load these columns in different orders (list identities vs a full model); compare by key, values strict.
+        ksort($meta);
         $type = $original->getRawOriginal('source_type');
         // Existing Journey read contract allows leading slash legacy spelling, never case/trailing-byte rewrites.
         if (! is_string($type) || ltrim($type, '\\') !== ClientIncident::class || ! $original->source_id) { return $empty(); }
