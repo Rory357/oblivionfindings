@@ -100,8 +100,9 @@ class IncidentAccessBoundaryTest extends TestCase
             ->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('tabCounts.all', 1)->where('rows.data.0.id', $own->id)
             ->where('detail', null)->has('clients', 1)->where('clients.0.id', $own->client_id));
-        $this->get('/incidents/'.$foreign->id)->assertForbidden();
-        $this->get('/incidents/'.$foreign->id.'/attachments/'.$attachment->id.'/download')->assertForbidden();
+        // Out-of-scope records are concealed (404); missing module authority alone is 403.
+        $this->get('/incidents/'.$foreign->id)->assertNotFound();
+        $this->get('/incidents/'.$foreign->id.'/attachments/'.$attachment->id.'/download')->assertNotFound();
         $this->assertFalse($viewer->can('update', $foreign));
         $this->assertSame(['incident-'.$own->id], array_column(app(ClientIncidentProvider::class)->authorizedTasks($viewer), 'id'));
         $this->assertSame([], app(IncidentFollowupProvider::class)->authorizedTasks($viewer, ['id' => $followup->id]));

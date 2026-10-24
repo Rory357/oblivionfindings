@@ -145,7 +145,8 @@ class IncidentOwnershipTest extends TestCase
         $this->actingAs($actor)->post('/incidents/'.$incident->id.'/owner', $this->command($owner))->assertSessionHasNoErrors();
         $owner->hrEmployeeProfile()->update(['primary_site_id' => Site::factory()->create()->id]);
         $this->get('/incidents/'.$incident->id)->assertInertia(fn (Assert $page) => $page->where('detail.ownership.state', 'replacement_needed')->where('detail.ownership.owner.name', $owner->name));
-        $this->actingAs($owner->fresh())->get('/incidents/'.$incident->id)->assertForbidden();
+        // Outside the owner's current Site scope the record is concealed (404), as the detail read decides.
+        $this->actingAs($owner->fresh())->get('/incidents/'.$incident->id)->assertNotFound();
         $this->assertSame($owner->id, $incident->fresh()->incident_owner_user_id);
         $this->assertNull(app(ClientIncidentProvider::class)->authorizedTasks($actor->fresh(), ['id' => $incident->id])[0]->assignee);
     }

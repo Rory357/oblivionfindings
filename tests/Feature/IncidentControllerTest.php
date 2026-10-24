@@ -1970,9 +1970,10 @@ class IncidentControllerTest extends TestCase
         $otherClient = Client::factory()->create();
         $incident = ClientIncident::factory()->create(['client_id' => $otherClient->id]);
 
+        // A record outside the reader's scope is concealed (404); only missing module authority is 403.
         $this->actingAs($this->staff)
             ->get("/incidents/{$incident->id}")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -3642,15 +3643,16 @@ class IncidentControllerTest extends TestCase
 
     public function test_attachment_download_accessible_by_admin(): void
     {
-        Storage::fake('public');
-        Storage::disk('public')->put('incident_attachments/test.txt', 'file content');
+        // Uploads store on the private disk (and 2026_06_21 moved older ones there); downloads serve only that disk.
+        Storage::fake('private');
+        Storage::disk('private')->put('incident_attachments/test.txt', 'file content');
 
         $incident = ClientIncident::factory()->create();
 
         $attachment = ClientIncidentAttachment::create([
             'incident_id' => $incident->id,
             'uploaded_by' => $this->admin->id,
-            'disk' => 'public',
+            'disk' => 'private',
             'original_name' => 'test.txt',
             'path' => 'incident_attachments/test.txt',
             'mime' => 'text/plain',
@@ -3679,9 +3681,10 @@ class IncidentControllerTest extends TestCase
             'size' => 1024,
         ]);
 
+        // Out-of-scope record: concealed as 404, the same shape as the detail page.
         $this->actingAs($this->staff)
             ->get("/incidents/{$incident->id}/attachments/{$attachment->id}/download")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_attachment_download_returns_404_for_mismatched_incident(): void
