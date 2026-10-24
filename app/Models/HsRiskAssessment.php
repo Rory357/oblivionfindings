@@ -162,17 +162,23 @@ class HsRiskAssessment extends Model
         return $query->whereIn('risk_level', [self::LEVEL_HIGH, self::LEVEL_EXTREME]);
     }
 
+    /** The worker calendar; an empty setting falls back to the application timezone. */
+    private static function workerTimezone(): string
+    {
+        return (string) (config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone', 'UTC'));
+    }
+
     public function scopeDueForReview($query)
     {
         return $query->whereNotNull('review_due_at')
-            ->whereDate('review_due_at', '<=', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+            ->whereDate('review_due_at', '<=', now(self::workerTimezone())->toDateString())
             ->whereIn('status', [self::STATUS_ACTIVE, self::STATUS_UNDER_REVIEW]);
     }
 
     public function scopeOverdueForReview($query)
     {
         return $query->whereNotNull('review_due_at')
-            ->whereDate('review_due_at', '<', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+            ->whereDate('review_due_at', '<', now(self::workerTimezone())->toDateString())
             ->whereIn('status', [self::STATUS_ACTIVE, self::STATUS_UNDER_REVIEW]);
     }
 
@@ -229,7 +235,7 @@ class HsRiskAssessment extends Model
     {
         return $this->review_due_at !== null
             && in_array($this->status, [self::STATUS_ACTIVE, self::STATUS_UNDER_REVIEW], true)
-            && $this->review_due_at->toDateString() <= now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+            && $this->review_due_at->toDateString() <= now(self::workerTimezone())->toDateString();
     }
 
     public function isHighOrExtreme(): bool
