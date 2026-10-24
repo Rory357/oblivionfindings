@@ -194,7 +194,9 @@ final class WorkerParticipationRecipientSourceService
         $frame = self::$receivers[request()]; $origins = [];
         $consume = function (HealthSafetyReadContext $active) use ($recipient, $candidates, $context, $frame, &$origins): array {
             $active->assertViewer($recipient);
-            return HealthSafetyReadMaterialisationProof::within($active, fn ($proof) => $active->consumeSourceViewer(self::PERMISSIONS,
+            // A plain closure, not an arrow fn: an arrow fn captures $origins by value, so the
+            // origins captured below would never reach the caller.
+            return HealthSafetyReadMaterialisationProof::within($active, function ($proof) use ($active, $candidates, $context, $frame, &$origins) { return $active->consumeSourceViewer(self::PERMISSIONS,
                 function ($current, $reads) use ($active, $proof, $candidates, $context, $frame, &$origins): array {
                     $lifetime = $context === null ? null : $this->originalLifetime($current, $active);
                     foreach ($candidates as $candidate) {
@@ -214,7 +216,7 @@ final class WorkerParticipationRecipientSourceService
                     }
                     $this->assertReceiverFrame($current, $frame);
                     return [];
-                }));
+                }); });
         };
         $context === null ? HealthSafetyReadContext::within($recipient, self::PERMISSIONS, $consume) : $consume($context);
         foreach ($origins as $origin) { $origin->assertOriginal(); }
