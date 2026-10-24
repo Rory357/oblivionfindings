@@ -25,9 +25,13 @@ final class InjuryMetricSourceReadTest extends WorkplaceInjurySourceTestCase
 
     private function hours(float $hours = 10000): void
     {
-        BillingEntry::create(['client_id' => Client::factory()->create(['site_id' => $this->site->id])->id,
-            'site_id' => $this->site->id, 'staff_id' => $this->worker->id, 'service_date' => '2026-10-10',
-            'hours' => $hours, 'rate' => 0, 'amount' => 0, 'site_name_snapshot' => $this->site->name]);
+        // billing_entries.hours is decimal(6,2): record the total as entries of at most 5,000 hours.
+        $client = Client::factory()->create(['site_id' => $this->site->id])->id;
+        for ($left = $hours; $left > 0; $left -= 5000) {
+            BillingEntry::create(['client_id' => $client,
+                'site_id' => $this->site->id, 'staff_id' => $this->worker->id, 'service_date' => '2026-10-10',
+                'hours' => min(5000, $left), 'rate' => 0, 'amount' => 0, 'site_name_snapshot' => $this->site->name]);
+        }
     }
 
     private function inReads($viewer, callable $operation): mixed
