@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BillingEntry;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\HsCorrectiveAction;
+use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
@@ -32,12 +34,22 @@ class HsKpiServiceTest extends TestCase
 
     private User $staff;
 
+    /** H&S reads are per viewer: current staff with H&S view across Sites and incident read. */
+    private User $viewer;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->svc = app(HsKpiService::class);
         $this->client = Client::factory()->create();
         $this->staff = User::factory()->create();
+        $this->viewer = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create(['user_id' => $this->viewer->id, 'primary_site_id' => Site::factory()->create()->id,
+            'secondary_site_ids' => [], 'is_active' => true, 'start_date' => '2020-01-01', 'end_date' => null]);
+        foreach (['hazards.view', 'healthSafety.viewAllSites', 'incidents.viewAny'] as $key) {
+            $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'test', 'module' => 'Test']);
+            $this->viewer->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+        }
     }
 
     /** Seed worked hours via a billing entry (the LTIFR/TRIFR denominator). */
@@ -113,11 +125,11 @@ class HsKpiServiceTest extends TestCase
         ]);
 
         // LTIFR = 1 lost-time / 1000 hrs × 1e6 = 1000.0
-        $this->assertEquals(1000.0, $this->svc->ltifr());
+        $this->assertEquals(1000.0, $this->svc->ltifr(null, null, null, $this->viewer));
         // TRIFR = 2 recordable / 1000 hrs × 1e6 = 2000.0
-        $this->assertEquals(2000.0, $this->svc->trifr());
+        $this->assertEquals(2000.0, $this->svc->trifr(null, null, null, $this->viewer));
         // Severity rate = 5 lost days / 1000 hrs × 1e6 = 5000.0
-        $this->assertEquals(5000.0, $this->svc->injurySeverityRate());
+        $this->assertEquals(5000.0, $this->svc->injurySeverityRate(null, null, null, $this->viewer));
     }
 
     public function test_rates_are_null_when_no_hours_worked(): void
@@ -128,9 +140,9 @@ class HsKpiServiceTest extends TestCase
         ]);
 
         // No billing entries booked → denominator 0 → null (no divide-by-zero figure).
-        $this->assertNull($this->svc->ltifr());
-        $this->assertNull($this->svc->trifr());
-        $this->assertNull($this->svc->injurySeverityRate());
+        $this->assertNull($this->svc->ltifr(null, null, null, $this->viewer));
+        $this->assertNull($this->svc->trifr(null, null, null, $this->viewer));
+        $this->assertNull($this->svc->injurySeverityRate(null, null, null, $this->viewer));
     }
 
     public function test_days_since_lost_time_injury_ignores_non_lost_time(): void
@@ -145,12 +157,12 @@ class HsKpiServiceTest extends TestCase
             'lost_time_days' => 0,
         ]);
 
-        $this->assertEquals(40, $this->svc->daysSinceLostTimeInjury());
+        $this->assertEquals(40, $this->svc->daysSinceLostTimeInjury(null, $this->viewer));
     }
 
     public function test_days_since_lost_time_injury_null_when_none(): void
     {
-        $this->assertNull($this->svc->daysSinceLostTimeInjury());
+        $this->assertNull($this->svc->daysSinceLostTimeInjury(null, $this->viewer));
     }
 
     // ──────────────────────────────────────────────────────
@@ -195,7 +207,7 @@ class HsKpiServiceTest extends TestCase
         ]);
 
         // 6 near misses ÷ 2 recordable incidents = 3.0×
-        $this->assertEquals(3.0, $this->svc->nearMissToIncidentRatio());
+        $this->assertEquals(3.0, $this->svc->nearMissToIncidentRatio(null, null, null, $this->viewer));
     }
 
     public function test_near_miss_ratio_null_when_no_recordable_incidents(): void
@@ -205,7 +217,7 @@ class HsKpiServiceTest extends TestCase
             'occurred_at' => now()->subMonths(2),
         ]);
 
-        $this->assertNull($this->svc->nearMissToIncidentRatio());
+        $this->assertNull($this->svc->nearMissToIncidentRatio(null, null, null, $this->viewer));
     }
 
     // ──────────────────────────────────────────────────────
@@ -248,7 +260,7 @@ class HsKpiServiceTest extends TestCase
             'lost_time_days' => 1,
         ]);
 
-        $operands = $this->svc->nearMissOperands();
+        $operands = $this->svc->nearMissOperands(null, null, null, $this->viewer);
 
         $this->assertEquals(4, $operands['near_misses']);
         $this->assertEquals(2, $operands['recordable']);
