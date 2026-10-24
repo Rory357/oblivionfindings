@@ -747,7 +747,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
     public function test_action_list_source_reference_search_and_parent_action_filter_remain_exact_after_source_revoke(): void
     {
         $source = $this->event();
-        $event = $this->hs($source, ['reference_number' => 'HS-PRIVATE-RESTRAINT-NEEDLE']);
+        $event = $this->hs($source, ['reference_number' => 'HS-PRIV-RESTR-NDL']);
         $viewer = $this->staff(['hazards.view', 'restraints.view', 'clients.viewAny']);
         $action = $this->action($event, $viewer);
         $ordinary = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id, 'reference_number' => 'HS-ORDINARY-NEEDLE']));
@@ -768,7 +768,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
     {
         $source = $this->event();
         $alert = $this->response($source);
-        $event = $this->hs($source, ['control_room_alert_id' => $alert->id, 'reference_number' => 'HS-RESTRAINT-SEARCH-UNIQUE']);
+        $event = $this->hs($source, ['control_room_alert_id' => $alert->id, 'reference_number' => 'HS-RESTR-SRCH-UNQ']);
         $viewer = $this->staff(['controlRoom.viewAny', 'controlRoom.alerts.view', 'hazards.view', 'restraints.view', 'clients.viewAny']);
         $query = app(AlertWorklistQuery::class);
         $filters = ['q' => $event->reference_number, 'site_id' => $this->site->id, 'severity' => 'medium', 'ids' => [$alert->id]];
@@ -789,10 +789,10 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
     {
         $viewer = $this->staff(['controlRoom.viewAny', 'controlRoom.alerts.view', 'hazards.view']);
         $localAlert = ControlRoomAlert::withoutEvents(fn () => ControlRoomAlert::factory()->create(['site_id' => $this->site->id, 'status' => 'open', 'severity' => 'medium', 'context' => []]));
-        $local = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id, 'control_room_alert_id' => $localAlert->id, 'reference_number' => 'HS-ORDINARY-SEARCH-LOCAL', 'handover_status' => HsEvent::HANDOVER_ACCEPTED]));
+        $local = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $this->site->id, 'control_room_alert_id' => $localAlert->id, 'reference_number' => 'HS-ORD-SRCH-LOCAL', 'handover_status' => HsEvent::HANDOVER_ACCEPTED]));
         $otherSite = Site::factory()->create();
         $foreignAlert = ControlRoomAlert::withoutEvents(fn () => ControlRoomAlert::factory()->create(['site_id' => $otherSite->id, 'status' => 'open', 'severity' => 'medium', 'context' => []]));
-        $foreign = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $otherSite->id, 'control_room_alert_id' => $foreignAlert->id, 'reference_number' => 'HS-ORDINARY-SEARCH-FOREIGN', 'handover_status' => HsEvent::HANDOVER_ACCEPTED]));
+        $foreign = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['site_id' => $otherSite->id, 'control_room_alert_id' => $foreignAlert->id, 'reference_number' => 'HS-ORD-SRCH-FOREIGN', 'handover_status' => HsEvent::HANDOVER_ACCEPTED]));
         $query = app(AlertWorklistQuery::class);
         $this->assertSame([$localAlert->id], $query->forUser($viewer, ['q' => $local->reference_number])->pluck('control_room_alerts.id')->all());
         $this->assertSame([], $query->forUser($viewer, ['q' => $foreign->reference_number])->pluck('control_room_alerts.id')->all());

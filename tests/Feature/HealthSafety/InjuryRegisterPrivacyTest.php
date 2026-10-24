@@ -826,7 +826,7 @@ class InjuryRegisterPrivacyTest extends InjuryWorkspaceReadTestCase
     {
         return WorkplaceInjury::withoutEvents(fn () => WorkplaceInjury::factory()->create([
             'user_id' => $this->worker->id, 'site_id' => $this->site->id, 'created_by' => $this->viewer->id,
-            'reference_number' => 'INJ-'.str()->uuid(), 'status' => 'reported', 'severity' => 'minor',
+            'reference_number' => 'INJ-'.substr(str_replace('-', '', (string) str()->uuid()), 0, 24), 'status' => 'reported', 'severity' => 'minor',
             'injury_type' => 'strain', 'body_part_affected' => 'Shoulder', 'description' => 'Factual occurrence',
             'injury_date' => now()->subDay(), 'lost_time_days' => 0, 'worksafe_notifiable' => false,
             'acc_claim_lodged' => false, 'medical_treatment_type' => 'none', ...$attributes,

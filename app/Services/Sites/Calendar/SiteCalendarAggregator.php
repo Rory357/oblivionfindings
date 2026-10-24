@@ -44,6 +44,14 @@ class SiteCalendarAggregator
     /** @var CalendarObligationProvider[] */
     private array $providers;
 
+    private array $participationAccess = ['status' => 'not_requested', 'reason' => null];
+
+    /** How the last range read admitted worker-participation obligations (they need a canonical viewer read). */
+    public function participationSourceAccess(): array
+    {
+        return $this->participationAccess;
+    }
+
     /**
      * @param  CalendarObligationProvider[]|null  $providers  Defaults to the full registry.
      */
@@ -92,6 +100,7 @@ class SiteCalendarAggregator
      */
     public function itemsForRange(array $siteIds, Carbon $start, Carbon $end, array $filters = []): array
     {
+        $this->participationAccess = ['status' => 'not_requested', 'reason' => null];
         if ($siteIds === []) {
             return [];
         }
@@ -120,7 +129,19 @@ class SiteCalendarAggregator
                 continue;
             }
 
-            foreach ($provider->obligations($siteIds, $start, $end) as $item) {
+            // Participation and drill obligations are read for the explicit viewer (their own source access).
+            $viewer = array_key_exists('viewer', $filters) ? $filters['viewer'] : request()->user();
+            if ($provider instanceof WorkerParticipationObligationProvider) {
+                $read = $provider->readForViewer($siteIds, $start, $end, $viewer,
+                    $filters['health_safety_context'] ?? null, $filters['participation_access'] ?? null);
+                $this->participationAccess = $read['source_access'];
+                $obligations = array_map(fn (array $facts): CalendarItem => new CalendarItem(...$facts), $read['items']);
+            } else {
+                $obligations = $provider instanceof DrillObligationProvider
+                    ? $provider->obligationsForViewer($siteIds, $start, $end, $viewer)
+                    : $provider->obligations($siteIds, $start, $end);
+            }
+            foreach ($obligations as $item) {
                 $items[] = $item;
             }
         }

@@ -571,7 +571,7 @@ final class RiskAssessmentAcceptanceService
             }
         });
         // A stripped flag/binding cannot make a still-private current parent an ordinary audit subject.
-        $query->orWhere(function (Builder $marker): void {
+        $query->orWhere(function (Builder $marker) use ($id): void {
             $marker->whereKey($id)->whereIn('assessment_id', HsRiskAssessment::query()->select('id')->where(function (Builder $risk): void {
                 $privateEvents = HsEvent::withTrashed()->select('id')->whereIn('source_type', [SubstanceExposureRecord::class, (new SubstanceExposureRecord)->getMorphClass()]);
                 $risk->whereIn('hs_event_id', clone $privateEvents)->orWhere(function (Builder $legacy) use ($privateEvents): void {
