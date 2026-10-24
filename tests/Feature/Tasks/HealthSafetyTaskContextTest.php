@@ -596,8 +596,13 @@ class HealthSafetyTaskContextTest extends TestCase
                     // "[not] exists (select 1 from <authority table> …)". They are ANDed into the read and
                     // only compare the original evidence, so they can deny but never grant. Any other read of
                     // an authority table (a select, join or load) would reacquire RBAC and still fails.
+                    // Likewise the current-staff filter's "not exists (select * from roles inner join role_user …)":
+                    // a NOT EXISTS can only remove rows (portal and client accounts), never grant. A positive
+                    // "exists" over role_user still fails.
                     $sql = preg_replace('/exists \(select 1 from `(permission_user|role_user|role_permission)`/',
                         'exists (select 1 from `authority_equality_guard`', strtolower($query['query']));
+                    $sql = preg_replace('/not exists \(select \* from `roles` inner join `role_user` on `roles`\.`id` = `role_user`\.`role_id` where `users`\.`id` = `role_user`\.`user_id`/',
+                        'not exists (select * from `roles` inner join `authority_exclusion_guard`', $sql);
                     foreach (['permission_user', 'role_user', 'role_permission'] as $authorityTable) {
                         $this->assertStringNotContainsString($authorityTable, $sql, 'Provided context must not reacquire RBAC.');
                     }
