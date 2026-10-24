@@ -90,7 +90,8 @@ class HsGovernanceTest extends TestCase
     {
         $summary = $this->governanceService->getBoardSummary(viewer: $this->applicationViewer);
 
-        $this->assertEquals('good', $summary['overall_status']);
+        // Codex's rule, kept: zeros in what one viewer can read never claim an organisation-wide all-clear.
+        $this->assertEquals('unknown', $summary['overall_status']);
     }
 
     public function test_effectiveness_rate_calculation(): void
