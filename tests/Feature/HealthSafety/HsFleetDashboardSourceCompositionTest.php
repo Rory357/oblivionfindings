@@ -178,11 +178,16 @@ final class HsFleetDashboardSourceCompositionTest extends IncidentRoutingTestCas
         $this->fleet($this->local, ['description' => 'PRIVATE-FLEET-BODY']);
         $state = (object) ['bodies' => 0];
         $dispatcher = Model::getEventDispatcher(); Model::setEventDispatcher(clone $dispatcher);
-        FleetIncident::retrieved(function (FleetIncident $row) use ($state): void {
-            if (array_key_exists('description', $row->getAttributes())) { $state->bodies++; }
+        // Main's sidebar task badge (its fleet incident task provider) loads asset names on every page; that's the
+        // shared sidebar, not the Overview's fleet counts under test, so only its share/badge frames are set aside.
+        $sidebar = static fn (): bool => array_filter(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), fn (array $frame): bool =>
+            ($frame['class'] ?? null) === \App\Http\Middleware\HandleInertiaRequests::class && ($frame['function'] ?? null) !== 'handle') !== []
+            && ! in_array(\App\Http\Controllers\HealthSafety\HealthSafetyDashboardController::class, array_column(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), 'class'), true);
+        FleetIncident::retrieved(function (FleetIncident $row) use ($state, $sidebar): void {
+            if (array_key_exists('description', $row->getAttributes()) && ! $sidebar()) { $state->bodies++; }
         });
-        Asset::retrieved(function (Asset $row) use ($state): void {
-            if (array_key_exists('name', $row->getAttributes())) { $state->bodies++; }
+        Asset::retrieved(function (Asset $row) use ($state, $sidebar): void {
+            if (array_key_exists('name', $row->getAttributes()) && ! $sidebar()) { $state->bodies++; }
         });
         try {
             $response = $this->page()->assertOk()->assertJsonPath('props.kpis.fleet_incidents_30d', 1);
