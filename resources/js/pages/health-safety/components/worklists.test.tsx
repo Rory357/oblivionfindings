@@ -20,28 +20,32 @@ const data: WorklistsPayload = {
 };
 it('opens the permanent equipment record directly instead of a second detail modal', () => {
     render(<HsWorklists worklists={data} show={['expiring']} />);
-    expect(screen.getAllByRole('link', { name: 'Open equipment: Recorded gloves' })[0]).toHaveAttribute('href', href);
-    expect(screen.getByRole('status')).toHaveTextContent(/does not confirm equipment suitability/);
+    expect(screen.getByRole('link', { name: /Recorded gloves/ })).toHaveAttribute('href', href);
+    expect(screen.getByText(/it doesn’t confirm equipment is fit to use/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 it('does not turn an undated repair marker into a due item or expose stale recorded facts', () => {
     render(<HsWorklists worklists={{ ...data, ppe_expiring_state: { ...data.ppe_expiring_state!, source_integrity: 'repair_required', total: null },
         expiring: [{ ...data.expiring[0], type: 'ppe_repair', label: 'Stale private-looking name', due_date: '2026-10-12', days_until: 0 }] }} show={['expiring']} />);
-    expect(screen.getAllByRole('link', { name: 'Open equipment: source needs review' })[0]).toHaveAttribute('href', href);
-    expect(screen.getByText('Source needs review')).toBeInTheDocument();
+    const row = screen.getByRole('link', { name: /Equipment facts need review/ });
+    expect(row).toHaveAttribute('href', href);
+    expect(within(row).getByText('Source needs review')).toBeInTheDocument();
+    expect(screen.getByText(/Some equipment facts are unconfirmed/)).toBeInTheDocument();
     expect(screen.queryByText('0 days')).not.toBeInTheDocument();
+    expect(screen.queryByText('Due today')).not.toBeInTheDocument();
     expect(screen.queryByText('Stale private-looking name')).not.toBeInTheDocument();
 });
 it('withdraws stale equipment rows when current authority is restricted while keeping unrelated due items', () => {
     render(<HsWorklists worklists={{ ...data, ppe_expiring_state: { ...data.ppe_expiring_state!, source_integrity: 'restricted' },
         expiring: [...data.expiring, { ...data.expiring[0], type: 'drill', type_label: 'Emergency drill', label: 'Recorded drill', register_url: '/health-safety/drills' }] }} show={['expiring']} />);
-    expect(screen.queryByRole('link', { name: /Open equipment/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Recorded gloves/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Recorded gloves')).not.toBeInTheDocument();
     expect(screen.getByText('Recorded drill')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/requires current safety and Site access/);
+    expect(screen.getByText(/Equipment attention requires current safety and Site access/)).toBeInTheDocument();
 });
 it('retains a capped-preview explanation even when no equipment row fits the combined feed', () => {
     render(<HsWorklists worklists={{ ...data, expiring: [], ppe_expiring_state: { ...data.ppe_expiring_state!, truncated: true, displayed_count: 0 } }} show={['expiring']} />);
-    expect(screen.getByRole('status')).toHaveTextContent(/outside this preview/);
+    expect(screen.getByText(/Some equipment items are outside this preview/)).toBeInTheDocument();
     expect(screen.getByText('No matching due items in this preview.')).toBeInTheDocument();
     expect(screen.queryByText('Nothing expiring soon.')).not.toBeInTheDocument();
 });
@@ -68,23 +72,23 @@ const connected: WorklistsPayload = {
 };
 it('opens actions, investigations and notifications on their permanent workspaces with visible owners', () => {
     render(<HsWorklists worklists={connected} show={['corrective_actions', 'investigations', 'notifiable']} />);
-    expect(screen.getAllByRole('link', { name: 'Open corrective action: Repair the rail' })[0]).toHaveAttribute('href', '/health-safety/corrective-actions/31');
-    expect(screen.getAllByRole('link', { name: 'Open investigation: INV-41' })[0]).toHaveAttribute('href', '/health-safety/events/22');
-    expect(screen.getAllByRole('link', { name: 'Open notifiable event: HS-22' })[0]).toHaveAttribute('href', '/health-safety/events/22');
-    expect(screen.getAllByText('Alex Chen')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Actions for Repair the rail' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open corrective action: Repair the rail' })).toHaveAttribute('href', '/health-safety/corrective-actions/31');
+    expect(screen.getByRole('link', { name: 'Open investigation: INV-41' })).toHaveAttribute('href', '/health-safety/events/22');
+    expect(screen.getByRole('link', { name: /Recorded event/ })).toHaveAttribute('href', '/health-safety/events/22');
+    expect(screen.getAllByText(/Alex Chen/)).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'More actions' })).toHaveLength(3);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 it('uses the real shared context menu and withdraws it when its source leaves the current preview', () => {
     const { rerender } = render(<HsWorklists worklists={connected} show={['corrective_actions']} />);
-    const card = () => screen.getAllByRole('link', { name: 'Open corrective action: Repair the rail' })[0].closest('li')!.firstElementChild!;
-    fireEvent.contextMenu(card(), { clientX: 40, clientY: 40 });
+    const row = () => screen.getByRole('link', { name: 'Open corrective action: Repair the rail' }).closest('li')!;
+    fireEvent.contextMenu(row(), { clientX: 40, clientY: 40 });
     const menu = screen.getByRole('menu');
     expect(within(menu).getByRole('menuitem', { name: 'Open record or register' })).toBeInTheDocument();
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'View recorded summary' }));
     expect(screen.getByRole('dialog', { name: 'Recorded summary' })).toHaveTextContent('Repair the rail');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    fireEvent.contextMenu(card(), { clientX: 40, clientY: 40 });
+    fireEvent.contextMenu(row(), { clientX: 40, clientY: 40 });
     rerender(<HsWorklists worklists={{ ...connected, overdue_corrective_actions: [] }} show={['corrective_actions']} />);
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -96,7 +100,6 @@ it('uses the real shared context menu and withdraws it when its source leaves th
 });
 it('uses the events register when a preview lacks a confirmed investigation parent', () => {
     render(<HsWorklists worklists={{ ...connected, open_investigations: [{ ...connected.open_investigations[0], event_id: null }] }} show={['investigations']} />);
-    expect(screen.getAllByRole('link', { name: 'Find investigation: INV-41' })[0]).toHaveAttribute('href', '/health-safety/events');
+    expect(screen.getByRole('link', { name: 'Find investigation: INV-41' })).toHaveAttribute('href', '/health-safety/events');
     expect(screen.queryByRole('link', { name: 'Open investigation: INV-41' })).not.toBeInTheDocument();
 });
-

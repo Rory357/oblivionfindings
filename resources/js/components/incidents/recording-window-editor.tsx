@@ -28,16 +28,18 @@ type Props = {
 /** Account/incident changes discard sensitive memory and abort the old request. */
 export function RecordingWindowEditor(props: Props) {
     const identity = `${props.actorId}:${props.incidentId}`;
-    const retained = useRef<{ identity: string; preview: RecordingPreview } | null>(null);
-    if (retained.current?.identity !== identity) retained.current = null;
+    // The last valid preview for this account and incident, kept as state from the previous render.
+    const [retained, setRetained] = useState<{ identity: string; preview: RecordingPreview } | null>(null);
     const available = validRecordingPreview(props.preview, props.actorId, props.incidentId);
-    if (available) retained.current = { identity, preview: props.preview! };
-    if (!retained.current) {
+    let kept = retained?.identity === identity ? retained : null;
+    if (available && kept?.preview !== props.preview) kept = { identity, preview: props.preview! };
+    if (kept !== retained) setRetained(kept);
+    if (!kept) {
         return <p role="alert" className="text-subtle text-muted-foreground">Reload the incident to check current evidence access.</p>;
     }
     // A malformed same-account refresh hides choices, but must not erase a command
     // whose response was lost. Only an account/incident change destroys that owner.
-    return <WindowEditor key={identity} {...props} preview={retained.current.preview} previewAvailable={available} />;
+    return <WindowEditor key={identity} {...props} preview={kept.preview} previewAvailable={available} />;
 }
 
 function WindowEditor({ preview, previewAvailable, actorId, incidentId, refreshing = false, onDraftStateChange, onSaved, onRefresh, requestDiscard }:

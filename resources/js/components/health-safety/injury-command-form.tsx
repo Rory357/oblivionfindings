@@ -82,7 +82,7 @@ export function InjuryCommandForm({ detail: d, command, actorId, capture, select
             if (command === 'edit' && (data.canonical_site_id !== canonicalSiteId || data.site_id !== Number(selectedSite) ||
                 !Array.isArray(data.sites) || !data.sites.every((site: { id?: unknown; name?: unknown } | null) => !!site && Number.isSafeInteger(site.id) && typeof site.name === 'string') ||
                 !data.sites.some((site: { id: number }) => site.id === data.site_id))) throw new Error('Site choices changed');
-            if (command === 'edit') setSiteChoices(data.sites);
+            if (command === 'edit') setSiteChoices(data.sites as { id: number; name: string }[]);
             setPickers(data as unknown as Options);
             if (command === 'create') setCaptureChoicesAllowed(true);
         }).catch(() => { if (!controller.signal.aborted) {
@@ -90,6 +90,7 @@ export function InjuryCommandForm({ detail: d, command, actorId, capture, select
             setPickerFailure('Current choices could not be loaded. Retry or check the current record before saving.');
         } });
         return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload choices only when the record id, version or Site changes, not for each new detail object.
     }, [endpoint, needsPickers, command, d?.id, canonicalSiteId, source.guard.version, selectedSite, pickerRetry, capture]);
     const title = command === 'create' ? 'Report workplace injury' : command === 'assign' && !d?.coordination.coordinator ? 'Assign incident owner' : INJURY_COMMAND_LABELS[command];
     const field = <K extends keyof InjuryFormValues>(key: K, label: string, type = 'text', required = false, maxLength?: number) => <Field label={label} htmlFor={`${id}-${key}`} required={required} error={(form.errors as Record<string, string>)[key]}>
@@ -187,7 +188,7 @@ export function InjuryCommandForm({ detail: d, command, actorId, capture, select
     const identityReview = Object.entries(requested).filter(([key]) => key.endsWith('_id')).map(([key, value]) => {
         let name: string | null = null;
         if (key === 'site_id') name = siteChoices.find((site) => site.id === value)?.name ?? null;
-        else if (key === 'related_incident_id') name = incidentChoices.find((incident) => incident.id === value)?.label ?? (d?.related_incident?.id === value ? d.related_incident.label : null);
+        else if (key === 'related_incident_id') name = incidentChoices.find((incident) => incident.id === value)?.label ?? (d?.related_incident && d.related_incident.id === value ? d.related_incident.label : null);
         else if (key === 'hr_document_id') name = pickers && 'documents' in pickers ? pickers.documents.items?.find((document) => document.id === value)?.title ?? null : null;
         else if (selectedPeople[key]?.id === value) name = selectedPeople[key].name;
         return { key, name: value == null ? 'Not selected' : name ?? 'Selected record needs confirmation' };

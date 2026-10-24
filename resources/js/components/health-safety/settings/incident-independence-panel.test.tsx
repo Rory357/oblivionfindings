@@ -111,11 +111,12 @@ it('saves the explicit assignment-only choice with its reason and captured polic
         screen.getByRole('combobox', { name: 'Independent review protection' }),
         { target: { value: 'assignment_only' } },
     );
+    // Once in the option card it describes, and once as the form's live explanation of the choice.
     expect(
-        screen.getByText(
+        screen.getAllByText(
             /Existing read and notification permissions still apply/,
         ),
-    ).toBeTruthy();
+    ).toHaveLength(2);
     save();
     expect(latest()[0]).toBe('/health-safety/settings/incident-independence');
     expect(latest()[1]).toMatchObject({

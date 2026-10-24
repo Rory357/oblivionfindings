@@ -18,7 +18,7 @@ import {
     visibleSafetyViews,
 } from '@/lib/health-safety/workspace-navigation';
 import { type SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ClipboardCheck, Settings } from 'lucide-react';
 import { useState } from 'react';
 
@@ -85,10 +85,12 @@ export default function SafetyRegisters({
                                 />
                                 {can_manage_settings && (
                                     <PageHeaderGlassButton
-                                        href="/health-safety/settings"
+                                        asChild
                                         icon={Settings}
                                     >
-                                        Settings
+                                        <Link href="/health-safety/settings">
+                                            Settings
+                                        </Link>
                                     </PageHeaderGlassButton>
                                 )}
                             </>

@@ -354,7 +354,7 @@ export function useSourceCommand<T extends FormDataType<T>>({
                     ...(guard.policyRevision != null
                         ? { expected_policy_revision: guard.policyRevision }
                         : {}),
-                }) as T,
+                }) as unknown as T,
         );
         let responded = false;
         form.submit(method, href, {

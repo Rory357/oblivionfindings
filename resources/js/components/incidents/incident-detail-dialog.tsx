@@ -1773,7 +1773,7 @@ export function FollowupsSection({
                     ? 'Each follow-up has a task, a person and a due date · mark one done from ⋮'
                     : 'Each follow-up has a task, a person and a due date'
             }
-            ariaLabel="Incident follow-ups"
+            ariaLabel="Incident follow-ups table"
             actions={
                 d.can.followupsManage && !formOpen ? (
                     <Button

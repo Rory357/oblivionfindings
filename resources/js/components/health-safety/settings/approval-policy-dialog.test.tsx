@@ -175,6 +175,7 @@ it('requires a reason, retains uncertain acceptance as dirty and retries the ide
         expect(register).toHaveBeenLastCalledWith(expect.any(String), {
             dirty: true,
             busy: false,
+            uncertain: false,
         }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));

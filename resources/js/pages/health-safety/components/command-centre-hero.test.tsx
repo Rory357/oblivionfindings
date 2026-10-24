@@ -70,7 +70,7 @@ const baseline: CommandCentreHeroProps = {
 
 describe('H&S shared header and source-aware attention', () => {
     it.each([null, 0, 45])(
-        'keeps the recorded LTI interval and its destination without a safety-clearance claim (%s)',
+        'keeps the recorded lost-time interval and its destination without a safety-clearance claim (%s)',
         (value) => {
             render(
                 <CommandCentreHero
@@ -85,180 +85,143 @@ describe('H&S shared header and source-aware attention', () => {
                 />,
             );
             const meter = screen.getByRole('link', {
-                name: 'View days since lti',
+                name: 'View days since a lost-time injury',
             });
             expect(
                 within(meter).getByText(value === null ? '—' : String(value)),
             ).toBeInTheDocument();
-            expect(
-                within(meter).getByText(
-                    value === null
-                        ? 'Not confirmed'
-                        : 'last readable lost-time injury',
-                ),
-            ).toBeInTheDocument();
+            if (value === null)
+                expect(within(meter).getByText('Not confirmed')).toBeInTheDocument();
+            else
+                expect(within(meter).queryByText('Not confirmed')).not.toBeInTheDocument();
             expect(meter).toHaveAttribute(
                 'href',
                 '/health-safety/analytics?period=custom&from=2026-07-01&to=2026-07-14&lens=governance',
             );
-            expect(screen.queryByText(/LTI-free/i)).not.toBeInTheDocument();
+            expect(screen.queryByText(/LTI-free|all clear/i)).not.toBeInTheDocument();
         },
     );
-    it('uses the exact backbone pending count instead of capped worklist rows without claiming safety clearance', () => {
+    it('uses the exact pending WorkSafe count and never shows unconfirmed PPE as zero', () => {
         render(
             <>
                 <CommandCentreHero {...baseline} />
                 <CommandCentreAttention {...baseline} />
             </>,
         );
+        const worksafe = screen.getByRole('link', { name: /WorkSafe reviews to do/ });
+        expect(within(worksafe).getByText('7')).toBeInTheDocument();
+        expect(worksafe).toHaveAttribute('href', '/health-safety/events?tab=worksafe_pending');
+        // No PPE state from the source: a dash and its reason, never a zero.
+        const ppe = screen.getByRole('link', { name: /Protective equipment \(PPE\) due/ });
+        expect(within(ppe).getByText('—')).toBeInTheDocument();
+        expect(within(ppe).getByText('Not confirmed')).toBeInTheDocument();
+        // Zeros fold into one line that says they only cover readable records.
         expect(
-            screen.getByText('7 pending WorkSafe reviews'),
-        ).toBeInTheDocument();
-        expect(
-            screen.queryByText('1 pending WorkSafe reviews'),
-        ).not.toBeInTheDocument();
-        expect(
-            screen.getByText('0 recorded active lone-worker alerts'),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByText('PPE attention unconfirmed'),
-        ).toBeInTheDocument();
-        expect(
-            screen.queryByText(
-                /all checked in|PPE all current|synced just now|all in review window/,
+            screen.getByText(
+                'None in the records you can see: Lone-worker alerts active, Safety data sheets to review, Drills due',
             ),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/all checked in|PPE all current|synced just now|all in review window|^Nothing/),
         ).not.toBeInTheDocument();
         expect(
             screen
-                .getByRole('heading', { level: 1, name: 'Health & Safety' })
+                .getByRole('heading', { level: 1, name: 'Health & safety' })
                 .closest('header'),
         ).toHaveClass('eh-header');
-        expect(
-            screen.getByRole('link', { name: '7 pending WorkSafe reviews' }),
-        ).toHaveAttribute('href', '/health-safety/events');
     });
     it.each([
-        ['restricted', true, 'PPE access restricted'],
-        ['repair_required', true, 'PPE facts need review'],
-        ['intact', true, 'PPE preview incomplete'],
-        ['intact', false, 'No matching PPE due in preview'],
+        ['restricted', true, '—', 'Access restricted'],
+        ['repair_required', true, '0', 'Facts need review'],
+        ['intact', true, '0', 'More records than shown'],
     ] as const)(
-        'retains %s preview truth and never counts undated source repairs as due equipment',
-        (integrity, truncated, label) => {
-            const ppeState = {
-                source_integrity: integrity,
-                truncated,
-                confirmed_count: null,
-                total: null,
-                repair_count: integrity === 'repair_required' ? 1 : null,
-                physical_record_count: null,
-                displayed_count: 1,
-            };
+        'keeps %s PPE truth on show and never counts undated source repairs as due equipment',
+        (integrity, truncated, value, note) => {
             render(
                 <CommandCentreAttention
                     {...baseline}
                     expiring={[{ type: 'ppe_repair' }]}
-                    ppeState={ppeState}
+                    ppeState={{
+                        source_integrity: integrity,
+                        truncated,
+                        confirmed_count: null,
+                        total: null,
+                        repair_count: integrity === 'repair_required' ? 1 : null,
+                        physical_record_count: null,
+                        displayed_count: 1,
+                    }}
                 />,
             );
-            expect(screen.getByText(label)).toBeInTheDocument();
-            expect(
-                screen.queryByText(/1 PPE due|No PPE due alerts/),
-            ).not.toBeInTheDocument();
+            const ppe = screen.getByRole('link', { name: /Protective equipment \(PPE\) due/ });
+            expect(within(ppe).getByText(value)).toBeInTheDocument();
+            expect(within(ppe).getByText(note)).toBeInTheDocument();
+            expect(within(ppe).queryByText('1')).not.toBeInTheDocument();
         },
     );
-    it('uses six meters in the canonical row and retains outcome and prevention destinations through the lens filter', () => {
+    it('folds an intact, complete PPE zero into the records-you-can-see line', () => {
+        render(
+            <CommandCentreAttention
+                {...baseline}
+                expiring={[{ type: 'ppe_repair' }]}
+                ppeState={{
+                    source_integrity: 'intact',
+                    truncated: false,
+                    confirmed_count: 0,
+                    total: 0,
+                    repair_count: null,
+                    physical_record_count: null,
+                    displayed_count: 0,
+                }}
+            />,
+        );
+        expect(
+            screen.queryByRole('link', { name: /Protective equipment/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByText(/^None in the records you can see: .*Protective equipment \(PPE\) due$/),
+        ).toBeInTheDocument();
+    });
+    it('shows four linked numbers for each lens and keeps their destinations', () => {
         const result = render(<CommandCentreHero {...baseline} />);
-        expect(screen.getAllByRole('link', { name: /^View /i })).toHaveLength(
-            7,
-        );
-        expect(
-            screen.getByRole('link', { name: 'View safeguarding' }),
-        ).toHaveAttribute('href', '/safeguarding?tab=open');
-        expect(
-            screen.getByRole('link', { name: 'View ltifr' }),
-        ).toHaveAttribute(
+        const analytics =
+            '/health-safety/analytics?period=custom&from=2026-07-01&to=2026-07-14&lens=governance';
+        expect(screen.getByRole('link', { name: 'View incidents' })).toHaveAttribute(
             'href',
-            '/health-safety/analytics?period=custom&from=2026-07-01&to=2026-07-14&lens=governance',
+            '/incidents?from=2026-07-01&to=2026-07-14&kind=incidents&tab=all',
         );
-        expect(
-            screen.getByRole('link', { name: 'View fleet incidents' }),
-        ).toHaveAttribute('href', '/fleet-assets/incidents?tab=open');
+        for (const name of [
+            'View lost-time injury rate',
+            'View recordable injury rate',
+            'View days since a lost-time injury',
+        ])
+            expect(screen.getByRole('link', { name })).toHaveAttribute('href', analytics);
         result.rerender(
             <CommandCentreHero
                 {...baseline}
                 filters={{ ...baseline.filters, lens: 'manager' }}
             />,
         );
-        expect(screen.getAllByRole('link', { name: /^View /i })).toHaveLength(
-            6,
+        const managerAnalytics = analytics.replace('lens=governance', 'lens=manager');
+        expect(
+            screen.getByRole('link', { name: 'View near misses per injury' }),
+        ).toHaveAttribute('href', managerAnalytics);
+        expect(screen.getByRole('link', { name: 'View training' })).toHaveAttribute(
+            'href',
+            managerAnalytics,
         );
         expect(
-            screen.getByRole('link', { name: 'View near-miss ratio' }),
+            screen.getByRole('link', { name: 'View actions on time' }),
         ).toHaveAttribute(
             'href',
-            '/health-safety/analytics?period=custom&from=2026-07-01&to=2026-07-14&lens=manager',
+            '/health-safety/corrective-actions?from=2026-07-01&to=2026-07-14&tab=all',
         );
         expect(
             screen.getByRole('link', { name: 'View open hazards' }),
         ).toHaveAttribute('href', '/compliance/hazards?tab=active');
-        expect(
-            screen.getByRole('link', { name: 'View procedures' }),
-        ).toHaveAttribute('href', '/health-safety/procedures?tab=approved');
-        expect(
-            screen.getByRole('link', {
-                name: 'Open full fleet incident register',
-            }),
-        ).toHaveAttribute('href', '/fleet-assets/incidents');
+        expect(screen.queryByRole('link', { name: 'View incidents' })).not.toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: /Export board summary/ }),
         ).not.toBeInTheDocument();
-    });
-    it('withholds Fleet navigation under both lenses when canonical Fleet counts are restricted, while a readable zero still links', () => {
-        const result = render(
-            <CommandCentreHero
-                {...baseline}
-                fleetUnresolved={null}
-                fleetIncidents30d={null}
-            />,
-        );
-        expect(
-            screen.queryByRole('link', { name: 'View fleet incidents' }),
-        ).not.toBeInTheDocument();
-        expect(screen.getByText('Access restricted')).toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Explain restricted Fleet access',
-            }),
-        );
-        expect(screen.getByRole('status')).toHaveTextContent(
-            'Fleet access is restricted for the selected sites.',
-        );
-        result.rerender(
-            <CommandCentreHero
-                {...baseline}
-                filters={{ ...baseline.filters, lens: 'manager' }}
-                fleetUnresolved={null}
-                fleetIncidents30d={null}
-            />,
-        );
-        expect(
-            screen.queryByRole('link', {
-                name: 'Open full fleet incident register',
-            }),
-        ).not.toBeInTheDocument();
-        result.rerender(
-            <CommandCentreHero
-                {...baseline}
-                filters={{ ...baseline.filters, lens: 'manager' }}
-                fleetIncidents30d={0}
-            />,
-        );
-        expect(
-            screen.getByRole('link', {
-                name: 'Open full fleet incident register',
-            }),
-        ).toHaveAttribute('href', '/fleet-assets/incidents');
     });
     it('retains the report callback and exposes only authorised board exports', () => {
         shared.governance = true;
@@ -286,31 +249,30 @@ describe('H&S shared header and source-aware attention', () => {
             lens: 'governance',
         };
         const result = render(
-            <CommandCentreHero {...baseline} filters={filters} />,
+            <>
+                <CommandCentreHero {...baseline} filters={filters} />
+                <CommandCentreAttention {...baseline} activeAlerts={2} site={3} />
+            </>,
         );
-        expect(
-            screen.getByRole('link', { name: 'View incidents' }),
-        ).toHaveAttribute(
+        expect(screen.getByRole('link', { name: 'View incidents' })).toHaveAttribute(
             'href',
             '/incidents?from=2026-09-03&to=2026-09-19&kind=incidents&tab=all&site_id=3',
         );
-        expect(
-            screen.getByRole('link', { name: 'View safeguarding' }),
-        ).toHaveAttribute('href', '/safeguarding?tab=open&site_id=3');
-        expect(
-            screen.getByRole('link', { name: 'View fleet incidents' }),
-        ).toHaveAttribute('href', '/fleet-assets/incidents?tab=open&site_id=3');
         const rateDetail =
             '/health-safety/analytics?period=custom&from=2026-09-03&to=2026-09-19&lens=governance&site_id=3';
         expect(
-            screen.getByRole('link', { name: 'View ltifr' }),
+            screen.getByRole('link', { name: 'View lost-time injury rate' }),
         ).toHaveAttribute('href', rateDetail);
         expect(
-            screen.getByRole('link', { name: 'View trifr' }),
+            screen.getByRole('link', { name: 'View recordable injury rate' }),
         ).toHaveAttribute('href', rateDetail);
+        // Current-state registers keep the Site but get no occurrence dates.
         expect(
-            screen.getAllByText('year basis · per million hours'),
-        ).toHaveLength(2);
+            screen.getByRole('link', { name: /WorkSafe reviews to do/ }),
+        ).toHaveAttribute('href', '/health-safety/events?tab=worksafe_pending&site_id=3');
+        expect(
+            screen.getByRole('link', { name: /Lone-worker alerts active/ }),
+        ).toHaveAttribute('href', '/health-safety/lone-workers?site_id=3');
         result.rerender(
             <CommandCentreHero
                 {...baseline}
@@ -323,30 +285,9 @@ describe('H&S shared header and source-aware attention', () => {
             'href',
             '/health-safety/corrective-actions?from=2026-09-03&to=2026-09-19&tab=all&site_id=3',
         );
-        expect(screen.getByText('due in selected period')).toBeInTheDocument();
         expect(
             screen.getByRole('link', { name: 'View open hazards' }),
         ).toHaveAttribute('href', '/compliance/hazards?tab=active&site_id=3');
-        expect(
-            screen.getByRole('link', { name: 'View procedures' }),
-        ).toHaveAttribute(
-            'href',
-            '/health-safety/procedures?tab=approved&site_id=3',
-        );
-        expect(
-            screen.getByText('year basis · per recordable injury'),
-        ).toBeInTheDocument();
-        expect(screen.queryByText('Training / audit')).not.toBeInTheDocument();
-        const register = screen.getByRole('link', {
-            name: 'Open full fleet incident register',
-        });
-        expect(register).toHaveAttribute(
-            'href',
-            '/fleet-assets/incidents?site_id=3',
-        );
-        expect(
-            screen.getByText('30-day count · full register'),
-        ).toBeInTheDocument();
     });
     it('keeps the overview search inside the shared header and sends its value to the current preview filter', () => {
         const onChange = vi.fn();
@@ -369,9 +310,6 @@ describe('H&S shared header and source-aware attention', () => {
                 <CommandCentreHero
                     {...baseline}
                     filters={{ ...baseline.filters, site: 999 }}
-                    openSafeguarding={null}
-                    fleetUnresolved={null}
-                    fleetIncidents30d={null}
                 />
                 <CommandCentreAttention
                     {...baseline}
@@ -381,14 +319,13 @@ describe('H&S shared header and source-aware attention', () => {
             </>,
         );
         expect(screen.getByText(/Site access unconfirmed/)).toBeInTheDocument();
+        for (const name of [/WorkSafe reviews to do/, /Lone-worker alerts active/]) {
+            const link = screen.getByRole('link', { name });
+            expect(within(link).getByText('—')).toBeInTheDocument();
+            expect(within(link).getByText('Not confirmed')).toBeInTheDocument();
+        }
         expect(
-            screen.getByText('WorkSafe review count unconfirmed'),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByText('Lone-worker alert count unconfirmed'),
-        ).toBeInTheDocument();
-        expect(
-            screen.queryByText('0 pending WorkSafe reviews'),
+            screen.queryByText(/None in the records you can see: WorkSafe/),
         ).not.toBeInTheDocument();
     });
     it('applies an inclusive 30-day NZ range at a UTC day boundary and preserves the selected site, lens and view', () => {
@@ -482,7 +419,7 @@ describe('H&S shared header and source-aware attention', () => {
             screen.getByRole('button', { name: 'Wed 8 July 2026' }),
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'Cancel', exact: true }),
+            screen.getByRole('button', { name: 'Cancel' }),
         );
         expect(shared.get).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: 'Set dates' }));

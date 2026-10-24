@@ -77,7 +77,6 @@ describe('Representative training evidence presentation', () => {
         fireEvent.click(
             screen.getByRole('button', {
                 name: 'Record training',
-                exact: true,
             }),
         );
         expect(

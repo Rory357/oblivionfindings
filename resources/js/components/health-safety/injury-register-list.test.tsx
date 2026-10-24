@@ -15,7 +15,12 @@ it('uses the permanent injury href and full filtered return without inferring an
     render(<InjuryRegisterList rows={[row]} total={26} returnTo="/health-safety/injuries?q=0&worksafe=0&acc_open=0&page=2" medical={false} />);
     const hrefs = screen.getAllByRole('link', { name: 'Open injury INJ-0009' }).map((link) => link.getAttribute('href'));
     expect(hrefs).toHaveLength(1);
-    expect(hrefs[0]).toBe('/health-safety/injuries/9?return_to=%2Fhealth-safety%2Finjuries%3Fq%3D0%26worksafe%3D0%26acc_open%3D0%26page%3D2');
+    // The same record and the full filtered return (query key order doesn't change the link).
+    const link = new URL(hrefs[0]!, 'https://test.invalid');
+    expect(link.pathname).toBe('/health-safety/injuries/9');
+    const back = new URL(link.searchParams.get('return_to')!, 'https://test.invalid');
+    expect(back.pathname).toBe('/health-safety/injuries');
+    expect(Object.fromEntries(back.searchParams)).toEqual({ q: '0', worksafe: '0', acc_open: '0', page: '2' });
     expect(screen.getByText('1 of 26 shown')).toBeInTheDocument();
     expect(screen.queryByText('Supporting records')).not.toBeInTheDocument();
     expect(screen.queryByText(/0 recorded days lost · Open injury/)).not.toBeInTheDocument();

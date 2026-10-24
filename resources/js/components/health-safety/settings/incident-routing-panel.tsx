@@ -958,6 +958,7 @@ function ActorRoutingPanel({
     const [saved, setSaved] = useState(false);
     const readKey = useMemo(
         () => crypto.randomUUID(),
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh read key each time the snapshot, Sites, account or permission changes.
         [snapshot, sites, actorId, canManage],
     );
     // Where new incidents go, drawn as the approved settings drawing (24c): each Site, its kinds of

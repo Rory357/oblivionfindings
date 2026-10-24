@@ -12,11 +12,10 @@ use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
-use App\Models\FirstAidFollowup;
 use App\Models\IncidentFollowup;
 use App\Models\LoneWorkerSession;
 use App\Models\MedicationRound;
-use App\Models\PpeAllocation;
+use App\Services\HealthSafety\PpePickerService;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftOpenPosition;
@@ -28,6 +27,11 @@ use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\GuidedRoundService;
 use App\Services\HandoverWorkerNotes;
+use App\Services\HealthSafety\FirstAidService;
+use App\Services\HealthSafety\FirstAidSourceProjectionService;
+use App\Services\HealthSafety\LoneWorkerSessionAccessService;
+use App\Services\HealthSafety\LoneWorkerSessionScope;
+use App\Services\HealthSafety\LoneWorkerSessionService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
@@ -39,6 +43,7 @@ use App\Services\ShiftHandoverService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
 use App\Services\UserSiteAccessService;
+use App\Support\HealthSafety\LoneWorkerSessionPresenter;
 use App\Support\ResidentHue;
 use App\Support\RunDetailPresenter;
 use Illuminate\Http\Request;
@@ -224,11 +229,13 @@ class MyTasksController extends Controller
             // LoneWorkerSession. The one-tap card POSTs to the existing
             // health-safety.lone-workers.sessions.check-in endpoint.
             'active_lone_worker_session' => $this->getActiveLoneWorkerSession($user),
+            'lone_worker_confirmation' => app(LoneWorkerSessionService::class)->confirmationForViewer($user, $request->session()->get('lone_worker_confirmation')),
             // Read-only "First-aid follow-ups assigned to me" card. Lists open
             // (uncompleted) FirstAidFollowup rows owned by the signed-in worker
             // so re-checks / ACC45 lodgements / whānau calls don't slip. Each
             // row deep-links to the register's record modal (no write here).
             'first_aid_followups' => $this->getFirstAidFollowups($user),
+            'first_aid_confirmation' => app(FirstAidService::class)->confirmationForViewer($user, $request->session()->get('first_aid_confirmation')),
             // Worker-facing "My PPE" card — the worker's own active allocations that
             // still need acknowledgement or an RPE fit-test. Empty unless action is
             // needed. One-tap acknowledge POSTs to ppe.allocations.acknowledge-own
@@ -237,7 +244,7 @@ class MyTasksController extends Controller
             // Cross-module "My tasks" card — the signed-in user's open work
             // items from the /tasks aggregator (assigned=me), capped at 8
             // rows. `total` carries the uncapped count for the footer link.
-            'myTasks' => $this->getMyAggregatedTasks($user, array_column($activeShiftCard['tasks'] ?? [], 'id')),
+            'myTasks' => Inertia::always($this->getMyAggregatedTasks($user, array_column($activeShiftCard['tasks'] ?? [], 'id'))),
             'active_shift' => $activeShiftCard,
             'task_creation' => [
                 'can_create' => $activeShift && app(ShiftTaskWorkService::class)->canCreate($user, $activeShift),
@@ -274,7 +281,7 @@ class MyTasksController extends Controller
             // `labels` prop shared globally by HandleInertiaRequests for
             // terminology overrides (client.singular, etc.).
             'my_day_labels' => Lang::get('my-day'),
-            'data_unavailable' => array_values(array_unique($this->unavailableSections)),
+            'data_unavailable' => Inertia::always(array_values(array_unique($this->unavailableSections))),
         ]);
     }
 
@@ -1216,57 +1223,31 @@ class MyTasksController extends Controller
     }
 
     /**
-     * The signed-in worker's live Lone Worker Safety session, if any.
-     *
-     * Returns the most recent session in a live state (active / overdue /
-     * emergency) where the user is the monitored worker — the data behind the
-     * My Day "You're being monitored — check in" card. Null when the worker is
-     * not currently being monitored (the card is hidden entirely).
-     *
-     * `next_check_in_at` / `is_check_in_overdue` are derived in PHP from the
-     * model's UTC-stored Carbons (never SQL NOW(), which can sit in a different
-     * timezone and skew the comparison — the same trap the coordinator hero hit).
+     * The most recent live session currently readable by its actual worker.
+     * Missing, ended, conflicting or revoked source evidence returns no card.
+     * Received check-in and startup scheduling evidence remain separate facts.
      */
     private function getActiveLoneWorkerSession(User $user): ?array
     {
         try {
-            $session = LoneWorkerSession::query()
-                ->where('user_id', $user->id)
-                ->whereIn('status', ['active', 'overdue', 'emergency'])
-                ->with(['site:id,name', 'client:id,first_name,last_name'])
-                ->latest('started_at')
-                ->first();
+            return app(LoneWorkerSessionAccessService::class)->withCurrentViewer($user, function ($current, $reads, $sites) {
+                $query = app(LoneWorkerSessionScope::class)->applyForSites(LoneWorkerSession::query(), $sites, true);
+                $session = $reads->query($query)->where('user_id', $current->id)
+                    ->whereIn('status', LoneWorkerSessionAccessService::LIVE_STATUSES)->whereNull('ended_at')
+                    ->latest('started_at')->orderByDesc('id')->first();
 
-            if (! $session) {
+                return $session ? app(LoneWorkerSessionPresenter::class)->selfSummary($session, $current) : null;
+            });
+        } catch (HttpException $error) {
+            if (in_array($error->getStatusCode(), [403, 404], true)) {
                 return null;
             }
+            report($error);
+            $this->unavailableSections[] = 'Lone-worker check-in';
 
-            $base = $session->last_check_in_at ?? $session->started_at;
-            $nextCheckInAt = $base
-                ? $base->copy()->addMinutes((int) $session->check_in_interval_minutes)
-                : null;
-
-            return [
-                'id' => $session->id,
-                'status' => $session->status,
-                'started_at' => optional($session->started_at)->toIso8601String(),
-                'expected_end_at' => optional($session->expected_end_at)->toIso8601String(),
-                'last_check_in_at' => optional($session->last_check_in_at)->toIso8601String(),
-                'check_in_interval_minutes' => (int) $session->check_in_interval_minutes,
-                'next_check_in_at' => optional($nextCheckInAt)->toIso8601String(),
-                // Overdue when the 5-min job has already flipped it, or the next
-                // check-in window has lapsed on a still-active session.
-                'is_check_in_overdue' => $session->status === 'overdue' || $session->isCheckInOverdue(),
-                'activity_description' => $session->activity_description,
-                'site' => $session->site
-                    ? ['id' => $session->site->id, 'name' => $session->site->name]
-                    : null,
-                'client' => $session->client
-                    ? ['id' => $session->client->id, 'name' => trim($session->client->first_name.' '.$session->client->last_name)]
-                    : null,
-            ];
-        } catch (\Throwable $e) {
-            report($e);
+            return null;
+        } catch (\Throwable $error) {
+            report($error);
             $this->unavailableSections[] = 'Lone-worker check-in';
 
             return null;
@@ -1279,34 +1260,13 @@ class MyTasksController extends Controller
      * Read-only digest data for the My Day "First-aid follow-ups assigned to
      * me" card. Returns uncompleted FirstAidFollowup rows (whose parent record
      * still exists) ordered by due date, each with a deep-link into the First
-     * Aid Register's record modal. Fail-soft — the home renders without the
+     * Aid record's exact follow-up section. Fail-soft — the home renders without the
      * card if anything throws.
      */
     private function getFirstAidFollowups(User $user): array
     {
         try {
-            return FirstAidFollowup::query()
-                ->where('assigned_to_user_id', $user->id)
-                ->whereNull('completed_at')
-                ->whereHas('record')
-                ->with([
-                    'record:id,treated_person_name,site_id,treatment_date,injury_illness_type',
-                    'record.site:id,name',
-                ])
-                ->orderBy('due_at')
-                ->limit(10)
-                ->get()
-                ->map(fn ($f) => [
-                    'id' => $f->id,
-                    'notes' => $f->notes,
-                    'due_at' => $f->due_at?->toIso8601String(),
-                    'is_overdue' => $f->due_at ? $f->due_at->isPast() : false,
-                    'record_id' => $f->first_aid_record_id,
-                    'treated_person_name' => $f->record?->treated_person_name,
-                    'site_name' => $f->record?->site?->name,
-                    'url' => '/health-safety/first-aid?record='.$f->first_aid_record_id,
-                ])
-                ->all();
+            return app(FirstAidSourceProjectionService::class)->forMyDay($user);
         } catch (\Throwable $e) {
             report($e);
             $this->unavailableSections[] = 'First-aid follow-ups';
@@ -1325,34 +1285,7 @@ class MyTasksController extends Controller
     private function getMyPpe(User $user): array
     {
         try {
-            return PpeAllocation::query()
-                ->where('user_id', $user->id)
-                ->whereNull('returned_at')
-                ->where(function ($q) {
-                    $q->where('acknowledged', false)
-                        ->orWhere(fn ($r) => $r->where('fit_test_completed', false)
-                            ->whereHas('ppeInventory.ppeType', fn ($t) => $t->where('category', 'respiratory')));
-                })
-                ->with(['ppeInventory.ppeType:id,name,category', 'ppeInventory.site:id,name'])
-                ->latest('allocated_at')
-                ->get()
-                ->map(function (PpeAllocation $a) {
-                    $item = $a->ppeInventory;
-                    $isRpe = $item?->ppeType?->category === 'respiratory';
-
-                    return [
-                        'id' => $a->id,
-                        'type_name' => $item?->ppeType?->name ?? 'PPE',
-                        'category' => $item?->ppeType?->category,
-                        'serial_number' => $item?->serial_number,
-                        'site' => $item?->site?->name,
-                        'allocated_at' => optional($a->allocated_at)->toIso8601String(),
-                        'acknowledged' => (bool) $a->acknowledged,
-                        'fit_test_required' => $isRpe,
-                        'fit_test_completed' => (bool) $a->fit_test_completed,
-                    ];
-                })
-                ->all();
+            return app(PpePickerService::class)->ownAllocations($user);
         } catch (\Throwable $e) {
             report($e);
             $this->unavailableSections[] = 'PPE';
@@ -1365,10 +1298,11 @@ class MyTasksController extends Controller
      * The signed-in user's open work items from the company-wide /tasks
      * aggregator (assigned=me), for the My Day "My tasks" card. Permission-
      * scoped exactly like /tasks — the aggregator runs as this user. Capped
-     * at 8 rows; `total` is the uncapped open count. Fail-soft: the home
-     * renders without the card if a provider throws.
+     * at 8 rows; `total` counts the current filtered feed before preview
+     * slicing. Providers may have their own bounds. A provider failure
+     * returns an empty fallback with the separate Other tasks unavailable marker.
      *
-     * @return array{total: int, items: array<int, array<string, mixed>>}
+     * @return array{viewer_id: int, total: int, items: array<int, array<string, mixed>>}
      */
     private function getMyAggregatedTasks(User $user, array $currentShiftTaskIds = []): array
     {
@@ -1384,6 +1318,7 @@ class MyTasksController extends Controller
             $items = array_values(array_filter($items, fn (TaskItem $i) => $i->bucket !== TaskItem::BUCKET_DONE && ! in_array($i->id, $currentIds, true)));
 
             return [
+                'viewer_id' => (int) $user->id,
                 'total' => count($items),
                 'items' => array_map(fn (TaskItem $i) => [
                     'id' => $i->id,
@@ -1400,7 +1335,7 @@ class MyTasksController extends Controller
             report($e);
             $this->unavailableSections[] = 'Other tasks';
 
-            return ['total' => 0, 'items' => []];
+            return ['viewer_id' => (int) $user->id, 'total' => 0, 'items' => []];
         }
     }
 

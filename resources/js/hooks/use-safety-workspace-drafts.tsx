@@ -81,6 +81,7 @@ export function useSafetyWorkspaceDrafts() {
             ? 'The request may still finish after you leave. Check the record before sending again. Cancel to stay here.'
             : 'Your unsaved entries will be discarded. Cancel to keep editing.',
         undefined,
+        false,
         isPreservedInboxRefresh,
     );
     const historyRecovery = useSafetyHistoryGuard(dirty || busy || uncertain, guard.request);

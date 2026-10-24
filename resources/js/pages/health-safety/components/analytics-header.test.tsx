@@ -169,7 +169,7 @@ describe('Analytics shared header', () => {
             screen.getByRole('button', { name: 'Wed 8 July 2026' }),
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'Cancel', exact: true }),
+            screen.getByRole('button', { name: 'Cancel' }),
         );
         expect(onReload).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: 'Set dates' }));

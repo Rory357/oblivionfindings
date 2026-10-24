@@ -2358,7 +2358,7 @@ function ReviewHandover({ d }: { d: EventDetail }) {
                   text: `Could have caused: ${summary.potential_consequence}`,
               }
             : null,
-    ].filter((fact): fact is StoryFact => fact !== null);
+    ].filter((fact) => fact !== null);
     const storyParas = [
         summary.narrative ? { h: 'What happened', t: summary.narrative } : null,
         summary.immediate_controls

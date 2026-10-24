@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- Test doubles use raw buttons as simple controls. */
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

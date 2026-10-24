@@ -295,6 +295,7 @@ export function ParticipationCards<T extends ParticipationRow>({
                             footer={{
                                 primary: `${titleCase(kind)} record`,
                                 trailing: (
+                                    // eslint-disable-next-line no-restricted-syntax -- the card footer's text action (same look as the other cards' links).
                                     <button
                                         type="button"
                                         className="frontline-tap frontline-focus shrink-0 text-sm font-semibold text-primary"

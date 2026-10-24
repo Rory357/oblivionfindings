@@ -45,18 +45,21 @@ export interface SgAction {
     label: string;
     href?: string;
     onClick?: () => void;
+    /** The name a screen reader hears when the visible label needs its context ("Open" → "Open corrective action: Repair the rail"). Starts with the visible label. */
+    ariaLabel?: string;
 }
 
 function ActionLink({ action, className }: { action: SgAction; className?: string }) {
     if (action.href) {
         return (
-            <Link href={action.href} className={cn('sg-act', className)} onClick={action.onClick}>
+            <Link href={action.href} aria-label={action.ariaLabel} className={cn('sg-act', className)} onClick={action.onClick}>
                 {action.label}
             </Link>
         );
     }
     return (
-        <button type="button" className={cn('sg-act', className)} onClick={action.onClick}>
+        // eslint-disable-next-line no-restricted-syntax -- the kit's quiet text action (.sg-act), not a form button.
+        <button type="button" aria-label={action.ariaLabel} className={cn('sg-act', className)} onClick={action.onClick}>
             {action.label}
         </button>
     );
@@ -157,14 +160,21 @@ export interface TallyItem {
     href?: string;
     /** The link's name when the number and label alone don't say where it goes ("View all meetings"). */
     linkLabel?: string;
+    /** Keep this zero on show even when the tally folds zeros (its sub carries a caveat, e.g. "Facts need review"). */
+    keep?: boolean;
 }
 
 /** Related numbers on one line. Zeros fold into one calm sentence ("Nothing overdue or unassigned"). */
 export function Tally({ title, sub, action, items, calm, keepZeros = false, ...rest }: Omit<SurfaceProps, 'children'> & { items: TallyItem[]; calm?: string; /** Measures where zero is a fact to show (rates, days since). */ keepZeros?: boolean }) {
-    const isZero = (v: ReactNode) => !keepZeros && String(v).trim() === '0';
-    const zeros = items.filter((i) => isZero(i.value));
-    const shown = items.filter((i) => !isZero(i.value));
-    const sentence = calm ?? (zeros.length ? `Nothing ${zeros.map((z) => z.label.toLowerCase()).join(' or ')}` : '');
+    const isZero = (i: TallyItem) => !keepZeros && !i.keep && String(i.value).trim() === '0';
+    const zeros = items.filter((i) => isZero(i));
+    const shown = items.filter((i) => !isZero(i));
+    // Lower-case only an ordinary first word: names and acronyms ("WorkSafe", "PPE") keep their capitals.
+    const inSentence = (label: string) => {
+        const [first = '', ...rest] = label.split(' ');
+        return [/[A-Z]/.test(first.slice(1)) ? first : first.toLowerCase(), ...rest].join(' ');
+    };
+    const sentence = calm ?? (zeros.length ? `Nothing ${zeros.map((z) => inSentence(z.label)).join(' or ')}` : '');
     return (
         <Surface title={title} sub={sub} action={action} aria-label={rest['aria-label']}>
             <div className="sg-tally">
@@ -439,6 +449,7 @@ export function PeopleCards({ title, sub, action, cols = 3, items }: { title?: s
                                     {body}
                                 </Link>
                             ) : p.onOpen ? (
+                                // eslint-disable-next-line no-restricted-syntax -- the whole person card opens its record (custom card layout).
                                 <button
                                     type="button"
                                     onClick={p.onOpen}
@@ -674,6 +685,7 @@ export function RiskMap({
             {views?.length ? (
                 <div className="sg-seg" role="group" aria-label="Risk view">
                     {views.map((v, i) => (
+                        // eslint-disable-next-line no-restricted-syntax -- segmented view switch styled by .sg-seg.
                         <button key={v} type="button" aria-pressed={i === view} onClick={() => onView?.(i)}>
                             {v}
                         </button>
@@ -811,6 +823,7 @@ export function Queue({ title, sub, items, selected, onSelect }: { title?: strin
         <Surface title={title} sub={sub}>
             <div className="sg-queue">
                 {items.map((i) => (
+                    // eslint-disable-next-line no-restricted-syntax -- queue item: a whole selectable card in the signature kit, not a form button.
                     <button key={i.key} type="button" className="sg-qi" aria-current={i.key === selected ? 'true' : undefined} onClick={() => onSelect?.(i.key)}>
                         <span className="sg-qi-h">
                             {i.tone ? <Ring tone={i.tone} /> : null}

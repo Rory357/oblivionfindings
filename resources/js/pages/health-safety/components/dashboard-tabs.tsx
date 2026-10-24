@@ -259,7 +259,7 @@ export function CompliancePanel({
                                 ? 'Not confirmed'
                                 : worksafePending > 0
                                   ? `${worksafePending} not notified yet`
-                                  : 'Nothing waiting'}
+                                  : 'None you can see'}
                         </StatusBadge>
                     ),
                 },

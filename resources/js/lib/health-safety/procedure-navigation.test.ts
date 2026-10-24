@@ -69,8 +69,13 @@ describe('procedure source and revision navigation', () => {
     );
     it('keeps supported list filters without a command or legacy modal state', () => {
         const incidentOrigin = '/incidents?kind=incidents&site_id=3&from=2026-09-03&to=2026-09-19';
-        expect(procedureReturn(incidentOrigin)).toBe(incidentOrigin);
-        expect(firstAidReturn(incidentOrigin)).toBe(incidentOrigin);
+        // The same page and filters; the order of query keys does not change the link.
+        const parts = (href: string) => {
+            const url = new URL(href, 'https://test.invalid');
+            return [url.pathname, Object.fromEntries(url.searchParams)];
+        };
+        expect(parts(procedureReturn(incidentOrigin))).toEqual(parts(incidentOrigin));
+        expect(parts(firstAidReturn(incidentOrigin))).toEqual(parts(incidentOrigin));
         expect(procedureReturn('/incidents?kind=unsupported&site_id=3')).toBe('/incidents?site_id=3');
         const origin = procedureReturn(
             PROCEDURE_REGISTER +

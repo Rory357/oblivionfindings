@@ -9,7 +9,7 @@ import {
 } from '@/hooks/use-safety-workspace-drafts';
 import { formatDate, formatDateTimeLong } from '@/lib/datetime';
 import { AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
     confirmsIndependenceReceipt,
     independenceModeLabel,
@@ -209,7 +209,10 @@ function IndependenceEditor({
         canManage,
         uuid: form.data.request_uuid,
     });
-    current.current = { actorId, canManage, uuid: form.data.request_uuid };
+    // The latest actor and request, read when a save answers (kept after each render, not during it).
+    useLayoutEffect(() => {
+        current.current = { actorId, canManage, uuid: form.data.request_uuid };
+    });
     useEffect(() => {
         active.current = true;
         return () => {

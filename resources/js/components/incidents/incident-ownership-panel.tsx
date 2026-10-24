@@ -108,7 +108,8 @@ export function IncidentOwnershipPanel({
     const latest = history[0];
     const assignLabel = incidentAssignLabel(ownership);
     const named =
-        ownership.owner?.name ?? ownership.last_owner_name ?? 'Not recorded';
+        ownership.owner?.name ?? ownership.last_owner_name ?? null;
+    const shownName = named ?? 'Owner not recorded';
     const incomingDelivered = latest?.deliveries.some(
         (delivery) =>
             delivery.role === 'incoming' && delivery.status === 'delivered',
@@ -216,10 +217,10 @@ export function IncidentOwnershipPanel({
                     <div className="sg-surface sg-p">
                         <div className="sg-ph">
                             <span aria-hidden="true" className="sg-av">
-                                {initialsOf(named)}
+                                {named ? initialsOf(named) : '?'}
                             </span>
                             <div>
-                                <b>{named}</b>
+                                <b>{shownName}</b>
                                 <small>
                                     {ownership.state === 'replacement_needed'
                                         ? 'Previous owner'
@@ -240,7 +241,7 @@ export function IncidentOwnershipPanel({
                           <div className="grid w-full gap-1">
                             {ownership.state === 'replacement_needed' ? (
                                 <p>
-                                    Previous owner: {named}. Their current
+                                    Previous owner: {shownName}. Their current
                                     access or eligibility no longer supports
                                     this assignment.
                                 </p>

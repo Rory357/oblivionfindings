@@ -252,7 +252,7 @@ class HsSourceConnectionContextPrivacyTest extends TestCase
     public function test_lone_worker_independent_reviews_and_incident_remain_visible_when_control_room_is_denied(): void
     {
         $client = Client::factory()->create(['site_id' => $this->sourceSite->id]);
-        $source = $this->session(['client_id' => $client->id]);
+        $source = $this->loneSession(['client_id' => $client->id]);
         $alert = $this->loneAlert($source);
         $event = $this->event(['control_room_alert_id' => $alert->id, 'source_type' => ControlRoomAlert::class,
             'source_id' => $alert->id, 'client_id' => $client->id]);
@@ -291,12 +291,12 @@ class HsSourceConnectionContextPrivacyTest extends TestCase
 
     public function test_lone_worker_wrong_alert_or_review_tuple_never_discovers_unrelated_private_source_content(): void
     {
-        $source = $this->session();
+        $source = $this->loneSession();
         $alert = $this->loneAlert($source);
         $valid = $this->event(['control_room_alert_id' => $alert->id, 'source_type' => ControlRoomAlert::class, 'source_id' => $alert->id]);
         $this->event(['control_room_alert_id' => $alert->id, 'site_id' => Site::factory()->create()->id]);
         $this->event(['control_room_alert_id' => $alert->id, 'client_id' => Client::factory()->create(['site_id' => $this->sourceSite->id])->id]);
-        $foreign = $this->loneAlert($this->session());
+        $foreign = $this->loneAlert($this->loneSession());
         $foreign->forceFill(['context' => $alert->context])->saveQuietly();
         $this->unrelatedPrivateSources();
         $reader = app(LoneWorkerSessionConnectionsService::class);
@@ -313,7 +313,7 @@ class HsSourceConnectionContextPrivacyTest extends TestCase
 
     public function test_lone_worker_warmed_source_rechecks_staff_site_and_view_permission_without_losing_owned_access(): void
     {
-        $source = $this->session();
+        $source = $this->loneSession();
         $alert = $this->loneAlert($source);
         $event = $this->event(['control_room_alert_id' => $alert->id, 'source_type' => ControlRoomAlert::class, 'source_id' => $alert->id]);
         $reader = app(LoneWorkerSessionConnectionsService::class);
@@ -444,7 +444,7 @@ class HsSourceConnectionContextPrivacyTest extends TestCase
             'created_by' => $this->manager->id, 'description' => 'Private source narrative', 'due_date' => now()->subDay()->toDateString(), ...$values]);
     }
 
-    private function session(array $values = []): LoneWorkerSession
+    private function loneSession(array $values = []): LoneWorkerSession
     {
         return LoneWorkerSession::create(['user_id' => $this->worker->id, 'site_id' => $this->sourceSite->id, 'started_at' => now()->subHour(),
             'expected_end_at' => now()->addHour(), 'check_in_interval_minutes' => 30, 'status' => 'active', 'created_by' => $this->worker->id, ...$values]);

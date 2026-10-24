@@ -113,7 +113,7 @@ function detail(action: LifecycleAction = 'reopen'): IncidentDetail {
         attachments: [],
         close_gate: { allowed: true, requirements: [] },
         can: { [action]: true },
-    } as IncidentDetail;
+    } as unknown as IncidentDetail;
 }
 function setup(action: LifecycleAction = 'reopen', incident = detail(action)) {
     const onClose = vi.fn();
@@ -476,7 +476,7 @@ describe('Incident draft editing and occurrence time', () => {
         setupEdit({ ...editDetail(), type: 'behavioural' });
         fireEvent.click(screen.getByRole('combobox', { name: 'Select type' }));
         fireEvent.click(
-            screen.getByRole('option', { name: 'Fall', exact: true }),
+            screen.getByRole('option', { name: 'Fall' }),
         );
         expect(
             screen.getByRole('combobox', { name: 'Select type' }),
@@ -499,7 +499,7 @@ describe('Incident draft editing and occurrence time', () => {
         setupEdit({ ...editDetail(), type: 'behavioural' });
         fireEvent.click(screen.getByRole('combobox', { name: 'Select type' }));
         fireEvent.click(
-            screen.getByRole('option', { name: 'Behaviour', exact: true }),
+            screen.getByRole('option', { name: 'Behaviour' }),
         );
         fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
         expect(state.put).toHaveBeenCalledWith(
@@ -513,7 +513,7 @@ describe('Incident draft editing and occurrence time', () => {
         const { rerender, onClose } = setupEdit(incident);
         fireEvent.click(screen.getByRole('combobox', { name: 'Select type' }));
         fireEvent.click(
-            screen.getByRole('option', { name: 'Fall', exact: true }),
+            screen.getByRole('option', { name: 'Fall' }),
         );
         rerender(
             <IncidentRecordActionDialog

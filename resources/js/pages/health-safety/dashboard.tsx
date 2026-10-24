@@ -280,6 +280,7 @@ export default function HealthSafetyDashboard({
             ppeState={worklists.ppe_expiring_state}
             worksafePending={backbone?.events.worksafe_pending ?? null}
             activeAlerts={kpis.active_alerts ?? null}
+            site={filters.site}
         />
     );
 

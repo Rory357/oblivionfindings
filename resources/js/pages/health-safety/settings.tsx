@@ -227,6 +227,7 @@ export default function HealthSafetySettings({
                     <div className="grid items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
                         <nav aria-label="Safety settings views" className="sg-surface grid gap-1 p-2">
                             {VIEWS.map((item) => (
+                                // eslint-disable-next-line no-restricted-syntax -- settings side navigation item (current-page styling).
                                 <button
                                     key={item.key}
                                     type="button"

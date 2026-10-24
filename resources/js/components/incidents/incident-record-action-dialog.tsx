@@ -41,6 +41,7 @@ export function IncidentRecordActionDialog({
         'Discard unsaved incident work?',
         'Your unsaved entries will be discarded. A request already sent may still finish; check the incident before retrying. Cancel to keep editing.',
         undefined,
+        false,
         preserveCurrentIncident,
     );
     const requestClose = () => {

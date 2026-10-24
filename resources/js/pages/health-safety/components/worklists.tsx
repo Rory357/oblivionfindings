@@ -617,7 +617,7 @@ export function HsWorklists({
                         sub: [row.pill.label, row.sub, row.owner].filter(Boolean).join(' · '),
                         menu: actions(row),
                         onContextMenu: (event: MouseEvent<HTMLElement>) => context.open(event, row),
-                        action: { label: 'Open', href: row.actionUrl ?? row.registerUrl },
+                        action: { label: 'Open', ariaLabel: row.actionLabel, href: row.actionUrl ?? row.registerUrl },
                     }))}
                 />
             ) : (

@@ -96,7 +96,7 @@ async function changeTime(hour: string, minute = '30', period = 'AM') {
     fireEvent.change(screen.getByLabelText('Meeting date & time time minute'), {
         target: { value: minute },
     });
-    fireEvent.click(screen.getByRole('button', { name: period, exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: period }));
     fireEvent.click(screen.getByRole('button', { name: 'Use time' }));
 }
 

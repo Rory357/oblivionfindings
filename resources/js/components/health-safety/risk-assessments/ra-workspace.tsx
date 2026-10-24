@@ -513,6 +513,7 @@ export function RaWorkspace({
                     <ul className="sg-list mt-2">
                         {sideSteps.map((step) => (
                             <li key={step.key}>
+                                {/* eslint-disable-next-line no-restricted-syntax -- a whole list row (.sg-li) that runs its next step. */}
                                 <button
                                     type="button"
                                     className="sg-li w-full text-left"

@@ -100,6 +100,8 @@ function ActorEvidenceWindowPanel(props: Props) {
                     setEditing(false);
                     if (saved) { setMessage('Evidence-window policy saved.'); void refresh(1, 'Evidence-window policy saved.'); }
                 }} /></div>
+            {/* A refused save keeps the retained command here; checking access is the way on. */}
+            {refused ? <div className="sg-actions">{buttons}</div> : null}
         </Surface> : refused || !rules.length ? <Surface title="How long evidence is reviewed" sub={sub}>
             {!refused ? <p className="sg-quiet">No evidence windows are recorded.</p> : null}
             <div className="sg-actions">{buttons}</div>

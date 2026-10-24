@@ -465,22 +465,27 @@ export function CommandCentreHero({
 
 /**
  * Recorded counts and capped previews describe attention, never overall safety clearance.
- * Drawn as one tally (approved H&S drawings, 23 Oct): each number opens its register; zeros fold
- * into one sentence; an unconfirmed count shows a dash with the reason, never a zero.
+ * Drawn as one tally (approved H&S drawings, 23 Oct): each number opens its register (keeping the
+ * selected Site); zeros fold into one sentence about the records you can see; an unconfirmed count
+ * shows a dash with the reason, never a zero.
  */
 export function CommandCentreAttention({
     expiring,
     ppeState,
     worksafePending,
     activeAlerts,
-}: AttentionProps) {
+    site = null,
+}: AttentionProps & { site?: number | null }) {
     const ppeRestricted = ppeState?.source_integrity === 'restricted';
-    const ppeDue = ppeRestricted
-        ? null
-        : expiring.filter(
-              (item) =>
-                  item.type === 'ppe_inspection' || item.type === 'ppe_expiry',
-          ).length;
+    // No PPE state from the source = not confirmed: a dash, never a zero.
+    const ppeDue =
+        ppeRestricted || !ppeState
+            ? null
+            : expiring.filter(
+                  (item) =>
+                      item.type === 'ppe_inspection' ||
+                      item.type === 'ppe_expiry',
+              ).length;
     const ppeNote = ppeRestricted
         ? 'Access restricted'
         : ppeState?.source_integrity === 'repair_required'
@@ -492,48 +497,62 @@ export function CommandCentreAttention({
               : undefined;
     const count = (type: string) =>
         expiring.filter((item) => item.type === type).length;
+    const register = (path: string, params: Record<string, string> = {}) => {
+        const query = new URLSearchParams(params);
+        if (site !== null) query.set('site_id', String(site));
+        return path + (query.size ? '?' + query.toString() : '');
+    };
     const items: TallyItem[] = [
         {
             value: worksafePending === null ? '—' : String(worksafePending),
             label: 'WorkSafe reviews to do',
             sub: worksafePending === null ? 'Not confirmed' : undefined,
             tone: (worksafePending ?? 0) > 0 ? 'critical' : undefined,
-            href: '/health-safety/events',
+            href: register('/health-safety/events', { tab: 'worksafe_pending' }),
         },
         {
             value: activeAlerts === null ? '—' : String(activeAlerts),
             label: 'Lone-worker alerts active',
             sub: activeAlerts === null ? 'Not confirmed' : undefined,
             tone: (activeAlerts ?? 0) > 0 ? 'critical' : undefined,
-            href: '/health-safety/lone-workers',
+            href: register('/health-safety/lone-workers'),
         },
         {
             value: String(count('sds')),
             label: 'Safety data sheets to review',
-            href: '/health-safety/substances',
+            href: register('/health-safety/substances'),
         },
         {
             value: String(count('drill')),
             label: 'Drills due',
-            href: '/health-safety/drills',
+            href: register('/health-safety/drills'),
         },
         {
             value: ppeDue === null ? '—' : String(ppeDue),
             label: 'Protective equipment (PPE) due',
             sub: ppeNote,
+            // A caveat on a zero (facts need review, more records than shown) must stay visible.
+            keep: ppeNote !== undefined,
             tone:
                 (ppeDue ?? 0) > 0 ||
                 ppeState?.source_integrity === 'repair_required'
                     ? 'warning'
                     : undefined,
-            href: '/health-safety/ppe',
+            href: register('/health-safety/ppe'),
         },
     ];
+    // A zero here only covers the records this person can see, so the folded sentence says so.
+    const zeros = items.filter((item) => item.value === '0' && !item.keep);
     return (
         <Tally
             title="Needs attention"
             sub="Open and due work from records you can see — it may not be everything. Open a register for the full list."
             items={items}
+            calm={
+                zeros.length
+                    ? `None in the records you can see: ${zeros.map((item) => item.label).join(', ')}`
+                    : undefined
+            }
         />
     );
 }

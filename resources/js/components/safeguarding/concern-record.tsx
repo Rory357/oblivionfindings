@@ -1014,6 +1014,7 @@ function OverviewSection({
             {f.activeAlerts.length ? (
                 <Note tone="critical" icon={RadioTower}>
                     <b>Active protective alert</b> on the subject — see{' '}
+                    {/* eslint-disable-next-line no-restricted-syntax -- an inline text link inside the alert note that switches to the Linked records section. */}
                     <button
                         type="button"
                         onClick={onLinked}
@@ -1045,7 +1046,7 @@ function OverviewSection({
                         : null,
                     d.location ? { icon: MapPin, text: d.location } : null,
                     { icon: Tag, text: concernKind(d.concern_type, d.abuse_category) },
-                ].filter((fact): fact is StoryFact => fact !== null)}
+                ].filter((fact) => fact !== null)}
                 paras={[
                     {
                         h: 'What was raised',
@@ -1664,7 +1665,7 @@ function LinkedSection({ d }: { d: ConcernDetail }) {
                   href: subject.href,
               }
             : null,
-    ].filter((item): item is RowItem => item !== null);
+    ].filter((item) => item !== null);
     const alerts = d.alerts ?? [];
     return (
         <>

@@ -44,7 +44,7 @@ describe('readable safety assurance reports', () => {
         expect(screen.queryByText('100')).not.toBeInTheDocument();
         expect(
             screen.getByText(
-                /Missing or unassessed records do not establish compliance/,
+                /Missing or unchecked records don’t prove compliance/,
             ),
         ).toBeInTheDocument();
     });

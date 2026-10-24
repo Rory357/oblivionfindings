@@ -12,6 +12,7 @@ const enums: Record<string, readonly string[]> = {
     period: ['all', 'week', '30d', 'quarter', 'year'], acc_open: ['0', '1', 'false', 'true'], worksafe: ['0', '1', 'false', 'true'],
 };
 export function injuryReadLeaf(value: string | null | undefined): string | null {
+    // eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
     if (!value || bytes(value) > 1500 || !value.startsWith('/') || value.startsWith('//') || /[\\#\u0000-\u0020\u007f]/.test(value)) return null;
     let target: URL; try { target = new URL(value, 'https://injury-leaf.invalid'); } catch { return null; }
     if (target.origin !== 'https://injury-leaf.invalid' || target.pathname !== value.split('?')[0] || target.searchParams.has('return_to')) return null;
@@ -25,6 +26,7 @@ export function injuryReadLeaf(value: string | null | undefined): string | null 
     } else {
         for (const key of ['tab', 'q', 'site_id', 'severity', 'status', 'treatment', 'acc_open', 'worksafe', 'period', 'from', 'to', 'type', 'body_part', 'page']) {
             const value = single(target.searchParams, key);
+            // eslint-disable-next-line no-control-regex -- refuses control characters in a filter value on purpose (return-link safety).
             if (!value || bytes(value) > 200 || /[\u0000-\u001f\u007f]/.test(value)) continue;
             if (['site_id', 'page'].includes(key) && !positive(value)) continue;
             if (['from', 'to'].includes(key) && !date(value)) continue;

@@ -296,17 +296,17 @@ describe('Participation shared header', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Clear Site' }));
         expect(props.onFilters).toHaveBeenLastCalledWith({ site_id: null });
         fireEvent.click(
-            screen.getByRole('button', { name: 'Quarter', exact: true }),
+            screen.getByRole('button', { name: 'Quarter' }),
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'All periods', exact: true }),
+            screen.getByRole('button', { name: 'All periods' }),
         );
         expect(props.onFilters).toHaveBeenLastCalledWith({ period: 'all' });
         fireEvent.click(
-            screen.getByRole('button', { name: 'Status', exact: true }),
+            screen.getByRole('button', { name: 'Status' }),
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'Resigned', exact: true }),
+            screen.getByRole('button', { name: 'Resigned' }),
         );
         expect(props.onFilters).toHaveBeenLastCalledWith({
             status: 'resigned',

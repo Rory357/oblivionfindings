@@ -1206,7 +1206,7 @@ function OverviewTab({
                 table={{
                     caption: 'Near-miss ratio by month',
                     columns: ['Month', 'Ratio'],
-                    rows: trends.map((t) => [t.label, t.near_miss_ratio]),
+                    rows: trends.map((t) => [t.label, t.near_miss_ratio ?? '—']),
                 }}
             >
                 <SingleAreaChart
@@ -1333,7 +1333,7 @@ function TrendsTab({ trends }: { trends: AnalyticsProps['trends'] }) {
                 table={{
                     caption: 'Near-miss ratio by month',
                     columns: ['Month', 'Ratio'],
-                    rows: trends.map((t) => [t.label, t.near_miss_ratio]),
+                    rows: trends.map((t) => [t.label, t.near_miss_ratio ?? '—']),
                 }}
             >
                 <SingleAreaChart

@@ -215,6 +215,7 @@ function useCurrentInvitation(
         if (positive(actorId) && positive(meetingId)) void refresh();
         else setState('unavailable');
         return () => {
+            // eslint-disable-next-line react-hooks/exhaustive-deps -- bumping the live generation on cleanup is the point: late answers from this run must be ignored.
             generation.current++;
             controller.current?.abort();
             if (deadline.current !== null) clearTimeout(deadline.current);

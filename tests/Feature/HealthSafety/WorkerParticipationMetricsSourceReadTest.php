@@ -161,7 +161,7 @@ final class WorkerParticipationMetricsSourceReadTest extends TestCase
             $this->assertNull($this->metrics->overview(null)['committees']);
             $this->assertSame('restricted', $this->metrics->overview(null)['source_access']);
             $this->assertNull($this->metrics->overview(null)['viewer_id']);
-            $this->assertNull($this->metrics->monthly(null, $this->from(), $this->to())['engagement']);
+            $this->assertNull($this->metrics->monthly(null, $this->periodFrom(), $this->to())['engagement']);
             $this->assertSame(0, $queries);
         } finally { $armed = false; }
     }
@@ -412,8 +412,8 @@ final class WorkerParticipationMetricsSourceReadTest extends TestCase
         }
     }
 
-    private function monthly(int|array|null $sites, ?HealthSafetyReadContext $context = null): array { return $this->metrics->monthly($this->actor, $this->from(), $this->to(), $sites, $context); }
-    private function from(): Carbon { return Carbon::parse('2026-10-01 00:00:00'); }
+    private function monthly(int|array|null $sites, ?HealthSafetyReadContext $context = null): array { return $this->metrics->monthly($this->actor, $this->periodFrom(), $this->to(), $sites, $context); }
+    private function periodFrom(): Carbon { return Carbon::parse('2026-10-01 00:00:00'); }
     private function to(): Carbon { return Carbon::parse('2026-10-31 23:59:59'); }
     private function grant(string $key, bool $allowed): void { $this->actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', $key)->sole()->id => ['allowed' => $allowed]]); }
 
