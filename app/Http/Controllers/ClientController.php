@@ -1324,15 +1324,19 @@ class ClientController extends Controller
 
             // Formal H&S risk assessments (polymorphic; distinct from the ClientRisk
             // care-risk list above — shown as a separate section in the same tab).
+            // One H&S read for the whole list (Codex's port): only risks this viewer may read are listed, so a risk
+            // copied from someone else's private treatment is left out instead of failing the whole profile.
             'hs_risk_assessments' => $sectionAccess['first_aid']
-                ? HsRiskAssessment::forAssessable(Client::class, $client->id)
-                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
-                    ->withCount('attachments')
-                    ->orderByDesc('created_at')
-                    ->limit(100)
-                    ->get()
-                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra))
-                    ->values()
+                ? RiskAssessmentPresenter::materialise($request->user(), null, function ($current, $reads, $context) use ($client): array {
+                    $query = HsRiskAssessment::forAssessable(Client::class, $client->id)
+                        ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])->withCount('attachments');
+
+                    $original = RiskAssessmentPresenter::guardEagerQuery($query, $current, $context);
+
+                    return (clone $original)
+                        ->orderByDesc('created_at')->orderByDesc('id')->limit(100)->get()
+                        ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra, $current, $context, $original))->values()->all();
+                })
                 : [],
             'ra_pickers' => $sectionAccess['first_aid_manage']
                 ? RiskAssessmentPresenter::pickers()
@@ -1698,7 +1702,8 @@ class ClientController extends Controller
             'transport' => $sectionAccess['transport']
                 ? Inertia::optional(fn () => $this->buildTransportData($client))
                 : null,
-            'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
+            // Read as the signed-in viewer: without one, events from incidents and treatment records are left out.
+            'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id, $request->user())),
             'safety' => ClientSafetyPayload::forClient(
                 $client,
                 includeMedical: $sectionAccess['medical'],
