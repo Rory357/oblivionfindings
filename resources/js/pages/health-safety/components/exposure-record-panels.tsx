@@ -137,7 +137,7 @@ export function ExposureRecordPanel({ detail, section, open, onPage, focusedFoll
                             {done ? <>{dot}done {dateTimeWithYear(row.completed_at, 'not recorded')} by {row.completed_by?.name ?? 'not recorded'}</> : null}
                             {row.completion_notes ? <>{dot}<span className="whitespace-pre-wrap">{row.completion_notes}</span></> : null}
                             {row.id === selectedId ? <>{dot}Selected follow-up</> : null}</>}
-                        actions={items.map((item) => <Fragment key={item.label}>{act(item.label, item.onClick!)}</Fragment>)} menu={items} menuTitle={row.instruction}
+                        actions={items.map((item) => <Fragment key={item.label}>{act(item.label ?? '', item.onClick!)}</Fragment>)} menu={items} menuTitle={row.instruction}
                         onContextMenu={(event) => followupMenu.open(event, row)}>
                         {row.assignment_attribution_state !== 'recorded' && <small className="text-status-warning">Earlier assignment history is unconfirmed. A recorded completion does not confirm that earlier assignment.</small>}
                     </LogRow>;
